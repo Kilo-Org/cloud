@@ -235,6 +235,18 @@ describe('createSecrets', () => {
     expect(transport).toHaveBeenCalledTimes(3);
   });
 
+  it('hands its unanswered attempts to waitUntil when a cold read gives up', async () => {
+    const transport = vi.fn<Transport>(hung);
+    const secrets = createSecrets(transport);
+    const ctx = context();
+
+    const error = await failureWithin(secrets.get(SECRET, ctx), 25);
+    expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
+    expect(transport).toHaveBeenCalledTimes(2);
+    // The request ends with the read; without waitUntil its calls would be cancelled.
+    expect(ctx.scheduled).toHaveLength(2);
+  });
+
   it('widens the gap between attempts while STS keeps failing', async () => {
     const calledAt: number[] = [];
     const transport = vi.fn<Transport>(async () => {
@@ -325,8 +337,6 @@ describe('createSecrets', () => {
 
     await advance(5);
     slow.resolve(ok(ETAG_1, 'slow-token'));
-    // The reader now waits on its second attempt and sees the first one's answer on its next poll.
-    await advance(1);
     expect(await read.promise).toBe('slow-token');
     expect(await secrets.get(SECRET)).toBe('slow-token');
   });
@@ -452,6 +462,31 @@ describe('createSecrets', () => {
     expect(transport).toHaveBeenCalledTimes(2);
   });
 
+  it('applies a denial newer than a late success that landed before it', async () => {
+    const first = Promise.withResolvers<BundleResult>();
+    const second = Promise.withResolvers<BundleResult>();
+    const transport = vi.fn<Transport>();
+    transport.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const secrets = createSecrets(transport);
+    const ctx = context();
+
+    // The first attempt times out at 5 s; the second starts after the 5 s backoff.
+    const read = track(secrets.get(SECRET, ctx));
+    await advance(10.1);
+    expect(transport).toHaveBeenCalledTimes(2);
+
+    // The first attempt's late success serves the read while its second attempt is unanswered.
+    first.resolve(ok());
+    await advance(0.1);
+    expect(await read.promise).toBe('ae-token');
+
+    second.resolve(denied());
+    await advance(0);
+    await expect(secrets.get(SECRET)).rejects.toMatchObject({ reason: 'denied', retryable: false });
+    // The read returned before its second attempt answered, so it kept that call alive.
+    expect(ctx.scheduled).toHaveLength(1);
+  });
+
   it('treats an identity rejection as non-retryable on a cold start', async () => {
     const transport = vi.fn<Transport>(async () => denied('identity_rejected'));
     const secrets = createSecrets(transport);
@@ -517,9 +552,28 @@ describe('createSecrets', () => {
     await advance(5);
     expect(await read.promise).toBe('new-token');
     expect(transport).toHaveBeenCalledTimes(4);
+    // That timed-out attempt is still newer than the held bundle, so its denial applies.
     lateConfirmation.resolve(denied());
     await advance(0);
-    expect(await secrets.get(SECRET)).toBe('new-token');
+    await expect(secrets.get(SECRET)).rejects.toMatchObject({ reason: 'denied' });
+  });
+
+  it('drops a denial from an attempt older than the held bundle', async () => {
+    const first = Promise.withResolvers<BundleResult>();
+    const second = Promise.withResolvers<BundleResult>();
+    const transport = vi.fn<Transport>();
+    transport.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const secrets = createSecrets(transport);
+
+    const read = track(secrets.get(SECRET));
+    await advance(10.1);
+    second.resolve(ok());
+    await advance(0.1);
+    expect(await read.promise).toBe('ae-token');
+
+    first.resolve(denied());
+    await advance(0);
+    expect(await secrets.get(SECRET)).toBe('ae-token');
   });
 
   it('retries a rejected transport inside the first-load window, then fails retryable', async () => {

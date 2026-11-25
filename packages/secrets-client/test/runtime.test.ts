@@ -142,3 +142,18 @@ it('takes over a read whose request ended before STS answered, then revalidates'
   await expectRevalidationWithEtag(2);
   expectNoCrossRequestUse();
 }, 40_000);
+
+it('serves two live requests from one attempt', async () => {
+  await plan([{ result: OK, delayMs: 1_000 }]);
+
+  // One request starts the load; the other finds it running and waits on the shared cache.
+  const replies = await Promise.all([read(), read()]);
+  const [delivered, ...more] = await calls();
+  expect(more).toEqual([]);
+  expect(delivered).toMatchObject({ ifNoneMatch: null, status: 'ok' });
+  for (const reply of replies) {
+    expect(reply).toMatchObject({ outcome: 'read', value: 'ae-token' });
+    expect(reply.at! - delivered.answeredAt!).toBeLessThan(1_000);
+  }
+  expectNoCrossRequestUse();
+}, 30_000);

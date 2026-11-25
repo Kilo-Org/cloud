@@ -126,3 +126,12 @@ export const MemberPermissionPolicySchema = z
   );
 
 export type MemberPermissionPolicy = z.infer<typeof MemberPermissionPolicySchema>;
+
+export const PERMISSION_POLICY_EXECUTION_OSES = ['linux', 'macos', 'windows'] as const;
+
+export const PermissionPolicyExecutionOsSchema = z.enum([
+  ...PERMISSION_POLICY_EXECUTION_OSES,
+  'other',
+]);
+
+export type PermissionPolicyExecutionOs = z.infer<typeof PermissionPolicyExecutionOsSchema>;

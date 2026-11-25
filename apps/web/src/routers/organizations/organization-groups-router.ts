@@ -11,14 +11,16 @@ import {
   type OrganizationGroupPolicies,
   type OrganizationGroupModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import { PermissionPolicyExecutionOsSchema } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import { NamedPolicyKindSchema } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/named-policy.schema';
 import {
-  OrganizationPermissionPolicySchema,
-  OrganizationPermissionPolicyTypeSchema,
-} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
-import {
-  getOrganizationPermissionPolicy,
-  getStoredOrganizationPermissionPolicy,
-} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.server';
+  createNamedOrganizationPolicy,
+  deleteNamedOrganizationPolicy,
+  getNamedPolicyDiagnostics,
+  listNamedOrganizationPolicies,
+  setNamedOrganizationPolicyLink,
+  updateNamedOrganizationPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/named-policy.server';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -101,9 +103,29 @@ const SetDefaultPolicyInputSchema = OrganizationIdInputSchema.extend({
   policy: ModelPolicySchema,
 }).strict();
 
-const PermissionPolicyTargetSchema = OrganizationIdInputSchema.extend({
-  groupId: z.uuid().optional(),
-});
+const NamedPolicyTargetSchema = OrganizationIdInputSchema.extend({
+  policyId: z.uuid(),
+}).strict();
+
+const NamedPolicyLinkSchema = OrganizationIdInputSchema.extend({
+  scope: z.discriminatedUnion('type', [
+    z.strictObject({ type: z.literal('default') }),
+    z.strictObject({ type: z.literal('group'), groupId: z.uuid() }),
+  ]),
+  kind: NamedPolicyKindSchema,
+  policyId: z.uuid().nullable(),
+}).strict();
+
+const NamedPolicyCreateSchema = OrganizationIdInputSchema.extend({
+  kind: NamedPolicyKindSchema,
+  name: z.string().min(1).max(80),
+  document: z.unknown(),
+}).strict();
+
+const NamedPolicyUpdateSchema = NamedPolicyTargetSchema.extend({
+  name: z.string().min(1).max(80).optional(),
+  document: z.unknown().optional(),
+}).strict();
 
 function modelPolicies(policies: OrganizationGroupPolicies): OrganizationGroupModelAccessPolicy[] {
   return policies.filter(policy => policy.type === 'model_access');
@@ -145,48 +167,78 @@ function actor(ctx: { user: { id: string; google_user_email: string; google_user
   };
 }
 
+function namedPolicyAccess(
+  ctx: { user: { id: string } },
+  organizationId: string
+): { organizationId: string; actor: { id: string; isBrowserSession: boolean } } {
+  return { organizationId, actor: { id: ctx.user.id, isBrowserSession: true } };
+}
+
 export const organizationGroupsRouter = createTRPCRouter({
   adminPermissionPolicy: createTRPCRouter({
-    settings: organizationBillingProcedure
-      .input(PermissionPolicyTargetSchema.strict())
+    list: organizationBillingProcedure
+      .input(OrganizationIdInputSchema.strict())
       .query(async ({ input, ctx }) => {
         assertPermissionPolicyAdminSession(ctx);
-        return await getStoredOrganizationPermissionPolicy(input.organizationId, input.groupId);
+        return await listNamedOrganizationPolicies(namedPolicyAccess(ctx, input.organizationId));
       }),
 
-    set: organizationAdminMutationProcedure
-      .input(
-        PermissionPolicyTargetSchema.extend({ policy: OrganizationPermissionPolicySchema }).strict()
-      )
+    create: organizationAdminMutationProcedure
+      .input(NamedPolicyCreateSchema)
       .mutation(async ({ input, ctx }) => {
         assertPermissionPolicyAdminSession(ctx);
-        const params = { ...input, actor: actor(ctx) };
-        const { result, policyRevision } = input.groupId
-          ? await setOrganizationGroupPolicy({ ...params, groupId: input.groupId })
-          : await setDefaultOrganizationGroupPolicy(params);
-        return { result: result.filter(policy => policy.type !== 'model_access'), policyRevision };
+        return await createNamedOrganizationPolicy(namedPolicyAccess(ctx, input.organizationId), {
+          kind: input.kind,
+          name: input.name,
+          document: input.document,
+        });
       }),
 
-    remove: organizationAdminMutationProcedure
-      .input(
-        PermissionPolicyTargetSchema.extend({
-          policyType: OrganizationPermissionPolicyTypeSchema,
-        }).strict()
-      )
+    update: organizationAdminMutationProcedure
+      .input(NamedPolicyUpdateSchema)
       .mutation(async ({ input, ctx }) => {
         assertPermissionPolicyAdminSession(ctx);
-        const params = { ...input, actor: actor(ctx) };
-        const { result, policyRevision } = input.groupId
-          ? await removeOrganizationGroupPolicy({ ...params, groupId: input.groupId })
-          : await removeDefaultOrganizationGroupPolicy(params);
-        return { result: result.filter(policy => policy.type !== 'model_access'), policyRevision };
+        return await updateNamedOrganizationPolicy(
+          namedPolicyAccess(ctx, input.organizationId),
+          input.policyId,
+          { name: input.name, document: input.document }
+        );
+      }),
+
+    delete: organizationAdminMutationProcedure
+      .input(NamedPolicyTargetSchema)
+      .mutation(async ({ input, ctx }) => {
+        assertPermissionPolicyAdminSession(ctx);
+        return await deleteNamedOrganizationPolicy(
+          namedPolicyAccess(ctx, input.organizationId),
+          input.policyId
+        );
+      }),
+
+    setLink: organizationAdminMutationProcedure
+      .input(NamedPolicyLinkSchema)
+      .mutation(async ({ input, ctx }) => {
+        assertPermissionPolicyAdminSession(ctx);
+        return await setNamedOrganizationPolicyLink(namedPolicyAccess(ctx, input.organizationId), {
+          scope: input.scope,
+          kind: input.kind,
+          policyId: input.policyId,
+        });
       }),
 
     diagnostics: organizationBillingProcedure
-      .input(OrganizationIdInputSchema.extend({ userId: z.string().min(1) }).strict())
+      .input(
+        OrganizationIdInputSchema.extend({
+          userId: z.string().min(1),
+          executionOs: PermissionPolicyExecutionOsSchema.optional(),
+        }).strict()
+      )
       .query(async ({ input, ctx }) => {
         assertPermissionPolicyAdminSession(ctx);
-        return await getOrganizationPermissionPolicy(input.organizationId, input.userId);
+        return await getNamedPolicyDiagnostics(namedPolicyAccess(ctx, input.organizationId), {
+          kiloUserId: input.userId,
+          executionOs: input.executionOs === 'other' ? undefined : input.executionOs,
+        });
       }),
   }),
 

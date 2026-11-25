@@ -9,6 +9,19 @@ export type OrganizationGroupsDrawerRef =
   | { type: 'policy-list'; target: OrganizationGroupPolicyTarget }
   | { type: 'policy-type-picker'; target: OrganizationGroupPolicyTarget }
   | {
+      type: 'named-policy-assignments';
+      scope: { type: 'default' } | { type: 'group'; groupId: string };
+      appliesTo: string;
+      canEdit: boolean;
+    }
+  | { type: 'named-policy-library'; canManage: boolean }
+  | {
+      type: 'named-policy-editor';
+      policyId: string | null;
+      defaultKind: 'agent_permissions' | 'client_configuration';
+    }
+  | { type: 'permission-policy-diagnostics' }
+  | {
       type: 'policy-editor';
       target: OrganizationGroupPolicyTarget;
       policyType: EditableOrganizationGroupPolicyType;

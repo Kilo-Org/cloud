@@ -10,6 +10,7 @@ import {
   useOrganizationGroupsDrawerStack,
 } from '@/components/organizations/groups/drawer/OrganizationGroupsDrawerStack';
 import { organizationGroupPolicyDefinition } from '@/components/organizations/groups/policies/registry.client';
+import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { OrganizationPageHeader } from '@/components/organizations/OrganizationPageHeader';
 import {
   AlertDialog,
@@ -48,6 +49,13 @@ function GroupsPageContent({
     ...trpc.organizations.groups.getPolicySettings.queryOptions({ organizationId }),
     enabled: canViewSettings,
   });
+  const organizationQuery = useOrganizationWithMembers(organizationId);
+  const isEnterprise = organizationQuery.data?.plan === 'enterprise';
+  const namedPolicies = useQuery({
+    ...trpc.organizations.groups.adminPermissionPolicy.list.queryOptions({ organizationId }),
+    enabled: canViewSettings && isEnterprise,
+  });
+  const showNamedPolicies = canViewSettings && isEnterprise && namedPolicies.data?.managed === true;
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: trpc.organizations.groups.pathKey() });
   }
@@ -87,12 +95,12 @@ function GroupsPageContent({
       {canViewSettings && (
         <Card>
           <CardHeader>
-            <CardTitle>Group policies</CardTitle>
+            <CardTitle>Group Defaults</CardTitle>
             <CardDescription>
               Configure organization defaults, then add independent policies to each group.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="grid gap-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="type-body font-medium">Default policies</p>
@@ -119,6 +127,45 @@ function GroupsPageContent({
                 Manage defaults
               </Button>
             </div>
+            {showNamedPolicies && (
+              <div className="grid gap-3 border-t pt-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+                <div>
+                  <p className="type-body font-medium">
+                    Agent Permissions and Client Configuration
+                  </p>
+                  <p className="type-label text-muted-foreground">
+                    Attach a named policy to the organization default. Groups can add restrictions.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      drawer.open({
+                        type: 'named-policy-assignments',
+                        scope: { type: 'default' },
+                        appliesTo: 'Organization default',
+                        canEdit: canManage,
+                      })
+                    }
+                  >
+                    Group Defaults
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => drawer.open({ type: 'named-policy-library', canManage })}
+                  >
+                    Policies
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => drawer.open({ type: 'permission-policy-diagnostics' })}
+                  >
+                    Inspect member policy
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -211,6 +258,24 @@ function GroupsPageContent({
                       </span>
                     )}
                   </button>
+                  {showNamedPolicies && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Permissions for ${group.name}`}
+                      onClick={() =>
+                        drawer.open({
+                          type: 'named-policy-assignments',
+                          scope: { type: 'group', groupId: group.id },
+                          appliesTo: group.name,
+                          canEdit: canManage,
+                        })
+                      }
+                    >
+                      <ShieldCheck className="size-4" />
+                      <span className="hidden sm:inline">Permissions</span>
+                    </Button>
+                  )}
                   {canManage && (
                     <div className="flex items-center gap-1">
                       <AlertDialog>

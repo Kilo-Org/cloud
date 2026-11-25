@@ -1,7 +1,11 @@
 import { createHmac } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { getOrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.server';
+import {
+  PERMISSION_POLICY_MAX_AGE_SECONDS,
+  PermissionPolicyExecutionOsSchema,
+} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import { getNamedPolicyMemberSnapshot } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/named-policy.server';
 import { getUserFromAccountBearer, uuidSchema } from '@kilocode/web-shared/lib/user/server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -32,10 +36,30 @@ export async function GET(
       );
     }
 
-    const { response } = await getOrganizationPermissionPolicy(organizationId, auth.user.id);
+    const query = new URL(request.url).searchParams;
+    const os = PermissionPolicyExecutionOsSchema.optional().safeParse(query.get('os') ?? undefined);
+    if (!os.success || query.size !== (os.data === undefined ? 0 : 1)) {
+      return errorResponse(400, 'Invalid execution OS selector');
+    }
+
+    const snapshot = await getNamedPolicyMemberSnapshot({
+      organizationId,
+      kiloUserId: auth.user.id,
+      executionOs: os.data === 'other' ? undefined : os.data,
+    });
+    const response = {
+      schema_version: 1 as const,
+      organization_id: organizationId,
+      managed: snapshot.managed,
+      revision: snapshot.policyRevision,
+      max_age_seconds: PERMISSION_POLICY_MAX_AGE_SECONDS,
+      policy: snapshot.policy,
+    };
     const body = JSON.stringify(response);
     const digest = createHmac('sha256', NEXTAUTH_SECRET)
-      .update(JSON.stringify(['organization-permission-policy', auth.user.id, organizationId]))
+      .update(
+        JSON.stringify(['organization-permission-policy', auth.user.id, organizationId, os.data])
+      )
       .update(body)
       .digest('base64url');
     const etag = `"${digest}"`;

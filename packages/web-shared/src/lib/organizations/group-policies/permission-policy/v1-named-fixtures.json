@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "sample_revision": 14,
+  "sources": {
+    "defaultPolicies": [
+      { "id": "policy-agent-all-os", "name": "Browser approval", "kind": "agent_permissions" }
+    ],
+    "groups": [
+      {
+        "groupId": "group-windows",
+        "groupName": "Windows team",
+        "policies": [
+          {
+            "id": "policy-agent-windows",
+            "name": "Block browser on Windows",
+            "kind": "agent_permissions"
+          }
+        ]
+      },
+      {
+        "groupId": "group-config",
+        "groupName": "Privacy",
+        "policies": [
+          { "id": "policy-config", "name": "Hide telemetry", "kind": "client_configuration" }
+        ]
+      }
+    ]
+  },
+  "named_policies": [
+    {
+      "id": "policy-agent-all-os",
+      "name": "Browser approval",
+      "kind": "agent_permissions",
+      "document": { "tools": { "browser_open": "ask" } }
+    },
+    {
+      "id": "policy-agent-windows",
+      "name": "Block browser on Windows",
+      "kind": "agent_permissions",
+      "document": { "by_os": { "windows": { "tools": { "browser_open": "deny" } } } }
+    },
+    {
+      "id": "policy-config",
+      "name": "Hide telemetry",
+      "kind": "client_configuration",
+      "document": { "disable_telemetry": true }
+    }
+  ],
+  "responses": {
+    "windows": {
+      "schema_version": 1,
+      "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+      "managed": true,
+      "revision": 14,
+      "max_age_seconds": 300,
+      "policy": {
+        "agent_permissions": {
+          "layers": [
+            { "schema_version": 1, "tools": { "browser_open": "ask" } },
+            { "schema_version": 1, "tools": { "browser_open": "deny" } }
+          ]
+        },
+        "client_configuration": { "disable_telemetry": true }
+      }
+    },
+    "linux": {
+      "schema_version": 1,
+      "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+      "managed": true,
+      "revision": 14,
+      "max_age_seconds": 300,
+      "policy": {
+        "agent_permissions": {
+          "layers": [{ "schema_version": 1, "tools": { "browser_open": "ask" } }]
+        },
+        "client_configuration": { "disable_telemetry": true }
+      }
+    },
+    "missing": {
+      "schema_version": 1,
+      "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+      "managed": true,
+      "revision": 14,
+      "max_age_seconds": 300,
+      "policy": {
+        "agent_permissions": {
+          "layers": [{ "schema_version": 1, "tools": { "browser_open": "ask" } }]
+        },
+        "client_configuration": { "disable_telemetry": true }
+      }
+    },
+    "other": {
+      "schema_version": 1,
+      "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+      "managed": true,
+      "revision": 14,
+      "max_age_seconds": 300,
+      "policy": {
+        "agent_permissions": {
+          "layers": [{ "schema_version": 1, "tools": { "browser_open": "ask" } }]
+        },
+        "client_configuration": { "disable_telemetry": true }
+      }
+    }
+  }
+}

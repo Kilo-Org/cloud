@@ -575,3 +575,111 @@ export async function setNamedOrganizationPolicyLink(
     };
   });
 }
+
+export type NamedPolicySource = { id: string; name: string; kind: PolicyKind };
+
+export type NamedPolicyDiagnostics = {
+  response: z.infer<typeof NamedMemberPermissionPolicySchema>;
+  sources: {
+    defaultPolicies: NamedPolicySource[];
+    groups: { groupId: string; groupName: string; policies: NamedPolicySource[] }[];
+  };
+};
+
+/**
+ * Privileged view of what Cloud would deliver for one member on one execution
+ * OS, with the named default and group links that contributed. Reads happen in
+ * a single snapshot so the displayed sources match the resolved response.
+ */
+export async function getNamedPolicyDiagnostics(
+  access: AdminAccess,
+  params: { kiloUserId: string; executionOs?: (typeof NAMED_POLICY_EXECUTION_OSES)[number] }
+): Promise<NamedPolicyDiagnostics> {
+  return await db.transaction(async tx => {
+    const { organizationId } = access;
+    await assertAdmin(tx, access, false);
+    const membership = await getMembership(tx, organizationId, params.kiloUserId);
+    if (!membership) throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found.' });
+    const policyRevision = await getRevision(tx, organizationId);
+    const managed = membership.plan === 'enterprise' && (await isManaged(tx, organizationId));
+    const groups = await tx
+      .select({ id: organization_groups.id, name: organization_groups.name })
+      .from(organization_group_memberships)
+      .innerJoin(
+        organization_groups,
+        eq(organization_groups.id, organization_group_memberships.group_id)
+      )
+      .where(
+        and(
+          eq(organization_group_memberships.organization_id, organizationId),
+          eq(organization_group_memberships.kilo_user_id, params.kiloUserId)
+        )
+      )
+      .orderBy(asc(organization_groups.id));
+    const attachments = managed
+      ? await readAttachments(
+          tx,
+          organizationId,
+          groups.map(group => group.id)
+        )
+      : [];
+    const policies = managed ? await readAttachedPolicies(tx, organizationId, attachments) : [];
+    const validated = validateMemberPolicy(
+      organizationId,
+      policyRevision,
+      managed,
+      memberPolicy(policies, params.executionOs)
+    );
+    if (!validated.success)
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Effective named policy does not meet the member policy contract.',
+      });
+
+    const meta = new Map<string, NamedPolicySource>();
+    const policyIds = [...new Set(attachments.map(attachment => attachment.policyId))];
+    if (policyIds.length) {
+      const rows = await tx
+        .select({
+          id: organization_named_policies.id,
+          name: organization_named_policies.name,
+          kind: organization_named_policies.kind,
+        })
+        .from(organization_named_policies)
+        .where(
+          and(
+            eq(organization_named_policies.organization_id, organizationId),
+            inArray(organization_named_policies.id, policyIds)
+          )
+        );
+      for (const row of rows) meta.set(row.id, { id: row.id, name: row.name, kind: row.kind });
+    }
+
+    const defaultPolicies = attachments
+      .filter(attachment => attachment.scope.type === 'default')
+      .map(attachment => meta.get(attachment.policyId))
+      .filter((policy): policy is NamedPolicySource => policy !== undefined);
+    const groupNames = new Map(groups.map(group => [group.id, group.name]));
+    const groupSources = new Map<string, NamedPolicySource[]>();
+    for (const attachment of attachments) {
+      if (attachment.scope.type !== 'group') continue;
+      const policy = meta.get(attachment.policyId);
+      if (!policy) continue;
+      const list = groupSources.get(attachment.scope.groupId) ?? [];
+      list.push(policy);
+      groupSources.set(attachment.scope.groupId, list);
+    }
+
+    return {
+      response: validated.data,
+      sources: {
+        defaultPolicies,
+        groups: [...groupSources.entries()].map(([groupId, linked]) => ({
+          groupId,
+          groupName: groupNames.get(groupId) ?? groupId,
+          policies: linked,
+        })),
+      },
+    };
+  }, snapshot);
+}

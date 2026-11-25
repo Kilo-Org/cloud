@@ -4,6 +4,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import { z } from 'zod';
 import migrations from '../../drizzle.refresher/migrations';
 import { managerReferenceRefusedEvent, policyChangedEvent } from '../audit/events';
 import { AuditLog } from '../audit/log';
@@ -25,6 +26,7 @@ import {
   WEBHOOK_MERGE_WINDOW_MS,
 } from '../constants';
 import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
+import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/refresher-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import { InfisicalClient, type ManagerFolder } from '../infisical/client';
@@ -41,6 +43,9 @@ import type { FillResult, WorkloadBundle } from '../types';
 import { getBundleStub, getSignerStub } from './stubs';
 
 type RefresherDatabase = DrizzleSqliteDODatabase<typeof schema>;
+
+/** KV storage key of the folder seal key (see `crypto/key-store.ts`). */
+const SEAL_KEY_NAME = 'refresher-seal-key';
 type RefresherState = typeof schema.refresherState.$inferSelect;
 
 /** Both folder copies from one successful read pair. */
@@ -96,7 +101,7 @@ export class RefresherDO extends DurableObject<Env> {
   private readonly stream: string;
   private readonly client: InfisicalClient;
   private pendingRead: Promise<ReadOutcome> | null = null;
-  private sealKey: string | null = null;
+  private sealKey: Promise<string> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -121,7 +126,7 @@ export class RefresherDO extends DurableObject<Env> {
    * objects call it in the background at most once a minute; it never sits on a read.
    */
   async ensureStarted(): Promise<void> {
-    this.ensureWebhookSecret();
+    this.webhookSecretValue();
     const now = Date.now();
     this.state(now);
     try {
@@ -139,7 +144,7 @@ export class RefresherDO extends DurableObject<Env> {
    * itself with it, so only a verified `secrets.modified` reaches this object.
    */
   async webhookSecret(): Promise<string> {
-    return this.ensureWebhookSecret();
+    return this.webhookSecretValue();
   }
 
   /** Called by the Worker after it verified a `secrets.modified` webhook for this environment. */
@@ -235,7 +240,7 @@ export class RefresherDO extends DurableObject<Env> {
     if (workloads.status === 'unreachable') return this.failedRead(startedAt, workloads);
     if (shared.status === 'unreachable') return this.failedRead(startedAt, shared);
 
-    const key = this.snapshotKey();
+    const key = await this.snapshotKey();
     const outcomes = [
       ['/workloads', workloads],
       ['/shared', shared],
@@ -453,7 +458,7 @@ export class RefresherDO extends DurableObject<Env> {
 
   private async storedFolders(): Promise<Map<ManagerFolder, StoredFolder>> {
     const rows = this.db.select().from(schema.managerFolder).all();
-    const key = rows.length > 0 ? this.snapshotKey() : null;
+    const key = rows.length > 0 ? await this.snapshotKey() : null;
     const folders = new Map<ManagerFolder, StoredFolder>();
     for (const row of rows) {
       let copy: FolderCopy | null = null;
@@ -485,22 +490,25 @@ export class RefresherDO extends DurableObject<Env> {
     };
   }
 
-  private snapshotKey(): string {
-    if (this.sealKey !== null) return this.sealKey;
-    const existing = this.db
-      .select()
-      .from(schema.refresherKey)
-      .where(eq(schema.refresherKey.id, 1))
-      .get();
-    const key = existing?.key ?? createEncryptionKey();
-    if (existing === undefined) {
-      this.db.insert(schema.refresherKey).values({ id: 1, key, createdAt: Date.now() }).run();
-    }
-    this.sealKey = key;
-    return key;
+  private snapshotKey(): Promise<string> {
+    this.sealKey ??= this.storedKey(
+      SEAL_KEY_NAME,
+      () =>
+        this.db.select().from(schema.refresherKey).where(eq(schema.refresherKey.id, 1)).get()
+          ?.key ?? null,
+      () => {
+        this.db.delete(schema.refresherKey).where(eq(schema.refresherKey.id, 1)).run();
+      }
+    );
+    return this.sealKey;
   }
 
-  private ensureWebhookSecret(): string {
+  /**
+   * The webhook secret stays in a SQL row, written once: the break-glass owner copies it from Data
+   * Studio, which reads SQL data only (README). Its single insert is the one statement that binds
+   * it; traces are off (wrangler.jsonc), and a leaked copy could only trigger early refreshes.
+   */
+  private webhookSecretValue(): string {
     const existing = this.db
       .select()
       .from(schema.webhookKey)
@@ -510,6 +518,26 @@ export class RefresherDO extends DurableObject<Env> {
     const key = createEncryptionKey();
     this.db.insert(schema.webhookKey).values({ id: 1, key, createdAt: Date.now() }).run();
     return key;
+  }
+
+  /** One generated secret in KV storage; a failed load is not cached. */
+  private storedKey(
+    name: string,
+    legacy: () => string | null,
+    dropLegacy: () => void
+  ): Promise<string> {
+    const pending = loadOrCreateKey({
+      storage: this.ctx.storage,
+      name,
+      schema: z.string().min(1),
+      legacy,
+      dropLegacy,
+      create: createEncryptionKey,
+    });
+    pending.catch(() => {
+      if (this.sealKey === pending) this.sealKey = null;
+    });
+    return pending;
   }
 
   /** The schedule row; a new object's first refresh is due at once. */

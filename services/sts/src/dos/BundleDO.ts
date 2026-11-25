@@ -9,6 +9,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { eq, lt, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import { z } from 'zod';
 import migrations from '../../drizzle.bundle/migrations';
 import { bundleDeliveredEvent } from '../audit/events';
 import { AuditLog } from '../audit/log';
@@ -23,6 +24,7 @@ import {
   RELAY_RETRY_MS,
 } from '../constants';
 import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
+import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/bundle-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import { policyExists, policyFor, workloadPolicyHash } from '../policy';
@@ -40,6 +42,14 @@ import { getBundleStub, getRefresherStub } from './stubs';
 type BundleDatabase = DrizzleSqliteDODatabase<typeof schema>;
 type BundleRow = typeof schema.bundle.$inferSelect;
 type BundleKeys = { sealKey: string; etagKey: string };
+
+/** KV storage key of the seal and ETag keys (see `crypto/key-store.ts`). */
+const BUNDLE_KEYS_NAME = 'bundle-keys';
+
+const BundleKeysSchema = z.strictObject({
+  sealKey: z.string().min(1),
+  etagKey: z.string().min(1),
+});
 
 /**
  * What a read serves: the stored bundle, or, when the stored copy was built under another policy,
@@ -66,7 +76,7 @@ export class BundleDO extends DurableObject<Env> {
   private readonly config: StsConfig;
   private readonly db: BundleDatabase;
   private readonly audit: AuditLog;
-  private keys: BundleKeys | null = null;
+  private keys: Promise<BundleKeys> | null = null;
   private pendingFill: Promise<BundleRow | null> | null = null;
   private refresherCheckedAt = 0;
 
@@ -283,7 +293,12 @@ export class BundleDO extends DurableObject<Env> {
       if (secret === undefined) missing.push(name);
       else secrets[name] = secret;
     }
-    const etag = await computeBundleEtag(this.bundleKeys().etagKey, policyHash, secrets, missing);
+    const etag = await computeBundleEtag(
+      (await this.bundleKeys()).etagKey,
+      policyHash,
+      secrets,
+      missing
+    );
     return { kind: 'narrowed', row, etag, secrets, missing };
   }
 
@@ -292,7 +307,7 @@ export class BundleDO extends DurableObject<Env> {
   }
 
   private async writeBundle(bundle: WorkloadBundle): Promise<{ row: BundleRow; changed: boolean }> {
-    const keys = this.bundleKeys();
+    const keys = await this.bundleKeys();
     const etag = await computeBundleEtag(
       keys.etagKey,
       bundle.policyHash,
@@ -349,7 +364,10 @@ export class BundleDO extends DurableObject<Env> {
   private async open(row: BundleRow): Promise<BundleSecrets | null> {
     try {
       const parsed = BundleSecretsSchema.safeParse(
-        await openJson(this.bundleKeys().sealKey, { iv: row.iv, ciphertext: row.ciphertext })
+        await openJson((await this.bundleKeys()).sealKey, {
+          iv: row.iv,
+          ciphertext: row.ciphertext,
+        })
       );
       if (parsed.success) return parsed.data;
     } catch {
@@ -359,22 +377,25 @@ export class BundleDO extends DurableObject<Env> {
     return null;
   }
 
-  private bundleKeys(): BundleKeys {
-    if (this.keys !== null) return this.keys;
-    const existing = this.db
-      .select()
-      .from(schema.bundleKey)
-      .where(eq(schema.bundleKey.id, 1))
-      .get();
-    const keys = existing ?? {
-      id: 1,
-      sealKey: createEncryptionKey(),
-      etagKey: createEncryptionKey(),
-      createdAt: Date.now(),
-    };
-    if (existing === undefined) this.db.insert(schema.bundleKey).values(keys).run();
-    this.keys = { sealKey: keys.sealKey, etagKey: keys.etagKey };
-    return this.keys;
+  private bundleKeys(): Promise<BundleKeys> {
+    this.keys ??= loadOrCreateKey({
+      storage: this.ctx.storage,
+      name: BUNDLE_KEYS_NAME,
+      schema: BundleKeysSchema,
+      legacy: () => {
+        const row = this.db.select().from(schema.bundleKey).where(eq(schema.bundleKey.id, 1)).get();
+        return row === undefined ? null : { sealKey: row.sealKey, etagKey: row.etagKey };
+      },
+      dropLegacy: () => {
+        this.db.delete(schema.bundleKey).where(eq(schema.bundleKey.id, 1)).run();
+      },
+      create: () => ({ sealKey: createEncryptionKey(), etagKey: createEncryptionKey() }),
+    });
+    const pending = this.keys;
+    pending.catch(() => {
+      if (this.keys === pending) this.keys = null;
+    });
+    return pending;
   }
 
   private stream(workload: string): string {

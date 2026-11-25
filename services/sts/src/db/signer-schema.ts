@@ -1,8 +1,8 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
- * One row, id 1: the ECDSA P-256 key STS signs its manager login JWTs with. The private JWK
- * stays in this Durable Object's storage; only the public half is served.
+ * Legacy: an earlier revision kept the manager login key here. `SignerDO` moves a row it finds to
+ * KV storage once and deletes it; nothing writes this table, so no SQL statement binds a key.
  */
 export const signingKey = sqliteTable('signing_key', {
   id: integer('id').primaryKey(),

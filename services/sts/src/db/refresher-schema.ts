@@ -5,7 +5,7 @@ import type { PolicySnapshotEntry } from '../policy/load';
 export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
 
 /**
- * The last successful read of each manager folder, sealed with `refresher_key`. Both rows are
+ * The last successful read of each manager folder, sealed with the refresher's seal key. Both rows are
  * written in one refresh, so they always come from the same read pair.
  */
 export const managerFolder = sqliteTable('manager_folder', {
@@ -16,7 +16,10 @@ export const managerFolder = sqliteTable('manager_folder', {
   ciphertext: text('ciphertext').notNull(),
 });
 
-/** One row, id 1: the AES-GCM key that seals the folder copies. */
+/**
+ * Legacy: an earlier revision kept the folder seal key here. `RefresherDO` moves a row it finds to
+ * KV storage once and deletes it; nothing writes this table.
+ */
 export const refresherKey = sqliteTable('refresher_key', {
   id: integer('id').primaryKey(),
   key: text('key').notNull(),
@@ -25,7 +28,8 @@ export const refresherKey = sqliteTable('refresher_key', {
 
 /**
  * One row, id 1: the secret Infisical signs this environment's `secrets.modified` webhook with.
- * STS generates it; the break-glass owner copies it into the webhook once (README).
+ * STS generates it; the break-glass owner copies it from Data Studio once (README). It stays in SQL
+ * because Data Studio reads only SQL data.
  */
 export const webhookKey = sqliteTable('webhook_key', {
   id: integer('id').primaryKey(),

@@ -98,7 +98,10 @@ export type OkBundle = z.infer<typeof OkBundleSchema>;
 /**
  * HTTP mapping for `POST /v1/bundle`, used by callers outside the Cloudflare account.
  * ok -> 200 with the JSON body, not_modified -> 304 with `ETag`, denied -> 401 (identity) or 403,
- * unavailable -> 503 with `Retry-After`. Every non-304 response carries a `BundleResult` JSON body.
+ * unavailable -> 503 with `Retry-After`. Each of these but 304 carries the `BundleResult` as its JSON
+ * body. Other statuses carry no `BundleResult`: a body too large (413) or not a valid request (400)
+ * gets a JSON `{ error }`, and another method or path gets 404 with a plain-text body, so a client
+ * must check the status first.
  */
 export function bundleResultHttpStatus(result: BundleResult): 200 | 304 | 401 | 403 | 503 {
   switch (result.status) {

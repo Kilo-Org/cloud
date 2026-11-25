@@ -258,13 +258,53 @@ const CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS = [
   'git show *--text*',
 ];
 
+// Kilo v2 includes a heredoc body in the classified command text, and the forge
+// publication commands send their JSON payload as a heredoc whose body often
+// carries `>`. A redirect rule for these commands would refuse every summary,
+// update and inline comment. The bare `reviews` and `issues/*/comments` forms
+// are listed too, because their redirect rule also matches the `--input` form.
+// Remove this exemption once the CLI hides heredoc bodies from the matched text.
+//
+// Until then, a redirect on these commands is refused only in the two forms
+// below, which ordinary comment text does not contain; a body that names
+// ` --jq`, ` --template` or `> .git/` is refused too. A `>` alone cannot be
+// refused: every review body carries one. Known gaps: a redirect to any other
+// target, including an absolute, quoted or glob spelling of `.git` and the
+// user's git configuration; the short `-q` and `-t` options, a tab before an
+// option and a quote inside one; `--hostname`; a `?` in the endpoint; endpoint
+// pinning for the glab forms; and `rg --pre`.
+const CODE_REVIEW_PUBLICATION_COMMANDS = new Set([
+  'gh api repos/*/pulls/*/reviews',
+  'gh api repos/*/pulls/*/reviews --input*',
+  'gh api repos/*/issues/*/comments',
+  'gh api repos/*/issues/*/comments --input*',
+  'gh api repos/*/issues/comments/* -X PATCH*',
+  'glab api --method POST *merge_requests/*/notes*',
+  'glab api --method PUT *merge_requests/*/notes/*',
+  'glab api --method POST *merge_requests/*/discussions*',
+]);
+
+// `--jq` and `--template` let gh choose the bytes it writes. The review reads
+// them without a redirect, so they are refused only together with a `>`.
+const CODE_REVIEW_PUBLICATION_SHAPED_REDIRECT_DENIED_PATTERNS = ['--jq', '--template'].flatMap(
+  option => [`gh api * ${option}*>*`, `gh api *>* ${option}*`]
+);
+
+// A redirect into the repository's git directory, where a configuration line can
+// make an allowed git read run a program.
+const CODE_REVIEW_GIT_DIR_REDIRECT_DENIED_PATTERNS = [
+  '*>.git/*',
+  '*> .git/*',
+  '*>./.git/*',
+  '*> ./.git/*',
+];
+
 // The policy denies the edit tool, so a review session writes no file. An output
 // redirect on an allow-listed command is the one write form a pattern can name,
-// and it is refused for every command the policy allows. A heredoc payload is
-// not part of the classified command text, so the forge publication commands
-// keep working; they need no output redirect.
+// and it is refused for every command the policy allows, except the publication
+// commands above.
 const CODE_REVIEW_WRITE_REDIRECT_DENIED_PATTERNS = [
-  ...CODE_REVIEW_ALLOWED_COMMANDS,
+  ...CODE_REVIEW_ALLOWED_COMMANDS.filter(command => !CODE_REVIEW_PUBLICATION_COMMANDS.has(command)),
   ...CODE_REVIEW_GIT_READ_SUBCOMMANDS.map(subcommand => `git ${subcommand}`),
 ].map(command => `${command} *>*`);
 
@@ -752,6 +792,8 @@ export function getCommandGuardPolicy(
       deniedAfterAllowedOverrides: [
         ...CODE_REVIEW_GIT_READ_DENIED_OPTION_PATTERNS,
         ...CODE_REVIEW_WRITE_REDIRECT_DENIED_PATTERNS,
+        ...CODE_REVIEW_PUBLICATION_SHAPED_REDIRECT_DENIED_PATTERNS,
+        ...CODE_REVIEW_GIT_DIR_REDIRECT_DENIED_PATTERNS,
       ],
     };
   }

@@ -4,21 +4,29 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "pnpm run test:node",
+    "dev": "wrangler dev --env local",
+    "test": "vitest run && pnpm run test:node",
+    "test:workers": "vitest run",
     "test:node": "vitest run --config vitest.node.config.ts",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/uts/src services/uts/test services/uts/scripts"
   },
   "dependencies": {
+    "@kilocode/uts-contracts": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "jose": "catalog:",
     "pg": "8.23.1",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

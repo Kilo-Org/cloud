@@ -48,6 +48,21 @@ export async function sendViaMailgun(params: OutboundEmailParams): Promise<boole
   const targetEnvironment = process.env.VERCEL_TARGET_ENV;
 
   if (isAutomatedTest()) {
+    // Browser end-to-end tests read emailed codes from the local outbox. The
+    // opt-in never applies on Vercel, where every automated-test email stays
+    // suppressed.
+    if (
+      process.env.LOCAL_EMAIL_OUTBOX_IN_AUTOMATED_TEST === '1' &&
+      !targetEnvironment &&
+      !process.env.VERCEL_ENV
+    ) {
+      const outboxFile = await writeEmailToLocalOutbox(params);
+      console.info('[email_service] Captured automated-test email locally', {
+        category,
+        outboxFile,
+      });
+      return true;
+    }
     console.info('[email_service] Suppressed outbound email', {
       targetEnvironment,
       category,

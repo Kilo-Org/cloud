@@ -17,6 +17,18 @@ import {
 import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
 import { registrationResponseSchema } from '@/lib/auth/passkey-response';
 import {
+  createPasskeyEnrollmentCode,
+  deletePasskeyEnrollmentCode,
+  expirePasskeyEnrollmentCode,
+  PASSKEY_ENROLLMENT_CODE_EXPIRY_MINUTES,
+  checkPasskeyEnrollmentCode,
+  PasskeyEnrollmentCodeRefusedError,
+  type PasskeyEnrollmentCodeRefusal,
+  type PasskeyEnrollmentEmailCode,
+} from '@/lib/auth/passkey-enrollment-email-code';
+import { PASSKEY_ENROLLMENT_CODE_LENGTH } from '@/lib/auth/passkey-enrollment-codes';
+import { sendPasskeyEnrollmentCodeEmail } from '@kilocode/web-shared/lib/email';
+import {
   getUserFromAuth,
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
@@ -27,11 +39,12 @@ import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-a
 import { captureException } from '@sentry/nextjs';
 
 /**
- * Vercel Firewall rate-limit rule applied to `{ action: 'options' }`, keyed
- * per user because the session is the actor. The rule lives in the project's
- * firewall configuration and must be created there with this exact id. When a
- * check returns an error the branch returns 503 RATE_LIMIT_UNAVAILABLE; the
- * shared check reports that condition to Sentry.
+ * Vercel Firewall rate-limit rule applied to `{ action: 'send_code' }` and
+ * `{ action: 'options' }`, keyed per user because the session is the actor.
+ * The rule lives in the project's firewall configuration and must be created
+ * there with this exact id. When a check returns an error the branch returns
+ * 503 RATE_LIMIT_UNAVAILABLE; the shared check reports that condition to
+ * Sentry.
  */
 const REGISTRATION_OPTIONS_RATE_LIMIT_ID = 'passkey-registration-options';
 
@@ -40,27 +53,54 @@ function registrationRateLimitKey(userId: string): string {
 }
 
 /**
- * `{ action: 'options' }` mints registration options and stores the challenge
- * server-side; `{ action: 'verify', challengeId, response }` verifies the
- * attestation against that stored challenge and binds the credential to the
- * authenticated user.
+ * Browser enrollment takes a fresh session and a code emailed to the account.
+ * `{ action: 'send_code' }` emails a code bound to this browser session.
+ * `{ action: 'options', emailCode }` checks the code without using it, then
+ * mints registration options and stores the challenge server-side, so a
+ * cancelled ceremony can ask again with the same code. `{ action: 'verify',
+ * challengeId, response, emailCode }` verifies the attestation against that
+ * stored challenge, binds the credential to the authenticated user and uses
+ * the code in the same transaction.
  *
- * Error contract: 400 invalid request, 401 `{ error }` with a stable
- * `PasskeyVerificationError` code on refusal, 401 `REAUTH_REQUIRED` when this
- * session is not fresh enough to enroll, 429 when the account exceeds the
- * registration-options firewall rule, 503 `RATE_LIMIT_UNAVAILABLE` or
- * `STEP_UP_UNAVAILABLE` when the firewall or the freshness lookup cannot be
- * evaluated.
+ * Error contract:
+ * - 400 `INVALID_REQUEST` for a body this schema refuses.
+ * - 401 `REAUTH_REQUIRED` when this session is not fresh enough to enroll or
+ *   has no browser session id.
+ * - 401 `EMAIL_CODE_REQUIRED` when options or verify has no `emailCode`.
+ * - 401 `EMAIL_CODE_INVALID` with `attemptsLeft` for a wrong code.
+ * - 401 `EMAIL_CODE_EXPIRED` for an expired, used, replaced or unknown code;
+ *   the client sends a new code.
+ * - 401 `{ error }` with a stable `PasskeyVerificationError` code when the
+ *   ceremony is refused.
+ * - 422 `EMAIL_UNDELIVERABLE` when the account's address refuses email.
+ * - 429 `EMAIL_CODE_COOLDOWN` (resend too soon), `EMAIL_CODE_HOURLY_LIMIT`
+ *   (the account has been sent the hourly limit of codes) or
+ *   `EMAIL_CODE_LOCKED`, each with `retryAfterSeconds` and `Retry-After`, or
+ *   `RATE_LIMITED` when the account exceeds the firewall rule.
+ * - 502 `EMAIL_DELIVERY_FAILED` when the code email could not be sent; retry.
+ * - 503 `RATE_LIMIT_UNAVAILABLE` or `STEP_UP_UNAVAILABLE` when the firewall or
+ *   the freshness lookup cannot be evaluated.
  *
- * A browser session answers as before. A request that carries a bearer token
- * is the native app path and follows the management contract below.
+ * A request that carries a bearer token is the native app path and follows
+ * the management contract below.
+ */
+const emailCodeSchema = z.object({
+  emailCodeId: z.string().uuid(),
+  code: z.string().regex(new RegExp(`^\\d{${PASSKEY_ENROLLMENT_CODE_LENGTH}}$`)),
+});
+
+/**
+ * `emailCode` is optional in the schema so a client that omits it answers
+ * `EMAIL_CODE_REQUIRED` instead of a generic invalid-request refusal.
  */
 const requestSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('options') }),
+  z.object({ action: z.literal('send_code') }),
+  z.object({ action: z.literal('options'), emailCode: emailCodeSchema.optional() }),
   z.object({
     action: z.literal('verify'),
     challengeId: z.string().uuid(),
     response: registrationResponseSchema,
+    emailCode: emailCodeSchema.optional(),
   }),
 ]);
 
@@ -281,7 +321,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Browser enrollment. A passkey is a sign-in factor, so the session must be
-  // fresh and a bearer token never takes this path: see the native handler.
+  // fresh, the person must prove control of the account's mailbox, and a
+  // bearer token never takes this path: see the native handler.
   const { user, authFailedResponse, webSessionId, webSessionPepper, authenticatedAt } =
     await getUserFromSessionForCredentialIssuance();
   if (authFailedResponse) {
@@ -293,23 +334,41 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
+  const input = parsed.data;
+
+  if (input.action !== 'verify') {
+    const limit = await checkFirewallRateLimit(REGISTRATION_OPTIONS_RATE_LIMIT_ID, {
+      source: 'passkey_register_options',
+      request,
+      rateLimitKey: registrationRateLimitKey(user.id),
+    });
+    const refusal = firewallRateLimitRefusal(limit);
+    if (refusal) return refusal;
+  }
+
+  const reauth = await refuseStaleEnrollment({ userId: user.id, webSessionId, authenticatedAt });
+  if (reauth) return reauth;
+
+  // A session that signed in before browser sessions had ids can not bind a
+  // code; signing in again gives it one.
+  if (!webSessionId) {
+    return NextResponse.json({ error: 'REAUTH_REQUIRED' }, { status: 401 });
+  }
+  const binding = { userId: user.id, email: user.google_user_email, webSessionId };
+
+  if (input.action === 'send_code') {
+    return sendEnrollmentCode(binding);
+  }
+
+  if (!input.emailCode) {
+    return NextResponse.json({ error: 'EMAIL_CODE_REQUIRED' }, { status: 401 });
+  }
+  const emailCode: PasskeyEnrollmentEmailCode = { binding, ...input.emailCode };
 
   try {
-    if (parsed.data.action === 'options') {
-      const limit = await checkFirewallRateLimit(REGISTRATION_OPTIONS_RATE_LIMIT_ID, {
-        source: 'passkey_register_options',
-        request,
-        rateLimitKey: registrationRateLimitKey(user.id),
-      });
-      const refusal = firewallRateLimitRefusal(limit);
-      if (refusal) return refusal;
-
-      const reauth = await refuseStaleEnrollment({
-        userId: user.id,
-        webSessionId,
-        authenticatedAt,
-      });
-      if (reauth) return reauth;
+    if (input.action === 'options') {
+      const checked = await checkPasskeyEnrollmentCode(emailCode);
+      if (checked.status !== 'ok') return emailCodeRefused(checked);
 
       const { challengeId, options } = await createRegistrationOptions(
         user.id,
@@ -318,18 +377,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ challengeId, options });
     }
 
-    const reauth = await refuseStaleEnrollment({
-      userId: user.id,
-      webSessionId,
-      authenticatedAt,
-    });
-    if (reauth) return reauth;
-
     const credential = await verifyRegistration(
       user.id,
-      parsed.data.challengeId,
-      parsed.data.response,
-      webSessionPepper
+      input.challengeId,
+      input.response,
+      webSessionPepper,
+      emailCode
     );
 
     await recordAdminPasskeyEnrollment({
@@ -341,9 +394,82 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {
+    if (error instanceof PasskeyEnrollmentCodeRefusedError) {
+      return emailCodeRefused(error.refusal);
+    }
     if (error instanceof PasskeyVerificationError) {
       return NextResponse.json({ error: error.code }, { status: 401 });
     }
     throw error;
   }
+}
+
+function tooManyRequests(error: string, retryAfterSeconds: number): NextResponse {
+  return NextResponse.json(
+    { error, retryAfterSeconds },
+    { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+  );
+}
+
+function emailCodeRefused(refusal: PasskeyEnrollmentCodeRefusal): NextResponse {
+  switch (refusal.status) {
+    case 'invalid':
+      return NextResponse.json(
+        { error: 'EMAIL_CODE_INVALID', attemptsLeft: refusal.attemptsLeft },
+        { status: 401 }
+      );
+    case 'expired':
+      return NextResponse.json({ error: 'EMAIL_CODE_EXPIRED' }, { status: 401 });
+    case 'locked':
+      return tooManyRequests('EMAIL_CODE_LOCKED', refusal.retryAfterSeconds);
+  }
+}
+
+/**
+ * Emails a new code to the account's address. A code whose email was
+ * definitely not sent is deleted. A code whose send threw is expired but kept,
+ * so it still counts toward the resend cooldown and the hourly limit.
+ */
+async function sendEnrollmentCode(
+  binding: PasskeyEnrollmentEmailCode['binding']
+): Promise<NextResponse> {
+  const created = await createPasskeyEnrollmentCode(binding);
+  if (created.status === 'locked') {
+    return tooManyRequests('EMAIL_CODE_LOCKED', created.retryAfterSeconds);
+  }
+  if (created.status === 'cooldown') {
+    return tooManyRequests('EMAIL_CODE_COOLDOWN', created.retryAfterSeconds);
+  }
+  if (created.status === 'hourly_limit') {
+    return tooManyRequests('EMAIL_CODE_HOURLY_LIMIT', created.retryAfterSeconds);
+  }
+
+  const delivery = await sendPasskeyEnrollmentCodeEmail(binding.email, {
+    code: created.code,
+    expiresInMinutes: PASSKEY_ENROLLMENT_CODE_EXPIRY_MINUTES,
+  }).catch((error: unknown) => {
+    captureException(error, { tags: { source: 'passkey_enrollment_code_email' } });
+    return { sent: false, reason: 'send_threw' } as const;
+  });
+
+  if (!delivery.sent) {
+    try {
+      if (delivery.reason === 'send_threw') {
+        await expirePasskeyEnrollmentCode(created.emailCodeId);
+      } else {
+        await deletePasskeyEnrollmentCode(created.emailCodeId);
+      }
+    } catch (error) {
+      captureException(error, { tags: { source: 'passkey_enrollment_code_email' } });
+    }
+    return delivery.reason === 'neverbounce_rejected'
+      ? NextResponse.json({ error: 'EMAIL_UNDELIVERABLE' }, { status: 422 })
+      : NextResponse.json({ error: 'EMAIL_DELIVERY_FAILED' }, { status: 502 });
+  }
+
+  return NextResponse.json({
+    emailCodeId: created.emailCodeId,
+    expiresInSeconds: created.expiresInSeconds,
+    email: binding.email,
+  });
 }

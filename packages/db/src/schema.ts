@@ -5681,7 +5681,13 @@ export const magic_link_tokens = pgTable(
     purpose: text()
       .default('magic_link')
       .notNull()
-      .$type<'magic_link' | 'sign_in_code' | 'data_export_download' | 'sign_in_method_change'>(),
+      .$type<
+        | 'magic_link'
+        | 'sign_in_code'
+        | 'data_export_download'
+        | 'sign_in_method_change'
+        | 'passkey_enrollment'
+      >(),
     challenge_id: uuid(),
   },
   table => [
@@ -5697,7 +5703,7 @@ export const magic_link_tokens = pgTable(
     // without this constraint the union above is a compile-time fiction.
     check(
       'check_magic_link_tokens_purpose',
-      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change')`
+      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change', 'passkey_enrollment')`
     ),
   ]
 );

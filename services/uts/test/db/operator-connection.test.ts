@@ -74,6 +74,14 @@ describe('the test database guard', () => {
     expect(() => adminUrl()).toThrow(NonLocalDatabaseError);
   });
 
+  it('refuse a loopback admin URL with a query parameter, which could name another host', () => {
+    vi.stubEnv(
+      'UTS_TEST_ADMIN_URL',
+      'postgres://postgres:secret@127.0.0.1:5432/postgres?host=db.example.com'
+    );
+    expect(() => adminUrl()).toThrow(NonLocalDatabaseError);
+  });
+
   it('accept a loopback admin URL', () => {
     vi.stubEnv('UTS_TEST_ADMIN_URL', 'postgres://uts_admin:local@localhost:55432/uts');
     expect(adminUrl()).toBe('postgres://uts_admin:local@localhost:55432/uts');

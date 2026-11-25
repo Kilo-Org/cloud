@@ -28,13 +28,19 @@ export class NonLocalDatabaseError extends Error {
   override name = 'NonLocalDatabaseError';
 }
 
-/** The local admin URL, or `UTS_TEST_ADMIN_URL` when it names a loopback host. */
+/**
+ * The local admin URL, or `UTS_TEST_ADMIN_URL` when it names a loopback host and has no query
+ * parameters (`pg` lets a `host=` parameter override the host name).
+ */
 export function adminUrl(): string {
   const url = new URL(process.env.UTS_TEST_ADMIN_URL ?? LOCAL_ADMIN_URL);
   if (!isLoopbackHost(url)) {
     throw new NonLocalDatabaseError(
       `UTS_TEST_ADMIN_URL must name 127.0.0.1, localhost or ::1, not ${url.hostname}`
     );
+  }
+  if (url.search !== '') {
+    throw new NonLocalDatabaseError('UTS_TEST_ADMIN_URL must not carry query parameters');
   }
   return url.toString();
 }

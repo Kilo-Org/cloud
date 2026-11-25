@@ -31,9 +31,7 @@ scopes: ['e2e-alpha:probe.read', 'e2e-beta:probe.read']
 };
 
 export class E2eSecretsBroker extends SecretsBroker {
-  protected override mintAuthority(): MintAuthority {
-    return E2E_AUTHORITY;
-  }
+  static override readonly mintAuthority = E2E_AUTHORITY;
 }
 
 export default {

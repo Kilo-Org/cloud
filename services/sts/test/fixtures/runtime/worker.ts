@@ -55,9 +55,7 @@ scopes: ['runtime-target:probe.read']
 };
 
 export class ProbeMinter extends SecretsBroker {
-  protected override mintAuthority(): MintAuthority {
-    return RUNTIME_AUTHORITY;
-  }
+  static override readonly mintAuthority = RUNTIME_AUTHORITY;
 }
 
 /** How long the signer, refresher and identity provider take to answer the calls STS caches. */
@@ -309,6 +307,20 @@ async function coldTokens(env: ProbeEnv): Promise<Response> {
   return Response.json(await Promise.all([keySet(), keySet(), mint(), mint()]));
 }
 
+/** Calls the broker's former `mintAuthority()` method through the binding, as any caller could. */
+async function authorityOverRpc(env: ProbeEnv): Promise<Response> {
+  const binding = env.MINTER as unknown as { mintAuthority(): Promise<unknown> };
+  try {
+    await binding.mintAuthority();
+    return Response.json({ reachable: true, error: null });
+  } catch (error) {
+    return Response.json({
+      reachable: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export default {
   async fetch(request: Request, env: ProbeEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -335,6 +347,8 @@ export default {
         return Response.json({ kid: await servedKid(env) });
       case '/cold-tokens':
         return await coldTokens(env);
+      case '/mint-authority':
+        return await authorityOverRpc(env);
       default:
         return new Response('not found', { status: 404 });
     }

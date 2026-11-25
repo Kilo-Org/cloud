@@ -31,6 +31,13 @@ const CallerPropsSchema = z.strictObject({ caller: WorkloadNameSchema });
  * against its policy files. Deploy-level trust, per design 6.4.
  */
 export class SecretsBroker extends WorkerEntrypoint<Env, SecretsBrokerProps> {
+  /**
+   * The policies and scope registry a mint is checked against; a test fixture's subclass sets its
+   * own. A static field, not a method: RPC exposes every prototype method of an entrypoint, and a
+   * caller must not read the policy map through the binding.
+   */
+  static readonly mintAuthority: MintAuthority = defaultMintAuthority;
+
   async getBundle(request: BundleRequest): Promise<BundleResult> {
     const config = readConfig(this.env);
     const props = CallerPropsSchema.safeParse(this.ctx.props);
@@ -61,13 +68,8 @@ export class SecretsBroker extends WorkerEntrypoint<Env, SecretsBrokerProps> {
       props.data.caller,
       request,
       promise => this.ctx.waitUntil(promise),
-      this.mintAuthority()
+      (this.constructor as typeof SecretsBroker).mintAuthority
     );
-  }
-
-  /** The policies and scope registry a mint is checked against; a test fixture supplies its own. */
-  protected mintAuthority(): MintAuthority {
-    return defaultMintAuthority;
   }
 }
 

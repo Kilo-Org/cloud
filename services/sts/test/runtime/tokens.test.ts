@@ -78,3 +78,14 @@ it('answers two cold key-set requests and two cold mint calls each from work of 
   for (const mint of mints) expect(first.kids).toContain(mint.kids[0]);
   expect(logs.filter(message => CROSS_REQUEST_WARNING.test(message))).toEqual([]);
 }, 60_000);
+
+it('does not let a bound caller read the mint authority over RPC', async () => {
+  const worker = await start(false);
+  const answer = (await (await worker.fetch('http://probe.test/mint-authority')).json()) as {
+    reachable: boolean;
+    error: string | null;
+  };
+  expect(answer.reachable).toBe(false);
+  // The method does not exist on the entrypoint (not a failure to serialize its answer).
+  expect(answer.error).toBe('The RPC receiver does not implement the method "mintAuthority".');
+}, 60_000);

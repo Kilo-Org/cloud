@@ -54,8 +54,16 @@ const JWKS_CACHE_MS = 5 * 60 * 1000;
  */
 let jwksCache: { environment: string; jwks: ManagerJwks; expiresAt: number } | null = null;
 
-/** The service-token key set, plain data as above. */
-let tokenJwksCache: { environment: string; jwks: TokenJwks; expiresAt: number } | null = null;
+/**
+ * The service-token key set, plain data as above, with the revoked-kid list it was built under: a
+ * change of that list (an emergency removal) rebuilds it, so the replacement keys show at once.
+ */
+let tokenJwksCache: {
+  environment: string;
+  revokedKids: string;
+  jwks: TokenJwks;
+  expiresAt: number;
+} | null = null;
 
 let gateCache: { environment: string; gate: WebhookGate } | null = null;
 
@@ -201,16 +209,20 @@ async function keySet(env: Env, config: StsConfig): Promise<Response> {
  * The service-token key set (design 5.7): the next, current and retired-in-grace keys of every
  * token signer shard. Each isolate serves it from memory for `TOKEN_JWKS_CACHE_MS`, the
  * response's max-age; a request that finds no fresh copy calls each shard itself, in parallel and
- * bounded like a mint, and stores the plain result only when every shard answered. A kid listed in
+ * bounded like a mint, and stores the plain result only when every shard answered. Requests that
+ * find the copy stale at the same moment each load it (no promise is shared across requests):
+ * a few extra shard calls per isolate per 5 minutes, accepted. A kid listed in
  * `TOKEN_SIGNING_KIDS_REVOKED` is left out here as well as in the signer, so an emergency removal
- * never waits on the object.
+ * never waits on the object, and a change of that list rebuilds the copy.
  */
 async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
   const cached = tokenJwksCache;
+  const revokedKids = config.revokedTokenKids.join(',');
   let jwks: TokenJwks;
   if (
     cached !== null &&
     cached.environment === config.environment &&
+    cached.revokedKids === revokedKids &&
     cached.expiresAt > Date.now()
   ) {
     jwks = cached.jwks;
@@ -245,6 +257,7 @@ async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
     jwks = { keys };
     tokenJwksCache = {
       environment: config.environment,
+      revokedKids,
       jwks,
       expiresAt: Date.now() + TOKEN_JWKS_CACHE_MS,
     };
@@ -255,9 +268,10 @@ async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
 
 /**
  * `POST /v1/token`: a provider OIDC token in `Authorization`, a mint request as the body. A token
- * that did not verify is refused and only logged. A verified identity whose policy refuses it is
- * audited as a token denial: one whose binding failed is refused whole, one that maps to no policy
- * here gets every token denied `unknown_workload`. The body is read only after the token verified.
+ * that did not verify is refused and only logged. A verified identity the verifier refused (its
+ * binding failed, its policy is for another environment, or no policy here names it) is refused
+ * whole and audited as one token denial with the verifier's own reason; its name never reaches
+ * the policy check. The body is read only after the token verified.
  */
 async function tokenRequest(
   request: Request,
@@ -273,45 +287,32 @@ async function tokenRequest(
   if (outcome.status === 'unavailable') {
     return mintResponse({ status: 'unavailable', retryAfterSeconds: VERIFIER_RETRY_AFTER_SECONDS });
   }
-  let caller: MintCaller;
-  if (outcome.status === 'verified') {
-    caller = {
-      channel: 'http',
-      workload: outcome.workload,
-      identity: outcome.provider,
-      attestationExp: outcome.attestationExp,
-      claims: { provider: outcome.provider },
-    };
-  } else {
+  if (outcome.status === 'denied') {
     const { subject } = outcome;
     if (subject === undefined) {
       console.warn('sts: token request refused: token not verified', {
         environment: config.environment,
         reason: outcome.reason,
       });
-      return mintResponse({ status: 'identity_rejected' });
-    }
-    const claims = { provider: subject.provider, ...subject.claims };
-    if (outcome.reason === 'identity_rejected') {
+    } else {
       const hop = recordDenial(env, config, {
         kind: 'token',
         channel: 'http',
-        reason: 'identity_rejected',
+        reason: outcome.reason,
         actor: subject.actor,
-        claims,
+        claims: { provider: subject.provider, ...subject.claims },
       });
       if (hop !== null) ctx.waitUntil(hop);
-      return mintResponse({ status: 'identity_rejected' });
     }
-    // No policy here names this identity: every requested token is denied `unknown_workload`.
-    caller = {
-      channel: 'http',
-      workload: subject.actor,
-      identity: subject.provider,
-      attestationExp: null,
-      claims,
-    };
+    return mintResponse({ status: 'identity_rejected' });
   }
+  const caller: MintCaller = {
+    channel: 'http',
+    workload: outcome.workload,
+    identity: outcome.provider,
+    attestationExp: outcome.attestationExp,
+    claims: { provider: outcome.provider },
+  };
 
   const text = await readCappedText(request, TOKEN_REQUEST_MAX_BODY_BYTES);
   if (text === null) {

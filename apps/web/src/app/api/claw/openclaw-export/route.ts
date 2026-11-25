@@ -15,8 +15,9 @@ import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organ
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import {
+  addAdminAuditMetadata,
   adminActionContextFromHeaders,
-  recordElevatedOrganizationAdminAction,
+  runElevatedOrganizationWrite,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 // Large workspaces can take a while to archive; raise the function timeout so
@@ -35,6 +36,19 @@ function jsonError(message: string, status: number, code?: string): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function instanceAccessErrorResponse(err: unknown): Response {
+  if (err instanceof TRPCError) {
+    if (err.code === 'FORBIDDEN' || err.code === 'UNAUTHORIZED') {
+      return jsonError(err.message, 403);
+    }
+    if (err.code === 'NOT_FOUND') {
+      return jsonError(err.message, 404);
+    }
+  }
+  console.error('[openclaw-export] failed to resolve instance access:', err);
+  return jsonError('Failed to resolve KiloClaw instance', 500);
 }
 
 /**
@@ -76,11 +90,35 @@ export async function POST(request: NextRequest): Promise<Response> {
       'openclaw_export_encryption_unsupported'
     );
   }
+  const exportRequest = { format, password };
+  if (!organizationId) return exportWorkspace(user, exportRequest, undefined);
 
+  try {
+    await ensureOrganizationAccess({ user, tokenSource } as TRPCContext, organizationId);
+  } catch (err) {
+    return instanceAccessErrorResponse(err);
+  }
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(user, request.headers),
+    {
+      organizationId,
+      requiredRoles: ORGANIZATION_ROLES,
+      action: 'organization.kiloclaw_workspace.export',
+      message: 'Exported the KiloClaw workspace',
+      metadata: { format, encrypted: password !== undefined },
+    },
+    () => exportWorkspace(user, exportRequest, organizationId)
+  );
+}
+
+async function exportWorkspace(
+  user: { id: string },
+  { format, password }: Pick<z.infer<typeof BodySchema>, 'format' | 'password'>,
+  organizationId: string | undefined
+): Promise<Response> {
   let instance: Awaited<ReturnType<typeof getActiveInstance>>;
   try {
     if (organizationId) {
-      await ensureOrganizationAccess({ user, tokenSource } as TRPCContext, organizationId);
       await requireActiveSubscriptionOrTrial(organizationId);
       instance = await getActiveOrgInstance(user.id, organizationId);
     } else {
@@ -88,21 +126,13 @@ export async function POST(request: NextRequest): Promise<Response> {
       instance = await getActiveInstance(user.id);
     }
   } catch (err) {
-    if (err instanceof TRPCError) {
-      if (err.code === 'FORBIDDEN' || err.code === 'UNAUTHORIZED') {
-        return jsonError(err.message, 403);
-      }
-      if (err.code === 'NOT_FOUND') {
-        return jsonError(err.message, 404);
-      }
-    }
-    console.error('[openclaw-export] failed to resolve instance access:', err);
-    return jsonError('Failed to resolve KiloClaw instance', 500);
+    return instanceAccessErrorResponse(err);
   }
 
   if (!instance) {
     return jsonError('No active KiloClaw instance found', 404, 'instance_not_found');
   }
+  addAdminAuditMetadata({ instanceId: instance.id });
 
   const client = new KiloClawInternalClient();
   let workerResponse: Response;
@@ -122,19 +152,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
     console.error('[openclaw-export] export request failed:', err);
     return jsonError('Export failed', 500);
-  }
-
-  if (organizationId) {
-    await recordElevatedOrganizationAdminAction(
-      adminActionContextFromHeaders(user, request.headers),
-      {
-        organizationId,
-        requiredRoles: ORGANIZATION_ROLES,
-        action: 'organization.kiloclaw_workspace.export',
-        message: 'Exported the KiloClaw workspace',
-        metadata: { instanceId: instance.id, format, encrypted: password !== undefined },
-      }
-    );
   }
 
   const contentType =

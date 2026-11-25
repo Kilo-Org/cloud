@@ -26,8 +26,9 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import {
+  addAdminAuditMetadata,
   adminActionContextFromHeaders,
-  recordElevatedOrganizationAdminAction,
+  runElevatedOrganizationWrite,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { restoreProviderInstallation } from '@/lib/integrations/oauth/provider-installation-restore';
@@ -132,121 +133,123 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
-    // 6. Verify the user may change the owner's Slack connection. An organization
-    // connection carries a shared bot token and model policy, so it needs
-    // organization management authority, not just membership.
-    if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_MANAGE_ROLES);
-    } else {
-      // For user-owned integrations, verify it's the same user
-      if (user.id !== owner.id) {
-        return NextResponse.redirect(
-          new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
-        );
+    if (owner.type === 'user' && user.id !== owner.id) {
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+      );
+    }
+
+    const connect = async () => {
+      if (verified.provider !== PLATFORM.SLACK || verified.purpose !== 'provider_install') {
+        return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
       }
-    }
 
-    if (verified.provider !== PLATFORM.SLACK || verified.purpose !== 'provider_install') {
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
-    }
-
-    if (
-      verified.purpose === 'provider_install' &&
-      !(await consumeProviderOAuthAttempt({
-        actorUserId: user.id,
-        owner,
-        provider: 'slack',
-        state,
-        purpose: 'provider_install',
-      }))
-    ) {
-      throw new Error('Slack OAuth attempt is invalid, expired, or already used');
-    }
-
-    await bot.initialize();
-    const slackAdapter = bot.getAdapter('slack');
-
-    const { installationId, installation } = await exchangeSlackOAuthCode(code);
-    // Resolve the owner's model policy before taking the workspace locks, so the
-    // transaction only performs the ownership check and the integration write.
-    const defaultModel =
-      owner.type === 'org'
-        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-        : DEFAULT_BOT_MODEL;
-
-    const conflictRedirect = NextResponse.redirect(
-      new URL(
-        buildIntegrationOAuthRedirectPathFromState(
-          PLATFORM.SLACK,
+      if (
+        verified.purpose === 'provider_install' &&
+        !(await consumeProviderOAuthAttempt({
+          actorUserId: user.id,
+          owner,
+          provider: 'slack',
           state,
-          'error=workspace_already_connected'
-        ),
-        APP_URL
-      )
-    );
+          purpose: 'provider_install',
+        }))
+      ) {
+        throw new Error('Slack OAuth attempt is invalid, expired, or already used');
+      }
 
-    const install = await withWorkspaceInstallationLock(
-      PLATFORM.SLACK,
-      owner,
-      installationId,
-      async tx => {
-        const conflicting = await getConflictingSlackInstallation(owner, installationId, tx);
-        if (conflicting) {
-          return { response: conflictRedirect, installed: false };
-        }
+      await bot.initialize();
+      const slackAdapter = bot.getAdapter('slack');
 
-        const previousInstallation = await slackAdapter.getInstallation(installationId);
-        await slackAdapter.setInstallation(installationId, installation);
+      const { installationId, installation } = await exchangeSlackOAuthCode(code);
+      addAdminAuditMetadata({ slackTeamId: installationId });
+      // Resolve the owner's model policy before taking the workspace locks, so the
+      // transaction only performs the ownership check and the integration write.
+      const defaultModel =
+        owner.type === 'org'
+          ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+          : DEFAULT_BOT_MODEL;
 
-        try {
-          await upsertSlackInstallation(
-            {
-              owner,
-              teamId: installationId,
-              installation,
-              allowWorkspaceRebind: owner.type === 'org',
-              defaultModel,
-            },
-            tx
-          );
-        } catch (error) {
-          // The installation store is not part of the database transaction, so a
-          // rolled-back write must put back what this install replaced.
-          await restoreProviderInstallation({
-            provider: 'slack',
-            previousInstallation,
-            setInstallation: restored => slackAdapter.setInstallation(installationId, restored),
-            deleteInstallation: () => slackAdapter.deleteInstallation(installationId),
-          });
+      const conflictRedirect = NextResponse.redirect(
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(
+            PLATFORM.SLACK,
+            state,
+            'error=workspace_already_connected'
+          ),
+          APP_URL
+        )
+      );
 
-          if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+      const install = await withWorkspaceInstallationLock(
+        PLATFORM.SLACK,
+        owner,
+        installationId,
+        async tx => {
+          const conflicting = await getConflictingSlackInstallation(owner, installationId, tx);
+          if (conflicting) {
             return { response: conflictRedirect, installed: false };
           }
 
-          throw error;
-        }
+          const previousInstallation = await slackAdapter.getInstallation(installationId);
+          await slackAdapter.setInstallation(installationId, installation);
 
-        const successPath = verified.returnTo
-          ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
-          : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');
+          try {
+            await upsertSlackInstallation(
+              {
+                owner,
+                teamId: installationId,
+                installation,
+                allowWorkspaceRebind: owner.type === 'org',
+                defaultModel,
+              },
+              tx
+            );
+          } catch (error) {
+            // The installation store is not part of the database transaction, so a
+            // rolled-back write must put back what this install replaced.
+            await restoreProviderInstallation({
+              provider: 'slack',
+              previousInstallation,
+              setInstallation: restored => slackAdapter.setInstallation(installationId, restored),
+              deleteInstallation: () => slackAdapter.deleteInstallation(installationId),
+            });
 
-        return { response: NextResponse.redirect(new URL(successPath, APP_URL)), installed: true };
-      }
-    );
+            if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+              return { response: conflictRedirect, installed: false };
+            }
 
-    if (install.installed && owner.type === 'org') {
-      await recordElevatedOrganizationAdminAction(
-        adminActionContextFromHeaders(user, request.headers),
-        {
-          organizationId: owner.id,
-          requiredRoles: ORGANIZATION_MANAGE_ROLES,
-          action: 'organization.slack.connect',
-          message: 'Slack: OAuth connection stored',
-          metadata: { slackTeamId: installationId },
+            throw error;
+          }
+
+          const successPath = verified.returnTo
+            ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
+            : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');
+
+          return {
+            response: NextResponse.redirect(new URL(successPath, APP_URL)),
+            installed: true,
+          };
         }
       );
-    }
-    return install.response;
+
+      return install.response;
+    };
+
+    if (owner.type !== 'org') return await connect();
+    // 6. Verify the user may change the owner's Slack connection. An organization
+    // connection carries a shared bot token and model policy, so it needs
+    // organization management authority, not just membership.
+    await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_MANAGE_ROLES);
+    return await runElevatedOrganizationWrite(
+      adminActionContextFromHeaders(user, request.headers),
+      {
+        organizationId: owner.id,
+        requiredRoles: ORGANIZATION_MANAGE_ROLES,
+        action: 'organization.slack.connect',
+        message: 'Slack: OAuth connection stored',
+      },
+      connect
+    );
   } catch (error) {
     console.error('Error handling Slack OAuth callback:', error);
 

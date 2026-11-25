@@ -15,8 +15,9 @@ import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import {
+  addAdminAuditMetadata,
   adminActionContextFromHeaders,
-  recordElevatedOrganizationAdminAction,
+  runElevatedOrganizationWrite,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import type { User } from '@kilocode/db/schema';
 
@@ -82,6 +83,23 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   const resolved = await resolveOwner(request, ORGANIZATION_BILLING_ROLES);
   if ('response' in resolved) return resolved.response;
   const { owner, user } = resolved;
+  if (owner.ownerType === 'user') return setMode(request, owner);
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(user, request.headers),
+    {
+      organizationId: owner.ownerId,
+      requiredRoles: ORGANIZATION_BILLING_ROLES,
+      action: 'organization.auto_routing_mode.set',
+      message: 'Set the auto-routing mode',
+    },
+    () => setMode(request, owner)
+  );
+}
+
+async function setMode(
+  request: NextRequest,
+  owner: AutoRoutingModeOwnerQuery
+): Promise<NextResponse> {
   if (owner.ownerType === 'org') {
     try {
       await requireActiveSubscriptionOrTrial(owner.ownerId);
@@ -106,18 +124,6 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid routing mode' }, { status: 400 });
   }
 
-  const result = await updateAutoRoutingMode({ ...owner, mode: parsed.data });
-  if (owner.ownerType === 'org' && result.status < 400) {
-    await recordElevatedOrganizationAdminAction(
-      adminActionContextFromHeaders(user, request.headers),
-      {
-        organizationId: owner.ownerId,
-        requiredRoles: ORGANIZATION_BILLING_ROLES,
-        action: 'organization.auto_routing_mode.set',
-        message: 'Set the auto-routing mode',
-        metadata: { mode: parsed.data },
-      }
-    );
-  }
-  return workerResultResponse(result);
+  addAdminAuditMetadata({ mode: parsed.data });
+  return workerResultResponse(await updateAutoRoutingMode({ ...owner, mode: parsed.data }));
 }

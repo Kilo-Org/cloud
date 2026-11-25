@@ -10,8 +10,9 @@ import {
 } from '@/lib/organizations/guardrails/mcp-connections';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import {
+  addAdminAuditMetadata,
   adminActionContextFromHeaders,
-  recordElevatedOrganizationAdminAction,
+  runElevatedOrganizationWrite,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export const MAX_MCP_CONNECTIONS_PER_REQUEST = 50;
@@ -60,32 +61,39 @@ export async function POST(
     return nextResponse;
   }
 
-  let json: unknown;
-  try {
-    json = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-  const body = BodySchema.safeParse(json);
-  if (!body.success) {
-    return NextResponse.json({ error: z.prettifyError(body.error) }, { status: 400 });
-  }
-
-  const response = await evaluateAndRecordMcpConnections({
-    organization: data.organization,
-    kiloUserId: data.user.id,
-    client: body.data.client,
-    connections: body.data.connections,
-  });
-  await recordElevatedOrganizationAdminAction(
-    adminActionContextFromHeaders(data.user, request.headers),
+  const { organization, user } = data;
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(user, request.headers),
     {
       organizationId,
       requiredRoles: ORGANIZATION_ROLES,
       action: 'organization.mcp_connections.report',
       message: 'Reported MCP connections',
-      metadata: { client: body.data.client, connectionCount: body.data.connections.length },
+    },
+    async () => {
+      let json: unknown;
+      try {
+        json = await request.json();
+      } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      }
+      const body = BodySchema.safeParse(json);
+      if (!body.success) {
+        return NextResponse.json({ error: z.prettifyError(body.error) }, { status: 400 });
+      }
+      addAdminAuditMetadata({
+        client: body.data.client,
+        connectionCount: body.data.connections.length,
+      });
+
+      return NextResponse.json(
+        await evaluateAndRecordMcpConnections({
+          organization,
+          kiloUserId: user.id,
+          client: body.data.client,
+          connections: body.data.connections,
+        })
+      );
     }
   );
-  return NextResponse.json(response);
 }

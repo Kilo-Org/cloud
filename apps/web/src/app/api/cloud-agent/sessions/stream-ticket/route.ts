@@ -13,7 +13,7 @@ import * as z from 'zod';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import {
   adminActionContextFromHeaders,
-  recordElevatedOrganizationAdminAction,
+  runElevatedOrganizationWrite,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const streamTicketSchema = z.object({
@@ -85,51 +85,57 @@ export async function POST(request: Request) {
 
     const { cloudAgentSessionId, organizationId } = validation.data;
 
-    const sessionAccess = organizationId
-      ? {
-          verify: async () => {
-            await ensureOrganizationAccess({ user, tokenSource }, organizationId);
-            return verifyOrgOwnsSessionByCloudAgentId(
-              db,
-              organizationId,
-              user.id,
-              cloudAgentSessionId
-            );
-          },
-          refusal: 'Organization does not own this session',
-          ticketFields: { organizationId },
-        }
-      : {
-          verify: () => verifyUserOwnsSessionByCloudAgentId(db, user.id, cloudAgentSessionId),
-          refusal: 'Session not found or access denied',
-          ticketFields: {},
-        };
-
-    const sessionOwnership = await sessionAccess.verify();
-
-    if (!sessionOwnership) {
-      return NextResponse.json({ error: sessionAccess.refusal }, { status: 403 });
-    }
-
-    const ticket = signStreamTicket({
-      userId: user.id,
-      kiloSessionId: sessionOwnership.kiloSessionId,
-      cloudAgentSessionId,
-      ...sessionAccess.ticketFields,
-    });
-    if (organizationId) {
-      await recordElevatedOrganizationAdminAction(
-        adminActionContextFromHeaders(user, request.headers),
-        {
-          organizationId,
-          requiredRoles: ORGANIZATION_ROLES,
-          action: 'organization.cloud_agent_session.stream_ticket',
-          message: 'Signed a cloud agent stream ticket',
-          metadata: { cloudAgentSessionId },
-        }
+    if (!organizationId) {
+      const sessionOwnership = await verifyUserOwnsSessionByCloudAgentId(
+        db,
+        user.id,
+        cloudAgentSessionId
+      );
+      if (!sessionOwnership) {
+        return NextResponse.json({ error: 'Session not found or access denied' }, { status: 403 });
+      }
+      return NextResponse.json(
+        signStreamTicket({
+          userId: user.id,
+          kiloSessionId: sessionOwnership.kiloSessionId,
+          cloudAgentSessionId,
+        })
       );
     }
-    return NextResponse.json(ticket);
+
+    await ensureOrganizationAccess({ user, tokenSource }, organizationId);
+    return await runElevatedOrganizationWrite(
+      adminActionContextFromHeaders(user, request.headers),
+      {
+        organizationId,
+        requiredRoles: ORGANIZATION_ROLES,
+        action: 'organization.cloud_agent_session.stream_ticket',
+        message: 'Signed a cloud agent stream ticket',
+        metadata: { cloudAgentSessionId },
+      },
+      async () => {
+        const sessionOwnership = await verifyOrgOwnsSessionByCloudAgentId(
+          db,
+          organizationId,
+          user.id,
+          cloudAgentSessionId
+        );
+        if (!sessionOwnership) {
+          return NextResponse.json(
+            { error: 'Organization does not own this session' },
+            { status: 403 }
+          );
+        }
+        return NextResponse.json(
+          signStreamTicket({
+            userId: user.id,
+            kiloSessionId: sessionOwnership.kiloSessionId,
+            cloudAgentSessionId,
+            organizationId,
+          })
+        );
+      }
+    );
   } catch (error) {
     return handleTRPCError(error);
   }

@@ -849,7 +849,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/routers/organizations/organization-members-router.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 3,
+    occurrences: 2,
   },
   {
     id: 'internal.routers.organizationSubOrganizations',
@@ -923,7 +923,7 @@ export type OrganizationElevationAudit =
  * Route handlers that can write to an organization through the admin bypass of
  * getAuthorizedOrgContext / ensureOrganizationAccess, directly or through a
  * helper, with how a Kilo admin's elevated write is audited: the actions the
- * handler records with recordElevatedOrganizationAdminAction, or why it records
+ * handler records through runElevatedOrganizationWrite, or why it records
  * nothing. `route` is the App Router path, as in the REST inventory.
  */
 export type OrganizationElevationWriteSite = {

@@ -1,7 +1,7 @@
-// The proof run 2 pass rule for `drive.ts --mode shared` (design 4.4), kept apart from the driver so
+// The proof run 3 pass rule for `drive.ts --mode shared` (design 4.4), kept apart from the driver so
 // `test/proof/pass-rule.test.ts` can check it. No imports: `node drive.ts` loads it as is.
 
-/** About 100 exchanges per burst per deployment (proof run 1): the hard limit. */
+/** About 100 exchanges per burst per project or team (proof runs 1 and 3): the hard limit. */
 export const BUDGET_EXCHANGES_PER_WAVE = 100;
 /**
  * The claim step should leave about one exchange per region and audience; 3 allows a lost

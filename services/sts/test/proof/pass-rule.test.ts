@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sharedChecks, type SharedRunFacts } from '../../proof/vercel-exchange/lib/pass-rule';
 
-// The proof run 2 pass rule (design 4.4): the hard limit of about 100 exchanges and, separately,
+// The proof run 3 pass rule (design 4.4): the hard limit of about 100 exchanges and, separately,
 // the claim step holding on the real Runtime Cache (at most 3 attempts per region, no 429).
 
 const PASSING: SharedRunFacts = {
@@ -22,7 +22,7 @@ function passed(facts: SharedRunFacts): boolean {
   return Object.values(sharedChecks(facts)).every(Boolean);
 }
 
-describe('proof run 2 pass rule', () => {
+describe('proof run 3 pass rule', () => {
   it('passes a wave with one exchange per region and no 429', () => {
     expect(passed(PASSING)).toBe(true);
     expect(passed({ ...PASSING, attemptsByRegion: { iad1: 3, fra1: 3 } })).toBe(true);

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { recordAlertFired, shouldSuppress } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
+import { readO11ySecret } from '../secrets';
 
 export const NATIVE_CONTAINER_APP = 'cloud-agent-next-sandboxcontainers';
 export const CONTAINER_ALLOCATION_THRESHOLDS = { info: 500, ticket: 1000, page: 5000 } as const;
@@ -40,8 +41,7 @@ export async function queryContainerAllocations(
   env: Pick<AllocationEnv, 'O11Y_CF_ACCOUNT_ID' | 'O11Y_CF_CONTAINERS_API_TOKEN'>,
   fetchFn: typeof fetch = fetch
 ): Promise<ContainerAllocations> {
-  const token = await env.O11Y_CF_CONTAINERS_API_TOKEN.get();
-  if (!token) throw new Error('O11Y_CF_CONTAINERS_API_TOKEN secret is not configured');
+  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN');
 
   const base = `https://api.cloudflare.com/client/v4/accounts/${env.O11Y_CF_ACCOUNT_ID}/containers/applications`;
   const get = async (url: URL) => {

@@ -40,6 +40,10 @@ export const MAX_ISOLATE_DISTINCT_PER_MINUTE = 100;
  */
 export type DenialCount = { denial: Denial; count: number; overflow: boolean; minute: string };
 
+/** After a failed send an isolate only counts for this long, doubling per failure up to the cap. */
+const BACKOFF_BASE_MS = 10_000;
+const BACKOFF_CAP_MS = 60_000;
+
 /** A failed send's counts wait at most this many entries for the next hop; older ones are dropped. */
 const MAX_RETRY_ENTRIES = 2 * MAX_ISOLATE_DISTINCT_PER_MINUTE;
 
@@ -63,6 +67,10 @@ export function utcMinute(time: number): string {
  * One distinct denial of the current minute. `unsent` counts occurrences not yet handed to the
  * denial object; `sent` is false until a send of this entry succeeded or is in flight.
  */
+function entryKey(count: { denial: Denial; overflow: boolean }): string {
+  return count.overflow ? `overflow:${count.denial.reason}` : denialKey(count.denial);
+}
+
 type Pending = {
   minute: string;
   denial: Denial;
@@ -76,13 +84,18 @@ type Pending = {
  * occurrence of a denial in a minute is sent at once; repeats are only counted, and the counts of
  * a minute that has ended ride along with the next hop this isolate makes, each with its own
  * minute. So one isolate sends at most one record call per distinct denial per minute, and a
- * replayed token costs no hop at all after its first use. A failed send gives its counts back:
- * they go out with the isolate's next hop, which the next occurrence of that denial starts. Past `MAX_ISOLATE_DISTINCT_PER_MINUTE` distinct denials a minute, further ones are counted
+ * replayed token costs no hop at all after its first use. A failed send gives its counts back and
+ * starts a backoff (10 s, doubling to 60 s, reset by a success) during which every denial is only
+ * counted; the first denial after it sends everything held. So an isolate makes at most one hop
+ * per backoff period while the denial object fails. Past `MAX_ISOLATE_DISTINCT_PER_MINUTE` distinct denials a minute, further ones are counted
  * per reason as overflow. Counts still pending when the isolate ends are lost.
  */
 export class DenialBuffer {
   private readonly pending = new Map<string, Pending>();
-  private retry: DenialCount[] = [];
+  /** Ended or returned counts for the next hop, keyed by minute and denial. */
+  private retry = new Map<string, DenialCount>();
+  private failures = 0;
+  private holdUntil = 0;
 
   constructor(
     private readonly send: (counts: DenialCount[]) => Promise<void>,
@@ -90,14 +103,16 @@ export class DenialBuffer {
     private readonly onFailure: (error: unknown, counts: DenialCount[]) => void = () => {}
   ) {}
 
-  /** Returns the hop to run after the response, or null when this denial only adds to a count. */
+  /**
+   * Returns the hop to run after the response, or null when this denial only adds to a count. While
+   * a backoff after a failed send runs, every denial is only counted.
+   */
   add(denial: Denial): Promise<void> | null {
-    const minute = utcMinute(this.now());
-    const batch = this.retry;
-    this.retry = [];
+    const now = this.now();
+    const minute = utcMinute(now);
     for (const [key, entry] of this.pending) {
       if (entry.minute === minute) continue;
-      if (entry.unsent > 0) batch.push(this.countOf(entry));
+      if (entry.unsent > 0) this.keep(this.countOf(entry));
       this.pending.delete(key);
     }
 
@@ -113,7 +128,11 @@ export class DenialBuffer {
       this.pending.set(key, entry);
     }
     entry.unsent += 1;
-    // The new entry, and any a failed send gave back, go out with this hop.
+    if (now < this.holdUntil) return null;
+
+    // Ended counts, the new entry, and any a failed send gave back go out with this hop.
+    const batch = [...this.retry.values()];
+    this.retry.clear();
     for (const waiting of this.pending.values()) {
       if (waiting.sent) continue;
       batch.push(this.countOf(waiting));
@@ -137,21 +156,33 @@ export class DenialBuffer {
   private async dispatch(batch: DenialCount[]): Promise<void> {
     try {
       await this.send(batch);
+      this.failures = 0;
+      this.holdUntil = 0;
     } catch (error) {
+      this.failures += 1;
+      this.holdUntil =
+        this.now() + Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (this.failures - 1));
       this.onFailure(error, batch);
       for (const count of batch) this.restore(count);
     }
   }
 
+  /** Holds an ended or returned count for the next hop, merged with one for the same minute. */
+  private keep(count: DenialCount): void {
+    const key = `${count.minute}\n${entryKey(count)}`;
+    const held = this.retry.get(key);
+    if (held !== undefined) held.count += count.count;
+    else if (this.retry.size < MAX_RETRY_ENTRIES) this.retry.set(key, count);
+  }
+
   private restore(count: DenialCount): void {
-    const key = count.overflow ? `overflow:${count.denial.reason}` : denialKey(count.denial);
-    const entry = this.pending.get(key);
+    const entry = this.pending.get(entryKey(count));
     if (entry !== undefined && entry.minute === count.minute) {
       entry.unsent += count.count;
       entry.sent = false;
       return;
     }
-    if (this.retry.length < MAX_RETRY_ENTRIES) this.retry.push(count);
+    this.keep(count);
   }
 }
 

@@ -167,8 +167,8 @@ Fail-closed and caching rules:
 | Rule | Code | Tests |
 |---|---|---|
 | JWKS: 5-min set, background refresh after 4 min, synchronous after expiry or cold | `jwks.ts` | `jwks.test.ts` key-set lifetime |
-| JWKS: last good set only while the issuer is unreachable, up to 24 h, then 503. Unreachable means the refresh failed, or has not answered in 1 s (`JWKS_STALE_WAIT_MS`) and the last good set holds the `kid`; a `kid` it lacks waits for the whole 5 s fetch | `jwks.ts` | the last good set while the issuer is unreachable |
-| JWKS: retry wait 5 s, doubling per failure up to 60 s while a last good set serves; 5 s with none | `jwks.ts` | the last good set while the issuer is unreachable; missing key set |
+| JWKS: the last good UTS set serves only while UTS is unreachable, up to 24 h, then 503. Unreachable means the refresh failed, or has not answered in 1 s (`JWKS_STALE_WAIT_MS`) and the last good set holds the `kid`; a `kid` it lacks waits for the whole 5 s fetch. An STS set never serves past its 5-minute lifetime | `jwks.ts` | the last good set while the issuer is unreachable |
+| JWKS: retry wait 5 s, doubling per failure up to 60 s while the held set still serves; 5 s once none does | `jwks.ts` | the last good set while the issuer is unreachable; missing key set |
 | JWKS: missing set is 503 with `Retry-After` | `jwks.ts` | missing key set |
 | JWKS: unknown `kid` refreshes at most once per 5 min per set, also when the requests are cancelled | `jwks.ts` | unknown kid |
 | Feed: background refresh 10 s after the last fetch, wait once the head is over 30 s old; 1 s fetch timeout | `revocation.ts` | `revocation.test.ts` request-driven revalidation |

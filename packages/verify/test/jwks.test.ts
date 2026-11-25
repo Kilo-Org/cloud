@@ -27,11 +27,12 @@ import {
   harness,
   sign,
   stsClaims,
+  utsClaims,
   type Harness,
   type Issuer,
 } from './helpers';
 
-// Design 7 key-set caching and fail-closed rules, through the verifier on an STS route.
+// Design 7 key-set caching and fail-closed rules, through the verifier (STS routes unless named).
 
 let h: Harness;
 
@@ -117,6 +118,16 @@ describe('key-set lifetime', () => {
 });
 
 describe('the last good set while the issuer is unreachable', () => {
+  // A UTS rule: an STS set never serves past its 5-minute lifetime (last test of this block).
+  async function verifyUtsWith(issuer: Issuer): Promise<VerifyResult> {
+    return await h.verifier.verify(
+      bearer(await sign(issuer, utsClaims())),
+      { issuer: 'uts', scope: SCOPE },
+      h.ctx
+    );
+  }
+  const verifyUts = () => verifyUtsWith(h.uts);
+
   it.each([
     ['serves past expiry while the issuer fails', JWKS_TTL_MS, { ok: true }],
     ['serves up to just under 24 hours', JWKS_MAX_STALE_MS - 1, { ok: true }],
@@ -126,46 +137,46 @@ describe('the last good set while the issuer is unreachable', () => {
       { ok: false, status: 503, error: 'temporarily_unavailable', reason: 'jwks_unavailable' },
     ],
   ])('%s', async (_name, after, expected) => {
-    await verify();
-    h.stsJwks.mode = 'fail';
+    await verifyUts();
+    h.utsJwks.mode = 'fail';
     advance(after);
-    expect(await verify()).toMatchObject(expected);
+    expect(await verifyUts()).toMatchObject(expected);
   });
 
   it('serves the stale set only while the issuer is unreachable', async () => {
-    await verify();
+    await verifyUts();
     advance(JWKS_TTL_MS);
     // The issuer answers with a set that no longer holds the key: the stale set is not consulted.
-    h.stsJwks.keys = [];
-    expect(await verify()).toMatchObject({ ok: false, status: 401, reason: 'unknown_kid' });
+    h.utsJwks.keys = [h.feedSigner.jwk];
+    expect(await verifyUts()).toMatchObject({ ok: false, status: 401, reason: 'unknown_kid' });
   });
 
   it('does not retry the issuer on every request during the backoff', async () => {
-    await verify();
-    h.stsJwks.mode = 'fail';
+    await verifyUts();
+    h.utsJwks.mode = 'fail';
     advance(JWKS_TTL_MS);
-    await verify();
-    await verify();
-    expect(h.stsJwks.calls).toBe(2);
+    await verifyUts();
+    await verifyUts();
+    expect(h.utsJwks.calls).toBe(2);
     advance(JWKS_RETRY_MS);
-    await verify();
-    expect(h.stsJwks.calls).toBe(3);
+    await verifyUts();
+    expect(h.utsJwks.calls).toBe(3);
   });
 
   it('doubles the retry wait per failure while the last good set serves, up to 60 s', async () => {
-    await verify();
-    h.stsJwks.mode = 'fail';
+    await verifyUts();
+    h.utsJwks.mode = 'fail';
     advance(JWKS_TTL_MS);
     const waits: number[] = [];
     for (let failures = 1; failures <= 6; failures++) {
-      const calls = h.stsJwks.calls;
-      expect(await verify()).toMatchObject({ ok: true });
-      expect(h.stsJwks.calls).toBe(calls + 1);
+      const calls = h.utsJwks.calls;
+      expect(await verifyUts()).toMatchObject({ ok: true });
+      expect(h.utsJwks.calls).toBe(calls + 1);
       // The wait: no fetch one millisecond before it, the next fetch at it.
       const wait = Math.min(JWKS_MAX_RETRY_MS, JWKS_RETRY_MS * 2 ** (failures - 1));
       advance(wait - 1);
-      await verify();
-      expect(h.stsJwks.calls).toBe(calls + 1);
+      await verifyUts();
+      expect(h.utsJwks.calls).toBe(calls + 1);
       advance(1);
       waits.push(wait);
     }
@@ -182,34 +193,34 @@ describe('the last good set while the issuer is unreachable', () => {
   });
 
   it('serves the last good set once a refresh of an expired set has not answered in 1 s', async () => {
-    await verify();
+    await verifyUts();
     advance(JWKS_TTL_MS);
-    h.stsJwks.mode = 'hang';
-    const token = await sign(h.sts, stsClaims());
+    h.utsJwks.mode = 'hang';
+    const token = await sign(h.uts, utsClaims());
     fakeAllTimers();
     let settled = false;
     const pending = h.verifier
-      .verify(bearer(token), { issuer: 'sts', scope: SCOPE }, h.ctx)
+      .verify(bearer(token), { issuer: 'uts', scope: SCOPE }, h.ctx)
       .then(result => {
         settled = true;
         return result;
       });
     await vi.advanceTimersByTimeAsync(JWKS_STALE_WAIT_MS - 1);
-    expect(h.stsJwks.calls).toBe(2);
+    expect(h.utsJwks.calls).toBe(2);
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(await pending).toMatchObject({ ok: true });
   });
 
   it('waits the whole fetch timeout for a kid the last good set lacks', async () => {
-    await verify();
+    await verifyUts();
     advance(JWKS_TTL_MS);
-    h.stsJwks.mode = 'hang';
-    const token = await sign(await createIssuer(STS_ISSUER), stsClaims());
+    h.utsJwks.mode = 'hang';
+    const token = await sign(await createIssuer(UTS_ISSUER, UTS_TOKEN_KID), utsClaims());
     fakeAllTimers();
     let settled = false;
     const pending = h.verifier
-      .verify(bearer(token), { issuer: 'sts', scope: SCOPE }, h.ctx)
+      .verify(bearer(token), { issuer: 'uts', scope: SCOPE }, h.ctx)
       .then(result => {
         settled = true;
         return result;
@@ -218,6 +229,15 @@ describe('the last good set while the issuer is unreachable', () => {
     expect(settled).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(await pending).toMatchObject({ ok: false, status: 503, reason: 'jwks_unavailable' });
+  });
+
+  it('never serves an STS set past its 5-minute lifetime', async () => {
+    await verify();
+    h.stsJwks.mode = 'fail';
+    advance(JWKS_TTL_MS - 1);
+    expect(await verify()).toMatchObject({ ok: true });
+    advance(1);
+    expect(await verify()).toMatchObject({ ok: false, status: 503, reason: 'jwks_unavailable' });
   });
 });
 

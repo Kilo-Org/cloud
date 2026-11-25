@@ -24,8 +24,8 @@ share one call (owner and pollers).
 
 | Path | Warm cache | Cache miss | Cold instance |
 |---|---|---|---|
-| STS token | 0 | Set older than 5 min: 1 key-set fetch, merged; the request waits at most 1 s when it holds a last good set with the `kid`, else up to the 5 s timeout. Unknown `kid`: at most 1 fetch per 5 min per set, cancelled requests included | 1 STS key-set fetch, in parallel with the UTS bootstrap when the service calls `warm` |
-| UTS token | 0 | Key set as above. Feed: when the signed head is over 30 s old, the request waits for one merged refresh (head, plus the list only when its hash changed), at most 1 s | 1 bootstrap call (UTS key set, head and list in one answer), merged, in parallel with the STS key set. Without a bootstrap port: key set, then head, then list, in series |
+| STS token | 0 | Set older than 5 min: 1 key-set fetch, merged; the request waits for it, up to the 5 s timeout (an STS set never serves past its 5-minute lifetime). Unknown `kid`: at most 1 fetch per 5 min per set, cancelled requests included | 1 STS key-set fetch, in parallel with the UTS bootstrap when the service calls `warm` |
+| UTS token | 0 | UTS set older than 5 min: 1 key-set fetch, merged; the request waits at most 1 s when it holds a last good set with the `kid`, else up to the 5 s timeout. Unknown `kid` as for STS. Feed: when the signed head is over 30 s old, the request waits for one merged refresh (head, plus the list only when its hash changed), at most 1 s | 1 bootstrap call (UTS key set, head and list in one answer), merged, in parallel with the STS key set. Without a bootstrap port: key set, then head, then list, in series |
 | PAT | 0 on an in-instance hit | Instance miss: 1 shared-cache read, started in parallel with the key-set and feed reads; on a shared miss, 1 UTS lookup (merged per hash), then 1 shared-cache write after the response | Bootstrap (as above) in parallel with the hash and the shared-cache read, then the lookup path |
 
 ## 3. Background fetches per isolate, and totals
@@ -65,19 +65,23 @@ so cancelling requests cannot raise any rate below.
 
 | Dependency down | Retry waits per isolate | Steady rate per isolate | 5,000 isolates | 2,200 instances |
 |---|---|---|---|---|
-| Key-set issuer, last good set serving (up to 24 h) | 5, 10, 20, 40, 60, 60 … s | 1/min per issuer, after about 2 min | 83/s per issuer | 37/s per issuer |
-| Key-set issuer, cold isolate (no set) | 5 s fixed | 12/min | only cold isolates | only cold instances |
+| UTS key set, last good set serving (up to 24 h) | 5, 10, 20, 40, 60, 60 … s | 1/min, after about 2 min | 83/s | 37/s |
+| STS key set, set expired (it never serves past 5 min, so STS routes get 503) | 5 s fixed | 12/min | 1,000/s | 440/s |
+| Either key set, cold isolate (no set) | 5 s fixed | 12/min | only cold isolates | only cold instances |
 | Revocation feed, copy serving short tokens (head up to 10 min) | 5, 10, 20, 30, 30 … s | 2/min, after about 1 min | 167/s | 73/s |
 | Bootstrap, cold isolate | 5 s fixed | 12/min | only cold isolates | only cold instances |
 
-First minute of a key-set outage: fetches at 0, 5, 15 and 35 s, so 4 per isolate (333/s at 5,000
-isolates, falling to 83/s).
+First minute of a UTS key-set outage: fetches at 0, 5, 15 and 35 s, so 4 per isolate (333/s at
+5,000 isolates, falling to 83/s). An STS outage keeps the 5 s wait, because no STS copy serves and
+a longer wait would only delay recovery; STS's key-set endpoint must carry that 1,000/s at 5,000
+isolates while it recovers.
 
-**Added latency in an outage.** Each refresh attempt is bounded: a hanging issuer delays requests
-that hold a last good set by at most 1 s per attempt (`JWKS_STALE_WAIT_MS`), once per retry wait,
-then the last good set serves; a hanging feed delays requests (only once the head is over 30 s old)
-by at most 1 s per attempt (`FEED_FETCH_TIMEOUT_MS`), once per retry wait. A cold request with no
-set waits up to the 5 s key-set or bootstrap timeout, then gets 503.
+**Added latency in an outage.** Each refresh attempt is bounded: a hanging UTS issuer delays
+requests that hold a last good set by at most 1 s per attempt (`JWKS_STALE_WAIT_MS`), once per
+retry wait, then the last good set serves; a hanging feed delays requests (only once the head is
+over 30 s old) by at most 1 s per attempt (`FEED_FETCH_TIMEOUT_MS`), once per retry wait. A request
+with no usable set (cold, or an STS set past 5 minutes) waits up to the 5 s key-set or bootstrap
+timeout, then gets 503.
 
 ## 5. Vercel function time
 

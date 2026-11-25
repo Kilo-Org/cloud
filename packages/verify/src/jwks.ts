@@ -15,21 +15,25 @@ import {
 export const JWKS_TTL_MS = 5 * 60_000;
 /** A request that finds the set older than 4 minutes starts a background refresh. */
 export const JWKS_REFRESH_AFTER_MS = 4 * 60_000;
-/** The last good set serves past its lifetime only while the issuer is unreachable, up to 24 hours. */
+/**
+ * The last good UTS set serves past its lifetime only while UTS is unreachable, up to 24 hours. An
+ * STS set never serves past its lifetime, so an STS `kid` removal reaches every verifier within 5
+ * minutes (design 7).
+ */
 export const JWKS_MAX_STALE_MS = 24 * 60 * 60_000;
 /** An unknown `kid` refreshes the set at most once per 5 minutes. */
 export const UNKNOWN_KID_REFRESH_INTERVAL_MS = 5 * 60_000;
 /** A key-set fetch that has not answered by then counts as a failure. */
 export const JWKS_FETCH_TIMEOUT_MS = 5_000;
 /**
- * A request that holds a last good set waits this long for the refresh of an expired set. An
+ * A request that holds a last good UTS set waits this long for the refresh of an expired set. An
  * issuer that has not answered by then counts as unreachable for that request, which then uses
  * the last good set; a request without one waits for the whole fetch timeout.
  */
 export const JWKS_STALE_WAIT_MS = 1_000;
-/** After a failed fetch, the next fetch waits this long; requests meanwhile serve the last good set. */
+/** After a failed fetch, the next fetch waits this long. */
 export const JWKS_RETRY_MS = 5_000;
-/** While a last good set serves, each further failure doubles the retry wait, up to this. */
+/** While the held set still serves, each further failure doubles the retry wait, up to this. */
 export const JWKS_MAX_RETRY_MS = 60_000;
 
 /**
@@ -159,6 +163,8 @@ type Failure = { attemptId: number; retryAt: number; consecutive: number };
  * `flight.ts`); concurrent refreshes merge into one fetch.
  */
 export function createKeySetCache(source: JwksSource, kind: KeySetKind): KeySetCache {
+  /** How long the held set serves after it was fetched: 24 h for UTS, its lifetime for STS. */
+  const servesForMs = kind === 'uts' ? JWKS_MAX_STALE_MS : JWKS_TTL_MS;
   let set: KeySet | null = null;
   let attempt: Attempt | null = null;
   let failure: Failure | null = null;
@@ -183,7 +189,7 @@ export function createKeySetCache(source: JwksSource, kind: KeySetKind): KeySetC
     if (attempt?.id !== done.id) return;
     attempt = null;
     const consecutive = (failure?.consecutive ?? 0) + 1;
-    const serving = set !== null && at - set.fetchedAt < JWKS_MAX_STALE_MS;
+    const serving = set !== null && at - set.fetchedAt < servesForMs;
     const wait = serving ? backoffMs(JWKS_RETRY_MS, JWKS_MAX_RETRY_MS, consecutive) : JWKS_RETRY_MS;
     failure = { attemptId: done.id, retryAt: at + wait, consecutive };
   }
@@ -227,9 +233,9 @@ export function createKeySetCache(source: JwksSource, kind: KeySetKind): KeySetC
       }
       const backingOff = failure !== null && now < failure.retryAt;
       const age = set === null ? Number.POSITIVE_INFINITY : now - set.fetchedAt;
-      /** What the held set answers for this lookup, while it is within the 24-hour bound. */
+      /** What the held set answers for this lookup, while it still serves. */
       let held: { status: 'ready' } | { status: 'key'; key: CryptoKey } | undefined;
-      if (set !== null && age < JWKS_MAX_STALE_MS) {
+      if (set !== null && age < servesForMs) {
         const key = kid === null ? undefined : set.tokenKeys.get(kid);
         if (kid === null) held = { status: 'ready' };
         else if (key !== undefined) held = { status: 'key', key };
@@ -290,7 +296,7 @@ export function createKeySetCache(source: JwksSource, kind: KeySetKind): KeySetC
       throw new Error('unreachable: a set lookup answers ready or unavailable');
     },
     feedKey(kid, now) {
-      if (set === null || now - set.fetchedAt >= JWKS_MAX_STALE_MS) return null;
+      if (set === null || now - set.fetchedAt >= servesForMs) return null;
       return set.feedKeys.get(kid) ?? null;
     },
     cold: () => set === null,

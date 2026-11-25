@@ -997,9 +997,53 @@ export const AdminActionAuditAction = z.enum([
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
 
-export const AdminActionAuditTargetType = z.enum(['user', 'organization']);
+export const AdminActionAuditTargetType = z.enum([
+  'user',
+  'organization',
+  'kiloclaw_instance',
+  'stripe_dispute',
+  'credit_campaign',
+  'coding_plan',
+  'model',
+  'other',
+]);
 
 export type AdminActionAuditTargetType = z.infer<typeof AdminActionAuditTargetType>;
+
+// Outcome of an audited admin action. Stored as plain text without a DB check,
+// like the action.
+export const AdminActionAuditOutcome = z.enum(['success', 'failure']);
+
+export type AdminActionAuditOutcome = z.infer<typeof AdminActionAuditOutcome>;
+
+// Self-service authentication actions recorded in auth_audit_logs. Stored as
+// plain text without a DB check constraint, so adding a value needs no
+// migration. Do not rename existing values; rows keep the name they were
+// written with.
+export const AuthAuditAction = z.enum([
+  'auth.sign_in',
+  'auth.sign_out',
+  'auth.sessions.revoke_all',
+  'auth.device_session.revoke',
+  'auth.sign_in_method.link',
+  'auth.sign_in_method.unlink',
+  'auth.passkey.add',
+  'auth.passkey.rename',
+  'auth.passkey.remove',
+  'auth.device_auth.create',
+  'auth.device_auth.approve',
+  'auth.device_auth.deny',
+  'auth.device_auth.cancel',
+  'auth.device_auth.redeem',
+  'auth.api_key.reset',
+]);
+
+export type AuthAuditAction = z.infer<typeof AuthAuditAction>;
+
+// Outcome of an audited auth action. Stored as plain text without a DB check.
+export const AuthAuditOutcome = z.enum(['success', 'failure']);
+
+export type AuthAuditOutcome = z.infer<typeof AuthAuditOutcome>;
 
 // --- KiloClaw scheduled action status enums ---
 

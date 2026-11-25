@@ -45,7 +45,7 @@ import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/li
 import {
   getOrganizationMembershipRoles,
   recordElevatedOrganizationAdminAction,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   enqueueInviteEmail,
   resetInviteEmailForResend,

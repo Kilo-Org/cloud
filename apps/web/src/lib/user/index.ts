@@ -91,6 +91,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  auth_audit_logs,
   blacklisted_domains_settings,
   kiloclaw_cli_runs,
   user_push_tokens,
@@ -158,6 +159,7 @@ import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 import {
   currentSignInMethodChangeAuditRequest,
   currentSignInMethodChangeRequestDetails,
@@ -1209,6 +1211,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
+ * - auth_audit_logs (retained until pruned; user_id anonymized and the
+ *   subject email hash nulled, both on the user's rows and on rows naming the
+ *   hash of the user's email)
  * - blacklisted_domains_settings (editor PII nulled; settings retained)
  * - model_eval_ingestions (promoter email anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
@@ -2107,6 +2112,18 @@ export async function anonymizeCloudUserData(
         eq(admin_action_audit_logs.target_id, userId)
       )
     );
+
+  await tx
+    .update(auth_audit_logs)
+    .set({ user_id: 'deleted-user', subject_email_hash: null })
+    .where(eq(auth_audit_logs.user_id, userId));
+
+  // Attempts on the address that never resolved to the account, such as a
+  // failed sign-in, carry only the hash.
+  await tx
+    .update(auth_audit_logs)
+    .set({ subject_email_hash: null })
+    .where(eq(auth_audit_logs.subject_email_hash, authAuditEmailHash(originalEmail)));
 
   await tx
     .update(model_eval_ingestions)

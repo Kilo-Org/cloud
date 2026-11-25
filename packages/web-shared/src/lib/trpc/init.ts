@@ -36,6 +36,11 @@ import {
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import {
+  reportAdminAuditGap,
+  runAdminAuditScope,
+  type AdminAuditSpec,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
@@ -272,11 +277,19 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
   };
 };
 
+/**
+ * Procedure meta. `adminAudit` declares how an admin mutation is audited; the
+ * admin audit middleware on `adminProcedure` enforces it.
+ */
+export type TRPCMeta = {
+  adminAudit?: AdminAuditSpec;
+};
+
 // Avoid exporting the entire t-object
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-const t = initTRPC.context<TRPCContext>().create({
+const t = initTRPC.context<TRPCContext>().meta<TRPCMeta>().create({
   errorFormatter: trpcErrorFormatter,
 });
 
@@ -556,6 +569,29 @@ const adminStepUpEnforcementMiddleware = t.middleware(
   }
 );
 
+// Audits every admin mutation, including those of the specialized procedures
+// chained on `adminProcedure`, from its `adminAudit` meta. It runs after the
+// admin and step-up guards, so a refused non-admin records nothing; a refusal
+// by a specialized guard chained later is recorded as a failure.
+const adminAuditMiddleware = t.middleware(({ ctx, meta, path, type, getRawInput, next }) => {
+  if (type !== 'mutation') return next();
+  const spec = meta?.adminAudit;
+  if (spec === undefined) {
+    reportAdminAuditGap(`${path} declares no adminAudit meta`);
+    return next();
+  }
+  return runAdminAuditScope({
+    spec,
+    route: path,
+    context: () => ctx,
+    input: getRawInput,
+    run: () => next(),
+    outcomeOf: result =>
+      result.ok ? { outcome: 'success' } : { outcome: 'failure', errorCode: result.error.code },
+  });
+});
+
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)
-  .use(adminStepUpEnforcementMiddleware);
+  .use(adminStepUpEnforcementMiddleware)
+  .use(adminAuditMiddleware);

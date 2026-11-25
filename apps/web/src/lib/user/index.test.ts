@@ -65,6 +65,7 @@ import {
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  auth_audit_logs,
   blacklisted_domains_settings,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
@@ -178,6 +179,7 @@ import {
   unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
@@ -5893,6 +5895,57 @@ describe('User', () => {
       expect(userTargeted?.target_id).toBe('deleted-user');
       expect(userTargeted?.actor_email).toBe(adminUser.google_user_email);
       expect(orgTargeted?.target_id).toBe(targetUser.id);
+    });
+
+    it('should anonymize auth audit logs naming the user or the hash of their email', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const userEmailHash = authAuditEmailHash(user.google_user_email);
+      const otherEmailHash = authAuditEmailHash(otherUser.google_user_email);
+
+      await db.insert(auth_audit_logs).values([
+        {
+          action: 'auth.sign_in',
+          outcome: 'success',
+          user_id: user.id,
+          method: 'google',
+          subject_email_hash: userEmailHash,
+          metadata: { marker: 'own-sign-in' },
+        },
+        {
+          action: 'auth.sign_in',
+          outcome: 'failure',
+          method: 'magic_link',
+          failure_reason: 'invalid_code',
+          subject_email_hash: userEmailHash,
+          metadata: { marker: 'unresolved-attempt' },
+        },
+        {
+          action: 'auth.sign_in',
+          outcome: 'success',
+          user_id: otherUser.id,
+          subject_email_hash: otherEmailHash,
+          metadata: { marker: 'other-user' },
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const rows = await db.select().from(auth_audit_logs);
+      const byMarker = new Map(rows.map(row => [row.metadata?.marker, row]));
+      expect(rows).toHaveLength(3);
+      expect(byMarker.get('own-sign-in')).toMatchObject({
+        user_id: 'deleted-user',
+        subject_email_hash: null,
+      });
+      expect(byMarker.get('unresolved-attempt')).toMatchObject({
+        user_id: null,
+        subject_email_hash: null,
+      });
+      expect(byMarker.get('other-user')).toMatchObject({
+        user_id: otherUser.id,
+        subject_email_hash: otherEmailHash,
+      });
     });
 
     it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {

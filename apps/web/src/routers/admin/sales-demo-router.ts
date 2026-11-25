@@ -12,7 +12,10 @@ import {
   restoreSalesDemoOrganization,
 } from '@/lib/organizations/sales-demo';
 import { isAllowedSalesDemoEmail } from '@/lib/organizations/sales-demo-email';
-import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  organizationActionTarget,
+  recordAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export const salesDemoRouter = createTRPCRouter({
   create: adminProcedure

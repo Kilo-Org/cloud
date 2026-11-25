@@ -57,7 +57,10 @@ import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  organizationActionTarget,
+  recordAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { getAdminCreditTransactionsForOrganization } from '@kilocode/web-shared/lib/creditTransactions';
 import {
   assertOrganizationHierarchyChangeAllowed,

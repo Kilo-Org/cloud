@@ -172,7 +172,7 @@ import {
   redactEmailAddressesInAuditText,
   userActionTarget,
   type AdminActionContext,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getKilocodeRepoOpenPullRequestCounts,

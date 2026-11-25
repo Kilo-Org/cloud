@@ -13,7 +13,7 @@ import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
-import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordElevatedOrganizationAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,

@@ -23,7 +23,10 @@ import {
   type OrganizationSsoStatusView,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  organizationActionTarget,
+  recordAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 

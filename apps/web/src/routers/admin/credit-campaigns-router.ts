@@ -2,7 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   credit_campaigns,
   credit_transactions,

@@ -14,7 +14,7 @@ import {
   recordAdminAction,
   redactEmailAddressesInAuditText,
   userActionTarget,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { superadminProcedure } from '@/lib/trpc/admin-procedures';
 
 const BulkCancelSchema = z.object({

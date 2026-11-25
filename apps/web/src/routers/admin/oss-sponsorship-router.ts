@@ -20,7 +20,10 @@ import {
 } from '@kilocode/web-shared/lib/email';
 import { getAcceptInviteUrl } from '@kilocode/web-shared/lib/organizations/organizations';
 import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
-import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  organizationActionTarget,
+  recordAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { TRPCError } from '@trpc/server';
 import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';

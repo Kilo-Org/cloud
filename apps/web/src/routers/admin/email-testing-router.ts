@@ -22,7 +22,7 @@ import { securityFindingTemplateVars } from '@/lib/security-notification-email-v
 import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import * as z from 'zod';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { format } from 'date-fns';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { addCalendarYearUtc } from '@kilocode/web-shared/lib/paidCreditPolicy';

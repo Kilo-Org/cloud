@@ -23,7 +23,7 @@ import {
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { captureException } from '@sentry/nextjs';
 
 /**

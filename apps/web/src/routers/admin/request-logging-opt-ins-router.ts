@@ -11,7 +11,7 @@ import {
   organizationActionTarget,
   recordAdminAction,
   userActionTarget,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const CreateOptInSchema = z.object({
   target_type: z.enum(['account', 'organization']),

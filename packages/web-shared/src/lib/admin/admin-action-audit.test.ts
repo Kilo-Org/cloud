@@ -8,17 +8,22 @@ import {
   createOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
+  addAdminAuditMetadata,
   adminActionContextFromHeaders,
+  auditedAdminRoute,
+  inputFieldTarget,
+  isAuditedAdminRoute,
   organizationActionTarget,
   recordAdminAction,
   recordElevatedOrganizationAdminAction,
   recordAdminActions,
   redactEmailAddressesInAuditText,
   setAdminActionSinkForTest,
+  setAdminAuditActor,
   userActionTarget,
   type AdminActionContext,
   type AdminActionEvent,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 function ctxFor(overrides: Partial<AdminActionContext> = {}): AdminActionContext {
   return {
@@ -74,6 +79,7 @@ describe('recordAdminAction', () => {
       {
         event: 'admin_action',
         action: 'user.api_key.reset',
+        outcome: 'success',
         auditLogId: rows[0]?.id,
         persisted: true,
         kiloUserId: ctx.user.id,
@@ -343,5 +349,127 @@ describe('recordElevatedOrganizationAdminAction', () => {
     const rows = await db.select().from(admin_action_audit_logs);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.metadata).toEqual({ heldRoles: null });
+  });
+});
+
+describe('auditedAdminRoute', () => {
+  const admin = defineTestUser({ is_admin: true, is_super_admin: false });
+  const path = '/admin/api/users/user-1/kill-balance-cache';
+  const routeContext = { params: Promise.resolve({ id: 'user-1' }) };
+  type RouteContext = typeof routeContext;
+  let events: AdminActionEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminActionSinkForTest(event => events.push(event));
+  });
+
+  afterEach(async () => {
+    setAdminActionSinkForTest(null);
+    await cleanupDbForTest();
+  });
+
+  function request() {
+    return new Request(`http://localhost:3000${path}`, {
+      method: 'POST',
+      headers: { 'x-vercel-forwarded-for': '198.51.100.4' },
+    });
+  }
+
+  const unblockUser = {
+    kind: 'declarative',
+    action: 'user.unblock',
+    target: inputFieldTarget('user', 'id'),
+  } as const;
+
+  test('records one success row with the target from the route params', async () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) => {
+      setAdminAuditActor(admin);
+      return Response.json({ ok: true });
+    });
+
+    expect((await POST(request(), routeContext)).status).toBe(200);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'success',
+        actor_id: admin.id,
+        target_type: 'user',
+        target_id: 'user-1',
+        message: path,
+        metadata: null,
+      }),
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({ outcome: 'success', route: path, ip: '198.51.100.4' }),
+    ]);
+  });
+
+  test('records a status of 400 or above as a failure and returns the response unchanged', async () => {
+    const refusal = Response.json({ error: 'Credit management access required' }, { status: 403 });
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) => {
+      setAdminAuditActor(admin);
+      return refusal;
+    });
+
+    await expect(POST(request(), routeContext)).resolves.toBe(refusal);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'failure',
+        target_id: 'user-1',
+        metadata: { errorCode: '403' },
+      }),
+    ]);
+    expect(events[0]).toMatchObject({ outcome: 'failure', metadata: { errorCode: '403' } });
+  });
+
+  test('records a throw as a failure without its message and rethrows the same error', async () => {
+    const failure = new Error('balance cache for someone@customer.test is unreachable');
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) => {
+      setAdminAuditActor(admin);
+      addAdminAuditMetadata({ attempt: 2 });
+      throw failure;
+    });
+
+    await expect(POST(request(), routeContext)).rejects.toBe(failure);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      outcome: 'failure',
+      metadata: { attempt: 2, errorCode: 'Error' },
+    });
+    expect(JSON.stringify(rows)).not.toContain('customer.test');
+    expect(JSON.stringify(events)).not.toContain('customer.test');
+  });
+
+  test('records nothing for a failure before the handler named its admin', async () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) =>
+      Response.json({ error: 'Unauthorized' }, { status: 401 })
+    );
+
+    expect((await POST(request(), routeContext)).status).toBe(401);
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  test('reports a success that never named its admin', async () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) =>
+      Response.json({ ok: true })
+    );
+
+    await expect(POST(request(), routeContext)).rejects.toThrow('Admin audit gap');
+  });
+
+  test('brands the wrapped handler without an enumerable key', () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request) => new Response());
+
+    expect(isAuditedAdminRoute(POST)).toBe(true);
+    expect(Object.keys(POST)).toEqual([]);
+    expect(isAuditedAdminRoute(async (_request: Request) => new Response())).toBe(false);
   });
 });

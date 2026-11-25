@@ -9,7 +9,7 @@ import {
   organizationActionTarget,
   recordAdminActions,
   userActionTarget,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   SERVICE_FEE_ROLLBACK_MAX_BATCH_SIZE,
   executeServiceFeeRollbackBatch,

@@ -10,7 +10,10 @@ import {
   getApiRequestLogBlob,
 } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
-import { adminActionContextFromHeaders, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  adminActionContextFromHeaders,
+  recordAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   formatTimestamp,
   isJson,

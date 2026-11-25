@@ -10,7 +10,10 @@ import {
   listInternalBotUsers,
 } from '@/lib/bot-users/bot-user-service';
 import { INTERNAL_BOT_SLUG_PATTERN } from '@/lib/bot-users/types';
-import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-audit';
+import {
+  recordAdminAction,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export const CreateInternalBotUserInputSchema = z.object({
   slug: z

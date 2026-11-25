@@ -2,7 +2,10 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { unblockBulkBlockedUsers } from '@/lib/abuse/bulkBlock';
-import { recordAdminActions, userActionTarget } from '@/lib/admin/admin-action-audit';
+import {
+  recordAdminActions,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { sql, count, isNotNull, desc, eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';

@@ -2668,6 +2668,13 @@
       "when": 1795638118058,
       "tag": "0380_app_shell_handoff_web_session_pepper",
       "breakpoints": true
+    },
+    {
+      "idx": 381,
+      "version": "7",
+      "when": 1795643894817,
+      "tag": "0381_admin_audit_outcome_auth_audit_logs",
+      "breakpoints": true
     }
   ]
 }

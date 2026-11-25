@@ -27,7 +27,7 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import {
   adminActionContextFromHeaders,
   recordElevatedOrganizationAdminAction,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 type CallbackState = { owner: string; returnTo?: string };
 type CallbackPhase =

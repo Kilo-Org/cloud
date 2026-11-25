@@ -13,7 +13,7 @@ import {
 import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
 import { loadEffectiveMembershipRows } from '@kilocode/web-shared/routers/organizations/utils';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   approveSupportGrant,
   assertGrantApprovable,

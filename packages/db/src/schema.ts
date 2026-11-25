@@ -148,7 +148,10 @@ import type {
   CustomPricingConfig,
   KiloClawAdminAuditAction,
   AdminActionAuditAction,
+  AdminActionAuditOutcome,
   AdminActionAuditTargetType,
+  AuthAuditAction,
+  AuthAuditOutcome,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
@@ -10197,6 +10200,7 @@ export const admin_action_audit_logs = pgTable(
     target_id: text(),
     message: text().notNull(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    outcome: text().$type<AdminActionAuditOutcome>().default('success').notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -10213,6 +10217,39 @@ export const admin_action_audit_logs = pgTable(
 
 export type AdminActionAuditLog = typeof admin_action_audit_logs.$inferSelect;
 export type NewAdminActionAuditLog = typeof admin_action_audit_logs.$inferInsert;
+
+// Self-service authentication audit log: one row per auth action attempt,
+// success or failure. Rows never hold an email address in clear: the subject
+// is the account id when known, and `subject_email_hash` is a keyed hash that
+// correlates attempts on one address. Rows older than the retention window are
+// pruned by a cron, so the created_at index also serves deletion.
+export const auth_audit_logs = pgTable(
+  'auth_audit_logs',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    action: text().$type<AuthAuditAction>().notNull(),
+    outcome: text().$type<AuthAuditOutcome>().notNull(),
+    user_id: text(),
+    method: text(),
+    failure_reason: text(),
+    subject_email_hash: text(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_auth_audit_logs_created_at').on(table.created_at),
+    index('IDX_auth_audit_logs_user_id_created_at').on(table.user_id, table.created_at),
+    index('IDX_auth_audit_logs_action_created_at').on(table.action, table.created_at),
+    index('IDX_auth_audit_logs_subject_email_hash_created_at')
+      .on(table.subject_email_hash, table.created_at)
+      .where(sql`${table.subject_email_hash} IS NOT NULL`),
+  ]
+);
+
+export type AuthAuditLog = typeof auth_audit_logs.$inferSelect;
 
 // KiloClaw Access Codes — one-time codes for authenticating browser sessions to the worker
 export const kiloclaw_access_codes = pgTable(

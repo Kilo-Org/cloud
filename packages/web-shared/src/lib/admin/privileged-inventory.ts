@@ -719,7 +719,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
   },
   {
     id: 'internal.admin.actionAudit',
-    file: 'apps/web/src/lib/admin/admin-action-audit.ts',
+    file: 'packages/web-shared/src/lib/admin/admin-action-audit.ts',
     actionClass: 'platform_read',
     surface: 'rest',
     occurrences: 1,

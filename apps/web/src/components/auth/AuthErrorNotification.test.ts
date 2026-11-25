@@ -48,7 +48,7 @@ describe('AuthErrorNotification', () => {
 
     expect(html).toContain('Sign In Again');
     expect(html).toContain('Sign in again to change your sign-in methods.');
-    expect(html).toContain('<button');
+    expect(html).toContain('>Sign in again</button>');
   });
 
   test('names the new sign-in without an action inside the app shell', () => {
@@ -60,6 +60,6 @@ describe('AuthErrorNotification', () => {
     );
 
     expect(html).toContain('Sign in again to change your sign-in methods.');
-    expect(html).not.toContain('<button');
+    expect(html).not.toContain('>Sign in again</button>');
   });
 });

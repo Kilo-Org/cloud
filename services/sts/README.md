@@ -322,6 +322,7 @@ Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, i
 `pnpm --filter cloudflare-sts test` runs the Workers-pool suites in `test/worker/` (identity
 acceptance and outages per provider against locally generated key sets, policy schema, bundle
 delivery, ETags, policy narrowing, fills, relay and pruning, the refresher against a mocked
-Infisical: login, folder reads, resolution, references, backoff, webhooks) and then the Node suite in
-`test/repo/` (policy files and the Worker config checks). `typecheck` and `lint` are the usual
-package scripts.
+Infisical: login, folder reads, resolution, references, backoff, webhooks) and then the Node suites:
+`test/repo/` (policy files and the Worker config checks) and `test/runtime/`, which starts a
+test-only Worker in local workerd and checks that a `SecretsBroker` call ends when it returns, even
+when the caller never disposes the result. `typecheck` and `lint` are the usual package scripts.

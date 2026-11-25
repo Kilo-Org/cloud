@@ -73,6 +73,11 @@ export async function serveWorkerCall(
  * One hop to the workload's bundle object. Deliberately not retried: a delivery appends an audit
  * row, so a retry after a committed append would audit the same read twice. A failed hop answers
  * `unavailable`; the caller keeps its copy and retries after 30 seconds.
+ *
+ * The answer is a plain copy, and the bundle object's RPC result is disposed here. workerd gives
+ * every object an RPC call returns a disposer, and a method that returns an object with a disposer
+ * keeps its own context open until its caller disposes that object: STS would end only when the
+ * calling Worker remembered to. https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
  */
 export async function serveBundle(
   env: Env,
@@ -81,8 +86,10 @@ export async function serveBundle(
   request: BundleRequest
 ): Promise<BundleResult> {
   const parsed = BundleRequestSchema.parse(request);
+  // Partial: only a workerd RPC result carries a disposer, and only on its top-level object.
+  let result: BundleResult & Partial<Disposable>;
   try {
-    return await getBundleStub(env, config, workload).getBundle(
+    result = await getBundleStub(env, config, workload).getBundle(
       workload,
       config.environment,
       parsed
@@ -97,5 +104,11 @@ export async function serveBundle(
       reason: 'internal',
       retryAfterSeconds: BUNDLE_OBJECT_RETRY_AFTER_SECONDS,
     };
+  }
+  try {
+    // The disposer is non-enumerable, so the spread leaves it behind; nested values are plain data.
+    return { ...result };
+  } finally {
+    result[Symbol.dispose]?.();
   }
 }

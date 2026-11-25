@@ -1,0 +1,56 @@
+// Test-only Worker that broker-rpc.test.ts starts in local workerd; never deployed. Every value is
+// local and synthetic. BROKER binds this Worker's own ProbeBroker entrypoint, as a consumer binds
+// SecretsBroker, so the bundle read is a real RPC call. The Worker and queue names stay outside
+// the `sts-*` and `kilo-audit-*` names test/repo/worker-configs.ts reserves for deployments.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "secrets-broker-rpc-test",
+  "main": "broker-worker.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "traces": { "enabled": false } },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+    {
+      "type": "Text",
+      "globs": ["**/*.yaml"],
+      "fallthrough": true,
+    },
+  ],
+  "vars": {
+    "STS_ENVIRONMENT": "development",
+    "STS_ISSUER": "https://sts.sts-test.invalid",
+    "MANAGER_BASE_URL": "https://manager.sts-test.invalid",
+    "MANAGER_PROJECT_ID": "test-project-id",
+    "MANAGER_ENVIRONMENT_SLUG": "development",
+    "MANAGER_IDENTITY_ID": "test-identity-id",
+    "DO_JURISDICTION": "none",
+  },
+  "services": [
+    {
+      "binding": "BROKER",
+      "service": "secrets-broker-rpc-test",
+      "entrypoint": "ProbeBroker",
+      "props": { "caller": "o11y" },
+    },
+  ],
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "secrets-broker-rpc-test-audit" }],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+      { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+      { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+      { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
+  ],
+}

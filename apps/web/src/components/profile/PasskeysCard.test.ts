@@ -600,6 +600,37 @@ describe('PasskeysCard', () => {
     expect(dialog()!.querySelector('input')).toBeNull();
   });
 
+  it('keeps the code entry with the previous code when a resend hits the hourly limit', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(
+        refused(429, { error: 'EMAIL_CODE_HOURLY_LIMIT', retryAfterSeconds: 1500 })
+      );
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    act(() => button(dialog()!, 'Send a new code').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain(
+      'Too many codes were sent for this account in the last hour. Try again in 25 minutes.'
+    );
+    expect(dialog()?.textContent).toContain('We sent a 6-digit code to person@example.com.');
+    expect(dialog()!.querySelector('input')).not.toBeNull();
+
+    mockFetch.mockResolvedValueOnce(OPTIONS);
+    typeCode('123456');
+    submitCode();
+    await settle();
+
+    expect(requestBody(2)).toEqual({
+      action: 'options',
+      emailCode: { emailCodeId: 'email-code-1', code: '123456' },
+    });
+  });
+
   it('shows the code entry for a code sent while the dialog was closed', async () => {
     mockQueryResult.data = { passkeys: [ROW] };
     const delivery = Promise.withResolvers<typeof SENT>();

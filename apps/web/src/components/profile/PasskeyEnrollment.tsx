@@ -244,9 +244,14 @@ export function usePasskeyEnrollment(onEnrolled: () => Promise<unknown> | void):
       const result = await sendPasskeyEnrollmentCode();
       // The server's codes changed whether or not this dialog is still open: a
       // new code is in the inbox, or a refusal that drops the code ended it. A
-      // cooldown or a failed request leaves the previous code as it was.
+      // cooldown, the hourly limit or a failed request keeps the previous code
+      // as a best guess; the server decides, and a code it already ended
+      // answers EMAIL_CODE_EXPIRED.
       const keepsPrevious =
-        !result.ok && (result.refusal.kind === 'cooldown' || result.refusal.kind === 'failed');
+        !result.ok &&
+        (result.refusal.kind === 'cooldown' ||
+          result.refusal.kind === 'hourly_limit' ||
+          result.refusal.kind === 'failed');
       if (result.ok) lastSentRef.current = result.sent;
       else if (!keepsPrevious) lastSentRef.current = null;
       if (!owns()) return;

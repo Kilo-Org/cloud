@@ -75,7 +75,8 @@ const REFUSAL_COPY: Readonly<Record<DeviceAuthRefusalCode, string>> = {
     'Choose whether to add the sign-in method before approving.',
   [DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid]:
     SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeInvalid,
-  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeLocked,
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked]:
+    SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeLocked,
   [DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired]:
     SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.sessionReauthRequired,
 };

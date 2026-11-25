@@ -1511,6 +1511,7 @@ describe('Device Auth', () => {
         provider: 'github',
         email: testUserEmail,
         displayName: 'octocat',
+        needsEmailedCode: true,
       });
 
       await setDeadline(code, deadline);

@@ -28,7 +28,10 @@ const TokensSchema = z.object({
    * The code emailed for adding the pending link, and its challenge. Required
    * to add a pending link to an existing account.
    */
-  pending_link_code: z.string().regex(/^\d{6}$/).optional(),
+  pending_link_code: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
   pending_link_challenge_id: z.uuid().optional(),
 });
 

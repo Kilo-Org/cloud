@@ -498,9 +498,11 @@ export function DeviceAuthClient({
           </div>
         </CardContent>
       </Card>
-      {pendingLink?.needsEmailedCode ? (
+      {/* Mounted only while open, like the Connected accounts cards; the page
+          keeps the last code, so reopening reuses it. */}
+      {pendingLink?.needsEmailedCode && isCodeDialogOpen ? (
         <SignInMethodCodeDialog
-          open={isCodeDialogOpen}
+          open
           change="link"
           provider={pendingLink.provider}
           challenge={codeChallenge}

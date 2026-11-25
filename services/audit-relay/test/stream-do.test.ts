@@ -1,6 +1,6 @@
 import { abortAllDurableObjects, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getStreamDOStub } from '../src/dos/StreamDO';
+import { GAP_PAGE_AFTER_MS, GAP_PAGE_ATTEMPTS, getStreamDOStub } from '../src/dos/StreamDO';
 import type { StreamOutcome } from '../src/dos/StreamDO';
 import { archiveObjectKey, writeArchivedBatch } from '../src/relay/archive';
 import { GENESIS_HASH, chainHash } from '../src/relay/chain';
@@ -140,6 +140,45 @@ describe('StreamDO', () => {
       archiveObjectKey(stream, 2),
       archiveObjectKey(stream, 5),
     ]);
+  });
+
+  it('pages once when a gap outlasts both thresholds, and watches the next gap afresh', async () => {
+    const stream = uniqueStream('gap-stalled');
+    vi.stubGlobal('fetch', recordingFetch(axiomOk).impl);
+    const stub = getStreamDOStub(env, stream);
+    const later = auditBatch(3, 5, stream);
+
+    // A burst of batches past the gap reaches the attempt count at once, but not the age.
+    for (let attempt = 1; attempt <= GAP_PAGE_ATTEMPTS; attempt += 1) {
+      expect(await stub.acceptBatch(later)).toMatchObject({ kind: 'retry', reason: 'gap' });
+    }
+
+    // The same gap, first seen past the age threshold: the next batch pages, later ones do not.
+    await runInDurableObject(stub, async (_instance, state) => {
+      const watch = await state.storage.get<{ since: number }>('gap');
+      if (!watch) throw new Error('gap watch missing');
+      await state.storage.put('gap', { ...watch, since: Date.now() - GAP_PAGE_AFTER_MS });
+    });
+    expect(await stub.acceptBatch(later)).toMatchObject({
+      kind: 'gap_stalled',
+      expectedSeq: 1,
+      attempts: GAP_PAGE_ATTEMPTS + 1,
+      delaySeconds: 30,
+    });
+    expect(await stub.acceptBatch(later)).toMatchObject({ kind: 'retry', reason: 'gap' });
+
+    accepted(await stub.acceptBatch(auditBatch(1, 2, stream)));
+    expect(await stub.acceptBatch(auditBatch(4, 6, stream))).toMatchObject({
+      kind: 'retry',
+      reason: 'gap',
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('gap')).toMatchObject({
+        expectedSeq: 3,
+        attempts: 1,
+        paged: false,
+      });
+    });
   });
 
   it('accepts only the new suffix of a partially overlapping batch', async () => {

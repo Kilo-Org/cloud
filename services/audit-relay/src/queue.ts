@@ -100,6 +100,22 @@ async function applyOutcome(
       );
       message.retry({ delaySeconds: outcome.delaySeconds });
       return;
+    case 'gap_stalled':
+      console.error(
+        JSON.stringify({
+          event: 'audit_relay.gap_stalled',
+          stream: outcome.stream,
+          expectedSeq: outcome.expectedSeq,
+          attempts: outcome.attempts,
+          stalledMs: outcome.stalledMs,
+        })
+      );
+      await pageOperator(
+        env,
+        `audit stream ${outcome.stream} has waited ${Math.round(outcome.stalledMs / 1000)} s for seq ${outcome.expectedSeq} and turned away ${outcome.attempts} later batches`
+      );
+      message.retry({ delaySeconds: outcome.delaySeconds });
+      return;
     case 'hot_gap':
       console.error(
         JSON.stringify({

@@ -4,10 +4,12 @@ import {
   createExecutionContext,
   createMessageBatch,
   getQueueResult,
+  runInDurableObject,
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src';
+import { GAP_PAGE_AFTER_MS, GAP_PAGE_ATTEMPTS, getStreamDOStub } from '../src/dos/StreamDO';
 import { archiveObjectKey } from '../src/relay/archive';
 import {
   auditBatch,
@@ -129,6 +131,36 @@ describe('queue handler', () => {
     expect(pages.map(page => JSON.parse(page.body ?? '{}'))).toEqual([
       {
         text: `bot: audit stream ${stream} received seq 1..2 again and it disagrees with the archive: content`,
+      },
+    ]);
+  });
+
+  it('pages and still retries a batch held behind a stalled gap', async () => {
+    const stream = uniqueStream('queue-stalled');
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    await runInDurableObject(getStreamDOStub(env, stream), async (_instance, state) => {
+      await state.storage.put('gap', {
+        expectedSeq: 1,
+        since: Date.now() - GAP_PAGE_AFTER_MS,
+        attempts: GAP_PAGE_ATTEMPTS - 1,
+        paged: false,
+      });
+    });
+
+    const { batch, result } = await runQueue('kilo-audit', [
+      (await encodeAuditBatch(auditBatch(3, 5, stream))).buffer,
+    ]);
+
+    expect(result.retryMessages).toEqual([expect.objectContaining({ msgId: batch.messages[0].id })]);
+    const pages = http.requests.filter(
+      request => request.url === 'https://hooks.slack.test/audit-relay'
+    );
+    expect(pages.map(page => JSON.parse(page.body ?? '{}'))).toEqual([
+      {
+        text: expect.stringMatching(
+          new RegExp(`^bot: audit stream ${stream} has waited \\d+ s for seq 1 and turned away 10 later batches$`)
+        ),
       },
     ]);
   });

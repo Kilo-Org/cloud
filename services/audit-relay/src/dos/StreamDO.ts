@@ -20,9 +20,24 @@ export type StreamHead = { seq: number; hash: string };
 
 const GAP_RETRY_SECONDS = 30;
 const FAILURE_RETRY_SECONDS = 60;
+/**
+ * A gap pages once it has turned away this many batches AND persisted this long. Both must hold:
+ * consumer concurrency routinely delivers a burst of later batches before the next one, which
+ * reaches the attempt count in seconds, while a single stuck batch retried every 30 s reaches
+ * both thresholds together, around the time `max_retries: 10` sends it to the DLQ.
+ */
+export const GAP_PAGE_ATTEMPTS = 10;
+export const GAP_PAGE_AFTER_MS = 5 * 60 * 1000;
 
 const HEAD_KEY = 'head';
+const GAP_KEY = 'gap';
 const HOT_COPY_PREFIX = 'hot_copy:';
+
+/**
+ * The sequence the stream is waiting for, since when, and how many batches it turned away. A
+ * record whose `expectedSeq` is not `head.seq + 1` belongs to a gap that has since closed.
+ */
+type GapWatch = { expectedSeq: number; since: number; attempts: number; paged: boolean };
 
 /** One row per archived range, keyed by its `toSeq` so a listing is sequence order. */
 function hotCopyKey(toSeq: number): string {
@@ -54,9 +69,10 @@ export type HotStoreGap = {
 /**
  * One batch's fate. `accepted` means archived and delivered to Axiom; `duplicate` means the batch
  * was already archived (`replayed` says an owed hot-copy range was re-ingested); `retry` asks the
- * queue for another attempt; `hot_gap` means archived but the hot copy is deferred to a replay job;
- * `dropped` is a non-retryable failure that lost the batch entirely; `duplicate_mismatch` is a
- * batch at or below the head that disagrees with the archive and is paged and acked unused.
+ * queue for another attempt; `gap_stalled` is a gap retry that also pages, once per gap;
+ * `hot_gap` means archived but the hot copy is deferred to a replay job; `dropped` is a
+ * non-retryable failure that lost the batch entirely; `duplicate_mismatch` is a batch at or below
+ * the head that disagrees with the archive and is paged and acked unused.
  */
 export type StreamOutcome =
   | {
@@ -83,6 +99,15 @@ export type StreamOutcome =
       reason: HotCopyFailureReason;
     }
   | { kind: 'dropped'; stream: string; fromSeq: number; reason: 'archive_conflict' }
+  | {
+      kind: 'gap_stalled';
+      stream: string;
+      fromSeq: number;
+      expectedSeq: number;
+      attempts: number;
+      stalledMs: number;
+      delaySeconds: number;
+    }
   | {
       kind: 'duplicate_mismatch';
       stream: string;
@@ -145,15 +170,7 @@ export class StreamDO extends DurableObject<Env> {
   private async applyBatch(batch: AuditBatch): Promise<StreamOutcome> {
     const head = await this.readHead();
     if (batch.toSeq <= head.seq) return this.replayIfOwed(batch, head);
-    if (batch.fromSeq > head.seq + 1) {
-      return {
-        kind: 'retry',
-        stream: batch.stream,
-        fromSeq: batch.fromSeq,
-        reason: 'gap',
-        delaySeconds: GAP_RETRY_SECONDS,
-      };
-    }
+    if (batch.fromSeq > head.seq + 1) return this.gapRetry(batch, head);
 
     const fromSeq = Math.max(batch.fromSeq, head.seq + 1);
     const trimmed: AuditBatch =
@@ -215,6 +232,39 @@ export class StreamDO extends DurableObject<Env> {
       toSeq: trimmed.toSeq,
       hash,
       archive,
+    };
+  }
+
+  /** Retries a batch past a gap and pages, once per gap, when the gap stops closing. */
+  private async gapRetry(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
+    const expectedSeq = head.seq + 1;
+    const now = Date.now();
+    const stored = await this.ctx.storage.get<GapWatch>(GAP_KEY);
+    const watch: GapWatch =
+      stored?.expectedSeq === expectedSeq
+        ? { ...stored, attempts: stored.attempts + 1 }
+        : { expectedSeq, since: now, attempts: 1, paged: false };
+    const stalledMs = now - watch.since;
+    const stalled =
+      !watch.paged && watch.attempts >= GAP_PAGE_ATTEMPTS && stalledMs >= GAP_PAGE_AFTER_MS;
+    await this.ctx.storage.put<GapWatch>(GAP_KEY, { ...watch, paged: watch.paged || stalled });
+    if (stalled) {
+      return {
+        kind: 'gap_stalled',
+        stream: batch.stream,
+        fromSeq: batch.fromSeq,
+        expectedSeq,
+        attempts: watch.attempts,
+        stalledMs,
+        delaySeconds: GAP_RETRY_SECONDS,
+      };
+    }
+    return {
+      kind: 'retry',
+      stream: batch.stream,
+      fromSeq: batch.fromSeq,
+      reason: 'gap',
+      delaySeconds: GAP_RETRY_SECONDS,
     };
   }
 

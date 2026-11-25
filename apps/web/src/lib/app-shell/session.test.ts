@@ -3,6 +3,7 @@ import type * as NextHeaders from 'next/headers';
 import type * as FindUserById from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type * as DomainGates from '@kilocode/web-shared/lib/user/domain-gates';
 import type * as SessionModule from './session';
+import type * as SignedToken from '@/lib/signed-token';
 import { shellUser } from '@/tests/helpers/shell-user.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -28,11 +29,13 @@ const {
   APP_SHELL_SESSION_COOKIE,
   APP_SHELL_SESSION_TTL_SECONDS,
   appShellSessionCookieOptions,
+  bindAppShellSession,
   createAppShellSessionToken,
   readAppShellSession,
   requireAppShellUser,
   verifyAppShellSessionToken,
 } = jest.requireActual<typeof SessionModule>('./session');
+const { createSignedToken } = jest.requireActual<typeof SignedToken>('@/lib/signed-token');
 
 const mockCookies = jest.mocked(cookies);
 const mockFindUserById = jest.mocked(findUserById);
@@ -42,6 +45,10 @@ function requestWithCookies(values: Record<string, string>) {
   mockCookies.mockResolvedValue({
     get: (name: string) => (values[name] === undefined ? undefined : { name, value: values[name] }),
   } as Awaited<ReturnType<typeof cookies>>);
+}
+
+function shellToken(userId: string, webSessionPepper: string | null = null): string {
+  return createAppShellSessionToken(bindAppShellSession(userId, webSessionPepper));
 }
 
 beforeEach(() => {
@@ -66,23 +73,39 @@ describe('appShellSessionCookieOptions', () => {
 });
 
 describe('appShellSessionToken', () => {
-  test('round-trips the user the hand-off named', () => {
-    expect(verifyAppShellSessionToken(createAppShellSessionToken('user-1'))).toEqual({
+  test('round-trips the user the hand-off named and its session binding', () => {
+    expect(verifyAppShellSessionToken(shellToken('user-1'))).toEqual({
       userId: 'user-1',
+      webSessionBinding: null,
+    });
+    expect(verifyAppShellSessionToken(shellToken('user-1', 'pepper-1'))).toEqual({
+      userId: 'user-1',
+      webSessionBinding: expect.any(String),
     });
   });
 
+  test('carries a digest of the web-session pepper, not the pepper', () => {
+    const token = shellToken('user-1', 'pepper-1');
+    const payload = Buffer.from(token.slice(0, token.indexOf('.')), 'base64url').toString('utf8');
+
+    expect(payload).not.toContain('pepper-1');
+  });
+
   test('refuses a tampered or missing token', () => {
-    const token = createAppShellSessionToken('user-1');
+    const token = shellToken('user-1');
 
     expect(verifyAppShellSessionToken(`${token}x`)).toBeNull();
     expect(verifyAppShellSessionToken(null)).toBeNull();
     expect(verifyAppShellSessionToken('')).toBeNull();
   });
 
+  test('refuses a token minted before sessions were bound to the pepper', () => {
+    expect(verifyAppShellSessionToken(createSignedToken({ userId: 'user-1' }))).toBeNull();
+  });
+
   test('expires after the shell session lifetime', () => {
     jest.useFakeTimers({ now: new Date('2026-01-01T00:00:00Z') });
-    const token = createAppShellSessionToken('user-1');
+    const token = shellToken('user-1');
 
     jest.setSystemTime(
       new Date(Date.parse('2026-01-01T00:00:00Z') + (APP_SHELL_SESSION_TTL_SECONDS + 1) * 1000)
@@ -94,9 +117,12 @@ describe('appShellSessionToken', () => {
 
 describe('readAppShellSession', () => {
   test('reads only the shell cookie', async () => {
-    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('user-1') });
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('user-1') });
 
-    await expect(readAppShellSession()).resolves.toEqual({ userId: 'user-1' });
+    await expect(readAppShellSession()).resolves.toEqual({
+      userId: 'user-1',
+      webSessionBinding: null,
+    });
   });
 
   test('does not accept a full web session as a shell session', async () => {
@@ -111,7 +137,7 @@ describe('readAppShellSession', () => {
 
 describe('requireAppShellUser', () => {
   test('loads the user the shell cookie names', async () => {
-    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('user-1') });
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('user-1') });
     mockFindUserById.mockResolvedValue(shellUser('user-1'));
 
     await expect(requireAppShellUser()).resolves.toMatchObject({ id: 'user-1' });
@@ -119,7 +145,7 @@ describe('requireAppShellUser', () => {
   });
 
   test('refuses a session whose account is gone', async () => {
-    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('deleted-user') });
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('deleted-user') });
     mockFindUserById.mockResolvedValue(undefined);
 
     await expect(requireAppShellUser()).resolves.toBeNull();
@@ -130,7 +156,7 @@ describe('requireAppShellUser', () => {
   // hand-off that minted it, so it repeats both checks instead of trusting the
   // mint.
   test('refuses a session whose account was blocked after the hand-off', async () => {
-    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('user-1') });
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('user-1') });
     mockFindUserById.mockResolvedValue({
       ...shellUser('user-1'),
       blocked_at: '2026-01-02T00:00:00.000Z',
@@ -141,10 +167,39 @@ describe('requireAppShellUser', () => {
   });
 
   test('refuses a session whose email domain is blocklisted', async () => {
-    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createAppShellSessionToken('user-1') });
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('user-1') });
     mockFindUserById.mockResolvedValue(shellUser('user-1'));
     mockIsUserBlacklistedByDomain.mockResolvedValue(true);
 
     await expect(requireAppShellUser()).resolves.toBeNull();
+  });
+
+  test('accepts a session while the web-session pepper it was minted with is current', async () => {
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('user-1', 'pepper-1') });
+    mockFindUserById.mockResolvedValue({ ...shellUser('user-1'), web_session_pepper: 'pepper-1' });
+
+    await expect(requireAppShellUser()).resolves.toMatchObject({ id: 'user-1' });
+  });
+
+  test('refuses a session after the web-session pepper rotates', async () => {
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('user-1', 'pepper-1') });
+    mockFindUserById.mockResolvedValue({ ...shellUser('user-1'), web_session_pepper: 'pepper-2' });
+
+    await expect(requireAppShellUser()).resolves.toBeNull();
+  });
+
+  test('refuses a session minted before the account had a pepper once one is set', async () => {
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: shellToken('user-1', null) });
+    mockFindUserById.mockResolvedValue({ ...shellUser('user-1'), web_session_pepper: 'pepper-1' });
+
+    await expect(requireAppShellUser()).resolves.toBeNull();
+  });
+
+  test('refuses a session token minted before sessions were bound to the pepper', async () => {
+    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createSignedToken({ userId: 'user-1' }) });
+    mockFindUserById.mockResolvedValue(shellUser('user-1'));
+
+    await expect(requireAppShellUser()).resolves.toBeNull();
+    expect(mockFindUserById).not.toHaveBeenCalled();
   });
 });

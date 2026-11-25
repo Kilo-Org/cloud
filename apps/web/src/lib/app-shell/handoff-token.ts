@@ -2,7 +2,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { app_shell_handoff_tokens } from '@kilocode/db/schema';
+import { app_shell_handoff_tokens, kilocode_users } from '@kilocode/db/schema';
 import { isAppShellPath } from './shell-paths';
 
 /**
@@ -39,6 +39,8 @@ export async function createAppShellHandoff(params: {
 export type ConsumedAppShellHandoff = {
   userId: string;
   targetPath: string;
+  /** The account's `web_session_pepper` as of the consuming statement. */
+  webSessionPepper: string | null;
 };
 
 /**
@@ -61,6 +63,12 @@ export async function cleanupExpiredAppShellHandoffTokens(): Promise<number> {
 /**
  * Consumes the token in one conditional update, so a replay — including two
  * requests racing on the same token — gets a result exactly once.
+ *
+ * The same statement reads the account's web-session pepper, so the shell
+ * session the caller mints is bound to the pepper that was current when the
+ * token was spent. A revocation either deletes the unconsumed row first, and
+ * this update finds nothing, or commits after this statement, and the pepper
+ * it rotates no longer matches the minted session.
  */
 export async function consumeAppShellHandoff(
   token: string
@@ -83,6 +91,10 @@ export async function consumeAppShellHandoff(
     .returning({
       userId: app_shell_handoff_tokens.kilo_user_id,
       targetPath: app_shell_handoff_tokens.target_path,
+      webSessionPepper: sql<string | null>`(${db
+        .select({ pepper: kilocode_users.web_session_pepper })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, app_shell_handoff_tokens.kilo_user_id))})`,
     });
 
   if (!row) return null;
@@ -90,5 +102,9 @@ export async function consumeAppShellHandoff(
   // already spent, so the caller reports it as unusable rather than redirecting.
   if (!isAppShellPath(row.targetPath)) return null;
 
-  return { userId: row.userId, targetPath: row.targetPath };
+  return {
+    userId: row.userId,
+    targetPath: row.targetPath,
+    webSessionPepper: row.webSessionPepper,
+  };
 }

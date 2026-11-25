@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from '@jest/globals';
 import { and, eq } from 'drizzle-orm';
-import { app_shell_handoff_tokens } from '@kilocode/db/schema';
+import { app_shell_handoff_tokens, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -31,7 +31,7 @@ describe('app shell hand-off tokens', () => {
     const { token, userId } = await mintHandoff('/app-shell/github-app');
 
     const first = await consumeAppShellHandoff(token);
-    expect(first).toEqual({ userId, targetPath: '/app-shell/github-app' });
+    expect(first).toEqual({ userId, targetPath: '/app-shell/github-app', webSessionPepper: null });
 
     // A replay — a second browser, or a refreshed tab — gets nothing.
     await expect(consumeAppShellHandoff(token)).resolves.toBeNull();
@@ -41,6 +41,25 @@ describe('app shell hand-off tokens', () => {
       .from(app_shell_handoff_tokens)
       .where(eq(app_shell_handoff_tokens.kilo_user_id, userId));
     expect(row?.consumed_at).not.toBeNull();
+  });
+
+  it("returns the account's current web-session pepper with the consumed token", async () => {
+    const user = await insertTestUser({ web_session_pepper: 'pepper-before-consume' });
+    createdUserIds.push(user.id);
+    const token = await createAppShellHandoff({
+      userId: user.id,
+      targetPath: '/app-shell/github-app',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ web_session_pepper: 'pepper-at-consume' })
+      .where(eq(kilocode_users.id, user.id));
+
+    await expect(consumeAppShellHandoff(token)).resolves.toEqual({
+      userId: user.id,
+      targetPath: '/app-shell/github-app',
+      webSessionPepper: 'pepper-at-consume',
+    });
   });
 
   it('refuses a token whose expiry has passed', async () => {

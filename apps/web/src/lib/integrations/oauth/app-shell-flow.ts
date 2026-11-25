@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import { createSignedToken, verifySignedToken } from '@/lib/signed-token';
+import { parseAppShellSession, type AppShellSession } from '@/lib/app-shell/session';
 
 /**
  * Binds one app-shell OAuth attempt to the browser that started it.
@@ -25,8 +26,15 @@ function stateFingerprint(state: string): string {
   return crypto.createHash('sha256').update(state).digest('hex');
 }
 
-export function createAppShellFlowToken(input: { userId: string; state: string }): string {
-  return createSignedToken({ userId: input.userId, stateHash: stateFingerprint(input.state) });
+/**
+ * The flow carries the shell session that started it, pepper binding included,
+ * so a session revocation during the provider round trip also ends the flow.
+ */
+export function createAppShellFlowToken(input: {
+  session: AppShellSession;
+  state: string;
+}): string {
+  return createSignedToken({ ...input.session, stateHash: stateFingerprint(input.state) });
 }
 
 export function appShellFlowCookieOptions(): {
@@ -46,20 +54,19 @@ export function appShellFlowCookieOptions(): {
 }
 
 /**
- * The user the flow cookie binds to this exact state, or null when the cookie
- * is missing, forged, expired, or minted for another attempt.
+ * The shell session the flow cookie binds to this exact state, or null when the
+ * cookie is missing, forged, expired, or minted for another attempt.
  */
 export function verifyAppShellFlowToken(
   request: NextRequest,
   state: string
-): { userId: string } | null {
+): AppShellSession | null {
   const token = request.cookies.get(APP_SHELL_FLOW_COOKIE)?.value ?? null;
   return verifySignedToken(token, {
     ttlSeconds: APP_SHELL_FLOW_TTL_SECONDS,
     parse: payload => {
-      if (typeof payload.userId !== 'string' || payload.userId.length === 0) return null;
       if (payload.stateHash !== stateFingerprint(state)) return null;
-      return { userId: payload.userId };
+      return parseAppShellSession(payload);
     },
   });
 }

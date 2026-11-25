@@ -9,6 +9,7 @@ import { SELF_CLEANUP_PROCEDURES } from '@kilocode/app-shared/auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
+  app_shell_handoff_tokens,
   cli_sessions_v2,
   credit_transactions,
   device_refresh_tokens,
@@ -40,6 +41,7 @@ import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
+import { createAppShellHandoff } from '@/lib/app-shell/handoff-token';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
@@ -524,6 +526,7 @@ describe('session and API token reset mutations', () => {
       device_session_id: deviceSession.id,
       expires_at: '2099-01-01 00:00:00+00',
     });
+    await createAppShellHandoff({ userId: user.id, targetPath: '/app-shell/github-app' });
     const caller = await createCallerForUser(user.id);
 
     await caller.user.resetAPIKey();
@@ -545,6 +548,12 @@ describe('session and API token reset mutations', () => {
       .from(device_refresh_tokens)
       .where(eq(device_refresh_tokens.device_session_id, deviceSession.id));
     expect(refreshTokens).toEqual([]);
+
+    const handoffTokens = await db
+      .select({ id: app_shell_handoff_tokens.id })
+      .from(app_shell_handoff_tokens)
+      .where(eq(app_shell_handoff_tokens.kilo_user_id, user.id));
+    expect(handoffTokens).toEqual([]);
   });
 
   it('signs out current user browser sessions without resetting the API key', async () => {

@@ -87,16 +87,22 @@ export async function verifyWebhook(input: {
   return { status: 'refresh' };
 }
 
-type LoadedKey = { key: Promise<CryptoKey>; at: number; failed: boolean };
-
 /**
  * Verifies webhooks in the Worker, so only a verified `secrets.modified` costs a refresher hop.
- * The secret is loaded once per isolate (concurrent first requests share the load). A signature
- * that fails is checked again against a freshly loaded secret, and a failed load is retried, at
- * most once per `WEBHOOK_KEY_RELOAD_MS`.
+ * Only plain data crosses requests (the imported key and load times), never a promise: workerd
+ * ties a promise to the request that created it, so a request awaiting another request's pending
+ * load stalls when that request ends first. A request that finds no key loads the secret itself,
+ * so concurrent first requests each make one load. A signature that fails is checked again against
+ * a freshly loaded secret, and a failed first load is retried, at most once per
+ * `WEBHOOK_KEY_RELOAD_MS`. A failed reload keeps the key already loaded.
  */
 export class WebhookGate {
-  private loaded: LoadedKey | null = null;
+  /** The newest loaded key, by the time its load started. */
+  private loaded: { key: CryptoKey; at: number } | null = null;
+  /** When the latest load started, whatever its outcome. */
+  private lastLoadAt: number | null = null;
+  /** When the latest failed load started while no key was loaded; null once one is. */
+  private failedAt: number | null = null;
 
   constructor(
     private readonly options: {
@@ -110,10 +116,8 @@ export class WebhookGate {
   /** Throws when the secret cannot be loaded; the caller answers 503. */
   async verify(body: string, signature: string | null): Promise<WebhookOutcome> {
     const now = this.options.now();
-    const loaded = this.loaded;
-    const key =
-      loaded === null || (loaded.failed && this.mayReload(now)) ? this.load(now) : loaded.key;
-    const outcome = await this.check(body, signature, await key, now);
+    const key = this.loaded?.key ?? (await this.firstKey(now));
+    const outcome = await this.check(body, signature, key, now);
     if (outcome.status !== 'rejected' || outcome.reason !== 'bad_signature') return outcome;
     if (!this.mayReload(now)) return outcome;
     const retried = await this.check(body, signature, await this.load(now), now);
@@ -125,21 +129,30 @@ export class WebhookGate {
     return retried;
   }
 
-  private mayReload(now: number): boolean {
-    return this.loaded === null || now - this.loaded.at >= WEBHOOK_KEY_RELOAD_MS;
+  private async firstKey(now: number): Promise<CryptoKey> {
+    if (this.failedAt !== null && now - this.failedAt < WEBHOOK_KEY_RELOAD_MS) {
+      throw new Error('webhook secret load failed less than a reload interval ago');
+    }
+    return await this.load(now);
   }
 
-  private load(now: number): Promise<CryptoKey> {
-    const entry: LoadedKey = {
-      key: this.options.loadSecret().then(importWebhookKey),
-      at: now,
-      failed: false,
-    };
-    entry.key.catch(() => {
-      entry.failed = true;
-    });
-    this.loaded = entry;
-    return entry.key;
+  private mayReload(now: number): boolean {
+    return this.lastLoadAt === null || now - this.lastLoadAt >= WEBHOOK_KEY_RELOAD_MS;
+  }
+
+  /** Loads in the calling request and stores the outcome from that request's own continuation. */
+  private async load(now: number): Promise<CryptoKey> {
+    this.lastLoadAt = now;
+    let key: CryptoKey;
+    try {
+      key = await importWebhookKey(await this.options.loadSecret());
+    } catch (error) {
+      if (this.loaded === null) this.failedAt = Math.max(this.failedAt ?? now, now);
+      throw error;
+    }
+    if (this.loaded === null || this.loaded.at <= now) this.loaded = { key, at: now };
+    this.failedAt = null;
+    return key;
   }
 
   private check(

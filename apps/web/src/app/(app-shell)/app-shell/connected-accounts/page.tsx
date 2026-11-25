@@ -15,10 +15,11 @@ type PageProps = {
 };
 
 /**
- * Lists the sign-in providers inside the shell. Linking and unlinking need a
- * recent browser sign-in, which the shell session is not, so the page shows the
- * list and points to the web app for changes. A `linked` or `error` parameter
- * is the outcome of a link that ended here.
+ * Lists the sign-in providers inside the shell. Linking and unlinking need the
+ * account's browser session and a code emailed to the account, and the shell
+ * session is not a browser session, so the page shows the list and points to
+ * the web app for changes. A `linked` or `error` parameter is the outcome of a
+ * link that ended here.
  */
 export default async function AppShellConnectedAccountsPage({ searchParams }: PageProps) {
   const search = await searchParams;

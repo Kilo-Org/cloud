@@ -108,6 +108,35 @@ test.each(['owner', 'member', 'admin', 'billing_manager'] as const)(
   }
 );
 
+test('rejects the retired html-deploy resource on both issuance routes', async () => {
+  const current = await user();
+  const organization = await organizationFor(current.id);
+  jest.mocked(getAuthorizedOrgContext).mockResolvedValue({
+    success: true,
+    data: {
+      user: { ...current, role: 'owner' },
+      organization,
+      access: { kind: 'member', role: 'owner' },
+    },
+  });
+  const request = () =>
+    new NextRequest('https://example.test/api/auth/resource-token', {
+      method: 'POST',
+      headers: { origin: 'https://example.test' },
+      body: JSON.stringify({ resource: 'html-deploy' }),
+    });
+  const responses = [
+    await personalResourcePost(request()),
+    await organizationResourcePost(request(), {
+      params: Promise.resolve({ id: organization.id }),
+    }),
+  ];
+  for (const response of responses) {
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Unsupported resource' });
+  }
+});
+
 afterEach(async () => {
   if (cleanups.length) {
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, cleanups));

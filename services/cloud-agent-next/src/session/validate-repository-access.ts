@@ -23,10 +23,12 @@ type AccessContext = { env: PersistenceEnv; userId: string; orgId?: string };
 export async function assertRepositoryAccessBeforeSessionCreation(
   input: AccessContext & { createdOnPlatform?: string; repository: SessionRepositoryRequest }
 ): Promise<void> {
-  if (input.repository.type === 'github' && input.repository.githubIntegrationId) {
+  if (input.repository.type === 'github') {
     await assertGitHubAccess(input, {
       repo: input.repository.repo,
-      expectedIntegrationId: input.repository.githubIntegrationId,
+      ...(input.repository.githubIntegrationId
+        ? { expectedIntegrationId: input.repository.githubIntegrationId }
+        : {}),
       accessPurpose: input.repository.githubAccessPurpose ?? 'workflow',
     });
     return;

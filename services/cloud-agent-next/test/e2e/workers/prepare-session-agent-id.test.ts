@@ -107,10 +107,12 @@ describe('prepareSession runtime agent ids', () => {
     const response = await SELF.fetch(prepareRequest(input('reviewer-probe')));
     const body = (await response.json()) as { error?: { message?: string } };
 
-    // The e2e entry leaves the session Durable Object unbound, so an accepted
-    // request reaches the handler and fails there. Reaching the handler is what
-    // proves the input passed validation.
-    expect(response.status).toBe(500);
-    expect(body.error?.message).toContain('createSessionForCloudAgent');
+    // The e2e entry leaves the git-token service unbound, so an accepted request
+    // reaches the handler and fails at its GitHub repository check. Reaching the
+    // handler is what proves the input passed validation.
+    expect(response.status).toBe(503);
+    expect(body.error?.message).toBe(
+      'GitHub repository authorization failed (service_not_configured)'
+    );
   });
 });

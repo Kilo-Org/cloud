@@ -13,17 +13,90 @@ const repository = {
 };
 
 describe('GitHub session creation preflight', () => {
-  it('skips legacy GitHub repositories without an integration pin', async () => {
-    const getTokenForRepo = vi.fn();
+  it.each(['no_installation_found', 'repository_not_installed'] as const)(
+    'rejects an unpinned GitHub repository when authorization reports %s',
+    async reason => {
+      const authorizeCloudAgentGitHubRepo = vi.fn().mockResolvedValue({ success: false, reason });
+
+      await expect(
+        assertRepositoryAccessBeforeSessionCreation({
+          env: { GIT_TOKEN_SERVICE: { authorizeCloudAgentGitHubRepo } } as never,
+          userId: 'user-1',
+          repository: { type: 'github', repo: 'acme/repo' },
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: `GitHub repository authorization failed (${reason})`,
+      });
+    }
+  );
+
+  it('authorizes an unpinned GitHub repository with no pin and the workflow purpose', async () => {
+    const authorizeCloudAgentGitHubRepo = vi.fn().mockResolvedValue({ success: true });
+    const orgId = '123e4567-e89b-12d3-a456-426614174030';
 
     await expect(
       assertRepositoryAccessBeforeSessionCreation({
-        env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
+        env: { GIT_TOKEN_SERVICE: { authorizeCloudAgentGitHubRepo } } as never,
         userId: 'user-1',
+        orgId,
         repository: { type: 'github', repo: 'acme/repo' },
       })
     ).resolves.toBeUndefined();
-    expect(getTokenForRepo).not.toHaveBeenCalled();
+    expect(authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
+      orgId,
+    });
+  });
+
+  it('authorizes an unpinned GitHub repository with the purpose of the request', async () => {
+    const authorizeCloudAgentGitHubRepo = vi.fn().mockResolvedValue({ success: true });
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { authorizeCloudAgentGitHubRepo } } as never,
+        userId: 'user-1',
+        repository: { type: 'github', repo: 'acme/repo', githubAccessPurpose: 'agent' },
+      })
+    ).resolves.toBeUndefined();
+    expect(authorizeCloudAgentGitHubRepo).toHaveBeenCalledWith({
+      accessPurpose: 'agent',
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
+    });
+  });
+
+  it.each([
+    ['no token-service binding', {}],
+    ['a binding without the authorization method', { GIT_TOKEN_SERVICE: {} }],
+  ])('reports %s for an unpinned GitHub repository as service unavailable', async (_case, env) => {
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GitHub repository authorization failed (service_not_configured)',
+    });
+  });
+
+  it('reports a token-service RPC failure for an unpinned GitHub repository as service unavailable', async () => {
+    const authorizeCloudAgentGitHubRepo = vi.fn().mockRejectedValue(new Error('unreachable'));
+
+    await expect(
+      assertRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { authorizeCloudAgentGitHubRepo } } as never,
+        userId: 'user-1',
+        repository: { type: 'github', repo: 'acme/repo' },
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GitHub repository authorization failed (rpc_error)',
+    });
   });
 
   it('preflights a pinned GitHub repository against the exact integration', async () => {

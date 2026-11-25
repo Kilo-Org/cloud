@@ -10,10 +10,12 @@ import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
  * one grouped operation. Split
  * `prepareSession` retains registration-only behavior and can queue later.
  *
- * Managed git-token resolution (GitHub App installation, managed GitLab) is
- * NOT performed here; it happens lazily in the flusher's workspace preparation
- * path. Provider credentials are intentionally not stored in registration
- * metadata; generic git repositories may still carry an explicit token.
+ * Create preflight authorizes managed repositories (GitHub, GitLab, Bitbucket)
+ * without keeping a credential. Credentials are issued lazily during workspace
+ * preparation, because a GitHub capability binds the sandbox's outbound
+ * container identity, which exists only after allocation. Provider credentials
+ * are never stored in registration metadata; generic git repositories may still
+ * carry an explicit token.
  */
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';

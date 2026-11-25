@@ -19,6 +19,9 @@ export const WEBHOOK_MAX_SKEW_MS = 5 * 60 * 1000;
 /** A webhook body above this size is refused before any signature work. */
 export const WEBHOOK_MAX_BODY_BYTES = 64 * 1024;
 
+/** A bundle request body is `{ ifNoneMatch }`; anything above this is refused unread. */
+export const BUNDLE_REQUEST_MAX_BODY_BYTES = 4 * 1024;
+
 /**
  * A Worker isolate reloads the webhook secret from the refresher at most this often, after a
  * signature that fails or a load that failed, so a forged flood costs at most one refresher hop

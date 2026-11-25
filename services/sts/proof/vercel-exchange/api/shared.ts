@@ -45,7 +45,9 @@ function cacheBackend(): 'request-context' | 'runtime-cache-endpoint' | 'in-memo
 /**
  * One STS-audience token per invocation through the D10 shared cache (`lib/shared-token.ts`), the
  * way the slice-4 client gets it. `drive.ts --mode shared` fans it out over a cold wave.
- * `?jitterMs=`, `?claim=0` and `?deadlineMs=` override the algorithm's defaults for a run.
+ * `?jitterMs=`, `?claim=0` and `?deadlineMs=` override the algorithm's defaults for a run; `?run=`
+ * salts the cache and memory key (`keyPrefix`), so a run never reads an earlier run's token while
+ * the audience stays the same.
  */
 export async function POST(request: Request): Promise<Response> {
   const refused = refusal(request);
@@ -76,6 +78,7 @@ export async function POST(request: Request): Promise<Response> {
       DEFAULT_SETTINGS.deadlineMs,
       25_000
     ),
+    keyPrefix: (url.searchParams.get('run') ?? '').slice(0, 64),
   });
   const times = tokenTimes(input.baseToken, outcome.status === 'ok' ? outcome.token : undefined);
   return Response.json(

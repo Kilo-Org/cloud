@@ -7840,6 +7840,10 @@ export const app_shell_handoff_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     /** The allow-listed shell path this token opens, including its query. */
     target_path: text().notNull(),
+    // The account's web-session pepper when the token was minted. Any rotation
+    // (sign-out of browser sessions, an admin sign-out, account recovery)
+    // leaves an unconsumed token unusable. See `revokeWebSessions`.
+    web_session_pepper: text(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

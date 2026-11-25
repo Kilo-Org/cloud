@@ -16,10 +16,15 @@ export const APP_SHELL_HANDOFF_TTL_SECONDS = 120;
  * Mints the one-time token the native app puts in the hand-off URL. The target
  * path is stored with the token, so the consuming request cannot choose where
  * the shell opens.
+ *
+ * `webSessionPepper` is the pepper of the account row the caller authenticated
+ * with. The token is good only while the account still has that pepper, so a
+ * session revocation between mint and consume leaves it unusable.
  */
 export async function createAppShellHandoff(params: {
   userId: string;
   targetPath: string;
+  webSessionPepper: string | null;
 }): Promise<string> {
   if (!isAppShellPath(params.targetPath)) {
     throw new Error(`Refusing to mint an app-shell hand-off for ${params.targetPath}`);
@@ -30,6 +35,7 @@ export async function createAppShellHandoff(params: {
     token_hash: crypto.createHash('sha256').update(token).digest('hex'),
     kilo_user_id: params.userId,
     target_path: params.targetPath,
+    web_session_pepper: params.webSessionPepper,
     expires_at: new Date(Date.now() + APP_SHELL_HANDOFF_TTL_SECONDS * 1000).toISOString(),
   });
 
@@ -39,7 +45,7 @@ export async function createAppShellHandoff(params: {
 export type ConsumedAppShellHandoff = {
   userId: string;
   targetPath: string;
-  /** The account's `web_session_pepper` as of the consuming statement. */
+  /** The account's `web_session_pepper`, unchanged since the mint. */
   webSessionPepper: string | null;
 };
 
@@ -64,16 +70,21 @@ export async function cleanupExpiredAppShellHandoffTokens(): Promise<number> {
  * Consumes the token in one conditional update, so a replay — including two
  * requests racing on the same token — gets a result exactly once.
  *
- * The same statement reads the account's web-session pepper, so the shell
- * session the caller mints is bound to the pepper that was current when the
- * token was spent. A revocation either deletes the unconsumed row first, and
- * this update finds nothing, or commits after this statement, and the pepper
- * it rotates no longer matches the minted session.
+ * The same statement requires the account's current web-session pepper to be
+ * the one the token was minted under, so the shell session the caller mints is
+ * bound to a pepper no revocation has replaced. A revocation that commits
+ * before this statement makes it match nothing; one that commits after it
+ * rotates the pepper the minted session is bound to, which ends that session.
  */
 export async function consumeAppShellHandoff(
   token: string
 ): Promise<ConsumedAppShellHandoff | null> {
   if (!token) return null;
+
+  const accountPepper = db
+    .select({ pepper: kilocode_users.web_session_pepper })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, app_shell_handoff_tokens.kilo_user_id));
 
   const [row] = await db
     .update(app_shell_handoff_tokens)
@@ -85,16 +96,14 @@ export async function consumeAppShellHandoff(
           crypto.createHash('sha256').update(token).digest('hex')
         ),
         isNull(app_shell_handoff_tokens.consumed_at),
-        sql`${app_shell_handoff_tokens.expires_at} > NOW()`
+        sql`${app_shell_handoff_tokens.expires_at} > NOW()`,
+        sql`${app_shell_handoff_tokens.web_session_pepper} IS NOT DISTINCT FROM (${accountPepper})`
       )
     )
     .returning({
       userId: app_shell_handoff_tokens.kilo_user_id,
       targetPath: app_shell_handoff_tokens.target_path,
-      webSessionPepper: sql<string | null>`(${db
-        .select({ pepper: kilocode_users.web_session_pepper })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, app_shell_handoff_tokens.kilo_user_id))})`,
+      webSessionPepper: app_shell_handoff_tokens.web_session_pepper,
     });
 
   if (!row) return null;

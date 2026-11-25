@@ -41,7 +41,7 @@ import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
-import { createAppShellHandoff } from '@/lib/app-shell/handoff-token';
+import { consumeAppShellHandoff, createAppShellHandoff } from '@/lib/app-shell/handoff-token';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
@@ -526,7 +526,11 @@ describe('session and API token reset mutations', () => {
       device_session_id: deviceSession.id,
       expires_at: '2099-01-01 00:00:00+00',
     });
-    await createAppShellHandoff({ userId: user.id, targetPath: '/app-shell/github-app' });
+    await createAppShellHandoff({
+      userId: user.id,
+      targetPath: '/app-shell/github-app',
+      webSessionPepper: user.web_session_pepper,
+    });
     const caller = await createCallerForUser(user.id);
 
     await caller.user.resetAPIKey();
@@ -561,6 +565,11 @@ describe('session and API token reset mutations', () => {
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
+    const handoff = await createAppShellHandoff({
+      userId: user.id,
+      targetPath: '/app-shell/github-app',
+      webSessionPepper: user.web_session_pepper,
+    });
     const caller = await createCallerForUser(user.id);
 
     await caller.user.signOutBrowserSessions();
@@ -569,6 +578,8 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
+    // A hand-off minted before the sign-out cannot open a shell after it.
+    await expect(consumeAppShellHandoff(handoff)).resolves.toBeNull();
   });
 
   it('lets admins reset a user API key without signing out browser sessions', async () => {
@@ -593,6 +604,11 @@ describe('session and API token reset mutations', () => {
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
+    const handoff = await createAppShellHandoff({
+      userId: target.id,
+      targetPath: '/app-shell/connected-accounts',
+      webSessionPepper: target.web_session_pepper,
+    });
     const caller = await createCallerForUser(admin.id);
 
     await caller.admin.users.signOutBrowserSessions({ userId: target.id });
@@ -601,6 +617,7 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
+    await expect(consumeAppShellHandoff(handoff)).resolves.toBeNull();
   });
 });
 

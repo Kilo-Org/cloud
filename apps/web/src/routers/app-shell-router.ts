@@ -12,7 +12,9 @@ import {
 /**
  * The bridge the native app uses to open a page it cannot render itself. The
  * mint is authenticated, so the token names the caller; the mutation decides
- * the shell path, so the browser cannot be pointed anywhere else.
+ * the shell path, so the browser cannot be pointed anywhere else. The token is
+ * bound to the web-session pepper the caller authenticated under, so a session
+ * revocation between this mint and the consume leaves it unusable.
  */
 export const appShellRouter = createTRPCRouter({
   mintHandoff: baseProcedure.input(appShellTargetSchema).mutation(async ({ ctx, input }) => {
@@ -24,6 +26,7 @@ export const appShellRouter = createTRPCRouter({
     const token = await createAppShellHandoff({
       userId: ctx.user.id,
       targetPath: buildAppShellTargetPath(input),
+      webSessionPepper: ctx.user.web_session_pepper,
     });
 
     return {

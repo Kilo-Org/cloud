@@ -2654,6 +2654,13 @@
       "when": 1795601948316,
       "tag": "0378_broad_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 379,
+      "version": "7",
+      "when": 1795635911086,
+      "tag": "0379_known_luckman",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,3 @@
-import { withDORetry } from '@kilocode/worker-utils';
 import {
   BundleRequestSchema,
   WorkloadNameSchema,
@@ -7,7 +6,7 @@ import {
 } from '@kilocode/sts-contracts';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
-import { getBundleStub, getRefresherStub } from './dos/stubs';
+import { getBundleStub } from './dos/stubs';
 import { readConfig, type Env, type StsConfig } from './env';
 import { policyExists, policyFor } from './policy';
 
@@ -48,6 +47,10 @@ export async function serveWorkerCall(
   return await serveBundle(env, config, caller, request);
 }
 
+/**
+ * One hop to the workload's bundle object. Deliberately not retried: a delivery appends an audit
+ * row, so a retry after a committed append would audit the same read twice.
+ */
 export async function serveBundle(
   env: Env,
   config: StsConfig,
@@ -55,17 +58,5 @@ export async function serveBundle(
   request: BundleRequest
 ): Promise<BundleResult> {
   const parsed = BundleRequestSchema.parse(request);
-  try {
-    await withDORetry(
-      () => getRefresherStub(env, config),
-      stub => stub.ensureStarted(),
-      'sts.ensureStarted'
-    );
-  } catch {
-    // The bundle object still serves its copy, or asks the refresher itself.
-  }
-  // Deliberately not retried: a delivery appends an audit row, so a retry after a
-  // committed append would audit the same read twice.
-  const stub = getBundleStub(env, config, workload);
-  return await stub.getBundle(workload, config.environment, parsed);
+  return await getBundleStub(env, config, workload).getBundle(workload, config.environment, parsed);
 }

@@ -5,57 +5,119 @@ import { getStreamDOStub } from './dos/StreamDO';
 import type { StreamDO, StreamOutcome } from './dos/StreamDO';
 import type { Env } from './env';
 import { pageOperator } from './page';
+import { deadLetterKey, putImmutable } from './relay/archive';
 import { errorName } from './relay/error-name';
 
 const DLQ_SUFFIX = '-dlq';
+/** A dead letter whose R2 write fails stays in the DLQ; its consumer retries it this often. */
+const DEAD_LETTER_RETRY_SECONDS = 300;
 
 export async function handleQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
   if (batch.queue.endsWith(DLQ_SUFFIX)) {
-    for (const message of batch.messages) {
-      console.error(
-        JSON.stringify({
-          event: 'audit_relay.dead_letter',
-          queue: batch.queue,
-          attempts: message.attempts,
-        })
-      );
-      message.ack();
-    }
+    await keepDeadLetters(batch.messages, batch.queue, env);
     return;
   }
 
-  for (const message of batch.messages) await handleMessage(message, env);
+  const unreadable: Message<unknown>[] = [];
+  for (const message of batch.messages) {
+    const auditBatch = await decodeMessage(message.body);
+    if (auditBatch) await handleBatch(auditBatch, message, env);
+    else unreadable.push(message);
+  }
+  // A body `encodeAuditBatch` did not produce never decodes, so a retry cannot help: it is kept
+  // like a dead letter rather than dropped.
+  if (unreadable.length > 0) await keepDeadLetters(unreadable, batch.queue, env);
 }
 
-async function handleMessage(message: Message<unknown>, env: Env): Promise<void> {
-  const bytes = toBytes(message.body);
-  if (!bytes) {
-    console.error(
-      JSON.stringify({ event: 'audit_relay.message_not_bytes', attempts: message.attempts })
-    );
-    message.ack();
-    return;
-  }
-
-  let auditBatch: AuditBatch;
-  try {
-    auditBatch = await decodeAuditBatch(bytes);
-  } catch (error) {
-    // A body the producer could not have produced from `encodeAuditBatch` will never decode; a
-    // retry cannot fix it, so it is acked and logged without the payload.
-    console.error(
-      JSON.stringify({ event: 'audit_relay.message_undecodable', error: errorName(error) })
-    );
-    message.ack();
-    return;
-  }
-
+async function handleBatch(
+  auditBatch: AuditBatch,
+  message: Message<unknown>,
+  env: Env
+): Promise<void> {
   const outcome = await withDORetry<DurableObjectStub<StreamDO>, StreamOutcome>(
     () => getStreamDOStub(env, auditBatch.stream),
     stub => stub.acceptBatch(auditBatch),
     'acceptBatch'
   );
   await applyOutcome(outcome, env, message);
+}
+
+/**
+ * Stores each message's raw bytes under `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz`
+ * (a lock rule keeps that prefix as long as the archive), pages once for the stored set with
+ * stream, range and key only, then acks what it stored. A message whose write fails is retried.
+ * The stream stays stalled behind a lost batch until an operator re-sends the stored bytes.
+ */
+async function keepDeadLetters(
+  messages: readonly Message<unknown>[],
+  queue: string,
+  env: Env
+): Promise<void> {
+  const stored: { message: Message<unknown>; line: string }[] = [];
+  for (const message of messages) {
+    const bytes = rawBytes(message.body);
+    const auditBatch = await decodeMessage(message.body);
+    const key = deadLetterKey(auditBatch?.stream ?? null, message.timestamp, message.id);
+    try {
+      await putImmutable(env.AUDIT_ARCHIVE, key, bytes, 'application/octet-stream');
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'audit_relay.dead_letter_write_failed',
+          queue,
+          key,
+          error: errorName(error),
+        })
+      );
+      message.retry({ delaySeconds: DEAD_LETTER_RETRY_SECONDS });
+      continue;
+    }
+    const range = auditBatch ? ` seq ${auditBatch.fromSeq}..${auditBatch.toSeq}` : '';
+    console.error(
+      JSON.stringify({
+        event: 'audit_relay.dead_letter_stored',
+        queue,
+        key,
+        stream: auditBatch?.stream ?? null,
+        fromSeq: auditBatch?.fromSeq ?? null,
+        toSeq: auditBatch?.toSeq ?? null,
+        attempts: message.attempts,
+      })
+    );
+    stored.push({
+      message,
+      line: `${auditBatch?.stream ?? 'unknown stream'}${range} after ${message.attempts} attempts at ${key}`,
+    });
+  }
+  if (stored.length === 0) return;
+
+  await pageOperator(
+    env,
+    `audit-relay kept ${stored.length} undelivered message(s) from ${queue} in R2; each named stream stalls until its batch is re-sent:\n${stored.map(entry => entry.line).join('\n')}`
+  );
+  for (const entry of stored) entry.message.ack();
+}
+
+async function decodeMessage(body: unknown): Promise<AuditBatch | null> {
+  const bytes = toBytes(body);
+  if (!bytes) return null;
+  try {
+    return await decodeAuditBatch(bytes);
+  } catch {
+    return null;
+  }
+}
+
+/** The body as stored bytes: producers send bytes; a string is kept as text, anything else as JSON. */
+function rawBytes(body: unknown): Uint8Array {
+  const bytes = toBytes(body);
+  if (bytes) return bytes;
+  if (typeof body === 'string') return new TextEncoder().encode(body);
+  try {
+    return new TextEncoder().encode(JSON.stringify(body) ?? String(body));
+  } catch {
+    return new TextEncoder().encode(String(body));
+  }
 }
 
 async function applyOutcome(

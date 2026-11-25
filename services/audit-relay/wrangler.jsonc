@@ -46,12 +46,15 @@
         "max_concurrency": 6,
         "dead_letter_queue": "kilo-audit-dlq",
       },
-      // Drains the DLQ so nothing backs up silently; the handler logs and acks each message.
+      // Keeps each dead letter's raw bytes in R2 under dead-letter/, pages, then acks. A failed
+      // R2 write retries every 5 minutes for about 8 hours (the Queues maximum of 100 retries).
       {
         "queue": "kilo-audit-dlq",
         "max_batch_size": 10,
         "max_batch_timeout": 30,
         "max_concurrency": 1,
+        "max_retries": 100,
+        "retry_delay": 300,
       },
     ],
   },
@@ -126,6 +129,8 @@
             "max_batch_size": 10,
             "max_batch_timeout": 30,
             "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 300,
           },
         ],
       },
@@ -179,6 +184,8 @@
             "max_batch_size": 10,
             "max_batch_timeout": 30,
             "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 300,
           },
         ],
       },

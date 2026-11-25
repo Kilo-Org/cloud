@@ -1,4 +1,4 @@
-import { encodeAuditBatch } from '@kilocode/sts-contracts';
+import { decodeAuditBatch, encodeAuditBatch } from '@kilocode/sts-contracts';
 import {
   abortAllDurableObjects,
   createExecutionContext,
@@ -8,9 +8,10 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import worker from '../src';
 import { GAP_PAGE_AFTER_MS, GAP_PAGE_ATTEMPTS, getStreamDOStub } from '../src/dos/StreamDO';
-import { archiveObjectKey } from '../src/relay/archive';
+import { archiveObjectKey, deadLetterKey } from '../src/relay/archive';
 import {
   auditBatch,
   axiomOk,
@@ -18,14 +19,15 @@ import {
   listObjectKeys,
   recordingFetch,
   uniqueStream,
+  type CapturedRequest,
 } from './helpers';
 
 async function runQueue(queue: string, bodies: unknown[]) {
   const batch = createMessageBatch(
     queue,
-    bodies.map((body, index) => ({
-      id: `message-${index}`,
-      timestamp: Date.now(),
+    bodies.map(body => ({
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
       attempts: 1,
       body,
     }))
@@ -38,6 +40,20 @@ async function runQueue(queue: string, bodies: unknown[]) {
 
 async function encoded(stream: string) {
   return (await encodeAuditBatch(auditBatch(1, 2, stream))).buffer;
+}
+
+async function storedBytes(key: string): Promise<Uint8Array> {
+  const object = await env.AUDIT_ARCHIVE.get(key);
+  if (!object) throw new Error(`object ${key} missing`);
+  return new Uint8Array(await object.arrayBuffer());
+}
+
+const PageSchema = z.object({ text: z.string() });
+
+function pageTexts(requests: CapturedRequest[]): string[] {
+  return requests
+    .filter(request => request.url === 'https://hooks.slack.test/audit-relay')
+    .map(request => PageSchema.parse(JSON.parse(request.body ?? '{}')).text);
 }
 
 describe('queue handler', () => {
@@ -74,23 +90,79 @@ describe('queue handler', () => {
     expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
   });
 
-  it('acks a body that cannot be decoded instead of retrying it forever', async () => {
-    const payload = new TextEncoder().encode('not a gzip frame').buffer;
-    const { result } = await runQueue('kilo-audit', [payload]);
+  it('keeps a body that cannot be decoded under dead-letter/unknown instead of dropping it', async () => {
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const payload = new TextEncoder().encode('not a gzip frame');
+
+    const { batch, result } = await runQueue('kilo-audit', [payload.buffer]);
 
     expect(result.retryBatch.retry).toBe(false);
     expect(result.retryMessages).toEqual([]);
     expect(result.explicitAcks).toHaveLength(1);
+    const [message] = batch.messages;
+    const key = deadLetterKey(null, message.timestamp, message.id);
+    expect(await storedBytes(key)).toEqual(payload);
+    expect(pageTexts(http.requests)).toEqual([
+      `bot: audit-relay kept 1 undelivered message(s) from kilo-audit in R2; each named stream stalls until its batch is re-sent:\nunknown stream after 1 attempts at ${key}`,
+    ]);
   });
 
-  it('acks dead-letter messages without decoding them', async () => {
+  it('keeps each dead letter as raw bytes in R2, pages once without the payload, then acks', async () => {
     const http = recordingFetch(axiomOk);
     vi.stubGlobal('fetch', http.impl);
+    const stream = uniqueStream('queue-dlq');
+    const bytes = await encodeAuditBatch(auditBatch(3, 5, stream));
 
-    const { result } = await runQueue('kilo-audit-dlq', ['anything']);
+    const { batch, result } = await runQueue('kilo-audit-dlq', [bytes.buffer, 'not bytes']);
 
-    expect(result.explicitAcks).toHaveLength(1);
-    expect(http.requests).toEqual([]);
+    expect(result.explicitAcks).toHaveLength(2);
+    expect(result.retryMessages).toEqual([]);
+    const [dead, odd] = batch.messages;
+    const deadKey = deadLetterKey(stream, dead.timestamp, dead.id);
+    const oddKey = deadLetterKey(null, odd.timestamp, odd.id);
+    expect(deadKey).toBe(`dead-letter/${stream}/${dead.timestamp.toISOString()}-${dead.id}.gz`);
+    expect(await storedBytes(deadKey)).toEqual(bytes);
+    expect(new TextDecoder().decode(await storedBytes(oddKey))).toBe('not bytes');
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
+
+    const pages = pageTexts(http.requests);
+    expect(pages).toEqual([
+      `bot: audit-relay kept 2 undelivered message(s) from kilo-audit-dlq in R2; each named stream stalls until its batch is re-sent:\n${stream} seq 3..5 after 1 attempts at ${deadKey}\nunknown stream after 1 attempts at ${oddKey}`,
+    ]);
+    const { events } = await decodeAuditBatch(bytes);
+    expect(events.some(event => pages[0].includes(event.id))).toBe(false);
+    expect(http.requests.filter(request => request.url.startsWith('https://api.axiom.co'))).toEqual(
+      []
+    );
+  });
+
+  it('retries a dead letter whose R2 write fails and pages nothing for it', async () => {
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const failingEnv = {
+      ...env,
+      AUDIT_ARCHIVE: {
+        ...env.AUDIT_ARCHIVE,
+        put: async () => {
+          throw new Error('r2 unavailable');
+        },
+        head: async () => null,
+      },
+    };
+    const batch = createMessageBatch('kilo-audit-dlq', [
+      { id: crypto.randomUUID(), timestamp: new Date(), attempts: 3, body: 'lost' },
+    ]);
+    const ctx = createExecutionContext();
+    await worker.queue?.(batch, failingEnv);
+    await waitOnExecutionContext(ctx);
+    const result = await getQueueResult(batch, ctx);
+
+    expect(result.explicitAcks).toEqual([]);
+    expect(result.retryMessages).toEqual([
+      expect.objectContaining({ msgId: batch.messages[0].id }),
+    ]);
+    expect(pageTexts(http.requests)).toEqual([]);
   });
 
   it('pages and acks a batch archived without the hot copy', async () => {

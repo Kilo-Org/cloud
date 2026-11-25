@@ -23,12 +23,15 @@ The current shared verifier rejects a token with an audience when no audience is
 
 `generateApiToken` originally used `expiresIn: '5y'` in commit `bc8179c70` (2026-02-04). Commit `c6bf3468f` (2026-02-10) changed the default to `5 * 365 * 24 * 60 * 60` seconds.
 
+Five-year tokens are no longer minted. `generateApiToken` has no default lifetime, and it, `signKiloToken`, and `signModernKiloToken` refuse a lifetime above 30 days (`KILO_TOKEN_MAX_LIFETIME_SECONDS`). User-held credentials (device authorization, the profile-page API key, editor sign-in, and the native sign-in without a refresh pair) are minted for exactly 30 days. This is an issuance cap only: verification does not reject tokens issued earlier with a five-year lifetime.
+
 | Legacy issuer expression | Exact `exp - iat` | Evidence |
 |---|---:|---|
-| Current numeric five-year default | `157680000` | `packages/web-shared/src/lib/tokens.ts` |
+| Numeric five-year default (until the 30-day cap) | `157680000` | `packages/web-shared/src/lib/tokens.ts` history |
+| 30-day user credential | `2592000` | `TOKEN_EXPIRY.thirtyDays` in `packages/web-shared/src/lib/tokens.ts` |
 | Historical `'5y'` default | `157788000` | `bc8179c70:src/lib/tokens.ts`; installed `ms` parser defines a year as 365.25 days |
 
-Both values are required for the narrow legacy five-year class. Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also calls the generic five-year issuer, including `apps/web/src/routers/cli-sessions-v2-router.ts`.
+The two five-year values are required for the narrow legacy five-year class; the 30-day value is the same class as minted now. Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also called the generic five-year issuer, and unmarked 30-day tokens share the shape (see below).
 
 ## Opt-in contract
 
@@ -69,7 +72,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 
 ## Legacy exchange class
 
-`five-year-api` is deliberately narrow. It permits both exact historical durations (`157680000`, `157788000`) and requires all of the following:
+`five-year-api` is deliberately narrow. The name is historical: it permits both exact five-year durations (`157680000`, `157788000`) and the exact 30-day duration minted now (`2592000`), and requires all of the following:
 
 - no `aud`;
 - no modern policy fields;
@@ -77,7 +80,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 - only the exchange-safe claim names listed above; this excludes `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceSessionId`, `isAdmin`, `orgMemberships`, `organizationId`, `organizationRole`, and any future or unknown claim;
 - `deviceAuthRequestCode` is allowed, preserving legacy device authorization output.
 
-Known marked automation and system-style issuers fail this shape. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
+Known marked automation and system-style issuers fail this shape. Device-bound legacy credentials (`deviceSessionId`) are checked separately by the web resource delegation and by `session-sync`, which accept one hour, 30 days, and the five-year `157680000`, each with a live device session. KiloClaw's 30-day runtime keys carry no marker, so since the 30-day duration joined this class they match it. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
 
 Future issuance routes should use `legacy: 'deny'` by default. A route requiring proof of human issuance must use trustworthy server-side issuance provenance or fresh session authentication, not enable the shape fallback as a substitute. Any compatibility exception requires an explicit policy decision accepting the documented residual risk. This concerns permission to exchange credentials, not supported ordinary legacy resource access; Phase 1 does not invalidate tokens.
 
@@ -89,7 +92,7 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 |---|---|---|---|---|---|
 | Chat fanout | `apps/web/src/lib/kilo-chat/token.ts`; mobile requests through `apps/mobile/src/components/kilo-chat/hooks/use-kilo-chat-token.ts` | Kilo Chat and Event Service via `apps/web/src/contexts/EventServiceContext.tsx`; Notifications badges via `apps/mobile/src/lib/hooks/use-unread-counts.ts` | None | `kilo-chat`, `event-service`, `notifications` | One chat token fans out to three services; decide whether it becomes a single multi-audience read token or separate audience-specific tokens. |
 | Cloud Agent control and downstream Kilo access | `packages/web-shared/src/lib/tokens.ts` (`generateCloudAgentWorkflowToken`) and Cloud Agent routers | `services/cloud-agent-next/src/validate-kilo-token.ts`; backend balance call; raw runtime bearer or contained capability in `services/cloud-agent-next/src/session-service.ts` | `cloud-agent-next` (workflow control token); None for request-delegated router credentials | `cloud-agent-next`, `kilo-api`, `kilo-gateway`, `session-ingest` | The raw user token can reach multiple downstream routes; contained Kilo capability has separate routing controls. |
-| Code Review | `apps/web/src/lib/code-reviews/triggers/prepare-review-payload.ts` | `services/code-review-infra/src/code-review-orchestrator.ts` forwards to Cloud Agent Next | None; default five-year token with `botId: 'reviewer'` | Cloud Agent control and downstream API/gateway boundaries | Preserve delegated workload purpose through forwarding and renewal. |
+| Code Review | `apps/web/src/lib/code-reviews/triggers/prepare-review-payload.ts` | `services/code-review-infra/src/code-review-orchestrator.ts` forwards to Cloud Agent Next | None (legacy) or `cloud-agent-next`; one-hour token with `botId: 'reviewer'` | Cloud Agent control and downstream API/gateway boundaries | Preserve delegated workload purpose through forwarding and renewal. |
 | Security Auto Analysis | `services/security-auto-analysis/src/token.ts` | `services/security-auto-analysis/src/launch.ts`, `remediation.ts`, and `manual-analysis.ts` forward user credentials to Cloud Agent Next | None; one-hour marked user tokens and separate minimal internal assertions | Cloud Agent control and downstream API/gateway boundaries for user tokens; identify each internal assertion consumer separately | Keep internal assertions distinct from runtime user credentials. |
 | Webhook Agent Ingest | `services/webhook-agent-ingest/src/services/token-minting-service.ts` | `services/webhook-agent-ingest/src/queue-consumer.ts` forwards to Cloud Agent Next | None; one-hour personal/bot-user token branches | Cloud Agent control and downstream API/gateway boundaries | Preserve non-exchangeable classification for both personal and bot-user branches. |
 | KiloClaw control and cookie | `apps/web/src/routers/kiloclaw-router.ts`; cookie minted in `services/kiloclaw/src/routes/access-gateway.ts` | `services/kiloclaw/src/auth/middleware.ts` | None | `kiloclaw` | Bearer control and 24-hour cookie share the verifier but may need different later purposes. |
@@ -120,7 +123,7 @@ Excluded from the credential-exchange compatibility class or treated as separate
 - encrypted Git/Kilo session capabilities, which have their own `purpose` field (for example `kilo_api_session`) in `services/git-token-service/src/kilo-session-capability.ts`;
 - container, share, repository, and MCP credentials, which require separate family-specific analysis rather than automatic migration as core Kilo API tokens.
 
-KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None qualifies for the five-year exchange compatibility class.
+KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None of those qualifies for the legacy exchange compatibility class, except the unmarked 30-day KiloClaw runtime key, which has the same shape and lifetime as a 30-day user API token.
 
 ## Phase 4: web readers
 

@@ -144,6 +144,7 @@ export {
   verifyKiloToken,
   kiloTokenPayload,
   KILO_TOKEN_VERSION,
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
 } from './kilo-token.js';
 export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
 export {

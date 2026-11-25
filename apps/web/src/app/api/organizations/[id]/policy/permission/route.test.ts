@@ -18,6 +18,7 @@ import {
   generateApiToken,
   generateInternalServiceToken,
   generateOrganizationApiToken,
+  TOKEN_EXPIRY,
 } from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -152,7 +153,7 @@ function signClaims(extra: Record<string, unknown>, secret = NEXTAUTH_SECRET): s
 }
 
 test('returns a disabled envelope and accepts only the exact opaque tag for the member', async () => {
-  const token = generateApiToken(user);
+  const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   const initial = await request({ token });
   expect(initial.status).toBe(200);
   expect(initial.headers.get('Cache-Control')).toBe('private, no-store');
@@ -191,10 +192,13 @@ test('does not match a validator from another account with an identical body or 
   await addMember(otherAccount, organizationId);
   await addMember(user, otherOrganization);
 
-  const token = generateApiToken(user);
+  const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   const original = await request({ token });
   const tag = requireTag(original);
-  const otherUserResponse = await request({ token: generateApiToken(otherAccount), tag });
+  const otherUserResponse = await request({
+    token: generateApiToken(otherAccount, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    tag,
+  });
   expect(otherUserResponse.status).toBe(200);
   expect(await otherUserResponse.text()).toBe(await original.text());
   expect(requireTag(otherUserResponse)).not.toBe(tag);
@@ -208,7 +212,11 @@ test('does not match a validator from another account with an identical body or 
 test('honors legacy and modern account organization bindings independently of mutable headers', async () => {
   const otherOrganization = await createOrganization();
   await addMember(user, otherOrganization);
-  const tag = requireTag(await request({ token: generateApiToken(user) }));
+  const tag = requireTag(
+    await request({
+      token: generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    })
+  );
   const humanClaims = { aud: 'kilo-api', tokenPurpose: 'human-api', credentialExchange: false };
 
   for (const token of [
@@ -237,7 +245,11 @@ test('honors legacy and modern account organization bindings independently of mu
 });
 
 test('refuses browser sessions, internal, delegated, and otherwise invalid credentials before matching a tag', async () => {
-  const tag = requireTag(await request({ token: generateApiToken(user) }));
+  const tag = requireTag(
+    await request({
+      token: generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    })
+  );
   const headers = { cookie: 'next-auth.session-token=session' };
   jest.mocked(getServerSession).mockResolvedValue({
     kiloUserId: user.id,
@@ -256,9 +268,9 @@ test('refuses browser sessions, internal, delegated, and otherwise invalid crede
   for (const token of [
     'anonymous',
     generateInternalServiceToken(user.id),
-    generateApiToken(user, { internalApiUse: true }),
-    generateApiToken(user, { tokenSource: 'cloud-agent' }),
-    generateApiToken(user, { botId: 'bot' }),
+    generateApiToken(user, { internalApiUse: true }, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    generateApiToken(user, { tokenSource: 'cloud-agent' }, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    generateApiToken(user, { botId: 'bot' }, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
     signClaims({ aud: 'kilo-api', tokenPurpose: 'internal-service', credentialExchange: false }),
     signClaims({ aud: 'kilo-api', tokenPurpose: 'delegated-workload', credentialExchange: false }),
     signClaims({ aud: 'kilo-api', tokenPurpose: 'device-access', credentialExchange: false }),
@@ -299,15 +311,43 @@ test('does not grant policy access through inherited membership, platform admin,
   const bot = await createUser({ is_bot: true });
   await addMember(bot, organizationId);
 
-  expectDenied(await request({ id: child, token: generateApiToken(user) }), 403);
-  expectDenied(await request({ token: generateApiToken(admin) }), 403);
-  expectDenied(await request({ token: generateApiToken(bot) }), 401);
-  expectDenied(await request({ id: crypto.randomUUID(), token: generateApiToken(user) }), 404);
-  expectDenied(await request({ id: 'not-a-uuid', token: generateApiToken(user) }), 400);
+  expectDenied(
+    await request({
+      id: child,
+      token: generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    }),
+    403
+  );
+  expectDenied(
+    await request({
+      token: generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    }),
+    403
+  );
+  expectDenied(
+    await request({
+      token: generateApiToken(bot, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    }),
+    401
+  );
+  expectDenied(
+    await request({
+      id: crypto.randomUUID(),
+      token: generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    }),
+    404
+  );
+  expectDenied(
+    await request({
+      id: 'not-a-uuid',
+      token: generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }),
+    }),
+    400
+  );
 });
 
 test('conditional requests fail immediately after membership revocation, account blocking, or token rotation', async () => {
-  const token = generateApiToken(user);
+  const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   const tag = requireTag(await request({ token }));
   await db
     .delete(organization_memberships)
@@ -354,7 +394,7 @@ test('an active signed native device credential loses conditional access immedia
 });
 
 test('distinguishes enabled-empty and disabled at the same revision', async () => {
-  const token = generateApiToken(user);
+  const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   await setPermissionPolicyFlag([organizationId]);
   const enabled = await request({ token });
   expect(enabled.status).toBe(200);
@@ -370,7 +410,7 @@ test('distinguishes enabled-empty and disabled at the same revision', async () =
 
 test('ignores retired stored policy and does not renew a tag for its old representation', async () => {
   await setPermissionPolicyFlag([organizationId]);
-  const token = generateApiToken(user);
+  const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   const retired = { schema_version: 1, mode: 'allowlist', clients: [] };
   await db.insert(organization_group_policy_settings).values({
     organization_id: organizationId,
@@ -395,7 +435,7 @@ test('ignores retired stored policy and does not renew a tag for its old represe
 
 test('serves only anonymous applicable policy layers and invalidates a tag after a same-revision policy change', async () => {
   await setPermissionPolicyFlag([organizationId]);
-  const token = generateApiToken(user);
+  const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   const memberLayer = { schema_version: 1, tools: { websearch: 'deny' } } as const;
   const otherLayer = { schema_version: 1, tools: { external_directory: 'ask' } } as const;
   const groupId = crypto.randomUUID();
@@ -430,7 +470,7 @@ test('serves only anonymous applicable policy layers and invalidates a tag after
 
 test('fails closed instead of renewing an authorized tag when stored policy or feature config is invalid', async () => {
   await setPermissionPolicyFlag([organizationId]);
-  const token = generateApiToken(user);
+  const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   const tag = requireTag(await request({ token }));
   const futurePolicy = [
     { type: 'client_access', data: { schema_version: 1, mode: 'allowlist', clients: [] } },

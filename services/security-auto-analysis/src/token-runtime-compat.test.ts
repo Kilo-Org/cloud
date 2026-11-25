@@ -28,7 +28,7 @@ describe('automation issuer to runtime compatibility', () => {
         userId: user.id,
         pepper,
         secret,
-        expiresInSeconds: 157_680_000,
+        expiresInSeconds: 30 * 24 * 60 * 60,
       });
       const control = await generateControlToken(user, secret, 'production', true, organizationId);
       const adapters = {

@@ -1,0 +1,318 @@
+import { AUDIT_BATCH_MAX_EVENTS } from '@kilocode/sts-contracts';
+import type pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import { RELAY_READ, TestDatabase, auditEvent, insertAudit, sqlStateOf } from './harness';
+
+/**
+ * Partition maintenance and the relay read at volume (design section 8.1). The database holds an
+ * old partition with 100,000 rows that every shard has relayed, an empty old partition, and newer
+ * rows that no shard has relayed. The tests pin the plans that keep both reads off relayed rows,
+ * and measure how long an audit insert waits while maintenance drops a partition. Each measured
+ * figure is printed.
+ */
+
+const DAY_MS = 86_400_000;
+const OLD_ROWS = 100_000;
+const NEW_ROWS = 20_000;
+const LOCK_TIMEOUT_MS = 200;
+
+const now = new Date();
+
+function partitionFor(daysFromToday: number): string {
+  const day = new Date(now.getTime() + daysFromToday * DAY_MS);
+  return `audit_events_${day.toISOString().slice(0, 10).replaceAll('-', '')}`;
+}
+
+const OLD_PARTITION = partitionFor(-9);
+const TODAY_PARTITION = partitionFor(0);
+
+/** `(txid, id) > (last_txid, last_id)`, as EXPLAIN prints it inside an index condition. */
+const ROW_COMPARISON =
+  /ROW\((\w+\.)?txid, (\w+\.)?id\) > ROW\(watermark\.last_txid, watermark\.last_id\)/;
+
+const PlanNodeSchema: z.ZodType<PlanNode> = z.lazy(() =>
+  z.looseObject({
+    'Node Type': z.string(),
+    'Relation Name': z.string().optional(),
+    'Index Name': z.string().optional(),
+    'Index Cond': z.string().optional(),
+    'Actual Rows': z.number(),
+    'Actual Loops': z.number(),
+    'Heap Fetches': z.number().optional(),
+    Plans: z.array(PlanNodeSchema).optional(),
+  })
+);
+type PlanNode = {
+  'Node Type': string;
+  'Relation Name'?: string;
+  'Index Name'?: string;
+  'Index Cond'?: string;
+  'Actual Rows': number;
+  'Actual Loops': number;
+  'Heap Fetches'?: number;
+  Plans?: PlanNode[];
+};
+const ExplainSchema = z.tuple([
+  z.looseObject({ Plan: PlanNodeSchema, 'Execution Time': z.number() }),
+]);
+
+function planNodes(node: PlanNode): PlanNode[] {
+  return [node, ...(node.Plans ?? []).flatMap(planNodes)];
+}
+
+async function explain(client: pg.Client, statement: string) {
+  const result = await client.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${statement}`);
+  const [explained] = ExplainSchema.parse(result.rows[0]['QUERY PLAN']);
+  return { nodes: planNodes(explained.Plan), executionMs: explained['Execution Time'] };
+}
+
+let db: TestDatabase;
+let owner: pg.Client;
+
+async function partitions(): Promise<string[]> {
+  const result = await owner.query<{ relname: string }>(
+    `SELECT child.relname FROM pg_inherits
+     JOIN pg_class AS child ON child.oid = pg_inherits.inhrelid
+     WHERE pg_inherits.inhparent = 'uts.audit_events'::regclass
+     ORDER BY child.relname`
+  );
+  return result.rows.map(row => row.relname);
+}
+
+function milliseconds(values: number[]): string {
+  return `${Math.max(...values).toFixed(1)} ms max, ${values.length} inserts`;
+}
+
+beforeAll(async () => {
+  db = await TestDatabase.create();
+  owner = await db.connectAsOwner();
+  // The two old partitions, created the way the cron creates partitions: one call per partition.
+  let created = true;
+  while (created) {
+    const step = await owner.query(
+      `SELECT 1 FROM uts.audit_partition_maintenance_at(now() - interval '9 days', 1)
+       WHERE action = 'created'`
+    );
+    created = step.rowCount === 1;
+  }
+  const event = auditEvent();
+  await owner.query(
+    `INSERT INTO uts.audit_events (created_at, event_id, event_type, event)
+     SELECT now() - interval '9 days', ids.id, $1, jsonb_set($2::jsonb, '{id}', to_jsonb(ids.id::text))
+     FROM (SELECT gen_random_uuid() AS id FROM generate_series(1, $3)) AS ids`,
+    [event.type, event, OLD_ROWS]
+  );
+  // Every shard has relayed every row so far.
+  await owner.query(
+    `UPDATE uts.audit_relay_watermarks AS watermark
+     SET last_txid = newest.txid, last_id = newest.id
+     FROM (SELECT DISTINCT ON (shard) shard, txid, id FROM uts.audit_events
+           ORDER BY shard, txid DESC, id DESC) AS newest
+     WHERE watermark.shard = newest.shard`
+  );
+  await owner.query(`VACUUM (ANALYZE) uts.${OLD_PARTITION}`);
+  const app = await db.connect('uts_app_a');
+  await app.query(
+    `INSERT INTO uts.audit_events (event_id, event_type, event)
+     SELECT ids.id, $1, jsonb_set($2::jsonb, '{id}', to_jsonb(ids.id::text))
+     FROM (SELECT gen_random_uuid() AS id FROM generate_series(1, $3)) AS ids`,
+    [event.type, event, NEW_ROWS]
+  );
+  await owner.query(`ANALYZE uts.${TODAY_PARTITION}`);
+}, 180_000);
+afterAll(() => db.drop());
+
+describe('audit reads at volume', () => {
+  it('read past the watermark with the row comparison as the index condition of every partition', async () => {
+    await owner.query('SET plan_cache_mode = force_generic_plan');
+    await owner.query(`PREPARE relay_read(smallint, integer) AS ${RELAY_READ}`);
+    try {
+      const { nodes, executionMs } = await explain(
+        owner,
+        `EXECUTE relay_read(3, ${AUDIT_BATCH_MAX_EVENTS})`
+      );
+      const scans = nodes.filter(node => node['Relation Name']?.startsWith('audit_events_'));
+      expect(scans.map(scan => scan['Relation Name']).sort()).toEqual(await partitions());
+      for (const scan of scans) {
+        expect(scan['Node Type']).toBe('Index Scan');
+        expect(scan['Index Name']).toBe(`${scan['Relation Name']}_shard_txid_id_idx`);
+        expect(scan['Index Cond']).toMatch(ROW_COMPARISON);
+      }
+      const relayed = scans.find(scan => scan['Relation Name'] === OLD_PARTITION);
+      expect(relayed?.['Actual Rows']).toBe(0);
+      console.info(
+        `relay read (generic plan) over ${OLD_ROWS} relayed and ${NEW_ROWS} new rows: ${executionMs} ms`
+      );
+    } finally {
+      await owner.query('DEALLOCATE relay_read');
+      await owner.query('RESET plan_cache_mode');
+    }
+
+    // Other test files' writes hold back the server-wide horizon for up to several seconds, so
+    // the read may wait up to 30 seconds.
+    await vi.waitFor(
+      async () => {
+        const read = await owner.query<{ shard: number; created_at: Date }>(RELAY_READ, [
+          3,
+          AUDIT_BATCH_MAX_EVENTS,
+        ]);
+        expect(read.rows).toHaveLength(AUDIT_BATCH_MAX_EVENTS);
+        for (const row of read.rows) {
+          expect(row.shard).toBe(3);
+          expect(row.created_at.getTime()).toBeGreaterThan(now.getTime() - DAY_MS);
+        }
+      },
+      { timeout: 30_000, interval: 100 }
+    );
+  }, 35_000);
+
+  it('check a relayed partition with one index-only probe per shard', async () => {
+    const built = await owner.query<{ query: string }>(
+      'SELECT uts.audit_partition_unrelayed_query($1) AS query',
+      [OLD_PARTITION]
+    );
+    const { query } = built.rows[0];
+    const { nodes, executionMs } = await explain(owner, query);
+    const partitionNodes = nodes.filter(node => node['Relation Name'] === OLD_PARTITION);
+    expect(partitionNodes).toHaveLength(1);
+    expect(partitionNodes[0]).toMatchObject({
+      'Node Type': 'Index Only Scan',
+      'Index Name': `${OLD_PARTITION}_shard_txid_id_idx`,
+      'Actual Rows': 0,
+      'Actual Loops': 8,
+      'Heap Fetches': 0,
+    });
+    expect(partitionNodes[0]['Index Cond']).toMatch(ROW_COMPARISON);
+    expect(nodes.filter(node => node['Node Type'] === 'Seq Scan')).toEqual([
+      expect.objectContaining({ 'Relation Name': 'audit_relay_watermarks' }),
+    ]);
+    const answer = await owner.query<{ exists: boolean }>(query);
+    expect(answer.rows).toEqual([{ exists: false }]);
+    console.info(`partition check over ${OLD_ROWS} relayed rows: ${executionMs} ms`);
+  });
+});
+
+describe('partition maintenance under insert load', () => {
+  it('truncate a relayed partition without locking the parent table', async () => {
+    const maintainer = await db.connectAsOwner();
+    const inserter = await db.connect('uts_app_a');
+    // Hold the TRUNCATE's transaction open to inspect its locks.
+    await maintainer.query('BEGIN');
+    try {
+      const started = performance.now();
+      const result = await maintainer.query(
+        'SELECT * FROM uts.audit_partition_maintenance_at(now(), 7)'
+      );
+      const callMs = performance.now() - started;
+      expect(result.rows).toEqual([{ action: 'truncated', partition_name: OLD_PARTITION }]);
+
+      const locks = await maintainer.query<{ relation: string; mode: string }>(
+        `SELECT relation::regclass::text AS relation, mode FROM pg_locks
+         WHERE pid = pg_backend_pid() AND locktype = 'relation'
+           AND relation IN ('uts.audit_events'::regclass, $1::regclass)`,
+        [`uts.${OLD_PARTITION}`]
+      );
+      expect(locks.rows.map(lock => lock.relation)).not.toContain('uts.audit_events');
+      expect(locks.rows).toContainEqual({
+        relation: `uts.${OLD_PARTITION}`,
+        mode: 'AccessExclusiveLock',
+      });
+
+      // An insert goes through while the TRUNCATE's lock is still held.
+      const insertStarted = performance.now();
+      await insertAudit(inserter);
+      const insertMs = performance.now() - insertStarted;
+      expect(insertMs).toBeLessThan(LOCK_TIMEOUT_MS);
+      console.info(
+        `truncate call over ${OLD_ROWS} rows ${callMs.toFixed(1)} ms; an insert during its open ` +
+          `transaction took ${insertMs.toFixed(1)} ms`
+      );
+    } finally {
+      await maintainer.query('COMMIT');
+    }
+    const left = await owner.query(`SELECT count(*)::int AS rows FROM uts.${OLD_PARTITION}`);
+    expect(left.rows).toEqual([{ rows: 0 }]);
+  });
+
+  it('give up after its lock wait when an insert holds the table, so a queued insert waits no longer', async () => {
+    const holder = await db.connect('uts_app_b');
+    const maintainer = await db.connectAsOwner();
+    const watcher = await db.connect();
+    const inserter = await db.connect('uts_app_a');
+    const pid = z
+      .object({ pid: z.number() })
+      .parse((await maintainer.query('SELECT pg_backend_pid() AS pid')).rows[0]).pid;
+
+    await holder.query('BEGIN');
+    await insertAudit(holder);
+    try {
+      const started = performance.now();
+      const call = sqlStateOf(() =>
+        maintainer.query('SELECT * FROM uts.audit_partition_maintenance_at(now(), 7)')
+      );
+      // The DROP now waits for the parent's lock, and every new insert queues behind it.
+      await vi.waitFor(
+        async () => {
+          const waiting = await watcher.query(
+            'SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted',
+            [pid]
+          );
+          expect(waiting.rowCount).toBe(1);
+        },
+        { timeout: LOCK_TIMEOUT_MS, interval: 2 }
+      );
+      const insertStarted = performance.now();
+      await insertAudit(inserter);
+      const insertWait = performance.now() - insertStarted;
+      expect(await call).toBe('55P03');
+      const callMs = performance.now() - started;
+
+      expect(callMs).toBeGreaterThanOrEqual(LOCK_TIMEOUT_MS - 5);
+      expect(insertWait).toBeLessThan(LOCK_TIMEOUT_MS + 100);
+      console.info(
+        `lock wait gave up after ${callMs.toFixed(1)} ms; the queued insert waited ${insertWait.toFixed(1)} ms`
+      );
+    } finally {
+      await holder.query('COMMIT');
+    }
+    expect(await partitions()).toContain(OLD_PARTITION);
+  });
+
+  it('drop the emptied partition while inserts wait no longer than the DDL', async () => {
+    const inserter = await db.connect('uts_app_a');
+    const baseline: number[] = [];
+    for (let index = 0; index < 200; index++) {
+      const started = performance.now();
+      await insertAudit(inserter);
+      baseline.push(performance.now() - started);
+    }
+
+    const during: number[] = [];
+    let running = true;
+    const load = (async () => {
+      while (running) {
+        const started = performance.now();
+        await insertAudit(inserter);
+        during.push(performance.now() - started);
+      }
+    })();
+    await vi.waitFor(() => expect(during.length).toBeGreaterThan(20));
+
+    const started = performance.now();
+    const result = await owner.query('SELECT * FROM uts.audit_partition_maintenance_at(now(), 7)');
+    const callMs = performance.now() - started;
+    const settled = during.length + 20;
+    await vi.waitFor(() => expect(during.length).toBeGreaterThan(settled));
+    running = false;
+    await load;
+
+    expect(result.rows).toEqual([{ action: 'dropped', partition_name: OLD_PARTITION }]);
+    expect(await partitions()).not.toContain(OLD_PARTITION);
+    expect(Math.max(...during)).toBeLessThanOrEqual(callMs + Math.max(...baseline));
+    console.info(
+      `drop call ${callMs.toFixed(1)} ms; inserts before: ${milliseconds(baseline)}; ` +
+        `inserts around the drop: ${milliseconds(during)}`
+    );
+  });
+});

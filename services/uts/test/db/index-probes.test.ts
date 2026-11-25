@@ -44,9 +44,11 @@ const SEED = `
          now() + interval '14 days', now() + interval '30 days'
   FROM uts.accounts;
 
+  -- One pass per session and gated action, since a pass serves only its own action and one row.
   INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
-  SELECT account_id, id, 'b', 'third_party_approve', '{recent_sign_in}', now() + interval '10 minutes'
-  FROM uts.browser_sessions;
+  SELECT account_id, id, 'b', action::uts.gated_action, '{recent_sign_in}', now() + interval '10 minutes'
+  FROM uts.browser_sessions
+  CROSS JOIN unnest(ARRAY['third_party_approve', 'pat_create', 'bot_key_create']) AS action;
 
   INSERT INTO uts.third_party_clients
     (client_id, client_name, redirect_uris, document, fetched_at, cache_expires_at)
@@ -55,7 +57,7 @@ const SEED = `
 
   INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
   SELECT account_id, 'https://client.example.com/metadata', '{mcp:tools.read}', id
-  FROM uts.gate_passes;
+  FROM uts.gate_passes WHERE action = 'third_party_approve';
 
   INSERT INTO uts.third_party_grant_families
     (account_id, client_id, consent_id, scopes, auth_time, amr, expires_at)
@@ -70,13 +72,13 @@ const SEED = `
     (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
   SELECT account_id, 'seed', sha256(convert_to('pat' || id, 'UTF8')), 'abcd', 'gateway',
          'gateway:models.read', id, now() + interval '90 days'
-  FROM uts.gate_passes;
+  FROM uts.gate_passes WHERE action = 'pat_create';
 
   INSERT INTO uts.org_bot_keys
     (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
   SELECT md5('org' || account_id)::uuid, account_id, 'seed', sha256(convert_to('bot' || id, 'UTF8')),
          'wxyz', 'gateway', 'gateway:models.read', id, now() + interval '90 days'
-  FROM uts.gate_passes;
+  FROM uts.gate_passes WHERE action = 'bot_key_create';
 
   ANALYZE uts.accounts, uts.org_sso_policies, uts.org_memberships, uts.device_sessions,
     uts.refresh_grants, uts.browser_sessions, uts.third_party_grant_families,

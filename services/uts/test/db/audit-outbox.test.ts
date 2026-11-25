@@ -2,18 +2,18 @@ import { randomUUID } from 'node:crypto';
 import {
   AUDIT_BATCH_MAX_COMPRESSED_BYTES,
   AUDIT_BATCH_MAX_EVENTS,
-  type AuditBatch,
   AuditBatchSchema,
   AuditBatchTooLargeError,
   type AuditEvent,
   AuditEventSchema,
+  decodeAuditBatch,
   encodeAuditBatch,
 } from '@kilocode/sts-contracts';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { withIdentityStore } from '../../src/db/client';
 import { AuditEventRowSchema } from '../../src/db/rows';
-import { TestDatabase, auditEvent, insertAudit, sqlStateOf } from './harness';
+import { RELAY_READ, TestDatabase, auditEvent, insertAudit, sqlStateOf } from './harness';
 
 const CHECK_VIOLATION = '23514';
 
@@ -26,29 +26,9 @@ beforeAll(async () => {
 });
 afterAll(() => db.drop());
 
-/** The relay's read for one shard: rows past the watermark, below the oldest open transaction. */
-const RELAY_READ = `SELECT event.*
-  FROM uts.audit_events AS event
-  JOIN uts.audit_relay_watermarks AS watermark ON watermark.shard = event.shard
-  WHERE event.shard = $1
-    AND (event.txid, event.id) > (watermark.last_txid, watermark.last_id)
-    AND event.txid < pg_snapshot_xmin(pg_current_snapshot())
-  ORDER BY event.txid, event.id
-  LIMIT $2`;
-
 async function relayRead(client: pg.Client, shard: number) {
   const result = await client.query<{ id: bigint }>(RELAY_READ, [shard, AUDIT_BATCH_MAX_EVENTS]);
   return result.rows.map(row => row.id);
-}
-
-/** Inserts `count` copies of `event`, each with its own id, in one statement. */
-async function insertCopies(event: AuditEvent, count: number) {
-  await app.query(
-    `INSERT INTO uts.audit_events (event_id, event_type, event)
-     SELECT ids.id, $1, jsonb_set($2::jsonb, '{id}', to_jsonb(ids.id::text))
-     FROM (SELECT gen_random_uuid() AS id FROM generate_series(1, $3)) AS ids`,
-    [event.type, event, count]
-  );
 }
 
 /** An event whose attributes hold `count` strings of 500 characters. */
@@ -58,6 +38,88 @@ function paddedEvent(count: number): AuditEvent {
     Array.from({ length: count }, (_, index) => [`pad${index}`, 'x'.repeat(500)])
   );
   return { ...base, data: { ...base.data, attributes } };
+}
+
+const CLIENTS = ['kilo-cli', 'kilo-vscode', 'kilo-jetbrains', 'kilo-mobile'];
+const AUDIENCES = ['gateway', 'kilo-chat', 'session-ingest', 'mcp'];
+const PLACES = [
+  ['DE', 'Berlin'],
+  ['US', 'Seattle'],
+  ['BR', 'Sao Paulo'],
+  ['IN', 'Bengaluru'],
+  ['JP', 'Osaka'],
+];
+
+/**
+ * A mint event shaped like real traffic: requester and version, subject, grant family, optional
+ * organization, latency, network fields (documentation addresses and ASNs) and `tokens` minted
+ * tokens with their ids, audiences and scopes. Every value varies with `index`, so gzip sees no
+ * more repetition than real rows give it.
+ */
+function mintEvent(index: number, tokens: number): AuditEvent {
+  const base = auditEvent();
+  const [country, city] = PLACES[index % PLACES.length];
+  const audiences = AUDIENCES.slice(0, tokens);
+  return {
+    ...base,
+    time: new Date(Date.now() - index * 997).toISOString(),
+    data: {
+      ...base.data,
+      actor: { kind: 'user', id: `oauth/github:${1_000_000 + index * 7_919}` },
+      attributes: {
+        requestingService: CLIENTS[index % CLIENTS.length],
+        clientVersion: `7.${index % 40}.${(index * 7) % 13}`,
+        grantFamily: randomUUID(),
+        ...(index % 3 === 0 ? { orgId: randomUUID() } : {}),
+        latencyMs: 18 + ((index * 37) % 190),
+        clientIp: `198.51.100.${(index % 254) + 1}`,
+        asn: 64_496 + (index % 16),
+        country,
+        city,
+        tokenIds: Array.from({ length: tokens }, () => randomUUID()),
+        audiences,
+        scopes: audiences.map(audience => `${audience}:read`),
+      },
+    },
+  };
+}
+
+/**
+ * The relay's split rule (as `sendRows` in the STS audit relay): send the batch as one message,
+ * and halve any batch the encoder refuses. Returns the encoded messages in order.
+ */
+async function encodeWithSplits(events: AuditEvent[], fromSeq = 1): Promise<Uint8Array[]> {
+  try {
+    return [
+      await encodeAuditBatch(
+        AuditBatchSchema.parse({
+          schemaVersion: 1,
+          stream: 'uts-development-shard-3',
+          fromSeq,
+          toSeq: fromSeq + events.length - 1,
+          events,
+        })
+      ),
+    ];
+  } catch (error) {
+    if (!(error instanceof AuditBatchTooLargeError) || events.length === 1) throw error;
+    const middle = Math.ceil(events.length / 2);
+    return [
+      ...(await encodeWithSplits(events.slice(0, middle), fromSeq)),
+      ...(await encodeWithSplits(events.slice(middle), fromSeq + middle)),
+    ];
+  }
+}
+
+/** Checks that `messages` fit the queue limit and carry exactly `events`, in order. */
+async function expectMessagesCarry(messages: Uint8Array[], events: AuditEvent[]) {
+  for (const message of messages) {
+    expect(message.byteLength).toBeLessThanOrEqual(AUDIT_BATCH_MAX_COMPRESSED_BYTES);
+  }
+  const decoded = await Promise.all(messages.map(message => decodeAuditBatch(message)));
+  expect(decoded.flatMap(batch => batch.events.map(event => event.id))).toEqual(
+    events.map(event => event.id)
+  );
 }
 
 describe('audit outbox rows', () => {
@@ -112,16 +174,17 @@ describe('audit outbox rows', () => {
     expect(await relayRead(relay, lateRow.shard)).not.toContain(lateRow.id);
 
     await early.query('COMMIT');
-    // Transactions of other test files share the cluster's oldest-open-transaction horizon, so
-    // wait for any of them to finish too.
+    // Transactions of other test files share the server's oldest-open-transaction horizon, so
+    // wait for any of them to finish too. Up to 30 seconds: a seed insert of 100,000 rows in
+    // `audit-maintenance.test.ts` holds the horizon for several seconds.
     await vi.waitFor(
       async () => {
         expect(await relayRead(relay, earlyRow.shard)).toContain(earlyRow.id);
         expect(await relayRead(relay, lateRow.shard)).toContain(lateRow.id);
       },
-      { timeout: 15_000, interval: 100 }
+      { timeout: 30_000, interval: 100 }
     );
-  });
+  }, 35_000);
 });
 
 type Mutation = (event: Record<string, unknown> & { data: Record<string, unknown> }) => unknown;
@@ -345,10 +408,75 @@ describe('the audit row check and AuditEventSchema', () => {
   });
 });
 
+describe('the credential check on audit rows', () => {
+  const insertWith = (event: AuditEvent, accountId: string | null = null) =>
+    app.query(
+      `INSERT INTO uts.audit_events (event_id, event_type, account_id, event)
+       VALUES ($1, $2, $3, $4)`,
+      [event.id, event.type, accountId, event]
+    );
+  const withAttribute = (value: string): AuditEvent => {
+    const base = auditEvent();
+    return { ...base, data: { ...base.data, attributes: { note: value } } };
+  };
+
+  it.each([
+    ['a PAT', 'kilo_pat_0123456789abcdef'],
+    ['a refresh grant', 'value kilo_rt_0123456789abcdef'],
+    ['an org bot key', 'kilo_bot_0123456789abcdef'],
+    // Built from parts: header `{"alg":"none"}`, payload `{"sub":"t"}`, a signature.
+    ['a JWT', `Bearer ${['eyJhbGciOiJub25lIn0', 'eyJzdWIiOiJ0In0', 'c2ln'].join('.')}`],
+  ])('refuse %s in an attribute', async (_name, value) => {
+    expect(await sqlStateOf(() => insertWith(withAttribute(value)))).toBe(CHECK_VIOLATION);
+  });
+
+  it('refuse an email address as the account or the actor', async () => {
+    expect(await sqlStateOf(() => insertWith(auditEvent(), 'someone@example.com'))).toBe(
+      CHECK_VIOLATION
+    );
+    const base = auditEvent();
+    const byAddress = {
+      ...base,
+      data: { ...base.data, actor: { kind: 'user' as const, id: 'someone@example.com' } },
+    };
+    expect(await sqlStateOf(() => insertWith(byAddress))).toBe(CHECK_VIOLATION);
+  });
+
+  it('accept an app user id, a token kind, a token id and a mention of a prefix', async () => {
+    const base = auditEvent();
+    const attributes = { tokenKind: 'kilo_pat', tokenRef: randomUUID() };
+    await insertWith({ ...base, data: { ...base.data, attributes } }, 'oauth/github:12345');
+    await insertWith({
+      ...base,
+      id: randomUUID(),
+      data: { ...base.data, outcome: 'failure', outcomeDetail: 'malformed kilo_pat_ value' },
+    });
+  });
+});
+
 describe('relay batches', () => {
-  it('read 500 rows of one shard into one queue message under 60 KB', async () => {
-    await insertCopies(auditEvent(), AUDIT_BATCH_MAX_EVENTS * 8 + 8);
-    // Another test file's open transaction can briefly hold back the oldest-open horizon.
+  it('split a 500-row read of realistic mint events into messages under 60 KB', async () => {
+    // Start shard 3 after the rows that earlier tests wrote.
+    await app.query(
+      `UPDATE uts.audit_relay_watermarks AS watermark
+       SET last_txid = newest.txid, last_id = newest.id
+       FROM (SELECT txid, id FROM uts.audit_events WHERE shard = 3
+             ORDER BY txid DESC, id DESC LIMIT 1) AS newest
+       WHERE watermark.shard = 3`
+    );
+    // 1 to 4 tokens per mint, changing every 8 rows so that every shard sees each count.
+    const events = Array.from({ length: AUDIT_BATCH_MAX_EVENTS * 8 + 8 }, (_, index) =>
+      mintEvent(index, 1 + (Math.floor(index / 8) % 4))
+    );
+    await app.query(
+      `INSERT INTO uts.audit_events (event_id, event_type, event)
+       SELECT (item ->> 'id')::uuid, item ->> 'type', item
+       FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS input(item, position)
+       ORDER BY position`,
+      [JSON.stringify(events)]
+    );
+    // Other test files' writes hold back the server-wide horizon, a seed insert of 100,000 rows
+    // for several seconds, so the read may wait up to 30 seconds.
     const rows = await vi.waitFor(
       async () => {
         const read = await withIdentityStore(
@@ -363,19 +491,41 @@ describe('relay batches', () => {
         expect(read).toHaveLength(AUDIT_BATCH_MAX_EVENTS);
         return read;
       },
-      { timeout: 15_000, interval: 100 }
+      { timeout: 30_000, interval: 100 }
     );
     expect(rows.every(row => row.shard === 3)).toBe(true);
 
-    const batch: AuditBatch = AuditBatchSchema.parse({
-      schemaVersion: 1,
-      stream: 'uts-development-shard-3',
-      fromSeq: 1,
-      toSeq: rows.length,
-      events: rows.map(row => row.event),
-    });
-    const message = await encodeAuditBatch(batch);
-    expect(message.byteLength).toBeLessThanOrEqual(AUDIT_BATCH_MAX_COMPRESSED_BYTES);
+    const read = rows.map(row => row.event);
+    const messages = await encodeWithSplits(read);
+    await expectMessagesCarry(messages, read);
+    console.info(
+      `500 mixed mint rows -> ${messages.length} messages of ${messages
+        .map(message => message.byteLength)
+        .join(', ')} bytes`
+    );
+  }, 35_000);
+
+  it('split 500 four-token mint events, which one message cannot hold', async () => {
+    const events = Array.from({ length: AUDIT_BATCH_MAX_EVENTS }, (_, index) =>
+      mintEvent(index, 4)
+    );
+    await expect(
+      encodeAuditBatch({
+        schemaVersion: 1,
+        stream: 'uts-development-shard-3',
+        fromSeq: 1,
+        toSeq: events.length,
+        events,
+      })
+    ).rejects.toThrow(AuditBatchTooLargeError);
+    const messages = await encodeWithSplits(events);
+    expect(messages.length).toBeGreaterThan(1);
+    await expectMessagesCarry(messages, events);
+    console.info(
+      `500 four-token mint events -> ${messages.length} messages of ${messages
+        .map(message => message.byteLength)
+        .join(', ')} bytes`
+    );
   });
 
   it('accept a row near the 8 KB cap, which fits one message alone, and refuse a larger one', async () => {

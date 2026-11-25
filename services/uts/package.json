@@ -12,6 +12,7 @@
     "db:up": "bash scripts/local-db.sh up",
     "db:down": "bash scripts/local-db.sh down",
     "db:migrate": "tsx scripts/migrate.ts",
+    "db:check-access": "tsx scripts/check-platform-access.ts",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/uts/src services/uts/test services/uts/scripts"
   },
   "dependencies": {

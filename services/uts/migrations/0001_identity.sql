@@ -273,6 +273,11 @@ CREATE INDEX device_sessions_account_idx ON uts.device_sessions (account_id)
 -- Gate passes (design section 5.11). Tier A needs a recent strongest-method sign-in plus an email
 -- code, and an email change also needs the code sent to the new address. Tier B needs a recent
 -- sign-in or a passkey check. A pass lasts at most 10 minutes and is consumed by one action.
+-- Each table that records a gated action carries that action as a constant `gate_pass_action`
+-- column, a foreign key on (pass, account, action) and a unique pass id, so a pass serves only
+-- its own account, its own action and one row. A pass is never swept while a credential refers to
+-- it: those foreign keys refuse the delete, and an org bot key lets go of its pass only once it is
+-- flagged, kept or revoked. Deleting the account deletes its passes with its credentials.
 CREATE TABLE uts.gate_passes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uts.account_id NOT NULL REFERENCES uts.accounts (id) ON DELETE CASCADE,
@@ -299,7 +304,8 @@ CREATE TABLE uts.gate_passes (
       ELSE satisfied_by && ARRAY['recent_sign_in', 'passkey']::uts.gate_check[]
     END
   ),
-  CONSTRAINT gate_passes_status_shape CHECK ((status = 'consumed') = (consumed_at IS NOT NULL))
+  CONSTRAINT gate_passes_status_shape CHECK ((status = 'consumed') = (consumed_at IS NOT NULL)),
+  CONSTRAINT gate_passes_account_action_key UNIQUE (id, account_id, action)
 );
 CREATE INDEX gate_passes_account_idx ON uts.gate_passes (account_id, passed_at);
 
@@ -337,6 +343,8 @@ CREATE INDEX step_ups_account_idx ON uts.step_ups (account_id, completed_at);
 -- First-party refresh grants: a `kilo_rt_` value bound to a DPoP key. Lifetimes by client class
 -- (design section 5.3): desktop 30 days idle and 180 days maximum, mobile 60 and 365 days.
 -- The grant id is the `sid` claim. A refresh may request any subset of `allowed_scopes`.
+-- UTS moves `last_used_at` and `idle_expires_at` at most once per grant per hour, not on every
+-- mint, and the free space that fillfactor 90 leaves lets those updates stay on the same page.
 CREATE TABLE uts.refresh_grants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uts.account_id NOT NULL REFERENCES uts.accounts (id) ON DELETE CASCADE,
@@ -372,7 +380,7 @@ CREATE TABLE uts.refresh_grants (
     (status = 'active' AND revoked_at IS NULL AND revoke_reason IS NULL)
     OR (status = 'revoked' AND revoked_at IS NOT NULL AND revoke_reason IS NOT NULL)
   )
-);
+) WITH (fillfactor = 90);
 CREATE INDEX refresh_grants_account_idx ON uts.refresh_grants (account_id) WHERE status = 'active';
 CREATE INDEX refresh_grants_device_session_idx ON uts.refresh_grants (device_session_id);
 CREATE INDEX refresh_grants_org_idx ON uts.refresh_grants (org_id, account_id)
@@ -401,11 +409,16 @@ CREATE TABLE uts.third_party_consents (
   client_id uts.client_id NOT NULL REFERENCES uts.third_party_clients (client_id) ON DELETE CASCADE,
   org_id uuid,
   scopes uts.scope_set NOT NULL,
-  gate_pass_id uuid NOT NULL REFERENCES uts.gate_passes (id),
+  gate_pass_id uuid NOT NULL,
+  gate_pass_action uts.gated_action NOT NULL
+    GENERATED ALWAYS AS ('third_party_approve'::uts.gated_action) STORED,
   granted_at timestamptz NOT NULL DEFAULT now(),
   status uts.credential_status NOT NULL DEFAULT 'active',
   revoked_at timestamptz,
-  CONSTRAINT third_party_consents_status_shape CHECK ((status = 'revoked') = (revoked_at IS NOT NULL))
+  CONSTRAINT third_party_consents_status_shape CHECK ((status = 'revoked') = (revoked_at IS NOT NULL)),
+  CONSTRAINT third_party_consents_gate_pass_key UNIQUE (gate_pass_id),
+  CONSTRAINT third_party_consents_gate_pass_fkey FOREIGN KEY (gate_pass_id, account_id, gate_pass_action)
+    REFERENCES uts.gate_passes (id, account_id, action)
 );
 CREATE UNIQUE INDEX third_party_consents_active_key
   ON uts.third_party_consents (account_id, client_id, org_id, scopes) NULLS NOT DISTINCT
@@ -509,6 +522,8 @@ CREATE INDEX authorization_codes_expires_idx ON uts.authorization_codes (expires
 CREATE TABLE uts.device_codes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   device_code_hash uts.sha256 NOT NULL,
+  -- HMAC-SHA-256 of the normalized user code under a key that only UTS holds. A user code is
+  -- short enough (RFC 8628, section 6.1) that a plain SHA-256 could be reversed offline.
   user_code_hash uts.sha256 NOT NULL,
   client_id uts.client_id NOT NULL,
   scopes uts.scope_set NOT NULL,
@@ -523,12 +538,18 @@ CREATE TABLE uts.device_codes (
   city text CHECK (length(city) <= 128),
   status uts.device_code_status NOT NULL DEFAULT 'pending',
   account_id uts.account_id REFERENCES uts.accounts (id) ON DELETE CASCADE,
-  gate_pass_id uuid REFERENCES uts.gate_passes (id),
+  -- The foreign key below applies only once both the account and the pass are set (approval).
+  gate_pass_id uuid,
+  gate_pass_action uts.gated_action NOT NULL
+    GENERATED ALWAYS AS ('device_approve'::uts.gated_action) STORED,
   approved_at timestamptz,
   denied_at timestamptz,
   consumed_at timestamptz,
   CONSTRAINT device_codes_device_code_hash_key UNIQUE (device_code_hash),
   CONSTRAINT device_codes_user_code_hash_key UNIQUE (user_code_hash),
+  CONSTRAINT device_codes_gate_pass_key UNIQUE (gate_pass_id),
+  CONSTRAINT device_codes_gate_pass_fkey FOREIGN KEY (gate_pass_id, account_id, gate_pass_action)
+    REFERENCES uts.gate_passes (id, account_id, action),
   CONSTRAINT device_codes_lifetime CHECK (
     expires_at > created_at AND expires_at <= created_at + interval '10 minutes'
   ),
@@ -627,7 +648,9 @@ CREATE TABLE uts.personal_access_tokens (
   audience uts.audience NOT NULL,
   scope uts.scope NOT NULL,
   org_id uuid,
-  gate_pass_id uuid NOT NULL REFERENCES uts.gate_passes (id),
+  gate_pass_id uuid NOT NULL,
+  gate_pass_action uts.gated_action NOT NULL
+    GENERATED ALWAYS AS ('pat_create'::uts.gated_action) STORED,
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   last_used_at timestamptz,
@@ -638,6 +661,10 @@ CREATE TABLE uts.personal_access_tokens (
   revoked_at timestamptz,
   revoke_reason uts.revoke_reason,
   CONSTRAINT personal_access_tokens_token_hash_key UNIQUE (token_hash),
+  CONSTRAINT personal_access_tokens_gate_pass_key UNIQUE (gate_pass_id),
+  CONSTRAINT personal_access_tokens_gate_pass_fkey
+    FOREIGN KEY (gate_pass_id, account_id, gate_pass_action)
+    REFERENCES uts.gate_passes (id, account_id, action),
   CONSTRAINT personal_access_tokens_lifetime CHECK (
     expires_at > created_at AND expires_at <= created_at + interval '365 days'
   ),
@@ -648,10 +675,17 @@ CREATE TABLE uts.personal_access_tokens (
 );
 CREATE INDEX personal_access_tokens_account_idx ON uts.personal_access_tokens (account_id);
 
--- Org bot keys: `kilo_bot_` values owned by the organization. `created_by` names the member who
--- created the key and has no foreign key, because the key outlives that account. Member removal
--- flags the member's keys; a flagged key stops working 7 days after `flagged_at` unless an org
--- admin keeps it (design section 5.8).
+-- Org bot keys: `kilo_bot_` values owned by the organization. `created_by` records the member who
+-- created the key, as history: it has no foreign key and outlives that account. Member removal, or
+-- deletion of the creator's account (`uts.flag_bot_keys_of_deleted_account`), flags the member's
+-- keys; a flagged key stops working 7 days after `flagged_at` unless an org admin keeps it (design
+-- section 5.8).
+--
+-- Every new key needs a tier B gate pass of its creator (`uts.require_bot_key_gate_pass`). The
+-- pass is deleted with the creator's account, and the foreign key then clears `gate_pass_id` only;
+-- `org_bot_keys_gate_pass_shape` refuses that for a key that is still active, so a pass is never
+-- swept from under a live key. `gate_pass_action` is a constant with a CHECK rather than a generated
+-- column, because PostgreSQL refuses ON DELETE SET NULL on a foreign key with a generated column.
 CREATE TABLE uts.org_bot_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id uuid NOT NULL,
@@ -661,7 +695,9 @@ CREATE TABLE uts.org_bot_keys (
   last_four text NOT NULL CHECK (last_four ~ '^[A-Za-z0-9_-]{4}$'),
   audience uts.audience NOT NULL,
   scope uts.scope NOT NULL,
-  gate_pass_id uuid NOT NULL REFERENCES uts.gate_passes (id),
+  gate_pass_id uuid,
+  gate_pass_action uts.gated_action NOT NULL DEFAULT 'bot_key_create'
+    CHECK (gate_pass_action = 'bot_key_create'),
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   last_used_at timestamptz,
@@ -672,6 +708,15 @@ CREATE TABLE uts.org_bot_keys (
   revoked_at timestamptz,
   revoked_by uts.account_id,
   CONSTRAINT org_bot_keys_token_hash_key UNIQUE (token_hash),
+  CONSTRAINT org_bot_keys_gate_pass_key UNIQUE (gate_pass_id),
+  -- The pass belongs to the member who created the key.
+  CONSTRAINT org_bot_keys_gate_pass_fkey FOREIGN KEY (gate_pass_id, created_by, gate_pass_action)
+    REFERENCES uts.gate_passes (id, account_id, action)
+    ON DELETE SET NULL (gate_pass_id),
+  -- Only a flagged, kept or revoked key can lose its pass.
+  CONSTRAINT org_bot_keys_gate_pass_shape CHECK (
+    gate_pass_id IS NOT NULL OR flagged_at IS NOT NULL OR revoked_at IS NOT NULL
+  ),
   CONSTRAINT org_bot_keys_lifetime CHECK (
     expires_at > created_at AND expires_at <= created_at + interval '365 days'
   ),
@@ -690,13 +735,56 @@ CREATE INDEX org_bot_keys_org_idx ON uts.org_bot_keys (org_id);
 CREATE INDEX org_bot_keys_creator_idx ON uts.org_bot_keys (org_id, created_by)
   WHERE status IN ('active', 'kept');
 
+-- No new key skips the tier B gate: a CHECK cannot tell an insert from the later loss of the pass,
+-- so this refuses the insert itself.
+CREATE FUNCTION uts.require_bot_key_gate_pass() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF NEW.gate_pass_id IS NULL THEN
+    RAISE EXCEPTION 'a new org bot key needs a gate pass'
+      USING ERRCODE = 'not_null_violation', TABLE = 'org_bot_keys', COLUMN = 'gate_pass_id';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER org_bot_keys_require_gate_pass
+  BEFORE INSERT ON uts.org_bot_keys
+  FOR EACH ROW EXECUTE FUNCTION uts.require_bot_key_gate_pass();
+
+-- Deleting an account flags the active bot keys it created, as member removal does (design
+-- section 5.8). It runs before the delete, so when the cascade removes the account's gate passes,
+-- every live key of that account is already flagged and may lose its pass. This trigger writes no
+-- audit row and no notice: the account-deletion function must, in the same statement before the
+-- delete, collect the keys this trigger is about to flag and write their bot-key-flagged audit rows
+-- and the org-admin notices (design sections 5.8 and 8.1).
+CREATE FUNCTION uts.flag_bot_keys_of_deleted_account() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  UPDATE uts.org_bot_keys
+  SET status = 'flagged', flagged_at = now()
+  WHERE created_by = OLD.id AND status = 'active';
+  RETURN OLD;
+END
+$$;
+CREATE INDEX org_bot_keys_active_creator_idx ON uts.org_bot_keys (created_by)
+  WHERE status = 'active';
+CREATE TRIGGER accounts_flag_bot_keys
+  BEFORE DELETE ON uts.accounts
+  FOR EACH ROW EXECUTE FUNCTION uts.flag_bot_keys_of_deleted_account();
+
 -- CI trust policies: a GitHub OIDC subject that UTS exchanges for 1-hour tokens (design section
 -- 5.3). Creation needs a tier B gate pass.
 CREATE TABLE uts.ci_trust_policies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uts.account_id NOT NULL REFERENCES uts.accounts (id) ON DELETE CASCADE,
   org_id uuid,
-  gate_pass_id uuid NOT NULL REFERENCES uts.gate_passes (id),
+  gate_pass_id uuid NOT NULL,
+  gate_pass_action uts.gated_action NOT NULL
+    GENERATED ALWAYS AS ('ci_policy_create'::uts.gated_action) STORED,
   repository text NOT NULL CHECK (repository ~ '^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$'),
   repository_id bigint NOT NULL CHECK (repository_id > 0),
   ref_pattern text CHECK (length(ref_pattern) BETWEEN 1 AND 255),
@@ -707,7 +795,10 @@ CREATE TABLE uts.ci_trust_policies (
   updated_at timestamptz NOT NULL DEFAULT now(),
   status uts.credential_status NOT NULL DEFAULT 'active',
   revoked_at timestamptz,
-  CONSTRAINT ci_trust_policies_status_shape CHECK ((status = 'revoked') = (revoked_at IS NOT NULL))
+  CONSTRAINT ci_trust_policies_status_shape CHECK ((status = 'revoked') = (revoked_at IS NOT NULL)),
+  CONSTRAINT ci_trust_policies_gate_pass_key UNIQUE (gate_pass_id),
+  CONSTRAINT ci_trust_policies_gate_pass_fkey FOREIGN KEY (gate_pass_id, account_id, gate_pass_action)
+    REFERENCES uts.gate_passes (id, account_id, action)
 );
 CREATE INDEX ci_trust_policies_repository_idx ON uts.ci_trust_policies (repository_id)
   WHERE status = 'active';

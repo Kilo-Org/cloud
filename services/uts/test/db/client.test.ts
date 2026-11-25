@@ -1,3 +1,5 @@
+import { inspect } from 'node:util';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -104,6 +106,38 @@ describe('identity-store client', () => {
     const failure = await failureOf(() => run('uts_app_a', insert));
     expect(failure.failure).toBe('permanent');
     expect(failure.sqlState).toBe('23505');
+    expect(failure.constraint).toBe('accounts_pkey');
+    expect(failure.table).toBe('accounts');
+  });
+
+  it('keeps no row value of a refused statement in the error', async () => {
+    const marker = 'failing-row-marker@example.com';
+    // A blocked account without `blocked_at`: the server's detail quotes the whole row.
+    const statement = {
+      text: `INSERT INTO uts.accounts (id, primary_email, status) VALUES ($1, $2, 'blocked')`,
+      values: ['oauth/failing-row', marker],
+    };
+    const raw = await db.connect('uts_app_a');
+    const serverError = await raw
+      .query(statement.text, statement.values)
+      .catch((error: unknown) => error);
+    expect(serverError).toBeInstanceOf(pg.DatabaseError);
+    expect(serverError instanceof pg.DatabaseError ? serverError.detail : '').toContain(marker);
+
+    const failure = await failureOf(() =>
+      run('uts_app_a', store => store.rows(statement, z.unknown()))
+    );
+    expect(failure).toMatchObject({
+      failure: 'permanent',
+      sqlState: '23514',
+      constraint: 'accounts_status_shape',
+      table: 'accounts',
+    });
+    expect(failure.cause).toBeUndefined();
+    for (const text of [inspect(failure, { depth: 10 }), JSON.stringify(failure), failure.stack]) {
+      expect(text).not.toContain(marker);
+      expect(text).not.toContain('oauth/failing-row');
+    }
   });
 
   it('reports a lock timeout as retryable', async () => {
@@ -134,14 +168,18 @@ describe('identity-store client', () => {
     }
   });
 
-  it('reports an unreachable database as retryable', async () => {
+  it('reports an unreachable database as retryable, with the system error code', async () => {
     const unreachable = new URL(db.url('uts_app_a'));
     unreachable.port = '55449';
     const failure = await failureOf(() =>
       withIdentityStore(unreachable.toString(), { waitUntil: () => undefined }, async () => null)
     );
-    expect(failure.failure).toBe('retryable');
-    expect(failure.sqlState).toBeUndefined();
+    expect(failure).toMatchObject({
+      failure: 'retryable',
+      sqlState: undefined,
+      systemCode: 'ECONNREFUSED',
+      message: 'identity store retryable failure (ECONNREFUSED)',
+    });
   });
 
   it('decodes enum arrays, domain arrays, bytea, xid8 and int8 into the row schemas', async () => {

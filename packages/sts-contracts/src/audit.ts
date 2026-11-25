@@ -77,15 +77,23 @@ export type AuditBatch = z.infer<typeof AuditBatchSchema>;
 
 export class AuditBatchTooLargeError extends Error {
   constructor(readonly compressedBytes: number) {
-    super(`audit batch compresses to ${compressedBytes} bytes, above ${AUDIT_BATCH_MAX_COMPRESSED_BYTES}`);
+    super(
+      `audit batch compresses to ${compressedBytes} bytes, above ${AUDIT_BATCH_MAX_COMPRESSED_BYTES}`
+    );
     this.name = 'AuditBatchTooLargeError';
   }
 }
 
-async function pipeThrough(bytes: Uint8Array<ArrayBuffer>, transform: CompressionStream | DecompressionStream) {
+async function pipeThrough(
+  bytes: Uint8Array<ArrayBufferLike>,
+  transform: CompressionStream | DecompressionStream
+) {
   const source = new ReadableStream<BufferSource>({
     start(controller) {
-      controller.enqueue(bytes);
+      // A fresh view keeps the argument a BufferSource whatever buffer the caller's view uses.
+      const owned = new Uint8Array(bytes.byteLength);
+      owned.set(bytes);
+      controller.enqueue(owned);
       controller.close();
     },
   });

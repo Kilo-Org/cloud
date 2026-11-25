@@ -5,25 +5,40 @@ const EXCHANGE_URL = 'https://oidc.vercel.com/~token';
 const EXCHANGE_TIMEOUT_MS = 10_000;
 const ERROR_BODY_LIMIT = 500;
 const JWT_PATTERN = /[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]*/g;
+/**
+ * The audience when the operator sets none: not an STS issuer, so a token the harness exchanges
+ * can never be presented to STS.
+ */
+const DEFAULT_AUDIENCE = 'https://sts-proof.invalid';
+const RATE_LIMIT_HEADER = /^(x-ratelimit-|ratelimit|retry-after$)/;
+
+/** The exchange's rate-limit headers (`x-ratelimit-*`, `ratelimit*`, `retry-after`), by name. */
+export type RateLimitHeaders = Record<string, string>;
 
 export type ExchangeResult = {
   status: number | 'network_error' | 'timeout' | 'invalid_body';
   ms: number;
   errorBody?: string;
+  rateLimitHeaders?: RateLimitHeaders;
   /** Set on success only; never leaves the function, only its claims sample does. */
   token?: string;
 };
 
-/** The claims an exchanged token carries, without the token: answers which issuer form it uses. */
+/** The claims an exchanged token carries, without the token. */
 export type ClaimSample = {
   iss: unknown;
   aud: unknown;
   act: unknown;
   sub: unknown;
+  owner: unknown;
   owner_id: unknown;
   project_id: unknown;
   environment: unknown;
   custom_environment_id: unknown;
+  /** `act` is an object whose `aud` is the team default `https://vercel.com/<owner>`. */
+  actAudIsTeamDefault: boolean;
+  /** `act` carries an `act` of its own: the token was exchanged from an exchanged token. */
+  actIsNested: boolean;
   lifetimeSeconds: number | null;
   expMatchesBaseToken: boolean;
   claimNames: string[];
@@ -48,7 +63,7 @@ export function refusal(request: Request): Response | null {
 
 export type ExchangeInput = { baseToken: string; audience: string };
 
-/** Reads the function's own OIDC token and the audience to exchange it for, or explains what is missing. */
+/** Reads the function's own OIDC token and the audience to exchange it for. */
 export function exchangeInput(request: Request): ExchangeInput | Response {
   const baseToken = request.headers.get('x-vercel-oidc-token');
   if (baseToken === null || baseToken === '') {
@@ -57,15 +72,19 @@ export function exchangeInput(request: Request): ExchangeInput | Response {
       { status: 500 }
     );
   }
-  const audience = process.env.PROOF_AUDIENCE;
-  if (audience === undefined || audience === '') {
-    return Response.json({ error: 'PROOF_AUDIENCE is not set' }, { status: 500 });
-  }
-  return { baseToken, audience };
+  return { baseToken, audience: process.env.PROOF_AUDIENCE || DEFAULT_AUDIENCE };
 }
 
 function redact(text: string): string {
   return text.slice(0, ERROR_BODY_LIMIT).replace(JWT_PATTERN, '<jwt>');
+}
+
+function rateLimitHeaders(headers: Headers): RateLimitHeaders | undefined {
+  const found: RateLimitHeaders = {};
+  for (const [name, value] of headers) {
+    if (RATE_LIMIT_HEADER.test(name)) found[name] = value;
+  }
+  return Object.keys(found).length > 0 ? found : undefined;
 }
 
 /** One exchange with a fresh `jti`, so no cache on either side can answer it. */
@@ -84,11 +103,15 @@ export async function exchangeOnce(input: ExchangeInput): Promise<ExchangeResult
     const timedOut = error instanceof DOMException && error.name === 'TimeoutError';
     return { status: timedOut ? 'timeout' : 'network_error', ms: elapsed() };
   }
+  const headers = rateLimitHeaders(response.headers);
   const text = await response.text();
   if (!response.ok) {
-    const retryAfter = response.headers.get('retry-after');
-    const body = retryAfter === null ? text : `retry-after=${retryAfter} ${text}`;
-    return { status: response.status, ms: elapsed(), errorBody: redact(body) };
+    return {
+      status: response.status,
+      ms: elapsed(),
+      errorBody: redact(text),
+      rateLimitHeaders: headers,
+    };
   }
   let token: unknown;
   try {
@@ -101,30 +124,43 @@ export async function exchangeOnce(input: ExchangeInput): Promise<ExchangeResult
   if (typeof token !== 'string') {
     return { status: 'invalid_body', ms: elapsed(), errorBody: redact(text) };
   }
-  return { status: response.status, ms: elapsed(), token };
+  return { status: response.status, ms: elapsed(), rateLimitHeaders: headers, token };
 }
 
-function payloadOf(token: string): Record<string, unknown> {
-  const part = token.split('.')[1] ?? '';
-  const parsed: unknown = JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
-  return typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+/** A JWT's claims, unverified; `{}` when the token is not a JWT. */
+export function payloadOf(token: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(
+      Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')
+    );
+    return typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+  } catch {
+    return {};
+  }
 }
 
 export function claimSample(exchanged: string, baseToken: string): ClaimSample {
   const claims = payloadOf(exchanged);
-  const base = payloadOf(baseToken);
-  const { exp, iat } = claims;
+  const { exp, iat, act, owner } = claims;
+  const actObject = typeof act === 'object' && act !== null && !Array.isArray(act) ? act : null;
   return {
     iss: claims.iss,
     aud: claims.aud,
-    act: claims.act,
+    act,
     sub: claims.sub,
+    owner,
     owner_id: claims.owner_id,
     project_id: claims.project_id,
     environment: claims.environment,
     custom_environment_id: claims.custom_environment_id,
+    actAudIsTeamDefault:
+      actObject !== null &&
+      typeof owner === 'string' &&
+      'aud' in actObject &&
+      actObject.aud === `https://vercel.com/${owner}`,
+    actIsNested: actObject !== null && 'act' in actObject,
     lifetimeSeconds: typeof exp === 'number' && typeof iat === 'number' ? exp - iat : null,
-    expMatchesBaseToken: exp !== undefined && exp === base.exp,
+    expMatchesBaseToken: exp !== undefined && exp === payloadOf(baseToken).exp,
     claimNames: Object.keys(claims).sort(),
   };
 }
@@ -155,4 +191,19 @@ export function statusCounts(results: readonly ExchangeResult[]): Record<string,
 export function boundedInteger(raw: string | null, fallback: number, max: number): number {
   const value = raw === null ? fallback : Number(raw);
   return Number.isInteger(value) && value >= 1 ? Math.min(value, max) : fallback;
+}
+
+function numberClaim(token: string, name: string): number | null {
+  const value = payloadOf(token)[name];
+  return typeof value === 'number' ? value : null;
+}
+
+/** The base token's `iat` and `exp` and the clock, so a run shows how old the header token is. */
+export function tokenTimes(baseToken: string, exchanged: string | undefined) {
+  return {
+    nowSeconds: Math.floor(Date.now() / 1000),
+    baseIat: numberClaim(baseToken, 'iat'),
+    baseExp: numberClaim(baseToken, 'exp'),
+    exchangedExp: exchanged === undefined ? null : numberClaim(exchanged, 'exp'),
+  };
 }

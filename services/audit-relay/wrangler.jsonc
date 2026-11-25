@@ -232,8 +232,10 @@
           "props": { "caller": "audit-relay" },
         },
       ],
+      // No schedules outside production and staging; trigger a cron by hand with
+      // `curl "http://127.0.0.1:8820/__scheduled?cron=0+*+*+*+*"` under `wrangler dev --test-scheduled`.
       "triggers": {
-        "crons": ["0 * * * *", "30 3 * * *", "0 4 1 * *"],
+        "crons": [],
       },
     },
   },

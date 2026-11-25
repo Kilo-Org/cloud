@@ -55,18 +55,33 @@ const TRANSACTION_CONTROL =
  */
 export type IdentityStoreFailure = 'retryable' | 'permanent';
 
+/** What the server said about a refused statement, without the row values it may quote. */
+export type IdentityStoreErrorDetails = {
+  sqlState: string | undefined;
+  constraint: string | undefined;
+  table: string | undefined;
+};
+
+/**
+ * Keeps only the SQLSTATE, the constraint name and the table name. The server's error detail
+ * ("Failing row contains ...") can hold an email address, a client address or a hash, so neither
+ * it nor the raw driver error travels with this error into a log or an error report.
+ */
 export class IdentityStoreError extends Error {
   override name = 'IdentityStoreError';
   readonly failure: IdentityStoreFailure;
   /** The PostgreSQL SQLSTATE, when the server answered with one. */
   readonly sqlState: string | undefined;
+  readonly constraint: string | undefined;
+  readonly table: string | undefined;
 
-  constructor(failure: IdentityStoreFailure, sqlState: string | undefined, cause: unknown) {
-    super(`identity store ${failure} failure${sqlState === undefined ? '' : ` (${sqlState})`}`, {
-      cause,
-    });
+  constructor(failure: IdentityStoreFailure, details: IdentityStoreErrorDetails) {
+    const { sqlState } = details;
+    super(`identity store ${failure} failure${sqlState === undefined ? '' : ` (${sqlState})`}`);
     this.failure = failure;
     this.sqlState = sqlState;
+    this.constraint = details.constraint;
+    this.table = details.table;
   }
 }
 
@@ -84,10 +99,18 @@ function toIdentityStoreError(error: unknown): IdentityStoreError {
     const sqlState = error.code;
     const failure =
       sqlState !== undefined && RETRYABLE_SQLSTATE.test(sqlState) ? 'retryable' : 'permanent';
-    return new IdentityStoreError(failure, sqlState, error);
+    return new IdentityStoreError(failure, {
+      sqlState,
+      constraint: error.constraint,
+      table: error.table,
+    });
   }
   // No SQLSTATE: the connection failed before or during the statement.
-  return new IdentityStoreError('retryable', undefined, error);
+  return new IdentityStoreError('retryable', {
+    sqlState: undefined,
+    constraint: undefined,
+    table: undefined,
+  });
 }
 
 export class IdentityStore {

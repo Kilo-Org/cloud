@@ -22,7 +22,6 @@ workload: web
 environments: [production, staging, development]
 identity:
   kind: vercel-oidc
-  issuer: ${SLUG_ISSUER}
   teamSlug: acme
   teamId: team_Acme1
   projectId: prj_Web1
@@ -31,19 +30,6 @@ identity:
     - production
     - preview
     - customEnvironmentId: env_Staging1
-secrets: [APP_SECRET]
-`,
-  'proxy.yaml': `
-workload: proxy
-environments: [production]
-identity:
-  kind: vercel-oidc
-  issuer: ${TEAM_ID_ISSUER}
-  teamSlug: acme
-  teamId: team_Acme1
-  projectId: prj_Proxy1
-  projectName: acme-proxy
-  environments: [production]
 secrets: [APP_SECRET]
 `,
 });
@@ -77,7 +63,7 @@ function vercelClaims(environment: string, overrides: JWTPayload = {}): JWTPaylo
     project: 'acme-web',
     project_id: 'prj_Web1',
     environment,
-    act: { aud: DEFAULT_AUDIENCE },
+    act: { iat: nowSeconds() - 60, aud: DEFAULT_AUDIENCE },
     ...overrides,
   };
 }
@@ -105,21 +91,11 @@ describe('Vercel function identity', () => {
     });
   });
 
-  it('accepts the team id issuer form for a policy that names it', async () => {
-    const { verify, teamId, slug } = await fixture('production');
-    const claims = vercelClaims('production', {
-      sub: 'owner:acme:project:acme-proxy:environment:production',
-      project: 'acme-proxy',
-      project_id: 'prj_Proxy1',
-    });
-    expect(await verify(await signToken(teamId, claims))).toMatchObject({
-      status: 'verified',
-      workload: 'proxy',
-    });
-    // The same project under the issuer its policy does not name matches no policy.
-    expect(await verify(await signToken(slug, claims))).toMatchObject({
+  it('refuses the team id issuer form, which no policy can name', async () => {
+    const { verify, teamId } = await fixture('production');
+    expect(await verify(await signToken(teamId, vercelClaims('production')))).toEqual({
       status: 'denied',
-      reason: 'unknown_workload',
+      reason: 'identity_rejected',
     });
   });
 
@@ -162,7 +138,7 @@ describe('Vercel function identity', () => {
     });
   });
 
-  it('refuses an environment the policy does not list', async () => {
+  it('refuses a development token without user_id, an environment no policy may list', async () => {
     const { verify, slug } = await fixture('development');
     const token = await signToken(slug, vercelClaims('development'));
     expect(await verify(token)).toMatchObject({
@@ -244,6 +220,71 @@ describe('Vercel function identity', () => {
   });
 });
 
+describe('Vercel tokens of a person', () => {
+  it('refuses a vercel dev token carrying user_id and audits the person', async () => {
+    const { verify, slug } = await fixture('development');
+    const token = await signToken(slug, vercelClaims('development', { user_id: 'usr_Dev1' }), {
+      expiresAt: nowSeconds() + 12 * 3600,
+    });
+    expect(await verify(token)).toEqual({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: {
+        provider: 'vercel',
+        actor: 'vercel:team_Acme1/prj_Web1',
+        claims: {
+          owner_id: 'team_Acme1',
+          project_id: 'prj_Web1',
+          environment: 'development',
+          user_id: 'usr_Dev1',
+        },
+      },
+    });
+  });
+
+  it.each([
+    ['preview', 'development'],
+    ['production', 'production'],
+  ] as const)(
+    'refuses a %s token carrying user_id on %s STS',
+    async (vercelEnvironment, stsEnvironment) => {
+      const { verify, slug } = await fixture(stsEnvironment);
+      const token = await signToken(slug, vercelClaims(vercelEnvironment, { user_id: 'usr_Dev1' }));
+      expect(await verify(token)).toMatchObject({
+        status: 'denied',
+        reason: 'identity_rejected',
+        subject: { claims: { environment: vercelEnvironment, user_id: 'usr_Dev1' } },
+      });
+    }
+  );
+});
+
+describe('Vercel exchange provenance', () => {
+  it.each([
+    ['without act', { act: undefined }],
+    ['whose act is not an object', { act: DEFAULT_AUDIENCE }],
+    ['whose act names another audience', { act: { aud: 'https://example.invalid' } }],
+    ['whose act names another team', { act: { aud: 'https://vercel.com/other' } }],
+    [
+      'exchanged from an already exchanged token',
+      { act: { aud: DEFAULT_AUDIENCE, act: { aud: 'https://example.invalid' } } },
+    ],
+  ])('refuses a token %s and audits it', async (_name, overrides) => {
+    const { verify, slug } = await fixture('production');
+    const claims = vercelClaims('production', overrides);
+    if (claims.act === undefined) delete claims.act;
+    expect(await verify(await signToken(slug, claims))).toEqual({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: {
+        provider: 'vercel',
+        actor: 'vercel:team_Acme1/prj_Web1',
+        claims: { owner_id: 'team_Acme1', project_id: 'prj_Web1', environment: 'production' },
+      },
+    });
+  });
+});
+
 describe('Vercel token rejection', () => {
   it.each(['HS256', 'ES256', 'none'])('refuses a token signed with %s', async algorithm => {
     const { verify } = await fixture('production');
@@ -285,6 +326,16 @@ describe('Vercel token rejection', () => {
       expiresAt: now + 7200,
     });
     expect((await verify(withinSkew)).status).toBe('verified');
+  });
+
+  it.each([
+    ['iat', { issuedAt: null }],
+    ['exp', { expiresAt: null }],
+    ['iat and exp', { issuedAt: null, expiresAt: null }],
+  ] as const)('refuses a token without %s', async (_name, times) => {
+    const { verify, slug } = await fixture('production');
+    const token = await signToken(slug, vercelClaims('production'), times);
+    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
   });
 });
 

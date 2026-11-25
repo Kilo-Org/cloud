@@ -57,8 +57,12 @@ export const GithubIdentitySchema = z
     message: 'github-oidc binds environments, refs, or both',
   });
 
-/** Vercel's built-in environments; any other `environment` claim is a custom environment's slug. */
-const VERCEL_STANDARD_ENVIRONMENTS = ['production', 'preview', 'development'] as const;
+/**
+ * The Vercel environments a policy may list. `development` is not one: its tokens come from a
+ * person's `vercel env pull` or `vercel dev`, not from a deployment. Any other `environment` claim
+ * is a custom environment's slug, listed by its id.
+ */
+const VERCEL_STANDARD_ENVIRONMENTS = ['production', 'preview'] as const;
 
 const VercelEnvironmentSchema = z.union([
   z.enum(VERCEL_STANDARD_ENVIRONMENTS),
@@ -68,37 +72,27 @@ const VercelEnvironmentSchema = z.union([
 export type VercelEnvironment = z.infer<typeof VercelEnvironmentSchema>;
 
 export const VERCEL_ISSUER_PREFIX = 'https://oidc.vercel.com/';
-const VercelTeamIdSchema = z.string().regex(/^team_[A-Za-z0-9]{1,64}$/);
 
 /**
  * Vercel function tokens after the custom-audience exchange (https://vercel.com/docs/oidc/reference).
- * `issuer` is the team issuer an exchanged token carries, written out in full: Vercel documents
- * `https://oidc.vercel.com/<team slug>`, and its Sandbox tokens carry the team id form instead, so
- * the policy names one of the two and the README's proof run says which. The stable `owner_id`,
+ * The issuer is the team slug form `https://oidc.vercel.com/<teamSlug>`, the form the proof run
+ * recorded on exchanged function tokens; the team id form is refused. The stable `owner_id`,
  * `project_id` and `environment` (or `custom_environment_id`) claims bind the identity;
  * `projectName` is for people reading the policy and never authorizes.
  */
-export const VercelIdentitySchema = z
-  .strictObject({
-    kind: z.literal('vercel-oidc'),
-    issuer: z.string(),
-    teamSlug: SlugSchema,
-    teamId: VercelTeamIdSchema,
-    projectId: z.string().regex(/^prj_[A-Za-z0-9]{1,64}$/),
-    projectName: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,99}$/),
-    environments: z.array(VercelEnvironmentSchema).min(1).max(32),
-  })
-  .refine(
-    identity =>
-      identity.issuer === `${VERCEL_ISSUER_PREFIX}${identity.teamSlug}` ||
-      identity.issuer === `${VERCEL_ISSUER_PREFIX}${identity.teamId}`,
-    { message: 'vercel-oidc issuer is https://oidc.vercel.com/<teamSlug> or /<teamId>' }
-  );
+export const VercelIdentitySchema = z.strictObject({
+  kind: z.literal('vercel-oidc'),
+  teamSlug: SlugSchema,
+  teamId: z.string().regex(/^team_[A-Za-z0-9]{1,64}$/),
+  projectId: z.string().regex(/^prj_[A-Za-z0-9]{1,64}$/),
+  projectName: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,99}$/),
+  environments: z.array(VercelEnvironmentSchema).min(1).max(32),
+});
 
 /**
  * The STS environments a Vercel environment may read (design 6.2): only `production` reaches
- * production values; a preview runs code from any branch, so it and `development` read development
- * values; a custom environment reads staging or development values.
+ * production values; a preview runs code from any branch, so it reads development values; a custom
+ * environment reads staging or development values.
  */
 export function vercelStsEnvironments(environment: VercelEnvironment): readonly StsEnvironment[] {
   if (typeof environment !== 'string') return ['staging', 'development'];

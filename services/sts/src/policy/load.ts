@@ -35,7 +35,7 @@ function canonicalIdentity(policy: Policy): string {
     case 'github-oidc':
       return `github-oidc|${identity.repositoryId}|${identity.repositoryOwnerId}|${sortedList(identity.environments)}|${sortedList(identity.refs)}|${sortedList(identity.allowedEvents)}`;
     case 'vercel-oidc':
-      return `vercel-oidc|${identity.issuer}|${identity.teamSlug}|${identity.teamId}|${identity.projectId}|${identity.projectName}|${sortedList(identity.environments.map(vercelEnvironmentKey))}`;
+      return `vercel-oidc|${identity.teamSlug}|${identity.teamId}|${identity.projectId}|${identity.projectName}|${sortedList(identity.environments.map(vercelEnvironmentKey))}`;
   }
 }
 

@@ -53,12 +53,11 @@ export type VerifyOutcome =
 
 const FLY_ISSUER_PREFIX = 'https://oidc.fly.io/';
 const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
-/** Vercel's team issuers, by slug or by team id; a policy names the exact one. */
-const VERCEL_TEAM = /^([a-z0-9][a-z0-9-]{0,62}|team_[A-Za-z0-9]{1,64})$/;
 /** Every provider signs with RS256; their discovery documents say so. */
 const ALGORITHMS = ['RS256'];
 const CLOCK_TOLERANCE_SECONDS = 60;
-const FLY_ORG = /^[a-z0-9][a-z0-9-]{0,62}$/;
+/** A Fly org slug or a Vercel team slug; Vercel's team id issuer form (`team_...`) is refused. */
+const ISSUER_SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 /** A provider endpoint failed: network error, timeout, non-200, or a body that is not JSON. */
 class ProviderUnavailableError extends Error {
@@ -77,7 +76,7 @@ function issuerFor(identity: PolicyIdentity): string | null {
     case 'github-oidc':
       return GITHUB_ISSUER;
     case 'vercel-oidc':
-      return identity.issuer;
+      return `${VERCEL_ISSUER_PREFIX}${identity.teamSlug}`;
   }
 }
 
@@ -89,10 +88,10 @@ function claim(payload: JWTPayload, name: string): string | null {
 function isKnownProviderIssuer(issuer: string): boolean {
   if (issuer === GITHUB_ISSUER) return true;
   if (issuer.startsWith(VERCEL_ISSUER_PREFIX)) {
-    return VERCEL_TEAM.test(issuer.slice(VERCEL_ISSUER_PREFIX.length));
+    return ISSUER_SLUG.test(issuer.slice(VERCEL_ISSUER_PREFIX.length));
   }
   return (
-    issuer.startsWith(FLY_ISSUER_PREFIX) && FLY_ORG.test(issuer.slice(FLY_ISSUER_PREFIX.length))
+    issuer.startsWith(FLY_ISSUER_PREFIX) && ISSUER_SLUG.test(issuer.slice(FLY_ISSUER_PREFIX.length))
   );
 }
 
@@ -112,8 +111,9 @@ const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
     'event_name',
   ],
   fly: ['org_id', 'org_name', 'app_id', 'app_name', 'machine_id'],
-  // Ids only: team and project names can be renamed and never authorize.
-  vercel: ['owner_id', 'project_id', 'environment', 'custom_environment_id'],
+  // Ids only: team and project names can be renamed and never authorize. `user_id` names the
+  // person whose `vercel env pull` or `vercel dev` token was refused.
+  vercel: ['owner_id', 'project_id', 'environment', 'custom_environment_id', 'user_id'],
 };
 
 function verifiedSubject(
@@ -169,6 +169,19 @@ function listedVercelEnvironment(
   }
   const environment = claim(payload, 'environment');
   return listed.find(entry => entry === environment) ?? null;
+}
+
+/**
+ * An exchanged function token's `act` names the base token's audience, the team default
+ * `https://vercel.com/<team slug>`, and nothing nested: a token exchanged from an already exchanged
+ * token, or one without `act`, did not come from a function's own token.
+ */
+function isExchangedFromFunctionToken(payload: JWTPayload, issuer: string): boolean {
+  const act = payload.act;
+  if (typeof act !== 'object' || act === null || Array.isArray(act)) return false;
+  if ('act' in act) return false;
+  const teamSlug = issuer.slice(VERCEL_ISSUER_PREFIX.length);
+  return 'aud' in act && act.aud === `https://vercel.com/${teamSlug}`;
 }
 
 function isPrivilegedEvent(event: string | null): boolean {
@@ -310,6 +323,14 @@ export class IdentityVerifier {
       reason,
       subject: verifiedSubject(provider, payload, workload),
     });
+    if (provider === 'vercel') {
+      // A person's `vercel env pull` or `vercel dev` token carries `user_id`; a deployment's
+      // function token does not. Refused in every environment, naming the person.
+      if (payload.user_id !== undefined) return rejected(null, 'identity_rejected');
+      if (!isExchangedFromFunctionToken(payload, issuer)) {
+        return rejected(null, 'identity_rejected');
+      }
+    }
     let mismatchedWorkload: string | null = null;
     for (const policy of candidates) {
       const identity = policy.identity;

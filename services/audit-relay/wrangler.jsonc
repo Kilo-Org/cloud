@@ -1,0 +1,205 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Top level is PRODUCTION. Deploy staging with `wrangler deploy --env staging`.
+  "name": "audit-relay",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  // Capped at the newest date the pinned miniflare/workerd binary supports, so tests and
+  // `wrangler dev` run the same runtime as production. Raise it with the wrangler bump.
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "port": 8820,
+    "local_protocol": "http",
+    "ip": "127.0.0.1",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  // Worker traces and logs reach the account Logpush job, which forwards them to Axiom.
+  "logpush": true,
+  // The public checkpoint key set lives at
+  // https://audit-relay.kiloapps.io/.well-known/audit-checkpoint-keys.json
+  "routes": [
+    {
+      "pattern": "audit-relay.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "AXIOM_DATASET": "kilo-audit",
+    "AXIOM_URL": "https://api.axiom.co",
+    "AUDIT_ENVIRONMENT": "production",
+  },
+  // Production prerequisites: README.md (queues, DLQ, EU R2 bucket with 400-day lock rules).
+  "queues": {
+    "consumers": [
+      {
+        "queue": "kilo-audit",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 10,
+        "retry_delay": 60,
+        "max_concurrency": 6,
+        "dead_letter_queue": "kilo-audit-dlq",
+      },
+      // Drains the DLQ so nothing backs up silently; the handler logs and acks each message.
+      {
+        "queue": "kilo-audit-dlq",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30,
+        "max_concurrency": 1,
+      },
+    ],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
+      { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
+      { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["StreamDO", "RegistryDO", "SignerDO"],
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIT_ARCHIVE",
+      "bucket_name": "kilo-audit-archive",
+    },
+  ],
+  // Secrets arrive through STS: no `secrets_store_secrets` or `vars` hold them.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "audit-relay" },
+    },
+  ],
+  "triggers": {
+    "crons": ["0 * * * *", "30 3 * * *", "0 4 1 * *"],
+  },
+  "env": {
+    // Deploy with: wrangler deploy --env staging
+    // `vars`, `durable_objects`, `queues`, `r2_buckets`, `services`, `routes` and `triggers` are
+    // not inherited by a named environment, so this block restates each one in full.
+    "staging": {
+      "name": "audit-relay-staging",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "audit-relay-staging.kiloapps.io",
+          "zone_name": "kiloapps.io",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "AXIOM_DATASET": "kilo-audit-staging",
+        "AXIOM_URL": "https://api.axiom.co",
+        "AUDIT_ENVIRONMENT": "staging",
+      },
+      "queues": {
+        "consumers": [
+          {
+            "queue": "kilo-audit-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 10,
+            "retry_delay": 60,
+            "max_concurrency": 6,
+            "dead_letter_queue": "kilo-audit-staging-dlq",
+          },
+          {
+            "queue": "kilo-audit-staging-dlq",
+            "max_batch_size": 10,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+          },
+        ],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
+          { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
+          { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+        ],
+      },
+      "r2_buckets": [
+        {
+          "binding": "AUDIT_ARCHIVE",
+          "bucket_name": "kilo-audit-archive-staging",
+        },
+      ],
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-staging",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "audit-relay-staging" },
+        },
+      ],
+      "triggers": {
+        "crons": ["0 * * * *", "30 3 * * *", "0 4 1 * *"],
+      },
+    },
+    // Local development only (`wrangler dev --env local`); no deploy workflow targets this name.
+    "local": {
+      "name": "audit-relay-local",
+      "workers_dev": true,
+      "vars": {
+        "AXIOM_DATASET": "kilo-audit-local",
+        "AXIOM_URL": "https://api.axiom.co",
+        "AUDIT_ENVIRONMENT": "local",
+      },
+      "queues": {
+        "consumers": [
+          {
+            "queue": "kilo-audit-local",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "retry_delay": 10,
+            "dead_letter_queue": "kilo-audit-local-dlq",
+          },
+          {
+            "queue": "kilo-audit-local-dlq",
+            "max_batch_size": 10,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+          },
+        ],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
+          { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
+          { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+        ],
+      },
+      "r2_buckets": [
+        {
+          "binding": "AUDIT_ARCHIVE",
+          "bucket_name": "kilo-audit-archive-local",
+        },
+      ],
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-local",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "audit-relay-local" },
+        },
+      ],
+      "triggers": {
+        "crons": ["0 * * * *", "30 3 * * *", "0 4 1 * *"],
+      },
+    },
+  },
+}

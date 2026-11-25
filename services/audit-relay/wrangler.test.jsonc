@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test-only config for @cloudflare/vitest-pool-workers. It has no STS service binding, so the
+  // Worker reads its two secrets from AUDIT_RELAY_LOCAL_SECRETS, the same seam `wrangler dev
+  // --env local` uses.
+  "name": "audit-relay-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "AXIOM_DATASET": "kilo-audit-test",
+    "AXIOM_URL": "https://api.axiom.co",
+    "AUDIT_ENVIRONMENT": "local",
+    "AUDIT_RELAY_LOCAL_SECRETS": "{\"AUDIT_RELAY_AXIOM_TOKEN\":\"test-axiom-token\",\"AUDIT_RELAY_SLACK_WEBHOOK_PAGE\":\"https://hooks.slack.test/audit-relay\"}",
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
+      { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
+      { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["StreamDO", "RegistryDO", "SignerDO"],
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIT_ARCHIVE",
+      "bucket_name": "kilo-audit-archive-test",
+    },
+  ],
+}

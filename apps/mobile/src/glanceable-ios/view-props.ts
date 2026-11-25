@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one props boundary: the surface props, the widget timeline frames, the Live Activity state, and the neutral placeholder share the same Home-only data and copy */
 import {
   buildGlanceableSnapshot,
   GLANCEABLE_STALE_MS,
@@ -306,6 +307,26 @@ export function buildGalleryPreviewProps(
     // An Approve in flight belongs to the placed widget, never the sample.
     actionFeedback: null,
   });
+}
+
+/**
+ * Props for an entry with no data yet: WidgetKit's placeholder, an empty or
+ * cleared stored timeline, and a first add before the app writes a frame. No
+ * Home presentation and no count: the layout draws the neutral locked copy.
+ * That is everything this widget process knows — a sign-out is the app's fact
+ * to state, and it writes `home.status = 'signed_out'` when it happens.
+ */
+export function buildWidgetPlaceholderProps(
+  translate: (key: string) => string
+): Partial<GlanceableViewProps> {
+  const copy = translate('glanceable.privacy');
+  return {
+    statusLine: copy,
+    countLines: [],
+    primaryCount: 0,
+    actions: { approve: false, newAgent: false },
+    accessibilityLabel: copy,
+  };
 }
 
 /**

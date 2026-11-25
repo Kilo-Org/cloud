@@ -53,6 +53,13 @@ vi.mock('expo-widgets', () => ({
   areLiveActivitiesEnabled: () => true,
 }));
 
+// This suite covers ActivityKit recovery, not the widget credential. The clear
+// stays pending so it neither loads its tRPC graph here nor schedules a late
+// terminal frame into these assertions.
+vi.mock('@/lib/glanceable/home-widget-refresh', () => ({
+  clearHomeWidgetRefresh: () => new Promise<void>(() => undefined),
+}));
+
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
   OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
   getActiveAgentsLiveActivity: () => ({

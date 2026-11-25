@@ -45,6 +45,7 @@ import { i18n } from '@/i18n';
 import { withGlanceableCopy } from './layout-copy';
 import {
   buildGalleryPreviewProps,
+  buildWidgetPlaceholderProps,
   type GlanceableWidgetAction,
   type GlanceableWidgetProps,
 } from './view-props';
@@ -189,7 +190,11 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const home =
     // eslint-disable-next-line anti-slop/no-runtime-typeof, typescript-eslint/no-unnecessary-condition -- the widget process reads raw app-group JSON, not the typed props vitest renders
     rawHome !== null && typeof rawHome === 'object' ? rawHome : undefined;
-  const homeStatus = safeText(home?.status);
+  // Props with no Home presentation are not proof of a sign-out: WidgetKit's
+  // placeholder, a cleared or empty timeline, and the native 401 blank all
+  // write no `home`. They draw the neutral locked state, and only the
+  // presentation's own `signed_out` asks the user to sign in.
+  const homeStatus = safeText(home?.status) ?? (home === undefined ? 'unavailable' : null);
   // The circular accessory has no room for a count line when nothing is counting.
   // A lone dash is near-invisible over a light wallpaper and says nothing, so the
   // no-count state draws the Kilo glyph over a state glyph instead — filled, so
@@ -211,7 +216,11 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   // Accessories deliberately ignore Home titles, feedback and retained work.
   const genericKind = kindOf(props.primaryKind);
   const genericCount = safeCount(props.primaryCount);
-  const genericStatus = safeText(props.statusLine) ?? COPY.signed_out ?? 'Sign in to see agents';
+  // A healthy count frame carries no status line, and an entry with no data
+  // cannot claim the user signed out: a missing line reads as the neutral,
+  // count-less state. The signed-out words come only from a `signed_out`
+  // presentation, whose writer supplies this line.
+  const genericStatus = safeText(props.statusLine) ?? COPY.privacy ?? 'Open Kilo to see agents';
   const genericLabel =
     safeText(props.primaryLabel) ?? (genericKind === null ? '' : labels[genericKind]);
   const white = foregroundStyle('#FFFFFF');
@@ -396,7 +405,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
 
   const primaryKind = home === undefined ? genericKind : kindOf(home.primaryKind);
   const primaryCount = home === undefined ? genericCount : safeCount(home.primaryCount);
-  const status = home?.status ?? (genericKind === null ? 'signed_out' : 'content');
+  const status = home?.status ?? (genericKind === null ? 'unavailable' : 'content');
   const content = status === 'content' && primaryKind !== null;
   const stale = home?.stale === true;
   const primaryLabel = primaryKind === null ? '' : labels[primaryKind];
@@ -1244,7 +1253,14 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
 export const WIDGET_NAME = 'ActiveAgentsWidget';
 export const activeAgentsWidgetLayout = layout;
 const registerLayout = () =>
-  createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(withWidgetLogo(layout)), {});
+  createWidget<WidgetProps>(
+    WIDGET_NAME,
+    withGlanceableCopy(withWidgetLogo(layout)),
+    // WidgetKit draws these for its placeholder, an empty stored timeline and
+    // the first add before the app writes a frame; an empty object would leave
+    // the neutral state to the layout's defaults.
+    buildWidgetPlaceholderProps(key => i18n.t(key))
+  );
 export const ActiveAgentsWidget = registerLayout();
 
 /**

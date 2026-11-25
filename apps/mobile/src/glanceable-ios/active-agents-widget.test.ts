@@ -11,6 +11,7 @@ import { type WidgetFamily } from 'expo-widgets';
 import { activeAgentsWidgetLayout } from './active-agents-widget';
 import {
   buildGlanceableViewProps,
+  buildWidgetPlaceholderProps,
   type GlanceableViewProps,
   type GlanceableWidgetProps,
   toWidgetProps,
@@ -85,6 +86,8 @@ const ENGLISH: Record<string, string> = {
   'common.working': 'Working',
   'common.scheduled': 'Scheduled',
   'common.idle': 'Idle',
+  'glanceable.privacy': 'Open Kilo to see agents',
+  'glanceable.signedOut': 'Sign in to see agents',
 };
 const translate = (key: string) => ENGLISH[key] ?? key;
 
@@ -113,6 +116,15 @@ function propsFor(sessions: HomeWidgetSessionRow[], options: Options = {}): Glan
     options.now ?? NOW
   );
 }
+
+/** The props `HomeWidgetRefreshStore.swift` writes on a rejected widget credential. */
+const NATIVE_401_BLANK = {
+  statusLine: 'Open Kilo to see agents',
+  countLines: [],
+  primaryCount: 0,
+  actions: { approve: false, newAgent: false },
+  accessibilityLabel: 'Open Kilo to see agents',
+} satisfies GlanceableWidgetProps;
 
 type Rendered = { kind: string; props: Record<string, unknown> };
 type Modifier = { $type: string; args: Record<string, unknown> | undefined };
@@ -801,6 +813,45 @@ describe('locked', () => {
       expect(collect(tree).some(node => node.props.systemName === 'lock.fill')).toBe(true);
     }
   });
+
+  it.each(HOME_FAMILIES)(
+    'draws the neutral locked copy, never a sign-out, without a Home presentation in %s',
+    family => {
+      // The widget process sees no presentation in WidgetKit's placeholder, an
+      // empty or cleared timeline, and the native 401 blank. None of them is
+      // evidence that the user signed out.
+      const tree = render({}, family);
+      expect(texts(tree).join(' ')).toBe('Open Kilo to see agents');
+      expect(buttons(tree)).toEqual([]);
+      expect(collect(tree).some(node => node.props.systemName === 'lock.fill')).toBe(true);
+    }
+  );
+
+  it.each(HOME_FAMILIES)(
+    'draws props with no Home presentation exactly like the privacy card in %s',
+    family => {
+      const noData = render({}, family);
+      const privacy = render(propsFor([], { status: 'privacy' }), family);
+      expect(texts(noData)).toEqual(texts(privacy));
+      // Centred like every other count-less state (design rule 7).
+      expect(baselines(noData, family)).toEqual(baselines(privacy, family));
+    }
+  );
+
+  it.each(HOME_FAMILIES)('keeps the native 401 blank neutral, not signed out, in %s', family => {
+    expect(texts(render(NATIVE_401_BLANK, family)).join(' ')).toBe('Open Kilo to see agents');
+  });
+
+  it.each(HOME_FAMILIES)('keeps the signed-out card when the app says so in %s', family => {
+    const tree = render(toWidgetProps(propsFor([], { status: 'signed_out' })), family);
+    expect(texts(tree).join(' ')).toBe('Sign in to see agents');
+  });
+
+  it.each(HOME_FAMILIES)('draws the placeholder props as the neutral locked card in %s', family => {
+    const tree = render(buildWidgetPlaceholderProps(translate), family);
+    expect(texts(tree).join(' ')).toBe('Open Kilo to see agents');
+    expect(buttons(tree)).toEqual([]);
+  });
 });
 
 describe('stress', () => {
@@ -973,4 +1024,57 @@ describe('Lock Screen accessories', () => {
     expect(marks.map(node => node.props.uiImage)).toEqual(['__KILO_WIDGET_GLYPH_URI__']);
     expect(texts(tree)).not.toContain('Kilo');
   });
+
+  it.each(['accessoryInline', 'accessoryRectangular'] as const)(
+    'prints the neutral copy, never a sign-out, without a Home presentation in %s',
+    family => {
+      const tree = render({}, family);
+      expect(texts(tree)).toEqual(['Open Kilo to see agents']);
+    }
+  );
+
+  it('draws the lock state glyph for an entry with no data', () => {
+    const tree = render({}, 'accessoryCircular');
+    const images = collect(tree).filter(node => node.kind === 'Image');
+    expect(images.map(node => node.props.uiImage ?? node.props.systemName)).toEqual([
+      '__KILO_WIDGET_GLYPH_URI__',
+      'lock.fill',
+    ]);
+    expect(texts(tree)).toEqual([]);
+  });
+
+  it('keeps the signed-out accessory copy when the app states it', () => {
+    expect(texts(render(propsFor([], { status: 'signed_out' }), 'accessoryRectangular'))).toEqual([
+      'Sign in to see agents',
+    ]);
+  });
+
+  it.each(['accessoryInline', 'accessoryRectangular'] as const)(
+    'keeps the native 401 blank’s privacy line in %s',
+    family => {
+      expect(texts(render(NATIVE_401_BLANK, family))).toEqual(['Open Kilo to see agents']);
+    }
+  );
+
+  it.each(['accessoryInline', 'accessoryRectangular'] as const)(
+    'prints the placeholder props as the neutral line in %s',
+    family => {
+      expect(texts(render(buildWidgetPlaceholderProps(translate), family))).toEqual([
+        'Open Kilo to see agents',
+      ]);
+    }
+  );
+
+  it.each(['accessoryInline', 'accessoryRectangular'] as const)(
+    'keeps a healthy count frame free of status copy in %s',
+    family => {
+      // A happy frame carries no status line at all; its counts are the whole
+      // message, so the neutral fallback must never replace them.
+      const props = propsFor([PERMISSION]);
+      expect(props.statusLine).toBeNull();
+      const shown = texts(render(props, family)).join(' ');
+      expect(shown).toContain('1 Needs input');
+      expect(shown).not.toContain('Open Kilo');
+    }
+  );
 });

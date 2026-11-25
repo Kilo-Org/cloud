@@ -14,6 +14,7 @@ import {
 import { aggregateLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
 import { i18n } from '@/i18n';
+import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
   type FollowableSessionRow,
   type FollowedSessionCounts,
@@ -22,6 +23,7 @@ import {
   getSnapshotRows,
 } from '@/lib/glanceable/followed-sessions';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
+import { clearHomeWidgetRefresh } from '@/lib/glanceable/home-widget-refresh';
 import {
   getGlanceableSnapshotForSignedInScope,
   isGlanceableRestoreSettled,
@@ -55,6 +57,7 @@ import {
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
   type GlanceableLiveActivityProps,
+  type GlanceableViewProps,
   toWidgetProps,
   widgetTimelineFrames,
 } from './view-props';
@@ -611,6 +614,22 @@ export function republishAggregateCard(): void {
   iosSink.publish(snapshot, lastSinkContext ?? undefined);
 }
 
+/**
+ * The credential clear deletes the widget's stored timeline, and it does that
+ * after an await (the push-token unregister), so it can land behind the
+ * terminal frame `publish` just wrote and leave the widget on its placeholder.
+ * Write the frame again once that clear finishes, and only while the same
+ * blank still owns the surface: a later sign-in or blank wins.
+ */
+async function keepTerminalWidgetFrame(props: Partial<GlanceableViewProps>): Promise<void> {
+  const blankEpoch = getTerminalBlankEpoch();
+  await clearHomeWidgetRefresh();
+  if (getTerminalBlankEpoch() !== blankEpoch) {
+    return;
+  }
+  ActiveAgentsWidget.updateSnapshot(props);
+}
+
 export const iosSink: GlanceableSink = {
   async waitForNativeTerminal() {
     await Promise.all(
@@ -638,11 +657,14 @@ export const iosSink: GlanceableSink = {
     ActiveAgentsWidget.updateSnapshot(props);
     // updateSnapshot leaves a single frame behind, so the shared builder adds
     // the delayed and expiry frames every timeline writer owes WidgetKit (see
-    // `widgetTimelineFrames`). Null means a terminal blank, whose copy needs no
-    // further frame.
+    // `widgetTimelineFrames`). Null means a terminal blank: it keeps the single
+    // frame, which the credential clear can erase, so it is written again once
+    // that clear finishes.
     const frames = widgetTimelineFrames(snapshot, props, translate, homeData);
     if (frames !== null) {
       ActiveAgentsWidget.updateTimeline(frames);
+    } else {
+      void keepTerminalWidgetFrame(props);
     }
     // The Live Activity counts only the sessions this device does not follow.
     const card = withoutFollowedSessions(snapshot);

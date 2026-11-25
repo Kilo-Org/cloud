@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the props builder, timeline frames, and the neutral placeholder contract share one harness */
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
@@ -13,6 +14,7 @@ import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import {
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
+  buildWidgetPlaceholderProps,
   toWidgetProps,
   widgetTimelineFrames,
 } from './view-props';
@@ -23,6 +25,7 @@ const COPY: Record<string, string> = {
   'glanceable.approving': 'Approving…',
   'glanceable.couldNotApprove': 'Could not approve',
   'glanceable.newestSession': 'Newest: {{title}}',
+  'glanceable.privacy': 'Open Kilo to see agents',
 };
 const translate = (key: string): string => COPY[key] ?? key;
 
@@ -90,6 +93,22 @@ describe('newestTitleFor', () => {
     // carrying a stale title.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
     expect(buildGlanceableViewProps(snapshotFor([]), {}, translate).newestTitle).toBeNull();
+  });
+});
+
+describe('buildWidgetPlaceholderProps', () => {
+  it('describes a neutral entry with no Home presentation and no counts', () => {
+    // WidgetKit draws these for its placeholder, an empty timeline and a first
+    // add. The shape must stay a neutral, count-less statement: an absent
+    // `home` is what makes the layout draw the privacy copy, and no field may
+    // turn that into a sign-out.
+    expect(buildWidgetPlaceholderProps(translate)).toEqual({
+      statusLine: 'Open Kilo to see agents',
+      countLines: [],
+      primaryCount: 0,
+      actions: { approve: false, newAgent: false },
+      accessibilityLabel: 'Open Kilo to see agents',
+    });
   });
 });
 

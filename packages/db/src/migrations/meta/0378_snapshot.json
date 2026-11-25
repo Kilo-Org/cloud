@@ -1,5 +1,5 @@
 {
-  "id": "e920ee36-29c2-41b4-8803-7acfbe0b743a",
+  "id": "d5cc3790-2fc7-47d3-9294-fa9910e6223a",
   "prevId": "38f99b16-bf3f-44c4-8911-71ac23ca2338",
   "version": "7",
   "dialect": "postgresql",
@@ -24556,7 +24556,8 @@
           "name": "api_token_pepper",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "gen_random_uuid()::text"
         },
         "web_session_pepper": {
           "name": "web_session_pepper",
@@ -25042,7 +25043,7 @@
         },
         "check_magic_link_tokens_purpose": {
           "name": "check_magic_link_tokens_purpose",
-          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change')"
+          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download')"
         }
       },
       "isRLSEnabled": false

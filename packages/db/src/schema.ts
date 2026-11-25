@@ -526,7 +526,9 @@ export const kilocode_users = pgTable(
     blocked_reason: text(),
     blocked_at: timestamp({ withTimezone: true, mode: 'string' }),
     blocked_by_kilo_user_id: text(),
-    api_token_pepper: text(),
+    // New accounts get a pepper, so a rotation revokes every token they can mint.
+    // Existing nulls are rotated separately.
+    api_token_pepper: text().default(sql`gen_random_uuid()::text`),
     web_session_pepper: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),

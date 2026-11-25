@@ -187,7 +187,7 @@ The deployed fake has two separate credential boundaries:
 | Route | Credential |
 |---|---|
 | `/health` | none |
-| `GET /api/openrouter/models`, `POST .../models/validate`, `POST .../chat/completions`, `POST .../audio/transcriptions` | A valid Kilo JWT signed with the `NEXTAUTH_SECRET` Secrets Store binding, with `apiTokenPepper` present. Accepts no audience or an audience matching `cloud-agent-next`, `kilo-api` or `kilo-gateway`. Allows `tokenPurpose`, `credentialExchange`, `runtimeAdmission` and `runtimeAuthorization`; rejects `organizationId` and `organizationRole`. |
+| `GET /api/openrouter/models`, `POST .../models/validate`, `POST .../chat/completions`, `POST .../audio/transcriptions` | A valid Kilo JWT signed with the `NEXTAUTH_SECRET` Secrets Store binding, which resolves to the development signing key `NEXTAUTH_SECRET_DEV` (both Workers are non-production), with `apiTokenPepper` present. Accepts no audience or an audience matching `cloud-agent-next`, `kilo-api` or `kilo-gateway`. Allows `tokenPurpose`, `credentialExchange`, `runtimeAdmission` and `runtimeAuthorization`; rejects `organizationId` and `organizationRole`. |
 | `/test/*` | `Authorization: Bearer $FAKE_LLM_ADMIN_TOKEN` |
 
 The model routes are enforced in the Worker entry; the `/test/*` guard is
@@ -204,6 +204,11 @@ account's stored pepper; a null claim is valid for an account whose
 current pepper without a database, so it is a shape check, not full gateway
 semantics.
 
+Both e2e Workers bind the development signing key, so a deployed run must present
+a user token signed with that key. A production-issued token, and a stream ticket
+issued by the production backend, are signed with the production key and are
+refused by these Workers.
+
 ## What the render changes, and why
 
 | Change | Reason |
@@ -215,7 +220,7 @@ semantics.
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
 | Only the native `SandboxContainers` container kept | Native Cloudflare Containers is the only runtime; the E2E Worker exercises the same provider as production. |
 | Runtime migrations preserve E2E history | `v15` removes the old runtime; `v15-e2e` creates the retained runtime namespaces. |
-| `NEXTAUTH_SECRET` Secrets Store binding added | Verifies the ticket and API token, and seals runtime authorization. |
+| `NEXTAUTH_SECRET` Secrets Store binding added, pointing at `NEXTAUTH_SECRET_DEV` | Verifies the ticket and API token, and seals runtime authorization, with the non-production signing key. |
 
 ### Container classes and migrations
 

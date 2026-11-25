@@ -1,2 +1,0 @@
-ALTER TABLE "magic_link_tokens" DROP CONSTRAINT "check_magic_link_tokens_purpose";--> statement-breakpoint
-ALTER TABLE "magic_link_tokens" ADD CONSTRAINT "check_magic_link_tokens_purpose" CHECK ("magic_link_tokens"."purpose" IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change'));

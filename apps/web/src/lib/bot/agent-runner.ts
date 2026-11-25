@@ -201,7 +201,11 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     headers['X-KiloCode-OrganizationId'] = params.platformIntegration.owned_by_organization_id;
   }
 
-  const authToken = generateApiToken(params.user, { internalApiUse: true });
+  const authToken = generateApiToken(
+    params.user,
+    { internalApiUse: true },
+    { expiresIn: TOKEN_EXPIRY.oneHour }
+  );
   const provider = createOpenAICompatible({
     name: 'kilo-gateway',
     baseURL: `${APP_URL}/api/openrouter`,

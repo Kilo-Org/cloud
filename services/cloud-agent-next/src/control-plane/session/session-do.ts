@@ -4170,8 +4170,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // `not_ready`: keep them queued and act on the view `prepare` returns
     // (spec §5). A `ready` view only updates the stored route and returns: it
     // must not re-enter delivery in this task, or a write that keeps losing to
-    // a ready route would recurse with no exit. The next `send` or `onRoute`
-    // retries, with one transport recovery opportunity if still ready.
+    // a ready route would recurse with no exit. The pass counts as unanswered,
+    // so it arms the next pass of the recovery window unless one is already
+    // due. The next `send` or `onRoute` also retries.
     const view = await this.prepareSandbox(pass);
     if (view === null) return;
     if (view.state === 'ready') {

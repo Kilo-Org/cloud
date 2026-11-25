@@ -220,15 +220,20 @@ exchange: the client reads it inside the request handler, never at module scope,
 to the exchange.
 
 The exchange allows about 100 exchanges per burst for a whole deployment, refilling within about
-65 seconds, and every instance of a deployment carries the same base token (proof run 1). A client
-therefore never exchanges once per instance: it shares the exchanged token through the Vercel
-Runtime Cache (decision D10, design 4.4 and Q49), with the algorithm in
-`proof/vercel-exchange/lib/shared-token.ts`: key SHA-256 of base token and audience; memory, then
-the cache; on a miss a random wait and a re-read, then a claim marker so one request exchanges; the
-token kept until 10 minutes before `exp`; others, and an exchanger that got 429, poll the cache
-with backoff instead of exchanging again. Because the exchanged token keeps the base token's `exp`,
-a fresh exchange that returns an `exp` under 10 minutes away is kept until 60 seconds before `exp`,
-not exchanged again on every request.
+65 seconds (proof runs 1 and 2), and refuses to exchange an exchanged token (401, proof run 2). A
+client therefore never exchanges once per instance: it shares the exchanged token through the
+Vercel Runtime Cache (decision D10, design 4.4 and Q49), with the algorithm in
+`proof/vercel-exchange/lib/shared-token.ts`: key SHA-256 of the base token's `owner_id`,
+`project_id`, `environment`, `custom_environment_id` and `deployment_id` and the audience (Vercel
+renews the base token during a deployment's life, even mid-wave, so the token itself is not in the
+key); memory, then the cache, a cached token used until its own `exp` minus 60 seconds whatever
+base token the reader holds; on a miss a random wait and a re-read, then a claim marker so one
+request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
+exchanging again. There is no early refresh: the exchanged token keeps the base token's `exp`, so
+exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
+the request at once. When the cache is down (the claim marker does not read back), each request
+exchanges once and fails at once on a 429: about 100 requests per 65 seconds get a token and the
+rest of a cold wave fail fast until the cache is back.
 
 STS verifies the exchanged token against the team slug issuer `https://oidc.vercel.com/<teamSlug>`
 (discovery, then the key set it names, each with a 5-second timeout); the team id issuer form
@@ -254,7 +259,7 @@ Environment mapping (design 6.2), checked when the policy loads and again on eve
 |---|---|
 | `production` | `production` only |
 | `preview` | `development` only (a preview runs code from any branch) |
-| custom environment, by id | `staging` or `development` |
+| custom environment, by id | `staging` only |
 
 The web app's staging is the custom environment `staging` (id `env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b`,
 deployed with `--target=staging`), so its policy lists
@@ -269,12 +274,20 @@ A token from a listed Vercel environment that this STS deployment may not serve 
 `project_id`, `environment`, `custom_environment_id` and `user_id` only (actor
 `vercel:<owner_id>/<project_id>` or the policy's workload), never a name or the token. The verified
 outcome carries the token's `exp` and `iat` (`attestationExp`, `attestationIat`, seconds). The mint
-(`/v1/token`) caps what it issues at `attestationExp`; for a Vercel token `attestationIat` is the
-exchange time, not the base token's issue time, so it says nothing about how old the deployment's
-token is.
+in the next PR of this stack (`/v1/token`) caps what it issues at `attestationExp`; for a Vercel
+token `attestationIat` is the exchange time, not the base token's issue time, so it says nothing
+about how old the deployment's token is.
 
-**Merge gate.** No Vercel workload uses STS until proof run 2 (`proof/vercel-exchange/`, shared
-cache, 2,500-invocation cold wave) passes.
+Person tokens: proof run 2 pulled `preview`, `production` and `staging` tokens with
+`vercel env pull`; each claimed `environment: development` and carried `user_id`, so STS refuses
+them. Build tokens: whether `scope` tells a build token from a function token is measured in proof
+run 3; if it does, the next round pins it, otherwise build code is trusted like the deployment's
+own code (design 6.2).
+
+**Merge gate.** No Vercel workload uses STS until proof run 3 (`proof/vercel-exchange/`, shared
+cache, 2,500-invocation cold wave, the `claimHolds` check) passes, and, for every environment
+pulled from the throwaway proof project, either Vercel issues no person token or both the pulled
+and the exchanged token carry `user_id`. Otherwise the merge stops until Igor decides.
 
 Cost, with about 2,200 Vercel instance starts per release and 43 releases a day, for R function
 regions (the web app's project setting) and one audience (STS):
@@ -282,11 +295,13 @@ regions (the web app's project setting) and one audience (STS):
 | | Exchanges per release | Exchanges per day | Bundle calls per day |
 |---|---|---|---|
 | One exchange per instance (no shared cache) | 2,200, above the limit of about 100 | 94,600 | 94,600 |
-| D10 shared cache | about R | about 43 R, plus about 12 R if Vercel renews the base token every 2 hours (proof run 2's warm mode measures it) | 94,600 |
+| D10 shared cache | about R | about 43 R, plus about 12 R if Vercel renews the base token every 2 hours (proof run 3's warm mode measures it) | 94,600 |
 
-A cold instance start also reads the Runtime Cache two or three times (a read, the re-read after the
-random wait, and the claim check on a second miss); a poller adds two reads per backoff step. The
-client count (10,000, 50,000 or 200,000) does
+Runtime Cache reads: a memory hit reads nothing, a cache hit is 1 read, a miss that reaches the claim
+is 4 reads and 1 to 2 writes, then 2 reads per poll step. Proof run 2's single-key wave measured
+about 1 read per instance, so about 2,200 to 3,000 reads per wave and region (worst case about
+120,000 if every instance polls to the deadline) and about 100,000 to 130,000 per day. The client
+count (10,000, 50,000 or 200,000) does
 not change any row: the instance count drives it. On the STS side each isolate fetches the Vercel
 issuer's discovery once and its key set at most once per 10 minutes (jose's default `cacheMaxAge`),
 plus at most once per 30 seconds after an unknown `kid` (its cooldown). Requests share only the

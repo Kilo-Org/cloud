@@ -9,9 +9,8 @@ exchange (`POST https://oidc.vercel.com/~token`). This standalone Vercel project
 - The exchange serves about 100 exchanges per burst, then answers 429 `{"error":"Rate limit
   exceeded"}` with no `retry-after`; the budget refills within about 65 seconds. Sustained 25 per
   3 seconds and 50 per 8 seconds pass.
-- The budget belongs to the deployment, not the instance: 2,500 invocations on 411 instances got 100
-  tokens in total. Every instance of a deployment carries the same base token (`act.iat` was equal
-  on all 411).
+- The budget belongs to the deployment (or something wider), not the instance: 2,500 invocations on
+  411 instances got 100 tokens in total.
 - Exchanged claims: `iss` `https://oidc.vercel.com/kilocode` (team slug form), `aud` exactly the
   requested audience, `act` `{ iat, aud: "https://vercel.com/kilocode" }`, `exp` equal to the base
   token's `exp`; claim names `act aud deployment_id environment exp iat iss jti nbf owner owner_id
@@ -19,28 +18,71 @@ exchange (`POST https://oidc.vercel.com/~token`). This standalone Vercel project
 - Team `kilocode` protects `*.vercel.app` by default (`ssoProtection: all_except_custom_domains`).
 
 So one exchange per instance cannot work. Decision D10 (design Q49): instances share the exchanged
-token through the Vercel Runtime Cache. `lib/shared-token.ts` implements the algorithm, the one the
-slice-4 Vercel client copies or imports; `test/proof/shared-token.test.ts` checks its logic against
-stand-ins. Proof run 2 checks it against the real Runtime Cache and exchange. **It is the merge gate
-for the first Vercel workload: no Vercel workload uses STS until proof run 2 passes.**
+token through the Vercel Runtime Cache.
+
+## What proof run 2 found (2026-11-25/26, throwaway project `sts-oidc-proof2`)
+
+- Gate run a **failed** on time to token (p99 11.6 s, max 13.1 s) with 707 instances, 36 exchanges,
+  35 claim winners and no 429; cache reads p99 62 ms. Every other check passed. Three later waves on
+  fresh deployments (329 to 399 instances) passed with one exchange and p99 72 to 555 ms.
+- Cause: the base token is **not** stable for a deployment's life. Vercel minted a new function
+  token on the same deployment 33 s apart (`iat` 1795648554, then 1795648587), so the run-2 key
+  (SHA-256 of base token and audience) split one wave into several keys, each with its own claim
+  and poll cycle. The key now leaves the token out (below).
+- Vercel refuses to exchange an exchanged token: 401 `{"error":"Token has already been exchanged"}`.
+- Burst from one instance: 100 exchanges, p50 235 ms, p99 553 ms; then 429, refill about 65 s; no
+  rate-limit headers on success or failure.
+- Person tokens: `vercel env pull` for `preview`, `production` and `staging` (that step ran against
+  the production web project, which run 3 no longer touches; nothing was opened or kept) each returned a token
+  claiming `environment: development` with `user_id`, so STS refuses all three. Whether `user_id`
+  survives the exchange was not measured; run 3 step 3 does.
+
+`lib/shared-token.ts` implements the algorithm, the one the slice-4 Vercel client copies or imports;
+`test/proof/shared-token.test.ts` checks its logic against stand-ins, and
+`test/proof/pass-rule.test.ts` checks the pass rule. **Proof run 3 is the merge gate for the first
+Vercel workload: no Vercel workload uses STS until it passes.**
 
 ## The shared-cache algorithm (`lib/shared-token.ts`)
 
-1. Key: SHA-256 of the base token and the audience. A region's instances share one key per audience;
-   a new base token (new deployment, or Vercel renewing it) is a new key.
-2. Instance memory, then the Runtime Cache: a hit is used.
-3. Miss: wait a random 0 to 500 ms, read again.
-4. Still a miss: claim. Write a claim marker (10 s TTL) unless one exists, wait 150 ms, read it back;
+1. Key: SHA-256 of a per-run salt (`?run=`, empty in production), the base token's `owner_id`,
+   `project_id`, `environment`, `custom_environment_id` and `deployment_id` (decoded, not
+   verified), and the audience. These stay the same when Vercel renews the base token, so all
+   instances of a deployment share one key per region and audience. A base token missing one of
+   them fails the request.
+2. A cached entry is used only if its token decodes to the same five claims, `aud` equal to the
+   audience and `exp` equal to the entry's, until `exp` minus 60 s, whichever base token the reader
+   holds. A forged entry with matching claims can only make the caller's STS call fail (STS checks
+   the signature); only code of the same project can write its cache (Vercel isolates preview and
+   production caches, and Pro and Enterprise caches per project).
+3. Instance memory, then the Runtime Cache: a hit is used. On a miss, a base token with under 60 s
+   left fails the request at once: no exchange, no waiting.
+4. Miss: wait a random 0 to 500 ms, read again.
+5. Still a miss: claim. Write a claim marker (10 s TTL) unless one exists, wait 150 ms, read it back;
    only the request whose marker is still there exchanges. The Runtime Cache has no lock, so the
-   last writer wins; random waiting alone would need several seconds of jitter to keep a
-   2,500-instance wave under 100 exchanges.
-5. The exchanger stores `{ token, exp }` until 10 minutes before `exp`. The exchange keeps the base
-   token's `exp`, so with under 10 minutes left a fresh token is kept until 60 seconds before `exp`
-   instead of being exchanged on every request.
-6. Everyone else, and an exchanger that got 429, polls the cache with backoff (50 ms doubling to
+   last writer wins.
+6. The exchanger stores `{ token, exp }` until 60 s before `exp`. There is no earlier refresh: the
+   exchange keeps the base token's `exp`, so exchanging earlier could not get a later one; the next
+   exchange happens on the first miss after the entry expires, with the claim winner's (newer)
+   base token.
+7. Everyone else, and an exchanger that got 429, polls the cache with backoff (50 ms doubling to
    800 ms, with jitter) and never exchanges again while a marker exists. When the marker expires
    without a token, one poller claims again: at most one exchange per 10 seconds per key.
-7. No token after 20 seconds: the request fails, and the caller's STS call fails with it.
+8. No token after 20 seconds: the request fails, and the caller's STS call fails with it.
+
+**Degraded mode (cache down).** When the marker does not read back (the Runtime Cache throws or
+keeps nothing), the request exchanges itself, once per request; on a 429 in that mode it fails at
+once instead of polling a cache that cannot bring a token. Cost: about 100 requests per 65 s get a
+token, the rest of a cold wave fail fast (no 20 s of function time each), and their STS calls fail
+until the cache is back.
+
+**Cache cost.** A memory hit reads nothing. A cache hit is 1 read. A miss that reaches the claim is
+4 reads (read, read after the random wait, claim check, read-back) and 1 write (2 for the
+exchanger), then 2 reads per poll step. Run 2's single-key wave measured 339 reads and 1 write for
+2,500 invocations on 332 instances, about 1 read per instance. Per wave of about 2,200 instances
+that is about 2,200 to 3,000 reads per audience and region (worst case, every instance polling to
+the deadline: about 56 reads each, about 120,000); per day at 43 releases about 100,000 to 130,000
+reads per audience and region, plus one miss wave per base-token renewal that outlives a cached
+token.
 
 ## Files
 
@@ -52,24 +94,27 @@ it at deploy. `pnpm typecheck` and `pnpm lint` in `services/sts` check this dire
 
 | File | What it does |
 |---|---|
-| `api/shared.ts` | `POST /api/shared`: one STS-audience token through the shared cache. Answers the source (`memory`, `cache`, `cache_after_jitter`, `exchanged`, `poll`), time to token, wait time, exchange attempts and 429s, whether it won the claim, cache reads and writes, the cache backend, the region, the base token's `iat`/`exp`, the clock and the token's `exp`. `?jitterMs=`, `?claim=0`, `?deadlineMs=` override the defaults. |
+| `api/shared.ts` | `POST /api/shared`: one STS-audience token through the shared cache. Answers the source (`memory`, `cache`, `cache_after_jitter`, `exchanged`, `poll`), time to token, wait time, exchange attempts and 429s, whether it won the claim, cache reads and writes, the cache backend, the region, the base token's `iat`/`exp`, the clock and the token's `exp`. `?jitterMs=`, `?claim=0`, `?deadlineMs=` override the defaults; `?run=` salts the key. |
 | `api/cold.ts` | `POST /api/cold`: one exchange per invocation, no cache (run 1's mode), plus the base token's `iat`/`exp`, the clock, the exchanged `exp` and the rate-limit headers. |
 | `api/exchange.ts` | `POST /api/exchange?n=2500&c=50`: a burst from one instance. Its latency numbers are the ones to quote; the limit is measured only by a fan-out. |
-| `api/chain.ts` | `POST /api/chain`: exchanges for `https://example.invalid`, then exchanges that token for the run's audience; answers whether Vercel refused the second hop and each token's full `act`. |
-| `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. |
-| `inspect-env-token.ts` | Pulls `VERCEL_OIDC_TOKEN` with `vercel env pull` per environment and prints only its `environment` claim and whether it carries `user_id`. |
+| `api/chain.ts` | `POST /api/chain`: exchanges for `https://example.invalid`, then exchanges that token again; `vercelRefusedChain` is true only for a non-429 refusal (`chainedRateLimited` marks a 429). |
+| `lib/pass-rule.ts` | The run-3 pass rule `drive.ts` applies. |
+| `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline and budget scope), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. Shared mode salts each run with a fresh `run` id. |
+| `inspect-env-token.ts` | Pulls `VERCEL_OIDC_TOKEN` with `vercel env pull` per environment of the proof project, exchanges it for `https://sts-proof.invalid`, and prints for both tokens `environment`, `custom_environment_id`, whether `user_id` is present, the `act` shape and `scope`, plus the gate outcome. Never a token. |
 | `vercel.json` | `fluid: false`, so concurrent invocations land on separate instances, as cold instances would. |
 
 Every function refuses a request without `x-proof-key` equal to the project's `PROOF_SHARED_SECRET`
 (at least 32 characters), and refuses everything while it is unset. The audience is
 `PROOF_AUDIENCE`, default `https://sts-proof.invalid`: not an STS issuer, so no token the harness
 gets can be presented to STS. No function returns a token. Rate-limit headers (`x-ratelimit-*`,
-`ratelimit*`, `retry-after`) are recorded on successes and failures.
+`ratelimit*`, `retry-after`) are recorded on successes and failures. Exchanged-claim samples record
+`scope` and `plan` values and whether `deployment_id` is present.
 
-## Proof run 2 runbook (operator)
+## Proof run 3 runbook (operator)
 
 Prerequisites: Vercel CLI logged in to team `kilocode`; the work VM (2,500 sockets need
-`ulimit -n 10000`); `node` 24.
+`ulimit -n 10000`); `node` 24. Every step runs against the throwaway proof project only; no other
+project of the team is linked, pulled or changed.
 
 ### 1. Deploy a throwaway project
 
@@ -77,17 +122,20 @@ Prerequisites: Vercel CLI logged in to team `kilocode`; the work VM (2,500 socke
 WORK=$(mktemp -d) && rsync -a --exclude node_modules --exclude .vercel \
   services/sts/proof/vercel-exchange/ "$WORK/" && cd "$WORK"   # keep .vercel out of the repo
 PROJECT=sts-proof-vercel-exchange-$(date +%Y%m%d)
+TEAM=team_ItxRShuUkJaEd9GmXMEEgunb
 vercel project add "$PROJECT" --scope kilocode
 vercel link --yes --scope kilocode --project "$PROJECT"
 PROJECT_ID=$(node -e 'console.log(require("./.vercel/project.json").projectId)')
 ```
 
 On that project only: OIDC federation on in team issuer mode, deployment protection off (team
-default protects `*.vercel.app`), Node 24:
+default protects `*.vercel.app`), Node 24, and a custom environment `staging` for step 3:
 
 ```sh
 printf '%s' '{"oidcTokenConfig":{"enabled":true,"issuerMode":"team"},"ssoProtection":null,"passwordProtection":null,"nodeVersion":"24.x"}' > patch.json
-vercel api "/v9/projects/$PROJECT_ID?teamId=team_ItxRShuUkJaEd9GmXMEEgunb" -X PATCH --input patch.json
+vercel api "/v9/projects/$PROJECT_ID?teamId=$TEAM" -X PATCH --input patch.json
+printf '%s' '{"slug":"staging","description":"proof run 3"}' > staging.json
+vercel api "/v9/projects/$PROJECT_ID/custom-environments?teamId=$TEAM" -X POST --input staging.json
 openssl rand -hex 32 | tr -d '\n' > proof-key && chmod 600 proof-key
 vercel env add PROOF_SHARED_SECRET production --scope kilocode --yes < proof-key
 vercel deploy --prod --yes --scope kilocode     # prints https://$PROJECT.vercel.app
@@ -96,7 +144,10 @@ vercel deploy --prod --yes --scope kilocode     # prints https://$PROJECT.vercel
 Leave `PROOF_AUDIENCE` unset (default `https://sts-proof.invalid`). Note the function region the
 deployment reports (`region` in every answer).
 
-### 2. Run (from the VM, with `drive.ts` and `proof-key` copied there)
+### 2. Run (from the VM, with `drive.ts`, `lib/pass-rule.ts` and `proof-key` copied there)
+
+Each shared run carries its own `run` salt, so no run reads an earlier run's token. A no-claim run
+still goes to a fresh deployment, so its instances start cold.
 
 ```sh
 ulimit -n 10000
@@ -106,52 +157,67 @@ URL=https://$PROJECT.vercel.app
 node drive.ts --mode shared --dry-run --url "$URL"
 # a. The gate: a 2,500-invocation cold wave through the shared cache.
 node drive.ts --mode shared --url "$URL" --invocations 2500 > shared.json
-# b. Wait 70 s (budget refill). The same wave with claims off, to show what the claim saves.
-sleep 70 && node drive.ts --mode shared --url "$URL" --invocations 2500 --no-claim > shared-noclaim.json
-# c. Chained exchange (S2) and the act shape.
-curl -sS -X POST -H "x-proof-key: $PROOF_SHARED_SECRET" "$URL/api/chain" > chain.json
-# d. Burst latency only (one instance): wait 70 s first so the budget is full.
+# b. On a fresh deployment (vercel deploy --prod on the Mac, note its URL as URL_B), after 70 s:
+#    the same wave with claims off, to show what the claim saves.
+sleep 70 && node drive.ts --mode shared --url "$URL_B" --invocations 2500 --no-claim > shared-noclaim.json
+# c. Chained exchange and the act shape, after the budget refills.
+sleep 70 && curl -sS -X POST -H "x-proof-key: $PROOF_SHARED_SECRET" "$URL/api/chain" > chain.json
+# d. Burst latency only (one instance), after the budget refills.
 sleep 70 && curl -sS -X POST -H "x-proof-key: $PROOF_SHARED_SECRET" "$URL/api/exchange?n=100&c=50" > burst.json
-# e. Header token age on long-lived instances: once a minute for 2.5 hours.
+# e. Budget scope (optional): two fresh deployments (URL_C, URL_D) at once, about 150 cold
+#    exchanges each. About 200 tokens in total means the budget is per deployment; about 100 means
+#    it is per project or team (repeat with a second throwaway project to tell those apart).
+sleep 70 && { node drive.ts --mode cold --url "$URL_C" --invocations 150 > scope-c.json &
+  node drive.ts --mode cold --url "$URL_D" --invocations 150 > scope-d.json & wait; }
+# f. Header token age on long-lived instances: once a minute for 2.5 hours.
 node drive.ts --mode warm --url "$URL" --interval-s 60 --duration-s 9000 > warm.json 2> warm-samples.jsonl
 ```
 
-Then, on the Mac from `$WORK` (read only; prints no token), against a directory linked to
-`kilocode-app` (`vercel link --yes --scope kilocode --project kilocode-app` in an empty directory):
+### 3. Person tokens (on the Mac, from `$WORK`, which is linked to the proof project)
 
 ```sh
-node inspect-env-token.ts --cwd <directory linked to kilocode-app> preview production staging > env-tokens.jsonl
+node inspect-env-token.ts --cwd "$WORK" preview production staging > env-tokens.jsonl
 ```
 
-### 3. Pass rule (run a, `drive.ts` prints `checks` and `passed`)
+The pull writes the proof project's own (dummy) values to a 0700 temp directory, removed at once.
+
+### 4. Pass rule (run a, `drive.ts` prints `checks` and `passed`)
 
 - `allServed`: every invocation got a token, no function 5xx.
 - `sharedBackend`: no invocation used the in-memory fallback of `getCache()`.
-- `withinExchangeBudget`: exchange attempts, 429s included, at most 100 in total and per region.
-  A 429 is tolerated only inside the next two rules; the expected result is 0.
+- `withinExchangeBudget` (hard limit): exchange attempts, 429s included, at most 100 in total and
+  per region.
+- `claimHolds`: exchange attempts per region (one audience per run) at most 3, and no 429. A run
+  inside the hard limit but above 3 per region shows the claim does not hold on the real cache.
 - `withinTimeToTokenBudget`: time to token inside the function p99 at most 3 s and max at most 20 s.
-  Design 3 states the cold-start budget as one shared-cache read per audience and two parallel
-  fetches, with no millisecond figure; 20 s is the longest STS waits for a bundle object.
 - `expMatchesBase`: every token's `exp` equals the base token's `exp`.
 - `actOk`: the exchanged token's `act` is an object whose `aud` is `https://vercel.com/kilocode`,
   with no nested `act` (STS refuses anything else).
-- `coldWave`: at least 200 distinct instances, otherwise the run is inconclusive (run 1 reached 411).
-  The run measures concurrent exchanges per wave; the instance count is reported with it.
+- `coldWave`: at least 200 distinct instances, otherwise the run is inconclusive.
+  `instancesVsDesignPeak` reports the measured count next to the design's peak of about 2,200.
 
-Record in the PR: `shared.json`, `shared-noclaim.json` (attempts and 429s without claims),
-`chain.json` (`vercelRefusedChain`, both `act` shapes), `burst.json` (latency percentiles and
-rate-limit headers), `warm.json` (oldest header token, least time left, fresh exchanges expiring
-within 10 minutes, how often the base token changed) and `env-tokens.jsonl` (`environment` and
-`userIdPresent` per pulled environment; STS refuses every token with `user_id`).
+**Person-token gate (step 3).** For every pulled environment, either Vercel issues no token, or both
+the pulled and the exchanged token carry `user_id` (`gate: "holds"`; a refused exchange counts as
+no exchanged token). Any `gate: "stops"` stops the merge until Igor decides: a team member could
+then pull, exchange and present a token STS accepts. `gate: "inconclusive"` (429 or network error)
+is rerun after 70 s.
 
-The fan-out (run a) is binding for the limit; the burst (run d) is for latency only. `--mode cold`
-is run 1's mode and is expected to fail (100 served, the rest 429); it is not part of run 2.
+**Build tokens.** Record `scope` from `exchangedClaims` (run a) and from step 3. If `scope` tells a
+build token from a function token, the next round pins the function value in STS; if not, design
+6.2 states that build code is trusted like the deployment's own code.
 
-### 4. Clean up
+Record in the PR: `shared.json`, `shared-noclaim.json`, `chain.json` (`vercelRefusedChain`, both
+`act` shapes; counts only if `chainedRateLimited` is false), `burst.json`, `scope-*.json` (if run),
+`warm.json` (oldest header token, least time left, `headerTokensUnder60sLeft`, how often the base
+token changed) and `env-tokens.jsonl`.
+
+The fan-out (run a) is binding for the limit; the burst (run d) is for latency only.
+
+### 5. Clean up
 
 ```sh
-vercel project rm "$PROJECT" --scope kilocode   # deletes the project, its deployments and env vars
-vercel project ls --scope kilocode | grep "$PROJECT"   # no output
-cd / && rm -rf "$WORK"                            # proof-key, patch.json and .vercel go with it
-# VM: rm -f proof-key drive.ts *.json *.jsonl
+vercel project rm "$PROJECT" --scope kilocode   # deletes the project, its deployments, env vars and custom environments
+vercel project ls --scope kilocode 2>&1 | grep "$PROJECT"   # no output
+cd / && rm -rf "$WORK"                            # proof-key, patch.json, staging.json and .vercel go with it
+# VM: rm -f proof-key drive.ts lib/pass-rule.ts *.json *.jsonl
 ```

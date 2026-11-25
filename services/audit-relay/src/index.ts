@@ -6,6 +6,7 @@ import { handleScheduled } from './scheduled';
 export { RegistryDO } from './dos/RegistryDO';
 export { SignerDO } from './dos/SignerDO';
 export { StreamDO } from './dos/StreamDO';
+export { VerifierDO } from './dos/VerifierDO';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

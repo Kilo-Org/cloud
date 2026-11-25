@@ -72,3 +72,15 @@ export async function readArchived(stream: string, toSeq: number): Promise<Archi
   if (read.kind !== 'ok') throw new Error(`archive object ${stream}@${toSeq} is ${read.kind}`);
   return read.object;
 }
+
+/** Every key under `prefix`, following R2's cursor until the listing is complete. */
+export async function listObjectKeys(prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await env.AUDIT_ARCHIVE.list({ prefix, cursor, limit: 1000 });
+    for (const object of page.objects) keys.push(object.key);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return keys;
+}

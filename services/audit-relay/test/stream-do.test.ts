@@ -2,12 +2,13 @@ import { abortAllDurableObjects, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getStreamDOStub } from '../src/dos/StreamDO';
 import type { StreamOutcome } from '../src/dos/StreamDO';
-import { archiveObjectKey, listObjectKeys } from '../src/relay/archive';
+import { archiveObjectKey } from '../src/relay/archive';
 import { GENESIS_HASH } from '../src/relay/chain';
 import {
   auditBatch,
   axiomOk,
   env,
+  listObjectKeys,
   readArchived,
   recordingFetch,
   requestBodyOf,
@@ -36,7 +37,7 @@ describe('StreamDO', () => {
 
     expect(first).toMatchObject({ fromSeq: 1, toSeq: 2, archive: 'written' });
     expect(second).toMatchObject({ fromSeq: 3, toSeq: 5, archive: 'written' });
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
       archiveObjectKey(stream, 5),
     ]);
@@ -61,7 +62,7 @@ describe('StreamDO', () => {
     const duplicate = await stub.acceptBatch(auditBatch(1, 2, stream));
 
     expect(duplicate).toMatchObject({ kind: 'duplicate', toSeq: 2, headSeq: 2 });
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
     ]);
     expect(http.requests).toHaveLength(1);
@@ -75,12 +76,12 @@ describe('StreamDO', () => {
 
     const gap = await stub.acceptBatch(auditBatch(3, 5, stream));
     expect(gap).toMatchObject({ kind: 'retry', reason: 'gap', delaySeconds: 30 });
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
 
     accepted(await stub.acceptBatch(auditBatch(1, 2, stream)));
     const filled = accepted(await stub.acceptBatch(auditBatch(3, 5, stream)));
     expect(filled).toMatchObject({ fromSeq: 3, toSeq: 5 });
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
       archiveObjectKey(stream, 5),
     ]);
@@ -115,7 +116,7 @@ describe('StreamDO', () => {
     const batch = auditBatch(1, 2, stream);
     const failed = await stub.acceptBatch(batch);
     expect(failed).toMatchObject({ kind: 'retry', reason: 'axiom', delaySeconds: 60 });
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
     ]);
 
@@ -123,7 +124,7 @@ describe('StreamDO', () => {
     // The head advanced with the archive write, so the retry is a duplicate that re-ingests the
     // recorded hot-store gap instead of writing the archive object again.
     expect(await stub.acceptBatch(batch)).toMatchObject({ kind: 'duplicate', replayed: true });
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
     ]);
     expect(http.requests).toHaveLength(2);
@@ -179,7 +180,7 @@ describe('StreamDO', () => {
       fromSeq: 3,
       toSeq: 5,
     });
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
       archiveObjectKey(stream, 5),
     ]);

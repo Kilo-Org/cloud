@@ -4,9 +4,8 @@ import { withDORetry } from '@kilocode/worker-utils';
 import { getStreamDOStub } from './dos/StreamDO';
 import type { StreamDO, StreamOutcome } from './dos/StreamDO';
 import type { Env } from './env';
+import { pageOperator } from './page';
 import { errorName } from './relay/error-name';
-import { pageSlack } from './relay/slack';
-import { secretsFor } from './secrets';
 
 const DLQ_SUFFIX = '-dlq';
 
@@ -132,18 +131,6 @@ async function applyOutcome(
       );
       message.ack();
       return;
-  }
-}
-
-async function pageOperator(env: Env, message: string): Promise<void> {
-  try {
-    const webhook = await secretsFor(env).get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE');
-    const delivered = await pageSlack(webhook, message, fetch);
-    if (!delivered) {
-      console.error(JSON.stringify({ event: 'audit_relay.page_undelivered' }));
-    }
-  } catch (error) {
-    console.error(JSON.stringify({ event: 'audit_relay.page_failed', error: errorName(error) }));
   }
 }
 

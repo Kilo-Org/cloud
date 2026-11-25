@@ -131,15 +131,3 @@ export async function readArchivedObject(
     return { kind: 'corrupt', detail: errorName(error) };
   }
 }
-
-/** Every key under `prefix`, following R2's cursor until the listing is complete. */
-export async function listObjectKeys(bucket: ArchiveBucket, prefix: string): Promise<string[]> {
-  const keys: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await bucket.list({ prefix, cursor, limit: 1000 });
-    for (const object of page.objects) keys.push(object.key);
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
-  return keys;
-}

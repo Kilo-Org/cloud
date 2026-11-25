@@ -1,6 +1,13 @@
-import { CRONS } from './schedule';
-import { createHourlyCheckpoint, verifyArchivedChains } from './checkpoint';
+import { withDORetry } from '@kilocode/worker-utils';
+import { createHourlyCheckpoint } from './checkpoint';
+import {
+  getVerifierDOStub,
+  type StartPassResult,
+  type VerifierDO,
+  type VerifyPassKind,
+} from './dos/VerifierDO';
 import type { Env } from './env';
+import { CRONS } from './schedule';
 
 export async function handleScheduled(controller: ScheduledController, env: Env): Promise<void> {
   switch (controller.cron) {
@@ -10,17 +17,22 @@ export async function handleScheduled(controller: ScheduledController, env: Env)
       return;
     }
     case CRONS.dailyVerification:
-      await runVerification(env, false);
+      await startVerification(env, 'daily');
       return;
     case CRONS.monthlyVerification:
-      await runVerification(env, true);
+      await startVerification(env, 'full');
       return;
     default:
       console.error(JSON.stringify({ event: 'audit_relay.unknown_cron', cron: controller.cron }));
   }
 }
 
-async function runVerification(env: Env, full: boolean): Promise<void> {
-  const summary = await verifyArchivedChains(env, { full });
-  console.log(JSON.stringify({ event: 'audit_relay.verification', full, ...summary }));
+/** Starts a pass; the verifier then walks it in alarm-driven slices and pages on a failure. */
+async function startVerification(env: Env, kind: VerifyPassKind): Promise<void> {
+  const result = await withDORetry<DurableObjectStub<VerifierDO>, StartPassResult>(
+    () => getVerifierDOStub(env),
+    stub => stub.startPass(kind),
+    'startPass'
+  );
+  console.log(JSON.stringify({ event: 'audit_relay.verification_start', ...result }));
 }

@@ -8,8 +8,15 @@ import {
 } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src';
-import { archiveObjectKey, listObjectKeys } from '../src/relay/archive';
-import { auditBatch, axiomOk, env, recordingFetch, uniqueStream } from './helpers';
+import { archiveObjectKey } from '../src/relay/archive';
+import {
+  auditBatch,
+  axiomOk,
+  env,
+  listObjectKeys,
+  recordingFetch,
+  uniqueStream,
+} from './helpers';
 
 async function runQueue(queue: string, bodies: unknown[]) {
   const batch = createMessageBatch(
@@ -46,7 +53,7 @@ describe('queue handler', () => {
 
     expect(result.retryBatch.retry).toBe(false);
     expect(result.retryMessages).toEqual([]);
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
     ]);
   });
@@ -62,7 +69,7 @@ describe('queue handler', () => {
 
     expect(result.retryBatch.retry).toBe(false);
     expect(result.retryMessages).toEqual([{ msgId: batch.messages[0].id }]);
-    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
   });
 
   it('acks a body that cannot be decoded instead of retrying it forever', async () => {

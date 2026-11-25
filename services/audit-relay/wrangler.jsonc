@@ -60,12 +60,17 @@
       { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
       { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
       { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+      { "name": "AUDIT_VERIFIER", "class_name": "VerifierDO" },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["StreamDO", "RegistryDO", "SignerDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["VerifierDO"],
     },
   ],
   "r2_buckets": [
@@ -129,6 +134,7 @@
           { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
           { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
           { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+          { "name": "AUDIT_VERIFIER", "class_name": "VerifierDO" },
         ],
       },
       "r2_buckets": [
@@ -181,6 +187,7 @@
           { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
           { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
           { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+          { "name": "AUDIT_VERIFIER", "class_name": "VerifierDO" },
         ],
       },
       "r2_buckets": [

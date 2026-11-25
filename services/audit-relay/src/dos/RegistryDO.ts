@@ -5,7 +5,6 @@ import type { StreamHead } from './StreamDO';
 export type StreamHeadRecord = StreamHead & { stream: string };
 
 const HEAD_PREFIX = 'head:';
-const VERIFIED_CHECKPOINT_KEY = 'verified_checkpoint';
 
 /**
  * One index object for every audit stream: one key per stream holding its newest archived head.
@@ -30,14 +29,6 @@ export class RegistryDO extends DurableObject<Env> {
       seq: head.seq,
       hash: head.hash,
     }));
-  }
-
-  async recordVerifiedCheckpoint(key: string): Promise<void> {
-    await this.ctx.storage.put(VERIFIED_CHECKPOINT_KEY, key);
-  }
-
-  async lastVerifiedCheckpoint(): Promise<string | null> {
-    return (await this.ctx.storage.get<string>(VERIFIED_CHECKPOINT_KEY)) ?? null;
   }
 }
 

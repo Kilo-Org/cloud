@@ -3,6 +3,7 @@ import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { eq } from 'drizzle-orm';
@@ -794,19 +795,28 @@ describe('adminCustomLlmRouter', () => {
       base_url: 'http://upstream.example.com/v1',
     };
     const originalNodeEnv = process.env.NODE_ENV;
-    const setNodeEnv = (value: string | undefined) => {
+    const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+    const allowedAddress = { 'x-vercel-forwarded-for': '203.0.113.7' };
+    const setEnv = (key: 'NODE_ENV' | 'ADMIN_ALLOWED_NETWORKS', value: string | undefined) => {
       const env: Record<string, string | undefined> = process.env;
-      if (value === undefined) delete env.NODE_ENV;
-      else env.NODE_ENV = value;
+      if (value === undefined) delete env[key];
+      else env[key] = value;
     };
 
+    beforeEach(() => {
+      setEnv('ADMIN_ALLOWED_NETWORKS', '203.0.113.7');
+      resetAdminNetworkConfigForTest();
+    });
+
     afterEach(() => {
-      setNodeEnv(originalNodeEnv);
+      setEnv('NODE_ENV', originalNodeEnv);
+      setEnv('ADMIN_ALLOWED_NETWORKS', originalNetworks);
+      resetAdminNetworkConfigForTest();
     });
 
     it('rejects a non-https base_url when the URL policy is enforced', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(admin.id);
+      setEnv('NODE_ENV', 'production');
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -826,7 +836,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects changing an existing definition to a non-https base_url when enforced', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
       const publicId = 'kilo-internal/http-update-model';
       await caller.admin.customLlm.upsert({
         public_id: publicId,
@@ -834,7 +844,7 @@ describe('adminCustomLlmRouter', () => {
         credentials,
       });
 
-      setNodeEnv('production');
+      setEnv('NODE_ENV', 'production');
 
       await expect(
         caller.admin.customLlm.upsert({ public_id: publicId, definition: httpDefinition })
@@ -845,8 +855,8 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('accepts an https base_url when the URL policy is enforced', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(admin.id);
+      setEnv('NODE_ENV', 'production');
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/https-model',
@@ -858,8 +868,8 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('accepts a non-https base_url in the test environment', async () => {
-      setNodeEnv('test');
-      const caller = await createCallerForUser(admin.id);
+      setEnv('NODE_ENV', 'test');
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/http-model-test-env',

@@ -65,6 +65,7 @@ describe('GET /api/private/users', () => {
       adminOnly: true,
       requestMethod: 'GET',
       stepUpExemptCredentials: ['human_bearer'],
+      adminNetworkExemptCredentials: ['human_bearer'],
     });
   });
 

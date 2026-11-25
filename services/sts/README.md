@@ -342,9 +342,10 @@ delivery, ETags, policy narrowing, fills, relay and pruning, the refresher again
 Infisical: login, folder reads, resolution, references, backoff, webhooks) and then the Node suites:
 `test/repo/` (policy files, the Worker config checks, and a check that every `wrangler.jsonc` under
 `services/` other than a service's own, a symlink included, sits under `test/fixtures/`, which the
-production deploy job skips, that no `wrangler.json` sits at the repository root, in `services/` or
-in a service directory, where Wrangler would read it instead of the service's `wrangler.jsonc`, and
-that no directory under `services/` is named `wrangler.json` or `wrangler.jsonc`) and
+production deploy job skips, that no `wrangler.json` and no tracked `.wrangler/deploy/config.json`
+redirect sits at the repository root, in `services/` or in a service directory, where Wrangler would
+read it instead of the service's `wrangler.jsonc`, and that no directory under `services/` is named
+`wrangler.json` or `wrangler.jsonc`) and
 `test/runtime/`. That suite starts the test-only Worker in `test/fixtures/runtime/` in
 local workerd and checks that a
 `SecretsBroker` call ends when it returns, even when the caller never disposes the result; that a

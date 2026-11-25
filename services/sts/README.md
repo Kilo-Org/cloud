@@ -64,10 +64,24 @@ local serve only non-production Vercel environments.
 
 Adding a file also means adding it to `src/policy/registry.ts`; the typed import map in
 `src/policy/index.ts` makes the two disagree at typecheck, and `test/repo/policy-files.test.ts`
-checks the directory itself. That test also scans every `services/*/wrangler.jsonc` environment and
-fails a `SecretsBroker` binding whose `props.caller` is not the worker's own top-level `name` (the
-workload name is the same in every environment), a production block that binds `sts-staging` or a
-`staging` block that binds `sts`, or a caller with no `worker-binding` policy.
+checks the directory itself.
+
+`test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
+`wrangler*.toml` in the repository (test fixtures excepted) with Wrangler's own parser, every env
+block included, and fails when:
+
+- a Durable Object binding names `script_name` `sts`, `sts-*`, `audit-relay` or `audit-relay-*`;
+- a service binding to `sts`/`sts-*` uses an entrypoint other than `SecretsBroker`, or any service
+  binding targets `audit-relay`/`audit-relay-*`;
+- the top-level (production) block binds anything but `sts`, or an `<env>` block anything but
+  `sts-<env>`;
+- `props.caller` is not the config's top-level `name`, in any block;
+- a config that binds STS has an env block whose `name` is neither absent nor `<name>-<env>`, or two
+  configs share a top-level `name`;
+- the caller has no `worker-binding` policy listing the environment the binding reaches.
+
+CI runs it whenever any Worker config changes (`scripts/affected-workspaces.mjs` routes every
+`wrangler*` file to this workspace).
 
 The first request after a deploy compares the policy hash with the stored one and writes one
 `ai.kilo.sts.policy.changed` event naming the workloads and secret names that were added or removed.

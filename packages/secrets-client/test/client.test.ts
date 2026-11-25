@@ -97,11 +97,10 @@ describe('createSecrets', () => {
     const transport = vi.fn<Transport>(async () => ok());
     const secrets = createSecrets(transport);
 
-    const [value, again, snapshot] = await Promise.all([
-      secrets.get(SECRET),
-      secrets.get(SECRET),
-      secrets.snapshot(),
-    ]);
+    const reads = Promise.all([secrets.get(SECRET), secrets.get(SECRET), secrets.snapshot()]);
+    // The two readers that did not start the fetch see its answer on their next poll.
+    await advance(1);
+    const [value, again, snapshot] = await reads;
 
     expect(value).toBe('ae-token');
     expect(again).toBe('ae-token');
@@ -141,6 +140,25 @@ describe('createSecrets', () => {
     expect(await secrets.get(SECRET)).toBe('rotated-token');
     expect((await secrets.snapshot()).etag).toBe(ETAG_2);
     expect(transport).toHaveBeenCalledTimes(2);
+  });
+
+  it('hands waitUntil only the revalidation that the same read started', async () => {
+    const pending = Promise.withResolvers<BundleResult>();
+    const transport = vi.fn<Transport>();
+    transport.mockResolvedValueOnce(ok()).mockReturnValueOnce(pending.promise);
+    const secrets = createSecrets(transport);
+    const first = context();
+    const second = context();
+
+    await secrets.get(SECRET);
+    await advance(241);
+
+    expect(await secrets.get(SECRET, first)).toBe('ae-token');
+    expect(await secrets.get(SECRET, second)).toBe('ae-token');
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(first.scheduled).toHaveLength(1);
+    // The second read may belong to another request, which must not hold the first one's call.
+    expect(second.scheduled).toHaveLength(0);
   });
 
   it('waits for revalidation once the 300 second cache expires', async () => {
@@ -307,6 +325,8 @@ describe('createSecrets', () => {
 
     await advance(5);
     slow.resolve(ok(ETAG_1, 'slow-token'));
+    // The reader now waits on its second attempt and sees the first one's answer on its next poll.
+    await advance(1);
     expect(await read.promise).toBe('slow-token');
     expect(await secrets.get(SECRET)).toBe('slow-token');
   });

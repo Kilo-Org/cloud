@@ -29,7 +29,7 @@ describe('automation issuer to runtime compatibility', () => {
         userId: user.id,
         pepper,
         secret,
-        expiresInSeconds: 157_680_000,
+        expiresInSeconds: 30 * 24 * 60 * 60,
       });
       const control = await generateControlToken(user, secret, 'production', true, organizationId);
       const adapters = {
@@ -104,18 +104,27 @@ describe('automation issuer to runtime compatibility', () => {
     'uses the intended receiver for flag %s',
     async flag => {
       const user = { id: 'oauth/test-user', api_token_pepper: null };
-      const tokens = [
-        [await generateControlToken(user, secret, 'production', flag), 'cloud-agent-next'],
-        [await generateTriageToken(user, secret, 'production', flag), 'kilo-gateway'],
-        [await generateInternalServiceToken(user.id, secret, flag), 'session-ingest'],
+      const modernControl = flag === true || flag === 'true';
+      const tokens: [string, string, boolean][] = [
+        [
+          await generateControlToken(user, secret, 'production', flag),
+          'cloud-agent-next',
+          modernControl,
+        ],
+        [
+          await generateTriageToken(user, secret, 'production', flag),
+          'kilo-gateway',
+          modernControl,
+        ],
+        [await generateInternalServiceToken(user.id, secret), 'session-ingest', true],
       ];
-      for (const [token, audience] of tokens) {
+      for (const [token, audience, modern] of tokens) {
         const auth = await verifyKiloTokenForPolicy(token, verifier, {
           audience,
           mode: 'allow-legacy',
         });
         expect(auth.claims.exp - auth.claims.iat).toBe(3600);
-        if (flag === true || flag === 'true') {
+        if (modern) {
           await expect(verifyKiloToken(token, verifier)).rejects.toThrow('audience');
           for (const other of [
             'cloud-agent-next',

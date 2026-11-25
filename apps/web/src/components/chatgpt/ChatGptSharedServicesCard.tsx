@@ -13,6 +13,11 @@ import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitD
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/openai/connect';
 import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
+import { SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES } from '@/lib/auth/sign-in-method-change-codes';
+import {
+  SignInMethodCodeDialog,
+  type SignInMethodChallenge,
+} from '@/components/profile/SignInMethodCodeDialog';
 
 /**
  * The organization's shared-services ChatGPT connection. It is one connection
@@ -43,7 +48,6 @@ const LOAD_ERROR_MESSAGE = "We couldn't load the shared services connection. Try
 const CONNECT_ERROR_MESSAGE = "We couldn't connect the shared services account. Try again.";
 const DISCONNECT_ERROR_MESSAGE =
   "We couldn't disconnect the shared services connection. Try again.";
-const CONNECT_FAILED_CODE = 'connect_failed';
 
 const CARD_BODY_CLASS = 'flex min-h-[7rem] flex-col justify-center gap-3';
 const CARD_STATUS_SLOT_CLASS = 'flex min-w-[7.625rem] justify-end';
@@ -133,7 +137,9 @@ function CardBody({
   if (authErrorCode) {
     return (
       <>
-        <p className="type-body text-muted-foreground">{CONNECT_ERROR_MESSAGE}</p>
+        <p className="type-body text-muted-foreground">
+          {SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[authErrorCode] ?? CONNECT_ERROR_MESSAGE}
+        </p>
         <ConnectAction label={TRY_AGAIN_LABEL} onConnect={onConnect} isConnecting={isConnecting} />
       </>
     );
@@ -237,7 +243,18 @@ export function ChatGptSharedServicesCardView(props: ChatGptSharedServicesCardVi
 
 const AUTH_ERROR_PARAM = 'openai_error';
 
-function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId: string }) {
+type ChatGptSharedServicesCardProps = {
+  organizationId: string;
+  /** The page's last requested sign-in method code; see `OpenAiChatGptCard`. */
+  codeChallenge: SignInMethodChallenge | null;
+  onCodeChallengeChange: (challenge: SignInMethodChallenge | null) => void;
+};
+
+function ChatGptSharedServicesCardConnected({
+  organizationId,
+  codeChallenge,
+  onCodeChallengeChange,
+}: ChatGptSharedServicesCardProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -275,22 +292,34 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
     })
   );
   const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
+  const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
 
   const handleConnect = () => {
     setAuthErrorCode(null);
+    // The code step below asks for the emailed code before it starts the link.
+    setIsCodeDialogOpen(true);
+  };
+
+  const handleCodeVerified = async (code: string, challengeId: string) => {
     setIsConnecting(true);
-    void startOpenAiChatGptConnect(
-      () =>
-        linkMutation.mutateAsync({
-          provider: 'openai',
-          organizationId,
-          chatGptScope: 'shared_services',
-        }),
-      organizationId
-    ).catch(() => {
+    try {
+      await startOpenAiChatGptConnect(
+        () =>
+          linkMutation.mutateAsync({
+            provider: 'openai',
+            organizationId,
+            chatGptScope: 'shared_services',
+            code,
+            challengeId,
+          }),
+        organizationId
+      );
+    } catch (error) {
+      // Only a failed attempt releases the busy state; a successful one
+      // navigates away with the label still pending.
       setIsConnecting(false);
-      setAuthErrorCode(CONNECT_FAILED_CODE);
-    });
+      throw error;
+    }
   };
 
   const handleDisconnect = () => {
@@ -299,23 +328,35 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
   };
 
   return (
-    <ChatGptSharedServicesCardView
-      status={statusQuery.data}
-      authErrorCode={authErrorCode}
-      hasLoadError={statusQuery.isError}
-      hasDisconnectError={hasDisconnectError}
-      isConnecting={isConnecting}
-      isDisconnecting={disconnectMutation.isPending}
-      isUsageLimitDismissed={
-        statusQuery.data?.usageLimit?.reachedAt === dismissedUsageLimitReachedAt
-      }
-      onConnect={handleConnect}
-      onDisconnect={handleDisconnect}
-      onRetry={() => void statusQuery.refetch()}
-      onDismissUsageLimit={() =>
-        setDismissedUsageLimitReachedAt(statusQuery.data?.usageLimit?.reachedAt ?? null)
-      }
-    />
+    <>
+      <ChatGptSharedServicesCardView
+        status={statusQuery.data}
+        authErrorCode={authErrorCode}
+        hasLoadError={statusQuery.isError}
+        hasDisconnectError={hasDisconnectError}
+        isConnecting={isConnecting}
+        isDisconnecting={disconnectMutation.isPending}
+        isUsageLimitDismissed={
+          statusQuery.data?.usageLimit?.reachedAt === dismissedUsageLimitReachedAt
+        }
+        onConnect={handleConnect}
+        onDisconnect={handleDisconnect}
+        onRetry={() => void statusQuery.refetch()}
+        onDismissUsageLimit={() =>
+          setDismissedUsageLimitReachedAt(statusQuery.data?.usageLimit?.reachedAt ?? null)
+        }
+      />
+      <SignInMethodCodeDialog
+        open={isCodeDialogOpen}
+        change="link"
+        provider="openai"
+        challenge={codeChallenge}
+        onChallengeChange={onCodeChallengeChange}
+        onOpenChange={setIsCodeDialogOpen}
+        onError={error => setAuthErrorCode(error)}
+        onVerified={handleCodeVerified}
+      />
+    </>
   );
 }
 
@@ -323,10 +364,10 @@ function ChatGptSharedServicesCardConnected({ organizationId }: { organizationId
  * The card on the organization BYOK page. `useSearchParams` needs a Suspense
  * boundary; the fallback is the card's own loading state.
  */
-export function ChatGptSharedServicesCard({ organizationId }: { organizationId: string }) {
+export function ChatGptSharedServicesCard(props: ChatGptSharedServicesCardProps) {
   return (
     <Suspense fallback={<ChatGptSharedServicesCardView status={undefined} />}>
-      <ChatGptSharedServicesCardConnected organizationId={organizationId} />
+      <ChatGptSharedServicesCardConnected {...props} />
     </Suspense>
   );
 }

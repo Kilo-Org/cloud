@@ -4,7 +4,7 @@ import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-po
 import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
 
 export type ValidateResult =
-  | { success: true; userId: string; token: string; pepper: string | null }
+  | { success: true; userId: string; token: string; pepper: string | null | undefined }
   | { success: false; error: string };
 
 /**
@@ -39,7 +39,7 @@ export async function validateKiloToken(
     success: true,
     userId: payload.kiloUserId,
     token,
-    pepper: payload.apiTokenPepper ?? null,
+    pepper: payload.apiTokenPepper,
   };
 }
 

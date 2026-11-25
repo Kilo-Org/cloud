@@ -31,9 +31,10 @@ test('the default seed token carries the shape the policy accepts', async () => 
   const params = apiTokenSigningParams(DEFAULT_EXPIRES_DAYS);
 
   assert.equal(params.env, 'development');
+  assert.equal(params.expiresInSeconds, 30 * 24 * 60 * 60);
   assert.ok(
     LEGACY_API_TOKEN_LIFETIMES_SECONDS.some(lifetime => lifetime === params.expiresInSeconds),
-    `default lifetime ${params.expiresInSeconds}s must be a legacy five-year API lifetime`
+    `default lifetime ${params.expiresInSeconds}s must be an exchangeable legacy API lifetime`
   );
 
   const { token } = await signKiloToken({
@@ -74,6 +75,18 @@ test('a short-lived dev token is exchange-ineligible (the broken pre-fix shape)'
     mode: 'allow-legacy',
   });
   assert.equal(isKiloCredentialExchangeEligible(auth, { legacy: 'five-year-api' }), false);
+});
+
+test('the shared signer refuses a seed lifetime above 30 days', async () => {
+  await assert.rejects(
+    signKiloToken({
+      userId: '00000000-0000-0000-0000-000000000001',
+      pepper: 'pepper',
+      secret: TEST_SECRET,
+      ...apiTokenSigningParams(31),
+    }),
+    /Kilo token lifetime exceeds the 30-day limit/
+  );
 });
 
 test('seed signing params supply the local development env', async () => {

@@ -3,6 +3,7 @@ import { SignJWT, decodeProtectedHeader } from 'jose';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import {
   kiloTokenPayload,
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
   KILO_TOKEN_VERSION,
   signKiloToken,
   verifyKiloToken,
@@ -105,6 +106,28 @@ describe('signKiloToken', () => {
 
     expect(expiresAt).toBe('2026-03-10T12:01:30.000Z');
   });
+
+  it('signs a lifetime of exactly 30 days', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-123',
+      pepper: null,
+      secret: SECRET,
+      expiresInSeconds: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
+    const payload = await verifyKiloToken(token, verifier);
+
+    expect(KILO_TOKEN_MAX_LIFETIME_SECONDS).toBe(30 * 24 * 60 * 60);
+    expect(payload.exp! - payload.iat!).toBe(KILO_TOKEN_MAX_LIFETIME_SECONDS);
+  });
+
+  it.each([KILO_TOKEN_MAX_LIFETIME_SECONDS + 1, 157_680_000, Number.POSITIVE_INFINITY, Number.NaN])(
+    'refuses a lifetime above the 30-day cap: %s',
+    async expiresInSeconds => {
+      await expect(
+        signKiloToken({ userId: 'user-123', pepper: null, secret: SECRET, expiresInSeconds })
+      ).rejects.toThrow('Kilo token lifetime exceeds the 30-day limit');
+    }
+  );
 
   it('includes env when provided and omits it when absent', async () => {
     const withEnv = await signKiloToken({

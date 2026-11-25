@@ -174,10 +174,12 @@ describe('pending auth link attach rule', () => {
       reason: 'EXPIRED',
     });
     expect(mockSendNotice).toHaveBeenCalledTimes(1);
-    expect(mockSendNotice).toHaveBeenCalledWith(user.google_user_email, 'GitHub', {
-      email: user.google_user_email,
-      displayName: 'octo-pending',
-    });
+    expect(mockSendNotice).toHaveBeenCalledWith(
+      user.google_user_email,
+      'GitHub',
+      { email: user.google_user_email, displayName: 'octo-pending' },
+      expect.objectContaining({ changedAt: expect.any(Date) })
+    );
   });
 
   it('restores the claim when the link call throws, then links on retry', async () => {

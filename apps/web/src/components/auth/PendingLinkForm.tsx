@@ -9,6 +9,16 @@ import { AuthProviderIdSchema, getProviderById } from '@/lib/auth/provider-metad
 import { SignInButton } from '@/components/auth/SigninButton';
 import { PasskeySignInButton } from '@/components/auth/sign-in/PasskeySignInButton';
 import { TurnstileView } from '@/components/auth/sign-in/TurnstileView';
+import {
+  SignInMethodCodeDialog,
+  type SignInMethodChallenge,
+} from '@/components/profile/SignInMethodCodeDialog';
+import {
+  SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES,
+  SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR,
+  SignInMethodChangeRefusedError,
+  isSignInMethodChangeRefusalCode,
+} from '@/lib/auth/sign-in-method-change-codes';
 
 const COMPLETE_URL = '/api/auth/pending-link/complete';
 
@@ -113,6 +123,8 @@ export function PendingLinkForm({
   const [pendingProvider, setPendingProvider] = useState<AuthProviderId | null>(null);
   const [turnstileAttemptId, setTurnstileAttemptId] = useState(0);
   const [turnstileError, setTurnstileError] = useState(false);
+  const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
 
   const load = useCallback(async () => {
     setView({ kind: 'loading' });
@@ -223,36 +235,82 @@ export function PendingLinkForm({
     }
   }, [code]);
 
+  /** Shows a refused completion that the code dialog does not explain. */
+  const showCompleteError = useCallback((error: string) => {
+    if (error === 'EXPIRED') {
+      setView({ kind: 'expired' });
+    } else if (isTerminalError(error)) {
+      setTerminalError(error);
+    } else if (error === 'WRONG_ACCOUNT' || error === 'SESSION_REQUIRED') {
+      setBannerError(error);
+    } else {
+      setRetryableError(pendingLinkErrorMessage(error));
+    }
+  }, []);
+
+  /**
+   * Asks the server to attach the identity. Navigates on success and returns
+   * null; otherwise returns the error code.
+   */
+  const postComplete = useCallback(
+    async (proof?: { code: string; challengeId: string }): Promise<string | null> => {
+      const response = await fetch(
+        COMPLETE_URL,
+        proof
+          ? {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(proof),
+            }
+          : { method: 'POST' }
+      );
+      if (response.ok) {
+        const parsed = completeResponseSchema.safeParse(await response.json());
+        if (!parsed.success) return 'LINKING-FAILED';
+        window.location.assign(parsed.data.redirectTo);
+        return null;
+      }
+      const parsed = errorResponseSchema.safeParse(await response.json().catch(() => null));
+      return parsed.success ? parsed.data.error : 'UNKNOWN';
+    },
+    []
+  );
+
   const confirmComplete = useCallback(async () => {
     setBusy(true);
     setRetryableError(null);
     try {
-      const response = await fetch(COMPLETE_URL, { method: 'POST' });
-      if (response.ok) {
-        const parsed = completeResponseSchema.safeParse(await response.json());
-        if (!parsed.success) {
-          setRetryableError(pendingLinkErrorMessage('LINKING-FAILED'));
-          return;
-        }
-        window.location.assign(parsed.data.redirectTo);
-        return;
-      }
-      const parsed = errorResponseSchema.safeParse(await response.json().catch(() => null));
-      const error = parsed.success ? parsed.data.error : 'UNKNOWN';
-      if (error === 'EXPIRED') {
-        setView({ kind: 'expired' });
-      } else if (isTerminalError(error)) {
-        setTerminalError(error);
-      } else if (error === 'WRONG_ACCOUNT' || error === 'SESSION_REQUIRED') {
-        setBannerError(error);
-      } else {
-        setRetryableError(pendingLinkErrorMessage(error));
-      }
+      const error = await postComplete();
+      if (error) showCompleteError(error);
     } catch {
       setRetryableError(pendingLinkErrorMessage('LINKING-FAILED'));
     } finally {
       setBusy(false);
     }
+  }, [postComplete, showCompleteError]);
+
+  // An existing-account link is confirmed with the code emailed to the
+  // account, like a link from Connected accounts. A refusal of the code goes
+  // back to the dialog, which shows it there or hands it to `onError`.
+  const completeWithCode = useCallback(
+    async (code: string, challengeId: string) => {
+      setRetryableError(null);
+      const error = await postComplete({ code, challengeId });
+      if (!error) return;
+      if (isSignInMethodChangeRefusalCode(error)) throw new SignInMethodChangeRefusedError(error);
+      showCompleteError(error);
+    },
+    [postComplete, showCompleteError]
+  );
+
+  const showCodeStepPageError = useCallback((pageError: string) => {
+    if (pageError === SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR) {
+      setBannerError(pageError);
+      return;
+    }
+    setRetryableError(
+      SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[pageError] ?? pendingLinkErrorMessage(pageError)
+    );
   }, []);
 
   const handleTurnstileSuccess = useCallback(
@@ -406,6 +464,19 @@ export function PendingLinkForm({
       </Link>
     </div>
   );
+  const reauthBanner = bannerError === SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR && (
+    <div role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
+      <p className="mb-3">{SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[bannerError]}</p>
+      <button
+        type="button"
+        onClick={() => void signOut({ callbackUrl: '/users/pending-link' })}
+        className="underline pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+      >
+        Sign out and sign in again
+      </button>
+    </div>
+  );
+  const needsEmailedCode = summary.kind === 'existing_account';
 
   if (confirm) {
     return (
@@ -415,16 +486,29 @@ export function PendingLinkForm({
         </h1>
         <p className="text-muted-foreground mb-8 text-center text-sm">
           Add {providerName} ({identityLabel}) to {summary.accountEmail}?
+          {needsEmailedCode && ` We will email a code to ${summary.accountEmail} to confirm.`}
         </p>
         {wrongAccountBanner}
         {sessionRequiredBanner}
+        {reauthBanner}
         {retryableError && (
           <p role="alert" className="mb-6 rounded-md bg-red-950 p-4 text-sm text-red-300">
             {retryableError}
           </p>
         )}
         <div className="flex flex-col gap-3">
-          <SignInButton onClick={() => void confirmComplete()} disabled={busy}>
+          <SignInButton
+            onClick={() => {
+              if (!needsEmailedCode) {
+                void confirmComplete();
+                return;
+              }
+              setRetryableError(null);
+              setBannerError(null);
+              setIsCodeDialogOpen(true);
+            }}
+            disabled={busy}
+          >
             Add {providerName}
           </SignInButton>
           <Link
@@ -434,6 +518,18 @@ export function PendingLinkForm({
             Not now
           </Link>
         </div>
+        {needsEmailedCode && (
+          <SignInMethodCodeDialog
+            open={isCodeDialogOpen}
+            change="link"
+            provider={summary.provider}
+            challenge={codeChallenge}
+            onChallengeChange={setCodeChallenge}
+            onOpenChange={setIsCodeDialogOpen}
+            onError={showCodeStepPageError}
+            onVerified={completeWithCode}
+          />
+        )}
       </div>
     );
   }

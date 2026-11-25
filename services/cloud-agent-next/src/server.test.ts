@@ -214,6 +214,7 @@ function signKiloToken(userId = 'usr_1'): string {
     {
       version: 3,
       kiloUserId: userId,
+      apiTokenPepper: null,
     },
     secret,
     { algorithm: 'HS256' }
@@ -225,6 +226,7 @@ function signKiloTokenWithAudience(audience: string | string[], userId = 'usr_1'
     {
       version: 3,
       kiloUserId: userId,
+      apiTokenPepper: null,
       aud: audience,
     },
     secret,

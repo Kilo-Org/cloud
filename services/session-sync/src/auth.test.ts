@@ -11,6 +11,7 @@ const USER = 'oauth/google:synthetic-user';
 const ORGANIZATION = '00000000-0000-4000-8000-000000000001';
 const PEPPER = 'synthetic-pepper';
 const FIVE_YEARS = 157_680_000;
+const THIRTY_DAYS = 30 * 24 * 60 * 60;
 // Nothing listens on port 1, so any database access fails like an outage.
 const UNREACHABLE_DATABASE = 'postgresql://synthetic:synthetic@127.0.0.1:1/none';
 
@@ -72,15 +73,19 @@ async function errorCode(result: unknown): Promise<{ status: number; code: unkno
 async function legacyApiToken(
   options: { lifetime?: number; env?: string; extra?: SignKiloTokenExtra } = {}
 ): Promise<string> {
-  const { token } = await signKiloToken({
-    userId: USER,
-    pepper: PEPPER,
-    secret: NEXTAUTH_SECRET,
-    expiresInSeconds: options.lifetime ?? FIVE_YEARS,
+  // Signed directly: the default is the five-year lifetime that `signKiloToken`
+  // no longer mints and the exchange must keep accepting.
+  return new SignJWT({
+    version: 3,
+    kiloUserId: USER,
+    apiTokenPepper: PEPPER,
     env: options.env ?? 'development',
-    extra: options.extra ?? { deviceAuthRequestCode: 'SYNTH-0001' },
-  });
-  return token;
+    ...(options.extra ?? { deviceAuthRequestCode: 'SYNTH-0001' }),
+    iat: nowSeconds(),
+    exp: nowSeconds() + (options.lifetime ?? FIVE_YEARS),
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
 }
 
 afterEach(() => {
@@ -215,7 +220,7 @@ describe('exchange', () => {
             userId: USER,
             pepper: PEPPER,
             secret: `${NEXTAUTH_SECRET}-forged`,
-            expiresInSeconds: FIVE_YEARS,
+            expiresInSeconds: THIRTY_DAYS,
             env: 'development',
           })
         ).token,
@@ -300,7 +305,7 @@ describe('exchange', () => {
           await signKiloToken({
             userId: USER,
             secret: NEXTAUTH_SECRET,
-            expiresInSeconds: FIVE_YEARS,
+            expiresInSeconds: THIRTY_DAYS,
             env: 'development',
           })
         ).token,
@@ -329,7 +334,7 @@ describe('exchange', () => {
       'a device credential with an unknown lifetime',
       () =>
         legacyApiToken({
-          lifetime: 30 * 24 * 3600,
+          lifetime: 7 * 24 * 3600,
           extra: { deviceSessionId: '00000000-0000-4000-8000-000000000002' },
         }),
       403,
@@ -338,6 +343,43 @@ describe('exchange', () => {
   ])('rejects %s before any account lookup', async (_name, token, status, code) => {
     const response = await exchange(exchangeRequest(await token()), env());
     expect(await errorCode(response)).toEqual({ status, code });
+  });
+
+  it.each<[string, () => Promise<string>]>([
+    ['a five-year API credential', () => legacyApiToken()],
+    ['a 30-day API credential', () => legacyApiToken({ lifetime: THIRTY_DAYS })],
+    [
+      'a 30-day API credential minted by the shared signer',
+      async () =>
+        (
+          await signKiloToken({
+            userId: USER,
+            pepper: PEPPER,
+            secret: NEXTAUTH_SECRET,
+            expiresInSeconds: THIRTY_DAYS,
+            env: 'development',
+            extra: { deviceAuthRequestCode: 'SYNTH-0001' },
+          })
+        ).token,
+    ],
+    [
+      'a five-year device credential',
+      () => legacyApiToken({ extra: { deviceSessionId: '00000000-0000-4000-8000-000000000002' } }),
+    ],
+    [
+      'a 30-day device credential',
+      () =>
+        legacyApiToken({
+          lifetime: THIRTY_DAYS,
+          extra: { deviceSessionId: '00000000-0000-4000-8000-000000000002' },
+        }),
+    ],
+  ])('admits %s to the account lookup', async (_name, token) => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // The only database here is unreachable, so reaching it proves the
+    // credential passed every check that precedes the account lookup.
+    const response = await exchange(exchangeRequest(await token()), env());
+    expect(await errorCode(response)).toEqual({ status: 503, code: 'auth_unavailable' });
   });
 
   it('reports an account database outage as unavailable without logging secrets', async () => {

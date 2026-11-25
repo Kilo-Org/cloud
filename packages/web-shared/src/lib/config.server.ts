@@ -155,8 +155,6 @@ export function isLocalCodeReviewDevelopmentEnabled(): boolean {
   );
 }
 
-if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
-
 export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID'
 );
@@ -206,6 +204,8 @@ export const MILVUS_TOKEN = getEnvVariable('MILVUS_TOKEN');
 
 // Cloud managed code indexing. Disabled unless explicitly enabled.
 export const CODE_INDEXING_ENABLED = getEnvVariable('CODE_INDEXING_ENABLED') === 'true';
+// Comma-separated user ids that may use code indexing without being an admin.
+export const CODE_INDEXING_ENABLED_USER_IDS = getEnvVariable('CODE_INDEXING_ENABLED_USER_IDS');
 
 // Slack
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');

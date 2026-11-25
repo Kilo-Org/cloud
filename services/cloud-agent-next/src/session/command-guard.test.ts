@@ -321,9 +321,9 @@ describe('code-review command guard policy', () => {
       'jq . package.json',
       'git diff HEAD',
       'git log --oneline -5',
-      // Review publication keeps working. The classified text of a call is one
-      // parsed command node, so a heredoc payload is not part of it; the CLI
-      // run in the pull request covers that path.
+      // Review publication keeps working. Kilo v2 includes a heredoc body in
+      // the classified text, so the publication commands are exempt from the
+      // redirect denial; the heredoc test below covers that path.
       'gh api repos/o/r/pulls/7/reviews --input -',
       'gh pr view 7 --json headRefOid',
       'glab mr diff 7',
@@ -332,6 +332,71 @@ describe('code-review command guard policy', () => {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }
   });
+
+  // Temporary: remove with the publication exemption once the CLI hides heredoc
+  // bodies from the classified text.
+  const SUMMARY_COMMAND = [
+    `glab api --method POST "projects/o%2Fr/merge_requests/7/notes" -H "Content-Type: application/json" --input - << 'EOF'`,
+    '{',
+    '  "body": "<!-- kilo-review -->\\n## Code Review Summary\\n\\n**Status:** No Issues Found | **Recommendation:** Merge\\n\\n<details>\\n<summary><b>Files Reviewed (3 files)</b></summary>\\n\\n- `src/config/services.yaml`\\n- `src/tool/search-tool.ts`\\n- `docs/guide/content/use.md`\\n\\n</details>"',
+    '}',
+    'EOF',
+  ].join('\n');
+
+  it.each(['github', 'gitlab'] as const)(
+    'allows %s review publication whose heredoc body contains a greater-than sign',
+    platform => {
+      const policy = getCommandGuardPolicy('code-review', platform);
+      if (!policy) throw new Error('Expected code-review command guard policy');
+      const permissions = buildCommandGuardBashPermissions(policy);
+
+      const body = [
+        '{',
+        '  "body": "<!-- kilo-review -->\\n<details><summary>Findings</summary>\\n\\n`a => b` > c\\n</details>"',
+        '}',
+      ].join('\n');
+      const heredoc = (command: string) => `${command} << 'EOF'\n${body}\nEOF`;
+
+      for (const command of [
+        heredoc(
+          'glab api --method POST "projects/o%2Fr/merge_requests/7/notes" -H "Content-Type: application/json" --input -'
+        ),
+        heredoc(
+          'glab api --method PUT "projects/o%2Fr/merge_requests/7/notes/31" -H "Content-Type: application/json" --input -'
+        ),
+        heredoc(
+          'glab api --method POST "projects/o%2Fr/merge_requests/7/discussions" -H "Content-Type: application/json" --input -'
+        ),
+        heredoc('gh api repos/o/r/pulls/7/reviews --input -'),
+        heredoc('gh api repos/o/r/issues/7/comments --input -'),
+        heredoc('gh api repos/o/r/issues/comments/31 -X PATCH --input -'),
+        `glab api --method POST "projects/o%2Fr/merge_requests/7/notes" --input - << 'EOF'\n{\n  "body": "<!-- kilo-review -->\\n> Quoted finding: \`a => b\`\\n\\n- \`api/config/services.yaml\`"\n}\nEOF`,
+        SUMMARY_COMMAND,
+        // The review reads existing comments with `--jq` and no redirect.
+        "gh api repos/o/r/issues/7/comments --paginate --jq '.[] | {id,created_at,updated_at,user:.user.login,body}'",
+      ]) {
+        expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+      }
+
+      for (const command of [
+        "gh api repos/o/r/issues/7/comments --jq '.[0].body' > notes.txt",
+        "gh api repos/o/r/pulls/7/reviews --template '{{.body}}' >> notes.txt",
+        heredoc(
+          'glab api --method POST "projects/o%2Fr/merge_requests/7/notes" --input - > .git/config'
+        ),
+        'cat foo > bar',
+        'grep -rn x src > out',
+        'glab mr view 7 > out',
+        'glab mr diff 7 > out',
+        'gh pr view 7 > out',
+        'gh pr diff 7 > out',
+        'gh api repos/o/r/pulls/7/comments > out',
+        'git diff > out',
+      ]) {
+        expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+      }
+    }
+  );
 
   it('matches only purpose-built Bitbucket review commands and exact scratch redirection', () => {
     const reviewId = '123e4567-e89b-12d3-a456-426614174023';

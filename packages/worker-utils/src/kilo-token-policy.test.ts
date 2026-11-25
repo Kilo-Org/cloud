@@ -34,6 +34,8 @@ const verifier: KiloTokenVerifier = {
 const NOW = new Date('2030-01-02T03:04:05.000Z');
 const NOW_SECONDS = Math.floor(NOW.getTime() / 1000);
 const HISTORICAL_FIVE_YEAR_LIFETIMES = [157_680_000, 157_788_000] as const;
+const THIRTY_DAYS = 30 * 24 * 60 * 60;
+const EXCHANGEABLE_LEGACY_LIFETIMES = [...HISTORICAL_FIVE_YEAR_LIFETIMES, THIRTY_DAYS] as const;
 const API_POLICY = { audience: 'kilo-api', mode: 'required' } as const;
 const LEGACY_POLICY = { audience: 'kilo-api', mode: 'allow-legacy' } as const;
 
@@ -544,8 +546,12 @@ describe('isKiloCredentialExchangeEligible', () => {
     ).rejects.toThrow('synthetic dependency unavailable');
   });
 
-  it.each(HISTORICAL_FIVE_YEAR_LIFETIMES)(
-    'permits historical %i-second legacy API tokens, including near expiry',
+  it('accepts exactly the five-year lifetimes and the 30-day lifetime', () => {
+    expect([...LEGACY_API_TOKEN_LIFETIMES_SECONDS]).toEqual([...EXCHANGEABLE_LEGACY_LIFETIMES]);
+  });
+
+  it.each(EXCHANGEABLE_LEGACY_LIFETIMES)(
+    'permits %i-second legacy API tokens, including near expiry',
     async lifetime => {
       vi.useFakeTimers();
       vi.setSystemTime(NOW);
@@ -574,9 +580,8 @@ describe('isKiloCredentialExchangeEligible', () => {
   it.each([
     6 * 60 * 60,
     24 * 60 * 60,
-    30 * 24 * 60 * 60,
-    ...HISTORICAL_FIVE_YEAR_LIFETIMES.map(lifetime => lifetime - 1),
-    ...HISTORICAL_FIVE_YEAR_LIFETIMES.map(lifetime => lifetime + 1),
+    ...EXCHANGEABLE_LEGACY_LIFETIMES.map(lifetime => lifetime - 1),
+    ...EXCHANGEABLE_LEGACY_LIFETIMES.map(lifetime => lifetime + 1),
   ])('rejects legacy original lifetime %i seconds', async lifetime => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -1101,6 +1106,22 @@ describe('signModernKiloToken', () => {
     ['reserved extra override', { extra: { aud: undefined } }],
   ])('rejects %s', async (_name, overrides) => {
     await expect(signModernKiloToken({ ...baseParams, ...overrides } as never)).rejects.toThrow();
+  });
+
+  it('signs a lifetime of exactly 30 days and refuses a longer one', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+
+    const { token } = await signModernKiloToken({ ...baseParams, expiresInSeconds: THIRTY_DAYS });
+    const { payload } = await jwtVerify(token, key(), { algorithms: ['HS256'] });
+    expect(payload.exp).toBe(NOW_SECONDS + THIRTY_DAYS);
+
+    await expect(
+      signModernKiloToken({ ...baseParams, expiresInSeconds: THIRTY_DAYS + 1 })
+    ).rejects.toThrow('Kilo token lifetime exceeds the 30-day limit');
+    await expect(
+      signModernKiloToken({ ...baseParams, expiresInSeconds: HISTORICAL_FIVE_YEAR_LIFETIMES[0] })
+    ).rejects.toThrow('Kilo token lifetime exceeds the 30-day limit');
   });
 
   it.each([

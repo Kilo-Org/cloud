@@ -684,7 +684,11 @@ export const adminRouter = createTRPCRouter({
 
       return {
         ...insertResult[0],
-        admin_kilo_user: ctx.user,
+        admin_kilo_user: {
+          id: ctx.user.id,
+          google_user_name: ctx.user.google_user_name,
+          google_user_email: ctx.user.google_user_email,
+        },
       };
     }),
 

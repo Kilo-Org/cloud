@@ -340,7 +340,7 @@ export async function prepareReviewPayload(
             organizationId: owner.type === 'org' ? owner.id : undefined,
             tokenSource: 'code-review',
             botId: 'reviewer',
-            expiresIn: TOKEN_EXPIRY.default,
+            expiresIn: TOKEN_EXPIRY.oneHour,
           }
         );
         // Single source for the standard reviewer's model so the session input and the
@@ -801,7 +801,7 @@ export async function prepareReviewPayload(
       organizationId: owner.type === 'org' ? owner.id : undefined,
       tokenSource: 'code-review',
       botId: 'reviewer',
-      expiresIn: TOKEN_EXPIRY.default,
+      expiresIn: TOKEN_EXPIRY.oneHour,
     });
 
     // A council run replaces the standard sub-agent sharding policy with a coordinator

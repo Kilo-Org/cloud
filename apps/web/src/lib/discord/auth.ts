@@ -1,6 +1,6 @@
 import 'server-only';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { Owner } from '@/lib/integrations/core/types';
 
@@ -18,12 +18,20 @@ export async function getDiscordBotAuthTokenForOwner(
   if (owner.type === 'org') {
     // For organizations, use a dedicated bot user
     const user = await ensureBotUserForOrg(owner.id, 'discord-bot');
-    authToken = generateApiToken(user, { botId: 'discord-bot', internalApiUse: true });
+    authToken = generateApiToken(
+      user,
+      { botId: 'discord-bot', internalApiUse: true },
+      { expiresIn: TOKEN_EXPIRY.oneHour }
+    );
     userId = user.id;
   } else {
     const user = await findUserById(owner.id);
     if (user) {
-      authToken = generateApiToken(user, { internalApiUse: true });
+      authToken = generateApiToken(
+        user,
+        { internalApiUse: true },
+        { expiresIn: TOKEN_EXPIRY.oneHour }
+      );
       userId = user.id;
     }
   }

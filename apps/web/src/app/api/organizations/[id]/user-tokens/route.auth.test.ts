@@ -22,7 +22,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   canIssueLegacyOrganizationToken,
@@ -139,18 +139,18 @@ for (const enabled of [false, true]) {
   describe(`legacy organization issuance with resource flags ${enabled}`, () => {
     beforeEach(() => setIssuance(enabled));
 
-    test.each(['cookie', 'legacy-1h', 'legacy-5y'] as const)(
+    test.each(['cookie', 'legacy-1h', 'legacy-30d', 'legacy-5y'] as const)(
       'preserves %s for absent, empty, malformed and empty-object bodies',
       async auth => {
-        const headers = auth.startsWith('legacy')
-          ? bearer(
-              generateApiToken(
-                user,
-                undefined,
-                auth === 'legacy-1h' ? { expiresIn: 3600 } : undefined
-              )
-            )
-          : new Headers({ cookie: 'next-auth.session-token=test-session' });
+        const legacyLifetimes = {
+          'legacy-1h': 3600,
+          'legacy-30d': TOKEN_EXPIRY.thirtyDays,
+          'legacy-5y': 157_680_000,
+        };
+        const headers =
+          auth === 'cookie'
+            ? new Headers({ cookie: 'next-auth.session-token=test-session' })
+            : bearer(signedClaims({ exp: Math.floor(Date.now() / 1000) + legacyLifetimes[auth] }));
         for (const body of [undefined, '', '{', '{}']) {
           const response = await request(headers, body);
           expect(response.status).toBe(200);
@@ -338,7 +338,7 @@ for (const enabled of [false, true]) {
       if (kind === 'wrong-user') {
         const other = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
         userIds.push(other.id);
-        token = generateApiToken(other);
+        token = generateApiToken(other, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
       }
       if (kind === 'revoked-pepper') {
         const pepper = crypto.randomUUID();
@@ -362,13 +362,23 @@ for (const enabled of [false, true]) {
     test.each(['{"resource":null}', '{"resource":"unknown"}'])(
       'rejects unsupported resource %s',
       async body => {
-        expect((await request(bearer(generateApiToken(user)), body)).status).toBe(400);
+        expect(
+          (
+            await request(
+              bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
+              body
+            )
+          ).status
+        ).toBe(400);
         expect(await auditLogs()).toEqual([]);
       }
     );
 
     test('keeps explicit delegation gated and separate from legacy issuance', async () => {
-      const response = await request(bearer(generateApiToken(user)), '{"resource":"api"}');
+      const response = await request(
+        bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
+        '{"resource":"api"}'
+      );
       expect(response.status).toBe(enabled ? 200 : 503);
       const result = await response.json();
       if (enabled) {
@@ -411,7 +421,10 @@ describe('explicit organization access', () => {
     'issues child organization tokens for inherited %s',
     async role => {
       await inherited(role);
-      for (const headers of [new Headers(), bearer(generateApiToken(user))]) {
+      for (const headers of [
+        new Headers(),
+        bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
+      ]) {
         const response = await request(headers, '{"resource":"api"}');
         expect(response.status).toBe(200);
         const claims = jwt.verify((await response.json()).token, NEXTAUTH_SECRET) as jwt.JwtPayload;
@@ -442,7 +455,14 @@ describe('explicit organization access', () => {
     await db
       .delete(organization_memberships)
       .where(eq(organization_memberships.organization_id, orgId));
-    expect((await request(bearer(generateApiToken(user)), '{"resource":"api"}')).status).toBe(404);
+    expect(
+      (
+        await request(
+          bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
+          '{"resource":"api"}'
+        )
+      ).status
+    ).toBe(404);
     expect(await auditLogs()).toEqual([]);
   });
 
@@ -465,7 +485,10 @@ describe('explicit organization access', () => {
       .delete(organization_memberships)
       .where(eq(organization_memberships.organization_id, orgId));
     await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, user.id));
-    for (const headers of [new Headers(), bearer(generateApiToken(user))]) {
+    for (const headers of [
+      new Headers(),
+      bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
+    ]) {
       const response = await request(headers, '{"resource":"api"}');
       expect(response.status).toBe(200);
       expect(jwt.verify((await response.json()).token, NEXTAUTH_SECRET)).toMatchObject({
@@ -539,7 +562,7 @@ describe('explicit organization access', () => {
     await inherited('owner');
     await expect(
       createControlTokenForRequest(user, 'cloud-agent-next', {
-        headers: bearer(generateApiToken(user)),
+        headers: bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
         organizationId: orgId,
       })
     ).rejects.toThrow('Unauthorized resource delegation request');

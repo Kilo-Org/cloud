@@ -478,6 +478,7 @@ The WorkOS Directory Sync (SCIM) write path is `apps/web/src/app/api/internal/sc
 - `MILVUS_ADDRESS` - Milvus vector DB address. [SERVER]
 - `MILVUS_TOKEN` - Milvus auth token. `[SECRET]`
 - `CODE_INDEXING_ENABLED` - Set to `true` to enable cloud managed code indexing. Disabled by default; unset, empty, or any other value keeps the feature off. [SERVER]
+- `CODE_INDEXING_ENABLED_USER_IDS` - Comma-separated Kilo user ids that may use code indexing without being an admin (`apps/web/src/lib/code-indexing/util.ts`). Unset or empty enables nobody beyond admins. Kept out of committed configuration because it lists real users. Set it with `pnpm web:env set CODE_INDEXING_ENABLED_USER_IDS` before merging the change that moved the list out of source; otherwise the next web deploy removes those users' access. Press Return at the tracked dotenv default prompts so the ids stay out of the repository. [SERVER]
 
 ### Email & Notifications
 

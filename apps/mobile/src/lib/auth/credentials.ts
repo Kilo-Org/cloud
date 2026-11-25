@@ -111,6 +111,32 @@ export type RefreshOutcome =
   | RefreshUnreadable
   | RefreshUnrenewable;
 
+/**
+ * The refusal that cleared the stored pair, kept for the session that owned it.
+ *
+ * Several callers rotate and discard the outcome (the request-header rotation,
+ * the native remote credential, the glanceable approve). The clear leaves the
+ * next refresh nothing to present, so it answers `unreadable`, and a 401 that
+ * follows would otherwise leave a signed-in surface on a dead token. A newer
+ * sign-in or sign-out moves the epoch, which retires the record.
+ */
+let recordedRefusal: RefreshRefused | null = null;
+
+/**
+ * The outcome a handler that ends sessions acts on: an `unreadable` refresh in
+ * the session whose pair a refusal already cleared is that refusal.
+ */
+export function withRecordedRefusal(outcome: RefreshOutcome): RefreshOutcome {
+  if (
+    outcome.kind === 'unreadable' &&
+    recordedRefusal !== null &&
+    isCurrentAuthEpoch(recordedRefusal.sessionVersion)
+  ) {
+    return recordedRefusal;
+  }
+  return outcome;
+}
+
 // The one refresh route. Named so the classification fingerprints and the
 // request path can never drift apart.
 const REFRESH_PATH = '/api/auth/native/refresh';
@@ -450,9 +476,13 @@ async function doRefresh(): Promise<RefreshOutcome> {
         // explain the session end instead of only signing out.
         const userBlocked =
           status === 401 && UserBlockRefusalBodySchema.safeParse(refusalBody).success;
-        return userBlocked
+        const refused: RefreshRefused = userBlocked
           ? { kind: 'refused', sessionVersion, userBlocked: true }
           : { kind: 'refused', sessionVersion };
+        if (classified.clearCredential) {
+          recordedRefusal = refused;
+        }
+        return refused;
       }
       if (classified.kind === 'retry') {
         return { kind: 'transient', retryAfterMs: classified.retryAfterMs };

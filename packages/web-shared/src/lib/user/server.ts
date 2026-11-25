@@ -25,10 +25,8 @@ import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
 import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
-import {
-  isApiTokenPepperCurrent,
-  requestOrganizationId,
-} from '@kilocode/worker-utils/account-access';
+import { requestOrganizationId } from '@kilocode/worker-utils/account-access';
+import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-token-pepper';
 import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -127,6 +125,15 @@ export const sessionAuthOptions = {
 } satisfies NextAuthOptions;
 
 /**
+ * False on apps/ai-gateway, whose next.config `env` inlines
+ * `KILO_BROWSER_SESSIONS` at build time. The gateway authenticates by bearer
+ * token only, so every session read there answers "no session".
+ */
+function acceptsBrowserSessions(): boolean {
+  return process.env.KILO_BROWSER_SESSIONS !== 'disabled';
+}
+
+/**
  * Reads the NextAuth session, treating a session read that throws as no
  * session. With the JWT strategy the read only parses and re-serializes request
  * cookies, so a throw means the cookies are unusable, for example a malformed
@@ -134,6 +141,7 @@ export const sessionAuthOptions = {
  * session token. Any other failure is rethrown so it stays visible.
  */
 async function readSession(): Promise<Session | null> {
+  if (!acceptsBrowserSessions()) return null;
   try {
     return await getServerSession(sessionAuthOptions);
   } catch (error) {
@@ -500,10 +508,7 @@ export async function getUserFromBearerForCredentialExchange(
   }
 
   const user = await findUserById(auth.userId, db);
-  if (
-    auth.claims.apiTokenPepper === undefined ||
-    auth.claims.apiTokenPepper !== user?.api_token_pepper
-  ) {
+  if (!user || !isKiloUserCredentialPepperCurrent(auth.claims, user.api_token_pepper)) {
     return authError(401, 'Unauthorized', auth.userId);
   }
 
@@ -554,7 +559,7 @@ export async function getUserFromAccountBearer(requestHeaders: Headers): Promise
   }
 
   const user = await findUserById(userId, db);
-  if (!user || user.is_bot || claims.apiTokenPepper !== user.api_token_pepper) {
+  if (!user || user.is_bot || !isKiloUserCredentialPepperCurrent(claims, user.api_token_pepper)) {
     return authError(401, 'Unauthorized', userId);
   }
   const result = await validateUserAuthorization({
@@ -650,12 +655,7 @@ async function resolveUserFromAuth(
 
     if (
       user &&
-      (scope
-        ? user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
-        : !isApiTokenPepperCurrent(
-            user.api_token_pepper,
-            authorizationValidationResult.apiTokenPepper
-          ))
+      !isKiloUserCredentialPepperCurrent(authorizationValidationResult, user.api_token_pepper)
     ) {
       return authError(401, 'Invalid API token', user.id, {
         credentialsRejected: true,
@@ -706,6 +706,7 @@ async function resolveUserFromAuth(
     return result;
   }
 
+  // On apps/ai-gateway `readSession` finds no session, so this is the anonymous result.
   return resolveUserFromSession(opts, readDb);
 }
 

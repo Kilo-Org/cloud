@@ -1,7 +1,12 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { KILO_API_AUDIENCE } from './internal-service-token-audiences';
-import { KILO_TOKEN_VERSION, kiloTokenPayload } from './kilo-token';
+import {
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
+  KILO_TOKEN_VERSION,
+  assertKiloTokenLifetimeWithinCap,
+  kiloTokenPayload,
+} from './kilo-token';
 import type { KiloTokenPayload } from './kilo-token';
 import { validateCloudAgentAuthorityClaims } from './cloud-agent-authority';
 import { KILO_TOKEN_PURPOSES } from './kilo-token-issuers';
@@ -212,7 +217,15 @@ export async function verifyKiloSessionForPolicy(
   return auth;
 }
 
-export const LEGACY_API_TOKEN_LIFETIMES_SECONDS = [157_680_000, 157_788_000] as const;
+/**
+ * Lifetimes of an audience-less user API credential: the two five-year values
+ * minted before the 30-day cap, which stay accepted, and the 30 days minted now.
+ */
+export const LEGACY_API_TOKEN_LIFETIMES_SECONDS = [
+  157_680_000,
+  157_788_000,
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
+] as const;
 
 export type KiloCredentialExchangeEligibilityPolicy = {
   legacy: 'deny' | 'five-year-api';
@@ -377,6 +390,7 @@ export async function signModernKiloToken(
   params: SignModernKiloTokenParams
 ): Promise<{ token: string; expiresAt: string }> {
   const expiresInSeconds = positiveSafeInteger.parse(params.expiresInSeconds);
+  assertKiloTokenLifetimeWithinCap(expiresInSeconds);
   const now = params.now ?? new Date();
   if (!Number.isFinite(now.getTime())) throw new Error('Invalid token issuance time');
   const issuedAt = Math.floor(now.getTime() / 1000);

@@ -11,7 +11,10 @@ const mockCustomRoutersCard = jest.fn(() => null);
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuanceOrRedirect: mockGetUserForCredentialIssuance,
 }));
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+  generateApiToken: mockGenerateApiToken,
+  TOKEN_EXPIRY: { thirtyDays: 2_592_000 },
+}));
 jest.mock('@kilocode/web-shared/lib/customerInfo', () => ({
   getCustomerInfo: mockGetCustomerInfo,
 }));
@@ -108,7 +111,9 @@ describe('ProfilePage', () => {
       }
       collectCards(page);
 
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(user);
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(user, undefined, {
+        expiresIn: 2_592_000,
+      });
       expect(cards).toEqual([
         {
           kiloToken: 'profile-test-token',

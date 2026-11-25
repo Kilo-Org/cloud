@@ -18,6 +18,7 @@
     "./kilo-token-issuers": "./src/kilo-token-issuers.ts",
     "./kilo-token-signer": "./src/kilo-token-signer.ts",
     "./kilo-token-verification": "./src/kilo-token-verification.ts",
+    "./kilo-token-pepper": "./src/kilo-token-pepper.ts",
     "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
     "./cloud-agent-attachments": "./src/cloud-agent-attachments.ts",
     "./cloud-agent-child-callback": "./src/cloud-agent-child-callback.ts",

@@ -51,9 +51,14 @@ const MAX_EXCHANGE_BODY_BYTES = 1024;
 /** Only issue-time checks tolerate skew; expiration remains a hard deadline. */
 export const AUTH_CLOCK_SKEW_SECONDS = 5;
 
-// A device-bound legacy credential carries the one-hour access lifetime or the
-// fixed five-year lifetime; both require a live device session.
-const LEGACY_DEVICE_LIFETIMES_SECONDS: readonly number[] = [60 * 60, 157_680_000];
+// A device-bound legacy credential carries the one-hour access lifetime, the
+// 30-day long-term lifetime, or the five-year lifetime minted before the 30-day
+// cap; all require a live device session.
+const LEGACY_DEVICE_LIFETIMES_SECONDS: readonly number[] = [
+  60 * 60,
+  30 * 24 * 60 * 60,
+  157_680_000,
+];
 
 const LEGACY_CLAIMS: Record<string, true> = {
   version: true,

@@ -40,14 +40,9 @@ export async function fetchLatestAssistantText(params: {
   userId: string;
   sessionIngestWorkerUrl: string;
   nextAuthSecret: string;
-  sharedResourceTokensEnabled?: string | boolean;
 }): Promise<string | null> {
   if (!params.sessionIngestWorkerUrl) return null;
-  const token = await generateInternalServiceToken(
-    params.userId,
-    params.nextAuthSecret,
-    params.sharedResourceTokensEnabled
-  );
+  const token = await generateInternalServiceToken(params.userId, params.nextAuthSecret);
   const response = await fetch(
     `${params.sessionIngestWorkerUrl}/api/session/${encodeURIComponent(params.sessionId)}/export`,
     { headers: { Authorization: `Bearer ${token}` } }

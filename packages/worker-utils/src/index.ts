@@ -72,7 +72,6 @@ export {
   KILOCLAW_AUDIENCE,
   SESSION_INGEST_AUDIENCE,
   AI_ATTRIBUTION_AUDIENCE,
-  HTML_DEPLOY_AUDIENCE,
   PAGES_AUDIENCE,
   PAGES_DEV_AUDIENCE,
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
@@ -147,6 +146,7 @@ export {
   verifyKiloToken,
   kiloTokenPayload,
   KILO_TOKEN_VERSION,
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
 } from './kilo-token.js';
 export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
 export {

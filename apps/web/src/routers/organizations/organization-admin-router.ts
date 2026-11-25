@@ -175,6 +175,11 @@ const UpdateKiloEncryptInputSchema = z.object({
   kilo_encrypt: z.boolean(),
 });
 
+const UpdateAllowNonSsoSignInMethodsInputSchema = z.object({
+  organizationId: z.uuid(),
+  allow_non_sso_sign_in_methods: z.boolean(),
+});
+
 const AdminOrganizationDetailsSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -565,6 +570,40 @@ export const organizationAdminRouter = createTRPCRouter({
         metadata: {
           previousKiloEncrypt: organization.settings.kilo_encrypt ?? null,
           kiloEncrypt: kilo_encrypt,
+        },
+      });
+
+      return successResult();
+    }),
+
+  // Members of a domain this organization requires SSO for may link another
+  // sign-in method (for example ChatGPT) only while this is on.
+  updateAllowNonSsoSignInMethods: adminProcedure
+    .input(UpdateAllowNonSsoSignInMethodsInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, allow_non_sso_sign_in_methods } = input;
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+      });
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      await mutateOrganizationSettings(organizationId, current => ({
+        ...current.settings,
+        allow_non_sso_sign_in_methods,
+      }));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.sso.sign_in_methods_policy.set',
+        target: organizationActionTarget(organizationId),
+        message: allow_non_sso_sign_in_methods
+          ? 'Allowed SSO members to link other sign-in methods'
+          : 'Stopped SSO members from linking other sign-in methods',
+        metadata: {
+          previousAllowNonSsoSignInMethods:
+            organization.settings.allow_non_sso_sign_in_methods ?? null,
+          allowNonSsoSignInMethods: allow_non_sso_sign_in_methods,
         },
       });
 

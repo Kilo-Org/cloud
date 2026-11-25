@@ -8,7 +8,7 @@ describe('encodeUserIdForPath', () => {
   });
 
   it('encodes an OAuth Google user ID', () => {
-    const oauthId = 'oauth/google:101043560986948156510';
+    const oauthId = 'oauth/google:100000000000000000003';
     const encoded = encodeUserIdForPath(oauthId);
     expect(encoded).toMatch(/^o-[A-Za-z0-9_-]+$/);
     expect(encoded).not.toContain('/');
@@ -36,7 +36,7 @@ describe('decodeUserIdFromPath', () => {
   });
 
   it('decodes an o- prefixed value', () => {
-    const oauthId = 'oauth/google:101043560986948156510';
+    const oauthId = 'oauth/google:100000000000000000003';
     const encoded = encodeUserIdForPath(oauthId);
     expect(decodeUserIdFromPath(encoded)).toBe(oauthId);
   });
@@ -45,7 +45,7 @@ describe('decodeUserIdFromPath', () => {
 describe('roundtrip', () => {
   const testIds = [
     '550e8400-e29b-41d4-a716-446655440000',
-    'oauth/google:101043560986948156510',
+    'oauth/google:100000000000000000003',
     'oauth/github:789456',
     'oauth/gitlab:12345',
     'simple-id',

@@ -97,15 +97,15 @@ describe('consent storage', () => {
     const { acceptConsent, hasAcceptedConsent } = await import('./consent');
 
     // These two ids differ only in stripped characters under the old scheme
-    await acceptConsent('oauth/google:103283381342696699340');
-    await acceptConsent('oauthgoogle103283381342696699340');
+    await acceptConsent('oauth/google:100000000000000000002');
+    await acceptConsent('oauthgoogle100000000000000000002');
 
     const keys = [...store.keys()];
     expect(keys.length).toBe(2);
     expect(keys[0]).not.toBe(keys[1]);
 
-    expect(await hasAcceptedConsent('oauth/google:103283381342696699340')).toBe(true);
-    expect(await hasAcceptedConsent('oauthgoogle103283381342696699340')).toBe(true);
+    expect(await hasAcceptedConsent('oauth/google:100000000000000000002')).toBe(true);
+    expect(await hasAcceptedConsent('oauthgoogle100000000000000000002')).toBe(true);
   });
 
   it('returns false when the stored consent version is old', async () => {

@@ -202,8 +202,13 @@ describe('validateKiloToken', () => {
     expect(getWorkerDb).not.toHaveBeenCalled();
   });
 
-  it('preserves bot IDs and distinguishes absent, null, and stale pepper claims', async () => {
+  it('preserves bot IDs and refuses absent, null, and stale pepper claims', async () => {
     userRowByUserId.set('user-1', { pepper: 'pepper-current', blockedReason: null });
+    const currentPepper = signResourceToken({
+      botId: 'bot-1',
+      apiTokenPepper: 'pepper-current',
+      aud: 'cloud-agent-next',
+    });
     const absentPepper = signResourceToken({ botId: 'bot-1', aud: 'cloud-agent-next' });
     const nullPepper = signResourceToken({ apiTokenPepper: null, aud: 'cloud-agent-next' });
     const stalePepper = signResourceToken({
@@ -211,11 +216,15 @@ describe('validateKiloToken', () => {
       aud: 'cloud-agent-next',
     });
 
-    await expect(validateKiloToken(`Bearer ${absentPepper}`, validParams)).resolves.toEqual({
+    await expect(validateKiloToken(`Bearer ${currentPepper}`, validParams)).resolves.toEqual({
       success: true,
       userId: 'user-1',
-      token: absentPepper,
+      token: currentPepper,
       botId: 'bot-1',
+    });
+    await expect(validateKiloToken(`Bearer ${absentPepper}`, validParams)).resolves.toEqual({
+      success: false,
+      error: 'Invalid or expired token',
     });
     await expect(validateKiloToken(`Bearer ${nullPepper}`, validParams)).resolves.toEqual({
       success: false,
@@ -226,6 +235,18 @@ describe('validateKiloToken', () => {
       error: 'Invalid or expired token',
     });
   });
+
+  it.each([null, 'pepper-current'])(
+    'refuses a legacy Session Ingest assertion for an account with pepper %s',
+    async pepper => {
+      userRowByUserId.set('user-1', { pepper, blockedReason: null });
+      const sessionIngestAssertion = signResourceToken({});
+
+      await expect(
+        validateKiloToken(`Bearer ${sessionIngestAssertion}`, validParams)
+      ).resolves.toEqual({ success: false, error: 'Invalid or expired token' });
+    }
+  );
 
   it('accepts a null pepper only for an account with a null pepper', async () => {
     userRowByUserId.set('user-1', { pepper: null, blockedReason: null });

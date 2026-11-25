@@ -683,6 +683,13 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
+    id: 'internal.lib.auth.signInMethodChange',
+    file: 'apps/web/src/lib/auth/sign-in-method-change.ts',
+    actionClass: 'sensitive_write',
+    surface: 'trpc',
+    occurrences: 1,
+  },
+  {
     id: 'internal.components.adminUserStatusBadge',
     file: 'apps/web/src/components/admin/UserStatusBadge.tsx',
     actionClass: 'platform_read',

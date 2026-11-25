@@ -23,6 +23,13 @@ export const BUNDLE_MAX_STALE_SECONDS = 24 * 60 * 60;
 
 export const STS_BUNDLE_HTTP_PATH = '/v1/bundle';
 
+/**
+ * Response headers on `POST /v1/bundle` for `ok` and `not_modified`. A 304 has no body, so these
+ * carry its `stale` flag (`true` or `false`) and its `fetchedAt` (ISO 8601).
+ */
+export const STS_STALE_HEADER = 'x-sts-stale';
+export const STS_FETCHED_AT_HEADER = 'x-sts-fetched-at';
+
 export const BundleSecretSchema = z.strictObject({
   value: z.string(),
   version: z.number().int().nonnegative(),

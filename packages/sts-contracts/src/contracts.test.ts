@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUDIT_BATCH_MAX_COMPRESSED_BYTES,
+  AUDIT_BATCH_MAX_DECOMPRESSED_BYTES,
+  AuditBatchDecompressionLimitError,
   AuditBatchSchema,
   AuditBatchTooLargeError,
   type AuditEvent,
@@ -62,6 +64,44 @@ describe('audit batches', () => {
       events: Array.from({ length: 500 }, () => auditEvent(randomFiller(300))),
     };
     await expect(encodeAuditBatch(batch)).rejects.toBeInstanceOf(AuditBatchTooLargeError);
+  });
+
+  it('refuses a batch that compresses small but inflates past the decompressed limit', async () => {
+    const repetitive = Object.fromEntries(
+      Array.from({ length: 60 }, (_unused, index) => [`k${index}`, 'a'.repeat(512)])
+    );
+    const event = auditEvent('a');
+    const batch = {
+      schemaVersion: 1 as const,
+      stream: 'sts:production:bundle:o11y',
+      fromSeq: 1,
+      toSeq: 40,
+      events: Array.from({ length: 40 }, () => ({
+        ...event,
+        id: crypto.randomUUID(),
+        data: { ...event.data, attributes: repetitive },
+      })),
+    };
+    expect(JSON.stringify(batch).length).toBeGreaterThan(AUDIT_BATCH_MAX_DECOMPRESSED_BYTES);
+    const error = await encodeAuditBatch(batch).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(AuditBatchTooLargeError);
+    if (!(error instanceof AuditBatchTooLargeError)) throw new Error('expected a size error');
+    expect(error.compressedBytes).toBeLessThan(AUDIT_BATCH_MAX_COMPRESSED_BYTES);
+  });
+
+  it('stops inflating a gzip bomb past the decompressed limit', async () => {
+    const zeros = new Uint8Array(4 * AUDIT_BATCH_MAX_DECOMPRESSED_BYTES);
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(zeros);
+        controller.close();
+      },
+    });
+    const bomb = new Uint8Array(
+      await new Response(source.pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
+    );
+    expect(bomb.byteLength).toBeLessThan(AUDIT_BATCH_MAX_COMPRESSED_BYTES);
+    await expect(decodeAuditBatch(bomb)).rejects.toBeInstanceOf(AuditBatchDecompressionLimitError);
   });
 
   it('requires the sequence range to match the event count', () => {

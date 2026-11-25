@@ -85,7 +85,7 @@ describe('repository Worker configs', () => {
     expect(paths.filter(path => path.includes('node_modules/'))).toEqual([]);
   });
 
-  it('keep every test Worker config under test/fixtures, out of the production deploy', () => {
+  it('keep every nested Worker config under test/fixtures, out of the production deploy', () => {
     // deploy-workers.yml deploys every directory holding a wrangler.jsonc that this find lists.
     const workflow = readFileSync(join(repoRoot, '.github/workflows/deploy-workers.yml'), 'utf8');
     const discovery = workflow
@@ -94,13 +94,16 @@ describe('repository Worker configs', () => {
     expect(discovery).toHaveLength(1);
     expect(discovery[0]).toContain('-not -path "*/test/fixtures/*"');
 
-    const exposed = workerConfigPaths(repoRoot).filter(
+    // Only a service's own top-level config is a Worker to deploy; any other wrangler.jsonc under
+    // services/ must sit where that find skips it.
+    const nested = workerConfigPaths(repoRoot).filter(
       path =>
-        /^services\/[^/]+\/test\//.test(path) &&
+        path.startsWith('services/') &&
         path.endsWith('/wrangler.jsonc') &&
-        !/^services\/[^/]+\/test\/fixtures\//.test(path)
+        !/^services\/[^/]+\/wrangler\.jsonc$/.test(path)
     );
-    expect(exposed).toEqual([]);
+    expect(nested).toContain('services/sts/test/fixtures/runtime/wrangler.jsonc');
+    expect(nested.filter(path => !/^services\/[^/]+\/test\/fixtures\//.test(path))).toEqual([]);
   });
 
   it('reach STS only through SecretsBroker as their own Worker, and never reach the relay', () => {

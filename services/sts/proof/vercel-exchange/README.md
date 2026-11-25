@@ -9,8 +9,8 @@ exchange (`POST https://oidc.vercel.com/~token`). This standalone Vercel project
 - The exchange serves about 100 exchanges per burst, then answers 429 `{"error":"Rate limit
   exceeded"}` with no `retry-after`; the budget refills within about 65 seconds. Sustained 25 per
   3 seconds and 50 per 8 seconds pass.
-- The budget belongs to the deployment (or something wider), not the instance: 2,500 invocations on
-  411 instances got 100 tokens in total.
+- The budget is wider than the instance: 2,500 invocations on 411 instances got 100 tokens in
+  total (proof run 3 run e showed it is wider than the deployment too).
 - Exchanged claims: `iss` `https://oidc.vercel.com/kilocode` (team slug form), `aud` exactly the
   requested audience, `act` `{ iat, aud: "https://vercel.com/kilocode" }`, `exp` equal to the base
   token's `exp`; claim names `act aud deployment_id environment exp iat iss jti nbf owner owner_id
@@ -37,10 +37,35 @@ token through the Vercel Runtime Cache.
   claiming `environment: development` with `user_id`, so STS refuses all three. Whether `user_id`
   survives the exchange was not measured; run 3 step 3 does.
 
+## What proof run 3 found (2026-11-25, throwaway project `sts-oidc-proof3`, deleted): PASS
+
+- Gate run a passed all 8 checks: 2,500 invocations on 498 cold instances in `iad1`, every one
+  served, 2 exchanges (`attemptsByRegion {iad1: 2}`, the base token rolled over inside the wave), 0 ×
+  429, time to token p99 1,954 ms, max 2,623 ms, `request-context` cache backend throughout.
+- Run b (claims off, fresh deployment): 340 cold instances, 1 exchange, p99 75 ms. With the token
+  out of the key, one wave on one base token needs one exchange; the claim adds a marker write.
+- Run c: the chained exchange is refused 401 `{"error":"Token has already been exchanged"}`; `act`
+  stays the team default audience and is not nested.
+- Run d: burst from one instance, about 123 exchanges/s (100 at concurrency 50 in 813 ms), p50
+  235 ms, p99 554 ms, no rate-limit headers.
+- Run e (budget scope): two fresh deployments of the project fired together got 42 + 58 = 100
+  tokens, then 429. The budget is **per project or per team, not per deployment** (which of the two
+  needs a second project and was not measured). Overlapping deployments, and if it is team-wide
+  every project of team `kilocode`, share it; with the shared cache each deployment spends about one
+  exchange per region and audience, so a release spends a handful.
+- Person tokens (step 3): `preview`, `production` and `staging` pulls each claim `environment:
+  development` with `user_id`, and `user_id` survives the exchange: all three `holds`.
+- A function token of the custom environment `staging` carries `environment: staging` and
+  `custom_environment_id`.
+- `scope` equals `sub` (`owner:kilocode:project:<name>:environment:<env>`) for function,
+  custom-environment and person tokens alike, so it does not tell a build token from a function
+  token: STS cannot tell them apart, and build code is trusted like the deployment's own code
+  (design 6.2).
+
 `lib/shared-token.ts` implements the algorithm, the one the slice-4 Vercel client copies or imports;
 `test/proof/shared-token.test.ts` checks its logic against stand-ins, and
-`test/proof/pass-rule.test.ts` checks the pass rule. **Proof run 3 is the merge gate for the first
-Vercel workload: no Vercel workload uses STS until it passes.**
+`test/proof/pass-rule.test.ts` checks the pass rule. **Proof run 3 was the merge gate for the first
+Vercel workload, and it passed.**
 
 ## The shared-cache algorithm (`lib/shared-token.ts`)
 
@@ -52,8 +77,10 @@ Vercel workload: no Vercel workload uses STS until it passes.**
 2. A cached entry is used only if its token decodes to the same five claims, `aud` equal to the
    audience and `exp` equal to the entry's, until `exp` minus 60 s, whichever base token the reader
    holds. A forged entry with matching claims can only make the caller's STS call fail (STS checks
-   the signature); only code of the same project can write its cache (Vercel isolates preview and
-   production caches, and Pro and Enterprise caches per project).
+   the signature). The key is not secret: code that can write the same Runtime Cache partition
+   (other deployments of the project in the same scope; a custom environment may share the preview
+   partition) can stall a deployment's exchanges, never change which token it presents; production
+   has its own partition.
 3. Instance memory, then the Runtime Cache: a hit is used. On a miss, a base token with under 60 s
    left fails the request at once: no exchange, no waiting.
 4. Miss: wait a random 0 to 500 ms, read again.
@@ -165,8 +192,8 @@ sleep 70 && curl -sS -X POST -H "x-proof-key: $PROOF_SHARED_SECRET" "$URL/api/ch
 # d. Burst latency only (one instance), after the budget refills.
 sleep 70 && curl -sS -X POST -H "x-proof-key: $PROOF_SHARED_SECRET" "$URL/api/exchange?n=100&c=50" > burst.json
 # e. Budget scope (optional): two fresh deployments (URL_C, URL_D) at once, about 150 cold
-#    exchanges each. About 200 tokens in total means the budget is per deployment; about 100 means
-#    it is per project or team (repeat with a second throwaway project to tell those apart).
+#    exchanges each. About 200 tokens in total would mean per deployment; about 100 (proof run 3:
+#    42 + 58) means per project or team (a second throwaway project tells those apart).
 sleep 70 && { node drive.ts --mode cold --url "$URL_C" --invocations 150 > scope-c.json &
   node drive.ts --mode cold --url "$URL_D" --invocations 150 > scope-d.json & wait; }
 # f. Header token age on long-lived instances: once a minute for 2.5 hours.
@@ -202,8 +229,8 @@ no exchanged token). Any `gate: "stops"` stops the merge until Igor decides: a t
 then pull, exchange and present a token STS accepts. `gate: "inconclusive"` (429 or network error)
 is rerun after 70 s.
 
-**Build tokens.** Record `scope` from `exchangedClaims` (run a) and from step 3. If `scope` tells a
-build token from a function token, the next round pins the function value in STS; if not, design
+**Build tokens.** Record `scope` from `exchangedClaims` (run a) and from step 3. Proof run 3: `scope`
+equals `sub` for every token, so it does not tell a build token from a function token, and design
 6.2 states that build code is trusted like the deployment's own code.
 
 Record in the PR: `shared.json`, `shared-noclaim.json`, `chain.json` (`vercelRefusedChain`, both

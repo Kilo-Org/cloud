@@ -219,8 +219,11 @@ https://github.com/vercel/vercel/blob/main/packages/oidc/src/exchange-vercel-oid
 exchange: the client reads it inside the request handler, never at module scope, and sends it only
 to the exchange.
 
-The exchange allows about 100 exchanges per burst for a whole deployment, refilling within about
-65 seconds (proof runs 1 and 2), and refuses to exchange an exchanged token (401, proof run 2). A
+The exchange allows about 100 exchanges per burst, refilling within about 65 seconds (proof runs 1
+and 2). The budget is per project or per team, not per deployment: two fresh deployments fired
+together got 42 + 58 = 100 tokens, then 429 (proof run 3, run e; project versus team was not
+measured). So overlapping deployments, and if it is team-wide every project of team `kilocode`,
+share it. It refuses to exchange an exchanged token (401, proof runs 2 and 3). A
 client therefore never exchanges once per instance: it shares the exchanged token through the
 Vercel Runtime Cache (decision D10, design 4.4 and Q49), with the algorithm in
 `proof/vercel-exchange/lib/shared-token.ts`: key SHA-256 of the base token's `owner_id`,
@@ -229,7 +232,11 @@ renews the base token during a deployment's life, even mid-wave, so the token it
 key); memory, then the cache, a cached token used until its own `exp` minus 60 seconds whatever
 base token the reader holds; on a miss a random wait and a re-read, then a claim marker so one
 request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
-exchanging again. There is no early refresh: the exchanged token keeps the base token's `exp`, so
+exchanging again. The cache key is not secret: code that can write the same Runtime Cache
+partition (other deployments of the project in the same scope; a custom environment may share the
+preview partition) can stall a deployment's exchanges, never change which token it presents (the
+reader checks the claims, STS checks the signature); production has its own partition. There is no
+early refresh: the exchanged token keeps the base token's `exp`, so
 exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
 the request at once. When the cache is down (the claim marker does not read back), each request
 exchanges once and fails at once on a 429: about 100 requests per 65 seconds get a token and the
@@ -278,16 +285,20 @@ in the next PR of this stack (`/v1/token`) caps what it issues at `attestationEx
 token `attestationIat` is the exchange time, not the base token's issue time, so it says nothing
 about how old the deployment's token is.
 
-Person tokens: proof run 2 pulled `preview`, `production` and `staging` tokens with
-`vercel env pull`; each claimed `environment: development` and carried `user_id`, so STS refuses
-them. Build tokens: whether `scope` tells a build token from a function token is measured in proof
-run 3; if it does, the next round pins it, otherwise build code is trusted like the deployment's
-own code (design 6.2).
+Person tokens: proof runs 2 and 3 pulled `preview`, `production` and `staging` tokens with
+`vercel env pull`; each claimed `environment: development` and carried `user_id`, and proof run 3
+showed `user_id` survives the exchange, so STS refuses them before and after it. Build tokens:
+`scope` equals `sub` (`owner:kilocode:project:<name>:environment:<env>`) for function,
+custom-environment and person tokens alike (proof run 3), so STS cannot tell a Vercel build token
+from a function token of the same environment: build code is trusted like the deployment's own
+code (design 6.2). A staging custom-environment function token carries `environment: staging` and
+`custom_environment_id`, so a policy pinned to `production` refuses it on the claim alone.
 
-**Merge gate.** No Vercel workload uses STS until proof run 3 (`proof/vercel-exchange/`, shared
-cache, 2,500-invocation cold wave, the `claimHolds` check) passes, and, for every environment
-pulled from the throwaway proof project, either Vercel issues no person token or both the pulled
-and the exchanged token carry `user_id`. Otherwise the merge stops until Igor decides.
+**Merge gate: passed.** Proof run 3 (2026-11-25, `proof/vercel-exchange/README.md`) passed every
+check of the gate run: a 2,500-invocation cold wave on 498 cold instances in `iad1` got every token
+with 2 exchanges, 0 × 429, time to token p99 1,954 ms and max 2,623 ms. For every environment pulled
+from the throwaway proof project, both the pulled and the exchanged token carry `user_id` (gate:
+holds). A Vercel workload may now move to STS.
 
 Cost, with about 2,200 Vercel instance starts per release and 43 releases a day, for R function
 regions (the web app's project setting) and one audience (STS):
@@ -295,7 +306,7 @@ regions (the web app's project setting) and one audience (STS):
 | | Exchanges per release | Exchanges per day | Bundle calls per day |
 |---|---|---|---|
 | One exchange per instance (no shared cache) | 2,200, above the limit of about 100 | 94,600 | 94,600 |
-| D10 shared cache | about R | about 43 R, plus about 12 R if Vercel renews the base token every 2 hours (proof run 3's warm mode measures it) | 94,600 |
+| D10 shared cache | about R (a handful of the shared budget; overlapping releases add theirs) | about 43 R, plus about 12 R if Vercel renews the base token every 2 hours | 94,600 |
 
 Runtime Cache reads: a memory hit reads nothing, a cache hit is 1 read, a miss that reaches the claim
 is 4 reads and 1 to 2 writes, then 2 reads per poll step. Proof run 2's single-key wave measured

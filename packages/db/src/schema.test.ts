@@ -26,6 +26,31 @@ afterAll(async () => {
   await schemaTestDb.pool.end();
 });
 
+describe('kilocode_users pepper default', () => {
+  it('gives a new account a pepper so a rotation revokes every token it can mint', async () => {
+    const pepperUserId = `oauth/schema-pepper-${crypto.randomUUID()}`;
+    try {
+      const [user] = await schemaTestDb.db
+        .insert(schema.kilocode_users)
+        .values({
+          id: pepperUserId,
+          google_user_email: `${pepperUserId}@example.com`,
+          google_user_name: 'Schema pepper test',
+          google_user_image_url: '',
+          stripe_customer_id: `cus_${crypto.randomUUID()}`,
+        })
+        .returning();
+      expect(user.api_token_pepper).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
+    } finally {
+      await schemaTestDb.db
+        .delete(schema.kilocode_users)
+        .where(eq(schema.kilocode_users.id, pepperUserId));
+    }
+  });
+});
+
 describe('cloud agent stacked workspace schema', () => {
   let userId: string;
   let otherUserId: string;

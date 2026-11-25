@@ -39,7 +39,11 @@ import { GET as catalog } from './models/route';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken, generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateOrganizationApiToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_routing_custom_routers } from '@kilocode/db/schema';
@@ -166,7 +170,9 @@ describe('model validation agrees with the catalog for one credential', () => {
       false
     );
     await addUserToOrganization(organization.id, user.id, 'member');
-    currentHeaders = new Headers({ authorization: `Bearer ${generateApiToken(user)}` });
+    currentHeaders = new Headers({
+      authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+    });
 
     await expect(validate(deniedModel)).resolves.toEqual({
       status: 200,

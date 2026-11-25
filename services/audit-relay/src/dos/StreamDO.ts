@@ -7,6 +7,7 @@ import { pageOperator } from '../page';
 import {
   ArchiveConflictError,
   archiveObjectKey,
+  archiveStreamPrefix,
   readArchivedObject,
   writeArchivedBatch,
 } from '../relay/archive';
@@ -202,9 +203,9 @@ export type StreamOutcome =
     };
 
 /**
- * Why a batch at or below the head disagrees with the archive: `content` differs from the object
- * at its `toSeq`, `unaligned` names a `toSeq` no object ends at, `corrupt` finds an object there
- * that does not decode.
+ * Why a batch at or below the head disagrees with the archive: `content` differs from the
+ * archived events it overlaps, `unaligned` finds no archived object covering its `toSeq`,
+ * `corrupt` finds one that does not decode.
  */
 export type DuplicateMismatchReason = 'content' | 'unaligned' | 'corrupt';
 
@@ -437,32 +438,45 @@ export class StreamDO extends DurableObject<Env> {
   }
 
   /**
-   * Compares a duplicate with the archived object that ends at its `toSeq`. When the duplicate
-   * covers the whole object, its trimmed form must re-hash to the stored chain hash; when it
-   * covers only a suffix of the object (the producer split differently), the overlapping events
+   * Compares a duplicate with the archive. When an object ends at the duplicate's `toSeq` and the
+   * duplicate covers it whole, the trimmed duplicate must re-hash to the stored chain hash; when it
+   * covers only a suffix of that object (the producer split differently), the overlapping events
    * must serialise identically, which is the same test because the hash is
-   * `sha256(prevHash || canonicalJson(batch))`. Throws on an R2 failure, which a retry fixes.
+   * `sha256(prevHash || canonicalJson(batch))`. When no object ends at `toSeq`, the duplicate is a
+   * shorter redelivery of a range a longer batch archived first (its send failed after the queue
+   * took it): the events it shares with the object covering `toSeq` must match. Throws on an R2
+   * failure, which a retry fixes.
    */
   private async compareWithArchive(batch: AuditBatch): Promise<'match' | DuplicateMismatchReason> {
-    const read = await readArchivedObject(
-      this.env.AUDIT_ARCHIVE,
-      archiveObjectKey(batch.stream, batch.toSeq)
-    );
-    if (read.kind === 'missing') return 'unaligned';
-    if (read.kind === 'corrupt') return 'corrupt';
-    const archived = read.object;
-    if (archived.batch.toSeq !== batch.toSeq) return 'content';
-
-    if (batch.fromSeq <= archived.batch.fromSeq) {
+    const bucket = this.env.AUDIT_ARCHIVE;
+    const exact = await readArchivedObject(bucket, archiveObjectKey(batch.stream, batch.toSeq));
+    if (exact.kind === 'corrupt') return 'corrupt';
+    if (exact.kind === 'ok') {
+      const archived = exact.object;
+      if (archived.batch.toSeq !== batch.toSeq) return 'content';
+      if (batch.fromSeq > archived.batch.fromSeq) return overlapMatches(batch, archived.batch);
       const trimmed: AuditBatch = {
         ...batch,
         fromSeq: archived.batch.fromSeq,
         events: batch.events.slice(archived.batch.fromSeq - batch.fromSeq),
       };
-      return (await chainHash(archived.prevHash, trimmed)) === archived.hash ? 'match' : 'content';
+      const hash = await chainHash(archived.prevHash, trimmed);
+      return hash === archived.hash ? 'match' : 'content';
     }
-    const overlap = archived.batch.events.slice(batch.fromSeq - archived.batch.fromSeq);
-    return canonicalJson(overlap) === canonicalJson(batch.events) ? 'match' : 'content';
+
+    // Keys are zero-padded, so the first key after `toSeq - 1` is the object covering `toSeq`.
+    const listed = await bucket.list({
+      prefix: archiveStreamPrefix(batch.stream),
+      startAfter: archiveObjectKey(batch.stream, batch.toSeq - 1),
+      limit: 1,
+    });
+    const coveringKey = listed.objects[0]?.key;
+    if (!coveringKey) return 'unaligned';
+    const covering = await readArchivedObject(bucket, coveringKey);
+    if (covering.kind === 'missing') return 'unaligned';
+    if (covering.kind === 'corrupt') return 'corrupt';
+    if (covering.object.batch.fromSeq > batch.toSeq) return 'unaligned';
+    return overlapMatches(batch, covering.object.batch);
   }
 
   /**
@@ -804,6 +818,14 @@ export class StreamDO extends DurableObject<Env> {
       );
     }
   }
+}
+
+/** True when the duplicate's events equal the archived events of the range both cover. */
+function overlapMatches(batch: AuditBatch, archived: AuditBatch): 'match' | 'content' {
+  const from = Math.max(batch.fromSeq, archived.fromSeq);
+  const ours = batch.events.slice(from - batch.fromSeq, batch.toSeq - batch.fromSeq + 1);
+  const theirs = archived.events.slice(from - archived.fromSeq, batch.toSeq - archived.fromSeq + 1);
+  return canonicalJson(ours) === canonicalJson(theirs) ? 'match' : 'content';
 }
 
 /** 30 s, 60 s, 120 s … capped at 15 minutes, each scaled by a jitter in [0.5, 1). */

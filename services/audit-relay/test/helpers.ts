@@ -1,6 +1,9 @@
 import type { AuditBatch, AuditEvent } from '@kilocode/sts-contracts';
+import { runInDurableObject } from 'cloudflare:test';
 import { env as bindings } from 'cloudflare:workers';
 import { z } from 'zod';
+import type { HotStoreGap, StreamDO } from '../src/dos/StreamDO';
+import type { PassResult, VerifierDO, VerifyPassKind } from '../src/dos/VerifierDO';
 import type { Env } from '../src/env';
 import { archiveObjectKey, readArchivedObject, type ArchivedBatch } from '../src/relay/archive';
 
@@ -106,4 +109,41 @@ export function axiomRequests(requests: CapturedRequest[]): CapturedRequest[] {
 /** The event ids one Axiom ingest request carried. */
 export function eventIds(request: CapturedRequest): string[] {
   return IngestSchema.parse(JSON.parse(request.body ?? '[]')).map(event => event.id);
+}
+
+/** A stream's owed hot-copy rows, then its parked ones, each oldest first, read from storage. */
+export async function hotRows(
+  stub: DurableObjectStub<StreamDO>,
+  limit = 1000
+): Promise<HotStoreGap[]> {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const [owed, parked] = await Promise.all([
+      state.storage.list<HotStoreGap>({ prefix: 'hot_copy:', limit }),
+      state.storage.list<HotStoreGap>({ prefix: 'hot_copy_parked:', limit }),
+    ]);
+    return [...owed.values(), ...parked.values()];
+  });
+}
+
+export type VerifierState = {
+  running: VerifyPassKind[];
+  lastVerifiedCheckpoint: string | null;
+  daily: PassResult | null;
+  full: PassResult | null;
+};
+
+/** The verifier's running passes, anchor and last results, read from its storage. */
+export async function verifierStatus(stub: DurableObjectStub<VerifierDO>): Promise<VerifierState> {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const storage = state.storage;
+    const running: VerifyPassKind[] = [];
+    if (await storage.get('pass:daily')) running.push('daily');
+    if (await storage.get('pass:full')) running.push('full');
+    return {
+      running,
+      lastVerifiedCheckpoint: (await storage.get<string>('verified_checkpoint')) ?? null,
+      daily: (await storage.get<PassResult>('last:daily')) ?? null,
+      full: (await storage.get<PassResult>('last:full')) ?? null,
+    };
+  });
 }

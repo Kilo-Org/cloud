@@ -12,6 +12,7 @@ import {
   env,
   eventIds,
   listObjectKeys,
+  hotRows,
   pageTexts,
   readArchived,
   recordingFetch,
@@ -108,18 +109,39 @@ describe('StreamDO', () => {
       reason: 'content',
     });
     expect(axiomRequests(http.requests)).toHaveLength(1);
-    expect(await stub.hotStoreGaps()).toHaveLength(1);
+    expect(await hotRows(stub)).toHaveLength(1);
   });
 
-  it('reports a duplicate that ends inside an archived batch', async () => {
-    const stream = uniqueStream('duplicate-unaligned');
+  it('compares a shorter redelivery with the longer archived batch that covers it', async () => {
+    const stream = uniqueStream('duplicate-shorter');
     vi.stubGlobal('fetch', recordingFetch(axiomOk).impl);
     const stub = getStreamDOStub(env, stream);
     const batch = auditBatch(1, 4, stream);
     accepted(await stub.acceptBatch(batch));
 
+    // No object ends at 2: the redelivery of 1..2 is compared with the object 1..4 covering it.
     const prefix = { ...batch, toSeq: 2, events: batch.events.slice(0, 2) };
-    expect(await stub.acceptBatch(prefix)).toMatchObject({
+    expect(await stub.acceptBatch(prefix)).toMatchObject({ kind: 'duplicate', toSeq: 2 });
+    const middle = { ...batch, fromSeq: 2, toSeq: 3, events: batch.events.slice(1, 3) };
+    expect(await stub.acceptBatch(middle)).toMatchObject({ kind: 'duplicate', toSeq: 3 });
+
+    const forged = auditBatch(1, 2, stream);
+    expect(await stub.acceptBatch(forged)).toMatchObject({
+      kind: 'duplicate_mismatch',
+      reason: 'content',
+    });
+  });
+
+  it('reports a duplicate no archived object covers', async () => {
+    const stream = uniqueStream('duplicate-unaligned');
+    vi.stubGlobal('fetch', recordingFetch(axiomOk).impl);
+    const stub = getStreamDOStub(env, stream);
+    accepted(await stub.acceptBatch(auditBatch(1, 2, stream)));
+    accepted(await stub.acceptBatch(auditBatch(3, 4, stream)));
+    await env.AUDIT_ARCHIVE.delete(archiveObjectKey(stream, 2));
+
+    // The object for 1..2 is gone, so the next object (3..4) does not cover seq 2.
+    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
       kind: 'duplicate_mismatch',
       reason: 'unaligned',
     });

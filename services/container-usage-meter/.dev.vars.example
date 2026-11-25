@@ -1,3 +1,7 @@
 # Local alert delivery uses this worktree's web app.
 # @url nextjs
 KILOCODE_BACKEND_BASE_URL=http://localhost:3000
+
+# Personal Cloud Agent payer list. Deployed as a Worker secret (see RUNBOOK.md).
+# An empty list is valid and enrolls nobody; without it the billing configuration is invalid.
+CONTAINER_BILLING_CLOUD_AGENT_USER_IDS=""

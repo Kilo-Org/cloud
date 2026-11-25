@@ -64,6 +64,24 @@ describe('cloud agent stacked workspace schema', () => {
       .where(inArray(schema.organizations.id, [organizationId, otherOrganizationId]));
   });
 
+  it('defaults a new account pepper so a rotation revokes every token it can mint', async () => {
+    const pepperUserId = `oauth/schema-pepper-${crypto.randomUUID()}`;
+    const [user] = await schemaTestDb.db
+      .insert(schema.kilocode_users)
+      .values({
+        id: pepperUserId,
+        google_user_email: `${pepperUserId}@example.com`,
+        google_user_name: 'Schema pepper test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      })
+      .returning();
+    expect(user.api_token_pepper).toMatch(/^[0-9a-f-]{36}$/);
+    await schemaTestDb.db
+      .delete(schema.kilocode_users)
+      .where(eq(schema.kilocode_users.id, pepperUserId));
+  });
+
   it('nulls a deleted worktree parent without losing the child base or sidebar position', async () => {
     const parentId = `workspace_${crypto.randomUUID()}`;
     const childId = `workspace_${crypto.randomUUID()}`;

@@ -256,14 +256,17 @@ deadline, folded into the existing alarm. The stored obligation is the due time 
 start of the current window of unanswered passes. The alarm reads `since`, consumes the deadline
 and runs one bounded recovery pass. It reads the passive `status(sessionId).view`, then prepares
 unknown/old failed work or delivers ready work. A returned ready view after `not_ready` does not
-recursively deliver. A pass that cannot make progress arms the next pass of the same window: 15 s
-after the window opens, then 30 s, then 60 s apart. The delay comes from `now - since`, never from
-a pass counter. The first such pass at least 90 s after `since` ends the window instead: queued
-work fails as `sandbox_unreachable` and an open preparation row closes with that reason. Accepted
-work keeps its own backstop. With the 2 s pass deadline, a window that opens at the first failure
-ends about 111 s later; the queued backstop stays the last resort. A consumed pass that is answered
-and does not arm another pass ends the window, so the next failure opens a new one. Delivered or
-terminal queued work cancels the obligation; normal preparing/reconnecting owner views end the
+recursively deliver. A pass that the Sandbox does not answer (no peer, or an RPC that misses the
+pass deadline) arms the next pass of the same window: 15 s after the window opens, then 30 s, then
+60 s apart. The delay comes from `now - since`, never from a pass counter. The first such pass at
+least 90 s after `since` ends the window instead: queued work fails as `sandbox_unreachable` and an
+open preparation row closes with that reason. Accepted work keeps its own backstop. With the 2 s
+pass deadline, a window that opens at the first failure ends about 111 s later; the queued backstop
+stays the last resort. The bound is per window, so a message sent late in an open window can fail
+within seconds. Any answer ends the window, so the next failure opens a new one. That includes an
+answer without progress, such as `not_ready` then a `ready` view, or a prepare that returns the
+same failed attempt: queued work then waits on the status check and the queued backstop. Delivered
+or terminal queued work cancels the obligation; normal preparing/reconnecting owner views end the
 window. While work stays queued and no pass is due, the obligation is a slow status check 60 s
 later, stored without `since`. It reads the passive view and acts on it like a recovery pass, so
 a lost route notification or a rolled-back acceptance is found within a minute. A check that reads

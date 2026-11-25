@@ -4170,14 +4170,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // `not_ready`: keep them queued and act on the view `prepare` returns
     // (spec §5). A `ready` view only updates the stored route and returns: it
     // must not re-enter delivery in this task, or a write that keeps losing to
-    // a ready route would recurse with no exit. The pass counts as unanswered,
-    // so it arms the next pass of the recovery window unless one is already
-    // due. The next `send` or `onRoute` also retries.
+    // a ready route would recurse with no exit. The Sandbox answered, so the
+    // pass ends any open recovery window. The status check, the next `send`
+    // or `onRoute` retries.
     const view = await this.prepareSandbox(pass);
     if (view === null) return;
     if (view.state === 'ready') {
       await this.persistRoute(view);
-      await this.scheduleTransportRecovery(pass);
+      await this.endTransportWindow();
       return;
     }
     await this.applyView(view, pass);
@@ -4325,7 +4325,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.route.state === 'failed' &&
         prepared.attemptId === this.route.attemptId
       ) {
-        await this.scheduleTransportRecovery(pass);
+        await this.endTransportWindow();
         return;
       }
       view = prepared;
@@ -4387,8 +4387,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * Arms the next recovery pass after a pass that could not make progress. The
-   * window of unanswered passes is bounded (spec "Queued transport recovery"):
+   * Arms the next recovery pass after a pass that the Sandbox did not answer.
+   * The window of unanswered passes is bounded (spec "Queued transport recovery"):
    * at its end, queued work fails with a specific reason, not at the backstop.
    */
   private async scheduleTransportRecovery(pass: TransportPass): Promise<void> {
@@ -4441,6 +4441,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       'failed',
       reason
     );
+  }
+
+  /**
+   * The Sandbox answered, but the pass could not make progress. An answer ends
+   * the window of unanswered passes; queued work keeps the slow status check.
+   */
+  private async endTransportWindow(): Promise<void> {
+    if (this.transportRecovery?.since !== undefined) await this.clearTransportRecovery();
+    await this.armAlarm();
   }
 
   private async clearTransportRecovery(): Promise<void> {

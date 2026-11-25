@@ -1158,6 +1158,72 @@ describe('SandboxSessionV2 bounded transport recovery', () => {
     expect((await rows(stub))[1]?.state).toBe('queued');
   });
 
+  it('keeps an answered delivery that stays not_ready on the status check, never sandbox_unreachable', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareView = peer.view('ready');
+    peer.deliverResult = 'not_ready';
+    const before = Date.now();
+    await bounded(stub.send(prompt('m1')));
+    await expectStatusCheck(stub, before);
+    // Four checks span more than the window: the Sandbox answered each of them.
+    for (let pass = 0; pass < 4; pass += 1) {
+      const passStart = Date.now();
+      await bounded(recover(stub, peer));
+      await expectStatusCheck(stub, passStart);
+    }
+    expect(peer.deliverCalls).toHaveLength(5);
+    expect((await rows(stub))[0]).toMatchObject({ state: 'queued', reason: null });
+  });
+
+  it('ends an open window when a send is answered but cannot deliver', async () => {
+    const { stub, peer } = await setup();
+    peer.prepareError = unreachable();
+    await bounded(stub.send(prompt('m1')));
+    // Age the window past its bound, so one more unanswered pass would end it.
+    await runInDurableObject(stub, async (instance, state) => {
+      const opened = await state.storage.get<StoredRecovery>(RECOVERY_KEY);
+      const aged = { dueAt: opened!.dueAt, since: opened!.since! - 100_000 };
+      await state.storage.put(RECOVERY_KEY, aged);
+      Object.assign(instance, { transportRecovery: aged });
+    });
+
+    peer.prepareError = null;
+    peer.prepareView = peer.view('ready');
+    peer.deliverResult = 'not_ready';
+    const before = Date.now();
+    await bounded(stub.send(prompt('m2')));
+    await expectStatusCheck(stub, before);
+
+    peer.statusError = unreachable();
+    const check = await bounded(recover(stub, peer));
+    const fresh = await storedRecovery(stub);
+    expect(fresh!.since).toBeGreaterThanOrEqual(check.dueAt);
+    expect(fresh!.dueAt - fresh!.since!).toBe(15_000);
+    expect((await rows(stub)).map(row => row.state)).toEqual(['queued', 'queued']);
+  });
+
+  it('keeps a retry that prepare answers with the same failed attempt on the status check', async () => {
+    const { stub, peer } = await setup();
+    const failedA = {
+      state: 'failed' as const,
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed' as const,
+    };
+    await stub.send(prompt('old'));
+    peer.prepareView = failedA;
+    await stub.onRoute(failedA);
+    expect((await rows(stub))[0]).toMatchObject({ state: 'failed', reason: failedA.reason });
+    peer.prepareError = unreachable();
+    await bounded(stub.send(prompt('retry')));
+    expect((await storedRecovery(stub))?.since).toBeDefined();
+
+    peer.prepareError = null;
+    const before = Date.now();
+    await bounded(recover(stub, peer));
+    await expectStatusCheck(stub, before);
+    expect((await rows(stub))[1]).toMatchObject({ state: 'queued', reason: null });
+  });
+
   it('reads a bare due time from an earlier deploy as a window opened one delay before it', async () => {
     const { stub, peer, sessionId } = await setup();
     peer.prepareError = unreachable();

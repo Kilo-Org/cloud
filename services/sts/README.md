@@ -104,9 +104,9 @@ pnpm --filter cloudflare-sts dev     # wrangler dev --env local
 
 The local block serves `http://localhost:8825` with `DO_JURISDICTION=none` (workerd enforces no data
 residency, so the objects live in the default jurisdiction) and the local queue
-`kilo-audit-local`. The manager vars point at a placeholder identity, so a bundle read waits on no
-manager and reports `manager_unreachable_no_copy` until you point `MANAGER_*` at a real development
-identity. The discovery and JWKS routes work without any manager access.
+`kilo-audit-local`. The manager vars name the `kilo-runtime` project and the development identity; a
+bundle read needs that identity's OIDC token and reports `manager_unreachable_no_copy` without it.
+The discovery and JWKS routes work without any manager access.
 
 ## Production prerequisites
 
@@ -114,8 +114,9 @@ identity. The discovery and JWKS routes work without any manager access.
    `sts-staging.kiloapps.io` for staging. `workers_dev` stays false.
 2. **Queues**: `kilo-audit` (production) and `kilo-audit-staging`, both EU. The producer binding
    exists here; the consumer is the separate audit-relay service.
-3. **Infisical identities**: one per environment as described above, with `MANAGER_PROJECT_ID` and
-   `MANAGER_IDENTITY_ID` filled in. The committed values are placeholders on purpose.
+3. **Infisical identities**: one per environment as described above. `MANAGER_PROJECT_ID` and
+   `MANAGER_IDENTITY_ID` are committed per environment; the deploy only needs the identity to exist
+   in that project with access to `/runtime`.
 4. **Runtime secrets**: every name in a policy file must exist on the manager's `/runtime` path of
    that environment. Names in a policy that the manager does not hold are reported in the bundle's
    `missing` list rather than failing the read.

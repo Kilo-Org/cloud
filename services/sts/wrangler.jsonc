@@ -41,10 +41,10 @@
     "STS_ISSUER": "https://sts.kiloapps.io",
     "MANAGER_BASE_URL": "https://eu.infisical.com",
     // Production prerequisites: README.md#production-prerequisites.
-    "MANAGER_PROJECT_ID": "REPLACE_WITH_INFISICAL_PROJECT_ID",
+    "MANAGER_PROJECT_ID": "88067dcf-1591-4937-8818-26e91ee14f0a",
     "MANAGER_ENVIRONMENT_SLUG": "prod",
     "MANAGER_SECRET_PATH": "/runtime",
-    "MANAGER_IDENTITY_ID": "REPLACE_WITH_INFISICAL_IDENTITY_ID",
+    "MANAGER_IDENTITY_ID": "c531ad9b-eec9-4f93-b173-e14d3d94f6ef",
     // Durable Objects hold secret material, so production and staging pin them to the EU.
     "DO_JURISDICTION": "eu",
   },
@@ -74,10 +74,10 @@
         "STS_ENVIRONMENT": "staging",
         "STS_ISSUER": "https://sts-staging.kiloapps.io",
         "MANAGER_BASE_URL": "https://eu.infisical.com",
-        "MANAGER_PROJECT_ID": "REPLACE_WITH_INFISICAL_PROJECT_ID",
+        "MANAGER_PROJECT_ID": "88067dcf-1591-4937-8818-26e91ee14f0a",
         "MANAGER_ENVIRONMENT_SLUG": "staging",
         "MANAGER_SECRET_PATH": "/runtime",
-        "MANAGER_IDENTITY_ID": "REPLACE_WITH_INFISICAL_IDENTITY_ID",
+        "MANAGER_IDENTITY_ID": "5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4",
         "DO_JURISDICTION": "eu",
       },
       "queues": {
@@ -100,10 +100,10 @@
         "STS_ENVIRONMENT": "development",
         "STS_ISSUER": "http://localhost:8825",
         "MANAGER_BASE_URL": "https://eu.infisical.com",
-        "MANAGER_PROJECT_ID": "local-project-id",
+        "MANAGER_PROJECT_ID": "88067dcf-1591-4937-8818-26e91ee14f0a",
         "MANAGER_ENVIRONMENT_SLUG": "dev",
         "MANAGER_SECRET_PATH": "/runtime",
-        "MANAGER_IDENTITY_ID": "local-identity-id",
+        "MANAGER_IDENTITY_ID": "8c46d33c-6f3b-465b-b99a-ebfb734e2c8c",
         // workerd enforces no data residency, so local development keeps objects unscoped.
         "DO_JURISDICTION": "none",
       },

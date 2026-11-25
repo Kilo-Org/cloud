@@ -91,8 +91,10 @@ Paging is per stream:
 - A failure whose start was paged always pages its recovery, from the run that delivers the last
   owed row, and the recovery restarts the hour. A failure that never paged its start pages no
   recovery.
-- `archive_unreadable` rows page outside the cap: one page per alarm run lists every such row the
-  run parked, because a changed archive must never wait an hour to be seen.
+- `archive_unreadable` rows page outside the cap, because a changed archive must never wait an
+  hour to be seen: the first at once, then at most one page per stream every 10 minutes summing
+  up the rows found since (count, first and last sequence, running total). An alarm makes sure the
+  summary goes out even when nothing else is due.
 
 Apart from unreadable archive objects, a stream therefore pages at most twice an hour for its hot
 copy (a start, or an age or parked page, plus the recovery of a paged start).
@@ -139,19 +141,22 @@ gap (the head advances) starts the next gap's count from zero.
 
 Since an archived batch is always acked, a message reaches the DLQ only when it stayed behind a
 gap for its 24 retries (about 12 minutes) or its archive write kept failing (60 s doubling to a
-15-minute cap, about 5.25 hours). The DLQ consumer (`max_batch_size: 100`,
-`max_concurrency: 5`) groups each batch of messages by stream, runs the streams in parallel and
-each stream in sequence order, and offers each decodable batch to its stream again, so batches
-an R2 outage or a gap dead-lettered archive themselves once the cause is gone, with no manual
-step: an `accepted` batch, or a `duplicate` that matches the archive, is acked with nothing kept.
-Once one batch of a stream is still waiting, its later batches in the same delivery are not
-offered (they would only gap). Several consumers can hold batches of one stream at once; the
-StreamDO serialises them, and one that arrives early waits behind its gap.
+15-minute cap, about 5.25 hours). The DLQ has **one** consumer (`max_batch_size: 100`,
+`max_concurrency: 1`): it groups each batch of messages by stream, runs the streams in parallel
+and each stream in sequence order, and offers each decodable batch to its stream again, so
+batches an R2 outage or a gap dead-lettered archive themselves once the cause is gone, with no
+manual step: an `accepted` batch, or a `duplicate` that matches the archive, is acked with
+nothing kept. Once one batch of a stream is still waiting, its later batches in the same
+delivery are not offered (they would only gap). Several consumers would hold later chunks of a
+stream while an earlier one is still archiving and push them all back behind its gap, so there
+is one.
 
 Every other message has its raw bytes written to
 `dead-letter/<stream or unknown>/<enqueue time>-<message id>.gz` in the archive bucket
-(create-only, 400-day lock rule). A batch still behind a gap or an R2 failure is then retried
-every 15 minutes, for about 25 hours (the Queues maximum of 100 retries). A message that cannot
+(create-only, 400-day lock rule). A batch still behind a gap is retried after 30 s while its
+stream's head has advanced within the last minute (a backlog that is draining), for its first 60
+deliveries; otherwise, and after an R2 failure, every 15 minutes, up to the Queues maximum of 100
+retries. A message that cannot
 recover is paged and acked: a duplicate that disagrees with the archive (`duplicate_content`,
 `duplicate_unaligned`, `duplicate_corrupt`), an archive conflict, an undecodable body (main
 queue or DLQ), or a batch still waiting at its final delivery, including one whose bytes could
@@ -303,8 +308,10 @@ that acks every archived batch and delivers it from the alarm (paging the start 
 runs, the recovery once, and nothing for a second failure inside the hour), sporadic failures
 that page nothing, a rejected row parked once a later row is delivered, a missing dataset and a
 payload every row fails that keep all rows owed and deliver them once fixed, 60 unreadable rows
-parked without starving the row behind them and paged outside the cap, a stream's later dead
-letters not offered behind a gap, two streams' dead letters archived in one parallel pass, a dead
+parked without starving the row behind them and paged at once and then once a summary is due, a
+stream's later dead letters not offered behind a gap, a backlog spread over several deliveries
+drained in a few rounds, the short and long dead-letter retry delays, two streams' dead letters
+archived in one parallel pass, a dead
 letter that cannot be stored at its final delivery, an owed row re-ingested from the archive and never
 from a forged redelivery, Axiom status classification, create-only writes with the same, a
 different and an undecodable object, dead-lettered batches that archive themselves once the cause

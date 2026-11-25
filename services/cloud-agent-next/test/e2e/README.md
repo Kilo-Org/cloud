@@ -733,6 +733,14 @@ The deployed profile drives a real deployed Cloudflare stack instead of the
 local Docker harness. See [`deploy/README.md`](./deploy/README.md) for the full
 deploy reference.
 
+The deployed profile is paused. Both e2e Workers verify control tokens and
+stream tickets with the development signing key (`NEXTAUTH_SECRET_DEV`), while
+the production backend at `https://api.kilo.ai` signs them with the production
+key, so a run against it fails and the nightly schedule is off. Running it again
+needs a backend that signs with `NEXTAUTH_SECRET_DEV` and a personal token issued
+by that backend; see
+[Why the deployed profile is paused](./deploy/README.md#why-the-deployed-profile-is-paused).
+
 Two Workers, in deploy order:
 
 1. `fake-llm` — Worker + `FakeLlmState` Durable Object running the
@@ -762,14 +770,16 @@ Two different fake URL bases — do not conflate them:
   `/test/requests` (and the other `/test/*` side channels) on it. Do not reuse
   the `/api/openrouter` provider base as `FAKE_LLM_URL`.
 
-Driver env: `E2E_PROFILE=deployed`, `WORKER_URL`,
-`E2E_BACKEND_URL=https://api.kilo.ai`, `FAKE_LLM_URL`, and a user token from
+Driver env: `E2E_PROFILE=deployed`, `WORKER_URL`, `E2E_BACKEND_URL` (a backend
+that signs control tokens and stream tickets with `NEXTAUTH_SECRET_DEV`, not
+`https://api.kilo.ai`), `FAKE_LLM_URL`, and a user token from
 either `E2E_USER_TOKEN` or `E2E_AUTH_FILE`; optional `E2E_MODEL` (default
 `kilo/fake-deterministic`) and `E2E_GIT_URL`. `E2E_USER_TOKEN`, when set and
-non-empty, is an ordinary personal Kilo API token used as the source credential;
-it needs no separate `userId` or `email`. The driver exchanges it for
-short-lived control tokens and uses it directly for backend requests,
-including stream tickets. Otherwise `E2E_AUTH_FILE` must name a mode-600
+non-empty, is an ordinary personal Kilo API token issued by that backend and
+used as the source credential; it needs no separate `userId` or `email`. The
+driver sends it only to the backend: it exchanges it for short-lived control
+tokens and uses it for backend requests, including stream tickets. The Worker
+never receives it. Otherwise `E2E_AUTH_FILE` must name a mode-600
 JSON file carrying the `token` field. When neither supplies a token the run fails
 and names both variables. An empty value counts as unset; a whitespace-padded
 value is present but rejected, never trimmed.
@@ -801,9 +811,13 @@ The auth file, named by the optional `E2E_AUTH_FILE`, is JSON
 identity and the fake-llm admin bearer as one alternative to `E2E_USER_TOKEN` and
 `FAKE_LLM_ADMIN_TOKEN`. The token must be an **ordinary
 personal Kilo API token** (the `generateApiToken` family), obtained from the
-user's personal API key or CLI token flow. The driver exchanges it for
-short-lived Cloud Agent control tokens (`POST /api/cloud-agent-next/token`) and
-presents those to the Worker; stream-ticket requests still use the source token.
+personal API key or CLI token flow of the backend named by `E2E_BACKEND_URL`.
+The driver exchanges it for short-lived Cloud Agent control tokens
+(`POST /api/cloud-agent-next/token`) and presents those to the Worker;
+stream-ticket requests still use the source token. The Worker accepts those
+control tokens and stream tickets only when they are signed with
+`NEXTAUTH_SECRET_DEV`, so a token for `https://api.kilo.ai` cannot drive a
+passing run.
 Session/control tokens, organization tokens, and delegated/runtime tokens are
 refused as the **source** with a diagnostic. Neither token is printed. A
 `503 Service Unavailable` from the exchange means Cloud Agent token issuance is
@@ -815,7 +829,7 @@ Exact run command, from `services/cloud-agent-next`:
 E2E_PROFILE=deployed \
 WORKER_URL=https://cloud-agent-e2e-test.engineering-e11.workers.dev \
 FAKE_LLM_URL=https://fake-llm.engineering-e11.workers.dev \
-E2E_BACKEND_URL=https://api.kilo.ai \
+E2E_BACKEND_URL=https://<backend-signing-with-NEXTAUTH_SECRET_DEV> \
 pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
 ```
 
@@ -982,9 +996,10 @@ attempt fails, the matrix reports a failure.
 
 The `cloud-agent-e2e-tests` GitHub workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
-and `workflow_call`. The `cloud-agent-e2e-nightly` workflow calls it after
-deploying the e2e stack at 03:37 UTC each day. It runs `e2e:parallel` as one
-job and uploads `e2e.log`. Its `parallel` input defaults to `4` and sets
+and `workflow_call`. The `cloud-agent-e2e-nightly` workflow deploys the e2e stack
+and then calls it. Its daily 03:37 UTC schedule is paused with the deployed
+profile (see above), so it runs only on manual dispatch. The tests workflow runs
+`e2e:parallel` as one job and uploads `e2e.log`. Its `parallel` input defaults to `4` and sets
 `E2E_PARALLEL`; `only` selects scenarios. Job failure is the runner's exit code.
 The workflow keeps its workflow-level `concurrency` only. Use `run.ts <name> _`
 for a focused single scenario.

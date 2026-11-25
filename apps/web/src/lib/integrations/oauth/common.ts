@@ -10,7 +10,7 @@ import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organ
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
 import { appShellRedirect } from '@/lib/app-shell/redirect';
-import { loadAppShellUser } from '@/lib/app-shell/session';
+import { bindAppShellSession, loadAppShellUser } from '@/lib/app-shell/session';
 import {
   APP_SHELL_FLOW_COOKIE,
   appShellFlowCookieOptions,
@@ -272,7 +272,10 @@ export async function startStatefulOAuthConnect(
   if (appShell) {
     response.cookies.set(
       APP_SHELL_FLOW_COOKIE,
-      createAppShellFlowToken({ userId: user.id, state }),
+      createAppShellFlowToken({
+        session: bindAppShellSession(user.id, user.web_session_pepper),
+        state,
+      }),
       appShellFlowCookieOptions()
     );
   }
@@ -385,7 +388,7 @@ export async function resolveOAuthCallbackActor(input: {
   const flow = verifyAppShellFlowToken(input.request, input.rawState);
   if (!flow || flow.userId !== input.verified.userId) return { status: 'unauthenticated' };
 
-  const lookup = await loadAppShellUser(input.verified.userId);
+  const lookup = await loadAppShellUser(flow);
   return lookup.status === 'active'
     ? { status: 'app_shell', user: lookup.user }
     : { status: 'unauthenticated' };

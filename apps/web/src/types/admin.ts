@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type {
-  UserAdminNote,
   User,
+  UserAdminNote,
   Organization,
   OrganizationMembership,
   AutoTopUpConfig,
@@ -11,6 +11,7 @@ import { OrganizationSchema } from '@kilocode/web-shared/lib/organizations/organ
 import { type BalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import type { PaginationMetadata } from '@kilocode/web-shared/types/pagination';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { ClientUser } from '@/lib/user/client-user';
 
 export type PaymentMethodStatus = Awaited<ReturnType<typeof describePaymentMethods>>;
 
@@ -21,7 +22,7 @@ export type HasCreditInfo = {
   creditInfo: BalanceForUser;
 };
 // Shared UserDetailProps type for components that need the full user object
-export type UserTableProps = User &
+export type UserTableProps = ClientUser &
   HasPaymentStatus & { is_blacklisted_by_domain: boolean; admin_notes: NoteWithAdminUser[] };
 export type UserOrganizationMembershipProps = {
   organization_memberships: {
@@ -82,7 +83,9 @@ export const OrganizationsApiGetResponseSchema = z.object({
   }),
 });
 
-export type NoteWithAdminUser = UserAdminNote & { admin_kilo_user: User | null };
+export type NoteWithAdminUser = UserAdminNote & {
+  admin_kilo_user: Pick<User, 'id' | 'google_user_name' | 'google_user_email'> | null;
+};
 
 export const AdminCreditTransactionSchema = z.object({
   id: z.string(),

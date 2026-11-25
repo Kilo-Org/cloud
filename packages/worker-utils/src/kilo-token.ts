@@ -12,6 +12,19 @@ import {
 } from './kilo-token-verification';
 
 export { KILO_TOKEN_VERSION };
+
+/** The longest lifetime any Kilo token may be minted with: 30 days. */
+export const KILO_TOKEN_MAX_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+
+/**
+ * Refuses to mint a token that would outlive the cap. Verification is not
+ * affected: tokens issued with a longer lifetime before the cap stay valid.
+ */
+export function assertKiloTokenLifetimeWithinCap(expiresInSeconds: number): void {
+  if (!(expiresInSeconds <= KILO_TOKEN_MAX_LIFETIME_SECONDS)) {
+    throw new Error('Kilo token lifetime exceeds the 30-day limit');
+  }
+}
 const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**
@@ -80,10 +93,10 @@ export type SignKiloTokenExtra = Pick<
 export async function signKiloToken(params: {
   userId: string;
   /**
-   * Omit (or pass `undefined`) to mint an internal-service token with no
-   * `apiTokenPepper` claim at all — verifiers treat an absent claim as
-   * "skip pepper comparison", unlike an explicit `null`, which is compared
-   * against the account's current pepper.
+   * Omit (or pass `undefined`) to mint an internal assertion with no
+   * `apiTokenPepper` claim. Only receivers of internal assertions accept such a
+   * token, and only while it lives at most one hour (`isKiloTokenPepperCurrent`);
+   * an explicit `null` is compared against the account's current pepper.
    */
   pepper?: string | null;
   secret: string;
@@ -92,6 +105,7 @@ export async function signKiloToken(params: {
   env?: string;
   extra?: SignKiloTokenExtra;
 }): Promise<{ token: string; expiresAt: string }> {
+  assertKiloTokenLifetimeWithinCap(params.expiresInSeconds);
   const now = Math.floor(Date.now() / 1000);
   const exp = now + params.expiresInSeconds;
 

@@ -10,6 +10,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { AuthProvider } from './LoginMethodsCard';
 import { UnlinkAccountDialog } from './UnlinkAccountDialog';
+import { SignInMethodCodeDialog, type SignInMethodChallenge } from './SignInMethodCodeDialog';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { getProviderById } from '@/lib/auth/provider-metadata';
 
@@ -17,32 +18,35 @@ type ConnectedAccountsCardProps = {
   providers: AuthProvider[];
   onRefetch: () => Promise<unknown>;
   onError: (error: string) => void;
+  /** Lists the accounts without the unlink action; see `LoginMethodsCard`. */
+  readOnly?: boolean;
+  /** The page's last requested code; see `LoginMethodsCard`. */
+  codeChallenge: SignInMethodChallenge | null;
+  onCodeChallengeChange: (challenge: SignInMethodChallenge | null) => void;
 };
 
 export function ConnectedAccountsCard({
   providers,
   onRefetch,
   onError,
+  readOnly = false,
+  codeChallenge,
+  onCodeChallengeChange,
 }: ConnectedAccountsCardProps) {
   const [unlinkingProvider, setUnlinkingProvider] = useState<AuthProviderId | null>(null);
   const [showConfirmUnlink, setShowConfirmUnlink] = useState<AuthProviderId | null>(null);
+  const [codeProvider, setCodeProvider] = useState<AuthProviderId | null>(null);
   const trpc = useTRPC();
 
   const unlinkMutation = useMutation(
     trpc.user.unlinkAuthProvider.mutationOptions({
-      onSuccess: async () => {
-        const providerName = showConfirmUnlink
-          ? getProviderById(showConfirmUnlink).name
-          : 'Connected';
+      onSuccess: async (_data, variables) => {
+        const providerName = getProviderById(variables.provider).name;
         toast.success(`${providerName} account unlinked successfully`);
         await onRefetch();
         setUnlinkingProvider(null);
         setShowConfirmUnlink(null);
-      },
-      onError: () => {
-        onError('LINKING-FAILED');
-        setUnlinkingProvider(null);
-        setShowConfirmUnlink(null);
+        setCodeProvider(null);
       },
     })
   );
@@ -52,15 +56,37 @@ export function ConnectedAccountsCard({
       <UnlinkAccountDialog
         open={!!showConfirmUnlink}
         providerName={showConfirmUnlink ? getProviderById(showConfirmUnlink).name : ''}
-        isUnlinking={unlinkingProvider === showConfirmUnlink}
         onConfirm={() => {
-          if (showConfirmUnlink) {
-            setUnlinkingProvider(showConfirmUnlink);
-            unlinkMutation.mutate({ provider: showConfirmUnlink });
-          }
+          if (!showConfirmUnlink) return;
+          // The code step confirms the unlink, so the confirmation closes now.
+          setCodeProvider(showConfirmUnlink);
+          setShowConfirmUnlink(null);
         }}
         onCancel={() => setShowConfirmUnlink(null)}
       />
+
+      {codeProvider !== null && (
+        <SignInMethodCodeDialog
+          open
+          change="unlink"
+          provider={codeProvider}
+          challenge={codeChallenge}
+          onChallengeChange={onCodeChallengeChange}
+          onOpenChange={open => {
+            if (!open) setCodeProvider(null);
+          }}
+          onError={onError}
+          onVerified={async (code, challengeId) => {
+            if (codeProvider === null) return;
+            setUnlinkingProvider(codeProvider);
+            try {
+              await unlinkMutation.mutateAsync({ provider: codeProvider, code, challengeId });
+            } finally {
+              setUnlinkingProvider(null);
+            }
+          }}
+        />
+      )}
 
       <Card className="h-full w-full rounded-xl shadow-sm">
         <CardContent className="space-y-6 pt-6">
@@ -88,7 +114,7 @@ export function ConnectedAccountsCard({
                       <div className="text-muted-foreground text-sm">{provider.email}</div>
                     </div>
                   </div>
-                  {providers.length > 1 && (
+                  {!readOnly && providers.length > 1 && (
                     <Button
                       variant="outline"
                       size="sm"

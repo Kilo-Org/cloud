@@ -1,4 +1,5 @@
 import 'server-only';
+import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { User } from '@kilocode/db/schema';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -18,21 +19,64 @@ export const APP_SHELL_SESSION_COOKIE = 'kilo_app_shell_session';
 /** How long one hand-off keeps the shell open. */
 export const APP_SHELL_SESSION_TTL_SECONDS = 60 * 60;
 
-export type AppShellSession = { userId: string };
+/**
+ * A shell credential: the user it names and a digest of that user's
+ * `web_session_pepper` when it was minted. Rotating the pepper (an API-key
+ * reset, "sign out everywhere", account recovery) ends every shell credential
+ * minted before it, the same way it ends every browser session. The cookie
+ * carries only the digest because the pepper itself never leaves the server.
+ */
+export type AppShellSession = { userId: string; webSessionBinding: string | null };
 
-export function createAppShellSessionToken(userId: string): string {
-  return createSignedToken({ userId });
+function webSessionBinding(webSessionPepper: string | null): string | null {
+  return webSessionPepper === null
+    ? null
+    : crypto.createHash('sha256').update(webSessionPepper).digest('base64url');
 }
 
+export function bindAppShellSession(
+  userId: string,
+  webSessionPepper: string | null
+): AppShellSession {
+  return { userId, webSessionBinding: webSessionBinding(webSessionPepper) };
+}
+
+/**
+ * Marks a signed token as a shell session. Every signed token in this app
+ * shares one key, so the marker is what stops another signed token that names
+ * a user, such as the app-shell OAuth flow cookie, from being accepted as a
+ * shell session.
+ */
+const APP_SHELL_SESSION_PURPOSE = 'app-shell-session';
+
+/**
+ * The session a signed shell payload names, or null when it is malformed. A
+ * payload without the binding was minted before shell credentials were bound
+ * to the pepper and is refused; the app opens the shell with a new hand-off.
+ * The caller checks the payload's purpose first.
+ */
+export function parseAppShellSession(payload: Record<string, unknown>): AppShellSession | null {
+  const { userId, webSessionBinding: binding } = payload;
+  if (typeof userId !== 'string' || userId.length === 0) return null;
+  if (binding !== null && typeof binding !== 'string') return null;
+  return { userId, webSessionBinding: binding };
+}
+
+export function createAppShellSessionToken(session: AppShellSession): string {
+  return createSignedToken({ purpose: APP_SHELL_SESSION_PURPOSE, ...session });
+}
+
+/**
+ * The shell session a token names, or null when it is missing, forged, stale
+ * or not a shell session token.
+ */
 export function verifyAppShellSessionToken(
   token: string | null | undefined
 ): AppShellSession | null {
   return verifySignedToken(token ?? null, {
     ttlSeconds: APP_SHELL_SESSION_TTL_SECONDS,
-    parse: payload => {
-      const userId = payload.userId;
-      return typeof userId === 'string' && userId.length > 0 ? { userId } : null;
-    },
+    parse: payload =>
+      payload.purpose === APP_SHELL_SESSION_PURPOSE ? parseAppShellSession(payload) : null,
   });
 }
 
@@ -65,17 +109,23 @@ async function isAppShellAccountRestricted(user: User): Promise<boolean> {
 export type AppShellUserLookup =
   | { status: 'active'; user: User }
   | { status: 'gone' }
-  | { status: 'restricted' };
+  | { status: 'restricted' }
+  | { status: 'revoked' };
 
 /**
- * The database row a shell credential names, after those gates. Both the
- * hand-off and every later read go through this, so a credential that names a
- * deleted, blocked or blocklisted account never becomes a user.
+ * The database row a shell credential names, after those gates and the
+ * web-session pepper check. The hand-off, every later read and the OAuth
+ * callbacks go through this, so a credential that names a deleted, blocked or
+ * blocklisted account, or one minted before the pepper last rotated, never
+ * becomes a user.
  */
-export async function loadAppShellUser(userId: string): Promise<AppShellUserLookup> {
-  const user = await findUserById(userId);
+export async function loadAppShellUser(session: AppShellSession): Promise<AppShellUserLookup> {
+  const user = await findUserById(session.userId);
   if (!user) return { status: 'gone' };
   if (await isAppShellAccountRestricted(user)) return { status: 'restricted' };
+  if (session.webSessionBinding !== webSessionBinding(user.web_session_pepper)) {
+    return { status: 'revoked' };
+  }
   return { status: 'active', user };
 }
 
@@ -93,6 +143,6 @@ export async function readAppShellSession(): Promise<AppShellSession | null> {
 export async function requireAppShellUser(): Promise<User | null> {
   const session = await readAppShellSession();
   if (!session) return null;
-  const lookup = await loadAppShellUser(session.userId);
+  const lookup = await loadAppShellUser(session);
   return lookup.status === 'active' ? lookup.user : null;
 }

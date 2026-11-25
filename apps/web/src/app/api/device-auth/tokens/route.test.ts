@@ -84,6 +84,53 @@ describe('POST /api/device-auth/tokens', () => {
     expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', { addPendingLink: false });
   });
 
+  it('passes the emailed code and the approving browser session when it adds the pending link', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1', google_user_email: 'owner@example.com' }),
+      authFailedResponse: null,
+      webSessionId: 'web-session-1',
+    });
+
+    const response = await POST(
+      createRequest(
+        JSON.stringify({
+          code: 'ABCD-EFGH',
+          add_pending_link: true,
+          pending_link_code: '123456',
+          pending_link_challenge_id: '00000000-0000-4000-8000-000000000009',
+        }),
+        sessionHeaders
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {
+      addPendingLink: true,
+      pendingLinkProof: {
+        email: 'owner@example.com',
+        webSessionId: 'web-session-1',
+        code: '123456',
+        challengeId: '00000000-0000-4000-8000-000000000009',
+      },
+    });
+  });
+
+  it('passes a proof without a code when it adds the pending link without one', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1', google_user_email: 'owner@example.com' }),
+      authFailedResponse: null,
+    });
+
+    await POST(
+      createRequest(JSON.stringify({ code: 'ABCD-EFGH', add_pending_link: true }), sessionHeaders)
+    );
+
+    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {
+      addPendingLink: true,
+      pendingLinkProof: { email: 'owner@example.com', webSessionId: undefined },
+    });
+  });
+
   it('answers 409 when the approval omits the pending link choice', async () => {
     mockGetUserFromSession.mockResolvedValue({
       user: defineTestUser({ id: 'user-1' }),
@@ -136,6 +183,18 @@ describe('POST /api/device-auth/tokens', () => {
     {
       code: DEVICE_AUTH_REFUSAL_CODES.requestExpired,
       status: 410,
+    },
+    {
+      code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid,
+      status: 400,
+    },
+    {
+      code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked,
+      status: 429,
+    },
+    {
+      code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired,
+      status: 403,
     },
   ])('returns $status when the approval refuses with $code', async ({ code, status }) => {
     mockGetUserFromSession.mockResolvedValue({

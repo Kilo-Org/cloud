@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { requireAppShellUser } from '@/lib/app-shell/session';
+import { bindAppShellSession, requireAppShellUser } from '@/lib/app-shell/session';
 import { appShellRedirect } from '@/lib/app-shell/redirect';
 import { APP_SHELL_EXPIRED_PATH, APP_SHELL_PREFIX } from '@/lib/app-shell/shell-paths';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
@@ -71,7 +71,10 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.redirect(buildGitHubAppInstallUrl(token, appType));
   response.cookies.set(
     APP_SHELL_FLOW_COOKIE,
-    createAppShellFlowToken({ userId: user.id, state: token }),
+    createAppShellFlowToken({
+      session: bindAppShellSession(user.id, user.web_session_pepper),
+      state: token,
+    }),
     appShellFlowCookieOptions()
   );
   return response;

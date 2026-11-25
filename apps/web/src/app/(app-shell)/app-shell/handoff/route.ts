@@ -8,6 +8,7 @@ import {
 import {
   APP_SHELL_SESSION_COOKIE,
   appShellSessionCookieOptions,
+  bindAppShellSession,
   createAppShellSessionToken,
   loadAppShellUser,
 } from '@/lib/app-shell/session';
@@ -29,20 +30,21 @@ export async function GET(request: NextRequest) {
   }
 
   // The mint already refuses a blocked account, but the token lives for two
-  // minutes: re-read the account here so a block recorded in that window cannot
-  // become an hour-long session.
-  const lookup = await loadAppShellUser(handoff.userId);
+  // minutes: re-read the account here so a block or a session revocation
+  // recorded in that window cannot become an hour-long session.
+  const session = bindAppShellSession(handoff.userId, handoff.webSessionPepper);
+  const lookup = await loadAppShellUser(session);
   if (lookup.status === 'restricted') {
     return noStore(appShellRedirect(APP_SHELL_ACCOUNT_UNAVAILABLE_PATH));
   }
-  if (lookup.status === 'gone') {
+  if (lookup.status !== 'active') {
     return noStore(appShellRedirect(APP_SHELL_EXPIRED_PATH));
   }
 
   const response = appShellRedirect(handoff.targetPath);
   response.cookies.set(
     APP_SHELL_SESSION_COOKIE,
-    createAppShellSessionToken(handoff.userId),
+    createAppShellSessionToken(session),
     appShellSessionCookieOptions()
   );
   return noStore(response);

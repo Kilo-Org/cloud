@@ -9,17 +9,10 @@ jest.mock('../../../../../../services/cloud-agent-next/src/sandbox-session/sessi
 }));
 let currentHeaders = new Headers();
 const mockHeaders = jest.fn(() => currentHeaders);
-const mockGetServerSession = jest.fn();
 
 jest.mock('next/headers', () => ({
   headers: () => mockHeaders(),
   cookies: jest.fn(),
-}));
-
-jest.mock('next-auth', () => ({
-  __esModule: true,
-  ...jest.requireActual('next-auth'),
-  getServerSession: (...args: unknown[]) => mockGetServerSession(...args),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -159,7 +152,6 @@ describe('cloud-agent model validation through real web authentication', () => {
     jest.clearAllMocks();
     proofMode = 'valid';
     currentHeaders = new Headers();
-    mockGetServerSession.mockResolvedValue(null);
     getEnhancedOpenRouterModels.mockResolvedValue(publicCatalog);
     getDirectByokModelsForUser.mockResolvedValue([]);
     getUserByokProviderIds.mockResolvedValue([]);

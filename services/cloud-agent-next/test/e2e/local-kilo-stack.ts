@@ -176,8 +176,8 @@ export function signUserToken(
     userId: user.id,
     pepper: user.api_token_pepper,
     secret: nextAuthSecret,
-    // Legacy API credential exchange requires the historical five-year lifetime.
-    expiresInSeconds: 1825 * 86400,
+    // Legacy API credential exchange requires an exact lifetime; 30 days is the one still minted.
+    expiresInSeconds: 30 * 86400,
     env: 'development',
   }).then(value => value.token);
 }

@@ -3,6 +3,7 @@ import { UserAdminDashboard } from '@/app/admin/components/UserAdmin/UserAdminDa
 import type { UserDetailProps } from '@/types/admin';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
+import { toClientUser } from '@/lib/user/client-user';
 import {
   getPaymentStatusByUserIds,
   describePaymentMethods,
@@ -43,6 +44,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     adminIds.length > 0
       ? await db.query.kilocode_users.findMany({
           where: inArray(kilocode_users.id, adminIds),
+          columns: { id: true, google_user_name: true, google_user_email: true },
           limit: 50,
         })
       : [];
@@ -100,7 +102,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
   );
 
   return {
-    ...user,
+    ...toClientUser(user),
     paymentMethodStatus: describePaymentMethods(
       (paymentMethodsByUserId[user.id] as PaymentMethod[]) || [],
       user,

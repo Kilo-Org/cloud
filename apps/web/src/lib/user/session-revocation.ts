@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
+  app_shell_handoff_tokens,
   device_auth_requests,
   device_refresh_tokens,
   device_sessions,
@@ -14,8 +15,9 @@ import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store
 /**
  * Revokes a user's live sessions other than the pepper-bound browser and API
  * credentials: step-up proofs, pending or approved device authorization
- * requests, device sessions with their unconsumed refresh tokens, and native
- * attested keys. Run it inside the caller's transaction.
+ * requests, device sessions with their unconsumed refresh tokens, native
+ * attested keys, and unconsumed app-shell hand-off tokens. Run it inside the
+ * caller's transaction.
  *
  * Returns the ids of the device sessions it revoked, so the caller can drop
  * them from this instance's device-session cache after commit.
@@ -59,6 +61,15 @@ export async function revokeUserSessions(
     );
 
   await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, kiloUserId));
+
+  await tx
+    .delete(app_shell_handoff_tokens)
+    .where(
+      and(
+        eq(app_shell_handoff_tokens.kilo_user_id, kiloUserId),
+        isNull(app_shell_handoff_tokens.consumed_at)
+      )
+    );
 
   return revokedSessions.map(row => row.id);
 }

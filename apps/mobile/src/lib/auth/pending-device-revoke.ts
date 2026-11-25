@@ -2,6 +2,7 @@ import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service
 import * as Sentry from '@sentry/react-native';
 import { z } from 'zod';
 
+import { IOS_BEARER_SECURE_STORE_OPTIONS } from '@/lib/auth/credentials';
 import {
   deleteStoredValueSafe,
   readStoredValueForUpdate,
@@ -136,7 +137,11 @@ function writeStore(revokes: readonly PendingDeviceRevoke[]): Promise<boolean> {
     ? deleteStoredValueSafe(PENDING_DEVICE_REVOKE_KEY)
     : writeStoredValueSafe(
         PENDING_DEVICE_REVOKE_KEY,
-        JSON.stringify({ version: 1, revokes: live })
+        JSON.stringify({ version: 1, revokes: live }),
+        // The recorded value is a live refresh token, so it is protected like
+        // the pair it came from: `THIS_DEVICE_ONLY`, never restored onto
+        // another device from a backup.
+        IOS_BEARER_SECURE_STORE_OPTIONS
       );
 }
 

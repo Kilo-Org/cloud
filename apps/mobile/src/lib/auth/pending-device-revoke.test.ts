@@ -4,6 +4,7 @@ import { z } from 'zod';
 const store = new Map<string, string>();
 
 vi.mock('expo-secure-store', () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
   getItemAsync: vi.fn((key: string) => store.get(key) ?? null),
   setItemAsync: vi.fn((key: string, value: string) => {
     store.set(key, value);
@@ -27,13 +28,14 @@ vi.mock('@sentry/react-native', () => sentryMock);
 
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
+import * as SecureStore from 'expo-secure-store';
 import {
   recordFailedDeviceSessionRevoke,
   recordPendingDeviceSessionRevoke,
   resetPendingDeviceRevokeForTests,
   retryPendingDeviceSessionRevoke,
 } from '@/lib/auth/pending-device-revoke';
-import { PENDING_DEVICE_REVOKE_KEY } from '@/lib/storage-keys';
+import { AUTH_TOKEN_KEY, PENDING_DEVICE_REVOKE_KEY, REFRESH_TOKEN_KEY } from '@/lib/storage-keys';
 /* eslint-enable import/first */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -87,6 +89,13 @@ describe('pending device-session revoke retry', () => {
     expect(storedRevokes()).toEqual([
       { refreshToken: 'old-refresh-token', retryUntilMs: expect.any(Number) },
     ]);
+    // The record holds a live refresh token, so it is written with the same
+    // `THIS_DEVICE_ONLY` keychain class as the pair it came from.
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      PENDING_DEVICE_REVOKE_KEY,
+      expect.any(String),
+      { keychainAccessible: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY' }
+    );
 
     await expect(retryPendingDeviceSessionRevoke()).resolves.toEqual({ kind: 'revoked' });
 
@@ -211,6 +220,24 @@ describe('pending device-session revoke retry', () => {
         tags: expect.objectContaining({ 'error.operation': 'device_revoke_retry_unavailable' }),
       })
     );
+  });
+
+  it('never touches the session a later sign-in published', async () => {
+    // A newer sign-in wrote its own pair while the old revoke was still owed.
+    store.set(AUTH_TOKEN_KEY, 'new-access-token');
+    store.set(REFRESH_TOKEN_KEY, 'new-refresh-token');
+    await recordPendingDeviceSessionRevoke('old-refresh-token');
+
+    await expect(retryPendingDeviceSessionRevoke()).resolves.toEqual({ kind: 'revoked' });
+
+    // The request names the recorded old token only, and carries no bearer, so
+    // the new session's credential cannot be the one revoked.
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.init.body).toBe(JSON.stringify({ refreshToken: 'old-refresh-token' }));
+    expect(requests[0]?.init.headers).toEqual({ 'Content-Type': 'application/json' });
+    // The retry's own delete removed only the record; the new pair is intact.
+    expect(store.get(AUTH_TOKEN_KEY)).toBe('new-access-token');
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('new-refresh-token');
   });
 
   it('never overwrites a payload it cannot decode', async () => {

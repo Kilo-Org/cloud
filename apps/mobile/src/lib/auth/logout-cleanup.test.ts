@@ -6,6 +6,7 @@ const store = new Map<string, string>();
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
 vi.mock('expo-secure-store', () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
   getItemAsync: vi.fn((key: string) => store.get(key) ?? null),
   setItemAsync: vi.fn((key: string, value: string) => {
     store.set(key, value);

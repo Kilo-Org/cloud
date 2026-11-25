@@ -182,7 +182,7 @@ them. A message that exhausts them lands in the DLQ, whose consumer keeps it in 
 
 ### Internal Durable Objects
 
-`StreamDO`, `RegistryDO`, `SignerDO` and `VerifierDO` are internal, and so is the Worker itself: no other Worker may bind `audit-relay`, `audit-relay-staging` or `audit-relay-local`, either as a service binding or through `durable_objects.bindings[].script_name`. Their methods (`SignerDO.sign`, stream appends) skip the queue path that checks batch contiguity and archives every batch, so a direct binding could sign or append without a record. `services/sts/test/repo/worker-configs.test.ts` scans every Wrangler config in the repository and fails on either kind of binding; it also requires this Worker to deploy exactly those three names, and it refuses any queue producer on the audit queues except this Worker and STS.
+`StreamDO`, `RegistryDO`, `SignerDO` and `VerifierDO` are internal, and so is the Worker itself: no other Worker may bind `audit-relay`, `audit-relay-staging` or `audit-relay-local` as a service, a Durable Object `script_name`, a workflow, a tail consumer, a dispatch outbound or a migration/export transfer source. No other Worker may consume or dead-letter into the `kilo-audit*` queues, or bind a `kilo-audit-archive*` bucket. Their methods (`SignerDO.sign`, stream appends) skip the queue path that checks batch contiguity and archives every batch. A foreign archive writer could pre-write a key that the 400-day lock then keeps. `services/sts/test/repo/worker-configs.test.ts` scans every Wrangler config in the repository and fails on any of these. It requires `"jurisdiction": "eu"` on the production and staging archive bindings, and requires this Worker to deploy exactly those three names.
 
 ## Production prerequisites
 

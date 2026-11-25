@@ -78,6 +78,13 @@ export async function GET(request: Request) {
       `Cleaned up ${passkeyRowsDeleted.managementAuthorizations} expired passkey management authorizations`
     );
 
+    sentryLogger(
+      'cron',
+      'info'
+    )(
+      `Cleaned up ${passkeyRowsDeleted.enrollmentEmailCodes} expired passkey enrollment email codes`
+    );
+
     const accessCodesDeleted = await cleanupExpiredAccessCodes();
     sentryLogger('cron', 'info')(`Cleaned up ${accessCodesDeleted} expired access codes`);
 
@@ -107,6 +114,7 @@ export async function GET(request: Request) {
         deleted_passkey_challenge_count: passkeyRowsDeleted.challenges,
         deleted_passkey_sign_in_ticket_count: passkeyRowsDeleted.tickets,
         deleted_passkey_management_authorization_count: passkeyRowsDeleted.managementAuthorizations,
+        deleted_passkey_enrollment_email_code_count: passkeyRowsDeleted.enrollmentEmailCodes,
         deleted_access_code_count: accessCodesDeleted,
         deleted_install_state_count: installStatesDeleted,
         deleted_app_shell_handoff_token_count: handoffTokensDeleted,
@@ -124,6 +132,7 @@ export async function GET(request: Request) {
       passkeyChallengesDeleted: passkeyRowsDeleted.challenges,
       passkeySignInTicketsDeleted: passkeyRowsDeleted.tickets,
       passkeyManagementAuthorizationsDeleted: passkeyRowsDeleted.managementAuthorizations,
+      passkeyEnrollmentEmailCodesDeleted: passkeyRowsDeleted.enrollmentEmailCodes,
       accessCodesDeleted,
       installStatesDeleted,
       handoffTokensDeleted,

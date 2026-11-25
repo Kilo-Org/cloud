@@ -14,7 +14,7 @@ import {
   deployConfigEntries,
   internalWorkerProblems,
   parseWorkerConfig,
-  trackedDeployRedirects,
+  trackedPaths,
   workerConfigPaths,
   workerConfigProblems,
 } from './worker-configs';
@@ -105,12 +105,11 @@ describe('repository Worker configs', () => {
     expect(paths.filter(path => /^(services\/([^/]+\/)?)?wrangler\.json$/.test(path))).toEqual([]);
     // The find lists a directory named wrangler.jsonc as a Worker to deploy.
     expect(entries.filter(entry => entry.directory).map(entry => entry.path)).toEqual([]);
-    // wrangler deploy follows a .wrangler/deploy/config.json there to the config it names.
+    // wrangler deploy follows a .wrangler/deploy/config.json there to the config it names, through
+    // a symlinked .wrangler or deploy directory too, so nothing under .wrangler there is tracked.
     // A local build writes an ignored, untracked redirect, so this one reads tracked files only.
     expect(
-      trackedDeployRedirects(repoRoot).filter(path =>
-        /^(services\/([^/]+\/)?)?\.wrangler\/deploy\/config\.json$/.test(path)
-      )
+      trackedPaths(repoRoot).filter(path => /^(services\/([^/]+\/)?)?\.wrangler(\/|$)/.test(path))
     ).toEqual([]);
 
     // Only a service's own top-level config is a Worker to deploy; any other wrangler.jsonc under

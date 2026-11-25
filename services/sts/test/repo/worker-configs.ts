@@ -480,16 +480,13 @@ export function deployConfigEntries(root: string): DeployConfigEntry[] {
   return entries.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-/**
- * Every tracked `.wrangler/deploy/config.json`. `wrangler deploy` follows that redirect file to the
- * config it names instead of the `wrangler.jsonc` beside it.
- */
-export function trackedDeployRedirects(root: string): string[] {
-  const listed = execFileSync(
-    'git',
-    ['ls-files', '-z', '--cached', '--', ':(glob)**/.wrangler/deploy/config.json'],
-    { cwd: root, encoding: 'utf8' }
-  );
+/** Every path the index tracks: a symlink is one entry, whatever it points at. */
+export function trackedPaths(root: string): string[] {
+  const listed = execFileSync('git', ['ls-files', '-z', '--cached'], {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
   return [...new Set(listed.split('\0').filter(Boolean))].sort();
 }
 

@@ -67,6 +67,14 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 - **Starting the loop.** Each bundle object asks the refresher, in the background and at most once
   a minute, to confirm its alarm; the read never waits on it.
 
+### Internal Durable Objects
+
+`BundleDO`, `RefresherDO` and `SignerDO` are internal. Their methods skip the policy check and the
+audit row that `SecretsBroker` performs, so no other Worker may bind them: a
+`durable_objects.bindings[].script_name` of `sts`, `sts-staging` or `sts-local` in any config
+fails `test/repo/worker-configs.test.ts`, as does an STS service binding at any entrypoint other
+than `SecretsBroker`.
+
 ## Configuration
 
 No secret is stored in this Worker's configuration. Everything is a plain var, validated with zod
@@ -118,7 +126,29 @@ why the exchange is a prerequisite.
 
 Adding a file also means adding it to `src/policy/registry.ts`; the typed import map in
 `src/policy/index.ts` makes the two disagree at typecheck, and `test/repo/policy-files.test.ts`
-checks the directory itself and the Worker configs that bind STS.
+checks the directory itself.
+
+`test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
+`wrangler*.toml` in the repository (test fixtures excepted) with Wrangler's own parser, every env
+block included, and fails when:
+
+- a Durable Object binding names `script_name` `sts`, `sts-*`, `audit-relay` or `audit-relay-*`;
+- a service binding to `sts`/`sts-*` uses an entrypoint other than `SecretsBroker`, or any service
+  binding targets `audit-relay`/`audit-relay-*`;
+- the top-level (production) block binds anything but `sts`, or an `<env>` block anything but
+  `sts-<env>`;
+- `props.caller` is not the config's top-level `name`, in any block;
+- a config that binds STS has an env block whose `name` is neither absent nor `<name>-<env>`, or two
+  configs share a top-level `name`;
+- the caller has no `worker-binding` policy listing the environment the binding reaches;
+- anything but the STS deployment of that environment (`sts` → `kilo-audit`, `sts-staging` →
+  `kilo-audit-staging`, `sts-local` and the test config `sts-test` → `kilo-audit-local`) produces to
+  a `kilo-audit*` queue, or anything but the matching `audit-relay*` deployment consumes one or
+  dead-letters into one;
+- a config other than the STS, STS test or relay config deploys under one of their names.
+
+CI runs it whenever any Worker config changes (`scripts/affected-workspaces.mjs` routes every
+`wrangler*` file to this workspace).
 
 The first refresher check after a deploy compares the policy hash with the stored one and writes one
 `ai.kilo.sts.policy.changed` event naming the workloads and secret names that were added or removed.

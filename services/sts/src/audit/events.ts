@@ -51,6 +51,41 @@ export function bundleDeliveredEvent(input: {
   });
 }
 
+/**
+ * The manager returned a value in secret-reference syntax. STS kept the last good copy of that
+ * one secret (or none) and records the name and version only (design 4.2).
+ */
+export function managerReferenceRefusedEvent(input: {
+  environment: StsEnvironment;
+  path: string;
+  name: string;
+  version: number;
+  keptLastGood: boolean;
+}): AuditEvent {
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.manager.reference_refused',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.read,
+      outcome: 'failure',
+      outcomeDetail: 'secret value uses reference syntax',
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        path: input.path.slice(0, 512),
+        secret: input.name.slice(0, 512),
+        version: input.version,
+        keptLastGood: input.keptLastGood,
+      },
+    },
+  });
+}
+
 function secretKeys(snapshot: PolicySnapshotEntry[]): string[] {
   return snapshot.flatMap(entry => entry.secrets.map(name => `${entry.workload}:${name}`));
 }

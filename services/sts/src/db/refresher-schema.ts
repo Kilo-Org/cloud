@@ -1,37 +1,54 @@
-import type { PolicySnapshotEntry } from '../policy/load';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { createAuditTables } from './audit-tables';
+import type { ManagerFolder } from '../infisical/client';
+import type { PolicySnapshotEntry } from '../policy/load';
 
-/** One row, id 1: the last manager read, sealed with the key in `refresher_key`. */
-export const managerSnapshot = sqliteTable('manager_snapshot', {
-  id: integer('id').primaryKey(),
+export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
+
+/**
+ * The last successful read of each manager folder, sealed with `refresher_key`. Both rows are
+ * written in one refresh, so they always come from the same read pair.
+ */
+export const managerFolder = sqliteTable('manager_folder', {
+  folder: text('folder').$type<ManagerFolder>().primaryKey(),
   etag: text('etag'),
-  fetchedAt: text('fetched_at').notNull(),
+  fetchedAt: integer('fetched_at').notNull(),
   iv: text('iv').notNull(),
   ciphertext: text('ciphertext').notNull(),
 });
 
-/** One row, id 1: the AES-GCM key that seals this object's manager snapshot. */
+/** One row, id 1: the AES-GCM key that seals the folder copies. */
 export const refresherKey = sqliteTable('refresher_key', {
   id: integer('id').primaryKey(),
   key: text('key').notNull(),
   createdAt: integer('created_at').notNull(),
 });
 
-/** One row, id 1: the policy the last audit event was written for. */
+/**
+ * One row, id 1: the secret Infisical signs this environment's `secrets.modified` webhook with.
+ * STS generates it; the break-glass owner copies it into the webhook once (README).
+ */
+export const webhookKey = sqliteTable('webhook_key', {
+  id: integer('id').primaryKey(),
+  key: text('key').notNull(),
+  createdAt: integer('created_at').notNull(),
+});
+
+/** One row, id 1: the policy the last policy-change audit event was written for. */
 export const policyState = sqliteTable('policy_state', {
   id: integer('id').primaryKey(),
   hash: text('hash').notNull(),
   snapshot: text('snapshot', { mode: 'json' }).$type<PolicySnapshotEntry[]>().notNull(),
 });
 
-/** One row, id 1: when the refresher is next due. */
+/**
+ * One row, id 1: the refresh schedule. `failures` counts consecutive failed manager reads; while
+ * it is above zero `next_refresh_at` is a backoff deadline. `webhook_refresh_at` is the end of an
+ * open webhook merge window, or null when none is open.
+ */
 export const refresherState = sqliteTable('refresher_state', {
   id: integer('id').primaryKey(),
   nextRefreshAt: integer('next_refresh_at').notNull(),
+  failures: integer('failures').notNull(),
+  webhookRefreshAt: integer('webhook_refresh_at'),
+  lastRefreshAt: integer('last_refresh_at'),
 });
-
-const auditTables = createAuditTables();
-
-export const auditEvent = auditTables.auditEvent;
-export const auditWatermark = auditTables.auditWatermark;

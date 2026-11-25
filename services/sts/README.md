@@ -86,7 +86,12 @@ block included, and fails when:
 - `props.caller` is not the config's top-level `name`, in any block;
 - a config that binds STS has an env block whose `name` is neither absent nor `<name>-<env>`, or two
   configs share a top-level `name`;
-- the caller has no `worker-binding` policy listing the environment the binding reaches.
+- the caller has no `worker-binding` policy listing the environment the binding reaches;
+- anything but the STS deployment of that environment (`sts` → `kilo-audit`, `sts-staging` →
+  `kilo-audit-staging`, `sts-local` and the test config `sts-test` → `kilo-audit-local`) produces to
+  a `kilo-audit*` queue, or anything but the matching `audit-relay*` deployment consumes one or
+  dead-letters into one;
+- a config other than the STS, STS test or relay config deploys under one of their names.
 
 CI runs it whenever any Worker config changes (`scripts/affected-workspaces.mjs` routes every
 `wrangler*` file to this workspace).

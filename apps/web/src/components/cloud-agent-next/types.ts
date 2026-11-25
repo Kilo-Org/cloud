@@ -65,37 +65,25 @@ export type {
   SessionStatus,
 };
 
-/**
- * StoredMessage - The message format stored in IndexedDB.
- * Contains message metadata (info) and an array of content parts.
- */
 export type StoredMessage = {
   info: OpenCodeMessage;
   parts: Part[];
 };
 
-/**
- * SubtaskPart - A part representing a child session/task.
- * Extracted from the Part union for convenience.
- */
 export type SubtaskPart = Extract<Part, { type: 'subtask' }>;
 
-/** Check if a part is a TextPart */
 export function isTextPart(part: Part): part is TextPart {
   return part.type === 'text';
 }
 
-/** Check if a part is a ToolPart */
 export function isToolPart(part: Part): part is ToolPart {
   return part.type === 'tool';
 }
 
-/** Check if a part is a FilePart */
 export function isFilePart(part: Part): part is FilePart {
   return part.type === 'file';
 }
 
-/** Check if a part is a ReasoningPart */
 export function isReasoningPart(part: Part): part is ReasoningPart {
   return part.type === 'reasoning';
 }
@@ -111,42 +99,34 @@ function hasVisibleReasoningText(text: string | undefined): boolean {
   );
 }
 
-/** Whether the reasoning expander has content worth showing. */
 export function shouldRenderReasoningPart(part: Part): boolean {
   return isReasoningPart(part) && hasVisibleReasoningText(part.text);
 }
 
-/** Check if a part is a StepStartPart */
 export function isStepStartPart(part: Part): part is StepStartPart {
   return part.type === 'step-start';
 }
 
-/** Check if a part is a StepFinishPart */
 export function isStepFinishPart(part: Part): part is StepFinishPart {
   return part.type === 'step-finish';
 }
 
-/** Check if a part is a SubtaskPart */
 export function isSubtaskPart(part: Part): part is SubtaskPart {
   return part.type === 'subtask';
 }
 
-/** Check if a part is a CompactionPart */
 export function isCompactionPart(part: Part): part is CompactionPart {
   return part.type === 'compaction';
 }
 
-/** Check if a part is a PatchPart */
 export function isPatchPart(part: Part): part is PatchPart {
   return part.type === 'patch';
 }
 
-/** Check if a message is a UserMessage */
 export function isUserMessage(message: OpenCodeMessage): message is OpenCodeUserMessage {
   return message.role === 'user';
 }
 
-/** Check if a message is an AssistantMessage */
 export function isAssistantMessage(message: OpenCodeMessage): message is OpenCodeAssistantMessage {
   return message.role === 'assistant';
 }
@@ -165,9 +145,6 @@ export function isPartStreaming(part: Part): boolean {
   return false;
 }
 
-/**
- * Check if any parts in a message are still streaming.
- */
 export function isMessageStreaming(message: StoredMessage): boolean {
   if (isAssistantMessage(message.info) && message.info.error) return false;
   if (isAssistantMessage(message.info) && !message.info.time.completed) return true;
@@ -189,10 +166,6 @@ export type AgentMode =
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   | (string & {});
 
-/**
- * WebSocket event envelope from cloud-agent.
- * These are the raw events received from the WebSocket stream.
- */
 export type StreamEventEnvelope = {
   eventId: number;
   executionId: string;
@@ -202,10 +175,6 @@ export type StreamEventEnvelope = {
   data: unknown;
 };
 
-/**
- * Stream event types we handle directly.
- * These map to OpenCode event types.
- */
 export type StreamEventType =
   | 'message.updated'
   | 'message.part.updated'
@@ -216,10 +185,6 @@ export type StreamEventType =
   | 'session.error'
   | 'session.idle';
 
-/**
- * Configuration collected when resuming a CLI session in cloud-agent.
- * Used by ResumeConfigModal and session configuration logic.
- */
 export type ResumeConfig = {
   mode: AgentMode;
   model: string;
@@ -227,10 +192,6 @@ export type ResumeConfig = {
   setupCommands?: string[];
 };
 
-/**
- * Tool execution
- * Represents a tool/command that was executed during the session
- */
 export type ToolExecution = {
   toolName: string; // Tool identifier (bash, read, edit, etc.)
   input: Record<string, unknown>; // Tool input parameters
@@ -239,21 +200,13 @@ export type ToolExecution = {
   timestamp: string; // ISO timestamp
 };
 
-/**
- * Session configuration
- * Stores the current session's configuration
- */
 export type SessionConfig = {
   sessionId: string; // Session identifier (agent_xxx)
   repository: string; // GitHub repo (owner/repo format)
-  mode: string; // Agent mode (code, plan, debug, orchestrator, ask, etc.)
-  model: string; // LLM model identifier
+  mode: string;
+  model: string;
 };
 
-/**
- * Session start configuration
- * Configuration needed to start a new session
- */
 export type SessionStartConfig = {
   githubRepo: string;
   prompt: string;
@@ -370,9 +323,6 @@ export type StoredSession = {
   localSync?: 'syncing' | 'synced' | 'failed';
 };
 
-/**
- * Zod schema for ToolExecution
- */
 export const ToolExecutionSchema = z.object({
   toolName: z.string(),
   input: z.record(z.string(), z.unknown()),
@@ -381,10 +331,6 @@ export const ToolExecutionSchema = z.object({
   timestamp: z.string(),
 });
 
-/**
- * Discriminated union of stream events we handle.
- * These are the typed event payloads after parsing from StreamEventEnvelope.
- */
 export type ParsedStreamEvent =
   | { type: 'message.updated'; data: EventMessageUpdated['properties'] }
   | { type: 'message.part.updated'; data: EventMessagePartUpdated['properties'] }

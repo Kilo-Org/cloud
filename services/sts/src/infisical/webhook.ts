@@ -92,9 +92,10 @@ export async function verifyWebhook(input: {
  * Only plain data crosses requests (the imported key and load times), never a promise: workerd
  * ties a promise to the request that created it, so a request awaiting another request's pending
  * load stalls when that request ends first. A request that finds no key loads the secret itself,
- * so concurrent first requests each make one load. A signature that fails is checked again against
- * a freshly loaded secret, and a failed first load is retried, at most once per
- * `WEBHOOK_KEY_RELOAD_MS`. A failed reload keeps the key already loaded.
+ * so concurrent first requests in a cold isolate each make one load. A signature that fails is
+ * checked again against a freshly loaded secret, and a failed first load is retried by one request,
+ * each at most once per `WEBHOOK_KEY_RELOAD_MS`; requests meanwhile answer 503. A failed reload
+ * keeps the key already loaded.
  */
 export class WebhookGate {
   /** The newest loaded key, by the time its load started. */
@@ -130,7 +131,12 @@ export class WebhookGate {
   }
 
   private async firstKey(now: number): Promise<CryptoKey> {
-    if (this.failedAt !== null && now - this.failedAt < WEBHOOK_KEY_RELOAD_MS) {
+    // Measured from the latest load start, which `load` sets before it awaits: once a retry has
+    // started, requests arriving alongside it answer 503 instead of each making their own load.
+    if (
+      this.failedAt !== null &&
+      now - (this.lastLoadAt ?? this.failedAt) < WEBHOOK_KEY_RELOAD_MS
+    ) {
       throw new Error('webhook secret load failed less than a reload interval ago');
     }
     return await this.load(now);

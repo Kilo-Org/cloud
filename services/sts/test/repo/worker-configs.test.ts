@@ -85,6 +85,24 @@ describe('repository Worker configs', () => {
     expect(paths.filter(path => path.includes('node_modules/'))).toEqual([]);
   });
 
+  it('keep every test Worker config under test/fixtures, out of the production deploy', () => {
+    // deploy-workers.yml deploys every directory holding a wrangler.jsonc that this find lists.
+    const workflow = readFileSync(join(repoRoot, '.github/workflows/deploy-workers.yml'), 'utf8');
+    const discovery = workflow
+      .split('\n')
+      .filter(line => line.includes('find services -name "wrangler.jsonc"'));
+    expect(discovery).toHaveLength(1);
+    expect(discovery[0]).toContain('-not -path "*/test/fixtures/*"');
+
+    const exposed = workerConfigPaths(repoRoot).filter(
+      path =>
+        /^services\/[^/]+\/test\//.test(path) &&
+        path.endsWith('/wrangler.jsonc') &&
+        !/^services\/[^/]+\/test\/fixtures\//.test(path)
+    );
+    expect(exposed).toEqual([]);
+  });
+
   it('reach STS only through SecretsBroker as their own Worker, and never reach the relay', () => {
     expect(workerConfigProblems(repoConfigs(), shippedPolicies())).toEqual([]);
   });

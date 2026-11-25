@@ -31,14 +31,21 @@ export async function createProvider(issuer: string, audience: string): Promise<
 export async function signToken(
   provider: TestProvider,
   claims: JWTPayload,
-  options?: { audience?: string; issuer?: string }
+  options?: {
+    audience?: string | string[];
+    issuer?: string;
+    /** Seconds since the epoch; default now. */
+    issuedAt?: number;
+    /** Seconds since the epoch; default 10 minutes from now. */
+    expiresAt?: number;
+  }
 ): Promise<string> {
   return await new SignJWT(claims)
     .setProtectedHeader({ alg: 'RS256', kid: `${provider.issuer}-key` })
     .setIssuer(options?.issuer ?? provider.issuer)
     .setAudience(options?.audience ?? provider.audience)
-    .setIssuedAt()
-    .setExpirationTime('10m')
+    .setIssuedAt(options?.issuedAt)
+    .setExpirationTime(options?.expiresAt ?? '10m')
     .sign(provider.privateKey);
 }
 

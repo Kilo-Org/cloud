@@ -32,7 +32,14 @@ export type VerifiedSubject = {
 };
 
 export type VerifyOutcome =
-  | { status: 'verified'; workload: WorkloadName; provider: IdentityProvider }
+  | {
+      status: 'verified';
+      workload: WorkloadName;
+      provider: IdentityProvider;
+      /** The provider token's own `exp` and `iat`, in seconds; a minted token never outlives it. */
+      attestationExp: number;
+      attestationIat: number;
+    }
   | { status: 'denied'; reason: DeniedReason; subject?: VerifiedSubject }
   /** A provider's discovery document or key set could not be fetched; the caller retries. */
   | { status: 'unavailable' };
@@ -218,6 +225,21 @@ export class IdentityVerifier {
     }
 
     const provider: IdentityProvider = issuer === GITHUB_ISSUER ? 'github' : 'fly';
+    const { exp, iat } = payload;
+    // jose checks `exp` and `nbf` but not a future `iat`; both times must be present.
+    if (exp === undefined || iat === undefined) {
+      return { status: 'denied', reason: 'identity_rejected' };
+    }
+    if (iat > Math.floor(Date.now() / 1000) + CLOCK_TOLERANCE_SECONDS) {
+      return { status: 'denied', reason: 'identity_rejected' };
+    }
+    const verified = (workload: WorkloadName): VerifyOutcome => ({
+      status: 'verified',
+      workload,
+      provider,
+      attestationExp: exp,
+      attestationIat: iat,
+    });
     const rejected = (workload: string | null, reason: DeniedReason): VerifyOutcome => ({
       status: 'denied',
       reason,
@@ -236,7 +258,7 @@ export class IdentityVerifier {
             mismatchedWorkload = policy.workload;
             continue;
           }
-          return { status: 'verified', workload: policy.workload, provider: 'fly' };
+          return verified(policy.workload);
         }
         case 'github-oidc': {
           if (claim(payload, 'repository_id') !== identity.repositoryId) continue;
@@ -258,7 +280,7 @@ export class IdentityVerifier {
             mismatchedWorkload = policy.workload;
             continue;
           }
-          return { status: 'verified', workload: policy.workload, provider: 'github' };
+          return verified(policy.workload);
         }
         case 'worker-binding':
           continue;

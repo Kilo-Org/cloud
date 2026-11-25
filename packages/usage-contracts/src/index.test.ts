@@ -67,6 +67,7 @@ function validMetadata() {
     is_free: null,
     abuse_delay: null,
     abuse_downgraded_from: null,
+    system_prompt_kind: null,
   };
 }
 

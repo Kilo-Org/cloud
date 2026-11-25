@@ -109,6 +109,7 @@ export async function buildClassifierUsage(
       is_free: false,
       abuse_delay: null,
       abuse_downgraded_from: null,
+      system_prompt_kind: null,
     },
     prior_microdollar_usage: 0,
     posthog_distinct_id: null,

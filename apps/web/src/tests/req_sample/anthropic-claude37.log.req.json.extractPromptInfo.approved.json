@@ -1,3 +1,4 @@
 {
-  "system_prompt_length": 190
+  "system_prompt_length": 190,
+  "system_prompt_kind": "kilo"
 }

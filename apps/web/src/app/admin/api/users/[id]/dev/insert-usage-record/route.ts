@@ -117,6 +117,7 @@ export const POST = auditedAdminRoute(
       is_free: false,
       abuse_delay: null,
       abuse_downgraded_from: null,
+      system_prompt_kind: null,
     };
 
     await insertUsageRecord(coreUsageFields, metadataFields);

@@ -1071,7 +1071,10 @@ function untrustedProjectId(header: string | null): string | null {
 }
 
 export function extractFimPromptInfo(body: { prompt: string; suffix?: string | null }): PromptInfo {
-  return { system_prompt_length: (body.suffix || '').length + body.prompt.length };
+  return {
+    system_prompt_length: (body.suffix || '').length + body.prompt.length,
+    system_prompt_kind: null,
+  };
 }
 
 /** An input item with a role, as both the chat and the responses APIs use. */
@@ -1615,7 +1618,7 @@ function priceTranscriptionUsage(
 }
 
 export function extractEmbeddingPromptInfo(): PromptInfo {
-  return { system_prompt_length: 0 };
+  return { system_prompt_length: 0, system_prompt_kind: null };
 }
 
 /**

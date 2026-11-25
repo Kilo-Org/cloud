@@ -76,7 +76,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       requested_model: 'manual-consumption',
       is_free: false,
       custom_llm_pricing: null,
-      promptInfo: { system_prompt_length: 0 },
+      promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
       max_tokens: null,
       has_middle_out_transform: null,
       isStreaming: false,

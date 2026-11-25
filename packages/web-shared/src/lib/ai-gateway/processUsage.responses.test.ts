@@ -37,7 +37,7 @@ describe('extractResponsesPromptInfo', () => {
           { role: 'user', content: 'Fix the bug.' },
         ],
       })
-    ).toEqual({ system_prompt_length: 54 });
+    ).toEqual({ system_prompt_length: 54, system_prompt_kind: 'kilo' });
   });
 
   test('combines top-level instructions with input message instructions', () => {
@@ -50,7 +50,7 @@ describe('extractResponsesPromptInfo', () => {
           { role: 'user', content: 'Summarize this.' },
         ],
       })
-    ).toEqual({ system_prompt_length: 40 });
+    ).toEqual({ system_prompt_length: 40, system_prompt_kind: null });
   });
 
   test('ignores malformed input while preserving valid text', () => {
@@ -72,14 +72,17 @@ describe('extractResponsesPromptInfo', () => {
       ],
     } as GatewayResponsesRequest;
 
-    expect(extractResponsesPromptInfo(body)).toEqual({ system_prompt_length: 20 });
+    expect(extractResponsesPromptInfo(body)).toEqual({
+      system_prompt_length: 20,
+      system_prompt_kind: null,
+    });
 
     expect(
       extractResponsesPromptInfo({
         model: 'openai/gpt-5.4',
         input: { invalid: true },
       } as unknown as GatewayResponsesRequest)
-    ).toEqual({ system_prompt_length: 0 });
+    ).toEqual({ system_prompt_length: 0, system_prompt_kind: null });
   });
 });
 

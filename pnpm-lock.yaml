@@ -3782,6 +3782,9 @@ importers:
 
   services/uts:
     dependencies:
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/uts-contracts':
         specifier: workspace:*
         version: link:../../packages/uts-contracts

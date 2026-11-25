@@ -9,9 +9,13 @@
     "test:workers": "vitest run",
     "test:node": "vitest run --config vitest.node.config.ts",
     "typecheck": "tsgo --noEmit",
+    "db:up": "bash scripts/local-db.sh up",
+    "db:down": "bash scripts/local-db.sh down",
+    "db:migrate": "tsx scripts/migrate.ts",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/uts/src services/uts/test services/uts/scripts"
   },
   "dependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/uts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "jose": "catalog:",

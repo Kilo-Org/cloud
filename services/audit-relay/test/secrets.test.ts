@@ -1,15 +1,18 @@
-import type { BundleResult } from '@kilocode/sts-contracts';
-import { describe, expect, it, vi } from 'vitest';
-import { SecretSourceError, createSecretSource, createStsSecretSource } from '../src/secrets';
+import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
+import { SecretUnavailableError, type BundleBinding } from '@kilocode/secrets-client';
+import { describe, expect, it, vi, type Mock } from 'vitest';
+import { secretsFor } from '../src/secrets';
+import type { SecretsEnv } from '../src/secrets';
 
 const FETCHED_AT = '2026-11-25T10:00:00.000Z';
+const ETAG = '"0123456789abcdef"';
 
 function okBundle(secrets: Record<string, { value: string; version: number }>): BundleResult {
   return {
     status: 'ok',
     workload: 'audit-relay',
     environment: 'production',
-    etag: '"0123456789abcdef"',
+    etag: ETAG,
     stale: false,
     fetchedAt: FETCHED_AT,
     secrets,
@@ -17,91 +20,128 @@ function okBundle(secrets: Record<string, { value: string; version: number }>): 
   };
 }
 
-function binding(result: BundleResult) {
-  return { getBundle: vi.fn().mockResolvedValue(result) };
+/** A stand-in for the STS service binding that records each request. */
+type FakeBinding = { getBundle: Mock<BundleBinding['getBundle']> };
+
+function binding(result: BundleResult | ((request: BundleRequest) => BundleResult)): FakeBinding {
+  const getBundle = vi.fn(async (request: BundleRequest) =>
+    typeof result === 'function' ? result(request) : result
+  );
+  return { getBundle };
 }
 
-describe('createStsSecretSource', () => {
-  it('returns a secret from an ok bundle and asks STS once for several gets', async () => {
-    const sts = binding(
-      okBundle({
-        AUDIT_RELAY_AXIOM_TOKEN: { value: 'axiom-token', version: 3 },
-        AUDIT_RELAY_SLACK_WEBHOOK_PAGE: { value: 'https://hooks.slack.test/x', version: 1 },
-      })
-    );
-    const source = createStsSecretSource(sts);
+function envWith(sts: FakeBinding, overrides: Partial<SecretsEnv> = {}): SecretsEnv {
+  return { AUDIT_ENVIRONMENT: 'production', STS: sts, ...overrides };
+}
 
-    await expect(source.get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('axiom-token');
-    await expect(source.get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE')).resolves.toBe(
-      'https://hooks.slack.test/x'
-    );
-    expect(sts.getBundle).toHaveBeenCalledTimes(1);
-    expect(sts.getBundle).toHaveBeenCalledWith({});
-  });
+async function failureFrom(read: Promise<string>): Promise<SecretUnavailableError> {
+  const error = await read.then(
+    () => null,
+    (caught: unknown) => caught
+  );
+  expect(error).toBeInstanceOf(SecretUnavailableError);
+  return error as SecretUnavailableError;
+}
 
-  it('reports a name the bundle does not hold as a non-retryable failure', async () => {
-    const source = createStsSecretSource(binding(okBundle({})));
-
-    const error = await source.get('AUDIT_RELAY_AXIOM_TOKEN').catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(SecretSourceError);
-    expect(error).toMatchObject({ kind: 'missing', retryable: false });
-  });
-
+describe('secretsFor', () => {
   it('reports a denied bundle as non-retryable', async () => {
-    const source = createStsSecretSource(binding({ status: 'denied', reason: 'unknown_workload' }));
+    const sts = binding({ status: 'denied', reason: 'unknown_workload' });
 
-    const error = await source.get('AUDIT_RELAY_AXIOM_TOKEN').catch((caught: unknown) => caught);
-    expect(error).toMatchObject({ kind: 'denied', retryable: false });
+    const error = await failureFrom(secretsFor(envWith(sts)).get('AUDIT_RELAY_AXIOM_TOKEN'));
+
+    expect(error).toMatchObject({ reason: 'denied', retryable: false });
   });
 
   it('reports an unavailable bundle as retryable', async () => {
-    const source = createStsSecretSource(
-      binding({
-        status: 'unavailable',
-        reason: 'manager_unreachable_no_copy',
-        retryAfterSeconds: 5,
-      })
-    );
+    const sts = binding({
+      status: 'unavailable',
+      reason: 'manager_unreachable_no_copy',
+      retryAfterSeconds: 5,
+    });
 
-    const error = await source.get('AUDIT_RELAY_AXIOM_TOKEN').catch((caught: unknown) => caught);
-    expect(error).toMatchObject({ kind: 'unavailable', retryable: true });
+    const error = await failureFrom(secretsFor(envWith(sts)).get('AUDIT_RELAY_AXIOM_TOKEN'));
+
+    expect(error).toMatchObject({ reason: 'unavailable', retryable: true });
   });
 
-  it('reports not_modified as retryable because the request is unconditional', async () => {
-    const source = createStsSecretSource(
-      binding({
-        status: 'not_modified',
-        etag: '"0123456789abcdef"',
-        stale: false,
-        fetchedAt: FETCHED_AT,
-      })
-    );
+  it('reports a name the bundle lists as missing as non-retryable', async () => {
+    const sts = binding(okBundle({}));
 
-    const error = await source.get('AUDIT_RELAY_AXIOM_TOKEN').catch((caught: unknown) => caught);
-    expect(error).toMatchObject({ kind: 'not_modified', retryable: true });
+    const error = await failureFrom(secretsFor(envWith(sts)).get('AUDIT_RELAY_AXIOM_TOKEN'));
+
+    expect(error).toMatchObject({ reason: 'not_granted', retryable: false });
+  });
+
+  it('reports a granted name the manager does not hold as non-retryable', async () => {
+    const bundle = okBundle({}) as Extract<BundleResult, { status: 'ok' }>;
+    const sts = binding({ ...bundle, missing: ['AUDIT_RELAY_AXIOM_TOKEN'] });
+
+    const error = await failureFrom(secretsFor(envWith(sts)).get('AUDIT_RELAY_AXIOM_TOKEN'));
+
+    expect(error).toMatchObject({ reason: 'missing', retryable: false });
+  });
+
+  it('reuses the isolate bundle, then revalidates with If-None-Match', async () => {
+    let now = Date.parse(FETCHED_AT);
+    const clock = () => now;
+    const sts = binding(request => {
+      if (request.ifNoneMatch === undefined) {
+        return okBundle({ AUDIT_RELAY_AXIOM_TOKEN: { value: 'axiom-token', version: 3 } });
+      }
+      expect(request.ifNoneMatch).toBe(ETAG);
+      return { status: 'not_modified', etag: ETAG, stale: false, fetchedAt: FETCHED_AT };
+    });
+    const env = envWith(sts);
+
+    await expect(secretsFor(env, { clock }).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe(
+      'axiom-token'
+    );
+    expect(sts.getBundle).toHaveBeenNthCalledWith(1, {});
+
+    now += 60_000;
+    await expect(secretsFor(env, { clock }).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe(
+      'axiom-token'
+    );
+    expect(sts.getBundle).toHaveBeenCalledTimes(1);
+
+    now += 181_000;
+    await expect(secretsFor(env, { clock }).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe(
+      'axiom-token'
+    );
+    expect(sts.getBundle).toHaveBeenCalledTimes(2);
+    expect(sts.getBundle).toHaveBeenNthCalledWith(2, { ifNoneMatch: ETAG });
   });
 });
 
-describe('createSecretSource', () => {
-  it('reads the local secrets in a local environment', async () => {
-    const source = createSecretSource({
+describe('local secrets', () => {
+  it('reads the local values in a local environment', async () => {
+    const env = envWith(binding(okBundle({})), {
       AUDIT_ENVIRONMENT: 'local',
       AUDIT_RELAY_LOCAL_SECRETS: '{"AUDIT_RELAY_AXIOM_TOKEN":"local-token"}',
-      STS: binding(okBundle({})),
     });
 
-    await expect(source.get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('local-token');
+    await expect(secretsFor(env).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('local-token');
   });
 
-  it('never reads the local secrets outside a local environment', async () => {
-    const sts = binding(okBundle({ AUDIT_RELAY_AXIOM_TOKEN: { value: 'sts-token', version: 1 } }));
-    const source = createSecretSource({
-      AUDIT_ENVIRONMENT: 'production',
+  it('reports a local name it does not hold as non-retryable', async () => {
+    const env = envWith(binding(okBundle({})), {
+      AUDIT_ENVIRONMENT: 'local',
       AUDIT_RELAY_LOCAL_SECRETS: '{"AUDIT_RELAY_AXIOM_TOKEN":"local-token"}',
-      STS: sts,
     });
 
-    await expect(source.get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('sts-token');
+    const error = await failureFrom(secretsFor(env).get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE'));
+
+    expect(error).toMatchObject({ reason: 'missing', retryable: false });
+  });
+
+  it('never reads the local values outside a local environment', async () => {
+    const sts = binding(okBundle({ AUDIT_RELAY_AXIOM_TOKEN: { value: 'sts-token', version: 1 } }));
+    const env = envWith(sts, {
+      AUDIT_ENVIRONMENT: 'production',
+      AUDIT_RELAY_LOCAL_SECRETS: '{"AUDIT_RELAY_AXIOM_TOKEN":"local-token"}',
+    });
+
+    await expect(secretsFor(env).get('AUDIT_RELAY_AXIOM_TOKEN')).resolves.toBe('sts-token');
     expect(sts.getBundle).toHaveBeenCalledTimes(1);
   });
 });

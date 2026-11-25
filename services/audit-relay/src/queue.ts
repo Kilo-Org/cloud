@@ -6,7 +6,7 @@ import type { StreamDO, StreamOutcome } from './dos/StreamDO';
 import type { Env } from './env';
 import { errorName } from './relay/error-name';
 import { pageSlack } from './relay/slack';
-import { createSecretSource } from './secrets';
+import { secretsFor } from './secrets';
 
 const DLQ_SUFFIX = '-dlq';
 
@@ -137,7 +137,7 @@ async function applyOutcome(
 
 async function pageOperator(env: Env, message: string): Promise<void> {
   try {
-    const webhook = await createSecretSource(env).get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE');
+    const webhook = await secretsFor(env).get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE');
     const delivered = await pageSlack(webhook, message, fetch);
     if (!delivered) {
       console.error(JSON.stringify({ event: 'audit_relay.page_undelivered' }));

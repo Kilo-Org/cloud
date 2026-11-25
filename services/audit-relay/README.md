@@ -50,9 +50,13 @@ acks the message and pages; the row stays until a replay job re-ingests that ran
 done). One rejected batch therefore never stalls the stream: the next batch is archived normally.
 
 A retry re-runs the same steps idempotently: the archive key already holds the same hash, and Axiom
-receives the same event ids. Secrets come from STS through `SecretSource` (`src/secrets.ts`):
-`AUDIT_RELAY_AXIOM_TOKEN` and `AUDIT_RELAY_SLACK_WEBHOOK_PAGE`. Nothing logs an event payload, a
-token, or a head value other than sequence and hash.
+receives the same event ids. Secrets come from STS through `@kilocode/secrets-client`
+(`src/secrets.ts`): `AUDIT_RELAY_AXIOM_TOKEN` and `AUDIT_RELAY_SLACK_WEBHOOK_PAGE`. One client
+serves the whole isolate, keyed by the binding, so a later batch revalidates with `If-None-Match`
+and steady state costs one `not_modified` round trip per 240 s. A read failure surfaces as
+`SecretUnavailableError`; `retryable` maps to `secrets_unavailable` (message retried) and a
+non-retryable `denied`, `missing` or `not_granted` to `secrets_denied` (hot-store gap, message
+acked). Nothing logs an event payload, a token, or a head value other than sequence and hash.
 
 `canonicalJson` (sorted keys, no insignificant whitespace) is the one serialisation for both the
 chain hash and the checkpoint signature. Changing it is a chain migration, not a refactor.
@@ -157,7 +161,9 @@ pnpm dev                        # wrangler dev --env local
 ```
 
 In `local` the Worker reads both secrets from `AUDIT_RELAY_LOCAL_SECRETS` (a JSON object) instead of
-STS; a deployed environment can never take that path.
+STS. A local run has no `sts-local` to call (it needs a manager identity and Infisical access), so
+this override stays; the gate is `AUDIT_ENVIRONMENT === 'local'`, which no deployed environment
+sets.
 
 ```sh
 pnpm test        # vitest-pool-workers
@@ -170,5 +176,6 @@ retried without a second archive write, a rejected batch that leaves a hot-store
 batch is still archived, a crash between the commit write and the ingest whose owed range the
 redelivery replays, a locked key with the same and with a different hash, checkpoint signing
 verified with the published key, tamper detection above and below the checkpoint, a forged
-checkpoint signature, and each `BundleResult` state of the secrets adapter.
+checkpoint signature, the secrets client's retryable and non-retryable failures, and the isolate
+bundle reuse that turns the second batch into an `If-None-Match` revalidation.
 Axiom and Slack are recorded and answered by a stubbed `fetch`.

@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "zod": "catalog:"

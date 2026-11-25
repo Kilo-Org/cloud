@@ -18,7 +18,7 @@ import { errorName } from './relay/error-name';
 import { CheckpointPublicKeySchema, verifyEd25519 } from './relay/signing';
 import type { CheckpointPublicKey } from './relay/signing';
 import { pageSlack } from './relay/slack';
-import { createSecretSource } from './secrets';
+import { secretsFor } from './secrets';
 
 export const AUDIT_CHECKPOINT_KEYS_PATH = '/.well-known/audit-checkpoint-keys.json';
 
@@ -302,7 +302,7 @@ async function pageFailure(
 ): Promise<VerifySummary> {
   console.error(JSON.stringify({ event: 'audit_relay.verification_failed', reason, detail }));
   try {
-    const webhook = await createSecretSource(env).get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE');
+    const webhook = await secretsFor(env).get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE');
     const delivered = await pageSlack(
       webhook,
       `audit-relay chain verification failed (${reason}): ${detail}`,

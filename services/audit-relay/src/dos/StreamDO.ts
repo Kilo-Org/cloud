@@ -1,12 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { AuditBatch } from '@kilocode/sts-contracts';
+import { SecretUnavailableError } from '@kilocode/secrets-client';
 import { withDORetry } from '@kilocode/worker-utils';
 import type { Env } from '../env';
 import { ArchiveConflictError, writeArchivedBatch } from '../relay/archive';
 import { ingestAuditEvents } from '../relay/axiom';
 import { GENESIS_HASH, chainHash } from '../relay/chain';
 import { errorName } from '../relay/error-name';
-import { SecretSourceError, createSecretSource } from '../secrets';
+import { secretsFor } from '../secrets';
 import { getRegistryDOStub } from './RegistryDO';
 
 export type StreamHead = { seq: number; hash: string };
@@ -234,9 +235,9 @@ export class StreamDO extends DurableObject<Env> {
 
     let token: string;
     try {
-      token = await createSecretSource(this.env).get('AUDIT_RELAY_AXIOM_TOKEN');
+      token = await secretsFor(this.env).get('AUDIT_RELAY_AXIOM_TOKEN', this.ctx);
     } catch (error) {
-      const denied = error instanceof SecretSourceError && !error.retryable;
+      const denied = error instanceof SecretUnavailableError && !error.retryable;
       const reason: HotCopyFailureReason = denied ? 'secrets_denied' : 'secrets_unavailable';
       await this.recordHotStoreGap({ ...range, reason });
       if (denied) return { kind: 'hot_gap', ...range, reason };

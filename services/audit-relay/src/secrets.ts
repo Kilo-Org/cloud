@@ -1,85 +1,64 @@
-import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
+import {
+  createWorkerSecrets,
+  SecretUnavailableError,
+  type BundleBinding,
+  type SecretsExecutionContext,
+} from '@kilocode/secrets-client';
 import { z } from 'zod';
 
 /**
- * The Worker's only way to read a secret. Deployed Workers answer through the STS service
- * binding, which hands back the bundle for the `props.caller` this Worker deployed with; a local
- * dev or test run answers from AUDIT_RELAY_LOCAL_SECRETS.
+ * One client per isolate, keyed by the STS binding. The client holds the bundle and its ETag, so
+ * every later batch, Durable Object request and scheduled run in the isolate revalidates with
+ * `If-None-Match` instead of refetching the bundle.
  */
-export type SecretSource = { get(name: string): Promise<string> };
+const clients = new WeakMap<BundleBinding, SecretReader>();
 
-/** The RPC surface of the STS `SecretsBroker` entrypoint, narrowed to what this Worker calls. */
-export type StsBinding = { getBundle(request: BundleRequest): Promise<BundleResult> };
+/**
+ * A local run has no STS to call: `sts-local` would need a manager identity and Infisical access,
+ * so `wrangler dev --env local` and the Workers-pool tests read the two names from
+ * AUDIT_RELAY_LOCAL_SECRETS instead. The gate is the environment, never a deployed one.
+ */
+let localReader: { raw: string; reader: SecretReader } | undefined;
 
-export type SecretSourceEnv = {
-  AUDIT_ENVIRONMENT: string;
-  AUDIT_RELAY_LOCAL_SECRETS?: string;
-  STS: StsBinding;
+/** The part of the client the relay uses; `Secrets` from `@kilocode/secrets-client` fits it. */
+export type SecretReader = {
+  get(name: string, ctx?: SecretsExecutionContext): Promise<string>;
 };
 
-export type SecretSourceFailure = 'denied' | 'unavailable' | 'missing' | 'not_modified';
+/** The STS service binding and the local-run override. */
+export type SecretsEnv = {
+  AUDIT_ENVIRONMENT: string;
+  AUDIT_RELAY_LOCAL_SECRETS?: string;
+  STS: BundleBinding;
+};
 
-export class SecretSourceError extends Error {
-  constructor(
-    readonly kind: SecretSourceFailure,
-    message: string
-  ) {
-    super(message);
-    this.name = 'SecretSourceError';
+export type SecretsOptions = { clock?: () => number };
+
+export function secretsFor(env: SecretsEnv, options: SecretsOptions = {}): SecretReader {
+  if (env.AUDIT_ENVIRONMENT === 'local' && env.AUDIT_RELAY_LOCAL_SECRETS) {
+    return localSecrets(env.AUDIT_RELAY_LOCAL_SECRETS);
   }
-
-  /** Only an unreachable STS or a stale answer is worth another queue attempt. */
-  get retryable(): boolean {
-    return this.kind === 'unavailable' || this.kind === 'not_modified';
-  }
-}
-
-export function createStsSecretSource(sts: StsBinding): SecretSource {
-  let bundle: Promise<BundleResult> | undefined;
-  return {
-    async get(name) {
-      const result = await (bundle ??= sts.getBundle({}));
-      return readBundleSecret(result, name);
-    },
-  };
-}
-
-function readBundleSecret(result: BundleResult, name: string): string {
-  switch (result.status) {
-    case 'ok': {
-      const secret = result.secrets[name];
-      if (!secret) throw new SecretSourceError('missing', `the STS bundle does not hold ${name}`);
-      return secret.value;
-    }
-    case 'not_modified':
-      throw new SecretSourceError(
-        'not_modified',
-        'STS answered not_modified to an unconditional bundle request'
-      );
-    case 'denied':
-      throw new SecretSourceError('denied', `STS denied the bundle: ${result.reason}`);
-    case 'unavailable':
-      throw new SecretSourceError('unavailable', `STS is unavailable: ${result.reason}`);
-  }
+  const held = clients.get(env.STS);
+  if (held !== undefined) return held;
+  const client = createWorkerSecrets(env.STS, options);
+  clients.set(env.STS, client);
+  return client;
 }
 
 const LocalSecretsSchema = z.record(z.string(), z.string());
 
-export function createSecretSource(env: SecretSourceEnv): SecretSource {
-  if (env.AUDIT_ENVIRONMENT === 'local' && env.AUDIT_RELAY_LOCAL_SECRETS) {
-    return createLocalSecretSource(env.AUDIT_RELAY_LOCAL_SECRETS);
-  }
-  return createStsSecretSource(env.STS);
-}
-
-function createLocalSecretSource(raw: string): SecretSource {
-  const secrets = LocalSecretsSchema.parse(JSON.parse(raw) as unknown);
-  return {
+function localSecrets(raw: string): SecretReader {
+  if (localReader?.raw === raw) return localReader.reader;
+  const values = LocalSecretsSchema.parse(JSON.parse(raw) as unknown);
+  const reader: SecretReader = {
     async get(name) {
-      if (!Object.hasOwn(secrets, name)) {
-        throw new SecretSourceError('missing', `the local secrets do not hold ${name}`);
+      const found = values[name];
+      if (found === undefined) {
+        throw new SecretUnavailableError('missing', { secretName: name });
       }
-      return secrets[name];
+      return found;
     },
   };
+  localReader = { raw, reader };
+  return reader;
 }

@@ -7600,11 +7600,20 @@ describe('User', () => {
       const user = await insertTestUser({ google_user_email: 'magic@example.com' });
 
       const futureDate = new Date(Date.now() + 1000 * 60 * 60).toISOString();
-      await db.insert(magic_link_tokens).values({
-        token_hash: 'test-token-hash',
-        email: 'magic@example.com',
-        expires_at: futureDate,
-      });
+      await db.insert(magic_link_tokens).values([
+        {
+          token_hash: 'test-token-hash',
+          email: 'magic@example.com',
+          expires_at: futureDate,
+        },
+        {
+          token_hash: 'passkey-enrollment-token-hash',
+          email: 'magic@example.com',
+          expires_at: futureDate,
+          purpose: 'passkey_enrollment',
+          challenge_id: crypto.randomUUID(),
+        },
+      ]);
 
       await softDeleteUser(user.id);
 

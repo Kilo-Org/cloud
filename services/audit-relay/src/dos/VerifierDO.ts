@@ -98,7 +98,12 @@ export type VerifierStatus = {
 export class VerifierDO extends DurableObject<Env> {
   async startPass(kind: VerifyPassKind, now: number = Date.now()): Promise<StartPassResult> {
     if (kind === 'daily') await this.pageIfFullPassOverdue(now);
-    if (await this.ctx.storage.get<VerifyPass>(passKey(kind))) return { kind: 'running', pass: kind };
+    if (await this.ctx.storage.get<VerifyPass>(passKey(kind))) {
+      // The runtime drops an alarm after its own retries run out; the next cron re-arms it so a
+      // running pass can never stall without a slice scheduled.
+      if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now());
+      return { kind: 'running', pass: kind };
+    }
 
     const verified = (await this.ctx.storage.get<string>(VERIFIED_CHECKPOINT_KEY)) ?? null;
     const anchorKey = kind === 'daily' ? verified : null;
@@ -184,7 +189,11 @@ export class VerifierDO extends DurableObject<Env> {
         await this.ctx.storage.put(passKey(pass.kind), { ...pass, errors });
         return { kind: 'retry', pass: pass.kind, errors };
       }
-      return this.failPass(pass, 'archive_read', `slice failed ${errors} times: ${errorName(error)}`);
+      return this.failPass(
+        pass,
+        'archive_read',
+        `slice failed ${errors} times: ${errorName(error)}`
+      );
     }
   }
 
@@ -197,7 +206,11 @@ export class VerifierDO extends DurableObject<Env> {
     const registered = new Set(heads.map(head => head.stream));
     const unknown = Object.keys(pass.checkpoint).find(stream => !registered.has(stream));
     if (unknown !== undefined) {
-      return this.failPass(pass, 'head', `stream ${unknown} is in the checkpoint, not the registry`);
+      return this.failPass(
+        pass,
+        'head',
+        `stream ${unknown} is in the checkpoint, not the registry`
+      );
     }
 
     let index = 0;

@@ -46,7 +46,7 @@ import {
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
-import { getAccountLinkingSession } from '@/lib/account-linking-session';
+import { getAccountLinkingSession, isLinkingWebSession } from '@/lib/account-linking-session';
 import {
   findUserIdByAuthProvider,
   getUserAuthProviders,
@@ -59,6 +59,7 @@ import {
   pendingLinkPageUrl,
   setPendingLinkCookie,
 } from '@/lib/auth/pending-link';
+import { isSignInMethodLinkAllowed } from '@/lib/auth/sign-in-method-change';
 import { whenOk } from '@kilocode/web-shared/lib/maybe-result';
 import type { AuthErrorType, SignupStepUpMethod } from '@kilocode/web-shared/lib/auth/constants';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
@@ -118,7 +119,6 @@ import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { z } from 'zod';
 import {
-  getUserFromSession,
   getUserFromSessionForCredentialIssuance,
   sessionAuthOptions,
 } from '@kilocode/web-shared/lib/user/server';
@@ -770,12 +770,38 @@ export function preserveSignInRedirectContext(url: string, context: SignInRedire
   return `${destination.pathname}${destination.search}`;
 }
 
-async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
+async function readCallbackUrlCookie(): Promise<string | undefined> {
   const cookieStore = await cookies();
-  const raw =
+  return (
     cookieStore.get('__Secure-next-auth.callback-url')?.value ??
-    cookieStore.get('next-auth.callback-url')?.value;
-  return parseSignInRedirectContext(raw);
+    cookieStore.get('next-auth.callback-url')?.value
+  );
+}
+
+async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
+  return parseSignInRedirectContext(await readCallbackUrlCookie());
+}
+
+/**
+ * Where a completed account link returns: the page that started it, which
+ * NextAuth keeps in its callback-url cookie, when that is an allowed callback
+ * path. Only the path and query are kept, so the cookie can not redirect off
+ * the site. Without one, the connected-accounts page reports the link.
+ */
+export function accountLinkCompletionPath(
+  callbackUrlCookieValue: string | undefined,
+  provider: string
+): string {
+  if (callbackUrlCookieValue) {
+    try {
+      const callbackUrl = new URL(callbackUrlCookieValue, 'http://localhost');
+      const path = `${callbackUrl.pathname}${callbackUrl.search}`;
+      if (isValidCallbackPath(path)) return path;
+    } catch {
+      // A malformed cookie falls back to the connected-accounts page.
+    }
+  }
+  return `/connected-accounts?linked=${encodeURIComponent(provider)}`;
 }
 
 async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): Promise<{
@@ -1176,17 +1202,30 @@ export const authOptions: NextAuthOptions = {
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
 
         // Account linking requires the person who started it: the pending link
-        // names a user, and the request must carry that user's web session. A
-        // request whose session does not name the same user is refused with the
-        // ordinary linking failure. The read above consumed the cookie, so a
-        // refusal is final.
+        // names a user and the browser session that started it, and the
+        // request must carry that same live web session (not a revoked one, a
+        // different session of the same user, or a bearer credential). A
+        // request whose session does not match is refused with the ordinary
+        // linking failure. The read above consumed the cookie, so a refusal is
+        // final.
         if (isAccountLinking && linkingSession) {
-          const claudeLinkingUser =
-            account.provider === 'claude'
-              ? (await getUserFromSessionForCredentialIssuance()).user
-              : undefined;
-          const linkingPrincipal =
-            account.provider === 'claude' ? claudeLinkingUser : await getUserFromSession();
+          // The link start checked the domain's SSO policy; the callback checks
+          // it again so a policy change in between, or a link started before
+          // the policy applied, can not add a method SSO forbids.
+          const linkTarget = await findUserById(linkingSession.existingUserId);
+          const linkRefusal: AuthErrorType | null = !linkTarget
+            ? 'LINKING-FAILED'
+            : (await isSignInMethodLinkAllowed(linkTarget))
+              ? null
+              : 'SIGN-IN-METHOD-SSO-REQUIRED';
+          if (linkRefusal) {
+            if (account.provider === 'openai' && linkingSession.organizationId) {
+              return openAiChatGptConnectFailureUrl(linkingSession.organizationId, linkRefusal);
+            }
+            return redirectUrlForCode(linkRefusal);
+          }
+          const linkingSessionRead = await getUserFromSessionForCredentialIssuance();
+          const linkingPrincipal = linkingSessionRead.user;
           if (linkingPrincipal?.id !== linkingSession.existingUserId) {
             // Apple answers with a cross-site form POST that cannot carry the
             // Lax session cookie. Park the identity as an explicit pending
@@ -1222,6 +1261,18 @@ export const authOptions: NextAuthOptions = {
             // An organization-scoped connect starts on the organization's BYOK
             // card, which reads `openai_error`; return the refusal there the
             // same way the shared-services re-check below does.
+            if (account.provider === 'openai' && linkingSession.organizationId) {
+              return openAiChatGptConnectFailureUrl(
+                linkingSession.organizationId,
+                'LINKING-FAILED'
+              );
+            }
+            return redirectUrlForCode('LINKING-FAILED');
+          }
+          if (!isLinkingWebSession(linkingSession, linkingSessionRead.webSessionId)) {
+            warnInSentry('SECURITY: Account link refused: another browser session finished it', {
+              extra: { provider: accountInfo.provider },
+            });
             if (account.provider === 'openai' && linkingSession.organizationId) {
               return openAiChatGptConnectFailureUrl(
                 linkingSession.organizationId,
@@ -1305,11 +1356,10 @@ export const authOptions: NextAuthOptions = {
         // we don't need to check gmail domains for SSO for now.
         // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
         //
-        // Account linking is not a sign-in: the person is already
-        // authenticated and is only attaching another provider. Enforcing the
-        // domain SSO policy here would redirect them to the sign-in page and
-        // abort the link, so a BYOK connection (for example "Sign in with
-        // ChatGPT") would never be stored for an SSO-protected domain.
+        // Account linking is not a sign-in: it attaches a provider to the
+        // account of the live session that started it and ends without a new
+        // session (see the end of this callback). The link's own SSO policy
+        // check ran above, so the sign-in redirect to SSO does not apply here.
         if (domainToCheck !== 'gmail.com' && !isAccountLinking) {
           // Fake login is intentionally exempt in supported non-production environments.
           if (accountInfo.provider !== 'workos' && accountInfo.provider !== 'fake-login') {
@@ -1329,6 +1379,16 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
+        // The link start offers neither SSO nor passkeys as a method to link,
+        // so a link callback for one is refused instead of running as a
+        // sign-in that would issue a new session.
+        if (
+          isAccountLinking &&
+          (accountInfo.provider === 'workos' || accountInfo.provider === 'passkey')
+        ) {
+          return redirectUrlForCode('LINKING-FAILED');
+        }
+
         // A redeemed passkey ticket already proved identity, so a passkey skips
         // both Turnstile and user settlement. This return sits after the domain
         // blacklist, the account-status gate and the SSO-authority checks above,
@@ -1346,9 +1406,8 @@ export const authOptions: NextAuthOptions = {
         const requestHeaders = await headers();
 
         if (accountInfo.provider === 'workos') {
-          const { affiliateTrackingId, trackingContext } = !isAccountLinking
-            ? await getImpactTrackingContextFromAuthFlow(requestHeaders)
-            : { affiliateTrackingId: null, trackingContext: {} };
+          const { affiliateTrackingId, trackingContext } =
+            await getImpactTrackingContextFromAuthFlow(requestHeaders);
 
           logImpactReferralDebug(
             'Auth flow forwarding Impact tracking context to SSO user upsert',
@@ -1365,11 +1424,9 @@ export const authOptions: NextAuthOptions = {
             requestHeaders,
             affiliateTrackingId,
             trackingContext,
-            !isAccountLinking
-              ? getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
-              : undefined
+            getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
           );
-          return typeof result === 'string' && !isAccountLinking
+          return typeof result === 'string'
             ? preserveSignInRedirectContext(result, redirectContext)
             : result;
         }
@@ -1521,8 +1578,17 @@ export const authOptions: NextAuthOptions = {
         ) {
           return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
         }
-        if (account.provider === 'claude' && isAccountLinking) {
-          return '/connected-accounts?linked=claude';
+        // A link keeps the session that started it. Returning a redirect makes
+        // NextAuth stop before the jwt callback, so no new session token is
+        // issued and the session keeps its sign-in time and its expiry: a link
+        // can never refresh how recently the session proved its holder. The
+        // ChatGPT credential the jwt callback stores on a sign-in is stored
+        // here for a link.
+        if (isAccountLinking) {
+          if (account.provider === 'openai' && account.access_token) {
+            await persistOpenAiChatGptConnection(result.user.id, account, profile);
+          }
+          return accountLinkCompletionPath(await readCallbackUrlCookie(), accountInfo.provider);
         }
 
         // NOTE(bmc): this is sad but its here for a reason, don't change it

@@ -89,7 +89,9 @@ Every template must include this branding footer below the content table:
 | `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
 | `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `accountLinkCode.html` | `code`, `provider_name`, `email`, `expires_in`, `year` | — |
-| `newSignInMethod.html` | `provider_name`, `linked_identity`, `connected_accounts_link` (rendered HTML anchor), `email`, `year` | — |
+| `newSignInMethod.html` | `provider_name`, `linked_identity`, `change_details` (rendered HTML: time, IP address, location, browser), `connected_accounts_link` (rendered HTML anchor), `support_email` (populated by `renderTemplate`), `email`, `year` | — |
+| `signInMethodRemoved.html` | `provider_name`, `change_details` (rendered HTML: time, IP address, location, browser), `connected_accounts_link` (rendered HTML anchor), `support_email` (populated by `renderTemplate`), `email`, `year` | — |
+| `signInMethodChangeCode.html` | `code`, `change_action` (`add` or `remove`), `provider_name`, `email`, `expires_in`, `support_email` (populated by `renderTemplate`), `year` | — |
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
 | `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
 | `codeReviewDisabled.html` | `reason`, `recovery_url`, `recovery_label`, `support_email` (populated by `renderTemplate`), `year` | — |

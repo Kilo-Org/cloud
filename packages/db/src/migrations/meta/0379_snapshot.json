@@ -1,5 +1,5 @@
 {
-  "id": "9b321e6b-6b19-4e06-a5b7-8adddf24db0d",
+  "id": "bbffe871-7648-4aee-8cff-0541e58c27e7",
   "prevId": "d5cc3790-2fc7-47d3-9294-fa9910e6223a",
   "version": "7",
   "dialect": "postgresql",
@@ -2863,12 +2863,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "web_session_pepper": {
-          "name": "web_session_pepper",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "expires_at": {
           "name": "expires_at",
@@ -25049,7 +25043,7 @@
         },
         "check_magic_link_tokens_purpose": {
           "name": "check_magic_link_tokens_purpose",
-          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download')"
+          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change')"
         }
       },
       "isRLSEnabled": false

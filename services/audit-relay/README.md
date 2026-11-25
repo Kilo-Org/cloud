@@ -48,26 +48,41 @@ For an accepted batch the Durable Object, in order:
 
 Axiom is the hot copy and cannot hold the stream hostage. Each owed row is
 `{ stream, fromSeq, toSeq, reason, recordedAt }`, stored under its own key (`hot_copy:<toSeq>`);
-rows are the archived ranges, so they never overlap. A failure stamps the row with
-`axiom_unavailable` (network error, 401, 403, 408, 429 or 5xx; a 401 or 403 follows a token
-rotation until the secrets client revalidates, at most 240 s), `axiom_rejected` (any other 4xx),
-`secrets_unavailable`, `secrets_denied`, `archive_unavailable` or `archive_unreadable`.
+rows are the archived ranges, so they never overlap, and `recordedAt` stays the archive time. A
+failure stamps the row with `axiom_unavailable` (network error, 401, 403, 408, 429 or 5xx; a 401
+or 403 follows a token rotation until the secrets client revalidates, at most 240 s),
+`axiom_rejected` (any other 4xx), `secrets_unavailable`, `secrets_denied`, `archive_unavailable`
+or `archive_unreadable`.
 
 The StreamDO alarm owns every owed row. It delivers up to 50 rows per run, oldest first, reading
 each row's events from its **archive object**, never from a queue message, so a forged redelivery
-can never put events into Axiom. A clean run that leaves rows re-arms at once. A failure re-arms
-with backoff: 30 s doubling per failed run, capped at 15 minutes, with jitter in [0.5, 1). A
-row-specific failure (`axiom_rejected`, `archive_unreadable`) is stamped and skipped, so it never
-blocks the rows after it; any other failure stops the run. While such a stream-wide failure is
-recorded, a new batch skips its own ingest and leaves the row to the alarm, so an outage costs one
-Axiom call per stream per backoff step instead of one per batch.
+can never put events into Axiom. A run that listed a full page re-arms at once. A stream-wide
+failure stops the run and re-arms with backoff: 30 s doubling per failed run, capped at 15
+minutes, with jitter in [0.5, 1). While it is recorded, a new batch skips its own ingest and
+leaves the row to the alarm, so an outage costs one Axiom call per stream per backoff step
+instead of one per batch.
 
-Paging is per stream and per reason: the first failure with a reason pages once
-(`the Axiom hot copy is failing (<reason>)`), a failure that still owes a row recorded over 6 hours
-ago pages once more, and the run that delivers the last owed row pages the recovery once. A row
-Axiom keeps refusing stays (retried at the backoff cap) until an operator clears it with
-`clearHotStoreGap(fromSeq, toSeq)` after checking the payload; `hotStoreGaps(limit)` lists the
-owed rows oldest first.
+A row-specific failure (`axiom_rejected`, `archive_unreadable`) **parks** the row: it moves to
+`hot_copy_parked:<toSeq>`, which the alarm never lists, so any number of refused rows cannot
+block or slow the rows behind them. `hotStoreGaps(limit)` returns the owed rows, then the parked
+ones, oldest first; an operator checks a parked payload and clears it with
+`clearHotStoreGap(fromSeq, toSeq)`.
+
+Paging is per stream:
+
+- A stream-wide failure pages its start only once it is real: two failed alarm runs in a row, or
+  an owed row 5 minutes old. A blip that the next run clears pages nothing, and a change of
+  reason is logged, not paged. A paged failure that still owes a row archived over 6 hours ago
+  pages once more.
+- A parked row pages (`parked seq a..b (<reason>)`).
+- Those pages share a cap of one per stream per hour; a page the cap holds back goes out at the
+  next failed run after the hour.
+- A failure whose start was paged always pages its recovery, from the run that delivers the last
+  owed row, and the recovery restarts the hour. A failure that never paged its start pages no
+  recovery.
+
+A stream therefore pages at most twice an hour for its hot copy (a start, or an age or parked
+page, plus the recovery of a paged start).
 
 Owed rows are bounded by time, not by count: a row is about 200 bytes and each stream adds at
 most one per batch, so a stream sending one batch per 5 s grows by at most 17,280 rows
@@ -108,19 +123,26 @@ gap (the head advances) starts the next gap's count from zero.
 
 ### Dead letters
 
-A message that exhausts its retries lands in the DLQ. Since an archived batch is always acked,
-what reaches it is a batch stuck behind a gap. The DLQ consumer first asks the stream's head: a
-batch at or below it is already archived and is acked as a no-op. Every other message has its raw
-bytes written to `dead-letter/<stream or unknown>/<enqueue time>-<message id>.gz` in the archive
-bucket (create-only, 400-day lock rule) and is acked. A failed R2 write retries the message every
-5 minutes, up to the Queues maximum of 100 retries. Pages carry the stream, sequence range,
-attempt count and key (never the payload), and each stream pages at most once an hour (bodies
-with no readable stream share one budget); every message is still logged. A main-queue body that
-does not decode is kept the same way under `dead-letter/unknown/` instead of being dropped.
+Since an archived batch is always acked, a message reaches the DLQ only when it stayed behind a
+gap for its 10 retries (about 5 minutes) or its archive write kept failing (60 s doubling to a
+1-hour cap, about 5 hours). The DLQ consumer offers each decodable batch to its stream again,
+lowest sequence first within the consumer batch, so batches an R2 outage or a gap dead-lettered
+archive themselves once the cause is gone, with no manual step: an `accepted` batch, or a
+`duplicate` that matches the archive, is acked with nothing kept.
 
-A dead-lettered batch stalls its stream: every later batch gap-retries behind it and dead-letters
-in turn. To recover, re-send the stored objects' bytes to the main queue as `bytes` messages,
-lowest sequence first; the StreamDO archives the missing batch and dedupes the rest.
+Every other message has its raw bytes written to
+`dead-letter/<stream or unknown>/<enqueue time>-<message id>.gz` in the archive bucket
+(create-only, 400-day lock rule). A batch still behind a gap or an R2 failure is then retried
+every 15 minutes, for about 25 hours (the Queues maximum of 100 retries). A message that cannot
+recover is paged and acked: a duplicate that disagrees with the archive (`duplicate_content`,
+`duplicate_unaligned`, `duplicate_corrupt`), an archive conflict, an undecodable body (main
+queue or DLQ), or a batch still waiting at its final delivery. Pages carry the stream, sequence
+range, reason, attempt count and key (never the payload), and each stream pages at most once an
+hour (bodies with no readable stream share one budget); every message is still logged.
+
+A batch lost at its final delivery stalls its stream: every later batch gap-retries behind it.
+To recover, re-send the stored object's bytes to the main queue as a `bytes` message; the
+StreamDO archives the missing batch and dedupes the rest.
 
 ## Checkpoints and verification
 
@@ -176,9 +198,9 @@ lowest sequence first; the StreamDO archives the missing batch and dedupes the r
 | `AXIOM_URL` | `https://api.axiom.co` |
 | `AUDIT_ENVIRONMENT` | `production` / `staging` / `local` |
 
-Retries are bounded: `max_retries: 10` with `retry_delay: 60`, and a gap retry consumes one of
-them. A message that exhausts them lands in the DLQ, whose consumer keeps it in R2 and pages
-(above); the DLQ consumer itself has `max_retries: 100` with `retry_delay: 300`.
+Retries are bounded: `max_retries: 10` with `retry_delay: 60`; a gap retry waits 30 s and an
+archive failure 60 s doubling to 1 hour, each consuming one retry. A message that exhausts them
+lands in the DLQ (above), whose consumer has `max_retries: 100` with `retry_delay: 900`.
 
 ### Internal Durable Objects
 
@@ -257,16 +279,20 @@ pnpm lint
 ```
 
 The suite covers in-order delivery, duplicates (matching, a matching suffix, forged content, an
-unaligned range), gap-then-fill, a stalled gap that pages once, partial overlap, an Axiom failure
-retried without a second archive write, Axiom status classification, a rejected batch that leaves a
-hot-store gap while the next batch is still archived, a crash between the commit write and the
-ingest whose owed range the redelivery replays, a locked key with the same, a different and an
-undecodable object, dead letters kept in R2 and paged without the payload, an undecodable
-main-queue body kept the same way, a failed dead-letter write retried, checkpoint signing verified
-with the published key, the bounded chain walk (budget pause and resume, `startAfter` the anchor,
-a checkpoint inside an object or with another hash, an archive short of the head), and one
-verifier scenario across slices: the first daily pass from genesis, a daily pass that reads only
-the objects above its anchor, a full pass that finds tampering below the anchor, tampering above
-the anchor that keeps the anchor in place, a forged checkpoint, and the 35-day full-pass page. The
-test config sets `AUDIT_VERIFY_SLICE_OBJECTS` to 2 so every pass resumes from its cursor. Axiom and
-Slack are recorded and answered by a stubbed `fetch`.
+unaligned range), gap-then-fill, a stalled gap that pages once, partial overlap, an Axiom outage
+that acks every archived batch and delivers it from the alarm (paging the start after two failed
+runs, the recovery once, and nothing for a second failure inside the hour), sporadic failures
+that page nothing, a refused row parked while the next batch is delivered, 60 undeliverable rows
+parked without starving the row behind them, an owed row re-ingested from the archive and never
+from a forged redelivery, Axiom status classification, create-only writes with the same, a
+different and an undecodable object, dead-lettered batches that archive themselves once the cause
+is gone, a batch still behind a gap retried and paged once an hour at its final delivery, a
+dead letter that disagrees with the archive, an undecodable main-queue body kept and paged, a
+failed dead-letter write retried, the archive retry delay, checkpoint signing verified with the
+published key, the bounded chain walk (object and byte budgets, `startAfter` the anchor, a
+checkpoint inside an object or with another hash, an archive short of the head), killed slices
+that fail their pass, and one verifier scenario across slices: the first daily pass from genesis,
+a daily pass that reads only the objects above its anchor, a full pass that finds tampering below
+the anchor, tampering above the anchor that keeps the anchor in place, a forged checkpoint, and the
+35-day full-pass page. The test config sets `AUDIT_VERIFY_SLICE_OBJECTS` to 2 so every pass
+resumes from its cursor. Axiom and Slack are recorded and answered by a stubbed `fetch`.

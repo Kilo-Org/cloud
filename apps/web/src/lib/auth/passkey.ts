@@ -35,7 +35,6 @@ import { deleteExpiredPasskeyManagementAuthorizations } from './passkey-manageme
 import {
   checkPasskeyEnrollmentCode,
   consumePasskeyEnrollmentCode,
-  deleteExpiredPasskeyEnrollmentCodes,
   PasskeyEnrollmentCodeRefusedError,
   type PasskeyEnrollmentEmailCode,
 } from './passkey-enrollment-email-code';
@@ -716,15 +715,11 @@ export async function consumeSignInTicket(
  *
  * Management authorizations: the same single-use, five-minute shape. Rows past
  * expiry can authorize nothing, so they are removed under the same cutoff.
- *
- * Enrollment email codes: kept until their wrong attempts stop counting toward
- * the account's lockout, then removed.
  */
 export async function cleanupExpiredPasskeyRows(): Promise<{
   challenges: number;
   tickets: number;
   managementAuthorizations: number;
-  enrollmentEmailCodes: number;
 }> {
   const cutoff = new Date().toISOString();
 
@@ -739,13 +734,11 @@ export async function cleanupExpiredPasskeyRows(): Promise<{
     .returning({ id: passkey_sign_in_tickets.id });
 
   const managementAuthorizations = await deleteExpiredPasskeyManagementAuthorizations(cutoff);
-  const enrollmentEmailCodes = await deleteExpiredPasskeyEnrollmentCodes();
 
   return {
     challenges: challenges.length,
     tickets: tickets.length,
     managementAuthorizations,
-    enrollmentEmailCodes,
   };
 }
 

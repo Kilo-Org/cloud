@@ -29,8 +29,12 @@ export const PASSKEY_ENROLLMENT_CODE_EXPIRY_MINUTES = 10;
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
 const RESEND_COOLDOWN_SECONDS = 60;
+// Codes sent to one account within the send window, so a held session can not
+// flood the mailbox. Codes whose email failed are deleted and do not count.
+const MAX_SENDS_PER_WINDOW = 5;
 const ATTEMPT_WINDOW = sql.raw(`interval '${LOCKOUT_MINUTES} minutes'`);
 const RESEND_COOLDOWN = sql.raw(`interval '${RESEND_COOLDOWN_SECONDS} seconds'`);
+const SEND_WINDOW = sql.raw(`interval '1 hour'`);
 
 /** The account and browser session a code is minted for. Any other binding does not match. */
 export type PasskeyEnrollmentCodeBinding = {
@@ -134,7 +138,11 @@ async function lockoutRemainingSeconds(tx: DrizzleTransaction, email: string): P
 /**
  * Makes a new code for the binding. One code is live per account: a new code
  * ends the previous one, whose wrong attempts keep counting. No code is made
- * while the account is locked or within the resend cooldown.
+ * while the account is locked, within the resend cooldown, or once the account
+ * has been sent the hourly limit of codes.
+ *
+ * Rows that count toward neither the lockout nor the hourly limit are removed
+ * here, per account, so the table holds only the rows these rules read.
  */
 export async function createPasskeyEnrollmentCode(
   binding: PasskeyEnrollmentCodeBinding
@@ -148,6 +156,16 @@ export async function createPasskeyEnrollmentCode(
 
   return db.transaction(async tx => {
     await lockAccountCodes(tx, binding.userId);
+
+    await tx
+      .delete(magic_link_tokens)
+      .where(
+        and(
+          accountFilter(binding.email),
+          sql`${magic_link_tokens.expires_at} <= NOW() - ${ATTEMPT_WINDOW}`,
+          sql`${magic_link_tokens.created_at} <= NOW() - ${SEND_WINDOW}`
+        )
+      );
 
     if ((await failedAttempts(tx, binding.email)) >= MAX_FAILED_ATTEMPTS) {
       return {
@@ -171,8 +189,27 @@ export async function createPasskeyEnrollmentCode(
       )
       .orderBy(sql`${magic_link_tokens.created_at} DESC`)
       .limit(1);
-    if (recent)
+    if (recent) {
       return { status: 'cooldown', retryAfterSeconds: Math.max(1, recent.retryAfterSeconds) };
+    }
+
+    const [sends] = await tx
+      .select({
+        count: sql<number>`COUNT(*)::int`,
+        retryAfterSeconds: sql<
+          number | null
+        >`CEIL(EXTRACT(EPOCH FROM (MIN(${magic_link_tokens.created_at}) + ${SEND_WINDOW} - NOW())))::int`,
+      })
+      .from(magic_link_tokens)
+      .where(
+        and(
+          accountFilter(binding.email),
+          sql`${magic_link_tokens.created_at} > NOW() - ${SEND_WINDOW}`
+        )
+      );
+    if (sends && sends.count >= MAX_SENDS_PER_WINDOW) {
+      return { status: 'cooldown', retryAfterSeconds: Math.max(1, sends.retryAfterSeconds ?? 1) };
+    }
 
     await tx
       .update(magic_link_tokens)
@@ -275,18 +312,4 @@ export async function consumePasskeyEnrollmentCode(
 /** Removes a new code whose email could not be sent. */
 export async function deletePasskeyEnrollmentCode(emailCodeId: string): Promise<void> {
   await db.delete(magic_link_tokens).where(codeFilter(emailCodeId));
-}
-
-/** Removes codes whose wrong attempts no longer count. */
-export async function deleteExpiredPasskeyEnrollmentCodes(): Promise<number> {
-  const deleted = await db
-    .delete(magic_link_tokens)
-    .where(
-      and(
-        eq(magic_link_tokens.purpose, CODE_PURPOSE),
-        sql`${magic_link_tokens.expires_at} <= NOW() - ${ATTEMPT_WINDOW}`
-      )
-    )
-    .returning({ challenge_id: magic_link_tokens.challenge_id });
-  return deleted.length;
 }

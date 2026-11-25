@@ -5,7 +5,6 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   checkPasskeyEnrollmentCode,
   createPasskeyEnrollmentCode,
-  deleteExpiredPasskeyEnrollmentCodes,
   type PasskeyEnrollmentCodeBinding,
   type PasskeyEnrollmentEmailCode,
 } from './passkey-enrollment-email-code';
@@ -109,24 +108,48 @@ describe('passkey enrollment email codes', () => {
     });
   });
 
-  it('removes only codes whose attempts no longer count', async () => {
-    const counted = await newCode(otherBinding);
-    await newCode();
-    await age(binding.email, 26);
+  it('sends at most five codes an hour, then waits for the oldest to leave the hour', async () => {
+    for (let send = 0; send < 5; send += 1) {
+      await newCode();
+      await age(binding.email, 2);
+    }
 
-    await deleteExpiredPasskeyEnrollmentCodes();
+    const capped = await createPasskeyEnrollmentCode(binding);
+    expect(capped.status).toBe('cooldown');
+    const retryAfterSeconds = capped.status === 'cooldown' ? capped.retryAfterSeconds : 0;
+    expect(retryAfterSeconds).toBeGreaterThan(50 * 60 - 10);
+    expect(retryAfterSeconds).toBeLessThanOrEqual(50 * 60);
 
-    expect(
-      await db
-        .select({ id: magic_link_tokens.challenge_id })
-        .from(magic_link_tokens)
-        .where(accountRows(binding.email))
-    ).toEqual([]);
+    await age(binding.email, 51);
+
+    await expect(createPasskeyEnrollmentCode(binding)).resolves.toMatchObject({
+      status: 'created',
+    });
+  });
+
+  it("removes this account's codes that count for neither the lockout nor the hourly limit", async () => {
+    const theirs = await newCode(otherBinding);
+    await age(otherBinding.email, 120);
+    const stale = await newCode();
+    await age(binding.email, 40);
+    const counted = await newCode();
+    await age(binding.email, 30);
+
+    const current = await newCode();
+
+    const rows = await db
+      .select({ id: magic_link_tokens.challenge_id })
+      .from(magic_link_tokens)
+      .where(accountRows(binding.email));
+    expect(rows.map(row => row.id).sort()).toEqual(
+      [counted.emailCodeId, current.emailCodeId].sort()
+    );
+    expect(rows.map(row => row.id)).not.toContain(stale.emailCodeId);
     expect(
       await db
         .select({ id: magic_link_tokens.challenge_id })
         .from(magic_link_tokens)
         .where(accountRows(otherBinding.email))
-    ).toEqual([{ id: counted.emailCodeId }]);
+    ).toEqual([{ id: theirs.emailCodeId }]);
   });
 });

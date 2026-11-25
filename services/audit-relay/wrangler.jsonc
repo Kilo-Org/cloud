@@ -15,10 +15,18 @@
     "local_protocol": "http",
     "ip": "127.0.0.1",
   },
+  // Logs only, never traces. A trace records every outbound fetch with `url.full`, and the Slack
+  // paging webhook URL is itself the secret; `redact_query_string` would not help, because the
+  // secret is in the path. Spans and attributes:
+  // https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/
+  // Nothing this Worker logs carries a URL it fetched. Named environments inherit this block.
   "observability": {
     "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
   },
-  // Worker traces and logs reach the account Logpush job, which forwards them to Axiom.
+  // Worker logs (Workers Trace Events: event, logs, exceptions, outcome; no subrequest URLs) reach
+  // the account Logpush job, which forwards them to Axiom.
   "logpush": true,
   // The public checkpoint key set lives at
   // https://audit-relay.kiloapps.io/.well-known/audit-checkpoint-keys.json
@@ -174,6 +182,8 @@
     "local": {
       "name": "audit-relay-local",
       "workers_dev": true,
+      // Not inherited from the top level: a local run has no custom domain.
+      "routes": [],
       "vars": {
         "AXIOM_DATASET": "kilo-audit-local",
         "AXIOM_URL": "https://api.axiom.co",

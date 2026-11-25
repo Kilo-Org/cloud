@@ -11,6 +11,7 @@ import {
   AUDIT_RELAY_DEPLOYMENTS,
   CLASSIFIED_KEYS,
   type WorkerConfig,
+  deployConfigEntries,
   internalWorkerProblems,
   parseWorkerConfig,
   workerConfigPaths,
@@ -86,21 +87,28 @@ describe('repository Worker configs', () => {
   });
 
   it('keep every nested Worker config under test/fixtures, out of the production deploy', () => {
-    // deploy-workers.yml deploys every directory holding a wrangler.jsonc that this find lists.
+    // deploy-workers.yml deploys every directory holding a wrangler.jsonc that this find lists, and
+    // runs Wrangler there with no --config.
     const workflow = readFileSync(join(repoRoot, '.github/workflows/deploy-workers.yml'), 'utf8');
     const discovery = workflow
       .split('\n')
       .filter(line => line.includes('find services -name "wrangler.jsonc"'));
     expect(discovery).toHaveLength(1);
+    expect(discovery[0]).toContain('-not -path "*/node_modules/*"');
     expect(discovery[0]).toContain('-not -path "*/test/fixtures/*"');
 
+    const entries = deployConfigEntries(repoRoot);
+    const paths = entries.map(entry => entry.path);
+    // Wrangler takes a wrangler.json in the service directory or any parent before the service's
+    // own wrangler.jsonc, so one there, in services/ or at the root replaces the config checked here.
+    expect(paths.filter(path => /^(services\/([^/]+\/)?)?wrangler\.json$/.test(path))).toEqual([]);
+    // The find lists a directory named wrangler.jsonc as a Worker to deploy.
+    expect(entries.filter(entry => entry.directory).map(entry => entry.path)).toEqual([]);
+
     // Only a service's own top-level config is a Worker to deploy; any other wrangler.jsonc under
-    // services/ must sit where that find skips it.
-    const nested = workerConfigPaths(repoRoot).filter(
-      path =>
-        path.startsWith('services/') &&
-        path.endsWith('/wrangler.jsonc') &&
-        !/^services\/[^/]+\/wrangler\.jsonc$/.test(path)
+    // services/, a broken symlink included, must sit where that find skips it.
+    const nested = paths.filter(
+      path => path.endsWith('/wrangler.jsonc') && !/^services\/[^/]+\/wrangler\.jsonc$/.test(path)
     );
     expect(nested).toContain('services/sts/test/fixtures/runtime/wrangler.jsonc');
     expect(nested.filter(path => !/^services\/[^/]+\/test\/fixtures\//.test(path))).toEqual([]);

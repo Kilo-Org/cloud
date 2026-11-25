@@ -679,14 +679,19 @@ type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 /**
  * One bounded transport pass. `unansweredSince` carries the open window of
  * unanswered recovery passes into the pass that the alarm consumes.
- * `unanswered` records that the pass asked for another recovery pass.
+ * `outcome` is `answered` once a Sandbox RPC returns, and `unanswered` once
+ * the pass asks for another recovery pass; `unanswered` is final.
  */
 type TransportPass = {
   deadlineAt: number;
   scheduleRecovery: boolean;
   unansweredSince?: number;
-  unanswered?: boolean;
+  outcome?: 'answered' | 'unanswered';
 };
+
+function markAnswered(pass: TransportPass): void {
+  pass.outcome ??= 'answered';
+}
 
 function parseStoredRunContainer(raw: string | null): CloudAgentRunContainer | undefined {
   if (raw == null) return undefined;
@@ -2847,7 +2852,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.clearTransportRecovery();
         const pass: TransportPass = { ...this.transportPass(), unansweredSince: recovery.since };
         await this.recoverQueued(pass);
-        if (recovery.since !== undefined && !pass.unanswered) {
+        if (recovery.since !== undefined && pass.outcome === 'answered') {
           logControlDiagnostic('session_transport_recovery', {
             sessionId: this.sessionId,
             outcome: 'answered',
@@ -4142,6 +4147,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return;
     }
+    markAnswered(pass);
     if (result === 'sent') {
       const now = Date.now();
       const reduction = acceptMessages(
@@ -4252,7 +4258,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // A Stop refuses work created before its wall clock; a later message is new intent.
     const intent = oldestOpenMessage(this.messages, 'queued');
     try {
-      return await withDORetry(
+      const view = await withDORetry(
         () => this.sandboxPeer() ?? peer,
         async stub =>
           stub.prepare({
@@ -4268,6 +4274,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'session.prepare',
         this.sandboxRpcConfig(pass)
       );
+      markAnswered(pass);
+      return view;
     } catch {
       // `unknown` must come only from the Sandbox, never from a transport error.
       await this.scheduleTransportRecovery(pass);
@@ -4361,6 +4369,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'session.status',
         this.sandboxRpcConfig(pass)
       );
+      markAnswered(pass);
       if (status.workspaceStopEpoch > this.workspaceStop.epoch) {
         const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
         const authoritativeRetired =
@@ -4392,7 +4401,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * at its end, queued work fails with a specific reason, not at the backstop.
    */
   private async scheduleTransportRecovery(pass: TransportPass): Promise<void> {
-    pass.unanswered = true;
+    pass.outcome = 'unanswered';
     if (
       !pass.scheduleRecovery ||
       this.transportRecovery?.since !== undefined ||

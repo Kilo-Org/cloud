@@ -84,7 +84,7 @@ describe('queue handler', () => {
     expect(http.requests).toEqual([]);
   });
 
-  it('pages and acks a batch that a non-retryable failure dropped', async () => {
+  it('pages and acks a batch archived without the hot copy', async () => {
     const stream = uniqueStream('queue-drop');
     const http = recordingFetch(request =>
       request.url.startsWith('https://api.axiom.co')
@@ -102,7 +102,7 @@ describe('queue handler', () => {
     );
     expect(page).toBeDefined();
     expect(JSON.parse(page?.body ?? '{}')).toMatchObject({
-      text: expect.stringMatching(/^bot: /),
+      text: expect.stringMatching(/^bot: audit stream .* without the hot copy: axiom_rejected$/),
     });
   });
 });

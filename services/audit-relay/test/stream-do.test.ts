@@ -112,28 +112,75 @@ describe('StreamDO', () => {
     ]);
 
     failing = false;
-    // Miniflare has no bucket-lock rule, so the retry rewrites an identical object instead of
-    // taking the locked-key path; archive.test.ts covers that path with a locked bucket.
-    const retried = accepted(await stub.acceptBatch(batch));
-    expect(retried.toSeq).toBe(2);
+    // The head advanced with the archive write, so the retry is a duplicate that re-ingests the
+    // recorded hot-store gap instead of writing the archive object again.
+    expect(await stub.acceptBatch(batch)).toMatchObject({ kind: 'duplicate', replayed: true });
     expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
       archiveObjectKey(stream, 2),
     ]);
     expect(http.requests).toHaveLength(2);
+    expect(await stub.hotStoreGaps()).toEqual([]);
     expect(await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, 2))).toMatchObject({
       prevHash: GENESIS_HASH,
       batch: { fromSeq: 1, toSeq: 2 },
     });
   });
 
-  it('drops a batch Axiom rejects as malformed', async () => {
+  it('records a durable hot-store gap when Axiom rejects a batch', async () => {
     const stream = uniqueStream('axiom-reject');
     const http = recordingFetch(() => new Response('invalid', { status: 400 }));
     vi.stubGlobal('fetch', http.impl);
+    const stub = getStreamDOStub(env, stream);
 
-    expect(await getStreamDOStub(env, stream).acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
-      kind: 'dropped',
+    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
+      kind: 'hot_gap',
+      fromSeq: 1,
+      toSeq: 2,
       reason: 'axiom_rejected',
     });
+    expect(await stub.hotStoreGaps()).toEqual([
+      {
+        stream,
+        fromSeq: 1,
+        toSeq: 2,
+        reason: 'axiom_rejected',
+        recordedAt: expect.any(String),
+      },
+    ]);
+
+    await stub.clearHotStoreGap(1, 2);
+    expect(await stub.hotStoreGaps()).toEqual([]);
+  });
+
+  it('accepts and archives the next batch after a hot-store gap', async () => {
+    const stream = uniqueStream('axiom-reject-continue');
+    let rejectFirst = true;
+    const http = recordingFetch(() => {
+      if (!rejectFirst) return axiomOk();
+      rejectFirst = false;
+      return new Response('invalid', { status: 400 });
+    });
+    vi.stubGlobal('fetch', http.impl);
+    const stub = getStreamDOStub(env, stream);
+
+    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
+      kind: 'hot_gap',
+    });
+    expect(await stub.acceptBatch(auditBatch(3, 5, stream))).toMatchObject({
+      kind: 'accepted',
+      fromSeq: 3,
+      toSeq: 5,
+    });
+    expect(await listObjectKeys(env.AUDIT_ARCHIVE, `streams/${stream}/`)).toEqual([
+      archiveObjectKey(stream, 2),
+      archiveObjectKey(stream, 5),
+    ]);
+    expect((await stub.hotStoreGaps()).map(gap => [gap.fromSeq, gap.toSeq])).toEqual([[1, 2]]);
+
+    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
+      kind: 'duplicate',
+      replayed: true,
+    });
+    expect(await stub.hotStoreGaps()).toEqual([]);
   });
 });

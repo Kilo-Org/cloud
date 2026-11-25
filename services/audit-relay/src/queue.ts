@@ -84,6 +84,7 @@ async function applyOutcome(
           stream: outcome.stream,
           toSeq: outcome.toSeq,
           headSeq: outcome.headSeq,
+          replayed: outcome.replayed,
         })
       );
       message.ack();
@@ -100,6 +101,22 @@ async function applyOutcome(
       );
       message.retry({ delaySeconds: outcome.delaySeconds });
       return;
+    case 'hot_gap':
+      console.error(
+        JSON.stringify({
+          event: 'audit_relay.hot_store_gap',
+          stream: outcome.stream,
+          fromSeq: outcome.fromSeq,
+          toSeq: outcome.toSeq,
+          reason: outcome.reason,
+        })
+      );
+      await pageOperator(
+        env,
+        `audit stream ${outcome.stream} archived seq ${outcome.fromSeq}..${outcome.toSeq} without the hot copy: ${outcome.reason}`
+      );
+      message.ack();
+      return;
     case 'dropped':
       console.error(
         JSON.stringify({
@@ -109,27 +126,21 @@ async function applyOutcome(
           reason: outcome.reason,
         })
       );
-      await pageDrop(env, outcome);
+      await pageOperator(
+        env,
+        `audit stream ${outcome.stream} could not archive a batch at seq ${outcome.fromSeq}: ${outcome.reason}`
+      );
       message.ack();
       return;
   }
 }
 
-async function pageDrop(
-  env: Env,
-  outcome: Extract<StreamOutcome, { kind: 'dropped' }>
-): Promise<void> {
+async function pageOperator(env: Env, message: string): Promise<void> {
   try {
     const webhook = await createSecretSource(env).get('AUDIT_RELAY_SLACK_WEBHOOK_PAGE');
-    const delivered = await pageSlack(
-      webhook,
-      `audit stream ${outcome.stream} dropped a batch at seq ${outcome.fromSeq}: ${outcome.reason}`,
-      fetch
-    );
+    const delivered = await pageSlack(webhook, message, fetch);
     if (!delivered) {
-      console.error(
-        JSON.stringify({ event: 'audit_relay.page_undelivered', reason: outcome.reason })
-      );
+      console.error(JSON.stringify({ event: 'audit_relay.page_undelivered' }));
     }
   } catch (error) {
     console.error(JSON.stringify({ event: 'audit_relay.page_failed', error: errorName(error) }));
@@ -138,7 +149,8 @@ async function pageDrop(
 
 function toBytes(body: unknown): Uint8Array | null {
   if (body instanceof ArrayBuffer) return new Uint8Array(body);
-  if (ArrayBuffer.isView(body))
+  if (ArrayBuffer.isView(body)) {
     return new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+  }
   return null;
 }

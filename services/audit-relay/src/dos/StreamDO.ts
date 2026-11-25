@@ -13,13 +13,33 @@ export type StreamHead = { seq: number; hash: string };
 
 const GAP_RETRY_SECONDS = 30;
 const FAILURE_RETRY_SECONDS = 60;
+const HOT_GAPS_KEY = 'hot_gaps';
 
-export type StreamRetryReason = 'gap' | 'axiom' | 'secrets' | 'archive';
-export type StreamDropReason = 'axiom_rejected' | 'secrets_denied' | 'archive_conflict';
+export type StreamRetryReason = 'gap' | 'archive' | 'axiom' | 'secrets';
+
+export type HotGapReason =
+  | 'axiom_rejected'
+  | 'axiom_unavailable'
+  | 'secrets_denied'
+  | 'secrets_unavailable';
 
 /**
- * One batch's fate. `accepted` and `duplicate` are final; `retry` asks the queue for another
- * attempt; `dropped` is a non-retryable failure the caller must page and ack.
+ * One archived range the hot copy (Axiom) never received. The R2 object holds the evidence, so a
+ * replay job re-ingests this range from the archive; `recordedAt` is the wall clock of the record.
+ */
+export type HotStoreGap = {
+  stream: string;
+  fromSeq: number;
+  toSeq: number;
+  reason: HotGapReason;
+  recordedAt: string;
+};
+
+/**
+ * One batch's fate. `accepted` means archived and delivered to Axiom; `duplicate` means the batch
+ * was already archived (`replayed` says a recorded hot-store gap was re-ingested); `retry` asks the
+ * queue for another attempt; `hot_gap` means archived but the hot copy is deferred to a replay job;
+ * `dropped` is a non-retryable failure that lost the batch entirely.
  */
 export type StreamOutcome =
   | {
@@ -30,7 +50,7 @@ export type StreamOutcome =
       hash: string;
       archive: 'written' | 'existing';
     }
-  | { kind: 'duplicate'; stream: string; toSeq: number; headSeq: number }
+  | { kind: 'duplicate'; stream: string; toSeq: number; headSeq: number; replayed: boolean }
   | {
       kind: 'retry';
       stream: string;
@@ -38,12 +58,16 @@ export type StreamOutcome =
       reason: StreamRetryReason;
       delaySeconds: number;
     }
-  | { kind: 'dropped'; stream: string; fromSeq: number; reason: StreamDropReason };
+  | { kind: 'hot_gap'; stream: string; fromSeq: number; toSeq: number; reason: HotGapReason }
+  | { kind: 'dropped'; stream: string; fromSeq: number; reason: 'archive_conflict' };
 
 /**
  * The single writer for one audit stream: it owns the chain head, the archive object for the
  * batch, and the Axiom ingest, in that order. Queues deliver at least once and in no fixed order,
- * so every step after the head read is idempotent by chain hash.
+ * so every step is idempotent by chain hash and replayable by sequence range.
+ *
+ * The archive is the evidence store, so the head advances as soon as the object is stored. Axiom
+ * is the hot copy: failing to fill it records a durable gap instead of stalling the stream.
  */
 export class StreamDO extends DurableObject<Env> {
   // Serialises the batches addressed to this stream inside the instance; the head in storage is
@@ -62,11 +86,22 @@ export class StreamDO extends DurableObject<Env> {
     return run;
   }
 
+  /** Ranges a replay job must re-ingest from the archive into Axiom. */
+  async hotStoreGaps(): Promise<HotStoreGap[]> {
+    return this.readHotStoreGaps();
+  }
+
+  /** Marks a replayed range done; a later duplicate batch covering it also clears it. */
+  async clearHotStoreGap(fromSeq: number, toSeq: number): Promise<void> {
+    const gaps = await this.readHotStoreGaps();
+    await this.writeHotStoreGaps(
+      gaps.filter(gap => gap.fromSeq !== fromSeq || gap.toSeq !== toSeq)
+    );
+  }
+
   private async applyBatch(batch: AuditBatch): Promise<StreamOutcome> {
     const head = await this.readHead();
-    if (batch.toSeq <= head.seq) {
-      return { kind: 'duplicate', stream: batch.stream, toSeq: batch.toSeq, headSeq: head.seq };
-    }
+    if (batch.toSeq <= head.seq) return this.replayIfGapped(batch, head);
     if (batch.fromSeq > head.seq + 1) {
       return {
         kind: 'retry',
@@ -112,43 +147,12 @@ export class StreamDO extends DurableObject<Env> {
       };
     }
 
-    let token: string;
-    try {
-      token = await createSecretSource(this.env).get('AUDIT_RELAY_AXIOM_TOKEN');
-    } catch (error) {
-      if (error instanceof SecretSourceError && !error.retryable) {
-        return { kind: 'dropped', stream: trimmed.stream, fromSeq, reason: 'secrets_denied' };
-      }
-      return {
-        kind: 'retry',
-        stream: trimmed.stream,
-        fromSeq,
-        reason: 'secrets',
-        delaySeconds: FAILURE_RETRY_SECONDS,
-      };
-    }
-
-    const ingest = await ingestAuditEvents(
-      { url: this.env.AXIOM_URL, dataset: this.env.AXIOM_DATASET, token },
-      trimmed.events,
-      fetch
-    );
-    if (ingest.kind === 'retryable') {
-      return {
-        kind: 'retry',
-        stream: trimmed.stream,
-        fromSeq,
-        reason: 'axiom',
-        delaySeconds: FAILURE_RETRY_SECONDS,
-      };
-    }
-    if (ingest.kind === 'rejected') {
-      return { kind: 'dropped', stream: trimmed.stream, fromSeq, reason: 'axiom_rejected' };
-    }
-
     await this.recordHead(trimmed.stream, trimmed.toSeq, hash);
     await this.ctx.storage.put('stream', trimmed.stream);
     await this.ctx.storage.put('head', { seq: trimmed.toSeq, hash });
+
+    const hotCopy = await this.deliverHotCopy(trimmed);
+    if (hotCopy.kind !== 'delivered') return hotCopy;
     return {
       kind: 'accepted',
       stream: trimmed.stream,
@@ -159,9 +163,105 @@ export class StreamDO extends DurableObject<Env> {
     };
   }
 
+  /**
+   * A batch at or below the head was already archived. If a recorded hot-store gap overlaps it,
+   * the redelivery is the second chance for the hot copy: re-ingest the events the message still
+   * carries (at-least-once, deduped by event id) and clear the gaps it fully covers.
+   */
+  private async replayIfGapped(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
+    const gaps = await this.readHotStoreGaps();
+    const overlapping = gaps.some(gap => gap.toSeq >= batch.fromSeq && gap.fromSeq <= batch.toSeq);
+    if (!overlapping) {
+      return {
+        kind: 'duplicate',
+        stream: batch.stream,
+        toSeq: batch.toSeq,
+        headSeq: head.seq,
+        replayed: false,
+      };
+    }
+
+    const hotCopy = await this.deliverHotCopy(batch);
+    if (hotCopy.kind !== 'delivered') return hotCopy;
+
+    const covered = (gap: HotStoreGap) => gap.fromSeq >= batch.fromSeq && gap.toSeq <= batch.toSeq;
+    await this.writeHotStoreGaps(gaps.filter(gap => !covered(gap)));
+    return {
+      kind: 'duplicate',
+      stream: batch.stream,
+      toSeq: batch.toSeq,
+      headSeq: head.seq,
+      replayed: true,
+    };
+  }
+
+  private async deliverHotCopy(
+    batch: AuditBatch
+  ): Promise<
+    { kind: 'delivered' } | Extract<StreamOutcome, { kind: 'retry' } | { kind: 'hot_gap' }>
+  > {
+    const range = { stream: batch.stream, fromSeq: batch.fromSeq, toSeq: batch.toSeq };
+
+    let token: string;
+    try {
+      token = await createSecretSource(this.env).get('AUDIT_RELAY_AXIOM_TOKEN');
+    } catch (error) {
+      const denied = error instanceof SecretSourceError && !error.retryable;
+      const reason: HotGapReason = denied ? 'secrets_denied' : 'secrets_unavailable';
+      await this.recordHotStoreGap({ ...range, reason });
+      if (denied) return { kind: 'hot_gap', ...range, reason };
+      return {
+        kind: 'retry',
+        ...range,
+        reason: 'secrets',
+        delaySeconds: FAILURE_RETRY_SECONDS,
+      };
+    }
+
+    const ingest = await ingestAuditEvents(
+      { url: this.env.AXIOM_URL, dataset: this.env.AXIOM_DATASET, token },
+      batch.events,
+      fetch
+    );
+    switch (ingest.kind) {
+      case 'ok':
+        return { kind: 'delivered' };
+      case 'retryable':
+        await this.recordHotStoreGap({ ...range, reason: 'axiom_unavailable' });
+        return {
+          kind: 'retry',
+          ...range,
+          reason: 'axiom',
+          delaySeconds: FAILURE_RETRY_SECONDS,
+        };
+      case 'rejected':
+        await this.recordHotStoreGap({ ...range, reason: 'axiom_rejected' });
+        return { kind: 'hot_gap', ...range, reason: 'axiom_rejected' };
+    }
+  }
+
   private async readHead(): Promise<StreamHead> {
     const stored = await this.ctx.storage.get<StreamHead>('head');
     return stored ?? { seq: 0, hash: GENESIS_HASH };
+  }
+
+  private async readHotStoreGaps(): Promise<HotStoreGap[]> {
+    return (await this.ctx.storage.get<HotStoreGap[]>(HOT_GAPS_KEY)) ?? [];
+  }
+
+  private async writeHotStoreGaps(gaps: HotStoreGap[]): Promise<void> {
+    await this.ctx.storage.put(HOT_GAPS_KEY, gaps);
+  }
+
+  // One row per archived range that missed the hot copy, so the range survives a DLQ landing.
+  private async recordHotStoreGap(gap: Omit<HotStoreGap, 'recordedAt'>): Promise<void> {
+    const gaps = await this.readHotStoreGaps();
+    const entry: HotStoreGap = { ...gap, recordedAt: new Date().toISOString() };
+    const others = gaps.filter(
+      existing => existing.fromSeq !== gap.fromSeq || existing.toSeq !== gap.toSeq
+    );
+    // Read-modify-write without an I/O boundary: the input gate keeps it atomic.
+    await this.writeHotStoreGaps([...others, entry]);
   }
 
   // The registry only indexes heads for the checkpoint and verify jobs. A failure there must not

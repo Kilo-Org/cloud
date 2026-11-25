@@ -77,12 +77,27 @@ export type AuditBatch = z.infer<typeof AuditBatchSchema>;
 
 export class AuditBatchTooLargeError extends Error {
   constructor(readonly compressedBytes: number) {
-    super(`audit batch compresses to ${compressedBytes} bytes, above ${AUDIT_BATCH_MAX_COMPRESSED_BYTES}`);
+    super(
+      `audit batch compresses to ${compressedBytes} bytes, above ${AUDIT_BATCH_MAX_COMPRESSED_BYTES}`
+    );
     this.name = 'AuditBatchTooLargeError';
   }
 }
 
-async function pipeThrough(bytes: Uint8Array<ArrayBuffer>, transform: CompressionStream | DecompressionStream) {
+/**
+ * Copies a view into an `ArrayBuffer`-backed one. The Workers lib types keep a view's
+ * buffer parameter, and `ReadableStream` here needs the non-shared form.
+ */
+function arrayBufferView(bytes: Uint8Array<ArrayBufferLike>): Uint8Array<ArrayBuffer> {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy;
+}
+
+async function pipeThrough(
+  bytes: Uint8Array<ArrayBuffer>,
+  transform: CompressionStream | DecompressionStream
+) {
   const source = new ReadableStream<BufferSource>({
     start(controller) {
       controller.enqueue(bytes);
@@ -94,7 +109,9 @@ async function pipeThrough(bytes: Uint8Array<ArrayBuffer>, transform: Compressio
 
 /** Gzips a validated batch for a queue message. Throws `AuditBatchTooLargeError`; the producer then splits the batch. */
 export async function encodeAuditBatch(batch: AuditBatch): Promise<Uint8Array> {
-  const json = new TextEncoder().encode(JSON.stringify(AuditBatchSchema.parse(batch)));
+  const json = arrayBufferView(
+    new TextEncoder().encode(JSON.stringify(AuditBatchSchema.parse(batch)))
+  );
   const compressed = await pipeThrough(json, new CompressionStream('gzip'));
   if (compressed.byteLength > AUDIT_BATCH_MAX_COMPRESSED_BYTES) {
     throw new AuditBatchTooLargeError(compressed.byteLength);
@@ -104,6 +121,7 @@ export async function encodeAuditBatch(batch: AuditBatch): Promise<Uint8Array> {
 
 /** Decodes and validates a queue message body produced by `encodeAuditBatch`. */
 export async function decodeAuditBatch(body: ArrayBuffer | Uint8Array): Promise<AuditBatch> {
-  const json = await pipeThrough(new Uint8Array(body), new DecompressionStream('gzip'));
+  const bytes = arrayBufferView(body instanceof Uint8Array ? body : new Uint8Array(body));
+  const json = await pipeThrough(bytes, new DecompressionStream('gzip'));
   return AuditBatchSchema.parse(JSON.parse(new TextDecoder().decode(json)));
 }

@@ -174,8 +174,9 @@ describe('audit outbox rows', () => {
     expect(await relayRead(relay, lateRow.shard)).not.toContain(lateRow.id);
 
     await early.query('COMMIT');
-    // Transactions of other test files share the cluster's oldest-open-transaction horizon, so
-    // wait for any of them to finish too.
+    // Transactions of other test files share the server's oldest-open-transaction horizon, so
+    // wait for any of them to finish too. Up to 30 seconds: a seed insert of 100,000 rows in
+    // `audit-maintenance.test.ts` holds the horizon for several seconds.
     await vi.waitFor(
       async () => {
         expect(await relayRead(relay, earlyRow.shard)).toContain(earlyRow.id);
@@ -469,7 +470,8 @@ describe('relay batches', () => {
        ORDER BY position`,
       [JSON.stringify(events)]
     );
-    // Another test file's open transaction can briefly hold back the oldest-open horizon.
+    // Other test files' writes hold back the server-wide horizon, a seed insert of 100,000 rows
+    // for several seconds, so the read may wait up to 30 seconds.
     const rows = await vi.waitFor(
       async () => {
         const read = await withIdentityStore(

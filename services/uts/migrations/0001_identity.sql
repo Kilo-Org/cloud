@@ -674,21 +674,25 @@ CREATE TABLE uts.personal_access_tokens (
 CREATE INDEX personal_access_tokens_account_idx ON uts.personal_access_tokens (account_id);
 
 -- Org bot keys: `kilo_bot_` values owned by the organization. `created_by` names the member who
--- created the key and has no foreign key, because the key outlives that account. Member removal
--- flags the member's keys; a flagged key stops working 7 days after `flagged_at` unless an org
--- admin keeps it (design section 5.8).
+-- created the key. Member removal flags the member's keys; a flagged key stops working 7 days
+-- after `flagged_at` unless an org admin keeps it (design section 5.8).
+--
+-- The key outlives the creator's account: deleting the account deletes its gate passes, and the
+-- foreign key then sets `created_by` and `gate_pass_id` to NULL together. `gate_pass_action` is a
+-- constant with a CHECK rather than a generated column, because PostgreSQL refuses ON DELETE
+-- SET NULL on a foreign key that contains a generated column.
 CREATE TABLE uts.org_bot_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id uuid NOT NULL,
-  created_by uts.account_id NOT NULL,
+  created_by uts.account_id,
   name text NOT NULL CHECK (length(name) BETWEEN 1 AND 100),
   token_hash uts.sha256 NOT NULL,
   last_four text NOT NULL CHECK (last_four ~ '^[A-Za-z0-9_-]{4}$'),
   audience uts.audience NOT NULL,
   scope uts.scope NOT NULL,
-  gate_pass_id uuid NOT NULL,
-  gate_pass_action uts.gated_action NOT NULL
-    GENERATED ALWAYS AS ('bot_key_create'::uts.gated_action) STORED,
+  gate_pass_id uuid,
+  gate_pass_action uts.gated_action NOT NULL DEFAULT 'bot_key_create'
+    CHECK (gate_pass_action = 'bot_key_create'),
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   last_used_at timestamptz,
@@ -702,7 +706,10 @@ CREATE TABLE uts.org_bot_keys (
   CONSTRAINT org_bot_keys_gate_pass_key UNIQUE (gate_pass_id),
   -- The pass belongs to the member who created the key.
   CONSTRAINT org_bot_keys_gate_pass_fkey FOREIGN KEY (gate_pass_id, created_by, gate_pass_action)
-    REFERENCES uts.gate_passes (id, account_id, action),
+    REFERENCES uts.gate_passes (id, account_id, action)
+    ON DELETE SET NULL (gate_pass_id, created_by),
+  -- Both are NULL only once the creator's account is gone.
+  CONSTRAINT org_bot_keys_creator_shape CHECK ((created_by IS NULL) = (gate_pass_id IS NULL)),
   CONSTRAINT org_bot_keys_lifetime CHECK (
     expires_at > created_at AND expires_at <= created_at + interval '365 days'
   ),

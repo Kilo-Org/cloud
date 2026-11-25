@@ -149,7 +149,8 @@ describe('audit reads at volume', () => {
       await owner.query('RESET plan_cache_mode');
     }
 
-    // Another test file's open transaction can briefly hold back the oldest-open horizon.
+    // Other test files' writes hold back the server-wide horizon for up to several seconds, so
+    // the read may wait up to 30 seconds.
     await vi.waitFor(
       async () => {
         const read = await owner.query<{ shard: number; created_at: Date }>(RELAY_READ, [

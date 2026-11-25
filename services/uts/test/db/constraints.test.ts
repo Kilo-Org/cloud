@@ -598,6 +598,72 @@ describe('gate pass binding', () => {
     await insertBotKey(accountId, gatePassId);
   });
 
+  it('keep a bot key with the organization when its creator account is deleted', async () => {
+    const creatorId = await insertAccount(app);
+    const orgId = crypto.randomUUID();
+    const gatePassId = await insertGatePass(app, creatorId, 'bot_key_create');
+    const key = await app.query<{ id: string }>(
+      `INSERT INTO uts.org_bot_keys
+         (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
+       VALUES ($1, $2, 'bot', $3, 'wxyz', 'gateway', 'gateway:models.read', $4,
+               now() + interval '90 days')
+       RETURNING id`,
+      [orgId, creatorId, randomHash(), gatePassId]
+    );
+    // The creator also holds a PAT, which goes with the account.
+    await app.query(
+      `INSERT INTO uts.personal_access_tokens
+         (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
+       VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')`,
+      [creatorId, randomHash(), await insertGatePass(app, creatorId, 'pat_create')]
+    );
+
+    await app.query('DELETE FROM uts.accounts WHERE id = $1', [creatorId]);
+
+    const kept = await app.query(
+      `SELECT org_id, created_by, gate_pass_id, status FROM uts.org_bot_keys WHERE id = $1`,
+      [key.rows[0].id]
+    );
+    expect(kept.rows).toEqual([
+      { org_id: orgId, created_by: null, gate_pass_id: null, status: 'active' },
+    ]);
+    const passes = await app.query('SELECT 1 FROM uts.gate_passes WHERE id = $1', [gatePassId]);
+    expect(passes.rowCount).toBe(0);
+    const pats = await app.query('SELECT 1 FROM uts.personal_access_tokens WHERE account_id = $1', [
+      creatorId,
+    ]);
+    expect(pats.rowCount).toBe(0);
+
+    // The deleted pass cannot create another key, for any account.
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `INSERT INTO uts.org_bot_keys
+             (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id,
+              expires_at)
+           VALUES ($1, $2, 'bot', $3, 'wxyz', 'gateway', 'gateway:models.read', $4,
+                   now() + interval '90 days')`,
+          [orgId, accountId, randomHash(), gatePassId]
+        )
+      )
+    ).toBe(FOREIGN_KEY_VIOLATION);
+  });
+
+  it('refuse a bot key with a creator but no gate pass, or a pass action of another kind', async () => {
+    const insert = (gatePassId: string | null, action: string) =>
+      app.query(
+        `INSERT INTO uts.org_bot_keys
+           (org_id, created_by, gate_pass_id, gate_pass_action, name, token_hash, last_four,
+            audience, scope, expires_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, 'bot', $4, 'wxyz', 'gateway', 'gateway:models.read',
+                 now() + interval '90 days')`,
+        [accountId, gatePassId, action, randomHash()]
+      );
+    expect(await sqlStateOf(() => insert(null, 'bot_key_create'))).toBe(CHECK_VIOLATION);
+    const gatePassId = await insertGatePass(app, accountId, 'bot_key_create');
+    expect(await sqlStateOf(() => insert(gatePassId, 'pat_create'))).toBe(CHECK_VIOLATION);
+  });
+
   it('bind a device approval to the approving account and one code', async () => {
     const approve = (approver: string, gatePassId: string) =>
       app.query(

@@ -343,13 +343,14 @@ export const PersonalAccessTokenRowSchema = z.strictObject({
 export const OrgBotKeyRowSchema = z.strictObject({
   id: uuid,
   org_id: uuid,
-  created_by: z.string(),
+  /** NULL, together with `gate_pass_id`, once the creator's account is deleted. */
+  created_by: z.string().nullable(),
   name: z.string(),
   token_hash: sha256,
   last_four: z.string(),
   audience: z.string(),
   scope: z.string(),
-  gate_pass_id: uuid,
+  gate_pass_id: uuid.nullable(),
   gate_pass_action: z.enum(enums.GATED_ACTIONS),
   created_at: timestamp,
   expires_at: timestamp,

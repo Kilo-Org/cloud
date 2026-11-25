@@ -68,6 +68,8 @@ whether granted directly, through `PUBLIC` or through an inherited role.
 - A gate pass serves one action of its own account once: each table that records a gated action
   holds a constant `gate_pass_action` column, a foreign key on (pass, account, action) and a unique
   pass id.
+- An org bot key outlives its creator's account (design section 5.8): deleting the account deletes
+  its gate passes, and the key's `created_by` and `gate_pass_id` become NULL together.
 - `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour, not on
   every mint; the table leaves 10 percent of each page free (`fillfactor = 90`) for those updates.
 - The app login still writes the credential tables directly. When the mint, refresh and revoke

@@ -103,6 +103,7 @@ describe('isolate denial buffer', () => {
     await subject.add(replayed('refs/heads/main'));
     expect(subject.failed).toHaveLength(1);
     subject.fail(false);
+    subject.advance(10_000);
 
     const retried = subject.add(replayed('refs/heads/main'));
     expect(retried).not.toBeNull();
@@ -122,6 +123,7 @@ describe('isolate denial buffer', () => {
     subject.fail(true);
     await subject.add(replayed('refs/heads/other'));
     subject.fail(false);
+    subject.advance(10_000);
 
     await subject.add(replayed('refs/heads/third'));
     expect(subject.sent.at(-1)).toEqual([
@@ -129,5 +131,54 @@ describe('isolate denial buffer', () => {
       { denial: replayed('refs/heads/other'), count: 1, overflow: false, minute: SECOND },
       { denial: replayed('refs/heads/third'), count: 1, overflow: false, minute: SECOND },
     ]);
+  });
+
+  it('only counts during a backoff after a failed send, then sends everything once', async () => {
+    const subject = buffer();
+    subject.fail(true);
+    await subject.add(replayed('refs/heads/a'));
+    for (let index = 0; index < 20; index += 1) {
+      expect(subject.add(replayed(`refs/heads/held-${index % 4}`))).toBeNull();
+    }
+    subject.advance(9_000);
+    expect(subject.add(replayed('refs/heads/a'))).toBeNull();
+    expect(subject.failed).toHaveLength(1);
+
+    subject.advance(1_000);
+    await subject.add(replayed('refs/heads/a'));
+    expect(subject.failed).toHaveLength(2);
+    expect(subject.failed[1].map(count => count.count).sort()).toEqual([3, 5, 5, 5, 5]);
+
+    subject.fail(false);
+    subject.advance(19_000);
+    expect(subject.add(replayed('refs/heads/a'))).toBeNull();
+    subject.advance(1_000);
+    await subject.add(replayed('refs/heads/a'));
+    expect(subject.sent).toHaveLength(1);
+    expect(subject.sent[0].reduce((total, count) => total + count.count, 0)).toBe(25);
+
+    await subject.add(replayed('refs/heads/fresh'));
+    expect(subject.sent).toHaveLength(2);
+  });
+
+  it('doubles the backoff per failure up to one minute', async () => {
+    const subject = buffer();
+    subject.fail(true);
+    const holds: number[] = [];
+    await subject.add(replayed('refs/heads/start'));
+    for (let failure = 0; failure < 6; failure += 1) {
+      let waited = 0;
+      for (;;) {
+        subject.advance(1_000);
+        waited += 1_000;
+        const hop = subject.add(replayed('refs/heads/start'));
+        if (hop !== null) {
+          await hop;
+          break;
+        }
+      }
+      holds.push(waited);
+    }
+    expect(holds).toEqual([10_000, 20_000, 40_000, 60_000, 60_000, 60_000]);
   });
 });

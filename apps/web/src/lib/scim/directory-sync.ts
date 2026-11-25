@@ -30,7 +30,7 @@ import { cleanupRemovedClaudeProfilesForUser } from '@/lib/claude-billing/delete
 import { extractEmailDomain } from '@/lib/email-domain';
 import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
 import {
-  listDnsVerifiedDomains,
+  listVerifiedDomains,
   VerifiedDomainLookupError,
   VerifiedDomainOwnerMissingError,
 } from '@/lib/scim/directory-verified-domains';
@@ -557,13 +557,12 @@ async function applyDirectoryUserChanges(
  * Two domains satisfy it. The organization's own `sso_domain`, which is the
  * Effective SSO policy domain and is checked first because it needs no
  * network call. Failing that, any domain the WorkOS organization has verified
- * **through DNS** — an enterprise commonly runs several mail domains through
- * one directory, and only one of them can be the SSO authority under Policy
- * Resolution rules 4 and 6, so the single column cannot express the set.
+ * — an enterprise commonly runs several mail domains through one directory,
+ * and only one of them can be the SSO authority under Policy Resolution rules
+ * 4 and 6, so the single column cannot express the set.
  *
- * DNS is the bar rather than `state === 'verified'`: WorkOS also reaches that
- * state by a `manual` tick in the dashboard, which is an assertion by whoever
- * had access rather than evidence of control. See
+ * A verified domain is the bar: WorkOS marks a domain `verified` whether it
+ * was proven by a DNS record or by a dashboard tick. See
  * `directory-verified-domains.ts`.
  *
  * The policy is read from the directory's organization rather than the
@@ -628,7 +627,7 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
 
   const policy = await resolveEffectiveOrganizationSsoPolicy(owner.id);
   if (policy.status === 'misconfigured') {
-    // Fails closed even though a DNS-verified domain might match: an ambiguous
+    // Fails closed even though a verified domain might match: an ambiguous
     // or nested policy means we cannot say which authority owns the address.
     return refuse(
       'domain_not_captured',
@@ -639,9 +638,8 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
   // The SSO domain, when there is one, needs no network call.
   if (policy.status === 'required' && emailDomain === policy.domain) return;
 
-  // Otherwise the address is allowed only by a DNS-verified organization
-  // domain, and without `external_org_id` there is nothing to ask WorkOS
-  // about.
+  // Otherwise the address is allowed only by a verified organization domain,
+  // and without `external_org_id` there is nothing to ask WorkOS about.
   //
   // Terminal, not retryable: the organization is already bound to this
   // directory, and `upsertDirectoryOrganization` returns an already-bound
@@ -659,7 +657,7 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
 
   let verified: string[];
   try {
-    verified = await listDnsVerifiedDomains(owner.externalOrgId);
+    verified = await listVerifiedDomains(owner.externalOrgId);
   } catch (error) {
     // A WorkOS organization that does not exist is a completed answer, so it
     // refuses terminally and the event parks. Retrying cannot conjure one, and
@@ -685,8 +683,8 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
   return refuse(
     'domain_not_captured',
     verified.length === 0
-      ? 'the organization has no DNS-verified domain, and a domain verified only by hand does not authorize a bind'
-      : `the organization's DNS-verified domains are ${verified.join(', ')}`
+      ? 'the organization has no verified domain'
+      : `the organization's verified domains are ${verified.join(', ')}`
   );
 }
 

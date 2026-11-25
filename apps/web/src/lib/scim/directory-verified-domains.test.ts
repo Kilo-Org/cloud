@@ -21,7 +21,7 @@ const { __getOrganization: getOrganization } = jest.requireMock<{ __getOrganizat
 );
 
 import {
-  listDnsVerifiedDomains,
+  listVerifiedDomains,
   VerifiedDomainLookupError,
   VerifiedDomainOwnerMissingError,
 } from './directory-verified-domains';
@@ -36,22 +36,21 @@ function domain(name: string, state: string, verificationStrategy: string) {
   };
 }
 
-describe('listDnsVerifiedDomains', () => {
-  test('keeps only domains verified through DNS', async () => {
+describe('listVerifiedDomains', () => {
+  test('keeps every verified domain, whichever strategy reached it', async () => {
     getOrganization.mockResolvedValueOnce({
       domains: [
         domain('dns.test', 'verified', 'dns'),
-        // Verified, but by a dashboard tick rather than a DNS record. WorkOS
-        // also accepts `state: 'verified'` directly on organization create, so
-        // this is an assertion by whoever held access, not evidence of
-        // control — and it must not authorize an account takeover.
+        // Verified by a dashboard tick rather than a DNS record. The state is
+        // the bar, not the strategy that reached it, so this authorizes a bind
+        // exactly like the DNS row above.
         domain('manual.test', 'verified', 'manual'),
         domain('pending.test', 'pending', 'dns'),
         domain('failed.test', 'failed', 'dns'),
       ],
     });
 
-    await expect(listDnsVerifiedDomains('org_1')).resolves.toEqual(['dns.test']);
+    await expect(listVerifiedDomains('org_1')).resolves.toEqual(['dns.test', 'manual.test']);
   });
 
   test('lowercases and drops blanks, so the comparison is on the mailbox host', async () => {
@@ -59,7 +58,7 @@ describe('listDnsVerifiedDomains', () => {
       domains: [domain('MiXeD.TEST', 'verified', 'dns'), domain('   ', 'verified', 'dns')],
     });
 
-    await expect(listDnsVerifiedDomains('org_1')).resolves.toEqual(['mixed.test']);
+    await expect(listVerifiedDomains('org_1')).resolves.toEqual(['mixed.test']);
   });
 
   test('reports an unreachable WorkOS rather than an empty set', async () => {
@@ -68,7 +67,7 @@ describe('listDnsVerifiedDomains', () => {
     // distinguishable or an outage would discard valid binds.
     getOrganization.mockRejectedValueOnce(new Error('503 upstream'));
 
-    await expect(listDnsVerifiedDomains('org_1')).rejects.toBeInstanceOf(VerifiedDomainLookupError);
+    await expect(listVerifiedDomains('org_1')).rejects.toBeInstanceOf(VerifiedDomainLookupError);
   });
 
   test('separates a missing organization from an outage, so the event can park', async () => {
@@ -78,12 +77,12 @@ describe('listDnsVerifiedDomains', () => {
     const notFound = Object.assign(new Error('Not found'), { status: 404 });
     getOrganization.mockRejectedValueOnce(notFound);
 
-    await expect(listDnsVerifiedDomains('org_gone')).rejects.toBeInstanceOf(
+    await expect(listVerifiedDomains('org_gone')).rejects.toBeInstanceOf(
       VerifiedDomainOwnerMissingError
     );
     // And not the transient class, which is what decides hold versus park.
     getOrganization.mockRejectedValueOnce(notFound);
-    await expect(listDnsVerifiedDomains('org_gone')).rejects.not.toBeInstanceOf(
+    await expect(listVerifiedDomains('org_gone')).rejects.not.toBeInstanceOf(
       VerifiedDomainLookupError
     );
   });
@@ -94,6 +93,6 @@ describe('listDnsVerifiedDomains', () => {
     // un-parkable 500.
     getOrganization.mockResolvedValueOnce({});
 
-    await expect(listDnsVerifiedDomains('org_1')).resolves.toEqual([]);
+    await expect(listVerifiedDomains('org_1')).resolves.toEqual([]);
   });
 });

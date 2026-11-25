@@ -518,26 +518,23 @@ domain, and the 409 body names the domain too — neither carries the address. S
 
 Two domains satisfy the gate. The organization's own `sso_domain`, checked
 first because it needs no network call, and any domain the WorkOS organization
-reports as verified **through DNS** — an enterprise routinely routes several
-mail domains through one directory, and only one of them can be the SSO
-authority under Policy Resolution rules 4 and 6.
+reports as verified — an enterprise routinely routes several mail domains
+through one directory, and only one of them can be the SSO authority under
+Policy Resolution rules 4 and 6.
 
-DNS is the bar rather than a verified *state*: WorkOS also reaches that state
-by a `manual` tick in the dashboard, and `POST /organizations` accepts
-`state: 'verified'` outright, so the weaker signal is an assertion by whoever
-held access rather than evidence of control — and this authorizes seizing an
-account someone else holds. The check lives in
+The verified *state* is the bar, not the route that reached it: WorkOS marks a
+domain `verified` whether it was proven by a DNS TXT record or a `manual` tick
+in the dashboard, and both are set through the organization the directory is
+bound to. The check lives in
 `apps/web/src/lib/scim/directory-verified-domains.ts`, which reads
-`GET /organizations/{id}` and keeps only
-`state === 'verified' && verificationStrategy === 'dns'`.
+`GET /organizations/{id}` and keeps every domain with `state === 'verified'`.
 
 It is read from that API rather than the event, because `dsync.activated`'s
-domain objects are `{object, id, domain}` only — no `state`, no
-`verificationStrategy` — so the payload cannot tell a DNS-verified domain from
-one still pending.
+domain objects are `{object, id, domain}` only — no `state` — so the payload
+cannot tell a verified domain from one still pending.
 
 Clearing the refusal is an administrative action on the organization, never a
-directory-side one: verify the domain through DNS in WorkOS, capture it in the
+directory-side one: verify the domain in WorkOS, capture it in the
 organization's SSO settings, or replay `dsync.activated` carrying `domains` for
 an organization that has none (rule 14). Until one of those happens every
 address the directory provisions is refused, and each refusal is recorded and

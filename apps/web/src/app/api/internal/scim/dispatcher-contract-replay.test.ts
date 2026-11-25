@@ -32,10 +32,11 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
 }));
 
 // WorkOS is unreachable in tests, and the domain gate asks it which domains
-// the organization verified through DNS. The recorded directory verified none
-// — its only domain is the Okta tenant hostname, verified by hand — so an
-// empty set is what the real run saw, and the user binds are refused for the
-// same reason there.
+// the organization verified. The recorded directory has one: the Okta tenant
+// hostname, which the app captured as the organization's SSO domain. It does
+// not cover the addresses the directory provisions — `gmail.com` and
+// `anaconda.com` — so the user binds are still refused, matching the recorded
+// run.
 jest.mock('@/lib/scim/directory-verified-domains', () => {
   // Both classes: `directory-sync` branches on
   // `instanceof VerifiedDomainOwnerMissingError`, and an omitted export is
@@ -45,7 +46,7 @@ jest.mock('@/lib/scim/directory-verified-domains', () => {
   return {
     VerifiedDomainLookupError,
     VerifiedDomainOwnerMissingError,
-    listDnsVerifiedDomains: jest.fn().mockResolvedValue([]),
+    listVerifiedDomains: jest.fn().mockResolvedValue(['integrator-6483000.okta.com']),
   };
 });
 

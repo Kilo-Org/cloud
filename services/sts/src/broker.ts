@@ -57,9 +57,13 @@ export async function serveWorkerCall(
 ): Promise<BundleResult> {
   const reason = refusalFor(config, caller);
   if (reason !== null) {
-    waitUntil(
-      recordDenial(env, config, { channel: 'worker-binding', reason, actor: caller, claims: {} })
-    );
+    const hop = recordDenial(env, config, {
+      channel: 'worker-binding',
+      reason,
+      actor: caller,
+      claims: {},
+    });
+    if (hop !== null) waitUntil(hop);
     return { status: 'denied', reason };
   }
   return await serveBundle(env, config, caller, request);

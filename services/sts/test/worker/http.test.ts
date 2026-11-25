@@ -1,9 +1,10 @@
 import { SELF, runInDurableObject } from 'cloudflare:test';
 import { STS_FETCHED_AT_HEADER, STS_STALE_HEADER } from '@kilocode/sts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearDenialBuffers } from '../../src/audit/denials';
 import { serveBundle, serveWorkerCall } from '../../src/broker';
 import { getBundleStub, getDenialStub, getRefresherStub } from '../../src/dos/stubs';
-import { bundleResponse } from '../../src/http';
+import { bundleResponse, readCappedText } from '../../src/http';
 import { workloadPolicyHash } from '../../src/policy';
 import { installManager, stubOfflineNetwork } from './manager';
 import { resetBundleObject, resetDenialObject } from './reset';
@@ -11,6 +12,7 @@ import { config, env } from './test-env';
 import { signWebhook, webhookBody } from './webhook';
 
 beforeEach(async () => {
+  clearDenialBuffers();
   stubOfflineNetwork();
   await resetBundleObject(getBundleStub(env, config, 'o11y'));
   await resetDenialObject(getDenialStub(env, config));
@@ -124,6 +126,48 @@ describe('manager webhook route', () => {
   });
 });
 
+function chunkedBody(chunks: number, chunkBytes: number): ReadableStream<Uint8Array> {
+  let sent = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (sent === chunks) {
+        controller.close();
+        return;
+      }
+      sent += 1;
+      controller.enqueue(new Uint8Array(chunkBytes).fill(0x61));
+    },
+  });
+}
+
+describe('request body limits', () => {
+  it('stops reading a chunked body past the limit', async () => {
+    const request = new Request('https://sts.test/manager-webhook', {
+      method: 'POST',
+      body: chunkedBody(1_000, 16 * 1024),
+    });
+    expect(request.headers.get('content-length')).toBeNull();
+    expect(await readCappedText(request, 64 * 1024)).toBeNull();
+
+    const small = new Request('https://sts.test/manager-webhook', {
+      method: 'POST',
+      body: chunkedBody(2, 1024),
+    });
+    expect(await readCappedText(small, 64 * 1024)).toBe('a'.repeat(2048));
+  });
+
+  it('answers 413 to an oversized chunked webhook without a Content-Length', async () => {
+    const signature = `t=${Date.now()};${'0'.repeat(64)}`;
+    const response = await SELF.fetch(`${config.issuer}/manager-webhook`, {
+      method: 'POST',
+      headers: { 'x-infisical-signature': signature },
+      body: chunkedBody(64, 16 * 1024),
+    });
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: 'too_large' });
+  });
+});
+
 describe('worker-binding entry', () => {
   it('serves the caller named in props after its policy check', async () => {
     const stub = getBundleStub(env, config, 'o11y');
@@ -153,6 +197,12 @@ describe('worker-binding entry', () => {
     expect(await pendingDenials()).toEqual([
       { key: expect.stringContaining('unknown-worker'), count: 1 },
     ]);
+
+    // Repeats in the same minute are counted in the isolate and cost no denial-object hop.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await serveWorkerCall(env, config, 'unknown-worker', {}, promise => pending.push(promise));
+    }
+    expect(pending).toHaveLength(1);
   });
 
   it('answers unavailable with a retry when the bundle object call fails', async () => {

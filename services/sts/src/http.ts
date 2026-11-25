@@ -10,7 +10,11 @@ import {
 } from '@kilocode/sts-contracts';
 import { recordDenial } from './audit/denials';
 import { serveBundle } from './broker';
-import { VERIFIER_RETRY_AFTER_SECONDS, WEBHOOK_MAX_BODY_BYTES } from './constants';
+import {
+  BUNDLE_REQUEST_MAX_BODY_BYTES,
+  VERIFIER_RETRY_AFTER_SECONDS,
+  WEBHOOK_MAX_BODY_BYTES,
+} from './constants';
 import { getRefresherStub, getSignerStub } from './dos/stubs';
 import type { ManagerJwks } from './dos/SignerDO';
 import { MANAGER_JWKS_PATH, readConfig, type Env, type StsConfig } from './env';
@@ -69,17 +73,59 @@ function identityVerifier(config: StsConfig): IdentityVerifier {
   return instance;
 }
 
-async function readBundleRequest(request: Request): Promise<BundleRequest | null> {
-  const text = await request.text();
-  if (text.trim() === '') return {};
+/**
+ * Reads a request body up to `limit` bytes and stops reading past it, so a chunked body with no
+ * Content-Length cannot make the isolate buffer it. Returns null past the limit.
+ */
+export async function readCappedText(request: Request, limit: number): Promise<string | null> {
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (declared > limit) {
+    await request.body?.cancel();
+    return null;
+  }
+  if (request.body === null) return '';
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+  let tooLarge = false;
+  try {
+    await request.body.pipeTo(
+      new WritableStream<Uint8Array>({
+        write(chunk: unknown) {
+          if (!(chunk instanceof Uint8Array)) throw new TypeError('request body is not bytes');
+          total += chunk.byteLength;
+          if (total > limit) {
+            tooLarge = true;
+            throw new Error('request body above the limit');
+          }
+          text += decoder.decode(chunk, { stream: true });
+        },
+      })
+    );
+  } catch (error) {
+    if (tooLarge) return null;
+    throw error;
+  }
+  return text + decoder.decode();
+}
+
+type BodyRead =
+  | { status: 'ok'; value: BundleRequest }
+  | { status: 'invalid' }
+  | { status: 'too_large' };
+
+async function readBundleRequest(request: Request): Promise<BodyRead> {
+  const text = await readCappedText(request, BUNDLE_REQUEST_MAX_BODY_BYTES);
+  if (text === null) return { status: 'too_large' };
+  if (text.trim() === '') return { status: 'ok', value: {} };
   let document: unknown;
   try {
     document = JSON.parse(text);
   } catch {
-    return null;
+    return { status: 'invalid' };
   }
   const parsed = BundleRequestSchema.safeParse(document);
-  return parsed.success ? parsed.data : null;
+  return parsed.success ? { status: 'ok', value: parsed.data } : { status: 'invalid' };
 }
 
 /** Concurrent misses in one isolate share one SignerDO call; a failed call is not cached. */
@@ -126,14 +172,13 @@ async function bundleRequest(
         reason: outcome.reason,
       });
     } else {
-      ctx.waitUntil(
-        recordDenial(env, config, {
-          channel: 'http',
-          reason: outcome.reason,
-          actor: outcome.subject.actor,
-          claims: { provider: outcome.subject.provider, ...outcome.subject.claims },
-        })
-      );
+      const hop = recordDenial(env, config, {
+        channel: 'http',
+        reason: outcome.reason,
+        actor: outcome.subject.actor,
+        claims: { provider: outcome.subject.provider, ...outcome.subject.claims },
+      });
+      if (hop !== null) ctx.waitUntil(hop);
     }
   }
   if (outcome.status === 'unavailable') {
@@ -148,8 +193,9 @@ async function bundleRequest(
   }
 
   const body = await readBundleRequest(request);
-  if (body === null) return jsonResponse({ error: 'invalid_request' }, 400, 'no-store');
-  return bundleResponse(await serveBundle(env, config, outcome.workload, body));
+  if (body.status === 'too_large') return jsonResponse({ error: 'too_large' }, 413, 'no-store');
+  if (body.status === 'invalid') return jsonResponse({ error: 'invalid_request' }, 400, 'no-store');
+  return bundleResponse(await serveBundle(env, config, outcome.workload, body.value));
 }
 
 function webhookGate(env: Env, config: StsConfig): WebhookGate {
@@ -180,14 +226,8 @@ async function managerWebhook(request: Request, env: Env, config: StsConfig): Pr
   if (signature === null || !/^t=\d{1,16};[0-9a-f]{64}$/.test(signature)) {
     return jsonResponse({ error: 'invalid_signature' }, 401, 'no-store');
   }
-  const declared = Number(request.headers.get('content-length') ?? '0');
-  if (declared > WEBHOOK_MAX_BODY_BYTES) {
-    return jsonResponse({ error: 'too_large' }, 413, 'no-store');
-  }
-  const body = await request.text();
-  if (new TextEncoder().encode(body).byteLength > WEBHOOK_MAX_BODY_BYTES) {
-    return jsonResponse({ error: 'too_large' }, 413, 'no-store');
-  }
+  const body = await readCappedText(request, WEBHOOK_MAX_BODY_BYTES);
+  if (body === null) return jsonResponse({ error: 'too_large' }, 413, 'no-store');
   let outcome: WebhookOutcome;
   try {
     outcome = await webhookGate(env, config).verify(body, signature);

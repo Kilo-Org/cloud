@@ -28,7 +28,7 @@ import {
   type CreateOrUpdateUserResult,
 } from '@/lib/user';
 import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address';
-import { generateApiToken } from '@/lib/auth/kilo-token-signing';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
@@ -181,7 +181,7 @@ async function checkExistingProviderAccount(
 }
 
 /**
- * Mint the long-lived credential returned to a sign-in that does not receive a
+ * Mint the 30-day credential returned to a sign-in that does not receive a
  * refresh pair. The response shape stays the same, and the credential carries
  * the device session resolved by the caller.
  */
@@ -192,7 +192,11 @@ function legacyTokenResponse(params: {
   pendingLink?: PendingLinkResult;
 }) {
   captureMessage('native_token_legacy_long_lived_count: 1');
-  const token = generateApiToken(params.user, { deviceSessionId: params.deviceSessionId });
+  const token = generateApiToken(
+    params.user,
+    { deviceSessionId: params.deviceSessionId },
+    { expiresIn: TOKEN_EXPIRY.thirtyDays }
+  );
   return NextResponse.json(
     {
       token,

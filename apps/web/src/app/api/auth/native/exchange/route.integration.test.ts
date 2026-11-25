@@ -90,7 +90,7 @@ describe('POST /api/auth/native/exchange integration', () => {
 
   test('answers 429 to a limited address and writes no device session', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const token = generateApiToken(user);
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockAddressRateLimited.mockResolvedValue(true);
 
     const response = await POST(createRequest({ Authorization: `Bearer ${token}` }));
@@ -106,7 +106,11 @@ describe('POST /api/auth/native/exchange integration', () => {
 
   test('exchanges a legacy generated API token with a null pepper and device authorization code', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const token = generateApiToken(user, { deviceAuthRequestCode: 'ABCD-EFGH' });
+    const token = generateApiToken(
+      user,
+      { deviceAuthRequestCode: 'ABCD-EFGH' },
+      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+    );
     mockCreateDeviceSessionWithCredentials.mockResolvedValue({
       ...credentials,
       sessionId: 'device-session-id',
@@ -158,7 +162,11 @@ describe('POST /api/auth/native/exchange integration', () => {
     [
       'cloud-agent token',
       (user: Awaited<ReturnType<typeof insertTestUser>>) =>
-        generateApiToken(user, { tokenSource: 'cloud-agent' }),
+        generateApiToken(
+          user,
+          { tokenSource: 'cloud-agent' },
+          { expiresIn: TOKEN_EXPIRY.thirtyDays }
+        ),
     ],
   ])('rejects a %s without issuing credentials', async (_name, createToken) => {
     const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
@@ -235,7 +243,9 @@ describe('POST /api/auth/native/exchange integration', () => {
     });
 
     const response = await POST(
-      createRequest({ Authorization: `Bearer ${generateApiToken(user)}` })
+      createRequest({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     expect(response.status).toBe(200);
@@ -258,7 +268,9 @@ describe('POST /api/auth/native/exchange integration', () => {
     });
 
     const response = await POST(
-      createRequest({ Authorization: `Bearer ${generateApiToken(user)}` })
+      createRequest({
+        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      })
     );
 
     expect(response.status).toBe(403);

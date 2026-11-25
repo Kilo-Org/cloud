@@ -19,6 +19,7 @@ import {
   getResourceDelegationAuthority,
 } from './resource-delegation';
 import { GET as getIdentity } from '@/app/api/user/route';
+import { toClientUser } from '@/lib/user/client-user';
 import {
   personalPrepareSessionNextSchema,
   organizationPrepareSessionNextSchema,
@@ -285,7 +286,7 @@ describe('verified scoped web authentication', () => {
       bearer({ ...claims, tokenPurpose: 'human-api', credentialExchange: true })
     );
     expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
-    expect(await (await getIdentity()).json()).toEqual(user);
+    expect(await (await getIdentity()).json()).toEqual(toClientUser(user));
     mockHeaders.mockResolvedValue(new Headers());
     expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
     expect(mockGetServerSession).toHaveBeenCalled();

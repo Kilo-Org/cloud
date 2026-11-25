@@ -467,7 +467,6 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
         userId,
         sessionIngestWorkerUrl: params.env.SESSION_INGEST_WORKER_URL,
         nextAuthSecret,
-        sharedResourceTokensEnabled: params.env.SHARED_RESOURCE_TOKENS_ENABLED,
       });
     },
     extractSandboxAnalysis: async ({ finding, rawMarkdown }) => {

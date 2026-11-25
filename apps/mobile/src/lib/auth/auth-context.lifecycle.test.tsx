@@ -2459,6 +2459,55 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   }, 30_000);
 
+  it('regression: a refusal a proactive refresh discarded still ends the session on the next 401', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    // The request-header path rotates a token close to expiry before sending
+    // and ignores the outcome. The server refuses (a revoked device session),
+    // so the rotation clears the stored pair.
+    hoisted.secureStore.getItemAsync.mockResolvedValue('stored-refresh');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'SESSION_REVOKED' }, { status: 401 }));
+    onTestFinished(() => {
+      fetchSpy.mockRestore();
+    });
+    const { performRefresh } = await import('@/lib/auth/credentials');
+    await act(async () => {
+      await performRefresh();
+    });
+    expect(getCtx().token).toBe(storedToken);
+
+    // The request then goes out with the dead token and fails with the
+    // context-level 401. The store is empty now, so the handler's own refresh
+    // finds no refresh token: it must still end the session it knows was refused.
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().token).toBeUndefined();
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
+      cause: 'session_ended',
+    });
+
+    unmount();
+  }, 30_000);
+
   it('a plain refused refresh does not raise the explanation', async () => {
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     hoisted.secureStore.getItemAsync

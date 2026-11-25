@@ -17,12 +17,16 @@ import {
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { validateAuthorizationHeader, type JWTTokenPayload } from '@kilocode/web-shared/lib/tokens';
-import { signTestApiToken } from '@kilocode/web-shared/tests/helpers/api-token.helper';
+import {
+  signTestApiToken,
+  signTestInternalServiceToken,
+} from '@kilocode/web-shared/tests/helpers/api-token.helper';
 import {
   generateApiToken,
   generateBoundedInternalServiceToken,
   generateInternalServiceToken,
   generateOrganizationApiToken,
+  TOKEN_EXPIRY,
   type BoundedInternalServiceAudience,
 } from './kilo-token-signing';
 
@@ -235,11 +239,43 @@ describe('Token Functions', () => {
       expect(decoded.kiloUserId).toBe(mockUser.id);
       expect(decoded.aud).toBeUndefined();
     });
+
+    it.each([
+      ['defaults', undefined],
+      [
+        'audience, organization and lifetime',
+        { audience: 'x', organizationId: 'org-1', expiresIn: 300 },
+      ],
+    ])('matches the web-shared test signer (%s)', (_label, options) => {
+      const decode = (token: string) => {
+        const { iat, exp, ...claims } = jwt.decode(token) as jwt.JwtPayload;
+        return { claims, lifetime: exp! - iat! };
+      };
+
+      expect(decode(signTestInternalServiceToken(mockUser.id, options))).toEqual(
+        decode(generateInternalServiceToken(mockUser.id, options))
+      );
+    });
+
+    it('accepts a lifetime of up to one hour', () => {
+      const decoded = jwt.decode(
+        generateInternalServiceToken(mockUser.id, { expiresIn: 3600 })
+      ) as jwt.JwtPayload;
+
+      expect(decoded.apiTokenPepper).toBeUndefined();
+      expect(decoded.exp! - decoded.iat!).toBe(3600);
+    });
+
+    it('refuses a lifetime longer than one hour', () => {
+      expect(() => generateInternalServiceToken(mockUser.id, { expiresIn: 3601 })).toThrow(
+        'Internal service token lifetime exceeds one hour'
+      );
+    });
   });
 
   describe('generateApiToken', () => {
     it('should generate a valid JWT token for a user', () => {
-      const token = generateApiToken(mockUser);
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
 
       expect(typeof token).toBe('string');
       expect(token.length).toBeGreaterThan(0);
@@ -256,7 +292,7 @@ describe('Token Functions', () => {
     });
 
     it.each([
-      ['defaults', undefined, undefined],
+      ['no extra claims', undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }],
       [
         'organization claims and a custom lifetime',
         { organizationId: 'org-1', organizationRole: 'member' as const },
@@ -280,22 +316,39 @@ describe('Token Functions', () => {
         api_token_pepper: 'different-pepper',
       };
 
-      const token1 = generateApiToken(mockUser);
-      const token2 = generateApiToken(user2);
+      const token1 = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+      const token2 = generateApiToken(user2, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
 
       expect(token1).not.toBe(token2);
     });
 
     it('should include expiration time in token', () => {
-      const token = generateApiToken(mockUser);
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
       const decoded = jwt.decode(token) as jwt.JwtPayload;
 
       expect(decoded.exp).toBeTruthy();
       expect(decoded.iat).toBeTruthy();
-      // Token should expire in the future (more than 4 years from now)
-      const fourYearsInSeconds = 4 * 365 * 24 * 60 * 60;
-      const actualDuration = decoded.exp! - decoded.iat!;
-      expect(actualDuration).toBeGreaterThan(fourYearsInSeconds);
+      expect(decoded.exp! - decoded.iat!).toBe(30 * 24 * 60 * 60);
+    });
+
+    it('mints the requested lifetime up to the 30-day cap', () => {
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.oneHour });
+      const decoded = jwt.decode(token) as jwt.JwtPayload;
+
+      expect(decoded.exp! - decoded.iat!).toBe(60 * 60);
+    });
+
+    it.each([TOKEN_EXPIRY.thirtyDays + 1, 157_680_000, Number.POSITIVE_INFINITY, Number.NaN])(
+      'refuses to mint a lifetime above the 30-day cap: %s',
+      expiresIn => {
+        expect(() => generateApiToken(mockUser, undefined, { expiresIn })).toThrow(
+          'Kilo token lifetime exceeds the 30-day limit'
+        );
+      }
+    );
+
+    it('offers no lifetime constant above the 30-day cap', () => {
+      expect(Math.max(...Object.values(TOKEN_EXPIRY))).toBe(30 * 24 * 60 * 60);
     });
   });
 
@@ -322,7 +375,7 @@ describe('Token Functions', () => {
     }
 
     it('should validate a valid Bearer token successfully', () => {
-      const token = generateApiToken(mockUser);
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
       const headers = new Headers();
       headers.set('authorization', `Bearer ${token}`);
 
@@ -363,7 +416,9 @@ describe('Token Functions', () => {
         { runtimeProxyAttestationVerified: true }
       );
       const personal = validateAuthorizationHeader(
-        new Headers({ authorization: `Bearer ${generateApiToken(mockUser)}` }),
+        new Headers({
+          authorization: `Bearer ${generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        }),
         { runtimeProxyAttestationVerified: true }
       );
 
@@ -489,7 +544,7 @@ describe('Token Functions', () => {
     });
 
     it('should handle case-insensitive Bearer prefix', () => {
-      const token = generateApiToken(mockUser);
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
       const headers = new Headers();
       headers.set('authorization', `bearer ${token}`); // lowercase
 
@@ -500,7 +555,7 @@ describe('Token Functions', () => {
     });
 
     it('should handle mixed case Bearer prefix', () => {
-      const token = generateApiToken(mockUser);
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
       const headers = new Headers();
       headers.set('authorization', `BeArEr ${token}`); // mixed case
 
@@ -664,14 +719,14 @@ describe('Token Functions', () => {
 
   describe('Token payload structure', () => {
     it('should create tokens with correct algorithm', () => {
-      const token = generateApiToken(mockUser);
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
       const header = jwt.decode(token, { complete: true })?.header;
 
       expect(header?.alg).toBe('HS256');
     });
 
     it('should include all required fields in user token payload', () => {
-      const token = generateApiToken(mockUser);
+      const token = generateApiToken(mockUser, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
       const payload = jwt.decode(token) as jwt.JwtPayload & JWTTokenPayload;
 
       expect(payload.env).toBe(process.env.NODE_ENV);

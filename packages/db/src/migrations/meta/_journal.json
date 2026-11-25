@@ -2647,6 +2647,27 @@
       "when": 1795428129892,
       "tag": "0377_environment_setup_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 378,
+      "version": "7",
+      "when": 1795601948316,
+      "tag": "0378_broad_puppet_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 379,
+      "version": "7",
+      "when": 1795635336986,
+      "tag": "0379_sign_in_method_change_code_purpose",
+      "breakpoints": true
+    },
+    {
+      "idx": 380,
+      "version": "7",
+      "when": 1795638118058,
+      "tag": "0380_app_shell_handoff_web_session_pepper",
+      "breakpoints": true
     }
   ]
 }

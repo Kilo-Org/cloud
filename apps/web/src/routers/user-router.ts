@@ -8,6 +8,7 @@ import { getPaidCreditPolicyPresentation } from '@kilocode/web-shared/lib/paidCr
 import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   assertUserCanBeSoftDeleted,
+  checkAuthProviderUnlink,
   getUserAuthProviders,
   SoftDeletePreconditionError,
   unlinkAuthProviderFromUser,
@@ -16,7 +17,20 @@ import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
   sendSignInCodeEmail,
+  sendSignInMethodChangeCodeEmail,
+  sendSignInMethodRemovedEmail,
 } from '@kilocode/web-shared/lib/email';
+import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { User } from '@kilocode/db/schema';
+import {
+  consumeSignInMethodChangeCode,
+  createSignInMethodChangeCode,
+  deleteSignInMethodChangeCode,
+  SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
+  type SignInMethodChangeCodeBinding,
+} from '@/lib/auth/sign-in-method-change-email-code';
+import { currentSignInMethodChangeRequestDetails } from '@/lib/auth/sign-in-method-change-request';
 import {
   consumeSignInCode,
   createSignInCode,
@@ -32,6 +46,18 @@ import {
 import { consumePasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+import {
+  authorizeSignInMethodChange,
+  recordSignInMethodChange,
+  type SignInMethodChange,
+} from '@/lib/auth/sign-in-method-change';
+import {
+  SIGN_IN_METHOD_CHANGE_REFUSAL_CODES,
+  SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES,
+  type SignInMethodChangeRefusal,
+} from '@/lib/auth/sign-in-method-change-codes';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
@@ -91,6 +117,7 @@ import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { revokeUserSessions } from '@/lib/user/session-revocation';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
@@ -202,14 +229,30 @@ const AutocompleteMetricsOutputSchema = z.object({
   tokens: z.number(),
 });
 
+/**
+ * The emailed code that authorizes one link or unlink. Optional in the schema
+ * only so that clients which can not send it get the refusal that says why.
+ */
+const SignInMethodChangeCodeInput = {
+  code: z.string().trim().max(32).optional(),
+  challengeId: z.uuid().optional(),
+};
+
 const LinkAuthProviderInputSchema = z.object({
   provider: AuthProviderIdSchema,
   organizationId: z.uuid().optional(),
   /** Set when the person connects the organization's shared-services account. */
   chatGptScope: z.literal('shared_services').optional(),
+  ...SignInMethodChangeCodeInput,
 });
 
 const UnlinkAuthProviderInputSchema = z.object({
+  provider: AuthProviderIdSchema,
+  ...SignInMethodChangeCodeInput,
+});
+
+const RequestSignInMethodChangeCodeInputSchema = z.object({
+  change: z.enum(['link', 'unlink']),
   provider: AuthProviderIdSchema,
 });
 
@@ -712,6 +755,99 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
   };
 }
 
+const SIGN_IN_METHOD_CHANGE_REFUSAL_STATUS: Record<SignInMethodChangeRefusal, TRPCError['code']> = {
+  browserSessionRequired: 'FORBIDDEN',
+  sessionReauthRequired: 'FORBIDDEN',
+  ssoLinkNotAllowed: 'FORBIDDEN',
+  codeInvalid: 'BAD_REQUEST',
+  codeLocked: 'TOO_MANY_REQUESTS',
+  codeCooldown: 'TOO_MANY_REQUESTS',
+  codeSendFailed: 'INTERNAL_SERVER_ERROR',
+};
+
+function signInMethodChangeRefused(refusal: SignInMethodChangeRefusal): TRPCError {
+  return new TRPCError({
+    code: SIGN_IN_METHOD_CHANGE_REFUSAL_STATUS[refusal],
+    message: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES[refusal],
+    cause: new UpstreamApiError(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES[refusal]),
+  });
+}
+
+// A sign-in method is a way into the account, so adding or removing one needs
+// the browser session of the account and a code sent to the account's primary
+// email address. A bearer credential (API key, CLI or app session) or an
+// app-shell session is refused. A copied session cookie alone can not change
+// how the account signs in, because the code proves control of the mailbox.
+async function signInMethodChangeBinding(
+  ctx: TRPCContext,
+  change: SignInMethodChange,
+  provider: AuthProviderId
+): Promise<SignInMethodChangeCodeBinding> {
+  if (ctx.credential !== 'session') {
+    throw signInMethodChangeRefused('browserSessionRequired');
+  }
+  const session = await getUserFromSessionForCredentialIssuance();
+  if (!session.user || session.user.id !== ctx.user.id) {
+    throw signInMethodChangeRefused('browserSessionRequired');
+  }
+  // A session signed in before browser sessions had ids can not bind a code;
+  // signing in again gives it one.
+  if (!session.webSessionId) {
+    throw signInMethodChangeRefused('sessionReauthRequired');
+  }
+  const refusal = await authorizeSignInMethodChange({ user: session.user, change });
+  if (refusal) {
+    throw signInMethodChangeRefused(refusal);
+  }
+  return {
+    userId: session.user.id,
+    email: session.user.google_user_email,
+    change,
+    provider,
+    webSessionId: session.webSessionId,
+  };
+}
+
+/** Uses the emailed code for the change, or refuses the change. */
+async function spendSignInMethodChangeCode(
+  binding: SignInMethodChangeCodeBinding,
+  code: string | undefined,
+  challengeId: string | undefined
+): Promise<void> {
+  if (!code || !challengeId) {
+    throw signInMethodChangeRefused('codeInvalid');
+  }
+  const result = await consumeSignInMethodChangeCode(binding, code, challengeId);
+  if (result === 'invalid') throw signInMethodChangeRefused('codeInvalid');
+  if (result === 'locked') throw signInMethodChangeRefused('codeLocked');
+}
+
+/**
+ * Tells the account owner about an unlink after it happened. A failed email
+ * does not undo the unlink; it is reported.
+ */
+async function sendSignInMethodRemovedNotice(
+  user: Pick<User, 'google_user_email'>,
+  provider: AuthProviderId
+): Promise<void> {
+  const details = await currentSignInMethodChangeRequestDetails();
+  try {
+    const notice = await sendSignInMethodRemovedEmail(
+      user.google_user_email,
+      AUTH_PROVIDER_DISPLAY_NAMES[provider],
+      details
+    );
+    if (!notice.sent) {
+      captureException(new Error('Sign-in method removed notice was not sent'), {
+        tags: { operation: 'sign_in_method_change_notice', provider },
+        extra: { reason: notice.reason },
+      });
+    }
+  } catch (error) {
+    captureException(error, { tags: { operation: 'sign_in_method_change_notice', provider } });
+  }
+}
+
 // Passkey enrollment and management change which authenticators can sign in
 // as this account, so they are never authorized by a bare bearer token. A
 // browser session keeps its existing rules; a native app session must present
@@ -942,14 +1078,18 @@ export const userRouter = createTRPCRouter({
         });
       }
 
+      const binding = await signInMethodChangeBinding(ctx, 'link', input.provider);
+      await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
+
       try {
-        // Create a secure linking session
-        await createAccountLinkingSession(
-          ctx.user.id,
-          input.provider,
-          input.organizationId,
-          input.chatGptScope
-        );
+        // Create a secure linking session, bound to this browser session
+        await createAccountLinkingSession({
+          existingUserId: ctx.user.id,
+          webSessionId: binding.webSessionId,
+          targetProvider: input.provider,
+          organizationId: input.organizationId,
+          chatGptScope: input.chatGptScope,
+        });
 
         return successResult();
       } catch (error) {
@@ -964,14 +1104,92 @@ export const userRouter = createTRPCRouter({
   unlinkAuthProvider: baseProcedure
     .input(UnlinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
-      return assertNoTrpcError(await unlinkAuthProviderFromUser(ctx.user.id, input.provider));
+      const binding = await signInMethodChangeBinding(ctx, 'unlink', input.provider);
+      // A refused unlink must not spend the code.
+      assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
+      await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
+      const result = assertNoTrpcError(
+        await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
+      );
+      await recordSignInMethodChange({
+        user: ctx.user,
+        change: 'unlink',
+        provider: input.provider,
+        request: { ip: ctx.ip, route: ctx.trpcPath },
+      });
+      await sendSignInMethodRemovedNotice(ctx.user, input.provider);
+      return result;
+    }),
+
+  // Emails a one-time code that authorizes one link or unlink from this
+  // browser session. The code goes to the account's primary email address.
+  requestSignInMethodChangeCode: baseProcedure
+    .input(RequestSignInMethodChangeCodeInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (input.change === 'link' && !isAccountLinkingProvider(input.provider)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This sign-in method cannot be added to an account.',
+        });
+      }
+      const binding = await signInMethodChangeBinding(ctx, input.change, input.provider);
+      if (input.change === 'unlink') {
+        // No code is sent for an unlink that would be refused.
+        assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
+      }
+      const created = await createSignInMethodChangeCode(binding);
+      if (created.status === 'locked') throw signInMethodChangeRefused('codeLocked');
+      if (created.status === 'cooldown') throw signInMethodChangeRefused('codeCooldown');
+
+      let delivered = false;
+      try {
+        const sent = await sendSignInMethodChangeCodeEmail(binding.email, {
+          code: created.code,
+          change: input.change,
+          providerName: AUTH_PROVIDER_DISPLAY_NAMES[input.provider],
+          expiresInMinutes: SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
+        });
+        delivered = sent.sent;
+      } catch (error) {
+        captureException(error, { tags: { operation: 'sign_in_method_change_code' } });
+      }
+      if (!delivered) {
+        // A code that never reached the mailbox would only block the next
+        // request with the resend cooldown.
+        try {
+          await deleteSignInMethodChangeCode(created.challengeId);
+        } catch (error) {
+          captureException(error, { tags: { operation: 'sign_in_method_change_code' } });
+        }
+        throw signInMethodChangeRefused('codeSendFailed');
+      }
+      return {
+        challengeId: created.challengeId,
+        expiresInMinutes: SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
+      };
     }),
 
   resetAPIKey: baseProcedure.mutation(async ({ ctx }) => {
-    await db
-      .update(kilocode_users)
-      .set({ api_token_pepper: crypto.randomUUID() })
-      .where(eq(kilocode_users.id, ctx.user.id));
+    // A reset has to evict whoever may already hold a credential for the
+    // account, so it rotates both peppers and closes the device sessions in
+    // one transaction: a stolen token or browser session cannot survive it,
+    // and a failure part-way leaves the old credentials intact rather than
+    // half-evicted.
+    const revokedSessionIds = await db.transaction(async tx => {
+      await tx
+        .update(kilocode_users)
+        .set({ api_token_pepper: crypto.randomUUID(), web_session_pepper: crypto.randomUUID() })
+        .where(eq(kilocode_users.id, ctx.user.id));
+
+      return revokeUserSessions(tx, ctx.user.id, {
+        stepUp: 'api_key_reset',
+        deviceSession: 'api_key_reset',
+      });
+    });
+
+    for (const sessionId of revokedSessionIds) {
+      invalidateDeviceSession(sessionId);
+    }
 
     return successResult();
   }),

@@ -11,7 +11,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { generateApiToken } from '@/lib/auth/kilo-token-signing';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { eq } from 'drizzle-orm';
 
 beforeEach(() => {
@@ -36,7 +36,9 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'pre-grant-pepper',
     });
 
-    const preGrantToken = generateApiToken(target);
+    const preGrantToken = generateApiToken(target, undefined, {
+      expiresIn: TOKEN_EXPIRY.thirtyDays,
+    });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${preGrantToken}` }));
 
     // Before the grant the token is valid but non-admin: an admin-only check fails.

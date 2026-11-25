@@ -12,7 +12,11 @@ import {
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
+import {
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
+  KILO_TOKEN_VERSION,
+  assertKiloTokenLifetimeWithinCap,
+} from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { JWTTokenExtraPayload } from '@kilocode/web-shared/lib/tokens';
@@ -46,14 +50,12 @@ const boundedInternalServiceAudienceSet: ReadonlySet<string> = new Set(
   BOUNDED_INTERNAL_SERVICE_AUDIENCES
 );
 
-const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
-const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
+const THIRTY_DAYS_IN_SECONDS = KILO_TOKEN_MAX_LIFETIME_SECONDS;
 const ONE_HOUR_IN_SECONDS = 60 * 60;
 const FIFTEEN_MINUTES_IN_SECONDS = 15 * 60;
 const FIVE_MINUTES_IN_SECONDS = 5 * 60;
 
 export const TOKEN_EXPIRY = {
-  default: FIVE_YEARS_IN_SECONDS,
   thirtyDays: THIRTY_DAYS_IN_SECONDS,
   oneHour: ONE_HOUR_IN_SECONDS,
   fifteenMinutes: FIFTEEN_MINUTES_IN_SECONDS,
@@ -65,11 +67,19 @@ export const TOKEN_EXPIRY = {
  * (e.g. session-ingest). Carries the minimal fields the workers require: kiloUserId and
  * version, plus an organizationId claim when the caller supplies one. Defaults to a
  * 1-hour expiry.
+ *
+ * The token has no pepper claim, so Session Ingest accepts it only while it lives at most one
+ * hour (`isKiloTokenPepperCurrent`); a longer lifetime would survive a pepper rotation.
  */
 export function generateInternalServiceToken(
   userId: string,
   options?: { expiresIn?: number; audience?: string; organizationId?: string }
 ): string {
+  const expiresIn = options?.expiresIn ?? ONE_HOUR_IN_SECONDS;
+  assertKiloTokenLifetimeWithinCap(expiresIn);
+  if (expiresIn > ONE_HOUR_IN_SECONDS) {
+    throw new Error('Internal service token lifetime exceeds one hour');
+  }
   return jwt.sign(
     {
       kiloUserId: userId,
@@ -79,7 +89,7 @@ export function generateInternalServiceToken(
     NEXTAUTH_SECRET,
     {
       algorithm: jwtSigningAlgorithm,
-      expiresIn: options?.expiresIn ?? ONE_HOUR_IN_SECONDS,
+      expiresIn,
       ...(options?.audience ? { audience: options.audience } : {}),
     }
   );
@@ -128,11 +138,16 @@ export function generateBoundedInternalServiceToken(
   });
 }
 
+/**
+ * Mints an audience-less Kilo API token. The lifetime is always explicit and
+ * never exceeds 30 days (`TOKEN_EXPIRY.thirtyDays`); a longer request throws.
+ */
 export function generateApiToken(
   { id, api_token_pepper }: User,
-  extraPayload?: JWTTokenExtraPayload,
-  options?: { expiresIn?: number }
+  extraPayload: JWTTokenExtraPayload | undefined,
+  options: { expiresIn: number }
 ) {
+  assertKiloTokenLifetimeWithinCap(options.expiresIn);
   return jwt.sign(
     {
       env: process.env.NODE_ENV,
@@ -144,7 +159,7 @@ export function generateApiToken(
     NEXTAUTH_SECRET,
     {
       algorithm: jwtSigningAlgorithm,
-      expiresIn: options?.expiresIn ?? FIVE_YEARS_IN_SECONDS,
+      expiresIn: options.expiresIn,
     }
   );
 }

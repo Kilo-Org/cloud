@@ -1,0 +1,1 @@
+ALTER TABLE "kilocode_users" ALTER COLUMN "api_token_pepper" SET DEFAULT gen_random_uuid()::text;

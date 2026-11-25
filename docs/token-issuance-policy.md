@@ -23,12 +23,15 @@ The current shared verifier rejects a token with an audience when no audience is
 
 `generateApiToken` originally used `expiresIn: '5y'` in commit `bc8179c70` (2026-02-04). Commit `c6bf3468f` (2026-02-10) changed the default to `5 * 365 * 24 * 60 * 60` seconds.
 
+Five-year tokens are no longer minted. `generateApiToken` has no default lifetime, and it, `signKiloToken`, and `signModernKiloToken` refuse a lifetime above 30 days (`KILO_TOKEN_MAX_LIFETIME_SECONDS`). User-held credentials (device authorization, the profile-page API key, editor sign-in, and the native sign-in without a refresh pair) are minted for exactly 30 days. This is an issuance cap only: verification does not reject tokens issued earlier with a five-year lifetime.
+
 | Legacy issuer expression | Exact `exp - iat` | Evidence |
 |---|---:|---|
-| Current numeric five-year default | `157680000` | `apps/web/src/lib/auth/kilo-token-signing.ts` |
+| Numeric five-year default (until the 30-day cap) | `157680000` | `packages/web-shared/src/lib/tokens.ts` history |
+| 30-day user credential | `2592000` | `TOKEN_EXPIRY.thirtyDays` in `apps/web/src/lib/auth/kilo-token-signing.ts` |
 | Historical `'5y'` default | `157788000` | `bc8179c70:src/lib/tokens.ts`; installed `ms` parser defines a year as 365.25 days |
 
-Both values are required for the narrow legacy five-year class. Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also calls the generic five-year issuer, including `apps/web/src/routers/cli-sessions-v2-router.ts`.
+The two five-year values are required for the narrow legacy five-year class; the 30-day value is the same class as minted now. Confidence is limited to repository history plus the presently installed parser: historical production cutovers, issued-token population, and dependency-lockfile history have not been independently confirmed. The class is compatibility evidence, not proof of a human credential: unmarked automation also called the generic five-year issuer, and unmarked 30-day tokens share the shape (see below).
 
 ## Opt-in contract
 
@@ -69,7 +72,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 
 ## Legacy exchange class
 
-`five-year-api` is deliberately narrow. It permits both exact historical durations (`157680000`, `157788000`) and requires all of the following:
+`five-year-api` is deliberately narrow. The name is historical: it permits both exact five-year durations (`157680000`, `157788000`) and the exact 30-day duration minted now (`2592000`), and requires all of the following:
 
 - no `aud`;
 - no modern policy fields;
@@ -77,7 +80,7 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 - only the exchange-safe claim names listed above; this excludes `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceSessionId`, `isAdmin`, `orgMemberships`, `organizationId`, `organizationRole`, and any future or unknown claim;
 - `deviceAuthRequestCode` is allowed, preserving legacy device authorization output.
 
-Known marked automation and system-style issuers fail this shape. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
+Known marked automation and system-style issuers fail this shape. Device-bound legacy credentials (`deviceSessionId`) are checked separately by the web resource delegation and by `session-sync`, which accept one hour, 30 days, and the five-year `157680000`, each with a live device session. KiloClaw's 30-day runtime keys carry no marker, so since the 30-day duration joined this class they match it. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
 
 Future issuance routes should use `legacy: 'deny'` by default. A route requiring proof of human issuance must use trustworthy server-side issuance provenance or fresh session authentication, not enable the shape fallback as a substitute. Any compatibility exception requires an explicit policy decision accepting the documented residual risk. This concerns permission to exchange credentials, not supported ordinary legacy resource access; Phase 1 does not invalidate tokens.
 
@@ -89,7 +92,7 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 |---|---|---|---|---|---|
 | Chat fanout | `apps/web/src/lib/kilo-chat/token.ts`; mobile requests through `apps/mobile/src/components/kilo-chat/hooks/use-kilo-chat-token.ts` | Kilo Chat and Event Service via `apps/web/src/contexts/EventServiceContext.tsx`; Notifications badges via `apps/mobile/src/lib/hooks/use-unread-counts.ts` | None | `kilo-chat`, `event-service`, `notifications` | One chat token fans out to three services; decide whether it becomes a single multi-audience read token or separate audience-specific tokens. |
 | Cloud Agent control and downstream Kilo access | `apps/web/src/lib/auth/kilo-token-signing.ts` (`generateCloudAgentWorkflowToken`) and Cloud Agent routers | `services/cloud-agent-next/src/validate-kilo-token.ts`; backend balance call; raw runtime bearer or contained capability in `services/cloud-agent-next/src/session-service.ts` | `cloud-agent-next` (workflow control token); None for request-delegated router credentials | `cloud-agent-next`, `kilo-api`, `kilo-gateway`, `session-ingest` | The raw user token can reach multiple downstream routes; contained Kilo capability has separate routing controls. |
-| Code Review | `apps/web/src/lib/code-reviews/triggers/prepare-review-payload.ts` | `services/code-review-infra/src/code-review-orchestrator.ts` forwards to Cloud Agent Next | None; default five-year token with `botId: 'reviewer'` | Cloud Agent control and downstream API/gateway boundaries | Preserve delegated workload purpose through forwarding and renewal. |
+| Code Review | `apps/web/src/lib/code-reviews/triggers/prepare-review-payload.ts` | `services/code-review-infra/src/code-review-orchestrator.ts` forwards to Cloud Agent Next | None (legacy) or `cloud-agent-next`; one-hour token with `botId: 'reviewer'` | Cloud Agent control and downstream API/gateway boundaries | Preserve delegated workload purpose through forwarding and renewal. |
 | Security Auto Analysis | `services/security-auto-analysis/src/token.ts` | `services/security-auto-analysis/src/launch.ts`, `remediation.ts`, and `manual-analysis.ts` forward user credentials to Cloud Agent Next | None; one-hour marked user tokens and separate minimal internal assertions | Cloud Agent control and downstream API/gateway boundaries for user tokens; identify each internal assertion consumer separately | Keep internal assertions distinct from runtime user credentials. |
 | Webhook Agent Ingest | `services/webhook-agent-ingest/src/services/token-minting-service.ts` | `services/webhook-agent-ingest/src/queue-consumer.ts` forwards to Cloud Agent Next | None; one-hour personal/bot-user token branches | Cloud Agent control and downstream API/gateway boundaries | Preserve non-exchangeable classification for both personal and bot-user branches. |
 | KiloClaw control and cookie | `apps/web/src/routers/kiloclaw-router.ts`; cookie minted in `services/kiloclaw/src/routes/access-gateway.ts` | `services/kiloclaw/src/auth/middleware.ts` | None | `kiloclaw` | Bearer control and 24-hour cookie share the verifier but may need different later purposes. |
@@ -116,11 +119,11 @@ Excluded from the credential-exchange compatibility class or treated as separate
 - internal-service tokens with no pepper claim;
 - existing operation-audience JWTs;
 - KiloClaw cookie and runtime credentials unless a resource opts in with their own modern policy;
-- Cloud Agent stream tickets and wrapper-dispatch tickets in `services/cloud-agent-next/src/auth.ts`;
+- Cloud Agent stream tickets in `services/cloud-agent-next/src/auth.ts`;
 - encrypted Git/Kilo session capabilities, which have their own `purpose` field (for example `kilo_api_session`) in `services/git-token-service/src/kilo-session-capability.ts`;
 - container, share, repository, and MCP credentials, which require separate family-specific analysis rather than automatic migration as core Kilo API tokens.
 
-KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None qualifies for the five-year exchange compatibility class.
+KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Organization tokens last 15 minutes and internal bot tokens, including the decider benchmark's, one hour. None of those qualifies for the legacy exchange compatibility class, except the unmarked 30-day KiloClaw runtime key, which has the same shape and lifetime as a 30-day user API token.
 
 ## Phase 4: web readers
 
@@ -128,12 +131,12 @@ The earlier sections describe the Phase 1 contracts. The web reader integration 
 
 - General web/API bearer authentication expects `kilo-api` by default. `validateAuthorizationHeader` checks the audience after signature verification; `getUserFromAuth` passes an optional, server-owned `expectedAudience` override. Cookie-session authentication and existing account/pepper checks are unchanged. A rejected bearer does not fall back to a browser session.
 - Model gateway operations explicitly expect `kilo-gateway`: chat/completions, Responses, Messages, embeddings, transcription, FIM, edit completions, model catalogs/validation, and the billed Exa proxy. Re-exported gateway/v1 handlers inherit the implementation's expectation; request headers and URL paths do not select the audience policy.
-- Anonymous access survives only the absence of a credential. A request that sends no bearer, or the `anonymous` sentinel a Kilo client sends when nobody is signed in (`ANONYMOUS_API_KEY` in `packages/kilo-gateway/src/api/constants.ts` of the kilocode repository), keeps the public catalogs and the free-model tier, and carries no user, organization, BYOK, bot, source, or billing identity.
+- Anonymous access survives only the absence of a credential. A request that sends no bearer, or the `anonymous` sentinel a Kilo client sends when nobody is signed in (`ANONYMOUS_API_KEY` in `packages/kilo-gateway/src/api/constants.ts` of the kilocode repository), keeps the public catalogs and the free-model tier, and carries no user, organization, BYOK, bot, source, or billing identity. apps/ai-gateway serves these operations and does not read the NextAuth session cookie, so a request that carries only a browser session is anonymous there too.
 - A rejected bearer fails with `401 INVALID_TOKEN` instead of continuing anonymously. The caller presented a credential and believes it is authenticated, so answering it as anonymous would drop its account, organization, BYOK, bot, source, and billing identity, and would hide the refused credential from the client. This covers an unverifiable, expired, outdated, or revoked token, and an operation-scoped `kilo-api` token sent to a `kilo-gateway` operation; mint that token with `resource: 'gateway'` from `/api/auth/resource-token` or `/api/organizations/[id]/user-tokens`.
 
 Both resource boundaries retain supported audience-less legacy tokens. Explicit audiences require exact matching, or membership in a valid audience array; null, empty, malformed, duplicate, and mismatched audiences are rejected. These changes do not add an environment check to ordinary web authentication, alter its historical timestamp handling, or migrate any signers.
 
-Do not treat every legacy-only verifier as a resource-migration target. Cloud Agent wrapper fallback must remain audience-less-only; REST `cloud-agent-next` tokens are not wrapper-dispatch capabilities. Existing deletion/export/Git operation audiences stay mandatory. Git user-authorization disconnect currently has a legacy-only contract and needs a dedicated operation-contract decision before its producer adopts an audience; do not widen it with the general API or gateway audience. Stored-token renewal and runtime reuse checks are separate issuer-migration work.
+Do not treat every legacy-only verifier as a resource-migration target. Existing deletion/export/Git operation audiences stay mandatory. Git user-authorization disconnect currently has a legacy-only contract and needs a dedicated operation-contract decision before its producer adopts an audience; do not widen it with the general API or gateway audience. Stored-token renewal and runtime reuse checks are separate issuer-migration work.
 
 ## Migration preconditions
 
@@ -151,7 +154,7 @@ Before wiring a real credential-issuance route, use an application-owned authent
 
 `signModernKiloToken` signs the validated modern payload with explicit audience, purpose, exchange permission, and positive lifetime. It does not change `signKiloToken` or the web's existing human/organization/shared signers. Web's synchronous `generateBoundedInternalServiceToken` uses the same payload builder, fixes `internal-service` / `credentialExchange: false`, and permits only the enumerated bounded service audiences. It requires a positive explicit lifetime, capped at 3600 seconds for generic Session Ingest and 300 seconds for the other bounded operations, in both rollout modes.
 
-Activation is **default-off**. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED=true` enables modern payloads at 16 selected web mint sites. Unset, `false`, or any other value retains their existing legacy shape, TTL, and audience behavior. The flag is server configuration, not a request option. No tracked dotenv values or external deployments are changed by this implementation.
+Activation is **default-off**. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED=true` enables modern payloads at 17 selected web mint sites. Unset, `false`, or any other value retains their existing legacy shape, TTL, and audience behavior. The flag is server configuration, not a request option. No tracked dotenv values or external deployments are changed by this implementation.
 
 | Producer group | Raw mint sites | Lifetime | Audience behavior |
 |---|---:|---|---|
@@ -159,7 +162,7 @@ Activation is **default-off**. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED=true` en
 | GitLab credential broker and GitHub user access-token broker | 2 | 300 seconds | Existing exact operation audience in both modes |
 | GitHub user-authorization disconnect | 1 | 300 seconds | Legacy absent audience; enabled mode uses `git-token-service:github-user-authorizations:disconnect` |
 | User export client and deletion-queue leaf-session cleanup | 2 | 300 seconds | Existing `user-data-export` and `session-ingest:user-deletion` audiences in both modes |
-| Session Ingest client, active-session/ticket router, rename notification | 9 | 3600 seconds | Legacy absent audience; enabled mode uses `session-ingest` |
+| Session Ingest client, active-session/ticket router, active-session list, rename notification | 10 | 3600 seconds | Legacy absent audience; enabled mode uses `session-ingest` |
 
 These assertions continue to omit pepper and environment, preserving the exact receiver contracts. Organization identity is preserved where already supplied. This is trusted backend assertion issuance for existing authorized operations, not a user-returned token-exchange endpoint or a new general delegation grant. Generic Session Ingest assertions are resource-scoped, not single-session or single-route capabilities; incoming-request authorization and receiver ownership checks still matter. Returned Git provider credentials, opaque web/share tickets, and export responses remain separate credential families.
 
@@ -174,7 +177,7 @@ The disconnect reader accepts its dedicated operation audience or legacy audienc
 
 ### Explicit PR 5.2 allocation
 
-Modern-builder organization roles also require a deliberate compatibility decision for web `admin` memberships; do not cast or promote them to owner. The generic organization-token issuer is not proven attribution-only and is likewise deferred. User/native credentials, Chat fan-out, Cloud Agent/automation runtime forwarding, and other shared credentials remain PR 5.2 work. The separate Worker-local `services/security-auto-analysis/src/token.ts` snapshot assertion is not one of these 16 web callsites; migrate it with that Worker's other token paths and rollout configuration in PR 5.2. KiloClaw stays minimal for its October EOL. These reallocations keep Phase 5 at exactly two PRs, rather than claiming unsafe control-plane migrations are bounded.
+Modern-builder organization roles also require a deliberate compatibility decision for web `admin` memberships; do not cast or promote them to owner. The generic organization-token issuer is not proven attribution-only and is likewise deferred. User/native credentials, Chat fan-out, Cloud Agent/automation runtime forwarding, and other shared credentials remain PR 5.2 work. The separate Worker-local `services/security-auto-analysis/src/token.ts` snapshot assertion is not one of these 17 web callsites; it is always the modern `session-ingest` assertion (see Current-pepper rule). That Worker's control and triage tokens remain PR 5.2 work. KiloClaw stays minimal for its October EOL. These reallocations keep Phase 5 at exactly two PRs, rather than claiming unsafe control-plane migrations are bounded.
 
 This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.
 
@@ -189,6 +192,22 @@ acting user, with the installation's organization scope and a one-hour lifetime.
 The shared Cloud Agent rollout flags select the credential format. Model calls retain
 their separate API credential; session preparation and initiation use the workflow
 credential and the shared model-eligibility policy.
+
+## Current-pepper rule
+
+A pepper rotation revokes every user credential in the web and in every Worker. `packages/worker-utils/src/kilo-token-pepper.ts` owns the decision:
+
+- A present `apiTokenPepper` claim, a string or `null`, must equal the account's current pepper. A claim that is `null` stops working when the pepper changes from `null` to a value.
+- `isKiloUserCredentialPepperCurrent` also refuses an absent claim. The web gateway, `auto-routing`, `ai-attribution`, KiloClaw and `verifyKiloBearerAgainstCurrentPepper` (cloud-agent-next, event-service, kilo-chat, notifications) use it. No claimless token is addressed to these receivers.
+- `isKiloTokenPepperCurrent` also accepts an absent claim on a short-lived internal assertion (`isKiloClaimlessInternalAssertion`, one hour). Only Session Ingest uses it, through `verifyKiloBearerOrInternalAssertionAgainstCurrentPepper`. The assertion needs `exp - iat` of at most 3600 seconds, `iat` at most 60 seconds ahead, at most 3600 seconds of remaining validity, and either `tokenPurpose: 'internal-service'` with an audience or no `tokenPurpose` (the legacy shape, with or without an audience).
+- The legacy shape is temporary. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` is off in production, so the 17 `generateBoundedInternalServiceToken` sites emit it. Remove the branch one hour after the flag is on in production. The one direct `generateInternalServiceToken` caller (Bitbucket workspace access-token release, 300 seconds) does not depend on it: git-token-service verifies that token with its exact operation audience, and the token reaches neither Session Ingest nor the disconnect route.
+- `internal-service` does not mean claimless. Workflow control tokens and the security-auto-analysis control and triage assertions carry the pepper claim. The triage assertion goes to the gateway.
+
+The git-token-service GitHub disconnect route accepts only the web's claimless assertion, through the same `isKiloClaimlessInternalAssertion` with a 300-second lifetime and the disconnect audience. A token with a pepper claim is refused. The assertion's `iat` must be at most 60 seconds ahead, and it must be `tokenPurpose: 'internal-service'` with the disconnect audience or, temporarily, have no `tokenPurpose` and either no audience or the disconnect audience. The other git-token-service routes require an exact operation audience, which no user credential carries.
+
+`generateInternalServiceToken` refuses a lifetime above 3600 seconds.
+
+Before this rule, the web accepted any token for an account without a pepper, including one with a stale string claim. Workers and `ai-attribution` skipped the comparison for an absent claim on every account. KiloClaw treated an absent claim as `null`, so it accepted a claimless token for an account without a pepper.
 
 ## Dedicated Home widget credential
 

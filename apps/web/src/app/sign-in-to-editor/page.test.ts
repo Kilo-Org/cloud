@@ -12,7 +12,10 @@ const mockOpenIdeAutomatically = jest.fn(() => null);
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuanceOrRedirect: mockGetUserForCredentialIssuance,
 }));
-jest.mock('@/lib/auth/kilo-token-signing', () => ({ generateApiToken: mockGenerateApiToken }));
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
+  generateApiToken: mockGenerateApiToken,
+  TOKEN_EXPIRY: { thirtyDays: 2_592_000 },
+}));
 jest.mock('next/navigation', () => ({ redirect: mockRedirect }));
 jest.mock('next/headers', () => ({ cookies: jest.fn() }));
 jest.mock('@/components/auth/getExtensionUrl', () => ({ getExtensionUrl: mockGetExtensionUrl }));
@@ -94,6 +97,9 @@ describe('RedirectPage', () => {
     const page = await RedirectPage({ searchParams: Promise.resolve({}) });
 
     expect(mockGenerateApiToken).toHaveBeenCalledTimes(1);
+    expect(mockGenerateApiToken).toHaveBeenCalledWith({ has_validation_stytch: true }, undefined, {
+      expiresIn: 2_592_000,
+    });
     expect(findElementProps(page, mockManualSetupSteps)).toMatchObject({
       kiloToken: 'minted-token',
     });

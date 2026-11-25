@@ -68,7 +68,7 @@ jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateApiToken: mockGenerateApiToken,
   generateCloudAgentWorkflowToken: mockGenerateCloudAgentWorkflowToken,
   generateWorkflowGatewayToken: mockGenerateWorkflowGatewayToken,
-  TOKEN_EXPIRY: { default: 157_680_000 },
+  TOKEN_EXPIRY: { oneHour: 3600 },
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({

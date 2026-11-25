@@ -1,7 +1,7 @@
 import { OpenCodeEditor } from '@/components/auth/OpenCodeEditor';
 import { DelayedLinks } from '@/components/auth/DelayedLinks';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
-import { generateApiToken } from '@/lib/auth/kilo-token-signing';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { getUserFromSessionForCredentialIssuanceOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -27,7 +27,7 @@ export default async function RedirectPage({
     redirect('/account-verification');
   }
 
-  const kiloToken = generateApiToken(user);
+  const kiloToken = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
   const url = `${extensionUrl}?token=${kiloToken}`;
 
   if (urlScheme === 'web') {

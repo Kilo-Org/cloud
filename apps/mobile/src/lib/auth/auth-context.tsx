@@ -42,6 +42,7 @@ import {
   performRefresh,
   persistSignInCredentialsAtEpoch,
   REFRESH_MARGIN_MS,
+  withRecordedRefusal,
   writeCredentials,
 } from '@/lib/auth/credentials';
 import {
@@ -701,7 +702,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   // performRefresh handles concurrent callers via its own single-flight lock.
   useEffect(() => {
     const handler = async () => {
-      const outcome = await performRefresh();
+      // A refusal another caller's rotation discarded still ends this session.
+      const outcome = withRecordedRefusal(await performRefresh());
 
       if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
         setToken(outcome.token);
@@ -791,7 +793,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             return;
           }
 
-          const outcome = await performRefresh();
+          const outcome = withRecordedRefusal(await performRefresh());
 
           if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
             setToken(outcome.token);

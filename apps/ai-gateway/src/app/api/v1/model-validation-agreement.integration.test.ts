@@ -9,11 +9,6 @@ jest.mock('next/headers', () => ({
   headers: () => mockHeaders(),
   cookies: jest.fn(),
 }));
-jest.mock('next-auth', () => ({
-  __esModule: true,
-  ...jest.requireActual('next-auth'),
-  getServerSession: jest.fn(async () => null),
-}));
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual('@sentry/nextjs'),
   captureException: jest.fn(),
@@ -45,6 +40,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { signTestApiToken } from '@kilocode/web-shared/tests/helpers/api-token.helper';
+import { KILO_TOKEN_MAX_LIFETIME_SECONDS } from '@kilocode/worker-utils/kilo-token';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_routing_custom_routers } from '@kilocode/db/schema';
@@ -179,7 +175,9 @@ describe('model validation agrees with the catalog for one credential', () => {
       false
     );
     await addUserToOrganization(organization.id, user.id, 'member');
-    currentHeaders = new Headers({ authorization: `Bearer ${signTestApiToken(user)}` });
+    currentHeaders = new Headers({
+      authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
+    });
 
     await expect(validate(deniedModel)).resolves.toEqual({
       status: 200,

@@ -10,16 +10,18 @@ import type { SeedResult } from '../index';
 
 export const usage = '<email> [options]';
 
-// Five years, matching generateApiToken()'s default in
-// apps/web/src/lib/auth/kilo-token-signing.ts (TOKEN_EXPIRY.default / FIVE_YEARS_IN_SECONDS).
+// Thirty days, the lifetime generateApiToken() mints for a user-held credential
+// (TOKEN_EXPIRY.thirtyDays in apps/web/src/lib/auth/kilo-token-signing.ts) and the
+// longest one signKiloToken() signs.
 // The resource-delegation policy (createControlTokenForRequest →
 // isKiloCredentialExchangeEligible, LEGACY_API_TOKEN_LIFETIMES_SECONDS in
-// @kilocode/worker-utils) only accepts legacy five-year API tokens for
-// credential exchange, so any other lifetime is rejected by control-token
-// routes such as cloudAgentNext.prepareSession with 403 "Unsupported legacy
-// credential context" — the 2026-09-12 failure of the delegation-protected
+// @kilocode/worker-utils) only accepts legacy API tokens with that exact
+// lifetime (or a historical five-year one) for credential exchange, so any
+// other lifetime is rejected by control-token routes such as
+// cloudAgentNext.prepareSession with 403 "Unsupported legacy credential
+// context" — the 2026-09-12 failure of the delegation-protected
 // prepareSession probe.
-export const DEFAULT_EXPIRES_DAYS = 1825;
+export const DEFAULT_EXPIRES_DAYS = 30;
 const SECONDS_PER_DAY = 24 * 60 * 60;
 
 /**
@@ -48,16 +50,16 @@ function printUsage(): void {
   console.log('authenticate a local kilo CLI or API client as that user.');
   console.log('');
   console.log('The token carries the shape generateApiToken() mints in production: a');
-  console.log('five-year legacy user API token with env="development" — the shape the');
+  console.log('30-day legacy user API token with env="development" — the shape the');
   console.log('resource-delegation policy accepts for control-token minting on the');
-  console.log('local dev stack. Override the lifetime with --expires-days only when the');
-  console.log('consumer never mints resource control tokens.');
+  console.log('local dev stack. Shorten the lifetime with --expires-days only when the');
+  console.log('consumer never mints resource control tokens. 30 days is the maximum.');
   console.log('');
   console.log('Matches either google_user_email exactly or normalized_email.');
   console.log('');
   console.log('Options:');
   console.log(
-    `  --expires-days=<number>   Token lifetime in days (default: ${DEFAULT_EXPIRES_DAYS})`
+    `  --expires-days=<number>   Token lifetime in days (default and maximum: ${DEFAULT_EXPIRES_DAYS})`
   );
   console.log(
     '  --admin                   Include isAdmin=true in the token payload (control-token exchange rejects it)'
@@ -66,7 +68,7 @@ function printUsage(): void {
   console.log('Examples:');
   console.log('  pnpm dev:seed app:api-token ada@example.com');
   console.log('  pnpm -s dev:seed app:api-token ada@example.com --json | jq -r .token');
-  console.log('  pnpm dev:seed app:api-token ada@example.com --expires-days=30 --admin');
+  console.log('  pnpm dev:seed app:api-token ada@example.com --expires-days=7 --admin');
 }
 
 function parsePositiveInteger(value: string, flagName: string): number {

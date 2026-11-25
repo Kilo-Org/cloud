@@ -1,12 +1,13 @@
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IDENTITY_STORE_TABLES } from '../../src/db/rows';
-import { LOGIN_ROLES, TEST_LOGIN_PASSWORD } from './connection';
+import { LOGIN_ROLES } from './connection';
 import {
   TestDatabase,
   insertAccount,
   insertAudit,
   insertGatePass,
+  loginPassword,
   randomHash,
   sqlStateOf,
 } from './harness';
@@ -50,6 +51,20 @@ describe('role attributes', () => {
     );
     expect(result.rows[0].idle_in_transaction_session_timeout).toBe('10s');
   });
+
+  it.each(LOGIN_ROLES)('set a 5-second statement limit for %s', async login => {
+    const client = await db.connect(login);
+    const result = await client.query<{ statement_timeout: string }>('SHOW statement_timeout');
+    expect(result.rows[0].statement_timeout).toBe('5s');
+  });
+
+  it('cancel a statement that runs for 5 seconds', async () => {
+    const client = await db.connect('uts_pat_a');
+    const started = Date.now();
+    expect(await sqlStateOf(() => client.query('SELECT pg_sleep(6)'))).toBe('57014');
+    expect(Date.now() - started).toBeGreaterThanOrEqual(4_900);
+    expect(Date.now() - started).toBeLessThan(6_000);
+  }, 10_000);
 
   it('terminate a session whose transaction stays idle for 10 seconds', async () => {
     const client = await db.connect('uts_app_a');
@@ -147,7 +162,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
 
   it('changes its own password, which the rotation job needs', async () => {
     const app = await db.connect(login);
-    await app.query(`ALTER ROLE CURRENT_USER PASSWORD '${TEST_LOGIN_PASSWORD}'`);
+    await app.query(`ALTER ROLE CURRENT_USER PASSWORD ${pg.escapeLiteral(loginPassword())}`);
   });
 });
 

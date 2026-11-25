@@ -1,7 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import type { TestProject } from 'vitest/node';
 import { applyMigrations, loadMigrations } from '../../scripts/migrator';
-import { LOGIN_ROLES, TEST_LOGIN_PASSWORD, databaseUrl, withAdmin } from './connection';
+import { LOGIN_ROLES, databaseUrl, withAdmin } from './connection';
 
 const TEMPLATE_DATABASE = 'uts_template';
 
@@ -14,10 +15,11 @@ async function dropDatabases(names: readonly string[]): Promise<void> {
 }
 
 /**
- * Migrates a template database once per run and gives the local logins a synthetic password.
- * Clones left by an interrupted run are dropped first.
+ * Migrates a template database once per run and gives the local logins a random password for
+ * this run. Clones left by an interrupted run are dropped first.
  */
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
+  const loginPassword = randomBytes(24).toString('base64url');
   const leftovers = await withAdmin(undefined, async client => {
     const result = await client.query<{ datname: string }>(
       String.raw`SELECT datname FROM pg_database WHERE datname LIKE 'uts\_t\_%'`
@@ -33,7 +35,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     await applyMigrations(template, await loadMigrations());
     for (const login of LOGIN_ROLES) {
       await template.query(
-        `ALTER ROLE ${pg.escapeIdentifier(login)} PASSWORD ${pg.escapeLiteral(TEST_LOGIN_PASSWORD)}`
+        `ALTER ROLE ${pg.escapeIdentifier(login)} PASSWORD ${pg.escapeLiteral(loginPassword)}`
       );
     }
   } finally {
@@ -41,5 +43,6 @@ export default async function setup(project: TestProject): Promise<() => Promise
   }
 
   project.provide('templateDatabase', TEMPLATE_DATABASE);
+  project.provide('loginPassword', loginPassword);
   return () => dropDatabases([TEMPLATE_DATABASE]);
 }

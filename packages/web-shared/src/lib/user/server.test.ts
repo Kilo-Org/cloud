@@ -1237,6 +1237,74 @@ describe('getUserFromSession', () => {
   });
 });
 
+describe('browser sessions by deployment', () => {
+  const originalSetting = process.env.KILO_BROWSER_SESSIONS;
+
+  afterEach(() => {
+    if (originalSetting === undefined) delete process.env.KILO_BROWSER_SESSIONS;
+    else process.env.KILO_BROWSER_SESSIONS = originalSetting;
+  });
+
+  async function signedInCookieRequest() {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers({ Cookie: 'next-auth.session-token=session' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      isNewUser: false,
+    });
+    return user;
+  }
+
+  test('apps/web accepts a session cookie', async () => {
+    delete process.env.KILO_BROWSER_SESSIONS;
+    const user = await signedInCookieRequest();
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.credential).toBe('session');
+  });
+
+  describe('apps/ai-gateway', () => {
+    beforeEach(() => {
+      process.env.KILO_BROWSER_SESSIONS = 'disabled';
+    });
+
+    test('treats a session cookie without a bearer as anonymous', async () => {
+      await signedInCookieRequest();
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(401);
+      expect(result.credentialsRejected).toBe(false);
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    });
+
+    test('never reads the session through the session-only entry points', async () => {
+      await signedInCookieRequest();
+
+      await expect(getUserFromSession()).resolves.toBeNull();
+      expect((await getUserFromSessionForCredentialIssuance()).user).toBeNull();
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    });
+
+    test('still authenticates a bearer token', async () => {
+      const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user?.id).toBe(user.id);
+    });
+  });
+});
+
 describe('credential issuance authentication guards', () => {
   test.each([
     ['Bearer token', { Authorization: 'Bearer token' }],

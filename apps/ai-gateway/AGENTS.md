@@ -26,6 +26,14 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   `apps/web` `maxDuration` and `withRestTiming` usage, with route patterns that
   match this app's paths. Import them as `@kilocode/web-shared/…`; see
   `packages/web-shared/AGENTS.md`.
+- Callers authenticate by bearer token only. `next.config.mjs` inlines
+  `KILO_BROWSER_SESSIONS=disabled` at build time, so the shared auth code never
+  reads the NextAuth session cookie here: a request without a bearer is
+  anonymous, even when the `apps/web` rewrite forwards a signed-in browser's
+  cookie. The Jest setup applies the same value to this app's tests.
+  `NEXTAUTH_SECRET` must stay set on the `kilocode-ai-gateway` project: it
+  verifies HS256 bearer tokens. It is no longer checked at boot, so a missing
+  value shows up as every bearer token being refused.
 - Requests only arrive here under `/api/v1`. The LLM proxy's path validation
   accepts only `/api/v1` and rejects the legacy `apps/web` prefixes.
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start`

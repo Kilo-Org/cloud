@@ -125,6 +125,15 @@ export const sessionAuthOptions = {
 } satisfies NextAuthOptions;
 
 /**
+ * False on apps/ai-gateway, whose next.config `env` inlines
+ * `KILO_BROWSER_SESSIONS` at build time. The gateway authenticates by bearer
+ * token only, so every session read there answers "no session".
+ */
+function acceptsBrowserSessions(): boolean {
+  return process.env.KILO_BROWSER_SESSIONS !== 'disabled';
+}
+
+/**
  * Reads the NextAuth session, treating a session read that throws as no
  * session. With the JWT strategy the read only parses and re-serializes request
  * cookies, so a throw means the cookies are unusable, for example a malformed
@@ -132,6 +141,7 @@ export const sessionAuthOptions = {
  * session token. Any other failure is rethrown so it stays visible.
  */
 async function readSession(): Promise<Session | null> {
+  if (!acceptsBrowserSessions()) return null;
   try {
     return await getServerSession(sessionAuthOptions);
   } catch (error) {
@@ -694,6 +704,7 @@ async function resolveUserFromAuth(
     return result;
   }
 
+  // On apps/ai-gateway `readSession` finds no session, so this is the anonymous result.
   return resolveUserFromSession(opts, readDb);
 }
 

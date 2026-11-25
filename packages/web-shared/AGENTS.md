@@ -36,16 +36,11 @@ work, work after the upstream request starts, and exceptional paths may use it.
   acceptable for auth. Shared helpers keep their `fromDb = db` default for the
   web app; gateway callers must pass `readDb`, since omitting it selects the
   primary.
-- The web-session revocation stamp is the one auth read a replica cannot answer:
-  `revokeWebSessions` commits it on the primary, so `resolveUserFromSession` reads
-  `web_session_pepper` from the primary (`readWebSessionPepper`) before it admits a
-  browser session, and only when the caller's connection is a replica. Bearer
-  authentication is unaffected. This is the one exception to the rule above
-  against `db` before the upstream inference request starts: it is a single
-  indexed primary-key lookup of `web_session_pepper`, taken only when the session
-  is resolved from a browser cookie (a bearer or inference-token request returns
-  before `resolveUserFromSession`), and the primary connection is held for that
-  one statement.
+- The gateway authenticates by bearer token only. Its `next.config.mjs` inlines
+  `KILO_BROWSER_SESSIONS=disabled` at build time, so `lib/user/server` never
+  reads the NextAuth session cookie there; a request without a bearer is
+  anonymous. Only `apps/web` resolves browser sessions, and with them the
+  primary `web_session_pepper` read (`readWebSessionPepper`).
 - `lib/model-stats/model-stats-cache` keeps one snapshot per read client, so the
   gateway's replica load and the web app's primary load never answer for each
   other; `invalidateModelStatsCache` expires both. The gateway callers that load

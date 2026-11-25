@@ -39,8 +39,14 @@ export class SignerDO extends DurableObject<Env> {
     return [publicKey];
   }
 
+  // One load per instance, shared by concurrent callers; a failed load is dropped so the next
+  // call retries instead of failing until the instance is evicted.
   private loadKey(): Promise<LoadedKey> {
-    return (this.loaded ??= this.readOrCreateKey());
+    this.loaded ??= this.readOrCreateKey().catch((error: unknown) => {
+      this.loaded = undefined;
+      throw error;
+    });
+    return this.loaded;
   }
 
   private async readOrCreateKey(): Promise<LoadedKey> {
@@ -63,11 +69,11 @@ export class SignerDO extends DurableObject<Env> {
       use: 'sig',
       alg: 'EdDSA',
     };
-    await this.ctx.storage.put(KEY_STORAGE, {
-      pkcs8: bytesToBase64url(new Uint8Array(exported)),
-      publicKey,
-    });
-    return { privateKey: pair.privateKey, publicKey };
+    const pkcs8 = bytesToBase64url(new Uint8Array(exported));
+    await this.ctx.storage.put(KEY_STORAGE, { pkcs8, publicKey });
+    // The generated pair is extractable only so its PKCS#8 can be stored; signing uses a
+    // non-extractable import of those bytes, the same key a later instance loads.
+    return { privateKey: await this.importPrivateKey(pkcs8), publicKey };
   }
 
   private importPrivateKey(pkcs8: string): Promise<CryptoKey> {

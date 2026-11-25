@@ -1,7 +1,12 @@
 import type { User } from '@kilocode/db/schema';
+import { CODE_INDEXING_ENABLED_USER_IDS } from '@kilocode/web-shared/lib/config.server';
 import { sql } from 'drizzle-orm';
 
-const ManuallyEnabledUsers = new Set(['9ff28f58-a37a-4d8a-ad45-bb0c9a4cd229']);
+const manuallyEnabledUsers = new Set(
+  CODE_INDEXING_ENABLED_USER_IDS.split(',')
+    .map(userId => userId.trim())
+    .filter(userId => userId.length > 0)
+);
 
 export function isEnabledForUser(user: User): boolean {
   // Code indexing is off by default - only admins have access
@@ -9,7 +14,7 @@ export function isEnabledForUser(user: User): boolean {
     return true;
   }
 
-  return ManuallyEnabledUsers.has(user.id);
+  return manuallyEnabledUsers.has(user.id);
 }
 
 /**

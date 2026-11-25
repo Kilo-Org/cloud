@@ -861,6 +861,53 @@ it.each([
   }
 });
 
+// Kilo v2 0.0.0-v2-141 reports each team catalog failure kind with a fixed text.
+// The organization kind means the account profile does not list the session's
+// organization. The other kinds are runtime credential or scope faults.
+const ORGANIZATION_MISSING_TEXT =
+  'The selected Kilo team is no longer available. Select another team or clear the team selection.';
+const TEAM_CATALOG_TEXTS = [
+  'Not signed in to Kilo Gateway. Sign in to load the team model catalog.',
+  "The selected Kilo team conflicts with the team of the Kilo token. Select the token's team or use another token.",
+  'This Kilo account has no personal account. Select a team to load its model catalog.',
+];
+
+it.each([
+  [ORGANIZATION_MISSING_TEXT, 'organization_unavailable', 'user'],
+  [
+    `SessionRunnerModel.ModelUnavailableError: ${ORGANIZATION_MISSING_TEXT}`,
+    'organization_unavailable',
+    'user',
+  ],
+  ...TEAM_CATALOG_TEXTS.flatMap(text => [
+    [text, 'model_catalog_unavailable', 'platform'] as const,
+    [
+      `SessionRunnerModel.ModelUnavailableError: ${text}`,
+      'model_catalog_unavailable',
+      'platform',
+    ] as const,
+  ]),
+] as const)('classifies the native team catalog failure %s as %s', (message, reason, owner) => {
+  const translated = nativeTurnError({ type: 'provider.no-route', message });
+  const failure = classifyAssistantFailure(translated, 'managed');
+  expect(failure.reason).toBe(reason);
+  expect(failure.terminalCode).toBeUndefined();
+  expect(failure.safeMessage).toBe(
+    reason === 'organization_unavailable'
+      ? 'The organization for this session is not available to this account'
+      : 'The Kilo model catalog could not be loaded'
+  );
+  expect(
+    classifyCloudAgentFailure({
+      source: 'run',
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      assistantReason: failure.reason,
+      providerOwnership: failure.providerOwnership,
+    })
+  ).toEqual({ responsibility: owner, reason });
+});
+
 it('restricts step starts to their message and emits each pending permission once', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';

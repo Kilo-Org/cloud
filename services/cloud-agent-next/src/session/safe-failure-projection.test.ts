@@ -226,6 +226,53 @@ describe('ChatGPT usage limit', () => {
   });
 });
 
+describe('Kilo team catalog failures', () => {
+  // Fixed Kilo v2 0.0.0-v2-141 catalog texts. They hold no identifiers, but
+  // their advice to select another team does not apply to a Cloud Agent session.
+  const ORGANIZATION_MISSING_TEXT =
+    'The selected Kilo team is no longer available. Select another team or clear the team selection.';
+
+  it.each(['', 'SessionRunnerModel.ModelUnavailableError: '])(
+    'classifies the missing organization text with prefix %j',
+    prefix => {
+      const source = {
+        name: 'UnknownError',
+        data: { message: `${prefix}${ORGANIZATION_MISSING_TEXT}` },
+      };
+      const failure = classifyAssistantFailure(source);
+      expect(failure).toEqual({
+        reason: 'organization_unavailable',
+        providerOwnership: 'unknown',
+        safeMessage: 'The organization for this session is not available to this account',
+      });
+      const safeError = projectSafeAssistantError(source);
+      expect(safeError).toBe(failure.safeMessage);
+      expect(classifyAssistantFailure(safeError)).toEqual(failure);
+    }
+  );
+
+  it.each([
+    'Not signed in to Kilo Gateway. Sign in to load the team model catalog.',
+    "The selected Kilo team conflicts with the team of the Kilo token. Select the token's team or use another token.",
+    'This Kilo account has no personal account. Select a team to load its model catalog.',
+  ])('classifies the runtime catalog text %s as a catalog failure', text => {
+    for (const message of [text, `SessionRunnerModel.ModelUnavailableError: ${text}`]) {
+      const failure = classifyAssistantFailure({ name: 'UnknownError', data: { message } });
+      expect(failure).toEqual({
+        reason: 'model_catalog_unavailable',
+        providerOwnership: 'unknown',
+        safeMessage: 'The Kilo model catalog could not be loaded',
+      });
+    }
+  });
+
+  it('does not claim a team text inside another failure', () => {
+    expect(classifyAssistantFailure(`Request failed: ${ORGANIZATION_MISSING_TEXT}`).reason).toBe(
+      'unknown'
+    );
+  });
+});
+
 describe('projectSafeAssistantError', () => {
   it('preserves a specific missing-agent failure without exposing the CLI agent list', () => {
     const error = {

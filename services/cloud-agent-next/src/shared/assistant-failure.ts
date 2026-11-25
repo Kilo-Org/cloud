@@ -425,6 +425,25 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   if (/\bfailed to load the kilo model catalog \(http 404\)/.test(message)) {
     return 'model_catalog_unavailable';
   }
+  // Kilo v2 reports each team catalog failure kind with a fixed text that holds
+  // no identifiers. `organization_missing` means the account profile does not
+  // list the session's organization, so a fresh session fails the same way.
+  // `unauthenticated`, `scope_conflict` and `personal_unavailable` mean the
+  // runtime credential or team scope is wrong, which the platform owns.
+  if (
+    /^(?:sessionrunnermodel\.modelunavailableerror: )?the selected kilo team is no longer available\./.test(
+      canonicalMessage
+    )
+  ) {
+    return 'organization_unavailable';
+  }
+  if (
+    /^(?:sessionrunnermodel\.modelunavailableerror: )?(?:not signed in to kilo gateway\. sign in to load the team model catalog|the selected kilo team conflicts with the team of the kilo token|this kilo account has no personal account\. select a team to load its model catalog)\./.test(
+      canonicalMessage
+    )
+  ) {
+    return 'model_catalog_unavailable';
+  }
   if (
     /^(?:sessionrunnermodel\.modelunavailableerror: )?model unavailable:/.test(canonicalMessage)
   ) {

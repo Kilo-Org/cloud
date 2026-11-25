@@ -121,6 +121,14 @@ describe('session event public projection', () => {
       'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
       'Assistant request was invalid',
     ],
+    [
+      'SessionRunnerModel.ModelUnavailableError: The selected Kilo team is no longer available. Select another team or clear the team selection.',
+      'The organization for this session is not available to this account',
+    ],
+    [
+      'Not signed in to Kilo Gateway. Sign in to load the team model catalog.',
+      'The Kilo model catalog could not be loaded',
+    ],
   ])(
     'sanitizes the native no-route error %s on the public execution failure event',
     (message, expected) => {

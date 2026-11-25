@@ -24,7 +24,10 @@ import { userRouter } from '@/routers/user-router';
  *   integration pages, which reads the selectable list and the preferred
  *   ordering `ModelCombobox` groups it by.
  * - `user.*`: the connected-accounts page's provider list, link and unlink,
- *   plus the Discord guild status card.
+ *   plus the Discord guild status card. Link and unlink refuse the shell
+ *   credential (they need the account's browser session and an emailed code),
+ *   so the shell page shows the list without those actions; they stay mounted
+ *   because the shared cards name them.
  * - `organizations.withMembers`, `seats`,
  *   `subscription.getLatestSeatPurchaseStatus`: the SSO and data-collection
  *   cards, which load the organization row and its trial/read-only status.

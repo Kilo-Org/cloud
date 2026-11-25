@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
@@ -18,6 +18,7 @@ import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { CHATGPT_ACCESS_FLAG } from '@kilocode/app-shared/feature-flags';
 import { ClaudeBillingCard } from './byok/ClaudeBillingCard';
+import type { SignInMethodChallenge } from '@/components/profile/SignInMethodCodeDialog';
 
 /**
  * A titled group of connection cards. The cards decide for themselves whether
@@ -53,6 +54,9 @@ export function BYOKContent({
 }) {
   const { assumedRole } = useRoleTesting();
   const chatGptEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
+  // Both ChatGPT cards ask for a sign-in method code, and the server keeps one
+  // live code per account, so they share the last one this page requested.
+  const [codeChallenge, setCodeChallenge] = useState<SignInMethodChallenge | null>(null);
 
   // Use assumed role if available, otherwise use actual role
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role || 'member';
@@ -75,7 +79,11 @@ export function BYOKContent({
             description="Used only for the requests you make in this organization. Every member links their own."
           >
             {chatGptEnabled === true ? (
-              <OpenAiChatGptCard organizationId={organizationId} />
+              <OpenAiChatGptCard
+                organizationId={organizationId}
+                codeChallenge={codeChallenge}
+                onCodeChallengeChange={setCodeChallenge}
+              />
             ) : chatGptEnabled === undefined ? (
               <OpenAiChatGptCardView status={undefined} isOrganization />
             ) : null}
@@ -93,7 +101,11 @@ export function BYOKContent({
                 description="Used by Kilo shared services in this organization, such as code review. Only owners and admins can manage these."
               >
                 {!canManageSharedServices(currentRole) ? null : chatGptEnabled === true ? (
-                  <ChatGptSharedServicesCard organizationId={organizationId} />
+                  <ChatGptSharedServicesCard
+                    organizationId={organizationId}
+                    codeChallenge={codeChallenge}
+                    onCodeChallengeChange={setCodeChallenge}
+                  />
                 ) : chatGptEnabled === undefined ? (
                   <ChatGptSharedServicesCardView status={undefined} />
                 ) : null}

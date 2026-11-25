@@ -1,12 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { experimental_readRawConfig } from 'wrangler';
+import { z } from 'zod';
 import { PolicySchema } from '../../src/policy/schema';
 import { repoRoot, shippedPolicyDocuments } from './repo';
 import {
   AUDIT_RELAY_DEPLOYMENTS,
+  CLASSIFIED_KEYS,
   type WorkerConfig,
   internalWorkerProblems,
   parseWorkerConfig,
@@ -49,12 +52,14 @@ const problemsOf = (...configs: WorkerConfig[]) =>
   workerConfigProblems(configs, [workerBindingPolicy('consumer')]);
 
 describe('repository Worker configs', () => {
-  it('lists every deployable config and skips test fixtures', () => {
+  it('lists every config a deploy can read, test fixtures included', () => {
     const paths = workerConfigPaths(repoRoot);
     expect(paths).toContain('services/sts/wrangler.jsonc');
     expect(paths).toContain('services/o11y/wrangler.jsonc');
     expect(paths).toContain('services/sts/wrangler.test.jsonc');
-    expect(paths.filter(path => path.split('/').includes('test'))).toEqual([]);
+    // cloud-agent-e2e-deploy.yml deploys this one to the account.
+    expect(paths).toContain('services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc');
+    expect(paths.filter(path => path.includes('node_modules/'))).toEqual([]);
   });
 
   it('reach STS only through SecretsBroker as their own Worker, and never reach the relay', () => {
@@ -63,6 +68,62 @@ describe('repository Worker configs', () => {
 
   it('agree with the deployment lists the check relies on', () => {
     expect(internalWorkerProblems(repoConfigs())).toEqual([]);
+  });
+});
+
+describe("Wrangler's config schema", () => {
+  const schemaPath = join(
+    dirname(createRequire(import.meta.url).resolve('wrangler/package.json')),
+    'config-schema.json'
+  );
+  const schema: unknown = JSON.parse(readFileSync(schemaPath, 'utf8'));
+  const NodeSchema = z.record(z.string(), z.unknown());
+  const at = (...path: string[]) =>
+    path.reduce<unknown>((node, key) => NodeSchema.parse(node)[key], schema);
+  const keysOf = (node: unknown) =>
+    Object.keys(z.object({ properties: NodeSchema }).parse(node).properties);
+  const definition = (name: string) => at('definitions', name);
+  const environment = (...path: string[]) =>
+    at('definitions', 'RawEnvironment', 'properties', ...path);
+  const wranglerKeys: Record<string, string[]> = {
+    environment: keysOf(definition('RawEnvironment')),
+    topLevel: keysOf(definition('RawConfig')),
+    previews: keysOf(definition('PreviewsConfig')),
+    'services[]': keysOf(environment('services', 'items')),
+    'durable_objects.bindings[]': keysOf(at('definitions', 'DurableObjectBindings', 'items')),
+    queues: keysOf(environment('queues')),
+    'queues.producers[]': keysOf(environment('queues', 'properties', 'producers', 'items')),
+    'queues.consumers[]': keysOf(environment('queues', 'properties', 'consumers', 'items')),
+    'r2_buckets[]': keysOf(environment('r2_buckets', 'items')),
+    'workflows[]': keysOf(definition('WorkflowBinding')),
+    'tail_consumers[]': keysOf(definition('TailConsumer')),
+    'streaming_tail_consumers[]': keysOf(definition('StreamingTailConsumer')),
+    'dispatch_namespaces[]': keysOf(environment('dispatch_namespaces', 'items')),
+    'dispatch_namespaces[].outbound': keysOf(definition('DispatchNamespaceOutbound')),
+    'routes[]': ['CustomDomainRoute', 'ZoneIdRoute', 'ZoneNameRoute'].flatMap(name =>
+      keysOf(definition(name))
+    ),
+    'migrations[]': keysOf(definition('DurableObjectMigration')),
+    'migrations[].transferred_classes[]': keysOf(
+      at('definitions', 'DurableObjectMigration', 'properties', 'transferred_classes', 'items')
+    ),
+    'exports.*': [
+      ...z
+        .array(z.unknown())
+        .parse(at('definitions', 'DurableObjectExport', 'anyOf'))
+        .flatMap(keysOf),
+      ...keysOf(definition('WorkerEntrypointExport')),
+    ],
+  };
+
+  it('has no key the check leaves unclassified, at any level the check models', () => {
+    expect(Object.keys(CLASSIFIED_KEYS).sort()).toEqual(Object.keys(wranglerKeys).sort());
+    for (const [level, keys] of Object.entries(wranglerKeys)) {
+      expect(
+        keys.filter(key => !(CLASSIFIED_KEYS[level] ?? []).includes(key)),
+        level
+      ).toEqual([]);
+    }
   });
 });
 
@@ -247,7 +308,7 @@ describe('worker config rules', () => {
     ]);
   });
 
-  it('accepts the audit relay as it binds STS and consumes its queues in every environment', () => {
+  it('accepts the audit relay as it binds STS, its queues and its archive in every environment', () => {
     const relayBinding = (service: string) => ({
       binding: 'STS',
       service,
@@ -263,27 +324,38 @@ describe('worker config rules', () => {
     const relayQueues = (queue: string) => ({
       consumers: [{ queue, dead_letter_queue: `${queue}-dlq` }, { queue: `${queue}-dlq` }],
     });
+    const archive = (bucket_name: string, jurisdiction?: string) => [
+      { binding: 'AUDIT_ARCHIVE', bucket_name, ...(jurisdiction ? { jurisdiction } : {}) },
+    ];
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
       durable_objects: ownObjects,
       queues: relayQueues('kilo-audit'),
+      r2_buckets: archive('kilo-audit-archive', 'eu'),
       services: [relayBinding('sts')],
       env: {
         staging: {
           name: 'audit-relay-staging',
           durable_objects: ownObjects,
           queues: relayQueues('kilo-audit-staging'),
+          r2_buckets: archive('kilo-audit-archive-staging', 'eu'),
           services: [relayBinding('sts-staging')],
         },
         local: {
           name: 'audit-relay-local',
           durable_objects: ownObjects,
           queues: relayQueues('kilo-audit-local'),
+          r2_buckets: archive('kilo-audit-archive-local'),
           services: [relayBinding('sts-local')],
         },
       },
     });
-    const configs = [readWorkerConfig(repoRoot, 'services/sts/wrangler.jsonc'), relay];
+    const relayTest = parseWorkerConfig('services/audit-relay/wrangler.test.jsonc', {
+      name: 'audit-relay-test',
+      durable_objects: ownObjects,
+      r2_buckets: archive('kilo-audit-archive-test'),
+    });
+    const configs = [readWorkerConfig(repoRoot, 'services/sts/wrangler.jsonc'), relay, relayTest];
     expect(workerConfigProblems(configs, shippedPolicies())).toEqual([]);
     expect(internalWorkerProblems(configs)).toEqual([]);
   });
@@ -352,6 +424,155 @@ describe('worker config rules', () => {
       `${PATH} (env.x) deploys as sts, which only the sts config deploys`,
       `${PATH} (env.y) deploys as audit-relay-local, which only the audit-relay config deploys`,
       `${PATH} (env.z) deploys as sts-test, which only the sts-test config deploys`,
+    ]);
+  });
+
+  it('refuses unsafe bindings in any block', () => {
+    const unsafe = {
+      bindings: [{ type: 'durable_object_namespace', class_name: 'SignerDO', script_name: 'sts' }],
+    };
+    const config = consumer({
+      unsafe,
+      env: { staging: { unsafe } },
+      previews: { unsafe },
+    });
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level): unsafe is refused; no rule here can read its bindings`,
+      `${PATH} (top level) previews: unsafe is refused; no rule here can read its bindings`,
+      `${PATH} (env.staging): unsafe is refused; no rule here can read its bindings`,
+    ]);
+  });
+
+  it('reports a key it does not model instead of ignoring it', () => {
+    const config = consumer({
+      durable_object_bindings: [{ name: 'SIGNER', class_name: 'SignerDO', script_name: 'sts' }],
+      env: { staging: { dev: { port: 1 }, legacy_env: true } },
+      previews: { routes: ['sts.kiloapps.io'] },
+    });
+    const hint = 'classify it in test/repo/worker-configs.ts';
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level): unmodelled key durable_object_bindings; ${hint}`,
+      `${PATH} (top level) previews: unmodelled key routes; ${hint}`,
+      `${PATH} (env.staging): unmodelled key dev; ${hint}`,
+      `${PATH} (env.staging): unmodelled key legacy_env; ${hint}`,
+    ]);
+  });
+
+  it('fails the parse on an unknown field inside a modelled binding', () => {
+    expect(() => consumer({ services: [{ ...stsBinding('sts'), script_name: 'sts' }] })).toThrow(
+      /Unrecognized key: "script_name"/
+    );
+    expect(() =>
+      consumer({ r2_buckets: [{ binding: 'A', bucket_name: 'a', bucket: 'kilo-audit-archive' }] })
+    ).toThrow(/Unrecognized key: "bucket"/);
+  });
+
+  it('lets a preview bind no STS, audit queue or archive bucket', () => {
+    const config = consumer({
+      services: [stsBinding('sts')],
+      previews: {
+        services: [stsBinding('sts')],
+        queues: { producers: [{ binding: 'AUDIT', queue: 'kilo-audit' }] },
+        r2_buckets: [{ binding: 'A', bucket_name: 'kilo-audit-archive', jurisdiction: 'eu' }],
+      },
+    });
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level) previews: AUDIT produces to kilo-audit; only sts may`,
+      `${PATH} (top level) previews: A names kilo-audit-archive in bucket_name; only audit-relay may`,
+      `${PATH} (top level) previews: STS binds sts; a preview runs unreviewed code and binds no STS`,
+    ]);
+  });
+
+  it('refuses every other reference into STS or relay classes and handlers', () => {
+    const config = consumer({
+      workflows: [
+        { binding: 'WF', name: 'wf', class_name: 'Flow', script_name: 'sts' },
+        { binding: 'OWN', name: 'own', class_name: 'Flow' },
+      ],
+      tail_consumers: [{ service: 'audit-relay' }, { service: 'o11y' }],
+      streaming_tail_consumers: [{ service: 'sts-staging' }],
+      dispatch_namespaces: [{ binding: 'D', namespace: 'ns', outbound: { service: 'sts' } }],
+      migrations: [
+        {
+          tag: 'v1',
+          transferred_classes: [{ from: 'SignerDO', from_script: 'sts', to: 'Mine' }],
+        },
+      ],
+      exports: {
+        Mine: {
+          type: 'durable-object',
+          state: 'expecting-transfer',
+          storage: 'sqlite',
+          transfer_from: 'sts',
+        },
+        Other: { type: 'worker-entrypoint', via: 'sts' },
+      },
+    });
+    const internal = 'its classes and handlers are internal';
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level): workflow WF script_name names sts; ${internal}`,
+      `${PATH} (top level): a tail consumer names audit-relay; ${internal}`,
+      `${PATH} (top level): a tail consumer names sts-staging; ${internal}`,
+      `${PATH} (top level): dispatch namespace D outbound names sts; ${internal}`,
+      `${PATH} (top level): migration v1 transferred_classes SignerDO from_script names sts; ${internal}`,
+      `${PATH} (top level): export Mine transfer_from names sts; ${internal}`,
+      `${PATH} (top level): export Other has unmodelled key via`,
+    ]);
+  });
+
+  it('lets only the relay bind its own archive bucket, in the EU outside local and test', () => {
+    const foreign = consumer({
+      r2_buckets: [
+        { binding: 'ARCHIVE', bucket_name: 'kilo-audit-archive', jurisdiction: 'eu' },
+        {
+          binding: 'SCRATCH',
+          bucket_name: 'scratch',
+          preview_bucket_name: 'kilo-audit-archive-local',
+        },
+      ],
+    });
+    const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
+      name: 'audit-relay',
+      r2_buckets: [{ binding: 'AUDIT_ARCHIVE', bucket_name: 'kilo-audit-archive' }],
+      env: {
+        staging: {
+          name: 'audit-relay-staging',
+          r2_buckets: [
+            { binding: 'AUDIT_ARCHIVE', bucket_name: 'kilo-audit-archive', jurisdiction: 'eu' },
+          ],
+        },
+        local: {
+          name: 'audit-relay-local',
+          r2_buckets: [{ binding: 'AUDIT_ARCHIVE', bucket_name: 'kilo-audit-archive-local' }],
+        },
+      },
+    });
+    expect(problemsOf(foreign, relay)).toEqual([
+      `${PATH} (top level): ARCHIVE names kilo-audit-archive in bucket_name; only audit-relay may`,
+      `${PATH} (top level): SCRATCH names kilo-audit-archive-local in preview_bucket_name; only audit-relay-local may`,
+      'services/audit-relay/wrangler.jsonc (top level): AUDIT_ARCHIVE names kilo-audit-archive in bucket_name without jurisdiction eu; only the EU bucket exists and carries the lock rules',
+      'services/audit-relay/wrangler.jsonc (env.staging): AUDIT_ARCHIVE names kilo-audit-archive in bucket_name; only audit-relay may',
+    ]);
+  });
+
+  it('refuses a route that covers an STS or relay hostname from another config', () => {
+    const config = consumer({
+      routes: [
+        { pattern: 'sts.kiloapps.io/v1/*', zone_name: 'kiloapps.io' },
+        '*.kiloapps.io/*',
+        'o11y.kiloapps.io',
+      ],
+      env: { staging: { route: 'audit-relay-staging.kiloapps.io' } },
+    });
+    const covers = (pattern: string, host: string, owner: string) =>
+      `route ${pattern} covers ${host}, which only the ${owner} config serves`;
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level): ${covers('sts.kiloapps.io/v1/*', 'sts.kiloapps.io', 'sts')}`,
+      `${PATH} (top level): ${covers('*.kiloapps.io/*', 'sts.kiloapps.io', 'sts')}`,
+      `${PATH} (top level): ${covers('*.kiloapps.io/*', 'sts-staging.kiloapps.io', 'sts')}`,
+      `${PATH} (top level): ${covers('*.kiloapps.io/*', 'audit-relay.kiloapps.io', 'audit-relay')}`,
+      `${PATH} (top level): ${covers('*.kiloapps.io/*', 'audit-relay-staging.kiloapps.io', 'audit-relay')}`,
+      `${PATH} (env.staging): ${covers('audit-relay-staging.kiloapps.io', 'audit-relay-staging.kiloapps.io', 'audit-relay')}`,
     ]);
   });
 });

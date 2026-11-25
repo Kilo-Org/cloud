@@ -108,13 +108,13 @@ describe('Fly machine identity', () => {
   it('refuses an app with the policy name but another app id', async () => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(FLY_ISSUER), { ...FLY_CLAIMS, app_id: '9999' });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
+    expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'unknown_workload' });
   });
 
   it('refuses an org id that differs from the policy', async () => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(FLY_ISSUER), { ...FLY_CLAIMS, org_id: '3333' });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
+    expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'unknown_workload' });
   });
 
   it('refuses the default Fly audience instead of the STS issuer', async () => {
@@ -141,7 +141,7 @@ describe('GitHub Actions identity', () => {
     const withoutEnvironment: Record<string, string> = { ...GITHUB_CLAIMS };
     delete withoutEnvironment.environment;
     const token = await signToken(provider(GITHUB_ISSUER), withoutEnvironment);
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+    expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'identity_rejected' });
   });
 
   it('keeps refs as an extra filter next to the environment', async () => {
@@ -150,7 +150,7 @@ describe('GitHub Actions identity', () => {
       ...GITHUB_CLAIMS,
       ref: 'refs/heads/feature',
     });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+    expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'identity_rejected' });
   });
 
   it.each(['pull_request_target', 'workflow_run', 'issue_comment'])(
@@ -161,7 +161,7 @@ describe('GitHub Actions identity', () => {
         ...GITHUB_CLAIMS,
         event_name: event,
       });
-      expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+      expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'identity_rejected' });
     }
   );
 
@@ -186,15 +186,67 @@ describe('GitHub Actions identity', () => {
       ...GITHUB_CLAIMS,
       repository_id: '999',
     });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
+    expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'unknown_workload' });
   });
 
   it('reports an environment mismatch for a policy this deployment does not serve', async () => {
     const { verify, provider } = await fixture('staging');
-    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toEqual({
+    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toMatchObject({
       status: 'denied',
       reason: 'environment_mismatch',
     });
+  });
+});
+
+describe('denial subjects', () => {
+  it('names the stable ids of a verified token that no policy grants', async () => {
+    const { verify, provider } = await fixture('production');
+    const token = await signToken(provider(GITHUB_ISSUER), {
+      ...GITHUB_CLAIMS,
+      repository_id: '999',
+    });
+    const outcome = await verify(token);
+    expect(outcome).toEqual({
+      status: 'denied',
+      reason: 'unknown_workload',
+      subject: {
+        provider: 'github',
+        actor: 'github:999',
+        claims: {
+          repository_id: '999',
+          repository_owner_id: '456',
+          repository: 'acme/repo',
+          environment: 'production',
+          ref: 'refs/heads/main',
+          event_name: 'push',
+        },
+      },
+    });
+    expect(JSON.stringify(outcome)).not.toContain(token);
+  });
+
+  it('names the policy workload when a verified token fails its binding', async () => {
+    const { verify, provider } = await fixture('production');
+    const token = await signToken(provider(FLY_ISSUER), { ...FLY_CLAIMS, app_id: '9999' });
+    expect(await verify(token)).toMatchObject({
+      reason: 'unknown_workload',
+      subject: { provider: 'fly', actor: 'fly:1111/9999' },
+    });
+    const github = await signToken(provider(GITHUB_ISSUER), {
+      ...GITHUB_CLAIMS,
+      ref: 'refs/heads/feature',
+    });
+    expect(await verify(github)).toMatchObject({
+      reason: 'identity_rejected',
+      subject: { actor: 'github-deploy' },
+    });
+  });
+
+  it('carries no subject for a token whose signature did not verify', async () => {
+    const { verify } = await fixture('production');
+    const impostor = await createProvider(FLY_ISSUER, STS_ISSUER);
+    expect(await verify(await signToken(impostor, FLY_CLAIMS))).not.toHaveProperty('subject');
+    expect(await verify('not-a-jwt')).not.toHaveProperty('subject');
   });
 });
 

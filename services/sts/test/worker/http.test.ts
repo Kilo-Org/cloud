@@ -1,18 +1,19 @@
 import { SELF, runInDurableObject } from 'cloudflare:test';
 import { STS_FETCHED_AT_HEADER, STS_STALE_HEADER } from '@kilocode/sts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { serveWorkerCall } from '../../src/broker';
-import { getBundleStub, getRefresherStub } from '../../src/dos/stubs';
+import { serveBundle, serveWorkerCall } from '../../src/broker';
+import { getBundleStub, getDenialStub, getRefresherStub } from '../../src/dos/stubs';
 import { bundleResponse } from '../../src/http';
 import { workloadPolicyHash } from '../../src/policy';
 import { installManager, stubOfflineNetwork } from './manager';
-import { resetBundleObject } from './reset';
+import { resetBundleObject, resetDenialObject } from './reset';
 import { config, env } from './test-env';
 import { signWebhook, webhookBody } from './webhook';
 
 beforeEach(async () => {
   stubOfflineNetwork();
   await resetBundleObject(getBundleStub(env, config, 'o11y'));
+  await resetDenialObject(getDenialStub(env, config));
 });
 
 afterEach(() => {
@@ -94,12 +95,7 @@ describe('manager webhook route', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     installManager({ secrets: [] });
     const refresher = getRefresherStub(env, config);
-    await refresher.receiveWebhook('{}', null);
-    const key = await runInDurableObject(
-      refresher,
-      (_instance, state) =>
-        state.storage.sql.exec<{ key: string }>('SELECT key FROM webhook_key').one().key
-    );
+    const key = await refresher.webhookSecret();
 
     const body = webhookBody({ timestamp: Date.now() });
     const signed = await SELF.fetch(`${config.issuer}/manager-webhook`, {
@@ -140,19 +136,60 @@ describe('worker-binding entry', () => {
       stale: false,
     });
 
-    const result = await serveWorkerCall(env, config, 'o11y', {});
+    const pending: Promise<unknown>[] = [];
+    const result = await serveWorkerCall(env, config, 'o11y', {}, promise => pending.push(promise));
     if (result.status !== 'ok') throw new Error(`expected ok, got ${result.status}`);
     expect(result.workload).toBe('o11y');
     expect(result.secrets.O11Y_CF_AE_API_TOKEN).toEqual({ value: 'ae-token', version: 7 });
+    expect(pending).toHaveLength(0);
   });
 
-  it('denies a caller with no policy', async () => {
-    expect(await serveWorkerCall(env, config, 'unknown-worker', {})).toEqual({
-      status: 'denied',
-      reason: 'unknown_workload',
+  it('denies a caller with no policy and records the denial for the audit stream', async () => {
+    const pending: Promise<unknown>[] = [];
+    expect(
+      await serveWorkerCall(env, config, 'unknown-worker', {}, promise => pending.push(promise))
+    ).toEqual({ status: 'denied', reason: 'unknown_workload' });
+    await Promise.all(pending);
+    expect(await pendingDenials()).toEqual([
+      { key: expect.stringContaining('unknown-worker'), count: 1 },
+    ]);
+  });
+
+  it('answers unavailable with a retry when the bundle object call fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // An invalid workload name makes the bundle object's own input check throw.
+    expect(await serveBundle(env, config, 'Not A Workload', {})).toEqual({
+      status: 'unavailable',
+      reason: 'internal',
+      retryAfterSeconds: 30,
     });
   });
 });
+
+describe('HTTP denials', () => {
+  it('logs an unverified token and records no denial', async () => {
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const token = unsignedToken({ iss: 'https://issuer.example', aud: config.issuer });
+    const response = await SELF.fetch(`${config.issuer}/v1/bundle`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.status).toBe(401);
+    expect(await pendingDenials()).toEqual([]);
+    const logged = JSON.stringify(warnings.mock.calls);
+    expect(logged).toContain('token not verified');
+    expect(logged).not.toContain(token);
+  });
+});
+
+function pendingDenials(): Promise<Array<{ key: string; count: number }>> {
+  return runInDurableObject(getDenialStub(env, config), (_instance, state) =>
+    state.storage.sql
+      .exec<{ key: string; count: number }>('SELECT key, count FROM denial_window ORDER BY key')
+      .toArray()
+      .map(row => ({ key: row.key, count: row.count }))
+  );
+}
 
 function unsignedToken(claims: Record<string, unknown>): string {
   const encode = (value: unknown): string =>

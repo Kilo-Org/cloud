@@ -17,6 +17,7 @@ import {
   AUDIT_RETRY_AFTER_SECONDS,
   DELIVERY_COUNTER_RETENTION_MS,
   MANAGER_RETRY_AFTER_SECONDS,
+  STALE_AFTER_MS,
   REFRESHER_CHECK_INTERVAL_MS,
   RELAY_DELAY_MS,
   RELAY_RETRY_MS,
@@ -125,9 +126,11 @@ export class BundleDO extends DurableObject<Env> {
       };
     }
     const etag = served.kind === 'stored' ? served.row.etag : served.etag;
+    // A copy whose pushes keep failing is stale even though no failed read marked it.
+    const stale = row.stale || Date.now() - Date.parse(row.fetchedAt) > STALE_AFTER_MS;
     if (ifNoneMatch === etag) {
       this.recordNotModified();
-      return { status: 'not_modified', etag, stale: row.stale, fetchedAt: row.fetchedAt };
+      return { status: 'not_modified', etag, stale, fetchedAt: row.fetchedAt };
     }
 
     const secrets = served.kind === 'stored' ? await this.open(row) : served.secrets;
@@ -146,7 +149,7 @@ export class BundleDO extends DurableObject<Env> {
           environment: this.config.environment,
           workload: target.workload,
           etag,
-          stale: row.stale,
+          stale,
           secrets: Object.entries(secrets).map(([name, secret]) => ({
             name,
             version: secret.version,
@@ -176,7 +179,7 @@ export class BundleDO extends DurableObject<Env> {
       workload: target.workload,
       environment: this.config.environment,
       etag,
-      stale: row.stale,
+      stale,
       fetchedAt: row.fetchedAt,
       secrets: delivered,
       missing,

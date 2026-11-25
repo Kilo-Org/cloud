@@ -8,6 +8,7 @@ import {
   type WorkloadName,
 } from '@kilocode/sts-contracts';
 import type { PolicySnapshotEntry } from '../policy/load';
+import type { Denial } from './denials';
 
 /** Attributes hold at most 256 values; longer lists are cut and flagged. */
 function attributeList(values: string[]): { values: string[]; truncated: boolean } {
@@ -46,6 +47,50 @@ export function bundleDeliveredEvent(input: {
         secretCount: input.secrets.length,
         secrets: input.secrets.map(secret => `${secret.name}:${secret.version}`),
         missing: [...input.missing],
+      },
+    },
+  });
+}
+
+/**
+ * `count` identical refused reads in the minute starting at `windowStart` (design 4.3: STS refuses
+ * and audits any other read). `overflow` marks the row that counts denials past the per-minute
+ * distinct limit; it carries no claims.
+ */
+export function bundleDeniedEvent(input: {
+  environment: StsEnvironment;
+  denial: Denial;
+  count: number;
+  windowStart: string;
+  overflow: boolean;
+}): AuditEvent {
+  const claims = Object.keys(input.denial.claims)
+    .sort()
+    .map(name => `${name}=${input.denial.claims[name]}`.slice(0, 256));
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.bundle.denied',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.read,
+      outcome: 'denied',
+      outcomeDetail: input.denial.reason,
+      actor: {
+        kind: input.denial.channel === 'worker-binding' ? 'workload' : 'service',
+        id: input.denial.actor,
+      },
+      attributes: {
+        environment: input.environment,
+        channel: input.denial.channel,
+        reason: input.denial.reason,
+        count: input.count,
+        windowStart: input.windowStart,
+        overflow: input.overflow,
+        claims,
       },
     },
   });

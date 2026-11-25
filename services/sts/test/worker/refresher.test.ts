@@ -5,7 +5,6 @@ import { backoffDelayMs } from '../../src/dos/RefresherDO';
 import { getBundleStub, getRefresherStub, getSignerStub } from '../../src/dos/stubs';
 import { installManager, secret, stubOfflineNetwork, type MockSecret } from './manager';
 import { resetBundleObject, resetRefresherObject } from './reset';
-import { signWebhook, webhookBody } from './webhook';
 import { config, env } from './test-env';
 
 beforeEach(async () => {
@@ -287,28 +286,12 @@ describe('manager failures', () => {
 });
 
 describe('manager webhooks', () => {
-  /** A refused webhook creates the secret without starting the alarm loop. */
-  async function webhookKey(): Promise<string> {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const refresher = getRefresherStub(env, config);
-    await refresher.receiveWebhook('{}', null);
-    return await runInDurableObject(
-      refresher,
-      (_instance, state) =>
-        state.storage.sql.exec<{ key: string }>('SELECT key FROM webhook_key').one().key
-    );
-  }
-
-  it('merges signed secrets.modified webhooks into one refresh 30 seconds after the first', async () => {
+  it('merges verified webhook refresh requests into one refresh 30 seconds after the first', async () => {
     installManager({ secrets: MANAGER });
-    const key = await webhookKey();
     const refresher = getRefresherStub(env, config);
     await refresher.refreshAll();
 
-    const first = webhookBody({ timestamp: Date.now() });
-    expect(await refresher.receiveWebhook(first, await signWebhook(key, first))).toEqual({
-      status: 'refresh',
-    });
+    await refresher.requestWebhookRefresh();
     const opened = await refresherState();
     if (opened.webhook_refresh_at === null || opened.last_refresh_at === null) {
       throw new Error('expected an open merge window');
@@ -316,8 +299,7 @@ describe('manager webhooks', () => {
     expect(opened.webhook_refresh_at).toBeGreaterThanOrEqual(opened.last_refresh_at + 30_000);
     expect(opened.webhook_refresh_at).toBeLessThan(opened.next_refresh_at);
 
-    const second = webhookBody({ timestamp: Date.now() + 5 });
-    await refresher.receiveWebhook(second, await signWebhook(key, second));
+    await refresher.requestWebhookRefresh();
     expect((await refresherState()).webhook_refresh_at).toBe(opened.webhook_refresh_at);
 
     const alarm = await runInDurableObject(refresher, (_instance, state) =>
@@ -327,51 +309,22 @@ describe('manager webhooks', () => {
     expect(alarm).toBeLessThanOrEqual(opened.webhook_refresh_at);
   });
 
-  it('refuses a bad signature and a timestamp older than five minutes, and ignores other scopes', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    installManager({ secrets: MANAGER });
-    const key = await webhookKey();
-    const refresher = getRefresherStub(env, config);
-    await refresher.refreshAll();
-
-    const body = webhookBody({ timestamp: Date.now() });
-    const forged = await signWebhook('not-the-key', body);
-    expect(await refresher.receiveWebhook(body, forged)).toEqual({
-      status: 'rejected',
-      reason: 'bad_signature',
-    });
-    expect(await refresher.receiveWebhook(body, null)).toEqual({
-      status: 'rejected',
-      reason: 'malformed',
-    });
-
-    const old = webhookBody({ timestamp: Date.now() - 6 * 60 * 1000 });
-    expect(await refresher.receiveWebhook(old, await signWebhook(key, old))).toEqual({
-      status: 'rejected',
-      reason: 'stale',
-    });
-
-    const staging = webhookBody({ timestamp: Date.now(), environment: 'staging' });
-    expect(await refresher.receiveWebhook(staging, await signWebhook(key, staging))).toEqual({
-      status: 'ignored',
-      reason: 'other_scope',
-    });
-    expect((await refresherState()).webhook_refresh_at).toBeNull();
-  });
-
   it('does not shorten a running backoff', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const manager = installManager({ secrets: MANAGER });
-    const key = await webhookKey();
     const refresher = getRefresherStub(env, config);
     manager.setReadStatus(500);
     await refresher.refreshAll();
 
-    const body = webhookBody({ timestamp: Date.now() });
-    expect((await refresher.receiveWebhook(body, await signWebhook(key, body))).status).toBe(
-      'refresh'
-    );
+    await refresher.requestWebhookRefresh();
     expect((await refresherState()).webhook_refresh_at).toBeNull();
+  });
+
+  it('hands out one stable webhook secret', async () => {
+    const refresher = getRefresherStub(env, config);
+    const first = await refresher.webhookSecret();
+    expect(first).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(await refresher.webhookSecret()).toBe(first);
   });
 });
 

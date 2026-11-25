@@ -227,6 +227,23 @@ column `key`, and pastes it into the Infisical webhook's secret key field; Terra
 that field (design 4.2). Data Studio is available to account members who can already read every
 Durable Object's storage, so this adds no reader (https://developers.cloudflare.com/durable-objects/observability/data-studio).
 A webhook only shortens the wait for the next read; a forged or lost one cannot change a bundle.
+The secret stays in its SQL row for this copy; its one insert is the only statement that binds it.
+Residual risk if it leaked (for example through a trace, which `wrangler.jsonc` turns off): forged
+webhooks could trigger early refreshes, at most one per 30 seconds per environment through the
+merge window, and never change a bundle.
+
+## Key material
+
+Every key STS generates stays inside the Durable Object that made it, in its KV storage
+(`ctx.storage.put/get`), never in a SQL row: a Workers trace records each SQL statement's bound
+values, while a storage get or put records only the key name
+(https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/). That covers
+the manager login key (`SignerDO`, `manager-signing-key`), each bundle object's seal and ETag keys
+(`bundle-keys`) and the refresher's folder seal key (`refresher-seal-key`). A row an earlier
+revision wrote to `signing_key`, `bundle_key` or `refresher_key` is moved to KV storage on the
+object's first use and deleted; those tables are no longer written. Traces are off in
+`wrangler.jsonc` (`observability.traces.enabled: false`, inherited by every environment), so a
+dashboard toggle or a changed platform default cannot start recording statements.
 
 ## Local development
 

@@ -8,8 +8,13 @@ const AUDIT_TABLES = ['audit_event', 'audit_watermark', 'audit_prune'];
  * aborted so in-memory caches (keys, the manager token) start empty too. Only test code
  * touches SQL directly.
  */
-async function resetObject(stub: DurableObjectStub, tables: string[]): Promise<void> {
+async function resetObject(
+  stub: DurableObjectStub,
+  tables: string[],
+  keys: string[] = []
+): Promise<void> {
   await runInDurableObject(stub, async (_instance, state) => {
+    if (keys.length > 0) await state.storage.delete(keys);
     for (const table of [...tables, ...AUDIT_TABLES]) {
       state.storage.sql.exec(`DELETE FROM ${table}`);
     }
@@ -22,12 +27,16 @@ async function resetObject(stub: DurableObjectStub, tables: string[]): Promise<v
 }
 
 export async function resetBundleObject(stub: DurableObjectStub): Promise<void> {
-  await resetObject(stub, ['bundle', 'bundle_key', 'delivery_counter']);
+  await resetObject(stub, ['bundle', 'bundle_key', 'delivery_counter'], ['bundle-keys']);
 }
 
 /** The webhook secret is kept: tests read it from storage when they sign a webhook. */
 export async function resetRefresherObject(stub: DurableObjectStub): Promise<void> {
-  await resetObject(stub, ['manager_folder', 'refresher_key', 'policy_state', 'refresher_state']);
+  await resetObject(
+    stub,
+    ['manager_folder', 'refresher_key', 'policy_state', 'refresher_state'],
+    ['refresher-seal-key']
+  );
 }
 
 export async function resetDenialObject(stub: DurableObjectStub): Promise<void> {

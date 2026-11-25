@@ -27,7 +27,6 @@ import {
   createSignInMethodChangeCode,
   deleteSignInMethodChangeCode,
   SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
-  SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES,
   type SignInMethodChangeCodeBinding,
 } from '@/lib/auth/sign-in-method-change-email-code';
 import { currentSignInMethodChangeRequestDetails } from '@/lib/auth/sign-in-method-change-request';
@@ -55,6 +54,7 @@ import {
 } from '@/lib/auth/sign-in-method-change';
 import {
   SIGN_IN_METHOD_CHANGE_REFUSAL_CODES,
+  SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES,
   type SignInMethodChangeRefusal,
 } from '@/lib/auth/sign-in-method-change-codes';
 import { TRPCError } from '@trpc/server';
@@ -752,17 +752,6 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
       : unavailableCapability('kiloclawInstanceRequired'),
   };
 }
-
-const SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES: Record<SignInMethodChangeRefusal, string> = {
-  browserSessionRequired:
-    'Sign-in methods can only be changed from a browser signed in to app.kilo.ai.',
-  ssoLinkNotAllowed:
-    'Your organization requires single sign-on, so other sign-in methods can not be linked.',
-  codeInvalid: 'The code is not correct or it expired. Try again, or send a new code.',
-  codeLocked: `Too many incorrect codes. Wait ${SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES} minutes, then send a new code.`,
-  codeCooldown: 'A code was sent a short time ago. Wait one minute before you send a new code.',
-  codeSendFailed: 'We could not send the code email. Try again in a few minutes.',
-};
 
 const SIGN_IN_METHOD_CHANGE_REFUSAL_STATUS: Record<SignInMethodChangeRefusal, TRPCError['code']> = {
   browserSessionRequired: 'FORBIDDEN',

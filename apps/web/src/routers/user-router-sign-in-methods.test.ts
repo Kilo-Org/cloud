@@ -36,7 +36,7 @@ jest.mock('@kilocode/web-shared/lib/email', () => ({
 }));
 
 import { encode, type JWT } from 'next-auth/jwt';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
   device_sessions,
@@ -166,6 +166,18 @@ async function requestCode(
 
 function wrongCode(code: string) {
   return code === '000000' ? '000001' : '000000';
+}
+
+/** Moves the account's codes back in time, as if `seconds` had passed. */
+async function passTime(user: User, seconds: number) {
+  const shift = sql`make_interval(secs => ${seconds}::double precision)`;
+  await db
+    .update(magic_link_tokens)
+    .set({
+      created_at: sql`${magic_link_tokens.created_at} - ${shift}`,
+      expires_at: sql`${magic_link_tokens.expires_at} - ${shift}`,
+    })
+    .where(eq(magic_link_tokens.email, normalizeEmail(user.google_user_email)));
 }
 
 beforeEach(() => {
@@ -382,6 +394,70 @@ describe('user.linkAuthProvider', () => {
     ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked));
     expect(mockSendCode).not.toHaveBeenCalled();
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('counts wrong codes across new codes, so a new code does not reset the limit', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const first = await requestCode(caller, 'link', 'github');
+
+    for (let attempt = 1; attempt < 5; attempt++) {
+      await expect(
+        caller.user.linkAuthProvider({
+          provider: 'github',
+          code: wrongCode(first.code),
+          challengeId: first.challengeId,
+        })
+      ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+    }
+
+    // Past the resend cooldown, a new code still carries the four wrong codes.
+    await passTime(user, 61);
+    const second = await requestCode(caller, 'link', 'github');
+    await expect(
+      caller.user.linkAuthProvider({
+        provider: 'github',
+        code: wrongCode(second.code),
+        challengeId: second.challengeId,
+      })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked));
+    await expect(caller.user.linkAuthProvider({ provider: 'github', ...second })).rejects.toEqual(
+      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked)
+    );
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps the lock for 15 minutes from the fifth wrong code, not from when the code was sent', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const { code, challengeId } = await requestCode(caller, 'link', 'github');
+    // The code was sent 9 minutes ago and still works.
+    await passTime(user, 9 * 60);
+
+    for (let attempt = 1; attempt < 5; attempt++) {
+      await expect(
+        caller.user.linkAuthProvider({ provider: 'github', code: wrongCode(code), challengeId })
+      ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+    }
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', code: wrongCode(code), challengeId })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked));
+
+    // 14 minutes after the fifth wrong code, 23 after the code was sent.
+    await passTime(user, 14 * 60);
+    mockSendCode.mockClear();
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked));
+    expect(mockSendCode).not.toHaveBeenCalled();
+
+    await passTime(user, 61);
+    const fresh = await requestCode(caller, 'link', 'github');
+    await expect(caller.user.linkAuthProvider({ provider: 'github', ...fresh })).resolves.toEqual({
+      success: true,
+    });
   });
 
   it('starts a link for every offered provider with its code', async () => {

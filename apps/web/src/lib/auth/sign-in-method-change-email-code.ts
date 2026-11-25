@@ -1,12 +1,15 @@
 import 'server-only';
-import { and, eq, gte, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { createHmac, randomInt, randomUUID } from 'crypto';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import { SIGN_IN_METHOD_CHANGE_CODE_LENGTH } from '@/lib/auth/sign-in-method-change-codes';
+import {
+  SIGN_IN_METHOD_CHANGE_CODE_LENGTH,
+  SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES,
+} from '@/lib/auth/sign-in-method-change-codes';
 import type { SignInMethodChange } from '@/lib/auth/sign-in-method-change';
 
 /**
@@ -17,14 +20,24 @@ import type { SignInMethodChange } from '@/lib/auth/sign-in-method-change';
  * The codes live in `magic_link_tokens` under their own `purpose`, and every
  * query here is purpose-scoped: `/api/auth/native/token` accepts a live
  * `sign_in_code` as a sign-in credential, so these codes must never share it.
+ *
+ * Wrong codes are counted per account, across codes. A code row's `expires_at`
+ * is the moment the code stops taking guesses: its expiry, its replacement by a
+ * newer code, or the lockout. The row's wrong attempts count until the attempt
+ * window has passed after that moment, so a new code does not reset the count.
+ * When the count reaches the limit, every counted code ends at once, so the
+ * lockout lasts the full window from the failure that reached the limit.
  */
 const CODE_PURPOSE = 'sign_in_method_change';
 export const SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES = 10;
-const CODE_MAX_ATTEMPTS = 5;
+// Wrong codes allowed for one account within the attempt window, across codes.
+const MAX_FAILED_ATTEMPTS = 5;
 // Minimum gap between two code emails, so a held session can not flood the mailbox.
 const RESEND_COOLDOWN_SECONDS = 60;
-// After the attempt limit, no new code is sent for this time.
-export const SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES = 15;
+// Wrong codes count for the lockout time after their code stops taking guesses,
+// and the lockout runs for that time from the wrong code that reached the limit.
+const ATTEMPT_WINDOW = sql.raw(`interval '${SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES} minutes'`);
+const RESEND_COOLDOWN = sql.raw(`interval '${RESEND_COOLDOWN_SECONDS} seconds'`);
 
 /** What one code authorizes. A code for another binding does not match. */
 export type SignInMethodChangeCodeBinding = {
@@ -69,6 +82,29 @@ function emailFilter(normalizedEmail: string) {
   );
 }
 
+/** The account's codes whose wrong attempts still count. */
+function attemptWindowFilter(normalizedEmail: string) {
+  return and(
+    emailFilter(normalizedEmail),
+    sql`${magic_link_tokens.expires_at} > NOW() - ${ATTEMPT_WINDOW}`
+  );
+}
+
+/** Serializes code creation and code checks of one account. */
+async function lockAccountCodes(tx: DrizzleTransaction, normalizedEmail: string): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${CODE_PURPOSE}:${normalizedEmail}`}, 0))`
+  );
+}
+
+async function failedAttempts(tx: DrizzleTransaction, normalizedEmail: string): Promise<number> {
+  const [row] = await tx
+    .select({ total: sql<number>`COALESCE(SUM(${magic_link_tokens.attempts}), 0)::int` })
+    .from(magic_link_tokens)
+    .where(attemptWindowFilter(normalizedEmail));
+  return row?.total ?? 0;
+}
+
 export type CreateSignInMethodChangeCodeResult =
   | { status: 'created'; code: string; challengeId: string }
   | { status: 'cooldown' }
@@ -76,8 +112,8 @@ export type CreateSignInMethodChangeCodeResult =
 
 /**
  * Makes a new code for the binding. One code is live per account: a new code
- * removes the previous one. A code that reached the attempt limit stays until
- * the lockout ends, so a new code can not reset the attempt limit.
+ * ends the previous one, whose wrong attempts keep counting. No code is made
+ * while the account is locked.
  */
 export async function createSignInMethodChangeCode(
   binding: SignInMethodChangeCodeBinding
@@ -90,22 +126,11 @@ export async function createSignInMethodChangeCode(
   const challengeId = randomUUID();
 
   return db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${CODE_PURPOSE}:${normalizedEmail}`}, 0))`
-    );
+    await lockAccountCodes(tx, normalizedEmail);
 
-    const [locked] = await tx
-      .select({ created_at: magic_link_tokens.created_at })
-      .from(magic_link_tokens)
-      .where(
-        and(
-          emailFilter(normalizedEmail),
-          gte(magic_link_tokens.attempts, CODE_MAX_ATTEMPTS),
-          sql`${magic_link_tokens.created_at} > NOW() - interval '${sql.raw(String(SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES))} minutes'`
-        )
-      )
-      .limit(1);
-    if (locked) return { status: 'locked' };
+    if ((await failedAttempts(tx, normalizedEmail)) >= MAX_FAILED_ATTEMPTS) {
+      return { status: 'locked' };
+    }
 
     const [recent] = await tx
       .select({ created_at: magic_link_tokens.created_at })
@@ -115,13 +140,24 @@ export async function createSignInMethodChangeCode(
           emailFilter(normalizedEmail),
           isNull(magic_link_tokens.consumed_at),
           sql`${magic_link_tokens.expires_at} > NOW()`,
-          sql`${magic_link_tokens.created_at} > NOW() - interval '${sql.raw(String(RESEND_COOLDOWN_SECONDS))} seconds'`
+          sql`${magic_link_tokens.created_at} > NOW() - ${RESEND_COOLDOWN}`
         )
       )
       .limit(1);
     if (recent) return { status: 'cooldown' };
 
-    await tx.delete(magic_link_tokens).where(emailFilter(normalizedEmail));
+    await tx
+      .delete(magic_link_tokens)
+      .where(
+        and(
+          emailFilter(normalizedEmail),
+          sql`${magic_link_tokens.expires_at} <= NOW() - ${ATTEMPT_WINDOW}`
+        )
+      );
+    await tx
+      .update(magic_link_tokens)
+      .set({ expires_at: sql`NOW()` })
+      .where(and(emailFilter(normalizedEmail), sql`${magic_link_tokens.expires_at} > NOW()`));
     await tx.insert(magic_link_tokens).values({
       token_hash: hashCode(binding, code),
       email: normalizedEmail,
@@ -140,8 +176,8 @@ export type ConsumeSignInMethodChangeCodeResult = 'ok' | 'invalid' | 'locked';
 
 /**
  * Checks the code and uses it. A correct code is used once only. A wrong code,
- * or a code for another user, change, provider or session, spends one
- * attempt. At the attempt limit the code is locked.
+ * or a code for another user, change, provider or session, spends one of the
+ * account's attempts. At the attempt limit the account is locked.
  */
 export async function consumeSignInMethodChangeCode(
   binding: SignInMethodChangeCodeBinding,
@@ -152,11 +188,15 @@ export async function consumeSignInMethodChangeCode(
   const normalizedEmail = normalizeEmail(binding.email);
 
   return db.transaction(async tx => {
+    await lockAccountCodes(tx, normalizedEmail);
+
+    const failures = await failedAttempts(tx, normalizedEmail);
+    if (failures >= MAX_FAILED_ATTEMPTS) return 'locked';
+
     const [row] = await tx
       .select({
         token_hash: magic_link_tokens.token_hash,
         email: magic_link_tokens.email,
-        attempts: magic_link_tokens.attempts,
         consumed: sql<boolean>`${magic_link_tokens.consumed_at} IS NOT NULL`,
         expired: sql<boolean>`${magic_link_tokens.expires_at} <= NOW()`,
       })
@@ -167,14 +207,19 @@ export async function consumeSignInMethodChangeCode(
 
     // A challenge of another account is not this account's to spend.
     if (!row || row.email !== normalizedEmail || row.consumed || row.expired) return 'invalid';
-    if (row.attempts >= CODE_MAX_ATTEMPTS) return 'locked';
 
     if (row.token_hash !== tokenHash) {
       await tx
         .update(magic_link_tokens)
         .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
         .where(challengeFilter(challengeId));
-      return row.attempts + 1 >= CODE_MAX_ATTEMPTS ? 'locked' : 'invalid';
+      if (failures + 1 < MAX_FAILED_ATTEMPTS) return 'invalid';
+
+      await tx
+        .update(magic_link_tokens)
+        .set({ expires_at: sql`NOW()` })
+        .where(attemptWindowFilter(normalizedEmail));
+      return 'locked';
     }
 
     await tx
@@ -189,5 +234,3 @@ export async function consumeSignInMethodChangeCode(
 export async function deleteSignInMethodChangeCode(challengeId: string): Promise<void> {
   await db.delete(magic_link_tokens).where(challengeFilter(challengeId));
 }
-
-export const __test__ = { CODE_PURPOSE, CODE_MAX_ATTEMPTS, RESEND_COOLDOWN_SECONDS, hashCode };

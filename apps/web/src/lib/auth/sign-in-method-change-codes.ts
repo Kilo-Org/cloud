@@ -1,5 +1,7 @@
 /** The number of digits in the code emailed before a sign-in method change. */
 export const SIGN_IN_METHOD_CHANGE_CODE_LENGTH = 6;
+/** How long an account stays locked after too many wrong codes. */
+export const SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES = 15;
 
 /**
  * The `upstreamCode` values with which `user.requestSignInMethodChangeCode`,
@@ -24,6 +26,20 @@ export const SIGN_IN_METHOD_CHANGE_REFUSAL_CODES = {
 
 export type SignInMethodChangeRefusal = keyof typeof SIGN_IN_METHOD_CHANGE_REFUSAL_CODES;
 
+/** The message for each refusal, sent with the tRPC error and shown on the pages. */
+export const SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES: Readonly<
+  Record<SignInMethodChangeRefusal, string>
+> = {
+  browserSessionRequired:
+    'To change your sign-in methods, use a browser that is signed in to app.kilo.ai.',
+  ssoLinkNotAllowed:
+    'Your organization requires single sign-on, so you can not link other sign-in methods.',
+  codeInvalid: 'The code is not correct or it expired. Try again, or send a new code.',
+  codeLocked: `Too many incorrect codes. Wait ${SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES} minutes, then send a new code.`,
+  codeCooldown: 'A code was sent a short time ago. Wait one minute before you send a new code.',
+  codeSendFailed: 'We could not send the code email. Try again in a few minutes.',
+};
+
 /** The page error code for a change that did not come from a browser session. */
 export const SIGN_IN_METHOD_BROWSER_SESSION_REQUIRED_ERROR =
   'SIGN-IN-METHOD-BROWSER-SESSION-REQUIRED';
@@ -40,17 +56,12 @@ export const SIGN_IN_METHOD_CODE_SEND_FAILED_ERROR = 'SIGN-IN-METHOD-CODE-SEND-F
 
 export const SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   [SIGN_IN_METHOD_BROWSER_SESSION_REQUIRED_ERROR]:
-    'To change your sign-in methods, use a browser that is signed in to app.kilo.ai.',
-  [SIGN_IN_METHOD_SSO_REQUIRED_ERROR]:
-    'Your organization requires single sign-on, so you can not link other sign-in methods.',
-  [SIGN_IN_METHOD_CODE_INVALID_ERROR]:
-    'The code is not correct or it expired. Try again, or send a new code.',
-  [SIGN_IN_METHOD_CODE_LOCKED_ERROR]:
-    'Too many incorrect codes. Wait 15 minutes, then send a new code.',
-  [SIGN_IN_METHOD_CODE_COOLDOWN_ERROR]:
-    'A code was sent a short time ago. Wait one minute before you send a new code.',
-  [SIGN_IN_METHOD_CODE_SEND_FAILED_ERROR]:
-    'We could not send the code email. Try again in a few minutes.',
+    SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.browserSessionRequired,
+  [SIGN_IN_METHOD_SSO_REQUIRED_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.ssoLinkNotAllowed,
+  [SIGN_IN_METHOD_CODE_INVALID_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeInvalid,
+  [SIGN_IN_METHOD_CODE_LOCKED_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeLocked,
+  [SIGN_IN_METHOD_CODE_COOLDOWN_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeCooldown,
+  [SIGN_IN_METHOD_CODE_SEND_FAILED_ERROR]: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES.codeSendFailed,
 };
 
 const PAGE_ERROR_FOR_UPSTREAM_CODE: Readonly<Record<string, string>> = {

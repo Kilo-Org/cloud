@@ -1170,7 +1170,7 @@ describe('getUserFromAuth', () => {
 
   test('revokes a user token when the pepper rotates from null to a value', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const token = generateApiToken(user);
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
     expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
 

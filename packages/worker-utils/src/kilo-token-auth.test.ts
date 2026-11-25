@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { SignJWT } from 'jose';
 
 import { clearSecretCacheForTest } from './cached-secret';
-import { signKiloToken } from './kilo-token';
+import { KILO_TOKEN_MAX_LIFETIME_SECONDS, signKiloToken } from './kilo-token';
 import {
   verifyKiloBearerAgainstCurrentPepper,
   verifyKiloBearerOrInternalAssertionAgainstCurrentPepper,
@@ -140,7 +140,7 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
       userId: 'user-xyz-789',
       pepper: null,
       secret: TEST_JWT_SECRET,
-      expiresInSeconds: 157_680_000,
+      expiresInSeconds: KILO_TOKEN_MAX_LIFETIME_SECONDS,
       env: 'production',
     });
     await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });

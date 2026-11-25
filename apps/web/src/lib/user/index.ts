@@ -158,7 +158,10 @@ import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
-import { currentSignInMethodChangeRequestDetails } from '@/lib/auth/sign-in-method-change-request';
+import {
+  currentSignInMethodChangeAuditRequest,
+  currentSignInMethodChangeRequestDetails,
+} from '@/lib/auth/sign-in-method-change-request';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -1043,7 +1046,7 @@ export async function linkAccountToExistingUser(
       user: existingUser,
       change: 'link',
       provider: authProviderData.provider,
-      request: { ip: details.ip },
+      request: await currentSignInMethodChangeAuditRequest(),
     });
 
     if (authProviderData.provider !== 'fake-login') {

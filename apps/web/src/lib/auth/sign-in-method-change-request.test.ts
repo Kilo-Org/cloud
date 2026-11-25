@@ -1,5 +1,14 @@
-import { describe, expect, it } from '@jest/globals';
-import { approximateLocation } from '@/lib/auth/sign-in-method-change-request';
+import { describe, expect, it, jest } from '@jest/globals';
+
+jest.mock('next/headers', () => ({ headers: jest.fn() }));
+
+import { headers } from 'next/headers';
+import {
+  approximateLocation,
+  currentSignInMethodChangeAuditRequest,
+} from '@/lib/auth/sign-in-method-change-request';
+
+const mockedHeaders = jest.mocked(headers);
 
 describe('approximateLocation', () => {
   it('reads the Vercel geolocation headers', () => {
@@ -15,5 +24,23 @@ describe('approximateLocation', () => {
     const headers = new Headers({ 'cf-ipcity': 'Springfield', 'cf-ipcountry': 'ZZ' });
 
     expect(approximateLocation(headers)).toBeNull();
+  });
+});
+
+describe('currentSignInMethodChangeAuditRequest', () => {
+  it('reads the route that the proxy forwards', async () => {
+    mockedHeaders.mockResolvedValue(
+      new Headers({ 'x-pathname': '/api/auth/callback/github' }) as never
+    );
+
+    await expect(currentSignInMethodChangeAuditRequest()).resolves.toMatchObject({
+      route: '/api/auth/callback/github',
+    });
+  });
+
+  it('has no route outside a request scope', async () => {
+    mockedHeaders.mockRejectedValue(new Error('outside a request scope'));
+
+    await expect(currentSignInMethodChangeAuditRequest()).resolves.toEqual({ ip: null });
   });
 });

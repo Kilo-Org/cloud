@@ -1,6 +1,9 @@
 import 'server-only';
 import { headers } from 'next/headers';
-import { clientIpFromHeaders } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  clientIpFromHeaders,
+  routeFromHeaders,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import type { SignInMethodChangeRequestDetails } from '@kilocode/web-shared/lib/email';
 
 const BROWSERS: ReadonlyArray<[RegExp, string]> = [
@@ -73,5 +76,24 @@ export async function currentSignInMethodChangeRequestDetails(): Promise<SignInM
     return signInMethodChangeRequestDetails(new Headers(await headers()));
   } catch {
     return { changedAt: new Date(), ip: null, location: null, device: null };
+  }
+}
+
+/**
+ * The client address and route of the current request, for the audit record
+ * of a sign-in method change. Outside a request scope both are absent.
+ */
+export async function currentSignInMethodChangeAuditRequest(): Promise<{
+  ip: string | null;
+  route?: string;
+}> {
+  try {
+    const headersList = new Headers(await headers());
+    return {
+      ip: clientIpFromHeaders(headersList),
+      route: routeFromHeaders(headersList) ?? undefined,
+    };
+  } catch {
+    return { ip: null };
   }
 }

@@ -88,6 +88,32 @@ const sessionId = 'workspace_stored';
 const userId = 'oauth/google:123456';
 const subject = { type: 'org', id: 'org-stored' } as const;
 
+/**
+ * A re-entering identity reader loops in microtasks and starves timers, so no test timeout can
+ * stop it. This cap ends that loop; a correct reader stays far below it.
+ */
+const FAILED_READ_CAP = 200;
+
+function failingStorageReads(storage: DurableObjectStorage, mode: 'rejects' | 'throws') {
+  let failing = false;
+  const failures: Error[] = [];
+  const read = storage.get;
+  vi.spyOn(storage, 'get').mockImplementation(((...args: unknown[]) => {
+    if (!failing) return Reflect.apply(read, storage, args);
+    if (failures.length >= FAILED_READ_CAP) return Promise.resolve(undefined);
+    const failure = new Error('private-storage-read-failure');
+    failures.push(failure);
+    if (mode === 'throws') throw failure;
+    return Promise.reject(failure);
+  }) as DurableObjectStorage['get']);
+  return {
+    failures,
+    fail() {
+      failing = true;
+    },
+  };
+}
+
 describe('Cloud Agent Durable Object real SDK boundaries', () => {
   it('returns a container limit rejection across RPC without sending it to Sentry', async () => {
     const stub = probes.SENTRY_BILLING_ADMISSION_CONTAINER.getByName(billingInput.sandboxId);
@@ -185,6 +211,60 @@ describe('Cloud Agent Durable Object real SDK boundaries', () => {
     });
     expect(JSON.stringify(events)).not.toContain('private-');
   });
+
+  it.each(['rejects', 'throws'] as const)(
+    'sends one event with the billing user when every sandbox storage read %s',
+    async mode => {
+      const InstrumentedSandbox = instrumentCloudAgentDurableObject(
+        SandboxControlV2,
+        'sandbox-control'
+      );
+      const billingSubject = { type: 'user', id: userId } as const;
+      const stub = env.SANDBOX_CONTROL.getByName(sandboxId);
+      const reads = await runInDurableObject(stub, async (instance, ctx) => {
+        await instance.getAllocationState();
+        await ctx.storage.put('control_plane_owner', 'oauth/github:unreadable-owner');
+        const pin: StoredProviderPin = {
+          provider: 'cloudflare-containers',
+          allocationName: sandboxId,
+          configuration: null,
+          locator: null,
+          containment: null,
+          billing: { sandboxId, sessionId, subject: billingSubject, actor: billingSubject },
+        };
+        drizzle(ctx.storage)
+          .update(allocation)
+          .set({ provider_pin: JSON.stringify(pin) })
+          .run();
+        const failingReads = failingStorageReads(ctx.storage, mode);
+        const sandbox = new InstrumentedSandbox(ctx, telemetryEnv);
+        await sandbox.getAllocationState();
+        failingReads.fail();
+        const rejection = await sandbox
+          .getSnapshotValidatorStatus()
+          .catch((error: unknown) => error);
+        expect(rejection).toBe(failingReads.failures[0]);
+        return failingReads;
+      });
+      await runInDurableObject(stub, () => undefined);
+      expect(reads.failures).toHaveLength(2);
+      await captured(1);
+      await runInDurableObject(stub, () => undefined);
+      expect(events).toHaveLength(1);
+      expect(events[0]?.user).toEqual({ id: userId });
+      expect(events[0]?.tags).toEqual({
+        component: 'sandbox-control',
+        orgId: '(personal)',
+        sessionId,
+        sandboxId,
+      });
+      expect(events[0]?.exception?.values?.[0]?.mechanism).toEqual({
+        type: 'auto.faas.cloudflare.durable_object',
+        handled: false,
+      });
+      expect(JSON.stringify(events)).not.toContain('private-');
+    }
+  );
 
   it('uses the persisted Kilo user, not the bot actor, from native container billing', async () => {
     const InstrumentedContainers = instrumentCloudAgentDurableObject(

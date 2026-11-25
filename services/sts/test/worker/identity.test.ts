@@ -1,76 +1,62 @@
 import { describe, expect, it } from 'vitest';
 import { IdentityVerifier, type VerifyOutcome } from '../../src/identity/verify';
 import { loadPolicies } from '../../src/policy/load';
-import { createProvider, providerFetch, signToken, type TestProvider } from './support';
+import {
+  createProvider,
+  providerFetch,
+  signToken,
+  type CountingFetch,
+  type TestProvider,
+} from './support';
 
 const STS_ISSUER = 'https://sts.test';
-
-const VERCEL_ISSUER = 'https://oidc.vercel.com/acme';
 const FLY_ISSUER = 'https://oidc.fly.io/acme';
 const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
 
 const policies = loadPolicies({
-  'vercel-app.yaml': `
-workload: vercel-app
-environments: [production]
-identity:
-  kind: vercel-oidc
-  teamSlug: acme
-  projectId: prj_acme_website
-  vercelEnvironments: [production]
-secrets: [APP_SECRET]
-`,
-  'vercel-preview.yaml': `
-workload: vercel-preview
-environments: [staging]
-identity:
-  kind: vercel-oidc
-  teamSlug: acme
-  projectId: prj_preview
-  vercelEnvironments: [preview]
-secrets: [APP_SECRET]
-`,
   'fly-app.yaml': `
 workload: fly-app
 environments: [production, staging]
 identity:
   kind: fly-oidc
   org: acme
+  orgId: '1111'
   app: fly-app
+  appId: '2222'
 secrets: [APP_SECRET]
 `,
-  'github-app.yaml': `
-workload: github-app
+  'github-deploy.yaml': `
+workload: github-deploy
 environments: [production]
 identity:
   kind: github-oidc
   repositoryId: '123'
   repositoryOwnerId: '456'
+  environments: [production]
   refs: [refs/heads/main]
 secrets: [APP_SECRET]
 `,
-  'github-env.yaml': `
-workload: github-env
-environments: [production]
+  'github-review.yaml': `
+workload: github-review
+environments: [staging]
 identity:
   kind: github-oidc
   repositoryId: '789'
   repositoryOwnerId: '456'
-  environments: [production]
+  refs: [refs/heads/main]
+  allowedEvents: [workflow_run]
 secrets: [APP_SECRET]
 `,
 });
 
 type Fixture = {
-  providers: TestProvider[];
-  calls: Map<string, number>;
+  local: CountingFetch;
   verify: (token: string) => Promise<VerifyOutcome>;
   provider: (issuer: string) => TestProvider;
 };
 
 async function fixture(environment: 'production' | 'staging'): Promise<Fixture> {
   const providers = [
-    await createProvider(VERCEL_ISSUER, 'https://vercel.com/acme'),
     await createProvider(FLY_ISSUER, STS_ISSUER),
     await createProvider(GITHUB_ISSUER, STS_ISSUER),
   ];
@@ -82,8 +68,7 @@ async function fixture(environment: 'production' | 'staging'): Promise<Fixture> 
     fetch: local.fetch,
   });
   return {
-    providers,
-    calls: local.calls,
+    local,
     verify: token => verifier.verify(token),
     provider: issuer => {
       const found = providers.find(candidate => candidate.issuer === issuer);
@@ -93,165 +78,123 @@ async function fixture(environment: 'production' | 'staging'): Promise<Fixture> 
   };
 }
 
-describe('Vercel workload identity', () => {
-  it('accepts a production token bound to the policy project and environment', async () => {
-    const { verify, provider } = await fixture('production');
-    const token = await signToken(provider(VERCEL_ISSUER), {
-      project_id: 'prj_acme_website',
-      environment: 'production',
-    });
-    expect(await verify(token)).toEqual({
-      status: 'verified',
-      workload: 'vercel-app',
-      provider: 'vercel',
-    });
-  });
+const FLY_CLAIMS = {
+  org_id: '1111',
+  org_name: 'acme',
+  app_id: '2222',
+  app_name: 'fly-app',
+  machine_id: 'machine-1',
+};
 
-  it('refuses a preview token in the production deployment', async () => {
-    const { verify, provider } = await fixture('production');
-    const token = await signToken(provider(VERCEL_ISSUER), {
-      project_id: 'prj_acme_website',
-      environment: 'preview',
-    });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'environment_mismatch' });
-  });
-
-  it('serves non-production Vercel environments from the staging deployment', async () => {
-    const { verify, provider } = await fixture('staging');
-    const token = await signToken(provider(VERCEL_ISSUER), {
-      project_id: 'prj_preview',
-      environment: 'preview',
-    });
-    expect(await verify(token)).toEqual({
-      status: 'verified',
-      workload: 'vercel-preview',
-      provider: 'vercel',
-    });
-  });
-
-  it('refuses a production token in the staging deployment', async () => {
-    const { verify, provider } = await fixture('staging');
-    const token = await signToken(provider(VERCEL_ISSUER), {
-      project_id: 'prj_preview',
-      environment: 'production',
-    });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'environment_mismatch' });
-  });
-
-  it('refuses a project that has no policy, even on the right team', async () => {
-    const { verify, provider } = await fixture('production');
-    const token = await signToken(provider(VERCEL_ISSUER), {
-      project_id: 'prj_unknown',
-      environment: 'production',
-    });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
-  });
-
-  it('refuses a token minted for another audience', async () => {
-    const { verify, provider } = await fixture('production');
-    const token = await signToken(
-      provider(VERCEL_ISSUER),
-      { project_id: 'prj_acme_website', environment: 'production' },
-      { audience: 'https://vercel.com/other' }
-    );
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
-  });
-});
+const GITHUB_CLAIMS = {
+  repository_id: '123',
+  repository_owner_id: '456',
+  repository: 'acme/repo',
+  environment: 'production',
+  ref: 'refs/heads/main',
+  event_name: 'push',
+};
 
 describe('Fly machine identity', () => {
-  it('accepts a machine token bound to the policy org and app', async () => {
+  it('accepts a machine token bound to the policy org and app ids', async () => {
     const { verify, provider } = await fixture('production');
-    const token = await signToken(provider(FLY_ISSUER), {
-      org_name: 'acme',
-      app_name: 'fly-app',
-      machine_id: 'machine-1',
-    });
-    expect(await verify(token)).toEqual({
+    expect(await verify(await signToken(provider(FLY_ISSUER), FLY_CLAIMS))).toEqual({
       status: 'verified',
       workload: 'fly-app',
       provider: 'fly',
     });
   });
 
-  it('refuses an app without a policy in the same org', async () => {
+  it('refuses an app with the policy name but another app id', async () => {
     const { verify, provider } = await fixture('production');
-    const token = await signToken(provider(FLY_ISSUER), {
-      org_name: 'acme',
-      app_name: 'other-app',
-    });
+    const token = await signToken(provider(FLY_ISSUER), { ...FLY_CLAIMS, app_id: '9999' });
+    expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
+  });
+
+  it('refuses an org id that differs from the policy', async () => {
+    const { verify, provider } = await fixture('production');
+    const token = await signToken(provider(FLY_ISSUER), { ...FLY_CLAIMS, org_id: '3333' });
     expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
   });
 
   it('refuses the default Fly audience instead of the STS issuer', async () => {
     const { verify, provider } = await fixture('production');
-    const token = await signToken(
-      provider(FLY_ISSUER),
-      { org_name: 'acme', app_name: 'fly-app' },
-      { audience: 'https://fly.io/acme' }
-    );
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS, {
+      audience: 'https://fly.io/acme',
+    });
     expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
   });
 });
 
 describe('GitHub Actions identity', () => {
-  it('accepts a workflow token bound to repository ids and a ref', async () => {
+  it('accepts a token bound to the repository ids, the environment and the ref', async () => {
     const { verify, provider } = await fixture('production');
-    const token = await signToken(provider(GITHUB_ISSUER), {
-      repository_id: '123',
-      repository_owner_id: '456',
-      repository: 'acme/repo',
-      ref: 'refs/heads/main',
-      event_name: 'push',
-    });
-    expect(await verify(token)).toEqual({
+    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toEqual({
       status: 'verified',
-      workload: 'github-app',
+      workload: 'github-deploy',
       provider: 'github',
     });
   });
 
-  it('refuses a workflow token from another ref of the same repository', async () => {
+  it('refuses a token without the bound GitHub environment', async () => {
+    const { verify, provider } = await fixture('production');
+    const withoutEnvironment: Record<string, string> = { ...GITHUB_CLAIMS };
+    delete withoutEnvironment.environment;
+    const token = await signToken(provider(GITHUB_ISSUER), withoutEnvironment);
+    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+  });
+
+  it('keeps refs as an extra filter next to the environment', async () => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(GITHUB_ISSUER), {
-      repository_id: '123',
-      repository_owner_id: '456',
+      ...GITHUB_CLAIMS,
       ref: 'refs/heads/feature',
     });
     expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
   });
 
-  it('refuses a token from another repository', async () => {
-    const { verify, provider } = await fixture('production');
-    const token = await signToken(provider(GITHUB_ISSUER), {
-      repository_id: '999',
-      repository_owner_id: '456',
-      ref: 'refs/heads/main',
-    });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
-  });
+  it.each(['pull_request_target', 'workflow_run', 'issue_comment'])(
+    'refuses a %s token the policy does not allow',
+    async event => {
+      const { verify, provider } = await fixture('production');
+      const token = await signToken(provider(GITHUB_ISSUER), {
+        ...GITHUB_CLAIMS,
+        event_name: event,
+      });
+      expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+    }
+  );
 
-  it('binds a deployment environment when the policy lists one', async () => {
-    const { verify, provider } = await fixture('production');
+  it('accepts a privileged event the policy names explicitly', async () => {
+    const { verify, provider } = await fixture('staging');
     const token = await signToken(provider(GITHUB_ISSUER), {
       repository_id: '789',
       repository_owner_id: '456',
-      environment: 'production',
+      ref: 'refs/heads/main',
+      event_name: 'workflow_run',
     });
     expect(await verify(token)).toEqual({
       status: 'verified',
-      workload: 'github-env',
+      workload: 'github-review',
       provider: 'github',
     });
   });
 
-  it('refuses a token without the bound environment', async () => {
+  it('refuses a token from another repository', async () => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(GITHUB_ISSUER), {
-      repository_id: '789',
-      repository_owner_id: '456',
-      ref: 'refs/heads/main',
+      ...GITHUB_CLAIMS,
+      repository_id: '999',
     });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+    expect(await verify(token)).toEqual({ status: 'denied', reason: 'unknown_workload' });
+  });
+
+  it('reports an environment mismatch for a policy this deployment does not serve', async () => {
+    const { verify, provider } = await fixture('staging');
+    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toEqual({
+      status: 'denied',
+      reason: 'environment_mismatch',
+    });
   });
 });
 
@@ -265,12 +208,11 @@ describe('token rejection', () => {
 
   it('refuses a token signed by a key the provider does not publish', async () => {
     const { verify } = await fixture('production');
-    const impostor = await createProvider(VERCEL_ISSUER, 'https://vercel.com/acme');
-    const token = await signToken(impostor, {
-      project_id: 'prj_acme_website',
-      environment: 'production',
+    const impostor = await createProvider(FLY_ISSUER, STS_ISSUER);
+    expect(await verify(await signToken(impostor, FLY_CLAIMS))).toEqual({
+      status: 'denied',
+      reason: 'identity_rejected',
     });
-    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
   });
 
   it('refuses a malformed token', async () => {
@@ -279,16 +221,42 @@ describe('token rejection', () => {
   });
 });
 
-describe('JWKS caching', () => {
+describe('provider outages', () => {
+  it('answers unavailable, not a rejection, when discovery fails', async () => {
+    const { verify, provider, local } = await fixture('production');
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS);
+    local.faults.discovery = 'error';
+    expect(await verify(token)).toEqual({ status: 'unavailable' });
+    local.faults.discovery = 'unreachable';
+    expect(await verify(token)).toEqual({ status: 'unavailable' });
+  });
+
+  it('answers unavailable when the key set cannot be fetched', async () => {
+    const { verify, provider, local } = await fixture('production');
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS);
+    local.faults.jwks = 'error';
+    expect(await verify(token)).toEqual({ status: 'unavailable' });
+    local.faults.jwks = 'unreachable';
+    expect(await verify(token)).toEqual({ status: 'unavailable' });
+  });
+
+  it('does not cache a failed discovery, so the next request recovers', async () => {
+    const { verify, provider, local } = await fixture('production');
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS);
+    local.faults.discovery = 'error';
+    expect(await verify(token)).toEqual({ status: 'unavailable' });
+    local.faults.discovery = 'none';
+    expect((await verify(token)).status).toBe('verified');
+  });
+});
+
+describe('key set caching', () => {
   it('discovers a provider once per verifier and reuses the key set', async () => {
-    const { verify, calls, provider } = await fixture('production');
-    const token = await signToken(provider(VERCEL_ISSUER), {
-      project_id: 'prj_acme_website',
-      environment: 'production',
-    });
+    const { verify, local, provider } = await fixture('production');
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS);
     await verify(token);
     await verify(token);
-    expect(calls.get(`${VERCEL_ISSUER}/.well-known/openid-configuration`)).toBe(1);
-    expect(calls.get(`${VERCEL_ISSUER}/.well-known/jwks`)).toBe(1);
+    expect(local.calls.get(`${FLY_ISSUER}/.well-known/openid-configuration`)).toBe(1);
+    expect(local.calls.get(`${FLY_ISSUER}/.well-known/jwks`)).toBe(1);
   });
 });

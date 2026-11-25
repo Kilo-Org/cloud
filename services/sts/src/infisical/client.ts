@@ -1,5 +1,9 @@
-import type { ManagerConfig } from '../env';
 import { z } from 'zod';
+import { MANAGER_FETCH_TIMEOUT_MS } from '../constants';
+import type { ManagerConfig } from '../env';
+
+/** The two folders the refresher reads in each environment (design 4.2). */
+export type ManagerFolder = '/workloads' | '/shared';
 
 const LoginResponseSchema = z.object({
   accessToken: z.string().min(1),
@@ -7,111 +11,193 @@ const LoginResponseSchema = z.object({
 });
 
 const SecretSchema = z.object({
+  id: z.string().min(1),
   secretKey: z.string().min(1),
   secretValue: z.string(),
   version: z.number().int().nonnegative(),
+  type: z.string(),
+  secretPath: z.string().optional(),
+  secretValueHidden: z.boolean(),
 });
 
 const ListResponseSchema = z.object({ secrets: z.array(SecretSchema) });
 
-export type ManagerSecret = { value: string; version: number };
+const NotFoundSchema = z.object({ error: z.string() });
 
-export type ManagerRead =
-  | { status: 'fresh'; secrets: Record<string, ManagerSecret>; etag: string | null }
+/** One secret as the manager stores it in one folder. */
+export type ManagerEntry = {
+  path: string;
+  name: string;
+  id: string;
+  version: number;
+  value: string;
+};
+
+export type FolderRead =
+  | { status: 'fresh'; entries: ManagerEntry[]; hidden: number; etag: string | null }
   | { status: 'not_modified' }
-  | { status: 'unreachable'; detail: string };
+  | { status: 'unreachable'; detail: string; retryAfterMs: number | null };
 
-/** Remaining token lifetime kept as a safety margin before STS logs in again. */
+/** Tokens are reused until this long before they expire (design 4.2: they live 10 minutes). */
 const TOKEN_EXPIRY_MARGIN_MS = 60_000;
 
-function failure(error: unknown, fallback: string): ManagerRead {
-  return { status: 'unreachable', detail: error instanceof Error ? error.message : fallback };
+class ManagerUnreachableError extends Error {
+  constructor(
+    readonly detail: string,
+    readonly retryAfterMs: number | null
+  ) {
+    super(detail);
+    this.name = 'ManagerUnreachableError';
+  }
+}
+
+function retryAfterMs(response: Response): number | null {
+  const seconds = Number(response.headers.get('retry-after'));
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
+}
+
+/** Status-only detail: no response body is kept, because a body can echo request data. */
+function unreachableFor(response: Response, action: string): ManagerUnreachableError {
+  return new ManagerUnreachableError(
+    `manager ${action} failed with status ${response.status}`,
+    response.status === 429 ? retryAfterMs(response) : null
+  );
+}
+
+async function managerFetch(input: URL | string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, { ...init, signal: AbortSignal.timeout(MANAGER_FETCH_TIMEOUT_MS) });
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'TimeoutError';
+    throw new ManagerUnreachableError(
+      timedOut ? 'manager request timed out' : 'manager request failed',
+      null
+    );
+  }
 }
 
 /**
- * Plain-REST client for Infisical Cloud. Values and tokens stay inside this
- * instance: `detail` strings are fixed text plus a status code.
+ * Plain-REST client for Infisical Cloud. It logs in with Infisical JWT Auth using a JWT the
+ * signer object issues, keeps the access token until shortly before it expires, and merges
+ * concurrent logins into one. Values and tokens stay inside this instance.
  */
 export class InfisicalClient {
   private token: { value: string; expiresAt: number } | null = null;
+  private pendingLogin: Promise<string> | null = null;
 
   constructor(
     private readonly config: ManagerConfig,
-    private readonly signManagerJwt: () => Promise<string>
+    private readonly signLoginJwt: () => Promise<string>
   ) {}
 
-  private async login(): Promise<string> {
+  private login(): Promise<string> {
     const cached = this.token;
-    if (cached && cached.expiresAt - TOKEN_EXPIRY_MARGIN_MS > Date.now()) return cached.value;
+    if (cached !== null && cached.expiresAt - TOKEN_EXPIRY_MARGIN_MS > Date.now()) {
+      return Promise.resolve(cached.value);
+    }
+    if (this.pendingLogin !== null) return this.pendingLogin;
+    const pending = this.performLogin().finally(() => {
+      this.pendingLogin = null;
+    });
+    this.pendingLogin = pending;
+    return pending;
+  }
 
-    const jwt = await this.signManagerJwt();
-    const response = await fetch(`${this.config.baseUrl}/api/v1/auth/oidc-auth/login`, {
+  private async performLogin(): Promise<string> {
+    let jwt: string;
+    try {
+      jwt = await this.signLoginJwt();
+    } catch {
+      throw new ManagerUnreachableError('login JWT could not be signed', null);
+    }
+    // https://infisical.com/docs/api-reference/endpoints/jwt-auth/login
+    const response = await managerFetch(`${this.config.baseUrl}/api/v1/auth/jwt-auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ identityId: this.config.identityId, jwt }),
     });
-    if (!response.ok) {
-      throw new Error(`manager login failed with status ${response.status}`);
+    if (!response.ok) throw unreachableFor(response, 'login');
+    const parsed = LoginResponseSchema.safeParse(await response.json().catch(() => null));
+    if (!parsed.success) {
+      throw new ManagerUnreachableError('manager login response did not match', null);
     }
-    const body = LoginResponseSchema.parse(await response.json());
     this.token = {
-      value: body.accessToken,
-      expiresAt: Date.now() + body.expiresIn * 1000,
+      value: parsed.data.accessToken,
+      expiresAt: Date.now() + parsed.data.expiresIn * 1000,
     };
-    return body.accessToken;
+    return parsed.data.accessToken;
   }
 
-  async read(ifNoneMatch: string | null): Promise<ManagerRead> {
-    let token: string;
+  /**
+   * Reads one folder and everything below it. A folder the manager does not have is an empty
+   * folder; a transport failure, a timeout, 429, 5xx, a refused login, another 4xx or a malformed
+   * body is unreachable. https://infisical.com/docs/api-reference/endpoints/secrets/list
+   */
+  async readFolder(folder: ManagerFolder, ifNoneMatch: string | null): Promise<FolderRead> {
     try {
-      token = await this.login();
+      return await this.performRead(folder, ifNoneMatch);
     } catch (error) {
-      return failure(error, 'manager login failed');
+      if (error instanceof ManagerUnreachableError) {
+        return { status: 'unreachable', detail: error.detail, retryAfterMs: error.retryAfterMs };
+      }
+      throw error;
     }
+  }
 
+  private async performRead(
+    folder: ManagerFolder,
+    ifNoneMatch: string | null
+  ): Promise<FolderRead> {
+    const token = await this.login();
     const url = new URL(`${this.config.baseUrl}/api/v4/secrets`);
     url.searchParams.set('projectId', this.config.projectId);
     url.searchParams.set('environment', this.config.environmentSlug);
-    url.searchParams.set('secretPath', this.config.secretPath);
-    url.searchParams.set('recursive', 'false');
+    url.searchParams.set('secretPath', folder);
+    url.searchParams.set('recursive', 'true');
+    url.searchParams.set('expandSecretReferences', 'false');
+    url.searchParams.set('includeImports', 'false');
+    url.searchParams.set('viewSecretValue', 'true');
 
     const headers = new Headers({ authorization: `Bearer ${token}` });
     if (ifNoneMatch !== null) headers.set('if-none-match', ifNoneMatch);
+    const response = await managerFetch(url, { headers });
 
-    let response: Response;
-    try {
-      response = await fetch(url, { headers });
-    } catch (error) {
-      return failure(error, 'manager request failed');
+    if (response.status === 304) return { status: 'not_modified' };
+    if (response.status === 404) {
+      // Infisical names a missing folder `SecretPathNotFound`; any other 404 (a project or
+      // environment that does not exist) is a misconfiguration and keeps the last copy.
+      const body = NotFoundSchema.safeParse(await response.json().catch(() => null));
+      if (body.success && body.data.error === 'SecretPathNotFound') {
+        return { status: 'fresh', entries: [], hidden: 0, etag: null };
+      }
+      throw new ManagerUnreachableError('manager read failed with status 404', null);
     }
-
     if (response.status === 401 || response.status === 403) {
       // A revoked or rotated token must not be reused on the next attempt.
       this.token = null;
-      return {
-        status: 'unreachable',
-        detail: `manager read denied with status ${response.status}`,
-      };
     }
-    if (response.status === 304) return { status: 'not_modified' };
-    if (!response.ok) {
-      return {
-        status: 'unreachable',
-        detail: `manager read failed with status ${response.status}`,
-      };
-    }
+    if (!response.ok) throw unreachableFor(response, 'read');
 
-    const parsed = ListResponseSchema.safeParse(await response.json());
+    const parsed = ListResponseSchema.safeParse(await response.json().catch(() => null));
     if (!parsed.success) {
-      return {
-        status: 'unreachable',
-        detail: 'manager response did not match the expected shape',
-      };
+      throw new ManagerUnreachableError('manager read response did not match', null);
     }
-    const secrets: Record<string, ManagerSecret> = {};
+    const entries: ManagerEntry[] = [];
+    let hidden = 0;
     for (const secret of parsed.data.secrets) {
-      secrets[secret.secretKey] = { value: secret.secretValue, version: secret.version };
+      if (secret.type !== 'shared') continue;
+      if (secret.secretValueHidden) {
+        hidden += 1;
+        continue;
+      }
+      entries.push({
+        path: (secret.secretPath ?? folder).replace(/(.)\/+$/, '$1'),
+        name: secret.secretKey,
+        id: secret.id,
+        version: secret.version,
+        value: secret.secretValue,
+      });
     }
-    return { status: 'fresh', secrets, etag: response.headers.get('etag') };
+    return { status: 'fresh', entries, hidden, etag: response.headers.get('etag') };
   }
 }

@@ -33,4 +33,8 @@ export function currentPolicyHash(): Promise<string> {
   return policyIndex.hash();
 }
 
+export function workloadPolicyHash(workload: string): Promise<string> {
+  return policyIndex.workloadHash(workload);
+}
+
 export { POLICY_FILES };

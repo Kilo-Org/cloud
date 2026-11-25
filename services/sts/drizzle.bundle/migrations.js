@@ -1,5 +1,5 @@
 import journal from './meta/_journal.json';
-import m0000 from './0000_faithful_lightspeed.sql';
+import m0000 from './0000_stiff_crusher_hogan.sql';
 
 export default {
   journal,

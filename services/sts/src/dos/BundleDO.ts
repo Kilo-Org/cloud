@@ -1,33 +1,36 @@
 import { withDORetry } from '@kilocode/worker-utils';
 import {
   BundleRequestSchema,
-  SecretNameSchema,
-  encodeAuditBatch,
   type BundleRequest,
   type BundleResult,
+  type BundleSecret,
 } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
-import { and, asc, eq, gt, lt, lte, sql } from 'drizzle-orm';
+import { eq, lt, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { z } from 'zod';
 import migrations from '../../drizzle.bundle/migrations';
 import { bundleDeliveredEvent } from '../audit/events';
-import { relayAudit, type AuditRelayStore } from '../audit/relay';
+import { AuditLog } from '../audit/log';
 import { computeBundleEtag } from '../bundle/etag';
 import {
   AUDIT_RETRY_AFTER_SECONDS,
+  DELIVERY_COUNTER_RETENTION_MS,
   MANAGER_RETRY_AFTER_SECONDS,
-  PRUNE_INTERVAL_MS,
+  REFRESHER_CHECK_INTERVAL_MS,
+  RELAY_DELAY_MS,
   RELAY_RETRY_MS,
 } from '../constants';
 import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
 import * as schema from '../db/bundle-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
-import { policyExists, policyFor } from '../policy';
+import { policyExists, policyFor, workloadPolicyHash } from '../policy';
+import type { Policy } from '../policy/schema';
 import {
+  BundleSecretsSchema,
   BundleTargetSchema,
   WorkloadBundleSchema,
+  type BundleSecrets,
   type PutBundleResult,
   type WorkloadBundle,
 } from '../types';
@@ -35,28 +38,42 @@ import { getBundleStub, getRefresherStub } from './stubs';
 
 type BundleDatabase = DrizzleSqliteDODatabase<typeof schema>;
 type BundleRow = typeof schema.bundle.$inferSelect;
-
-const BundleSecrets = z.record(
-  SecretNameSchema,
-  z.object({ value: z.string(), version: z.number().int().nonnegative() })
-);
-
-const RELAY_DELAY_MS = 5_000;
+type BundleKeys = { sealKey: string; etagKey: string };
 
 /**
- * One object per environment and workload. It holds the workload's bundle sealed
- * with a key it generated itself, and it appends the delivery audit row in the same
- * call that hands the bundle out. Retrying a delivery is deliberately not attempted
- * by the caller's DO helper: a retry after a committed append would audit twice.
+ * What a read serves: the stored bundle, or, when the stored copy was built under another policy,
+ * that copy cut down to the current grants with its ETag and missing list recomputed.
+ */
+type ServedBundle =
+  | { kind: 'stored'; row: BundleRow }
+  | { kind: 'narrowed'; row: BundleRow; etag: string; secrets: BundleSecrets; missing: string[] };
+
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
+}
+
+function utcMinute(time: number): string {
+  return new Date(time).toISOString().slice(0, 16);
+}
+
+/**
+ * One object per environment and workload. It holds the workload's bundle sealed with a key it
+ * generated itself, and it appends the delivery audit row in the same call that hands the bundle
+ * out. Callers do not retry a delivery: a retry after a committed append would audit twice.
  */
 export class BundleDO extends DurableObject<Env> {
   private readonly config: StsConfig;
   private readonly db: BundleDatabase;
+  private readonly audit: AuditLog;
+  private keys: BundleKeys | null = null;
+  private pendingFill: Promise<BundleRow | null> | null = null;
+  private refresherCheckedAt = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.config = readConfig(env);
     this.db = drizzle(ctx.storage, { schema });
+    this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
     });
@@ -81,31 +98,39 @@ export class BundleDO extends DurableObject<Env> {
         retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
       };
     }
-    if (policyFor(this.config.environment, target.workload) === null) {
+    const policy = policyFor(this.config.environment, target.workload);
+    if (policy === null) {
       return {
         status: 'denied',
         reason: policyExists(target.workload) ? 'environment_mismatch' : 'unknown_workload',
       };
     }
+    this.checkRefresher();
 
-    let row = this.readBundle();
+    const row = this.readBundle() ?? (await this.fill(target.workload));
     if (row === null) {
-      row = await this.fill(target.workload);
-      if (row === null) {
-        return {
-          status: 'unavailable',
-          reason: 'manager_unreachable_no_copy',
-          retryAfterSeconds: MANAGER_RETRY_AFTER_SECONDS,
-        };
-      }
+      return {
+        status: 'unavailable',
+        reason: 'manager_unreachable_no_copy',
+        retryAfterSeconds: MANAGER_RETRY_AFTER_SECONDS,
+      };
     }
 
-    if (ifNoneMatch === row.etag) {
+    const served = await this.serve(row, policy);
+    if (served === null) {
+      return {
+        status: 'unavailable',
+        reason: 'internal',
+        retryAfterSeconds: MANAGER_RETRY_AFTER_SECONDS,
+      };
+    }
+    const etag = served.kind === 'stored' ? served.row.etag : served.etag;
+    if (ifNoneMatch === etag) {
       this.recordNotModified();
-      return { status: 'not_modified', etag: row.etag, stale: row.stale, fetchedAt: row.fetchedAt };
+      return { status: 'not_modified', etag, stale: row.stale, fetchedAt: row.fetchedAt };
     }
 
-    const secrets = await this.openBundle(row);
+    const secrets = served.kind === 'stored' ? await this.open(row) : served.secrets;
     if (secrets === null) {
       return {
         status: 'unavailable',
@@ -113,103 +138,178 @@ export class BundleDO extends DurableObject<Env> {
         retryAfterSeconds: MANAGER_RETRY_AFTER_SECONDS,
       };
     }
-    if (!this.appendDelivery(row, secrets)) {
+    const missing = served.kind === 'stored' ? row.missing : served.missing;
+    try {
+      await this.audit.append(
+        this.stream(target.workload),
+        bundleDeliveredEvent({
+          environment: this.config.environment,
+          workload: target.workload,
+          etag,
+          stale: row.stale,
+          secrets: Object.entries(secrets).map(([name, secret]) => ({
+            name,
+            version: secret.version,
+          })),
+          missing,
+        })
+      );
+    } catch (error) {
+      console.error('sts: delivery audit append failed; the read is refused', {
+        workload: target.workload,
+        reason: errorName(error),
+      });
       return {
         status: 'unavailable',
         reason: 'audit_write_failed',
         retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
       };
     }
-    await this.ensureRelayScheduled();
+    await this.scheduleRelay();
 
+    const delivered: Record<string, BundleSecret> = {};
+    for (const [name, secret] of Object.entries(secrets)) {
+      delivered[name] = { value: secret.value, version: secret.version };
+    }
     return {
       status: 'ok',
       workload: target.workload,
       environment: this.config.environment,
-      etag: row.etag,
+      etag,
       stale: row.stale,
       fetchedAt: row.fetchedAt,
-      secrets,
-      missing: row.missing,
+      secrets: delivered,
+      missing,
     };
   }
 
-  /** Called by the refresher. An unchanged ETag rewrites freshness only. */
+  /** Called by the refresher. An unchanged ETag rewrites freshness and the stale flag only. */
   async putBundle(raw: WorkloadBundle): Promise<PutBundleResult> {
     const bundle = WorkloadBundleSchema.parse(raw);
     if (!this.ctx.id.equals(getBundleStub(this.env, this.config, bundle.workload).id)) {
       // Addressed by a name that is not this workload's: refuse rather than store another bundle.
-      return { status: 'mismatch', changed: false, etag: '' };
+      return { status: 'mismatch' };
     }
     const { row, changed } = await this.writeBundle(bundle);
     return { status: 'stored', changed, etag: row.etag };
   }
 
-  /** Called by the refresher after a failed manager read: keep the copy, mark it stale. */
-  async markStale(): Promise<void> {
-    this.db.update(schema.bundle).set({ stale: true }).where(eq(schema.bundle.id, 1)).run();
-  }
-
   async alarm(): Promise<void> {
     const row = this.readBundle();
-    if (row === null) return;
-    try {
-      const result = await relayAudit({
-        store: this.auditStore(),
-        stream: `sts:${this.config.environment}:bundle:${row.workload}`,
-        send: async batch => {
-          const bytes = await encodeAuditBatch(batch);
-          await this.env.AUDIT_QUEUE.send(bytes, { contentType: 'bytes' });
-        },
-        now: Date.now(),
-      });
-      for (const seq of result.skipped) {
-        console.warn('sts: audit event dropped: above the message size limit', { seq });
+    let relayFailed = false;
+    if (row !== null) {
+      try {
+        await this.audit.relay(this.stream(row.workload));
+      } catch (error) {
+        relayFailed = true;
+        console.warn('sts: bundle audit relay failed; rows stay for the next alarm', {
+          workload: row.workload,
+          reason: errorName(error),
+        });
       }
-    } catch (error) {
-      console.warn('sts: audit relay failed; rows stay for the next alarm', {
-        reason: error instanceof Error ? error.name : 'unknown',
-      });
     }
-    await this.scheduleNextAlarm();
+    const now = Date.now();
+    if (now >= this.audit.nextPruneAt()) {
+      this.db
+        .delete(schema.deliveryCounter)
+        .where(lt(schema.deliveryCounter.minute, utcMinute(now - DELIVERY_COUNTER_RETENTION_MS)))
+        .run();
+    }
+    this.audit.pruneIfDue(now);
+    await this.scheduleNextAlarm(Date.now(), relayFailed);
+  }
+
+  /**
+   * Asks the refresher to confirm its alarm loop, at most once a minute and off the read path, so
+   * a refresher that lost its alarm restarts within a minute of the next read.
+   */
+  private checkRefresher(): void {
+    const now = Date.now();
+    if (now - this.refresherCheckedAt < REFRESHER_CHECK_INTERVAL_MS) return;
+    this.refresherCheckedAt = now;
+    this.ctx.waitUntil(
+      withDORetry(
+        () => getRefresherStub(this.env, this.config),
+        stub => stub.ensureStarted(),
+        'sts.ensureStarted'
+      ).catch((error: unknown) => {
+        console.warn('sts: refresher check failed', { reason: errorName(error) });
+      })
+    );
+  }
+
+  /** Concurrent reads of an empty object share one fill. */
+  private fill(workload: string): Promise<BundleRow | null> {
+    if (this.pendingFill !== null) return this.pendingFill;
+    const pending = this.performFill(workload).finally(() => {
+      this.pendingFill = null;
+    });
+    this.pendingFill = pending;
+    return pending;
+  }
+
+  private async performFill(workload: string): Promise<BundleRow | null> {
+    try {
+      const result = await withDORetry(
+        () => getRefresherStub(this.env, this.config),
+        async stub => await stub.buildBundle(workload),
+        'sts.bundle.fill'
+      );
+      if (result.status !== 'built') return null;
+      return (await this.writeBundle(result.bundle)).row;
+    } catch (error) {
+      console.warn('sts: bundle fill failed', { workload, reason: errorName(error) });
+      return null;
+    }
+  }
+
+  /**
+   * A stored copy built under the current policy serves as is. One built under another policy, for
+   * example during a manager outage after a deploy, is cut down to the current grants first, so a
+   * removed grant is never served (design 4.4: STS refuses any read the policy does not list).
+   */
+  private async serve(row: BundleRow, policy: Policy): Promise<ServedBundle | null> {
+    const policyHash = await workloadPolicyHash(policy.workload);
+    if (row.policyHash === policyHash) return { kind: 'stored', row };
+    const stored = await this.open(row);
+    if (stored === null) return null;
+    const secrets: BundleSecrets = {};
+    const missing: string[] = [];
+    for (const name of policy.secrets) {
+      const secret = stored[name];
+      if (secret === undefined) missing.push(name);
+      else secrets[name] = secret;
+    }
+    const etag = await computeBundleEtag(this.bundleKeys().etagKey, policyHash, secrets, missing);
+    return { kind: 'narrowed', row, etag, secrets, missing };
   }
 
   private readBundle(): BundleRow | null {
     return this.db.select().from(schema.bundle).where(eq(schema.bundle.id, 1)).get() ?? null;
   }
 
-  private async fill(workload: string): Promise<BundleRow | null> {
-    let built: WorkloadBundle | null;
-    try {
-      built = await withDORetry(
-        () => getRefresherStub(this.env, this.config),
-        stub => stub.buildBundle(workload),
-        'sts.bundle.fill'
-      );
-    } catch {
-      return null;
-    }
-    if (built === null) return null;
-    return (await this.writeBundle(built)).row;
-  }
-
   private async writeBundle(bundle: WorkloadBundle): Promise<{ row: BundleRow; changed: boolean }> {
-    const versions: Record<string, number> = {};
-    for (const [name, secret] of Object.entries(bundle.secrets)) {
-      versions[name] = secret.version;
-    }
-    const etag = await computeBundleEtag(bundle.policyHash, versions);
+    const keys = this.bundleKeys();
+    const etag = await computeBundleEtag(
+      keys.etagKey,
+      bundle.policyHash,
+      bundle.secrets,
+      bundle.missing
+    );
     const existing = this.readBundle();
     if (existing !== null && existing.etag === etag) {
       this.db
         .update(schema.bundle)
-        .set({ fetchedAt: bundle.fetchedAt, stale: false })
+        .set({ fetchedAt: bundle.fetchedAt, stale: bundle.stale })
         .where(eq(schema.bundle.id, 1))
         .run();
-      return { row: { ...existing, fetchedAt: bundle.fetchedAt, stale: false }, changed: false };
+      return {
+        row: { ...existing, fetchedAt: bundle.fetchedAt, stale: bundle.stale },
+        changed: false,
+      };
     }
 
-    const sealed = await sealJson(this.encryptionKey(), bundle.secrets);
+    const sealed = await sealJson(keys.sealKey, bundle.secrets);
     const values: BundleRow = {
       id: 1,
       workload: bundle.workload,
@@ -217,7 +317,7 @@ export class BundleDO extends DurableObject<Env> {
       etag,
       policyHash: bundle.policyHash,
       fetchedAt: bundle.fetchedAt,
-      stale: false,
+      stale: bundle.stale,
       missing: bundle.missing,
       iv: sealed.iv,
       ciphertext: sealed.ciphertext,
@@ -243,67 +343,45 @@ export class BundleDO extends DurableObject<Env> {
     return { row: values, changed: true };
   }
 
-  private async openBundle(row: BundleRow): Promise<z.infer<typeof BundleSecrets> | null> {
-    const key = this.db
-      .select()
-      .from(schema.bundleKey)
-      .where(eq(schema.bundleKey.id, 1))
-      .get()?.key;
-    if (key === undefined) return null;
+  private async open(row: BundleRow): Promise<BundleSecrets | null> {
     try {
-      const parsed = BundleSecrets.safeParse(
-        await openJson(key, { iv: row.iv, ciphertext: row.ciphertext })
+      const parsed = BundleSecretsSchema.safeParse(
+        await openJson(this.bundleKeys().sealKey, { iv: row.iv, ciphertext: row.ciphertext })
       );
-      return parsed.success ? parsed.data : null;
+      if (parsed.success) return parsed.data;
     } catch {
-      return null;
+      // Reported below; the cause can carry no secret material.
     }
+    console.error('sts: stored bundle could not be opened', { workload: row.workload });
+    return null;
   }
 
-  private encryptionKey(): string {
+  private bundleKeys(): BundleKeys {
+    if (this.keys !== null) return this.keys;
     const existing = this.db
       .select()
       .from(schema.bundleKey)
       .where(eq(schema.bundleKey.id, 1))
       .get();
-    if (existing !== undefined) return existing.key;
-    const key = createEncryptionKey();
-    this.db
-      .insert(schema.bundleKey)
-      .values({ id: 1, key, createdAt: Date.now() })
-      .onConflictDoUpdate({ target: schema.bundleKey.id, set: { key } })
-      .run();
-    return key;
+    const keys = existing ?? {
+      id: 1,
+      sealKey: createEncryptionKey(),
+      etagKey: createEncryptionKey(),
+      createdAt: Date.now(),
+    };
+    if (existing === undefined) this.db.insert(schema.bundleKey).values(keys).run();
+    this.keys = { sealKey: keys.sealKey, etagKey: keys.etagKey };
+    return this.keys;
   }
 
-  private appendDelivery(
-    row: BundleRow,
-    secrets: Record<string, { value: string; version: number }>
-  ): boolean {
-    try {
-      const event = bundleDeliveredEvent({
-        environment: this.config.environment,
-        workload: row.workload,
-        etag: row.etag,
-        stale: row.stale,
-        secrets: Object.entries(secrets).map(([name, secret]) => ({
-          name,
-          version: secret.version,
-        })),
-        missing: row.missing,
-      });
-      this.db.insert(schema.auditEvent).values({ event, createdAt: Date.now() }).run();
-      return true;
-    } catch {
-      return false;
-    }
+  private stream(workload: string): string {
+    return `sts:${this.config.environment}:bundle:${workload}`;
   }
 
   private recordNotModified(): void {
-    const minute = new Date().toISOString().slice(0, 16);
     this.db
       .insert(schema.deliveryCounter)
-      .values({ minute, count: 1 })
+      .values({ minute: utcMinute(Date.now()), count: 1 })
       .onConflictDoUpdate({
         target: schema.deliveryCounter.minute,
         set: { count: sql`${schema.deliveryCounter.count} + 1` },
@@ -311,71 +389,33 @@ export class BundleDO extends DurableObject<Env> {
       .run();
   }
 
-  private watermark(): number {
-    return (
-      this.db.select().from(schema.auditWatermark).where(eq(schema.auditWatermark.id, 1)).get()
-        ?.relayedSeq ?? 0
-    );
-  }
-
-  private auditStore(): AuditRelayStore {
-    const db = this.db;
-    return {
-      nextRows: (afterSeq, limit) =>
-        db
-          .select()
-          .from(schema.auditEvent)
-          .where(gt(schema.auditEvent.seq, afterSeq))
-          .orderBy(asc(schema.auditEvent.seq))
-          .limit(limit)
-          .all(),
-      watermark: () => this.watermark(),
-      advanceWatermark: toSeq => {
-        db.insert(schema.auditWatermark)
-          .values({ id: 1, relayedSeq: toSeq })
-          .onConflictDoUpdate({
-            target: schema.auditWatermark.id,
-            set: { relayedSeq: toSeq },
-          })
-          .run();
-      },
-      prune: olderThanMs => {
-        const watermark = this.watermark();
-        if (watermark === 0) return;
-        db.delete(schema.auditEvent)
-          .where(
-            and(lt(schema.auditEvent.createdAt, olderThanMs), lte(schema.auditEvent.seq, watermark))
-          )
-          .run();
-      },
-    };
-  }
-
-  private countAuditRows(afterSeq: number | null): number {
-    const query = this.db.select({ count: sql<number>`count(*)` }).from(schema.auditEvent);
-    const row =
-      afterSeq === null ? query.get() : query.where(gt(schema.auditEvent.seq, afterSeq)).get();
-    return row?.count ?? 0;
-  }
-
-  private async ensureRelayScheduled(): Promise<void> {
+  private async scheduleRelay(): Promise<void> {
     try {
+      const now = Date.now();
       const alarm = await this.ctx.storage.getAlarm();
-      if (alarm === null || alarm > Date.now() + RELAY_RETRY_MS) {
-        await this.ctx.storage.setAlarm(Date.now() + RELAY_DELAY_MS);
+      if (alarm === null || alarm > now + RELAY_DELAY_MS) {
+        await this.ctx.storage.setAlarm(now + RELAY_DELAY_MS);
       }
-    } catch {
-      // The row is committed; the next delivery or the prune alarm relays it.
+    } catch (error) {
+      // The row is committed; the next delivery or alarm relays it.
+      console.warn('sts: relay alarm could not be set', { reason: errorName(error) });
     }
   }
 
-  private async scheduleNextAlarm(): Promise<void> {
-    if (this.countAuditRows(this.watermark()) > 0) {
-      await this.ctx.storage.setAlarm(Date.now() + RELAY_RETRY_MS);
+  private async scheduleNextAlarm(now: number, relayFailed: boolean): Promise<void> {
+    const audit = this.audit;
+    if (audit.hasUnrelayed()) {
+      await this.ctx.storage.setAlarm(now + (relayFailed ? RELAY_RETRY_MS : RELAY_DELAY_MS));
       return;
     }
-    if (this.countAuditRows(null) > 0) {
-      await this.ctx.storage.setAlarm(Date.now() + PRUNE_INTERVAL_MS);
+    const counters =
+      this.db
+        .select({ minute: schema.deliveryCounter.minute })
+        .from(schema.deliveryCounter)
+        .limit(1)
+        .get() !== undefined;
+    if (audit.hasRows() || counters) {
+      await this.ctx.storage.setAlarm(Math.max(now + 1_000, audit.nextPruneAt()));
     }
   }
 }

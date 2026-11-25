@@ -3640,9 +3640,6 @@ importers:
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.11
-      jsonc-parser:
-        specifier: 3.3.1
-        version: 3.3.1
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

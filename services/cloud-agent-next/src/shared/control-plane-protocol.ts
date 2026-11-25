@@ -194,6 +194,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'invalid_configuration',
   'network_secret_configuration_invalid',
   'sandbox_create_failed',
+  'sandbox_unreachable',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',
   'runtime_cli_probe_failed',

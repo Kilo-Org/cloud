@@ -152,6 +152,10 @@ describe('preparationErrorText', () => {
     expect(preparationErrorText('repository_access_failed', t)).toBe('Workspace setup failed');
   });
 
+  it('names an unanswered sandbox service with existing connection copy, not its raw code', () => {
+    expect(preparationErrorText('sandbox_unreachable', t)).toBe('The sandbox connection was lost');
+  });
+
   it('names the wrapper sentences a step failure carries', () => {
     expect(preparationErrorText('Setup command 2 failed', t)).toBe('Setup command 2 failed');
     expect(preparationErrorText('Setup command 1 timed out', t)).toBe('Setup command 1 timed out');

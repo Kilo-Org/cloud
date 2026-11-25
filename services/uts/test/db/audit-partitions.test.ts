@@ -95,7 +95,7 @@ describe('audit partition maintenance', () => {
     expect(await sqlStateOf(() => maintain(now, 32))).toBe('22023');
   });
 
-  it('drops an old partition only after every shard relayed every row in it', async () => {
+  it('truncates, then drops, an old partition only after every shard relayed every row in it', async () => {
     expect(await createPartitions(daysAgo(10), 1)).toEqual([partitionFor(-10), partitionFor(-9)]);
     const old = partitionFor(-10);
     const rows = await insertRowsAt(new Date(daysAgo(10).setUTCHours(12, 0, 0, 0)));
@@ -112,6 +112,8 @@ describe('audit partition maintenance', () => {
     expect(await partitions()).toContain(old);
 
     await advanceWatermark(heldBack);
+    expect(await maintain(now)).toEqual([{ action: 'truncated', partition_name: old }]);
+    expect(await owner.query(`SELECT 1 FROM uts.${old}`)).toMatchObject({ rowCount: 0 });
     expect(await maintain(now)).toEqual([{ action: 'dropped', partition_name: old }]);
     expect(await partitions()).not.toContain(old);
   });

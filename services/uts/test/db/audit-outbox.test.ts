@@ -442,10 +442,15 @@ describe('the credential check on audit rows', () => {
     expect(await sqlStateOf(() => insertWith(byAddress))).toBe(CHECK_VIOLATION);
   });
 
-  it('accept an app user id, a token kind and a token id', async () => {
+  it('accept an app user id, a token kind, a token id and a mention of a prefix', async () => {
     const base = auditEvent();
     const attributes = { tokenKind: 'kilo_pat', tokenRef: randomUUID() };
     await insertWith({ ...base, data: { ...base.data, attributes } }, 'oauth/github:12345');
+    await insertWith({
+      ...base,
+      id: randomUUID(),
+      data: { ...base.data, outcome: 'failure', outcomeDetail: 'malformed kilo_pat_ value' },
+    });
   });
 });
 

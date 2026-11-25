@@ -194,6 +194,47 @@ describe('audit reads at volume', () => {
 });
 
 describe('partition maintenance under insert load', () => {
+  it('truncate a relayed partition without locking the parent table', async () => {
+    const maintainer = await db.connectAsOwner();
+    const inserter = await db.connect('uts_app_a');
+    // Hold the TRUNCATE's transaction open to inspect its locks.
+    await maintainer.query('BEGIN');
+    try {
+      const started = performance.now();
+      const result = await maintainer.query(
+        'SELECT * FROM uts.audit_partition_maintenance_at(now(), 7)'
+      );
+      const callMs = performance.now() - started;
+      expect(result.rows).toEqual([{ action: 'truncated', partition_name: OLD_PARTITION }]);
+
+      const locks = await maintainer.query<{ relation: string; mode: string }>(
+        `SELECT relation::regclass::text AS relation, mode FROM pg_locks
+         WHERE pid = pg_backend_pid() AND locktype = 'relation'
+           AND relation IN ('uts.audit_events'::regclass, $1::regclass)`,
+        [`uts.${OLD_PARTITION}`]
+      );
+      expect(locks.rows.map(lock => lock.relation)).not.toContain('uts.audit_events');
+      expect(locks.rows).toContainEqual({
+        relation: `uts.${OLD_PARTITION}`,
+        mode: 'AccessExclusiveLock',
+      });
+
+      // An insert goes through while the TRUNCATE's lock is still held.
+      const insertStarted = performance.now();
+      await insertAudit(inserter);
+      const insertMs = performance.now() - insertStarted;
+      expect(insertMs).toBeLessThan(LOCK_TIMEOUT_MS);
+      console.info(
+        `truncate call over ${OLD_ROWS} rows ${callMs.toFixed(1)} ms; an insert during its open ` +
+          `transaction took ${insertMs.toFixed(1)} ms`
+      );
+    } finally {
+      await maintainer.query('COMMIT');
+    }
+    const left = await owner.query(`SELECT count(*)::int AS rows FROM uts.${OLD_PARTITION}`);
+    expect(left.rows).toEqual([{ rows: 0 }]);
+  });
+
   it('give up after its lock wait when an insert holds the table, so a queued insert waits no longer', async () => {
     const holder = await db.connect('uts_app_b');
     const maintainer = await db.connectAsOwner();
@@ -238,7 +279,7 @@ describe('partition maintenance under insert load', () => {
     expect(await partitions()).toContain(OLD_PARTITION);
   });
 
-  it('drop a relayed partition of 100,000 rows while inserts wait no longer than the DDL', async () => {
+  it('drop the emptied partition while inserts wait no longer than the DDL', async () => {
     const inserter = await db.connect('uts_app_a');
     const baseline: number[] = [];
     for (let index = 0; index < 200; index++) {

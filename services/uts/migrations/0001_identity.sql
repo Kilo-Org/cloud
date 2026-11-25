@@ -755,7 +755,10 @@ CREATE TRIGGER org_bot_keys_require_gate_pass
 
 -- Deleting an account flags the active bot keys it created, as member removal does (design
 -- section 5.8). It runs before the delete, so when the cascade removes the account's gate passes,
--- every live key of that account is already flagged and may lose its pass.
+-- every live key of that account is already flagged and may lose its pass. This trigger writes no
+-- audit row and no notice: the account-deletion function must, in the same statement before the
+-- delete, collect the keys this trigger is about to flag and write their bot-key-flagged audit rows
+-- and the org-admin notices (design sections 5.8 and 8.1).
 CREATE FUNCTION uts.flag_bot_keys_of_deleted_account() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp

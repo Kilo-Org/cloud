@@ -78,7 +78,10 @@ whether granted directly, through `PUBLIC` or through an inherited role.
 - The app login still writes the credential tables directly. When the mint, refresh and revoke
   functions land, they become security-definer functions that write the credential row and its
   audit row together, and the app login loses direct writes on the credential tables, so no
-  credential can change without its audit row.
+  credential can change without its audit row. The account-deletion function is one of them: in
+  the same statement, before the delete, it collects the active bot keys the account created (the
+  keys the delete trigger is about to flag) and writes a bot-key-flagged audit row and the org-admin
+  notices for each (design sections 5.8 and 8.1).
 - `IdentityStoreError` keeps only the SQLSTATE, the constraint, the table, and for a failed
   connection the system error code (`ECONNREFUSED`, `ETIMEDOUT`, ...). The server's error detail can
   quote the refused row, so it never leaves `src/db/client.ts`.

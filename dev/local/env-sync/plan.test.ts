@@ -342,6 +342,32 @@ test('applies an explicit worker override even when root and existing dev vars d
   }
 });
 
+test('adds the empty meter payer list to an existing meter .dev.vars', () => {
+  const meterDir = 'services/container-usage-meter';
+  const example = fs.readFileSync(
+    new URL('../../../services/container-usage-meter/.dev.vars.example', import.meta.url),
+    'utf-8'
+  );
+  const repo = createRepo({
+    '.env.local': '',
+    [`${meterDir}/.dev.vars.example`]: example,
+    [`${meterDir}/.dev.vars`]: 'KILOCODE_BACKEND_BASE_URL=http://localhost:3000\n',
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['container-usage-meter']));
+    const meter = plan.devVarsChanges.find(change => change.workerDir === meterDir);
+    assert.ok(meter, 'expected a meter .dev.vars plan');
+    assert.equal(meter.isNew, false);
+    assert.deepEqual(
+      meter.keyChanges.find(change => change.key === 'CONTAINER_BILLING_CLOUD_AGENT_USER_IDS'),
+      { key: 'CONTAINER_BILLING_CLOUD_AGENT_USER_IDS', oldValue: undefined, newValue: '' }
+    );
+    assert.ok(!meter.missingValues.includes('CONTAINER_BILLING_CLOUD_AGENT_USER_IDS'));
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('auto-creates blank shared callback secrets before syncing worker dev vars', () => {
   const repo = createRepo({
     '.env.local': 'CALLBACK_TOKEN_SECRET=\n',

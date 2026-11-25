@@ -48,15 +48,17 @@
         "dead_letter_queue": "kilo-audit-dlq",
       },
       // Offers each dead letter to its stream again (streams in parallel, each in sequence
-      // order), and keeps its raw bytes in R2 under dead-letter/. One still behind a gap or an R2
-      // failure retries every 15 minutes for about 25 hours (the Queues maximum of 100 retries);
-      // one that cannot recover is paged and acked. Order needs no single consumer: the StreamDO
-      // serialises each stream and a batch that arrives early waits behind its gap.
+      // order), and keeps its raw bytes in R2 under dead-letter/. One still behind a gap retries
+      // after 30 s while its stream's head advances, else (and after an R2 failure) every 15
+      // minutes, for up to the Queues maximum of 100 retries;
+      // one that cannot recover is paged and acked. One consumer: several would hold later
+      // chunks of a stream while an earlier chunk still archives, and push them all back behind
+      // its gap; one consumer with 100 messages per batch, streams in parallel, drains in order.
       {
         "queue": "kilo-audit-dlq",
         "max_batch_size": 100,
         "max_batch_timeout": 30,
-        "max_concurrency": 5,
+        "max_concurrency": 1,
         "max_retries": 100,
         "retry_delay": 900,
       },
@@ -135,7 +137,7 @@
             "queue": "kilo-audit-staging-dlq",
             "max_batch_size": 100,
             "max_batch_timeout": 30,
-            "max_concurrency": 5,
+            "max_concurrency": 1,
             "max_retries": 100,
             "retry_delay": 900,
           },
@@ -191,7 +193,7 @@
             "queue": "kilo-audit-local-dlq",
             "max_batch_size": 100,
             "max_batch_timeout": 30,
-            "max_concurrency": 5,
+            "max_concurrency": 1,
             "max_retries": 100,
             "retry_delay": 900,
           },

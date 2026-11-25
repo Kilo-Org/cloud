@@ -132,10 +132,21 @@ describe('StreamDO', () => {
     const stub = getStreamDOStub(env, stream);
 
     const gap = await stub.acceptBatch(auditBatch(3, 5, stream));
-    expect(gap).toMatchObject({ kind: 'retry', reason: 'gap', delaySeconds: 30 });
+    expect(gap).toMatchObject({
+      kind: 'retry',
+      reason: 'gap',
+      delaySeconds: 30,
+      headAdvancedAt: null,
+    });
     expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
 
     accepted(await stub.acceptBatch(auditBatch(1, 2, stream)));
+    const before = Date.now();
+    expect(await stub.acceptBatch(auditBatch(6, 7, stream))).toMatchObject({ reason: 'gap' });
+    const later = await stub.acceptBatch(auditBatch(6, 7, stream));
+    if (later.kind !== 'retry') throw new Error(`expected retry, got ${later.kind}`);
+    // The head just advanced, so a dead letter behind this gap can tell its backlog is draining.
+    expect(later.headAdvancedAt).toBeGreaterThanOrEqual(before - 60_000);
     const filled = accepted(await stub.acceptBatch(auditBatch(3, 5, stream)));
     expect(filled).toMatchObject({ fromSeq: 3, toSeq: 5 });
     expect(await listObjectKeys(`streams/${stream}/`)).toEqual([
@@ -409,12 +420,25 @@ describe('StreamDO', () => {
     const gaps = await stub.hotStoreGaps(100);
     expect(gaps).toHaveLength(60);
     expect(gaps.every(row => row.reason === 'archive_unreadable')).toBe(true);
-    // An archive that changed under the relay pages every run, outside the hourly cap.
-    const pages = pageTexts(http.requests);
+    // An archive that changed under the relay pages outside the hourly cap: at once for the first
+    // run, then a summary once 10 minutes have passed, whatever else the alarm does.
+    let pages = pageTexts(http.requests);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toContain(
+      '50 archive objects missing, undecodable or changed under the relay'
+    );
+    expect(pages[0]).toContain('(seq 1..50; 50 so far)');
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      const watch = await state.storage.get<{ lastPageAt: number }>('unreadable');
+      if (!watch) throw new Error('unreadable watch missing');
+      await state.storage.put('unreadable', { ...watch, lastPageAt: Date.now() - 10 * 60_000 });
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    pages = pageTexts(http.requests);
     expect(pages).toHaveLength(2);
-    expect(pages[0]).toContain('changed under the relay for seq 1..1, 2..2');
-    expect(pages[0]).toContain('(50 rows)');
-    expect(pages[1]).toContain('(10 rows)');
+    expect(pages[1]).toContain('10 archive objects missing');
+    expect(pages[1]).toContain('(seq 51..60; 60 so far)');
   });
 
   it('re-ingests an owed row from the archive, never from a redelivered message', async () => {

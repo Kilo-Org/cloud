@@ -15,6 +15,15 @@ const DLQ_SUFFIX = '-dlq';
  */
 const DEAD_LETTER_RETRY_SECONDS = 900;
 /**
+ * A dead letter behind a gap whose stream's head advanced within `DEAD_LETTER_PROGRESS_WINDOW_MS`
+ * is behind a backlog that is draining, so it is offered again after this short delay instead.
+ * Short retries stop after `DEAD_LETTER_LAST_SHORT_ATTEMPT`, keeping at least 40 long retries
+ * (10 hours) of the window.
+ */
+const DEAD_LETTER_SHORT_RETRY_SECONDS = 30;
+const DEAD_LETTER_PROGRESS_WINDOW_MS = 60_000;
+const DEAD_LETTER_LAST_SHORT_ATTEMPT = 60;
+/**
  * The DLQ delivery after which Queues drops the message (`max_retries: 100`, so 101 deliveries);
  * a batch still waiting then is paged as lost. It counts the deliveries the message reports.
  */
@@ -67,8 +76,18 @@ async function handleBatch(
 
 type DeadLetterFate =
   | { kind: 'recovered'; outcome: 'accepted' | 'duplicate' }
-  | { kind: 'waiting'; reason: string }
+  | { kind: 'waiting'; reason: string; progressing: boolean }
   | { kind: 'lost'; reason: string };
+
+/** 30 s while the stream's gap is closing (early deliveries only), else 15 minutes. */
+export function deadLetterRetrySeconds(
+  fate: Extract<DeadLetterFate, { kind: 'waiting' }>,
+  attempts: number
+): number {
+  return fate.progressing && attempts <= DEAD_LETTER_LAST_SHORT_ATTEMPT
+    ? DEAD_LETTER_SHORT_RETRY_SECONDS
+    : DEAD_LETTER_RETRY_SECONDS;
+}
 
 /**
  * Handles messages that will never be delivered normally: a DLQ message or an undecodable body.
@@ -79,10 +98,10 @@ type DeadLetterFate =
  * nothing kept. Once one batch of a stream is still waiting, the later ones are not offered
  * (they would only gap). Every other message has its raw bytes stored under
  * `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (create-only, so a retry rewrites
- * nothing) and a waiting one is retried every 15 minutes. A message that cannot recover (a forged
- * or conflicting copy, an undecodable body, its final delivery, or bytes that could not be
- * stored by then) is acked and paged; each stream (and the unknown bucket) pages at most once an
- * hour.
+ * nothing) and a waiting one is retried: after 30 s while its stream's head is advancing, else
+ * after 15 minutes. A message that cannot recover (a forged or conflicting copy, an undecodable
+ * body, its final delivery, or bytes that could not be stored by then) is acked and paged; each
+ * stream (and the unknown bucket) pages at most once an hour.
  */
 async function keepDeadLetters(
   messages: readonly Message<unknown>[],
@@ -167,6 +186,7 @@ async function settleDeadLetter(
     where = 'and its bytes could not be stored';
   }
   if (fate.kind === 'waiting' && !final) {
+    const delaySeconds = deadLetterRetrySeconds(fate, message.attempts);
     console.log(
       JSON.stringify({
         event: 'audit_relay.dead_letter_waiting',
@@ -174,9 +194,10 @@ async function settleDeadLetter(
         key,
         reason,
         attempts: message.attempts,
+        delaySeconds,
       })
     );
-    message.retry({ delaySeconds: DEAD_LETTER_RETRY_SECONDS });
+    message.retry({ delaySeconds });
     return null;
   }
 
@@ -211,9 +232,16 @@ async function offerAgain(auditBatch: AuditBatch, env: Env): Promise<DeadLetterF
     case 'duplicate':
       return { kind: 'recovered', outcome: outcome.kind };
     case 'retry':
-      return { kind: 'waiting', reason: outcome.reason };
-    case 'gap_stalled':
-      return { kind: 'waiting', reason: 'gap' };
+    case 'gap_stalled': {
+      const advancedAt = outcome.headAdvancedAt;
+      const progressing =
+        advancedAt !== null && Date.now() - advancedAt <= DEAD_LETTER_PROGRESS_WINDOW_MS;
+      return {
+        kind: 'waiting',
+        reason: outcome.kind === 'retry' ? outcome.reason : 'gap',
+        progressing,
+      };
+    }
     case 'dropped':
       return { kind: 'lost', reason: outcome.reason };
     case 'duplicate_mismatch':

@@ -9,7 +9,7 @@ import {
 } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src';
-import { archiveRetryDelaySeconds } from '../src/queue';
+import { archiveRetryDelaySeconds, deadLetterRetrySeconds } from '../src/queue';
 import { GAP_PAGE_AFTER_MS, GAP_PAGE_ATTEMPTS, getStreamDOStub } from '../src/dos/StreamDO';
 import { archiveObjectKey, deadLetterKey } from '../src/relay/archive';
 import {
@@ -160,6 +160,46 @@ describe('queue handler', () => {
     await runInDurableObject(getStreamDOStub(env, stream), async (_instance, state) => {
       expect(await state.storage.get('gap')).toMatchObject({ expectedSeq: 1, attempts: 1 });
     });
+  });
+
+  it('drains a backlog spread over several deliveries in a few rounds', async () => {
+    vi.stubGlobal('fetch', recordingFetch(axiomOk).impl);
+    const stream = uniqueStream('queue-dlq-rounds');
+    const chunk = async (from: number, to: number) => {
+      const bodies = [];
+      for (let seq = from; seq <= to; seq += 2) {
+        bodies.push((await encodeAuditBatch(auditBatch(seq, seq + 1, stream))).buffer);
+      }
+      return bodies;
+    };
+    const [first, second, third] = await Promise.all([chunk(1, 6), chunk(7, 12), chunk(13, 18)]);
+
+    // The later chunks arrive first: they wait, and nothing has advanced, so they wait long.
+    const early = await runQueue('kilo-audit-dlq', [...third, ...second]);
+    expect(early.result.retryMessages).toHaveLength(6);
+    // The first chunk archives; the others come back and archive in one more round.
+    expect((await runQueue('kilo-audit-dlq', first)).result.explicitAcks).toHaveLength(3);
+    const rest = await runQueue('kilo-audit-dlq', [...third, ...second], 2);
+    expect(rest.result.explicitAcks).toHaveLength(6);
+    expect(await listObjectKeys(`streams/${stream}/`)).toHaveLength(9);
+  });
+
+  it('retries a gap after 30 s while its head advances, else after 15 minutes', () => {
+    expect(deadLetterRetrySeconds({ kind: 'waiting', reason: 'gap', progressing: true }, 1)).toBe(
+      30
+    );
+    expect(deadLetterRetrySeconds({ kind: 'waiting', reason: 'gap', progressing: true }, 60)).toBe(
+      30
+    );
+    expect(deadLetterRetrySeconds({ kind: 'waiting', reason: 'gap', progressing: true }, 61)).toBe(
+      900
+    );
+    expect(deadLetterRetrySeconds({ kind: 'waiting', reason: 'gap', progressing: false }, 1)).toBe(
+      900
+    );
+    expect(
+      deadLetterRetrySeconds({ kind: 'waiting', reason: 'archive', progressing: false }, 1)
+    ).toBe(900);
   });
 
   it('keeps a batch still behind a gap, retries it, and pages its final delivery once an hour', async () => {

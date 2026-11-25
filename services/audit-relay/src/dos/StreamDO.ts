@@ -53,13 +53,34 @@ export const OWED_ROW_PAGE_AGE_MS = 6 * 60 * 60 * 1000;
 export const HOT_COPY_PAGE_INTERVAL_MS = 60 * 60 * 1000;
 /** Dead letters of one stream page at most once per this window. */
 export const DEAD_LETTER_PAGE_INTERVAL_MS = 60 * 60 * 1000;
+/**
+ * Unreadable archive objects page outside the hot-copy cap, but at most once per this window per
+ * stream: the first at once, then a summary of the rows found since, so a large backlog of them
+ * cannot page every alarm run.
+ */
+export const UNREADABLE_PAGE_INTERVAL_MS = 10 * 60 * 1000;
 
 const HEAD_KEY = 'head';
+const HEAD_ADVANCED_KEY = 'head_advanced_at';
 const GAP_KEY = 'gap';
 const HOT_STATE_KEY = 'hot_state';
+const UNREADABLE_KEY = 'unreadable';
 const DEAD_LETTER_PAGED_KEY = 'dead_letter_paged_at';
 const HOT_COPY_PREFIX = 'hot_copy:';
 const PARKED_PREFIX = 'hot_copy_parked:';
+
+/**
+ * Unreadable rows parked since the last unreadable page (`pending`, from `firstSeq` to
+ * `lastSeq`), the stream's running `total`, and when that page went out.
+ */
+type UnreadableWatch = {
+  stream: string;
+  total: number;
+  pending: number;
+  firstSeq: number | null;
+  lastSeq: number | null;
+  lastPageAt: number | null;
+};
 
 /**
  * The sequence the stream is waiting for, since when, and how many batches it turned away. A
@@ -158,6 +179,8 @@ export type StreamOutcome =
       fromSeq: number;
       reason: 'gap' | 'archive';
       delaySeconds: number;
+      /** When the head last advanced (gap only), so a waiting dead letter can tell progress. */
+      headAdvancedAt: number | null;
     }
   | { kind: 'dropped'; stream: string; fromSeq: number; reason: 'archive_conflict' }
   | {
@@ -168,6 +191,7 @@ export type StreamOutcome =
       attempts: number;
       stalledMs: number;
       delaySeconds: number;
+      headAdvancedAt: number | null;
     }
   | {
       kind: 'duplicate_mismatch';
@@ -286,6 +310,7 @@ export class StreamDO extends DurableObject<Env> {
         fromSeq,
         reason: 'archive',
         delaySeconds: ARCHIVE_RETRY_SECONDS,
+        headAdvancedAt: null,
       };
     }
 
@@ -306,8 +331,9 @@ export class StreamDO extends DurableObject<Env> {
     // Axiom, and, when nothing is scheduled, the alarm that delivers the row if this instance
     // dies before the ingest below finishes.
     const commit: Promise<unknown>[] = [
-      this.ctx.storage.put<StreamHead | HotStoreGap>({
+      this.ctx.storage.put<StreamHead | HotStoreGap | number>({
         [HEAD_KEY]: { seq: trimmed.toSeq, hash },
+        [HEAD_ADVANCED_KEY]: Date.now(),
         [hotCopyKey(trimmed.toSeq)]: owed,
       }),
     ];
@@ -337,7 +363,10 @@ export class StreamDO extends DurableObject<Env> {
   private async gapRetry(batch: AuditBatch, head: StreamHead): Promise<StreamOutcome> {
     const expectedSeq = head.seq + 1;
     const now = Date.now();
-    const stored = await this.ctx.storage.get<GapWatch>(GAP_KEY);
+    const [stored, headAdvancedAt] = await Promise.all([
+      this.ctx.storage.get<GapWatch>(GAP_KEY),
+      this.ctx.storage.get<number>(HEAD_ADVANCED_KEY),
+    ]);
     const watch: GapWatch =
       stored?.expectedSeq === expectedSeq
         ? { ...stored, attempts: stored.attempts + 1 }
@@ -355,6 +384,7 @@ export class StreamDO extends DurableObject<Env> {
         attempts: watch.attempts,
         stalledMs,
         delaySeconds: GAP_RETRY_SECONDS,
+        headAdvancedAt: headAdvancedAt ?? null,
       };
     }
     return {
@@ -363,6 +393,7 @@ export class StreamDO extends DurableObject<Env> {
       fromSeq: batch.fromSeq,
       reason: 'gap',
       delaySeconds: GAP_RETRY_SECONDS,
+      headAdvancedAt: headAdvancedAt ?? null,
     };
   }
 
@@ -390,6 +421,7 @@ export class StreamDO extends DurableObject<Env> {
         fromSeq: batch.fromSeq,
         reason: 'archive',
         delaySeconds: ARCHIVE_RETRY_SECONDS,
+        headAdvancedAt: null,
       };
     }
     if (agreement !== 'match') {
@@ -447,8 +479,12 @@ export class StreamDO extends DurableObject<Env> {
     const rows = [...listed.values()];
     const first = rows[0];
     if (!first) {
-      const stored = await this.ctx.storage.get<HotCopyState>(HOT_STATE_KEY);
+      const [stored, watch] = await Promise.all([
+        this.ctx.storage.get<HotCopyState>(HOT_STATE_KEY),
+        this.ctx.storage.get<UnreadableWatch>(UNREADABLE_KEY),
+      ]);
       if (stored?.failing) await this.recovered(stored);
+      if (watch) await this.noteUnreadable(watch.stream, []);
       return;
     }
     let state = await this.readHotState(first.stream);
@@ -474,34 +510,75 @@ export class StreamDO extends DurableObject<Env> {
         continue;
       }
       // Every row before this one was delivered or parked, except a suspect, which is older.
-      await this.pageUnreadable(first.stream, unreadable);
       await this.noteFailure(state, delivery.reason, true, suspect ?? row);
+      await this.noteUnreadable(first.stream, unreadable);
       return;
     }
-    await this.pageUnreadable(first.stream, unreadable);
 
     if (suspect) {
       await this.noteFailure(state, 'axiom_rejected', true, suspect);
-      return;
-    }
-    if (rows.length === HOT_COPY_ROWS_PER_ALARM) {
+    } else if (rows.length === HOT_COPY_ROWS_PER_ALARM) {
       await this.ctx.storage.put<HotCopyState>(HOT_STATE_KEY, { ...state, attempts: 0 });
       await this.ctx.storage.setAlarm(Date.now());
-      return;
+    } else {
+      await this.recovered(state);
     }
-    await this.recovered(state);
+    await this.noteUnreadable(first.stream, unreadable);
   }
 
   /**
    * An archive object that went missing or changed under the relay is evidence of tampering or
-   * loss, so its page never waits for the hourly cap: one page per alarm run lists the rows.
+   * loss, so its page never waits for the hourly hot-copy cap. The first page goes out at once;
+   * rows found within `UNREADABLE_PAGE_INTERVAL_MS` after it are summarised in the next page, which
+   * an alarm guarantees even when no other work is due. Runs after the scheduling decision, so its
+   * alarm only ever moves the next run earlier.
    */
-  private async pageUnreadable(stream: string, rows: HotStoreGap[]): Promise<void> {
-    if (rows.length === 0) return;
-    const ranges = rows.map(row => `${row.fromSeq}..${row.toSeq}`).join(', ');
+  private async noteUnreadable(stream: string, rows: HotStoreGap[]): Promise<void> {
+    const stored = await this.ctx.storage.get<UnreadableWatch>(UNREADABLE_KEY);
+    if (rows.length === 0 && !stored?.pending) return;
+    const now = Date.now();
+    const base: UnreadableWatch = stored ?? {
+      stream,
+      total: 0,
+      pending: 0,
+      firstSeq: null,
+      lastSeq: null,
+      lastPageAt: null,
+    };
+    const last = rows.at(-1);
+    const watch: UnreadableWatch = {
+      ...base,
+      total: base.total + rows.length,
+      pending: base.pending + rows.length,
+      firstSeq: base.firstSeq ?? rows[0]?.fromSeq ?? null,
+      lastSeq: last?.toSeq ?? base.lastSeq,
+    };
+
+    const dueAt = watch.lastPageAt === null ? now : watch.lastPageAt + UNREADABLE_PAGE_INTERVAL_MS;
+    if (now < dueAt) {
+      await this.ctx.storage.put<UnreadableWatch>(UNREADABLE_KEY, watch);
+      const scheduled = await this.ctx.storage.getAlarm();
+      if (scheduled === null || scheduled > dueAt) await this.ctx.storage.setAlarm(dueAt);
+      return;
+    }
+    await this.ctx.storage.put<UnreadableWatch>(UNREADABLE_KEY, {
+      ...watch,
+      pending: 0,
+      firstSeq: null,
+      lastSeq: null,
+      lastPageAt: now,
+    });
+    console.error(
+      JSON.stringify({
+        event: 'audit_relay.archive_unreadable',
+        stream,
+        rows: watch.pending,
+        total: watch.total,
+      })
+    );
     await pageOperator(
       this.env,
-      `audit stream ${stream}: archive objects missing, undecodable or changed under the relay for seq ${ranges} (${rows.length} rows); their hot copy is parked, check the archive`,
+      `audit stream ${stream}: ${watch.pending} archive objects missing, undecodable or changed under the relay (seq ${watch.firstSeq}..${watch.lastSeq}; ${watch.total} so far); their hot copy is parked, check the archive`,
       this.ctx
     );
   }

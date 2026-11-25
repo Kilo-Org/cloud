@@ -22,6 +22,13 @@ export const APP_SHELL_FLOW_COOKIE_PATH = '/api/integrations';
 /** Provider round trips are capped by the 10-minute OAuth state; allow a margin. */
 const APP_SHELL_FLOW_TTL_SECONDS = 15 * 60;
 
+/**
+ * Marks a signed token as an app-shell OAuth flow. Every signed token in this
+ * app shares one key, so the marker keeps a flow cookie and a shell session
+ * cookie from standing in for each other.
+ */
+const APP_SHELL_FLOW_PURPOSE = 'app-shell-flow';
+
 function stateFingerprint(state: string): string {
   return crypto.createHash('sha256').update(state).digest('hex');
 }
@@ -34,7 +41,11 @@ export function createAppShellFlowToken(input: {
   session: AppShellSession;
   state: string;
 }): string {
-  return createSignedToken({ ...input.session, stateHash: stateFingerprint(input.state) });
+  return createSignedToken({
+    purpose: APP_SHELL_FLOW_PURPOSE,
+    ...input.session,
+    stateHash: stateFingerprint(input.state),
+  });
 }
 
 export function appShellFlowCookieOptions(): {
@@ -55,7 +66,8 @@ export function appShellFlowCookieOptions(): {
 
 /**
  * The shell session the flow cookie binds to this exact state, or null when the
- * cookie is missing, forged, expired, or minted for another attempt.
+ * cookie is missing, forged, expired, not a flow token, or minted for another
+ * attempt.
  */
 export function verifyAppShellFlowToken(
   request: NextRequest,
@@ -65,6 +77,7 @@ export function verifyAppShellFlowToken(
   return verifySignedToken(token, {
     ttlSeconds: APP_SHELL_FLOW_TTL_SECONDS,
     parse: payload => {
+      if (payload.purpose !== APP_SHELL_FLOW_PURPOSE) return null;
       if (payload.stateHash !== stateFingerprint(state)) return null;
       return parseAppShellSession(payload);
     },

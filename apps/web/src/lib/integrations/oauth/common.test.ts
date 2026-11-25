@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import type * as UserServer from '@kilocode/web-shared/lib/user/server';
@@ -6,6 +7,7 @@ import type * as DomainGates from '@kilocode/web-shared/lib/user/domain-gates';
 import type * as AppShellFlow from '@/lib/integrations/oauth/app-shell-flow';
 import type * as AppShellSession from '@/lib/app-shell/session';
 import type * as CommonModule from './common';
+import type * as SignedToken from '@/lib/signed-token';
 import { shellUser } from '@/tests/helpers/shell-user.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -40,6 +42,7 @@ const { createAppShellFlowToken } = jest.requireActual<typeof AppShellFlow>(
 );
 const { bindAppShellSession } =
   jest.requireActual<typeof AppShellSession>('@/lib/app-shell/session');
+const { createSignedToken } = jest.requireActual<typeof SignedToken>('@/lib/signed-token');
 const { resolveOAuthCallbackActor } = jest.requireActual<typeof CommonModule>('./common');
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -136,6 +139,26 @@ describe('resolveOAuthCallbackActor', () => {
         verified: VERIFIED,
       })
     ).resolves.toEqual({ status: 'unauthenticated' });
+    expect(mockFindUserById).not.toHaveBeenCalled();
+  });
+
+  test('refuses another signed token that names the shell user and this state', async () => {
+    mockFindUserById.mockResolvedValue(shellUser(USER_ID));
+    const session = bindAppShellSession(USER_ID, null);
+    const stateHash = crypto.createHash('sha256').update(RAW_STATE).digest('hex');
+
+    // A shell session token, and a flow token minted before flows carried a
+    // purpose, both share the signing key and the payload shape.
+    for (const purpose of ['app-shell-session', undefined]) {
+      const token = createSignedToken({ purpose, ...session, stateHash });
+      await expect(
+        resolveOAuthCallbackActor({
+          request: callbackRequest(`kilo_app_shell_flow=${token}`),
+          rawState: RAW_STATE,
+          verified: VERIFIED,
+        })
+      ).resolves.toEqual({ status: 'unauthenticated' });
+    }
     expect(mockFindUserById).not.toHaveBeenCalled();
   });
 });

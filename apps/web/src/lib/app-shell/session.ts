@@ -42,9 +42,18 @@ export function bindAppShellSession(
 }
 
 /**
+ * Marks a signed token as a shell session. Every signed token in this app
+ * shares one key, so the marker is what stops another signed token that names
+ * a user, such as the app-shell OAuth flow cookie, from being accepted as a
+ * shell session.
+ */
+const APP_SHELL_SESSION_PURPOSE = 'app-shell-session';
+
+/**
  * The session a signed shell payload names, or null when it is malformed. A
  * payload without the binding was minted before shell credentials were bound
  * to the pepper and is refused; the app opens the shell with a new hand-off.
+ * The caller checks the payload's purpose first.
  */
 export function parseAppShellSession(payload: Record<string, unknown>): AppShellSession | null {
   const { userId, webSessionBinding: binding } = payload;
@@ -54,15 +63,20 @@ export function parseAppShellSession(payload: Record<string, unknown>): AppShell
 }
 
 export function createAppShellSessionToken(session: AppShellSession): string {
-  return createSignedToken(session);
+  return createSignedToken({ purpose: APP_SHELL_SESSION_PURPOSE, ...session });
 }
 
+/**
+ * The shell session a token names, or null when it is missing, forged, stale
+ * or not a shell session token.
+ */
 export function verifyAppShellSessionToken(
   token: string | null | undefined
 ): AppShellSession | null {
   return verifySignedToken(token ?? null, {
     ttlSeconds: APP_SHELL_SESSION_TTL_SECONDS,
-    parse: parseAppShellSession,
+    parse: payload =>
+      payload.purpose === APP_SHELL_SESSION_PURPOSE ? parseAppShellSession(payload) : null,
   });
 }
 

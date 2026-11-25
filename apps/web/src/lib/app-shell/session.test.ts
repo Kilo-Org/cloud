@@ -4,6 +4,7 @@ import type * as FindUserById from '@kilocode/web-shared/lib/user/find-user-by-i
 import type * as DomainGates from '@kilocode/web-shared/lib/user/domain-gates';
 import type * as SessionModule from './session';
 import type * as SignedToken from '@/lib/signed-token';
+import type * as AppShellFlow from '@/lib/integrations/oauth/app-shell-flow';
 import { shellUser } from '@/tests/helpers/shell-user.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -36,6 +37,9 @@ const {
   verifyAppShellSessionToken,
 } = jest.requireActual<typeof SessionModule>('./session');
 const { createSignedToken } = jest.requireActual<typeof SignedToken>('@/lib/signed-token');
+const { createAppShellFlowToken } = jest.requireActual<typeof AppShellFlow>(
+  '@/lib/integrations/oauth/app-shell-flow'
+);
 
 const mockCookies = jest.mocked(cookies);
 const mockFindUserById = jest.mocked(findUserById);
@@ -100,7 +104,19 @@ describe('appShellSessionToken', () => {
   });
 
   test('refuses a token minted before sessions were bound to the pepper', () => {
-    expect(verifyAppShellSessionToken(createSignedToken({ userId: 'user-1' }))).toBeNull();
+    const unbound = createSignedToken({ purpose: 'app-shell-session', userId: 'user-1' });
+
+    expect(verifyAppShellSessionToken(unbound)).toBeNull();
+  });
+
+  test('refuses a signed token minted for another purpose', () => {
+    const session = bindAppShellSession('user-1', null);
+    const flowToken = createAppShellFlowToken({ session, state: 'oauth-state' });
+
+    expect(verifyAppShellSessionToken(flowToken)).toBeNull();
+    // The same payload without the marker, as shell sessions were minted
+    // before they carried one.
+    expect(verifyAppShellSessionToken(createSignedToken({ ...session }))).toBeNull();
   });
 
   test('expires after the shell session lifetime', () => {
@@ -196,7 +212,12 @@ describe('requireAppShellUser', () => {
   });
 
   test('refuses a session token minted before sessions were bound to the pepper', async () => {
-    requestWithCookies({ [APP_SHELL_SESSION_COOKIE]: createSignedToken({ userId: 'user-1' }) });
+    requestWithCookies({
+      [APP_SHELL_SESSION_COOKIE]: createSignedToken({
+        purpose: 'app-shell-session',
+        userId: 'user-1',
+      }),
+    });
     mockFindUserById.mockResolvedValue(shellUser('user-1'));
 
     await expect(requireAppShellUser()).resolves.toBeNull();

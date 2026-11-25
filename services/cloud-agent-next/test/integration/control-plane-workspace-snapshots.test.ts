@@ -755,9 +755,10 @@ describe('idle workspace disk checkpoint', () => {
 
   it('lets a new sibling restore the workspace and attaches later siblings with provenance', async () => {
     const test = await setup();
+    const capturedAt = Date.now() - 60_000;
     test.controls.capture = async () => ({
       ...stored(),
-      capturedAt: Date.parse('2026-10-24T21:32:19Z'),
+      capturedAt,
     });
     await test.checkpoint();
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
@@ -771,7 +772,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(attempts.flatMap(attempt => attempt.steps)).toContainEqual(
         expect.objectContaining({
           latestDetail: 'Using workspace snapshot',
-          snapshotCapturedAt: Date.parse('2026-10-24T21:32:19Z'),
+          snapshotCapturedAt: capturedAt,
         })
       );
     });

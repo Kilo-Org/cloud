@@ -20,6 +20,9 @@ const ASSISTANT_FAILURE_MESSAGES = {
   content_filter: 'The model provider blocked the response under its content policy',
   structured_output: 'The model response did not match the required format',
   model_catalog_unavailable: 'The Kilo model catalog could not be loaded',
+  chatgpt_usage_limit: 'The ChatGPT usage limit was reached; check usage in ChatGPT settings',
+  organization_unavailable: 'The organization for this session is not available to this account',
+  variant_unsupported: 'The selected model does not support the selected variant',
   unknown: 'Assistant request failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, string>;
 const BYOK_INVALID_REQUEST_MESSAGE =

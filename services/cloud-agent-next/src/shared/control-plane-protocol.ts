@@ -251,6 +251,9 @@ export const CONTROL_PLANE_ASSISTANT_FAILURE_REASONS = [
   'content_filter',
   'structured_output',
   'model_catalog_unavailable',
+  'chatgpt_usage_limit',
+  'organization_unavailable',
+  'variant_unsupported',
   'unknown',
 ] as const satisfies readonly CloudAgentAssistantFailureReason[];
 export type ControlPlaneAssistantFailureReason =

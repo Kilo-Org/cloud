@@ -61,10 +61,16 @@
         "title": "裝置登入已獲核准"
       },
       "apiKeyReset": {
-        "title": "API 金鑰已重設"
+        "title": "API 權杖已重設"
       },
       "browserSessionsRevoked": {
         "title": "已從所有瀏覽器登出"
+      },
+      "deviceSessionRevoked": {
+        "title": "有裝置已從你的帳戶登出"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo 支援團隊已重設登入"
       },
       "newSignIn": {
         "title": "你的帳戶有新的登入"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "來自 {{location}} 附近的 {{device}}。不是你本人？請立即檢查你的帳戶安全。",
         "device": "來自 {{device}}。不是你本人？請立即檢查你的帳戶安全。",
         "location": "來自 {{location}} 附近。不是你本人？請立即檢查你的帳戶安全。",
-        "unknown": "不是你本人？請立即檢查你的帳戶安全。"
+        "unknown": "不是你本人？請立即檢查你的帳戶安全。",
+        "support": "由 Kilo 支援團隊操作。如果你沒有提出此要求，請聯絡支援團隊。"
       }
     }
   },

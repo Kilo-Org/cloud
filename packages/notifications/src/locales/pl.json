@@ -61,10 +61,16 @@
         "title": "Zatwierdzono logowanie z urządzenia"
       },
       "apiKeyReset": {
-        "title": "Zresetowano klucz API"
+        "title": "Zresetowano token API"
       },
       "browserSessionsRevoked": {
         "title": "Wylogowano ze wszystkich przeglądarek"
+      },
+      "deviceSessionRevoked": {
+        "title": "Urządzenie zostało wylogowane z Twojego konta"
+      },
+      "signInResetBySupport": {
+        "title": "Pomoc techniczna Kilo zresetowała logowanie"
       },
       "newSignIn": {
         "title": "Nowe logowanie na Twoje konto"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Z {{device}} w pobliżu {{location}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
         "device": "Z {{device}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
         "location": "W pobliżu {{location}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
-        "unknown": "To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta."
+        "unknown": "To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
+        "support": "Wykonane przez pomoc techniczną Kilo. Jeśli to nie była Twoja prośba, skontaktuj się z pomocą techniczną."
       }
     }
   },

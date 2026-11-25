@@ -5,46 +5,49 @@
  * A notice never blocks or fails the action it reports. The caller schedules
  * it once the change has committed, on the call that won the action's own
  * single-use guard, and delivery runs after the response. Every failure is
- * caught here and reported to Sentry with the event type as the only tag.
+ * caught here and reported to Sentry as a fixed, content-free error with the
+ * event type as the only tag.
  */
 import 'server-only';
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { headers } from 'next/headers';
 import { captureException } from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { transactional_email_log } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { AccountSecurityOrigin } from '@kilocode/notifications/schemas';
+import { clientIpFromHeaders } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  quotedClientName,
   sendApiKeyResetEmail,
   sendBrowserSessionsRevokedEmail,
+  sendDeviceSessionRevokedEmail,
   sendDeviceSignInApprovedEmail,
   sendNewSignInEmail,
   sendNewSignInMethodEmail,
   sendPasskeyAddedEmail,
   sendPasskeyRemovedEmail,
   sendSignInMethodRemovedEmail,
+  sendSignInResetBySupportEmail,
+  type DeviceSignInRequester,
+  type SecurityNoticeRequest,
   type SendResult,
-  type SignInMethodChangeRequestDetails,
 } from '@kilocode/web-shared/lib/email';
 import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 import { runAfterResponse } from '@/lib/after-response';
-import {
-  currentSignInMethodChangeRequestDetails,
-  signInMethodChangeRequestDetails,
-} from '@/lib/auth/sign-in-method-change-request';
+import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
+import { approximateLocation, describeUserAgent } from '@/lib/auth/sign-in-method-change-request';
 
-/** Where and when the action came from, as the notice reports it. */
-export type SecurityNoticeRequest = {
-  occurredAt: Date;
-  ip: string | null;
-  /** An approximate location from the request's geolocation headers. */
-  location: string | null;
-  /** The browser and operating system from the user agent. */
-  device: string | null;
-};
+/**
+ * The server-held identifier of the session that took an action: the browser
+ * session or the device session that authenticated the request. Null when the
+ * request carried neither, as with a plain API token.
+ */
+type ActingSessionId = string | null;
 
 export type SecurityNoticeEvent =
   | { type: 'passkey_added'; passkeyId: string; passkeyName: string | null }
@@ -52,27 +55,31 @@ export type SecurityNoticeEvent =
   | {
       type: 'sign_in_method_linked';
       provider: AuthProviderId;
-      providerAccountId: string;
       linkedIdentity: { email: string; displayName?: string | null };
       /** When the link row was written; a later re-link after an unlink is a new event. */
       linkedAt: Date;
     }
-  | { type: 'sign_in_method_unlinked'; provider: AuthProviderId }
+  | { type: 'sign_in_method_unlinked'; provider: AuthProviderId; actingSessionId: ActingSessionId }
   | {
       type: 'device_sign_in_approved';
       deviceAuthRequestId: string;
       /** The requesting client, from its stored request, never from the approving browser. */
-      clientLabel: string | null;
+      requester: DeviceSignInRequester;
       requestIp: string | null;
     }
-  | { type: 'api_key_reset' }
-  | { type: 'browser_sessions_revoked' }
+  | { type: 'api_key_reset'; actingSessionId: ActingSessionId }
+  | { type: 'browser_sessions_revoked'; actingSessionId: ActingSessionId }
+  | {
+      type: 'device_session_revoked';
+      deviceSessionId: string;
+      /** Kilo's description of the signed-out device, or null when it has none. */
+      revokedDevice: string | null;
+    }
+  | { type: 'sign_in_reset_by_support'; actingSessionId: ActingSessionId }
   | {
       type: 'new_sign_in';
       /** The sign-in provider id; an id this build does not name renders generically. */
       method: string;
-      deviceKeyHash: string;
-      networkKeyHash: string;
     };
 
 type SecurityNoticeType = SecurityNoticeEvent['type'];
@@ -80,46 +87,99 @@ type SecurityNoticeType = SecurityNoticeEvent['type'];
 /** The one `transactional_email_log` type every notice claims its key under. */
 const SECURITY_NOTICE_EMAIL_TYPE = 'security_notice';
 
-/** Repeats of a reset or a sign-out inside this window are one notice. */
+/** Repeats of a reset, a sign-out or a support reset by one session inside this window are one notice. */
 const REVOCATION_BUCKET_MS = 10 * 60 * 1000;
 
 /** An unlink is guarded by its single-use code; the bucket only absorbs a replayed schedule. */
 const UNLINK_BUCKET_MS = 60 * 1000;
 
+/**
+ * At most one new-sign-in notice per user per hour: the sign-in check's own
+ * cap claims at most one per rolling hour from the same `occurredAt`, so two
+ * notices it allows are always at least an hour apart and fall in different
+ * fixed hour buckets.
+ */
+const NEW_SIGN_IN_BUCKET_MS = 60 * 60 * 1000;
+
 /** The longest device or location label the push carries; the dispatch schema enforces it. */
 const PUSH_LABEL_MAX_LENGTH = 120;
 
+/** The owner's own request, read from its headers. */
 export function securityNoticeRequestFromHeaders(
   headersList: Headers,
   occurredAt: Date = new Date()
 ): SecurityNoticeRequest {
-  const details = signInMethodChangeRequestDetails(headersList, occurredAt);
   return {
-    occurredAt: details.changedAt,
-    ip: details.ip,
-    location: details.location,
-    device: details.device,
+    actor: 'owner',
+    occurredAt,
+    ip: clientIpFromHeaders(headersList),
+    location: approximateLocation(headersList),
+    device: describeUserAgent(headersList.get('user-agent')),
   };
 }
 
 /**
- * The current request's details. Outside a request scope there are no
- * headers, so the details hold only the time.
+ * The owner's current request. Outside a request scope there are no headers,
+ * so the request holds only the time.
  */
 export async function currentSecurityNoticeRequest(): Promise<SecurityNoticeRequest> {
-  const details = await currentSignInMethodChangeRequestDetails();
-  return {
-    occurredAt: details.changedAt,
-    ip: details.ip,
-    location: details.location,
-    device: details.device,
-  };
+  try {
+    return securityNoticeRequestFromHeaders(new Headers(await headers()));
+  } catch {
+    return { actor: 'owner', occurredAt: new Date(), ip: null, location: null, device: null };
+  }
+}
+
+/** An action Kilo support took: the notice names support and the time, never the staff member's request. */
+export function supportSecurityNoticeRequest(occurredAt: Date = new Date()): SecurityNoticeRequest {
+  return { actor: 'support', occurredAt };
+}
+
+/** The session that authenticated a tRPC request, for the key of a notice it causes. */
+export function actingSessionIdFromContext(ctx: {
+  webSessionId?: string;
+  deviceSessionId?: string;
+}): ActingSessionId {
+  return ctx.webSessionId ?? ctx.deviceSessionId ?? null;
+}
+
+/**
+ * Kilo's own description of a client from its recorded user agent: a
+ * recognised client kind or a parsed browser label, never the raw header.
+ */
+export function recognisedClientLabel(userAgent: string | null): string | null {
+  const client = classifyDeviceSessionClient(userAgent);
+  switch (client.kind) {
+    case 'cli':
+      return 'Kilo CLI';
+    case 'app':
+      return client.platform === 'ios' ? 'Kilo app on iOS' : 'Kilo app on Android';
+    case 'browser':
+      return describeUserAgent(userAgent);
+    case 'other':
+      return null;
+  }
+}
+
+function timeBucket(occurredAt: Date, bucketMs: number): string {
+  return String(Math.floor(occurredAt.getTime() / bucketMs));
+}
+
+/**
+ * The acting session in a key. An action whose request carried no session is
+ * keyed on a fresh random value, so it is its own notice: a lost security
+ * notice is worse than a duplicate one.
+ */
+function actingSessionKeyPart(actingSessionId: ActingSessionId): string {
+  return actingSessionId ?? `unidentified:${randomUUID()}`;
 }
 
 /**
  * The event's identity: two schedules of one event share it, two events never
- * do. The parts are hashed so that no account, provider, or device identifier
- * reaches the outbox row or the push channel's logs.
+ * do. Every part is a server-issued random id, a provider id from a fixed list,
+ * or a time; no email address, IP address, network or provider account id
+ * goes in, because a plain SHA-256 of a guessable value can be reversed by
+ * anyone who can read the outbox row.
  */
 function securityNoticeIdempotencyKey(
   userId: string,
@@ -132,19 +192,26 @@ function securityNoticeIdempotencyKey(
       case 'passkey_removed':
         return [event.passkeyId];
       case 'sign_in_method_linked':
-        return [event.provider, event.providerAccountId, event.linkedAt.toISOString()];
+        return [event.provider, event.linkedAt.toISOString()];
       case 'sign_in_method_unlinked':
         return [
           event.provider,
-          String(Math.floor(request.occurredAt.getTime() / UNLINK_BUCKET_MS)),
+          actingSessionKeyPart(event.actingSessionId),
+          timeBucket(request.occurredAt, UNLINK_BUCKET_MS),
         ];
       case 'device_sign_in_approved':
         return [event.deviceAuthRequestId];
+      case 'device_session_revoked':
+        return [event.deviceSessionId];
       case 'api_key_reset':
       case 'browser_sessions_revoked':
-        return [String(Math.floor(request.occurredAt.getTime() / REVOCATION_BUCKET_MS))];
+      case 'sign_in_reset_by_support':
+        return [
+          actingSessionKeyPart(event.actingSessionId),
+          timeBucket(request.occurredAt, REVOCATION_BUCKET_MS),
+        ];
       case 'new_sign_in':
-        return [event.deviceKeyHash, event.networkKeyHash];
+        return [timeBucket(request.occurredAt, NEW_SIGN_IN_BUCKET_MS)];
     }
   })();
   const digest = createHash('sha256')
@@ -166,45 +233,43 @@ function sendSecurityNoticeEmail(
   event: SecurityNoticeEvent,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  const details: SignInMethodChangeRequestDetails = {
-    changedAt: request.occurredAt,
-    ip: request.ip,
-    location: request.location,
-    device: request.device,
-  };
   switch (event.type) {
     case 'passkey_added':
-      return sendPasskeyAddedEmail(email, event.passkeyName, details);
+      return sendPasskeyAddedEmail(email, event.passkeyName, request);
     case 'passkey_removed':
-      return sendPasskeyRemovedEmail(email, event.passkeyName, details);
+      return sendPasskeyRemovedEmail(email, event.passkeyName, request);
     case 'sign_in_method_linked':
       return sendNewSignInMethodEmail(
         email,
         AUTH_PROVIDER_DISPLAY_NAMES[event.provider],
         event.linkedIdentity,
-        details
+        request
       );
     case 'sign_in_method_unlinked':
       return sendSignInMethodRemovedEmail(
         email,
         AUTH_PROVIDER_DISPLAY_NAMES[event.provider],
-        details
+        request
       );
     case 'device_sign_in_approved':
       return sendDeviceSignInApprovedEmail(
         email,
-        { clientLabel: event.clientLabel, requestIp: event.requestIp },
-        details
+        { client: event.requester, ip: event.requestIp },
+        request
       );
     case 'api_key_reset':
-      return sendApiKeyResetEmail(email, details);
+      return sendApiKeyResetEmail(email, request);
     case 'browser_sessions_revoked':
-      return sendBrowserSessionsRevokedEmail(email, details);
+      return sendBrowserSessionsRevokedEmail(email, request);
+    case 'device_session_revoked':
+      return sendDeviceSessionRevokedEmail(email, event.revokedDevice, request);
+    case 'sign_in_reset_by_support':
+      return sendSignInResetBySupportEmail(email, request);
     case 'new_sign_in':
       return sendNewSignInEmail(
         email,
         isNamedAuthProvider(event.method) ? AUTH_PROVIDER_DISPLAY_NAMES[event.method] : null,
-        details
+        request
       );
   }
 }
@@ -214,8 +279,46 @@ function pushLabel(value: string | null): string | null {
   return label ? label : null;
 }
 
-function reportNoticeFailure(type: SecurityNoticeType, error: unknown): void {
-  captureException(error, { tags: { security_notice: type } });
+/**
+ * Who the push says acted. A device sign-in approval describes the device
+ * that was signed in, never the approving browser: in a device-code phishing
+ * attack the owner approves from their own browser, and naming it would
+ * reassure them instead of warning them.
+ */
+function pushOrigin(
+  event: SecurityNoticeEvent,
+  request: SecurityNoticeRequest
+): AccountSecurityOrigin {
+  if (request.actor === 'support') return { actor: 'support' };
+  if (event.type !== 'device_sign_in_approved') {
+    return {
+      actor: 'owner',
+      device: pushLabel(request.device),
+      location: pushLabel(request.location),
+    };
+  }
+  const { requester } = event;
+  switch (requester.kind) {
+    case 'self_named':
+      return {
+        actor: 'owner',
+        device: pushLabel(quotedClientName(requester.name)),
+        location: null,
+      };
+    case 'recognised':
+      return { actor: 'owner', device: pushLabel(requester.label), location: null };
+    case 'unidentified':
+      return { actor: 'owner', device: null, location: null };
+  }
+}
+
+/**
+ * Reports a failure with the event type as the only tag. The error itself is
+ * never passed on: a database error's message carries the query parameters,
+ * which hold the user id and the notice key.
+ */
+function reportNoticeFailure(type: SecurityNoticeType): void {
+  captureException(new Error('security_notice_failed'), { tags: { security_notice: type } });
 }
 
 type NoticeClaim = 'claimed' | 'duplicate' | 'unrecorded';
@@ -243,8 +346,8 @@ async function claimNotice(
       })
       .onConflictDoNothing();
     return (claim.rowCount ?? 0) === 0 ? 'duplicate' : 'claimed';
-  } catch (error) {
-    reportNoticeFailure(type, error);
+  } catch {
+    reportNoticeFailure(type);
     return 'unrecorded';
   }
 }
@@ -260,8 +363,8 @@ async function releaseNoticeClaim(type: SecurityNoticeType, idempotencyKey: stri
           eq(transactional_email_log.idempotency_key, idempotencyKey)
         )
       );
-  } catch (error) {
-    reportNoticeFailure(type, error);
+  } catch {
+    reportNoticeFailure(type);
   }
 }
 
@@ -284,15 +387,14 @@ async function deliverSecurityNotice(
         recipientUserId: user.id,
         event: event.type,
         idempotencyKey,
-        device: pushLabel(request.device),
-        location: pushLabel(request.location),
+        origin: pushOrigin(event, request),
       }),
       sendSecurityNoticeEmail(user.google_user_email, event, request),
     ]);
 
     if (email.status === 'rejected') {
       // A transport failure may succeed later, so the claim is freed for it.
-      reportNoticeFailure(event.type, email.reason);
+      reportNoticeFailure(event.type);
       if (claim === 'claimed') {
         await releaseNoticeClaim(event.type, idempotencyKey);
       }
@@ -300,13 +402,13 @@ async function deliverSecurityNotice(
     }
     if (!email.value.sent) {
       // A rejected address or a missing provider will not change on a retry.
-      captureException(new Error('Security notice email was not sent'), {
+      captureException(new Error('security_notice_email_not_sent'), {
         tags: { security_notice: event.type },
         extra: { reason: email.value.reason },
       });
     }
-  } catch (error) {
-    reportNoticeFailure(event.type, error);
+  } catch {
+    reportNoticeFailure(event.type);
   }
 }
 
@@ -323,7 +425,7 @@ export async function scheduleSecurityNotice(
 ): Promise<void> {
   try {
     await runAfterResponse(() => deliverSecurityNotice(user, event, request));
-  } catch (error) {
-    reportNoticeFailure(event.type, error);
+  } catch {
+    reportNoticeFailure(event.type);
   }
 }

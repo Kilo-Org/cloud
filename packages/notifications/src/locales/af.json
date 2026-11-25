@@ -61,10 +61,16 @@
         "title": "Toestelaanmelding goedgekeur"
       },
       "apiKeyReset": {
-        "title": "API-sleutel teruggestel"
+        "title": "API-token teruggestel"
       },
       "browserSessionsRevoked": {
         "title": "Uit alle blaaiers afgemeld"
+      },
+      "deviceSessionRevoked": {
+        "title": "Toestel by jou rekening afgemeld"
+      },
+      "signInResetBySupport": {
+        "title": "Aanmelding deur Kilo-ondersteuning teruggestel"
       },
       "newSignIn": {
         "title": "Nuwe aanmelding by jou rekening"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Vanaf {{device}} naby {{location}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
         "device": "Vanaf {{device}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
         "location": "Naby {{location}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
-        "unknown": "Nie jy nie? Hersien nou jou rekeningsekuriteit."
+        "unknown": "Nie jy nie? Hersien nou jou rekeningsekuriteit.",
+        "support": "Gedoen deur Kilo-ondersteuning. As jy nie hierom gevra het nie, kontak ondersteuning."
       }
     }
   },

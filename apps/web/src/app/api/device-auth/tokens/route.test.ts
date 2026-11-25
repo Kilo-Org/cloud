@@ -77,10 +77,33 @@ describe('POST /api/device-auth/tokens', () => {
       {
         type: 'device_sign_in_approved',
         deviceAuthRequestId: 'request-1',
-        clientLabel: 'Kilo CLI',
+        requester: { kind: 'recognised', label: 'Kilo CLI' },
         requestIp: '198.51.100.24',
       },
-      expect.objectContaining({ occurredAt: expect.any(Date) })
+      expect.objectContaining({ actor: 'owner', occurredAt: expect.any(Date) })
+    );
+  });
+
+  it('attributes a name the requesting device chose to that device', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+    mockApprove.mockResolvedValueOnce({
+      id: 'request-2',
+      requestingClientName: 'Kilo security check',
+      userAgent: 'Kilo-Code/1.2.3',
+      ipAddress: null,
+    });
+
+    await POST(createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders));
+
+    expect(mockScheduleSecurityNotice).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        requester: { kind: 'self_named', name: 'Kilo security check' },
+      }),
+      expect.anything()
     );
   });
 

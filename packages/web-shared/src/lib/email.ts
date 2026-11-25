@@ -34,6 +34,8 @@ export const subjects = {
   deviceSignInApproved: 'Kilo: A device sign-in was approved for your account',
   apiKeyReset: 'Kilo: Your API token was reset',
   browserSessionsRevoked: 'Kilo: You were signed out of all browsers',
+  deviceSessionRevoked: 'Kilo: A device was signed out of your account',
+  signInResetBySupport: 'Kilo: Kilo support reset how you sign in',
   newSignIn: 'Kilo: New sign-in to your account',
   signInMethodChangeCode: 'Kilo: Your code to change a sign-in method',
   balanceAlert: 'Kilo: Low Balance Alert',
@@ -369,24 +371,34 @@ export async function sendAccountLinkCodeEmail(
   });
 }
 
-/** Where and when a sign-in method change came from, for the notice email. */
-export type SignInMethodChangeRequestDetails = {
-  changedAt: Date;
-  ip: string | null;
-  /** An approximate location from the request's geolocation headers. */
-  location: string | null;
-  /** The browser and operating system from the user agent. */
-  device: string | null;
-};
+/**
+ * Who acted and when, as a security notice reports it. The owner's own request
+ * names its address, approximate location and browser; an action Kilo support
+ * took names support and the time only, never the staff member's request.
+ */
+export type SecurityNoticeRequest =
+  | {
+      actor: 'owner';
+      occurredAt: Date;
+      ip: string | null;
+      /** An approximate location from the request's geolocation headers. */
+      location: string | null;
+      /** The browser and operating system from the user agent. */
+      device: string | null;
+    }
+  | { actor: 'support'; occurredAt: Date };
 
-function signInMethodChangeDetails(details: SignInMethodChangeRequestDetails): RawHtml {
-  const time = `${details.changedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-  const lines = [
-    `Time: ${time}`,
-    `IP address: ${details.ip ?? 'Unknown'}`,
-    `Approximate location: ${details.location ?? 'Unknown'}`,
-    `Browser: ${details.device ?? 'Unknown'}`,
-  ];
+function securityNoticeDetails(request: SecurityNoticeRequest): RawHtml {
+  const time = `Time: ${request.occurredAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  const lines =
+    request.actor === 'support'
+      ? [time, 'Done by: Kilo support']
+      : [
+          time,
+          `IP address: ${request.ip ?? 'Unknown'}`,
+          `Approximate location: ${request.location ?? 'Unknown'}`,
+          `Browser: ${request.device ?? 'Unknown'}`,
+        ];
   return new RawHtml(lines.map(escapeHtml).join('<br />'));
 }
 
@@ -398,34 +410,41 @@ function appPageLink(pagePath: '/connected-accounts' | '/profile'): RawHtml {
 }
 
 /**
- * The variables every security notice shares: where and when the action came
- * from, and navigational links to the pages its "If this was not you" steps
- * name. Neither link changes anything when opened.
+ * The variables every security notice shares: who acted and when, and
+ * navigational links to the pages its "If this was not you" steps name.
+ * Neither link changes anything when opened.
  */
-function securityNoticeVars(
-  email: string,
-  details: SignInMethodChangeRequestDetails
-): TemplateVars {
+function securityNoticeVars(email: string, request: SecurityNoticeRequest): TemplateVars {
   return {
     email,
-    change_details: signInMethodChangeDetails(details),
+    change_details: securityNoticeDetails(request),
     connected_accounts_link: appPageLink('/connected-accounts'),
     profile_link: appPageLink('/profile'),
   };
+}
+
+/**
+ * The sentences of a notice that either the owner or Kilo support can cause:
+ * "if this was you" fits only the owner's own action.
+ */
+function actorNoticeVars(request: SecurityNoticeRequest): TemplateVars {
+  return request.actor === 'support'
+    ? { actor_note: 'Kilo support made this change.', not_you_lead: 'If you did not ask for this:' }
+    : { actor_note: 'If this was you, no action is needed.', not_you_lead: 'If this was not you:' };
 }
 
 export async function sendNewSignInMethodEmail(
   email: string,
   providerName: string,
   linkedIdentity: { email: string; displayName?: string | null },
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   const displayName = linkedIdentity.displayName?.trim();
   return send({
     to: email,
     templateName: 'newSignInMethod',
     templateVars: {
-      ...securityNoticeVars(email, details),
+      ...securityNoticeVars(email, request),
       provider_name: providerName,
       linked_identity: displayName
         ? `${displayName} (${linkedIdentity.email})`
@@ -437,31 +456,32 @@ export async function sendNewSignInMethodEmail(
 export async function sendSignInMethodRemovedEmail(
   email: string,
   providerName: string,
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   return send({
     to: email,
     templateName: 'signInMethodRemoved',
-    templateVars: { ...securityNoticeVars(email, details), provider_name: providerName },
+    templateVars: { ...securityNoticeVars(email, request), provider_name: providerName },
   });
 }
 
-/** A passkey's own name, or a plain word when it was never named. */
-function passkeyLabel(passkeyName: string | null): RawHtml {
-  return renderNonAutolinkedText(passkeyName?.trim() || 'unnamed');
+/** A passkey's own name in parentheses after "A passkey", or nothing when it was never named. */
+function passkeyNameNote(passkeyName: string | null): RawHtml {
+  const name = passkeyName?.trim();
+  return new RawHtml(name ? ` (${renderNonAutolinkedText(name).html})` : '');
 }
 
 export async function sendPasskeyAddedEmail(
   email: string,
   passkeyName: string | null,
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   return send({
     to: email,
     templateName: 'passkeyAdded',
     templateVars: {
-      ...securityNoticeVars(email, details),
-      passkey_label: passkeyLabel(passkeyName),
+      ...securityNoticeVars(email, request),
+      passkey_name_note: passkeyNameNote(passkeyName),
     },
   });
 }
@@ -469,58 +489,135 @@ export async function sendPasskeyAddedEmail(
 export async function sendPasskeyRemovedEmail(
   email: string,
   passkeyName: string | null,
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   return send({
     to: email,
     templateName: 'passkeyRemoved',
     templateVars: {
-      ...securityNoticeVars(email, details),
-      passkey_label: passkeyLabel(passkeyName),
+      ...securityNoticeVars(email, request),
+      passkey_name_note: passkeyNameNote(passkeyName),
     },
   });
 }
 
 /**
+ * How a device sign-in names the device that asked. A name the requesting
+ * device chose for itself is its own words, not Kilo's, so it is always shown
+ * quoted and attributed; a recognised client kind or a parsed browser label
+ * is Kilo's own description.
+ */
+export type DeviceSignInRequester =
+  | { kind: 'self_named'; name: string }
+  | { kind: 'recognised'; label: string }
+  | { kind: 'unidentified' };
+
+/** The longest self-chosen device name a notice repeats, in characters. */
+const SELF_NAMED_CLIENT_MAX_LENGTH = 40;
+
+/**
+ * A name the requesting device chose for itself, cut to a short length and
+ * quoted so it never reads as Kilo's own words.
+ */
+export function quotedClientName(name: string): string {
+  const characters = Array.from(name.trim());
+  const short =
+    characters.length > SELF_NAMED_CLIENT_MAX_LENGTH
+      ? `${characters.slice(0, SELF_NAMED_CLIENT_MAX_LENGTH).join('').trimEnd()}…`
+      : characters.join('');
+  return `"${short}"`;
+}
+
+function requesterSentenceLabel(requester: DeviceSignInRequester): string {
+  switch (requester.kind) {
+    case 'self_named':
+      return `a device that named itself ${quotedClientName(requester.name)}`;
+    case 'recognised':
+      return requester.label;
+    case 'unidentified':
+      return 'an unidentified device';
+  }
+}
+
+function requesterLineLabel(requester: DeviceSignInRequester): string {
+  switch (requester.kind) {
+    case 'self_named':
+      return `named itself ${quotedClientName(requester.name)}`;
+    case 'recognised':
+      return requester.label;
+    case 'unidentified':
+      return 'Unidentified';
+  }
+}
+
+/**
  * `requester` is the device that asked to sign in, read from its stored
- * request; `details` is where the approval was given, which can be a
+ * request; `request` is where the approval was given, which can be a
  * different place.
  */
 export async function sendDeviceSignInApprovedEmail(
   email: string,
-  requester: { clientLabel: string | null; requestIp: string | null },
-  details: SignInMethodChangeRequestDetails
+  requester: { client: DeviceSignInRequester; ip: string | null },
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   return send({
     to: email,
     templateName: 'deviceSignInApproved',
     templateVars: {
-      ...securityNoticeVars(email, details),
-      client_label: renderNonAutolinkedText(requester.clientLabel ?? 'an unidentified device'),
-      request_ip: requester.requestIp ?? 'Unknown',
+      ...securityNoticeVars(email, request),
+      client_label: renderNonAutolinkedText(requesterSentenceLabel(requester.client)),
+      requesting_device: renderNonAutolinkedText(requesterLineLabel(requester.client)),
+      request_ip: requester.ip ?? 'Unknown',
     },
   });
 }
 
 export async function sendApiKeyResetEmail(
   email: string,
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   return send({
     to: email,
     templateName: 'apiKeyReset',
-    templateVars: securityNoticeVars(email, details),
+    templateVars: { ...securityNoticeVars(email, request), ...actorNoticeVars(request) },
   });
 }
 
 export async function sendBrowserSessionsRevokedEmail(
   email: string,
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   return send({
     to: email,
     templateName: 'browserSessionsRevoked',
-    templateVars: securityNoticeVars(email, details),
+    templateVars: { ...securityNoticeVars(email, request), ...actorNoticeVars(request) },
+  });
+}
+
+/** `revokedDevice` is Kilo's description of the signed-out device, or null when it has none. */
+export async function sendDeviceSessionRevokedEmail(
+  email: string,
+  revokedDevice: string | null,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'deviceSessionRevoked',
+    templateVars: {
+      ...securityNoticeVars(email, request),
+      revoked_device: renderNonAutolinkedText(revokedDevice ?? 'A device'),
+    },
+  });
+}
+
+export async function sendSignInResetBySupportEmail(
+  email: string,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'signInResetBySupport',
+    templateVars: securityNoticeVars(email, request),
   });
 }
 
@@ -528,13 +625,13 @@ export async function sendBrowserSessionsRevokedEmail(
 export async function sendNewSignInEmail(
   email: string,
   methodName: string | null,
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   return send({
     to: email,
     templateName: 'newSignIn',
     templateVars: {
-      ...securityNoticeVars(email, details),
+      ...securityNoticeVars(email, request),
       method_name: methodName ?? 'a sign-in method',
     },
   });

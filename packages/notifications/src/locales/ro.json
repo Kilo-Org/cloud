@@ -61,10 +61,16 @@
         "title": "Conectarea de pe dispozitiv a fost aprobată"
       },
       "apiKeyReset": {
-        "title": "Cheia API a fost resetată"
+        "title": "Tokenul API a fost resetat"
       },
       "browserSessionsRevoked": {
         "title": "Deconectat din toate browserele"
+      },
+      "deviceSessionRevoked": {
+        "title": "Un dispozitiv a fost deconectat din contul tău"
+      },
+      "signInResetBySupport": {
+        "title": "Conectarea a fost resetată de asistența Kilo"
       },
       "newSignIn": {
         "title": "Conectare nouă în contul tău"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "De pe {{device}} lângă {{location}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
         "device": "De pe {{device}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
         "location": "Lângă {{location}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
-        "unknown": "Nu ai fost tu? Verifică acum securitatea contului tău."
+        "unknown": "Nu ai fost tu? Verifică acum securitatea contului tău.",
+        "support": "Realizat de asistența Kilo. Dacă nu ai cerut asta, contactează asistența."
       }
     }
   },

@@ -61,10 +61,16 @@
         "title": "Aprobouse o inicio de sesión dun dispositivo"
       },
       "apiKeyReset": {
-        "title": "Restableceuse a chave da API"
+        "title": "Restableceuse o token da API"
       },
       "browserSessionsRevoked": {
         "title": "Pechouse a sesión en todos os navegadores"
+      },
+      "deviceSessionRevoked": {
+        "title": "Pechouse a sesión dun dispositivo na túa conta"
+      },
+      "signInResetBySupport": {
+        "title": "O soporte de Kilo restableceu o inicio de sesión"
       },
       "newSignIn": {
         "title": "Novo inicio de sesión na túa conta"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Desde {{device}} preto de {{location}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
         "device": "Desde {{device}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
         "location": "Preto de {{location}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
-        "unknown": "Non fuches ti? Revisa agora a seguranza da túa conta."
+        "unknown": "Non fuches ti? Revisa agora a seguranza da túa conta.",
+        "support": "Fíxoo o soporte de Kilo. Se non o pediches, contacta co soporte."
       }
     }
   },

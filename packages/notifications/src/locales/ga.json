@@ -61,10 +61,16 @@
         "title": "Faomhadh síniú isteach ó ghléas"
       },
       "apiKeyReset": {
-        "title": "Athshocraíodh an eochair API"
+        "title": "Athshocraíodh an comhartha API"
       },
       "browserSessionsRevoked": {
         "title": "Síníodh amach as gach brabhsálaí"
+      },
+      "deviceSessionRevoked": {
+        "title": "Síníodh gléas amach as do chuntas"
+      },
+      "signInResetBySupport": {
+        "title": "D'athshocraigh tacaíocht Kilo an síniú isteach"
       },
       "newSignIn": {
         "title": "Síniú isteach nua ar do chuntas"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Ó {{device}} gar do {{location}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
         "device": "Ó {{device}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
         "location": "Gar do {{location}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
-        "unknown": "Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois."
+        "unknown": "Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
+        "support": "Rinne tacaíocht Kilo é seo. Mura ndearna tú é a iarraidh, déan teagmháil le tacaíocht."
       }
     }
   },

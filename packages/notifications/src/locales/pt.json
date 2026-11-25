@@ -61,10 +61,16 @@
         "title": "Início de sessão de dispositivo aprovado"
       },
       "apiKeyReset": {
-        "title": "Chave de API reposta"
+        "title": "Token de API reposto"
       },
       "browserSessionsRevoked": {
         "title": "Sessão terminada em todos os navegadores"
+      },
+      "deviceSessionRevoked": {
+        "title": "Um dispositivo terminou sessão na sua conta"
+      },
+      "signInResetBySupport": {
+        "title": "Início de sessão reposto pelo suporte da Kilo"
       },
       "newSignIn": {
         "title": "Novo início de sessão na sua conta"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "A partir de {{device}} perto de {{location}}. Não foi você? Reveja agora a segurança da sua conta.",
         "device": "A partir de {{device}}. Não foi você? Reveja agora a segurança da sua conta.",
         "location": "Perto de {{location}}. Não foi você? Reveja agora a segurança da sua conta.",
-        "unknown": "Não foi você? Reveja agora a segurança da sua conta."
+        "unknown": "Não foi você? Reveja agora a segurança da sua conta.",
+        "support": "Feito pelo suporte da Kilo. Se não pediu isto, contacte o suporte."
       }
     }
   },

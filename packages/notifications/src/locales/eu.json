@@ -61,10 +61,16 @@
         "title": "Gailu baten saio-hasiera onartu da"
       },
       "apiKeyReset": {
-        "title": "API gakoa berrezarri da"
+        "title": "API tokena berrezarri da"
       },
       "browserSessionsRevoked": {
         "title": "Arakatzaile guztietako saioak itxi dira"
+      },
+      "deviceSessionRevoked": {
+        "title": "Gailu baten saioa itxi da zure kontuan"
+      },
+      "signInResetBySupport": {
+        "title": "Kiloren laguntza-taldeak saio-hasiera berrezarri du"
       },
       "newSignIn": {
         "title": "Saio-hasiera berria zure kontuan"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "{{device}} gailutik, {{location}} inguruan. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
         "device": "{{device}} gailutik. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
         "location": "{{location}} inguruan. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
-        "unknown": "Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna."
+        "unknown": "Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
+        "support": "Kiloren laguntza-taldeak egin du. Ez baduzu eskatu, jarri harremanetan laguntza-taldearekin."
       }
     }
   },

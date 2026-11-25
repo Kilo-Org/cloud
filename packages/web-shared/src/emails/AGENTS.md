@@ -91,11 +91,13 @@ Every template must include this branding footer below the content table:
 | `accountLinkCode.html` | `code`, `provider_name`, `email`, `expires_in`, `year` | — |
 | `newSignInMethod.html` | `provider_name`, `linked_identity`, plus the security-notice variables below | — |
 | `signInMethodRemoved.html` | `provider_name`, plus the security-notice variables below | — |
-| `passkeyAdded.html` | `passkey_label` (rendered HTML: the passkey's name, or `unnamed`), plus the security-notice variables below | — |
-| `passkeyRemoved.html` | `passkey_label` (rendered HTML: the passkey's name, or `unnamed`), plus the security-notice variables below | — |
-| `deviceSignInApproved.html` | `client_label` (rendered HTML: the requesting client, from its stored request), `request_ip` (the requesting client's address), plus the security-notice variables below, where `change_details` describes the approving browser | — |
-| `apiKeyReset.html` | the security-notice variables below | — |
-| `browserSessionsRevoked.html` | the security-notice variables below | — |
+| `passkeyAdded.html` | `passkey_name_note` (rendered HTML: ` (<name>)` when the passkey has a name, else empty, placed right after "A passkey"), plus the security-notice variables below | — |
+| `passkeyRemoved.html` | `passkey_name_note`, as for `passkeyAdded.html`, plus the security-notice variables below | — |
+| `deviceSignInApproved.html` | `client_label` (rendered HTML: the requesting client in a sentence) and `requesting_device` (rendered HTML: the same client on its own line), both from the stored request, where a name the requesting device chose for itself is shown quoted as `named itself "…"` and cut to 40 characters; `request_ip` (the requesting client's address), plus the security-notice variables below, where `change_details` describes the approving browser | — |
+| `apiKeyReset.html` | `actor_note` and `not_you_lead` (the sentences that differ between the owner's own reset and one by Kilo support), plus the security-notice variables below | — |
+| `browserSessionsRevoked.html` | `actor_note` and `not_you_lead`, as for `apiKeyReset.html`, plus the security-notice variables below | — |
+| `deviceSessionRevoked.html` | `revoked_device` (rendered HTML: Kilo's description of the signed-out device, or `A device`), plus the security-notice variables below, where `change_details` describes the browser that signed it out | — |
+| `signInResetBySupport.html` | the security-notice variables below; `change_details` names Kilo support and the time only | — |
 | `newSignIn.html` | `method_name` (sign-in method display name), plus the security-notice variables below | — |
 | `signInMethodChangeCode.html` | `code`, `change_action` (`add` or `remove`), `provider_name`, `email`, `expires_in`, `support_email` (populated by `renderTemplate`), `year` | — |
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
@@ -136,4 +138,4 @@ Every template must include this branding footer below the content table:
 | `kiloPassOrgBlocked.html` | `organization_name`, `manage_url`, `year` | — |
 | `autoRoutingPoolConverted.html` | `pool_owner`, `router_name`, `model_id`, `manage_url`, `year`. ADR 0005 cutover notice: the owner's saved Efficient pool became a custom router. `manage_url` is `/profile` for a user and `/organizations/<id>/providers-and-models` for an organization. | — |
 
-Security-notice variables, shared by every account-security notice above and built by `securityNoticeVars()` in `email.ts`: `change_details` (rendered HTML: time, IP address, location, browser), `connected_accounts_link` and `profile_link` (rendered HTML anchors; navigation only, never a link that changes state), `support_email` (populated by `renderTemplate`), `email`, `year`.
+Security-notice variables, shared by every account-security notice above and built by `securityNoticeVars()` in `email.ts`: `change_details` (rendered HTML: for the owner's own action the time, IP address, location and browser; for an action by Kilo support the time and "Done by: Kilo support", never the staff member's address, location or browser), `connected_accounts_link` and `profile_link` (rendered HTML anchors; navigation only, never a link that changes state), `support_email` (populated by `renderTemplate`), `email`, `year`.

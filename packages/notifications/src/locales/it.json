@@ -61,10 +61,16 @@
         "title": "Accesso da dispositivo approvato"
       },
       "apiKeyReset": {
-        "title": "Chiave API reimpostata"
+        "title": "Token API reimpostato"
       },
       "browserSessionsRevoked": {
         "title": "Disconnesso da tutti i browser"
+      },
+      "deviceSessionRevoked": {
+        "title": "Un dispositivo è stato disconnesso dal tuo account"
+      },
+      "signInResetBySupport": {
+        "title": "Accesso reimpostato dall'assistenza Kilo"
       },
       "newSignIn": {
         "title": "Nuovo accesso al tuo account"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Da {{device}} vicino a {{location}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
         "device": "Da {{device}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
         "location": "Vicino a {{location}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
-        "unknown": "Non sei stato tu? Controlla subito la sicurezza del tuo account."
+        "unknown": "Non sei stato tu? Controlla subito la sicurezza del tuo account.",
+        "support": "Eseguito dall'assistenza Kilo. Se non l'hai richiesto, contatta l'assistenza."
       }
     }
   },

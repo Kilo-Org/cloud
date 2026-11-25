@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 
 // The procedures read the browser session from the request cookies and the
@@ -36,13 +36,14 @@ jest.mock('@kilocode/web-shared/lib/email', () => ({
 }));
 
 import { encode, type JWT } from 'next-auth/jwt';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
   device_sessions,
   magic_link_tokens,
   organization_audit_logs,
   organizations,
+  transactional_email_log,
   user_auth_provider,
   type User,
 } from '@kilocode/db/schema';
@@ -75,7 +76,8 @@ const mockSendRemoved = jest.mocked(sendSignInMethodRemovedEmail);
 const mockSendAdded = jest.mocked(sendNewSignInMethodEmail);
 
 const EXPECTED_DETAILS = {
-  changedAt: expect.any(Date),
+  actor: 'owner' as const,
+  occurredAt: expect.any(Date),
   ip: '203.0.113.7',
   location: 'San Francisco, US',
   device: 'Chrome on macOS',
@@ -101,9 +103,25 @@ async function setSessionCookie(user: User, claims: Partial<JWT> = {}) {
   });
 }
 
+const createdUserIds: string[] = [];
+
 async function insertUser(fields: Partial<User> = {}) {
-  return insertTestUser({ web_session_pepper: randomUUID(), ...fields });
+  const user = await insertTestUser({ web_session_pepper: randomUUID(), ...fields });
+  createdUserIds.push(user.id);
+  return user;
 }
+
+// The notices this suite sends leave outbox rows that reference its users; a
+// later suite in the same worker that deletes every user would hit them. The
+// rows go after each test, while the database connection is still open.
+afterEach(async () => {
+  const userIds = createdUserIds.splice(0);
+  if (userIds.length > 0) {
+    await db
+      .delete(transactional_email_log)
+      .where(inArray(transactional_email_log.user_id, userIds));
+  }
+});
 
 /** A user whose email domain an organization claims for SSO. */
 async function insertSsoMember(fields: Partial<User> = {}) {
@@ -595,12 +613,14 @@ describe('user.unlinkAuthProvider', () => {
       caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
     ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod));
     expect(await providersOf(user.id)).toEqual(['github']);
+    expect(mockSendRemoved).not.toHaveBeenCalled();
 
     await addProvider(user.id, 'google');
     await expect(
       caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
     ).resolves.toEqual({ success: true });
     expect(await providersOf(user.id)).toEqual(['google']);
+    expect(mockSendRemoved).toHaveBeenCalledTimes(1);
   });
 
   it('unlinks with the code, writes the admin audit row and sends the notice', async () => {

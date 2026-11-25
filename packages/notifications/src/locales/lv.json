@@ -61,10 +61,16 @@
         "title": "Pierakstīšanās no ierīces apstiprināta"
       },
       "apiKeyReset": {
-        "title": "API atslēga atiestatīta"
+        "title": "API marķieris atiestatīts"
       },
       "browserSessionsRevoked": {
         "title": "Izrakstīts no visām pārlūkprogrammām"
+      },
+      "deviceSessionRevoked": {
+        "title": "Ierīce izrakstīta no jūsu konta"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo atbalsts atiestatīja pierakstīšanos"
       },
       "newSignIn": {
         "title": "Jauna pierakstīšanās jūsu kontā"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "No {{device}} netālu no {{location}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
         "device": "No {{device}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
         "location": "Netālu no {{location}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
-        "unknown": "Tas nebijāt jūs? Tagad pārskatiet sava konta drošību."
+        "unknown": "Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
+        "support": "To izdarīja Kilo atbalsts. Ja jūs to nepieprasījāt, sazinieties ar atbalstu."
       }
     }
   },

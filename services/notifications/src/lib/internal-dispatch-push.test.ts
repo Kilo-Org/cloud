@@ -93,8 +93,7 @@ function accountSecurity(
     recipientUserId: 'user-a',
     event: 'passkey_added',
     idempotencyKey: 'passkey_added:event-digest',
-    device: 'Chrome on macOS',
-    location: 'Berlin, DE',
+    origin: { actor: 'owner', device: 'Chrome on macOS', location: 'Berlin, DE' },
     ...overrides,
   };
 }
@@ -849,15 +848,34 @@ describe('dispatchInternalPushCore', () => {
   it('account_security names only what the request carried', async () => {
     const { deps, calls } = fakeDeps();
     await dispatchInternalPushCore(
-      accountSecurity({ event: 'api_key_reset', device: null, location: null }),
+      accountSecurity({
+        event: 'api_key_reset',
+        origin: { actor: 'owner', device: null, location: null },
+      }),
       deps
     );
 
     expect(calls.dispatchPushInputs[0]?.push).toMatchObject({
-      title: 'API key reset',
+      title: 'API token reset',
       body: 'Not you? Review your account security now.',
       i18nKey: 'accountSecurity:api_key_reset:unknown',
       i18nParams: {},
+    });
+  });
+
+  it('account_security names Kilo support, and nothing else, for a support action', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(
+      accountSecurity({ event: 'sign_in_reset_by_support', origin: { actor: 'support' } }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs[0]?.push).toMatchObject({
+      title: 'Sign-in reset by Kilo support',
+      body: 'Done by Kilo support. If you did not ask for this, contact support.',
+      i18nKey: 'accountSecurity:sign_in_reset_by_support:support',
+      i18nParams: {},
+      data: { type: 'account_security', event: 'sign_in_reset_by_support' },
     });
   });
 

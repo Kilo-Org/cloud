@@ -55,12 +55,7 @@ describe('scheduleNewSignInCheck', () => {
     expect(mockScheduleSecurityNotice).toHaveBeenCalledTimes(1);
     expect(mockScheduleSecurityNotice).toHaveBeenCalledWith(
       user,
-      {
-        type: 'new_sign_in',
-        method: 'google',
-        deviceKeyHash: expect.stringMatching(/^[0-9a-f]{64}$/),
-        networkKeyHash: expect.stringMatching(/^[0-9a-f]{64}$/),
-      },
+      { type: 'new_sign_in', method: 'google' },
       expect.objectContaining({
         occurredAt: expect.any(Date),
         location: 'Berlin, US',

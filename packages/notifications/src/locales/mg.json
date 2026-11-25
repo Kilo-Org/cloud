@@ -61,10 +61,16 @@
         "title": "Nankatoavina ny fidirana avy amin’ny fitaovana"
       },
       "apiKeyReset": {
-        "title": "Naverina ho voalohany ny lakile API"
+        "title": "Naverina ho voalohany ny token API"
       },
       "browserSessionsRevoked": {
         "title": "Nivoaka tamin’ny mpitety rehetra"
+      },
+      "deviceSessionRevoked": {
+        "title": "Nivoahana tamin’ny kaontinao ny fitaovana iray"
+      },
+      "signInResetBySupport": {
+        "title": "Naverin’ny mpanohana Kilo ho voalohany ny fidirana"
       },
       "newSignIn": {
         "title": "Fidirana vaovao ao amin’ny kaontinao"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Avy amin’ny {{device}} akaikin’i {{location}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
         "device": "Avy amin’ny {{device}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
         "location": "Akaikin’i {{location}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
-        "unknown": "Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao."
+        "unknown": "Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
+        "support": "Nataon’ny mpanohana Kilo. Raha tsy nangataka izany ianao, mifandraisa amin’ny mpanohana."
       }
     }
   },

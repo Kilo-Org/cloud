@@ -132,6 +132,8 @@ describe('notificationPathForData', () => {
     ['new_sign_in', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
     ['api_key_reset', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
     ['browser_sessions_revoked', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
+    ['device_session_revoked', '/(app)/(tabs)/(3_profile)/device-sessions?via=push'],
+    ['sign_in_reset_by_support', '/(app)/(tabs)/(3_profile)/login-methods?via=push'],
   ] as const)(
     'routes an account_security %s notice to the screen that reviews it',
     (event, path) => {

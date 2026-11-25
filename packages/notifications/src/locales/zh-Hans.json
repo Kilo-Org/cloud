@@ -61,10 +61,16 @@
         "title": "设备登录已获批准"
       },
       "apiKeyReset": {
-        "title": "API 密钥已重置"
+        "title": "API 令牌已重置"
       },
       "browserSessionsRevoked": {
         "title": "已从所有浏览器退出登录"
+      },
+      "deviceSessionRevoked": {
+        "title": "有设备已从你的账户退出登录"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo 支持团队已重置登录"
       },
       "newSignIn": {
         "title": "你的账户有新的登录"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "来自 {{location}} 附近的 {{device}}。不是你本人？请立即检查你的账户安全。",
         "device": "来自 {{device}}。不是你本人？请立即检查你的账户安全。",
         "location": "来自 {{location}} 附近。不是你本人？请立即检查你的账户安全。",
-        "unknown": "不是你本人？请立即检查你的账户安全。"
+        "unknown": "不是你本人？请立即检查你的账户安全。",
+        "support": "由 Kilo 支持团队操作。如果你没有提出此请求，请联系支持团队。"
       }
     }
   },

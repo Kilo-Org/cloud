@@ -466,20 +466,38 @@ export type InternalDispatchAgentBriefingRequest = z.infer<
  */
 const ACCOUNT_SECURITY_LABEL_MAX_LENGTH = 120;
 
+const accountSecurityLabelSchema = nonEmptyStringSchema
+  .max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH)
+  .nullable();
+
+/**
+ * Who took the action an account-security notice reports. The owner's own
+ * request carries the device and approximate location, each null when the
+ * request did not say; an action by Kilo support carries nothing about the
+ * staff member's request.
+ */
+export const accountSecurityOriginSchema = z.discriminatedUnion('actor', [
+  z.object({
+    actor: z.literal('owner'),
+    device: accountSecurityLabelSchema,
+    location: accountSecurityLabelSchema,
+  }),
+  z.object({ actor: z.literal('support') }),
+]);
+export type AccountSecurityOrigin = z.infer<typeof accountSecurityOriginSchema>;
+
 /**
  * Account-security notice for one account owner. `idempotencyKey` is derived
- * by the producer from the event (a credential id, a request id, a time
- * bucket), so a repeated dispatch of one event collapses to one push. `device`
- * and `location` describe where the action came from and are null when the
- * request did not say; the push names them only in full previews.
+ * by the producer from the event (a credential id, a request id, a session and
+ * a time bucket), so a repeated dispatch of one event collapses to one push.
+ * The push names the origin only in full previews.
  */
 export const internalDispatchAccountSecurityRequestSchema = z.object({
   kind: z.literal('account_security'),
   recipientUserId: nonEmptyStringSchema,
   event: accountSecurityEventSchema,
   idempotencyKey: nonEmptyStringSchema.max(200),
-  device: nonEmptyStringSchema.max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH).nullable(),
-  location: nonEmptyStringSchema.max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH).nullable(),
+  origin: accountSecurityOriginSchema,
 });
 export type InternalDispatchAccountSecurityRequest = z.infer<
   typeof internalDispatchAccountSecurityRequestSchema

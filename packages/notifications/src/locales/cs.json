@@ -61,10 +61,16 @@
         "title": "Přihlášení zařízení bylo schváleno"
       },
       "apiKeyReset": {
-        "title": "Klíč API byl resetován"
+        "title": "Token API byl resetován"
       },
       "browserSessionsRevoked": {
         "title": "Byli jste odhlášeni ze všech prohlížečů"
+      },
+      "deviceSessionRevoked": {
+        "title": "Zařízení bylo odhlášeno z vašeho účtu"
+      },
+      "signInResetBySupport": {
+        "title": "Přihlášení resetovala podpora Kilo"
       },
       "newSignIn": {
         "title": "Nové přihlášení k vašemu účtu"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Ze zařízení {{device}} poblíž {{location}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
         "device": "Ze zařízení {{device}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
         "location": "Poblíž {{location}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
-        "unknown": "Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu."
+        "unknown": "Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
+        "support": "Provedla podpora Kilo. Pokud jste o to nežádali, kontaktujte podporu."
       }
     }
   },

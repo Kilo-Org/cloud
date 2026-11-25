@@ -61,10 +61,16 @@
         "title": "Connexion d'un appareil approuvée"
       },
       "apiKeyReset": {
-        "title": "Clé API réinitialisée"
+        "title": "Jeton d'API réinitialisé"
       },
       "browserSessionsRevoked": {
         "title": "Déconnecté de tous les navigateurs"
+      },
+      "deviceSessionRevoked": {
+        "title": "Un appareil a été déconnecté de votre compte"
+      },
+      "signInResetBySupport": {
+        "title": "Connexion réinitialisée par l'assistance Kilo"
       },
       "newSignIn": {
         "title": "Nouvelle connexion à votre compte"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Depuis {{device}} près de {{location}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
         "device": "Depuis {{device}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
         "location": "Près de {{location}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
-        "unknown": "Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte."
+        "unknown": "Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
+        "support": "Effectué par l'assistance Kilo. Si vous ne l'avez pas demandé, contactez l'assistance."
       }
     }
   },

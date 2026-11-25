@@ -2,14 +2,24 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
   return { ...actual, revokeStepUpProofs: jest.fn(actual.revokeStepUpProofs) };
 });
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/notifications-worker-client'),
+  dispatchAccountSecurityPush: jest.fn(async () => true),
+}));
+jest.mock('@kilocode/web-shared/lib/email', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/email'),
+  sendSignInResetBySupportEmail: jest.fn(async () => ({ sent: true })),
+}));
 
 // The concurrency cases poll for a Postgres lock wait, so a single case needs
 // more than the default 5s budget.
 jest.setTimeout(30_000);
 
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, describe, expect, test } from '@jest/globals';
 import { createHash } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
+import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { sendSignInResetBySupportEmail } from '@kilocode/web-shared/lib/email';
 import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { TRPCError } from '@trpc/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
@@ -24,6 +34,7 @@ import {
   passkey_credentials,
   passkey_sign_in_tickets,
   session_step_up_proofs,
+  transactional_email_log,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -45,6 +56,23 @@ import {
 } from '@/lib/auth/passkey';
 import { getPostgresErrorCode } from '@/lib/db-errors';
 import { createCallerForUser } from '@/routers/test-utils';
+
+const mockDispatchPush = jest.mocked(dispatchAccountSecurityPush);
+const mockSendResetEmail = jest.mocked(sendSignInResetBySupportEmail);
+
+// A recovery notice leaves an outbox row that references its user, which
+// would block a later suite in the same worker that deletes every user. The
+// rows go after each test, while the database connection is still open.
+afterEach(async () => {
+  const recipientIds = mockDispatchPush.mock.calls.map(([push]) => push.recipientUserId);
+  if (recipientIds.length > 0) {
+    await db
+      .delete(transactional_email_log)
+      .where(inArray(transactional_email_log.user_id, recipientIds));
+  }
+  mockDispatchPush.mockClear();
+  mockSendResetEmail.mockClear();
+});
 
 async function insertHeldAccount() {
   const user = await insertTestUser({
@@ -392,6 +420,21 @@ describe('admin.users.resetToMagicLinkLogin', () => {
         revokedDeviceSessionCount: 1,
       },
     });
+
+    // One notice for the whole reset, to the account owner only, naming Kilo
+    // support and the time and nothing about the admin's request.
+    expect(mockDispatchPush.mock.calls.map(([push]) => push)).toEqual([
+      expect.objectContaining({
+        recipientUserId: user.id,
+        event: 'sign_in_reset_by_support',
+        origin: { actor: 'support' },
+      }),
+    ]);
+    expect(mockSendResetEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendResetEmail).toHaveBeenCalledWith(user.google_user_email, {
+      actor: 'support',
+      occurredAt: expect.any(Date),
+    });
   });
 
   test('a passkey the prior holder registered no longer signs in after recovery', async () => {
@@ -591,6 +634,9 @@ describe('admin.users.resetToMagicLinkLogin', () => {
       const after = await accountState(user.id);
       expect(after).toEqual(before);
       expect(await adminAudits(admin.id)).toEqual([]);
+      // A reset that did not commit sends no notice.
+      expect(mockDispatchPush).not.toHaveBeenCalled();
+      expect(mockSendResetEmail).not.toHaveBeenCalled();
     }
   );
 
@@ -601,5 +647,6 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     await expect(
       caller.admin.users.resetToMagicLinkLogin({ userId: 'missing-recovery-user' })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
   });
 });

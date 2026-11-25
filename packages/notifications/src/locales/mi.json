@@ -61,10 +61,16 @@
         "title": "Kua whakaaetia te takiuru a tētahi pūrere"
       },
       "apiKeyReset": {
-        "title": "Kua tautuhia anōtia te kī API"
+        "title": "Kua tautuhia anōtia te tohu API"
       },
       "browserSessionsRevoked": {
         "title": "Kua takiputaina i ngā pūtirotiro katoa"
+      },
+      "deviceSessionRevoked": {
+        "title": "Kua takiputaina tētahi pūrere i tō pūkete"
+      },
+      "signInResetBySupport": {
+        "title": "Kua tautuhia anōtia te takiuru e te tautoko o Kilo"
       },
       "newSignIn": {
         "title": "He takiuru hou ki tō pūkete"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Mai i {{device}} e tata ana ki {{location}}. Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
         "device": "Mai i {{device}}. Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
         "location": "E tata ana ki {{location}}. Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
-        "unknown": "Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei."
+        "unknown": "Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
+        "support": "Nā te tautoko o Kilo i mahi. Ki te kore koe i tono, whakapā atu ki te tautoko."
       }
     }
   },

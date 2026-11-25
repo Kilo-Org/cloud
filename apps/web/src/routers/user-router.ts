@@ -28,7 +28,12 @@ import {
   SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
   type SignInMethodChangeCodeBinding,
 } from '@/lib/auth/sign-in-method-change-email-code';
-import { currentSecurityNoticeRequest, scheduleSecurityNotice } from '@/lib/security-notices';
+import {
+  actingSessionIdFromContext,
+  currentSecurityNoticeRequest,
+  recognisedClientLabel,
+  scheduleSecurityNotice,
+} from '@/lib/security-notices';
 import {
   consumeSignInCode,
   createSignInCode,
@@ -172,15 +177,16 @@ async function assertSelfServiceAccountDeletionAllowed(userId: string): Promise<
  * One conditional UPDATE does the whole job: the ownership filter means a
  * caller can never revoke another user's session, and the `revoked_at` filter
  * keeps the first revocation's timestamp and reason. A missing, foreign, or
- * already-revoked session is a silent no-op — no caller reads the difference,
- * and staying silent stops a caller probing for other users' session ids.
+ * already-revoked session is a silent no-op to the client, which stops a
+ * caller probing for other users' session ids. Returns the revoked session's
+ * recorded user agent when this call revoked a live session, else null.
  */
 async function revokeOwnedDeviceSession(
   sessionId: string,
   userId: string,
   reason: 'user_revoked' | 'logout'
-): Promise<void> {
-  await db
+): Promise<{ userAgent: string | null } | null> {
+  const [revoked] = await db
     .update(device_sessions)
     .set({ revoked_at: sql`now()`, revoked_reason: reason })
     .where(
@@ -189,8 +195,10 @@ async function revokeOwnedDeviceSession(
         eq(device_sessions.kilo_user_id, userId),
         isNull(device_sessions.revoked_at)
       )
-    );
+    )
+    .returning({ userAgent: device_sessions.user_agent });
   invalidateDeviceSession(sessionId);
+  return revoked ?? null;
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
@@ -1104,7 +1112,11 @@ export const userRouter = createTRPCRouter({
       });
       await scheduleSecurityNotice(
         ctx.user,
-        { type: 'sign_in_method_unlinked', provider: input.provider },
+        {
+          type: 'sign_in_method_unlinked',
+          provider: input.provider,
+          actingSessionId: binding.webSessionId,
+        },
         await currentSecurityNoticeRequest()
       );
       return result;
@@ -1182,7 +1194,7 @@ export const userRouter = createTRPCRouter({
 
     await scheduleSecurityNotice(
       ctx.user,
-      { type: 'api_key_reset' },
+      { type: 'api_key_reset', actingSessionId: actingSessionIdFromContext(ctx) },
       await currentSecurityNoticeRequest()
     );
 
@@ -1193,7 +1205,7 @@ export const userRouter = createTRPCRouter({
     await revokeWebSessions(ctx.user.id);
     await scheduleSecurityNotice(
       ctx.user,
-      { type: 'browser_sessions_revoked' },
+      { type: 'browser_sessions_revoked', actingSessionId: actingSessionIdFromContext(ctx) },
       await currentSecurityNoticeRequest()
     );
 
@@ -1228,7 +1240,19 @@ export const userRouter = createTRPCRouter({
   revokeDeviceSessionById: baseProcedure
     .input(z.object({ sessionId: DeviceSessionIdSchema }))
     .mutation(async ({ ctx, input }) => {
-      await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
+      const revoked = await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
+      // Only the call that revoked a live session reports it.
+      if (revoked) {
+        await scheduleSecurityNotice(
+          ctx.user,
+          {
+            type: 'device_session_revoked',
+            deviceSessionId: input.sessionId,
+            revokedDevice: recognisedClientLabel(revoked.userAgent),
+          },
+          await currentSecurityNoticeRequest()
+        );
+      }
       return successResult();
     }),
 

@@ -38,16 +38,7 @@ export async function scheduleNewSignInCheck(params: {
         now: request.occurredAt,
       });
       if (decision.kind !== 'new_device_new_network') return;
-      await scheduleSecurityNotice(
-        user,
-        {
-          type: 'new_sign_in',
-          method,
-          deviceKeyHash: decision.deviceKeyHash,
-          networkKeyHash: decision.networkKeyHash,
-        },
-        request
-      );
+      await scheduleSecurityNotice(user, { type: 'new_sign_in', method }, request);
     } catch (error) {
       captureException(error, { tags: { source: 'sign_in_context_check' } });
     }

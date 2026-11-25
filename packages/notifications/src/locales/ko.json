@@ -61,10 +61,16 @@
         "title": "기기 로그인이 승인되었습니다"
       },
       "apiKeyReset": {
-        "title": "API 키가 재설정되었습니다"
+        "title": "API 토큰이 재설정되었습니다"
       },
       "browserSessionsRevoked": {
         "title": "모든 브라우저에서 로그아웃되었습니다"
+      },
+      "deviceSessionRevoked": {
+        "title": "기기가 계정에서 로그아웃되었습니다"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo 지원팀이 로그인을 재설정했습니다"
       },
       "newSignIn": {
         "title": "계정에 새로운 로그인"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "{{location}} 근처의 {{device}}에서. 본인이 아닌가요? 지금 계정 보안을 확인하세요.",
         "device": "{{device}}에서. 본인이 아닌가요? 지금 계정 보안을 확인하세요.",
         "location": "{{location}} 근처에서. 본인이 아닌가요? 지금 계정 보안을 확인하세요.",
-        "unknown": "본인이 아닌가요? 지금 계정 보안을 확인하세요."
+        "unknown": "본인이 아닌가요? 지금 계정 보안을 확인하세요.",
+        "support": "Kilo 지원팀이 처리했습니다. 요청하지 않으셨다면 지원팀에 문의하세요."
       }
     }
   },

@@ -61,10 +61,16 @@
         "title": "Innskráning tækis samþykkt"
       },
       "apiKeyReset": {
-        "title": "API-lykill endurstilltur"
+        "title": "API-tóki endurstilltur"
       },
       "browserSessionsRevoked": {
         "title": "Skráð út úr öllum vöfrum"
+      },
+      "deviceSessionRevoked": {
+        "title": "Tæki skráð út af reikningnum þínum"
+      },
+      "signInResetBySupport": {
+        "title": "Þjónusta Kilo endurstillti innskráningu"
       },
       "newSignIn": {
         "title": "Ný innskráning á reikninginn þinn"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Frá {{device}} nálægt {{location}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
         "device": "Frá {{device}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
         "location": "Nálægt {{location}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
-        "unknown": "Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna."
+        "unknown": "Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
+        "support": "Gert af þjónustu Kilo. Ef þú baðst ekki um þetta skaltu hafa samband við þjónustuna."
       }
     }
   },

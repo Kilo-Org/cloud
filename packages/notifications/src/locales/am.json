@@ -61,10 +61,16 @@
         "title": "የመሣሪያ መግቢያ ጸድቋል"
       },
       "apiKeyReset": {
-        "title": "የAPI ቁልፍ ዳግም ተጀምሯል"
+        "title": "የAPI ቶከን ዳግም ተጀምሯል"
       },
       "browserSessionsRevoked": {
         "title": "ከሁሉም አሳሾች ወጥተዋል"
+      },
+      "deviceSessionRevoked": {
+        "title": "መሣሪያ ከመለያዎ ወጥቷል"
+      },
+      "signInResetBySupport": {
+        "title": "መግቢያ በKilo ድጋፍ ዳግም ተጀምሯል"
       },
       "newSignIn": {
         "title": "ወደ መለያዎ አዲስ መግቢያ"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "ከ{{device}} በ{{location}} አቅራቢያ። እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።",
         "device": "ከ{{device}}። እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።",
         "location": "በ{{location}} አቅራቢያ። እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።",
-        "unknown": "እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።"
+        "unknown": "እርስዎ አይደሉም? የመለያዎን ደህንነት አሁን ይገምግሙ።",
+        "support": "በKilo ድጋፍ የተደረገ። ይህን ካልጠየቁ፣ ድጋፍን ያግኙ።"
       }
     }
   },

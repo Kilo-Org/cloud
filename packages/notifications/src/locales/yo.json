@@ -61,10 +61,16 @@
         "title": "A fọwọ́ sí ìwọlé ẹ̀rọ"
       },
       "apiKeyReset": {
-        "title": "A tún kọ́kọ́rọ́ API ṣètò"
+        "title": "A tún àmì API ṣètò"
       },
       "browserSessionsRevoked": {
         "title": "O ti jáde kúrò ní gbogbo aṣàwákiri"
+      },
+      "deviceSessionRevoked": {
+        "title": "A ti mú ẹ̀rọ kan jáde kúrò ní àkọọ́lẹ̀ rẹ"
+      },
+      "signInResetBySupport": {
+        "title": "Ìrànlọ́wọ́ Kilo tún ìwọlé ṣètò"
       },
       "newSignIn": {
         "title": "Ìwọlé tuntun sí àkọọ́lẹ̀ rẹ"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Láti {{device}} nítòsí {{location}}. Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
         "device": "Láti {{device}}. Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
         "location": "Nítòsí {{location}}. Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
-        "unknown": "Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí."
+        "unknown": "Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
+        "support": "Ìrànlọ́wọ́ Kilo ló ṣe èyí. Tí o kò bá béèrè fún un, kàn sí ìrànlọ́wọ́."
       }
     }
   },

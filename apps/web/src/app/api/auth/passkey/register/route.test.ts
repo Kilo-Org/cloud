@@ -16,6 +16,14 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store'),
   evaluateStepUp: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/notifications-worker-client'),
+  dispatchAccountSecurityPush: jest.fn(async () => true),
+}));
+jest.mock('@kilocode/web-shared/lib/email', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/email'),
+  sendPasskeyAddedEmail: jest.fn(async () => ({ sent: true })),
+}));
 
 import {
   getUserFromAuth,
@@ -33,9 +41,15 @@ import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-managemen
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { device_sessions, passkey_management_authorizations, type User } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  device_sessions,
+  passkey_management_authorizations,
+  transactional_email_log,
+  type User,
+} from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { POST } from './route';
 import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
@@ -48,6 +62,12 @@ const mockVerifyRegistration = jest.mocked(verifyRegistration);
 const mockVerifyNativeRegistration = jest.mocked(verifyNativeRegistration);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
+const mockDispatchPush = jest.mocked(dispatchAccountSecurityPush);
+
+/** The (recipient, event) of every security-notice push sent since the last clear. */
+function noticePushes() {
+  return mockDispatchPush.mock.calls.map(([push]) => [push.recipientUserId, push.event]);
+}
 
 const fakeUser = {
   id: 'user-1',
@@ -198,6 +218,7 @@ describe('POST /api/auth/passkey/register', () => {
       attestation,
       'session-pepper-1'
     );
+    expect(noticePushes()).toEqual([['user-1', 'passkey_added']]);
   });
 
   it('returns 400 for an invalid request', async () => {
@@ -250,6 +271,7 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'CHALLENGE_ALREADY_USED' });
+    expect(noticePushes()).toEqual([]);
   });
 
   it('refuses a stale admin enrollment without a fresh sign-in or step-up proof', async () => {
@@ -452,12 +474,29 @@ describe('POST /api/auth/passkey/register', () => {
 describe('POST /api/auth/passkey/register (native app)', () => {
   let user: User;
   let deviceSessionId: string;
+  // An enrollment notice leaves an outbox row that references its user; a
+  // later suite in the same worker that deletes every user would hit it.
+  const createdUserIds: string[] = [];
+
+  async function insertUser(fields: Partial<User> = {}): Promise<User> {
+    const created = await insertTestUser(fields);
+    createdUserIds.push(created.id);
+    return created;
+  }
+
+  afterAll(async () => {
+    if (createdUserIds.length > 0) {
+      await db
+        .delete(transactional_email_log)
+        .where(inArray(transactional_email_log.user_id, createdUserIds));
+    }
+  });
 
   beforeEach(async () => {
     jest.clearAllMocks();
     rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
-    user = await insertTestUser();
+    user = await insertUser();
     const [session] = await db
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
@@ -511,10 +550,11 @@ describe('POST /api/auth/passkey/register (native app)', () => {
 
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
     expect(mockVerifyNativeRegistration).not.toHaveBeenCalled();
+    expect(noticePushes()).toEqual([]);
   });
 
   it('requires the grant before an admin enrollment too', async () => {
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await insertUser({ is_admin: true });
     const [session] = await db
       .insert(device_sessions)
       .values({ kilo_user_id: admin.id })
@@ -650,10 +690,12 @@ describe('POST /api/auth/passkey/register (native app)', () => {
       error: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
     });
     expect(mockVerifyNativeRegistration).toHaveBeenCalledTimes(1);
+    // One notice for the enrollment, none for the refused replay.
+    expect(noticePushes()).toEqual([[user.id, 'passkey_added']]);
   });
 
   it('audits an admin enrollment from the native path as a bearer enrollment', async () => {
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await insertUser({ is_admin: true });
     const [session] = await db
       .insert(device_sessions)
       .values({ kilo_user_id: admin.id })

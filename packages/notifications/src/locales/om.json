@@ -61,10 +61,16 @@
         "title": "Seensi meeshaa irraa mirkanaa’e"
       },
       "apiKeyReset": {
-        "title": "Furtuun API haaromfame"
+        "title": "Tookanii API haaromfame"
       },
       "browserSessionsRevoked": {
         "title": "Barbaadduu hunda irraa baate"
+      },
+      "deviceSessionRevoked": {
+        "title": "Meeshaan tokko herrega kee irraa baafame"
+      },
+      "signInResetBySupport": {
+        "title": "Seensi deeggarsa Kilo’n haaromfame"
       },
       "newSignIn": {
         "title": "Seensa haaraa herrega keetti"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "{{device}} irraa, {{location}} bira. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
         "device": "{{device}} irraa. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
         "location": "{{location}} bira. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
-        "unknown": "Isin miti? Amma nageenya herrega keessanii ilaalaa."
+        "unknown": "Isin miti? Amma nageenya herrega keessanii ilaalaa.",
+        "support": "Deeggarsa Kilo’n raawwatame. Yoo kana hin gaafanne, deeggarsa qunnamaa."
       }
     }
   },

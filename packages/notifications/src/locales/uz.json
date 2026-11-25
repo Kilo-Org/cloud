@@ -61,10 +61,16 @@
         "title": "Qurilmadan kirish tasdiqlandi"
       },
       "apiKeyReset": {
-        "title": "API kaliti qayta o‘rnatildi"
+        "title": "API tokeni qayta o‘rnatildi"
       },
       "browserSessionsRevoked": {
         "title": "Barcha brauzerlardan chiqildi"
+      },
+      "deviceSessionRevoked": {
+        "title": "Qurilma hisobingizdan chiqarildi"
+      },
+      "signInResetBySupport": {
+        "title": "Kirish Kilo yordam xizmati tomonidan qayta o‘rnatildi"
       },
       "newSignIn": {
         "title": "Hisobingizga yangi kirish"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "{{location}} yaqinidagi {{device}} qurilmasidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
         "device": "{{device}} qurilmasidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
         "location": "{{location}} yaqinidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
-        "unknown": "Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring."
+        "unknown": "Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "support": "Kilo yordam xizmati tomonidan bajarildi. Agar buni so‘ramagan bo‘lsangiz, yordam xizmatiga murojaat qiling."
       }
     }
   },

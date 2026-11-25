@@ -61,10 +61,16 @@
         "title": "Geräteanmeldung genehmigt"
       },
       "apiKeyReset": {
-        "title": "API-Schlüssel zurückgesetzt"
+        "title": "API-Token zurückgesetzt"
       },
       "browserSessionsRevoked": {
         "title": "Von allen Browsern abgemeldet"
+      },
+      "deviceSessionRevoked": {
+        "title": "Gerät von deinem Konto abgemeldet"
+      },
+      "signInResetBySupport": {
+        "title": "Anmeldung vom Kilo-Support zurückgesetzt"
       },
       "newSignIn": {
         "title": "Neue Anmeldung bei deinem Konto"
@@ -73,7 +79,8 @@
         "deviceAndLocation": "Von {{device}} in der Nähe von {{location}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
         "device": "Von {{device}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
         "location": "In der Nähe von {{location}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
-        "unknown": "Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos."
+        "unknown": "Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
+        "support": "Vom Kilo-Support durchgeführt. Wenn du das nicht angefordert hast, kontaktiere den Support."
       }
     }
   },

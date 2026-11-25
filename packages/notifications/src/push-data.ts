@@ -111,6 +111,8 @@ export const ACCOUNT_SECURITY_EVENTS = [
   'device_sign_in_approved',
   'api_key_reset',
   'browser_sessions_revoked',
+  'device_session_revoked',
+  'sign_in_reset_by_support',
   'new_sign_in',
 ] as const;
 export const accountSecurityEventSchema = z.enum(ACCOUNT_SECURITY_EVENTS);

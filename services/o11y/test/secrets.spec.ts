@@ -1,4 +1,8 @@
-import { SecretUnavailableError, type BundleBinding } from '@kilocode/secrets-client';
+import {
+  SecretUnavailableError,
+  type BundleBinding,
+  type SecretsExecutionContext,
+} from '@kilocode/secrets-client';
 import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
 import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -325,5 +329,51 @@ describe('every o11y secret read site over the STS source', () => {
     await expect(query(env, fetchFn)).rejects.toBe(stop);
     expect(requests[0]?.authorization).toBe(['Bearer', `bundle-${CONTAINERS_TOKEN}`].join(' '));
     expect(reads).toEqual([]);
+  });
+
+  it.each([
+    [
+      'container capacity',
+      (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>
+        queryContainerApplications(env, fetchFn, ctx),
+    ],
+    [
+      'container allocations',
+      (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>
+        queryContainerAllocations(env, fetchFn, ctx),
+    ],
+    [
+      'queue backlog',
+      (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>
+        queryQueueBacklog(env, fetchFn, undefined, ctx),
+    ],
+    [
+      'queue lookup',
+      (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>
+        resolveQueueId(env, fetchFn, 'kilo-alerts', ctx),
+    ],
+  ] as const)('keeps the %s read revalidation alive with the run context', async (_site, query) => {
+    const { env } = stsOnlyEnv();
+    const { fetchFn } = capturingFetch();
+    const scheduled: Promise<unknown>[] = [];
+    const ctx: SecretsExecutionContext = {
+      waitUntil(promise) {
+        scheduled.push(promise);
+      },
+    };
+
+    await expect(query(env, fetchFn, ctx)).rejects.toBe(stop);
+    expect(scheduled).toEqual([]);
+
+    // Past the 240 s revalidation age the read serves the held bundle and revalidates in the
+    // background, which only the context it was given keeps alive.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 241_000 });
+    try {
+      await expect(query(env, fetchFn, ctx)).rejects.toBe(stop);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(scheduled).toHaveLength(1);
+    await scheduled[0];
   });
 });

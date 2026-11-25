@@ -1,3 +1,4 @@
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
 import { readO11ySecret } from '../secrets';
 
@@ -25,9 +26,10 @@ const QueueListResponseSchema = z.discriminatedUnion('success', [
 export async function resolveQueueId(
   env: QueryEnv,
   fetchFn: FetchFn,
-  queueName: string
+  queueName: string,
+  ctx?: SecretsExecutionContext
 ): Promise<string> {
-  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN');
+  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN', ctx);
 
   const ids: string[] = [];
   for (let page = 1; page <= MAX_LOOKUP_PAGES; page++) {

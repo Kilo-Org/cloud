@@ -37,8 +37,31 @@ const repoConfigs = () => workerConfigPaths(repoRoot).map(path => readWorkerConf
 const workerBindingPolicy = (workload: string, environments = ALL_ENVIRONMENTS) =>
   PolicySchema.parse({ workload, environments, identity: { kind: 'worker-binding' }, secrets: [] });
 
+/** Every block of a secret-holding fixture inherits this unless it sets its own. */
+const NO_TRACES = { observability: { enabled: true, traces: { enabled: false } } };
+
 const consumer = (raw: Record<string, unknown>, path = PATH) =>
-  parseWorkerConfig(path, { name: 'consumer', ...raw });
+  parseWorkerConfig(path, { name: 'consumer', ...NO_TRACES, ...raw });
+
+const stsFixture = () =>
+  parseWorkerConfig('services/sts/wrangler.jsonc', {
+    name: 'sts',
+    ...NO_TRACES,
+    vars: { STS_ENVIRONMENT: 'production' },
+    queues: { producers: [{ binding: 'AUDIT_QUEUE', queue: 'kilo-audit' }] },
+    env: {
+      staging: {
+        name: 'sts-staging',
+        vars: { STS_ENVIRONMENT: 'staging' },
+        queues: { producers: [{ binding: 'AUDIT_QUEUE', queue: 'kilo-audit-staging' }] },
+      },
+      local: {
+        name: 'sts-local',
+        vars: { STS_ENVIRONMENT: 'development' },
+        queues: { producers: [{ binding: 'AUDIT_QUEUE', queue: 'kilo-audit-local' }] },
+      },
+    },
+  });
 
 const stsBinding = (service: string, extra: Record<string, unknown> = {}) => ({
   binding: 'STS',
@@ -114,6 +137,7 @@ describe("Wrangler's config schema", () => {
         .flatMap(keysOf),
       ...keysOf(definition('WorkerEntrypointExport')),
     ],
+    'secrets_store_secrets[]': keysOf(environment('secrets_store_secrets', 'items')),
   };
 
   it('has no key the check leaves unclassified, at any level the check models', () => {
@@ -140,6 +164,8 @@ describe('reading a Worker config', () => {
           'service = "sts"',
           'entrypoint = "SecretsBroker"',
           'props = { caller = "consumer" }',
+          '[observability.traces]',
+          'enabled = false',
           '[[env.staging.durable_objects.bindings]]',
           'name = "SIGNER"',
           'class_name = "SignerDO"',
@@ -277,7 +303,8 @@ describe('worker config rules', () => {
   });
 
   it('refuses a config that binds STS without a top-level name', () => {
-    expect(problemsOf(parseWorkerConfig(PATH, { services: [stsBinding('sts')] }))).toEqual([
+    const nameless = parseWorkerConfig(PATH, { ...NO_TRACES, services: [stsBinding('sts')] });
+    expect(problemsOf(nameless)).toEqual([
       `${PATH} (top level): a config with no top-level name binds STS`,
     ]);
   });
@@ -329,6 +356,8 @@ describe('worker config rules', () => {
     ];
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
+      ...NO_TRACES,
+      triggers: { crons: ['0 * * * *'] },
       durable_objects: ownObjects,
       queues: relayQueues('kilo-audit'),
       r2_buckets: archive('kilo-audit-archive', 'eu'),
@@ -336,6 +365,7 @@ describe('worker config rules', () => {
       env: {
         staging: {
           name: 'audit-relay-staging',
+          triggers: { crons: ['0 * * * *'] },
           durable_objects: ownObjects,
           queues: relayQueues('kilo-audit-staging'),
           r2_buckets: archive('kilo-audit-archive-staging', 'eu'),
@@ -343,6 +373,7 @@ describe('worker config rules', () => {
         },
         local: {
           name: 'audit-relay-local',
+          triggers: { crons: [] },
           durable_objects: ownObjects,
           queues: relayQueues('kilo-audit-local'),
           r2_buckets: archive('kilo-audit-archive-local'),
@@ -355,7 +386,7 @@ describe('worker config rules', () => {
       durable_objects: ownObjects,
       r2_buckets: archive('kilo-audit-archive-test'),
     });
-    const configs = [readWorkerConfig(repoRoot, 'services/sts/wrangler.jsonc'), relay, relayTest];
+    const configs = [stsFixture(), relay, relayTest];
     expect(workerConfigProblems(configs, shippedPolicies())).toEqual([]);
     expect(internalWorkerProblems(configs)).toEqual([]);
   });
@@ -376,11 +407,13 @@ describe('worker config rules', () => {
     });
     const crossed = parseWorkerConfig('services/sts/wrangler.jsonc', {
       name: 'sts',
+      ...NO_TRACES,
       queues: audit('kilo-audit-staging'),
       env: { local: { name: 'sts-local', queues: audit('kilo-audit-local') } },
     });
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
+      ...NO_TRACES,
       queues: audit('kilo-audit'),
     });
     expect(problemsOf(foreign, crossed, relay)).toEqual([
@@ -400,6 +433,7 @@ describe('worker config rules', () => {
     });
     const crossed = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
+      ...NO_TRACES,
       queues: {
         consumers: [{ queue: 'kilo-audit-staging', dead_letter_queue: 'kilo-audit-staging-dlq' }],
       },
@@ -533,6 +567,7 @@ describe('worker config rules', () => {
     });
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
+      ...NO_TRACES,
       r2_buckets: [{ binding: 'AUDIT_ARCHIVE', bucket_name: 'kilo-audit-archive' }],
       env: {
         staging: {
@@ -574,6 +609,83 @@ describe('worker config rules', () => {
       `${PATH} (top level): ${covers('*.kiloapps.io/*', 'audit-relay-staging.kiloapps.io', 'audit-relay')}`,
       `${PATH} (env.staging): ${covers('audit-relay-staging.kiloapps.io', 'audit-relay-staging.kiloapps.io', 'audit-relay')}`,
     ]);
+  });
+
+  it('requires traces off in every block of STS, the relay and every config that binds STS', () => {
+    const sts = parseWorkerConfig('services/sts/wrangler.jsonc', {
+      name: 'sts',
+      observability: { enabled: true },
+      env: {
+        staging: { name: 'sts-staging', observability: { traces: { enabled: true } } },
+        local: { name: 'sts-local', observability: { traces: { enabled: false } } },
+      },
+    });
+    const bindsSts = consumer({
+      observability: undefined,
+      services: [stsBinding('sts')],
+      previews: { observability: { traces: { enabled: true } } },
+    });
+    const unrelated = parseWorkerConfig('services/other/wrangler.jsonc', {
+      name: 'other',
+      observability: { enabled: true },
+    });
+    const why =
+      'it must be false, as a trace records outbound URLs and Durable Object SQL bindings';
+    expect(problemsOf(sts, bindsSts, unrelated)).toEqual([
+      `services/sts/wrangler.jsonc (top level): observability.traces.enabled resolves to undefined; ${why}`,
+      `services/sts/wrangler.jsonc (env.staging): observability.traces.enabled resolves to true; ${why}`,
+      `${PATH} (top level): observability.traces.enabled resolves to undefined; ${why}`,
+      `${PATH} (top level) previews: observability.traces.enabled resolves to true; ${why}`,
+    ]);
+  });
+
+  it('keeps production secrets of the shared store out of the non-production blocks of a config that binds STS', () => {
+    const store = '342a86d9e3a94da698e82d0c6e2a36f0';
+    const secrets = [
+      { binding: 'A', store_id: store, secret_name: 'O11Y_SLACK_WEBHOOK_PAGE' },
+      { binding: 'B', store_id: store, secret_name: 'O11Y_SLACK_WEBHOOK_PAGE_DEV' },
+      { binding: 'C', store_id: 'another-store', secret_name: 'O11Y_SLACK_WEBHOOK_PAGE' },
+    ];
+    const config = consumer({
+      services: [stsBinding('sts')],
+      secrets_store_secrets: secrets,
+      previews: {
+        secrets_store_secrets: [{ binding: 'P', store_id: store, secret_name: 'O11Y_TOKEN' }],
+      },
+      env: { local: { services: [stsBinding('sts-local')], secrets_store_secrets: secrets } },
+    });
+    const unrelated = parseWorkerConfig('services/other/wrangler.jsonc', {
+      name: 'other',
+      env: { local: { secrets_store_secrets: secrets } },
+    });
+    const rule =
+      'a non-production block reads only a _DEV, _DEVELOPMENT, _LOCAL, _STAGING or _TEST secret there';
+    expect(problemsOf(config, unrelated)).toEqual([
+      `${PATH} (top level) previews: P reads O11Y_TOKEN from the production Secrets Store; ${rule}`,
+      `${PATH} (env.local): A reads O11Y_SLACK_WEBHOOK_PAGE from the production Secrets Store; ${rule}`,
+    ]);
+  });
+
+  it('runs no production schedule from a non-production block of a config that binds STS', () => {
+    const config = consumer({
+      services: [stsBinding('sts')],
+      triggers: { crons: ['* * * * *'] },
+      env: {
+        local: { services: [stsBinding('sts-local')] },
+        dev: { triggers: { crons: ['*/5 * * * *'] } },
+        staging: { services: [stsBinding('sts-staging')], triggers: { crons: ['0 * * * *'] } },
+        ci: { triggers: { crons: [] } },
+      },
+    });
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (env.local) inherits the production crons ["* * * * *"]; set triggers.crons to []`,
+      `${PATH} (env.dev) sets triggers.crons ["*/5 * * * *"]; only staging may run schedules outside production, so set []`,
+    ]);
+    const withoutCrons = consumer({
+      services: [stsBinding('sts')],
+      env: { local: { services: [stsBinding('sts-local')] } },
+    });
+    expect(problemsOf(withoutCrons)).toEqual([]);
   });
 });
 

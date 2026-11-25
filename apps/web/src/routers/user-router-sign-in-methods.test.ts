@@ -65,6 +65,9 @@ import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { linkAccountToExistingUser } from '@/lib/user';
 import { SIGN_IN_METHOD_CHANGE_REFUSAL_CODES } from '@/lib/auth/sign-in-method-change-codes';
+import { SIGN_IN_METHOD_REFUSAL_CODES } from '@kilocode/app-shared/auth';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { setAdminActionSinkForTest, type AdminActionEvent } from '@/lib/admin/admin-action-audit';
 
 const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
 const mockSendCode = jest.mocked(sendSignInMethodChangeCodeEmail);
@@ -551,12 +554,18 @@ describe('linkAccountToExistingUser', () => {
     display_name: null,
   });
 
-  it('writes the admin audit row when a method is linked to an admin', async () => {
+  it('writes the admin audit row with the request IP address when a method is linked to an admin', async () => {
     const admin = await insertUser({ is_admin: true });
+    const events: AdminActionEvent[] = [];
+    setAdminActionSinkForTest(event => events.push(event));
 
-    const result = await linkAccountToExistingUser(admin.id, identity('linked@example.net'));
+    try {
+      const result = await linkAccountToExistingUser(admin.id, identity('linked@example.net'));
+      expect(result.success).toBe(true);
+    } finally {
+      setAdminActionSinkForTest(null);
+    }
 
-    expect(result.success).toBe(true);
     const rows = await db
       .select()
       .from(admin_action_audit_logs)
@@ -567,6 +576,9 @@ describe('linkAccountToExistingUser', () => {
         )
       );
     expect(rows).toEqual([expect.objectContaining({ metadata: { provider: 'github' } })]);
+    expect(events).toEqual([
+      expect.objectContaining({ action: 'admin.sign_in_method.link', ip: '203.0.113.7' }),
+    ]);
     // The provider account address is not recorded.
     expect(JSON.stringify(rows)).not.toContain('linked@example.net');
   });

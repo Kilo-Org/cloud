@@ -1037,43 +1037,47 @@ export async function linkAccountToExistingUser(
   );
 
   if (!isNoOpRelink) {
+    // Read while the request is still in scope; the email goes after the response.
+    const details = await currentSignInMethodChangeRequestDetails();
     await recordSignInMethodChange({
       user: existingUser,
       change: 'link',
       provider: authProviderData.provider,
+      request: { ip: details.ip },
     });
-  }
 
-  if (!isNoOpRelink && authProviderData.provider !== 'fake-login') {
-    // Read while the request is still in scope; the email goes after the response.
-    const details = await currentSignInMethodChangeRequestDetails();
-    // Sent after the response: the notice must never delay or fail the sign-in.
-    await runAfterResponse(async () => {
-      try {
-        const notice = await sendNewSignInMethodEmail(
-          existingUser.google_user_email,
-          AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
-          {
-            email: authProviderData.google_user_email,
-            displayName: authProviderData.display_name ?? null,
-          },
-          details
-        );
-        if (!notice.sent) {
-          captureException(new Error('New sign-in method notice was not sent'), {
+    if (authProviderData.provider !== 'fake-login') {
+      // Sent after the response: the notice must never delay or fail the sign-in.
+      await runAfterResponse(async () => {
+        try {
+          const notice = await sendNewSignInMethodEmail(
+            existingUser.google_user_email,
+            AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
+            {
+              email: authProviderData.google_user_email,
+              displayName: authProviderData.display_name ?? null,
+            },
+            details
+          );
+          if (!notice.sent) {
+            captureException(new Error('New sign-in method notice was not sent'), {
+              tags: {
+                operation: 'sign_in_method_change_notice',
+                provider: authProviderData.provider,
+              },
+              extra: { reason: notice.reason },
+            });
+          }
+        } catch (error) {
+          captureException(error, {
             tags: {
               operation: 'sign_in_method_change_notice',
               provider: authProviderData.provider,
             },
-            extra: { reason: notice.reason },
           });
         }
-      } catch (error) {
-        captureException(error, {
-          tags: { operation: 'sign_in_method_change_notice', provider: authProviderData.provider },
-        });
-      }
-    });
+      });
+    }
   }
 
   // Log the account linking event

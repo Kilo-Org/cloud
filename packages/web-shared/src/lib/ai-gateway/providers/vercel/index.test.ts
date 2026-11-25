@@ -767,6 +767,7 @@ describe('isValidVercelModelId', () => {
 
   it.each([
     ['zai/glm-5', 'z-ai/glm-5'],
+    ['zai/glm-5.3', 'z-ai/glm-5.3'],
     ['alibaba/qwen3-coder', 'qwen/qwen3-coder'],
     ['mistral/mistral-small', 'mistralai/mistral-small'],
     ['spacexai/grok-5', 'x-ai/grok-5'],
@@ -813,14 +814,13 @@ describe('isValidVercelModelId', () => {
     await expect(isValidVercelModelId('anthropic/claude-haiku-4.5')).resolves.toBe(true);
   });
 
-  it.each(['zai/glm-5.3', 'zai/glm-5.3-flash'])(
-    'accepts the retained legacy alias %s that uses the Vercel spelling',
-    async modelId => {
-      const isValidVercelModelId = await loadIsValidVercelModelId({ vercelModelIds: [modelId] });
+  it('accepts the retained legacy alias zai/glm-5.3-flash that uses the Vercel spelling', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId({
+      vercelModelIds: ['zai/glm-5.3-flash'],
+    });
 
-      await expect(isValidVercelModelId(modelId)).resolves.toBe(true);
-    }
-  );
+    await expect(isValidVercelModelId('zai/glm-5.3-flash')).resolves.toBe(true);
+  });
 
   it('accepts a retained legacy alias that an override also targets', async () => {
     const isValidVercelModelId = await loadIsValidVercelModelId({

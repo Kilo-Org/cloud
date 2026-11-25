@@ -485,7 +485,6 @@ describe('gateway model metadata readers', () => {
 
 describe('isValidOpenRouterModelId', () => {
   it.each([
-    'anthropic/claude-haiku-4-5',
     'anthropic/claude-sonnet-4-5',
     'claude-sonnet-5',
     'deepseek-v4-flash',
@@ -499,9 +498,7 @@ describe('isValidOpenRouterModelId', () => {
     'minimax-m3',
     'minimax/minimax-m2.5-20260211',
     'nvidia/nemotron-3.5-lightning-free',
-    'poolside/laguna-s-2.1',
     'qwen/qwen3.8-max',
-    'zai/glm-5.3',
     'zai/glm-5.3-flash',
   ])('accepts retained legacy alias %s without consulting the database', async modelId => {
     const execute = jest.spyOn(readDb, 'execute');
@@ -511,6 +508,7 @@ describe('isValidOpenRouterModelId', () => {
   });
 
   it.each([
+    'anthropic/claude-haiku-4-5',
     'anthropic/claude-sonnet-4-6',
     'anthropic/claude-sonnet-5-20260630',
     'arcee-ai/trinity-large-thinking',
@@ -533,8 +531,10 @@ describe('isValidOpenRouterModelId', () => {
     'openai/o1',
     'openai/o3-mini',
     'openai/o4-mini',
+    'poolside/laguna-s-2.1',
     'qwen/qwen3-next-80b-a3b-thinking',
     'step-3.5-flash',
+    'zai/glm-5.3',
   ])('rejects removed legacy alias %s when absent from the catalog', async modelId => {
     await storeOpenRouterModels([textModel('openai/gpt-4o')]);
 

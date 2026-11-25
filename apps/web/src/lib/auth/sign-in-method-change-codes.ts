@@ -85,6 +85,26 @@ const PAGE_ERROR_FOR_UPSTREAM_CODE: Readonly<Record<string, string>> = {
   [SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeSendFailed]: SIGN_IN_METHOD_CODE_SEND_FAILED_ERROR,
 };
 
+/** Whether a REST route's error code is one of the sign-in method change refusals. */
+export function isSignInMethodChangeRefusalCode(code: string): boolean {
+  return Object.hasOwn(PAGE_ERROR_FOR_UPSTREAM_CODE, code);
+}
+
+/**
+ * A refusal that a REST route returned as `{ error: <upstream code> }`. It
+ * carries the code where a tRPC error does, so `signInMethodChangeError` and
+ * the code dialog read both the same way.
+ */
+export class SignInMethodChangeRefusedError extends Error {
+  readonly data: { upstreamCode: string };
+
+  constructor(upstreamCode: string) {
+    super(upstreamCode);
+    this.name = 'SignInMethodChangeRefusedError';
+    this.data = { upstreamCode };
+  }
+}
+
 /**
  * The page error code for a refused sign-in method request, read from the
  * tRPC error's `upstreamCode`, or null when the error is not such a refusal.

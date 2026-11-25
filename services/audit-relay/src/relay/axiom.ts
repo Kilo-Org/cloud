@@ -8,6 +8,8 @@ export type AxiomIngestResult =
   | { kind: 'retryable'; detail: string }
   | { kind: 'rejected'; status: number };
 
+const RETRYABLE_STATUSES = new Set([401, 403, 408, 429]);
+
 /**
  * The hot copy. Events keep their `id` so a downstream reader can dedupe at-least-once delivery;
  * `_time` is Axiom's event-time field and comes from the CloudEvents `time`.
@@ -37,7 +39,9 @@ export async function ingestAuditEvents(
 
   await response.body?.cancel();
   if (response.ok) return { kind: 'ok' };
-  if (response.status === 429 || response.status >= 500) {
+  // 401 and 403 follow a token rotation until the secrets client revalidates (at most 240 s),
+  // so they retry like an outage instead of turning every batch into a paged hot-store gap.
+  if (RETRYABLE_STATUSES.has(response.status) || response.status >= 500) {
     return { kind: 'retryable', detail: `http_${response.status}` };
   }
   return { kind: 'rejected', status: response.status };

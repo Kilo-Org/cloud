@@ -12,7 +12,7 @@ import { MarkdownCodeFence } from './markdown-code-fence';
 import { type MarkdownCopyCodeHandler } from './markdown-handlers';
 import { HOST_PAGE, MERMAID_VERSION, SCRIPT_FILE_NAME } from './markdown-mermaid-host';
 import { type MarkdownPalette } from './markdown-palette';
-import { darkPieThemeVariables } from './mermaid-pie-theme';
+import { darkPieThemeVariables, lightPieThemeVariables } from './mermaid-pie-theme';
 
 /**
  * Mermaid 11.12.0 (`dist/mermaid.min.js`, MIT) ships with the app as an asset,
@@ -125,9 +125,11 @@ type RenderState = {
  * The script the app runs in the loaded page. The diagram travels as a JSON
  * literal in a JS context (never as HTML), so its text cannot become markup.
  *
- * `themeVariables` is present on the wire only when a theme needs overrides: the
- * light theme takes mermaid's defaults, and an empty map there would say a theme
- * override was chosen.
+ * `themeVariables` is present on the wire only when a theme needs overrides: a
+ * theme that takes mermaid's own colours sends nothing, and an empty map there
+ * would say a theme override was chosen. Both of this component's themes now
+ * send their measured pie fills, so null is the contract a future theme keeps
+ * rather than a state this caller reaches.
  */
 function renderCall(state: RenderState): string {
   const { source, dark, background, themeVariables } = state;
@@ -202,9 +204,14 @@ export function MarkdownMermaid({
   // The theme overrides a diagram needs, derived once per theme rather than per
   // injection: every redraw of a loaded page carries the map, and a fresh object
   // each time would be pointless work for a page whose theme has not changed.
-  // The dark theme's own pie fills sit near the page colour, so a dark diagram
-  // carries the measured ones; the light theme keeps mermaid's defaults.
-  const themeVariables = useMemo(() => (dark ? darkPieThemeVariables() : null), [dark]);
+  // Both themes state their own measured pie fills, because mermaid's own
+  // palettes put a slice near the page colour in either mode. The page still
+  // picks mermaid's `dark` or `default` theme name, so only the pie keys are
+  // overridden and every other diagram type keeps mermaid's own colours.
+  const themeVariables = useMemo(
+    () => (dark ? darkPieThemeVariables() : lightPieThemeVariables()),
+    [dark]
+  );
   // What the page should be painting. The load handler and the color effect both
   // read it, so the injection that follows a load carries the colors in effect by
   // then instead of the ones a prop had while the page was loading.

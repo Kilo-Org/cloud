@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { extractBearerToken } from '@kilocode/worker-utils';
 import { previewTargetSchema } from './shared/preview-target.js';
 import { AGENT_SANDBOX_PROVIDERS } from './shared/sandbox-provider.js';
 
@@ -65,18 +64,6 @@ const previewTokenPayloadSchema = z.intersection(
   z.object({ exp: z.number() })
 );
 
-export type WrapperDispatchTicketClaims = {
-  type: 'wrapper_dispatch_ticket';
-  userId: string;
-  cloudAgentSessionId: string;
-  kiloSessionId: string;
-  wrapperRunId: string;
-  wrapperGeneration: number;
-  wrapperConnectionId: string;
-};
-
-const WRAPPER_DISPATCH_TICKET_MAX_LIFETIME_SECONDS = 4 * 60 * 60;
-
 export type SecretBinding = string | { get(): Promise<string> };
 
 export async function resolveSecret(
@@ -132,16 +119,6 @@ export function validateStreamTicket(
     }
     return { success: false, error: 'Ticket validation failed' };
   }
-}
-
-export function mintWrapperDispatchTicket(
-  claims: WrapperDispatchTicketClaims,
-  secret: string
-): string {
-  return jwt.sign(claims, secret, {
-    algorithm: 'HS256',
-    expiresIn: WRAPPER_DISPATCH_TICKET_MAX_LIFETIME_SECONDS,
-  });
 }
 
 export const PREVIEW_SESSION_LIFETIME_SECONDS = 3600;
@@ -223,64 +200,4 @@ export function validatePreviewSessionToken(
     return { success: false, error: 'Invalid preview session type' };
   }
   return previewClaimsFrom(payload);
-}
-
-function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDispatchTicketClaims {
-  if (typeof payload !== 'object' || payload === null) return false;
-  const claims = payload as Record<string, unknown>;
-  return (
-    claims.type === 'wrapper_dispatch_ticket' &&
-    typeof claims.userId === 'string' &&
-    typeof claims.cloudAgentSessionId === 'string' &&
-    typeof claims.kiloSessionId === 'string' &&
-    typeof claims.wrapperRunId === 'string' &&
-    typeof claims.wrapperGeneration === 'number' &&
-    typeof claims.wrapperConnectionId === 'string'
-  );
-}
-
-export async function validateWrapperDispatchTicket(
-  authHeader: string | null,
-  secret: string | null | undefined
-): Promise<
-  { success: true; claims: WrapperDispatchTicketClaims } | { success: false; error: string }
-> {
-  if (!secret) {
-    return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
-  }
-
-  const ticket = extractBearerToken(authHeader);
-  if (!ticket) {
-    return { success: false, error: 'Missing or malformed Authorization header' };
-  }
-
-  let payload: string | jwt.JwtPayload;
-  try {
-    payload = jwt.verify(ticket, secret, { algorithms: ['HS256'] });
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return { success: false, error: 'Ticket expired' };
-    }
-    if (error instanceof jwt.JsonWebTokenError) {
-      return { success: false, error: 'Invalid ticket signature' };
-    }
-    return { success: false, error: 'Ticket validation failed' };
-  }
-
-  if (!isWrapperDispatchTicketClaims(payload)) {
-    return { success: false, error: 'Invalid ticket type' };
-  }
-
-  return {
-    success: true,
-    claims: {
-      type: payload.type,
-      userId: payload.userId,
-      cloudAgentSessionId: payload.cloudAgentSessionId,
-      kiloSessionId: payload.kiloSessionId,
-      wrapperRunId: payload.wrapperRunId,
-      wrapperGeneration: payload.wrapperGeneration,
-      wrapperConnectionId: payload.wrapperConnectionId,
-    },
-  };
 }

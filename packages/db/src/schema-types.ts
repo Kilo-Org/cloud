@@ -953,6 +953,7 @@ export const AdminActionAuditAction = z.enum([
   'organization.sso.config.create',
   'organization.sso.config.delete',
   'organization.sso.admin_portal_link.generate',
+  'organization.sso.sign_in_methods_policy.set',
   'internal_bot_user.create',
   'sales_demo.create',
   'sales_demo.reset',
@@ -962,6 +963,8 @@ export const AdminActionAuditAction = z.enum([
   'admin.permissions.set',
   'admin.step_up.verified',
   'admin.passkey.enrolled',
+  'admin.sign_in_method.link',
+  'admin.sign_in_method.unlink',
   'cloud_agent_session.messages.view',
   'cloud_agent_session.api_history.view',
   'webhook_trigger.request_logs.view',
@@ -1697,6 +1700,10 @@ const OrganizationSettingsSchema = z.object({
   // routes Vercel AI Gateway requests globally; a set one also disables OpenRouter.
   disable_openrouter: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
+  // Set by Kilo admins on an organization that requires SSO for its domain:
+  // lets members of that domain link sign-in methods other than SSO. Absent
+  // means members can not link them.
+  allow_non_sso_sign_in_methods: z.boolean().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -1881,6 +1888,8 @@ export type AuditLogAction = z.infer<typeof AuditLogAction>;
 // if you introduce a new event action, please use present tense for consistency.
 export const AuditLogAction = z.enum([
   'organization.user.login', // ✅
+  'organization.user.link_sign_in_method',
+  'organization.user.unlink_sign_in_method',
   'organization.user.logout', // TODO: (bmc) - not sure nextauth lets us get this?
   'organization.user.accept_invite', // ✅
   'organization.user.send_invite', // ✅
@@ -3274,6 +3283,8 @@ export const CustomLlmDefinitionSchema = z
      * an upstream that does not train on prompts. It never makes a custom LLM eligible
      * for zero data retention (`provider.zdr`), which excludes every custom LLM. */
     may_train_on_prompts: z.boolean().optional(),
+    /** False keeps the row but serves it nowhere, as if it were deleted. Unset means enabled. */
+    is_enabled: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);

@@ -1,6 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
+  app_shell_handoff_tokens,
   kilocode_users,
   device_auth_requests,
   device_sessions,
@@ -13,6 +14,7 @@ import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { blockUser } from '@/lib/user/block';
+import { consumeAppShellHandoff, createAppShellHandoff } from '@/lib/app-shell/handoff-token';
 
 async function getUser(id: string) {
   return db.query.kilocode_users.findFirst({
@@ -210,6 +212,34 @@ describe('blockUser (integration)', () => {
       where: eq(native_attested_keys.key_id, 'test-key-block'),
     });
     expect(afterKey).toBeUndefined();
+  });
+
+  test('deletes unconsumed app-shell hand-off tokens and keeps consumed ones', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'initial-pepper' });
+    const spent = await createAppShellHandoff({
+      userId: user.id,
+      targetPath: '/app-shell/github-app',
+    });
+    await expect(consumeAppShellHandoff(spent)).resolves.not.toBeNull();
+    const pending = await createAppShellHandoff({
+      userId: user.id,
+      targetPath: '/app-shell/connected-accounts',
+    });
+
+    const didBlock = await blockUser({ kiloUserId: user.id, reason: 'hand-off block' });
+
+    expect(didBlock).toBe(true);
+    await expect(consumeAppShellHandoff(pending)).resolves.toBeNull();
+    const remaining = await db
+      .select({
+        targetPath: app_shell_handoff_tokens.target_path,
+        consumedAt: app_shell_handoff_tokens.consumed_at,
+      })
+      .from(app_shell_handoff_tokens)
+      .where(eq(app_shell_handoff_tokens.kilo_user_id, user.id));
+    expect(remaining).toEqual([
+      { targetPath: '/app-shell/github-app', consumedAt: expect.any(String) },
+    ]);
   });
 
   test('does not revoke an already-revoked session', async () => {

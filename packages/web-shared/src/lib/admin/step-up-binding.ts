@@ -48,6 +48,16 @@ export const stepUpOperationSchema = z
   .strict();
 
 /**
+ * The one canonical form of an operation method: lower case. Hashing, both
+ * conversions, and equality all use it, so a proof is bound to the same method
+ * an echo of its binding compares and sends back, whatever casing the accepted
+ * client value carried.
+ */
+export function normalizeStepUpMethod(method: string): string {
+  return method.toLowerCase();
+}
+
+/**
  * Canonical text one proof or challenge is bound to. The version prefix lets a
  * later format change stay distinct from values already stored.
  */
@@ -60,7 +70,7 @@ export function stepUpBindingValue(
     actionClass,
     operation.surface,
     operation.route,
-    operation.method.toLowerCase(),
+    normalizeStepUpMethod(operation.method),
     operation.target.kind,
     operation.target.id ?? '',
   ].join('\n');
@@ -75,7 +85,7 @@ export function stepUpOperationFromBinding(binding: StepUpOperationBinding): {
     operation: {
       surface: binding.surface,
       route: binding.route,
-      method: binding.method,
+      method: normalizeStepUpMethod(binding.method),
       target: { kind: binding.targetKind, id: binding.targetId },
     },
   };
@@ -89,7 +99,7 @@ export function stepUpBindingFromOperation(
     actionClass,
     surface: operation.surface,
     route: operation.route,
-    method: operation.method.toLowerCase(),
+    method: normalizeStepUpMethod(operation.method),
     targetKind: operation.target.kind,
     targetId: operation.target.id,
   };
@@ -104,7 +114,7 @@ export function stepUpBindingsEqual(
     left.actionClass === right.actionClass &&
     left.surface === right.surface &&
     left.route === right.route &&
-    left.method === right.method &&
+    normalizeStepUpMethod(left.method) === normalizeStepUpMethod(right.method) &&
     left.targetKind === right.targetKind &&
     left.targetId === right.targetId
   );

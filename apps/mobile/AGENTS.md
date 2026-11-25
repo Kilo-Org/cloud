@@ -4,7 +4,7 @@
 
 Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-specific code.
 
-- Start the backend and Metro yourself; never ask the user to start them.
+- Start the backend yourself and let the worktree's dev runner own Metro; never ask the user to start either.
 - Substantial mobile work may require edits to backend, shared packages, infrastructure, or sibling repositories; that is in scope.
 
 ## Stack
@@ -378,7 +378,6 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 
 ## Debugging
 
-- Keep the simulator font size and font scaling at their defaults.
 - Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging. The design gate's opt-in `font-max` cell is the only exception, and it restores the setting itself.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.

@@ -8,7 +8,7 @@ import { GitLabSessionCapabilityCodec } from '../../../git-token-service/src/git
 import type * as BitbucketResolver from '../../../git-token-service/src/bitbucket-runtime-token-resolver.js';
 import { ContainersOutbound } from '../../src/sandbox-containers/containers-outbound.js';
 import type { ByocVercelCredential } from '../../src/byoc/vercel-credential-resolver.js';
-import { registerVercelScmBrokerRoute } from '../../src/scm-broker/vercel-route.js';
+import { registerVercelEgressRoute } from '../../src/egress/vercel-egress-route.js';
 import type { HonoContext } from '../../src/hono-context.js';
 import { admitVercelScmForward } from '../../src/scm-broker/vercel-admission.js';
 import { createVercelJwksCache } from '../../src/scm-broker/vercel-jwks.js';
@@ -252,7 +252,7 @@ async function harness(
   });
   vi.stubGlobal('fetch', upstream);
   const app = new Hono<HonoContext>();
-  registerVercelScmBrokerRoute(app);
+  registerVercelEgressRoute(app);
   async function send(url: string, method = 'GET', body?: Uint8Array, credential = alias) {
     const authorization = `Bearer ${credential}`;
     const init = { method, ...(body ? { body } : {}), headers: { Authorization: authorization } };
@@ -334,7 +334,7 @@ async function harness(
       SANDBOX_CONTROL: {
         getByName: (name: string) => {
           expect(name).toBe(SANDBOX);
-          return { admitScmForward };
+          return { admitScmForward, admitEgressForward: async () => ({ ok: true, policy: null }) };
         },
       },
     } as unknown as Env);

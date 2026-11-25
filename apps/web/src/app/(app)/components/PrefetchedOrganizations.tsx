@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
-import type { User } from '@kilocode/db/schema';
+import { toClientUser, type ClientUser } from '@/lib/user/client-user';
 import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { SeedUserQuery } from './SeedUserQuery';
@@ -21,12 +21,12 @@ import { SeedUserQuery } from './SeedUserQuery';
  */
 export async function PrefetchedOrganizations({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient();
-  let user: User | null = null;
+  let user: ClientUser | null = null;
 
   try {
     const ctx = await createTRPCContext();
     // Same user `GET /api/user` returns; `useUser()` fetches that route on the client.
-    user = ctx.user;
+    user = ctx.user ? toClientUser(ctx.user) : null;
     const trpc = createTRPCOptionsProxy({ router: rootRouter, ctx, queryClient });
     await queryClient.query(trpc.organizations.list.queryOptions()).catch(() => undefined);
   } catch (error) {

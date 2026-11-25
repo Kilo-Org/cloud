@@ -2609,8 +2609,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
         const next = applyPendingInteractionEvent(this.pendingInteractions, event);
         if (next !== undefined && next !== this.pendingInteractions) {
+          const questionId = event.properties.id;
+          const notify =
+            event.type === 'question.asked' &&
+            typeof questionId === 'string' &&
+            !this.hasPendingInteraction('questions', questionId) &&
+            this.messageCallbacks.persistQuestionCallback(event.properties);
           this.pendingInteractions = next;
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+          if (notify) await this.armAlarm();
         }
         await this.recordRootStatus(event);
         const rootRename = this.nativeRootRename(event);
@@ -3198,6 +3205,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return [];
     return listPreparationAttempts(this.eventQueries);
+  }
+
+  /** The most recent preparation attempt, for the session's read model. */
+  async getLatestPreparationAttempt(): Promise<PreparationAttempt | null> {
+    await this.initialized;
+    if (this.registration === null) return null;
+    return listPreparationAttempts(this.eventQueries).at(-1) ?? null;
   }
 
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {

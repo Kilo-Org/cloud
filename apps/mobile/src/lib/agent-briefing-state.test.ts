@@ -9,6 +9,7 @@ import {
   type BriefingSafeguardField,
   type BriefingSafeguardInput,
   briefingSpendMicrodollars,
+  briefingSummaryBodyKey,
   briefingSummaryStatusKey,
   briefingSyncDelayMs,
   canReadBriefingContext,
@@ -173,6 +174,33 @@ describe('briefingSummaryStatusKey', () => {
     expect(briefingSummaryStatusKey('failed', 'gateway_declined')).toBe(
       'agentBriefing.snapshotSummaryFailed'
     );
+  });
+});
+
+describe('briefingSummaryBodyKey', () => {
+  it('names a skipped summary not_admitted before its status', () => {
+    expect(briefingSummaryBodyKey('failed', 'not_admitted')).toBe(
+      'agentBriefing.summaryNotAdmittedBody'
+    );
+    expect(briefingSummaryBodyKey('unavailable', 'not_admitted')).toBe(
+      'agentBriefing.summaryNotAdmittedBody'
+    );
+  });
+
+  it('drops the subject the detail card heading already prints', () => {
+    expect(briefingSummaryBodyKey('failed', 'time_limit')).toBe(
+      'agentBriefing.snapshotSummaryFailedBody'
+    );
+    expect(briefingSummaryBodyKey('failed')).toBe('agentBriefing.snapshotSummaryFailedBody');
+    expect(briefingSummaryBodyKey('failed', null)).toBe('agentBriefing.snapshotSummaryFailedBody');
+    expect(briefingSummaryBodyKey('disabled')).toBe('agentBriefing.summaryUnavailableBody');
+    expect(briefingSummaryBodyKey('pending')).toBe('agentBriefing.summaryPendingBody');
+    expect(briefingSummaryBodyKey('running')).toBe('agentBriefing.summaryPendingBody');
+  });
+
+  it('falls back to the unavailable body for an unknown status', () => {
+    expect(briefingSummaryBodyKey('unknown')).toBe('agentBriefing.summaryUnavailableBody');
+    expect(briefingSummaryBodyKey('ready')).toBe('agentBriefing.summaryUnavailableBody');
   });
 });
 

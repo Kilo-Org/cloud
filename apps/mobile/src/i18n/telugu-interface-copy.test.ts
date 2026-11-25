@@ -21,7 +21,9 @@ import { i18n } from '@/i18n';
  *
  * The skill and question labels take the verbal-noun form because
  * `permission-tool-label.ts` interpolates the same values into the permission
- * card sentence. This branch changes catalog values only: no key, placeholder,
+ * card sentence. The spoken loading cost keeps the English entry's 'so far'
+ * qualifier, because the context pill announces it while the session is still
+ * resolving. This branch changes catalog values only: no key, placeholder,
  * or plural category moves.
  */
 
@@ -196,5 +198,13 @@ describe('Telugu one term per concept', () => {
   it('uses the access loan in both repository access strings', () => {
     expect(i18n.t('codeReviewer.repos.manageAccess')).toContain('యాక్సెస్');
     expect(i18n.t('codeReviewer.repos.repositoryAccess')).toContain('యాక్సెస్');
+  });
+});
+
+describe('Telugu spoken loading cost', () => {
+  it('marks the figure as accumulated so far, like the canonical entry', () => {
+    expect(i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: '$0.04' })).toBe(
+      'ఇంతవరకు ఖర్చు $0.04.'
+    );
   });
 });

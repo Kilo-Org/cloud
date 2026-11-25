@@ -21,8 +21,12 @@ jest.mock('@/lib/app-shell/session', () => ({
 const { consumeAppShellHandoff } = jest.requireMock<typeof HandoffTokenModule>(
   '@/lib/app-shell/handoff-token'
 );
-const { APP_SHELL_SESSION_COOKIE, verifyAppShellSessionToken, loadAppShellUser } =
-  jest.requireMock<typeof SessionModule>('@/lib/app-shell/session');
+const {
+  APP_SHELL_SESSION_COOKIE,
+  bindAppShellSession,
+  verifyAppShellSessionToken,
+  loadAppShellUser,
+} = jest.requireMock<typeof SessionModule>('@/lib/app-shell/session');
 const { GET } = jest.requireActual<typeof HandoffRouteModule>('./route');
 
 const mockConsume = jest.mocked(consumeAppShellHandoff);
@@ -45,6 +49,7 @@ describe('GET /app-shell/handoff', () => {
     mockConsume.mockResolvedValue({
       userId: 'user-1',
       targetPath: '/app-shell/github-app?organizationId=org-1',
+      webSessionPepper: 'pepper-at-consume',
     });
 
     const response = await GET(handoffRequest('one-time-token'));
@@ -54,17 +59,20 @@ describe('GET /app-shell/handoff', () => {
     expect(response.headers.get('cache-control')).toContain('no-store');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
 
+    const session = bindAppShellSession('user-1', 'pepper-at-consume');
+    expect(mockLoadUser).toHaveBeenCalledWith(session);
     const cookie = response.cookies.get(APP_SHELL_SESSION_COOKIE);
     expect(cookie?.path).toBe('/app-shell');
     expect(cookie?.httpOnly).toBe(true);
     expect(cookie?.sameSite).toBe('lax');
-    expect(verifyAppShellSessionToken(cookie?.value)).toEqual({ userId: 'user-1' });
+    expect(verifyAppShellSessionToken(cookie?.value)).toEqual(session);
   });
 
   test('redirects on the origin the browser requested, not the bind host', async () => {
     mockConsume.mockResolvedValue({
       userId: 'user-1',
       targetPath: '/app-shell/connected-accounts',
+      webSessionPepper: null,
     });
 
     // The dev server binds 0.0.0.0, so a Location built from `request.url` would
@@ -96,7 +104,11 @@ describe('GET /app-shell/handoff', () => {
   });
 
   test('does not hand a blocked account a shell session', async () => {
-    mockConsume.mockResolvedValue({ userId: 'blocked-user', targetPath: '/app-shell/github-app' });
+    mockConsume.mockResolvedValue({
+      userId: 'blocked-user',
+      targetPath: '/app-shell/github-app',
+      webSessionPepper: null,
+    });
     mockLoadUser.mockResolvedValue({ status: 'restricted' });
 
     const response = await GET(handoffRequest('one-time-token'));
@@ -106,8 +118,26 @@ describe('GET /app-shell/handoff', () => {
   });
 
   test('does not hand a deleted account a shell session', async () => {
-    mockConsume.mockResolvedValue({ userId: 'deleted-user', targetPath: '/app-shell/github-app' });
+    mockConsume.mockResolvedValue({
+      userId: 'deleted-user',
+      targetPath: '/app-shell/github-app',
+      webSessionPepper: null,
+    });
     mockLoadUser.mockResolvedValue({ status: 'gone' });
+
+    const response = await GET(handoffRequest('one-time-token'));
+
+    expect(response.headers.get('location')).toBe('/app-shell/expired');
+    expect(response.cookies.get(APP_SHELL_SESSION_COOKIE)).toBeUndefined();
+  });
+
+  test('does not hand a session revoked after the token was spent a shell session', async () => {
+    mockConsume.mockResolvedValue({
+      userId: 'user-1',
+      targetPath: '/app-shell/github-app',
+      webSessionPepper: 'pepper-before-reset',
+    });
+    mockLoadUser.mockResolvedValue({ status: 'revoked' });
 
     const response = await GET(handoffRequest('one-time-token'));
 

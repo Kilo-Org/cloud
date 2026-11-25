@@ -1,4 +1,4 @@
-import { SignJWT } from 'jose';
+import { decodeJwt, SignJWT } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import {
   issueRuntimeProxyAttestation,
@@ -130,5 +130,36 @@ describe('runtime proxy attestation', () => {
     await expect(verifyRuntimeProxyAttestation({ ...input, value: control, now })).resolves.toBe(
       true
     );
+  });
+
+  it('accepts signed lifetimes up to 120 seconds without extending expiration', async () => {
+    const claims = decodeJwt(await issueRuntimeProxyAttestation(input));
+    const issuedAt = Math.floor(now.getTime() / 1000);
+    expect(claims.exp).toBe(issuedAt + 30);
+
+    const signWithLifetime = (seconds: number) =>
+      new SignJWT(claims)
+        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+        .setExpirationTime(issuedAt + seconds)
+        .sign(new TextEncoder().encode(secret));
+
+    const proof = await signWithLifetime(120);
+    await expect(
+      verifyRuntimeProxyAttestation({
+        ...input,
+        value: proof,
+        now: new Date(now.getTime() + 31_000),
+      })
+    ).resolves.toBe(true);
+    await expect(
+      verifyRuntimeProxyAttestation({
+        ...input,
+        value: proof,
+        now: new Date(now.getTime() + 121_000),
+      })
+    ).resolves.toBe(false);
+
+    const overlong = await signWithLifetime(121);
+    await expect(verifyRuntimeProxyAttestation({ ...input, value: overlong })).resolves.toBe(false);
   });
 });

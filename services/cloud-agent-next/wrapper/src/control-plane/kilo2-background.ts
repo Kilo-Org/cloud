@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import {
+  BACKGROUND_ACTIVITY_INVENTORY_LIMIT,
   backgroundJobSchema,
   backgroundActivityInventorySchema,
 } from '../../../src/shared/background-activity.js';
 import type { Kilo2Api } from './kilo2-api.js';
 import { createKilo2Reads, kilo2LocationQuery } from './kilo2-reads.js';
 
-const LIMIT = 256;
+const LIMIT = BACKGROUND_ACTIVITY_INVENTORY_LIMIT;
 const shellListSchema = z.array(z.object({ id: z.string(), status: z.string() }));
 
 export async function readKilo2BackgroundActivity(

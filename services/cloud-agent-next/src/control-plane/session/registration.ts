@@ -375,6 +375,7 @@ export function buildControlPlaneSessionRegistration(
   const credentials: ControlPlaneCredentialSource = {
     ...credentialSourceFromMetadata(metadata),
     scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    ...(metadata.allowSubagentSessions === true ? { allowSubagentSessions: true } : {}),
     ...(encryptedMcpServers === undefined ? {} : { mcpServers: encryptedMcpServers }),
     ...(encryptedSecrets === undefined ? {} : { encryptedSecrets }),
     ...(networkSecrets === undefined ? {} : { networkSecrets }),

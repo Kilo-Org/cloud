@@ -2,6 +2,8 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -66,6 +68,7 @@ export function useOrgGroupMutations(organizationId: string, canManageBilling = 
   };
   const onSuccess = () => {
     void queryClient.invalidateQueries(groupsFilter);
+    void reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId));
   };
 
   return {

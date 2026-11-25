@@ -66,6 +66,7 @@ import {
   agent_environment_profiles,
   cloud_agent_sandbox_allocation_settings,
   cloud_agent_environments,
+  cloud_agent_environment_setup_runs,
   security_findings,
   security_finding_notifications,
   security_remediation_attempts,
@@ -156,6 +157,11 @@ import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
+import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
+import {
+  currentSignInMethodChangeAuditRequest,
+  currentSignInMethodChangeRequestDetails,
+} from '@/lib/auth/sign-in-method-change-request';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -1033,30 +1039,48 @@ export async function linkAccountToExistingUser(
     existingKiloUserId
   );
 
-  if (!isNoOpRelink && authProviderData.provider !== 'fake-login') {
-    // Sent after the response: the notice must never delay or fail the sign-in.
-    await runAfterResponse(async () => {
-      try {
-        const notice = await sendNewSignInMethodEmail(
-          existingUser.google_user_email,
-          AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
-          {
-            email: authProviderData.google_user_email,
-            displayName: authProviderData.display_name ?? null,
+  if (!isNoOpRelink) {
+    // Read while the request is still in scope; the email goes after the response.
+    const details = await currentSignInMethodChangeRequestDetails();
+    await recordSignInMethodChange({
+      user: existingUser,
+      change: 'link',
+      provider: authProviderData.provider,
+      request: await currentSignInMethodChangeAuditRequest(),
+    });
+
+    if (authProviderData.provider !== 'fake-login') {
+      // Sent after the response: the notice must never delay or fail the sign-in.
+      await runAfterResponse(async () => {
+        try {
+          const notice = await sendNewSignInMethodEmail(
+            existingUser.google_user_email,
+            AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
+            {
+              email: authProviderData.google_user_email,
+              displayName: authProviderData.display_name ?? null,
+            },
+            details
+          );
+          if (!notice.sent) {
+            captureException(new Error('New sign-in method notice was not sent'), {
+              tags: {
+                operation: 'sign_in_method_change_notice',
+                provider: authProviderData.provider,
+              },
+              extra: { reason: notice.reason },
+            });
           }
-        );
-        if (!notice.sent) {
-          console.warn('[auth] New sign-in method notice was not sent', {
-            provider: authProviderData.provider,
-            reason: notice.reason,
+        } catch (error) {
+          captureException(error, {
+            tags: {
+              operation: 'sign_in_method_change_notice',
+              provider: authProviderData.provider,
+            },
           });
         }
-      } catch {
-        console.warn('[auth] New sign-in method notice failed', {
-          provider: authProviderData.provider,
-        });
-      }
-    });
+      });
+    }
   }
 
   // Log the account linking event
@@ -1207,6 +1231,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   grants, agent_configs, webhook_events, webhook_events_v2,
  *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
+ *   cloud_agent_environment_setup_runs (user-owned runs are deleted; runs the
+ *   deleted user created for an organization are retained with `requirements`
+ *   cleared and `created_by_user_id` kept),
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
  *   security_remediation_attempts actor references,
@@ -1441,6 +1468,17 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
   await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+  // Sign-in method change and data export download codes are stored under the
+  // normalized address. Only those purposes go: another account can own a
+  // different address with the same normalized form.
+  await tx
+    .delete(magic_link_tokens)
+    .where(
+      and(
+        eq(magic_link_tokens.email, normalizeEmail(originalEmail)),
+        inArray(magic_link_tokens.purpose, ['sign_in_method_change', 'data_export_download'])
+      )
+    );
   // Passkey credentials are PII: the credential id, public key and user-facing
   // label identify the user's device. Consumed sign-in tickets are removed too:
   // their `kilo_user_id` still names the deleted account.
@@ -1530,6 +1568,15 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_sandbox_allocation_settings)
     .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, userId));
+  await tx
+    .delete(cloud_agent_environment_setup_runs)
+    .where(eq(cloud_agent_environment_setup_runs.owned_by_user_id, userId));
+  await tx
+    .update(cloud_agent_environment_setup_runs)
+    .set({
+      data: sql`jsonb_set(${cloud_agent_environment_setup_runs.data}, '{requirements}', '""'::jsonb)`,
+    })
+    .where(eq(cloud_agent_environment_setup_runs.created_by_user_id, userId));
   await tx
     .delete(cloud_agent_environments)
     .where(eq(cloud_agent_environments.owned_by_user_id, userId));
@@ -2632,11 +2679,11 @@ async function tryVerifyDiscordGuildMembership(
   }
 }
 
-export async function unlinkAuthProviderFromUser(
+/** Whether the provider can be unlinked: it is linked and is not the last method. */
+export async function checkAuthProviderUnlink(
   kiloUserId: string,
   provider: AuthProviderId
 ): Promise<OptionalError<TRPCError>> {
-  // Safety check: ensure user has at least 2 auth providers before unlinking
   const userProviders = await getUserAuthProviders(kiloUserId);
 
   if (userProviders.length <= 1)
@@ -2646,14 +2693,23 @@ export async function unlinkAuthProviderFromUser(
       cause: new UpstreamApiError(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod),
     });
 
-  const providerToUnlink = userProviders.find(p => p.provider === provider);
-  if (!providerToUnlink) {
+  if (!userProviders.some(p => p.provider === provider)) {
     return trpcFailure({
       code: 'BAD_REQUEST',
       message: `User does not have a linked ${provider} account`,
       cause: new UpstreamApiError(SIGN_IN_METHOD_REFUSAL_CODES.notLinked),
     });
   }
+
+  return successResult();
+}
+
+export async function unlinkAuthProviderFromUser(
+  kiloUserId: string,
+  provider: AuthProviderId
+): Promise<OptionalError<TRPCError>> {
+  const unlinkable = await checkAuthProviderUnlink(kiloUserId, provider);
+  if (!unlinkable.success) return unlinkable;
 
   await db
     .delete(user_auth_provider)

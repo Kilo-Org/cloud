@@ -7,9 +7,10 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { signKiloToken, type SignKiloTokenExtra } from '@kilocode/worker-utils/kilo-token';
+import type { SignKiloTokenExtra } from '@kilocode/worker-utils/kilo-token';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { eq, inArray } from 'drizzle-orm';
+import { SignJWT } from 'jose';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { authorize, exchange, type AuthEnv } from '../../src/auth';
@@ -18,6 +19,7 @@ import { exchangeResponseSchema } from '../../src/protocol';
 const NEXTAUTH_SECRET = 'exchange-postgres-nextauth-secret-0123456789';
 const GRANT_SECRET = 'exchange-postgres-grant-secret-0123456789abc';
 const FIVE_YEARS = 157_680_000;
+const THIRTY_DAYS = 30 * 24 * 60 * 60;
 
 let client: DrizzleClient;
 let env: AuthEnv;
@@ -83,15 +85,20 @@ async function legacy(
   user: { id: string; pepper: string },
   options: { lifetime?: number; extra?: SignKiloTokenExtra } = {}
 ) {
-  const { token } = await signKiloToken({
-    userId: user.id,
-    pepper: user.pepper,
-    secret: NEXTAUTH_SECRET,
-    expiresInSeconds: options.lifetime ?? FIVE_YEARS,
+  // Signed directly: the default is the five-year lifetime that `signKiloToken`
+  // no longer mints and the exchange must keep accepting.
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return new SignJWT({
+    version: 3,
+    kiloUserId: user.id,
+    apiTokenPepper: user.pepper,
     env: 'development',
-    extra: options.extra ?? { deviceAuthRequestCode: 'SYNTH-0001' },
-  });
-  return token;
+    ...(options.extra ?? { deviceAuthRequestCode: 'SYNTH-0001' }),
+    iat: issuedAt,
+    exp: issuedAt + (options.lifetime ?? FIVE_YEARS),
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
 }
 
 function request(token: string, organizationID?: string) {
@@ -127,6 +134,27 @@ describe('credential exchange against the account database', () => {
       userID: user.id,
       tenant: { type: 'user', id: user.id },
     });
+  });
+
+  it('issues a grant for a 30-day API credential', async () => {
+    const user = await account();
+    const response = await exchange(request(await legacy(user, { lifetime: THIRTY_DAYS })), env);
+    expect(response.status).toBe(200);
+    expect(exchangeResponseSchema.parse(await response.json())).toMatchObject({ userID: user.id });
+  });
+
+  it('issues a grant for a 30-day credential bound to a live device session', async () => {
+    const user = await account();
+    const [session] = await client.db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    if (!session) throw new Error('The device session fixture was not created');
+    const token = await legacy(user, {
+      lifetime: THIRTY_DAYS,
+      extra: { deviceSessionId: session.id },
+    });
+    expect((await exchange(request(token), env)).status).toBe(200);
   });
 
   it('never extends a grant beyond the credential expiration', async () => {

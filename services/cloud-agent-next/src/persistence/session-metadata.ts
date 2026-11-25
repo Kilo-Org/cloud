@@ -293,6 +293,7 @@ const SANDBOX_ALLOCATION_ID_CLASS: Record<
   'cloudflare-containers-standard-4': 'isolated-small',
   'vercel-small': 'isolated-small',
   'vercel-large': 'isolated-small',
+  'aws-microvm-8g': 'isolated-small',
 };
 
 function sandboxIdentityMatchesAllocation(
@@ -473,6 +474,14 @@ const MetadataCloneSchema = z
   })
   .strip();
 
+const MetadataEnvironmentSetupSchema = z
+  .object({
+    runId: z.string().uuid(),
+    environmentId: z.string().uuid(),
+    role: z.enum(['setup', 'verification']),
+  })
+  .strict();
+
 export const CurrentSessionMetadataSchema = z
   .object({
     metadataSchemaVersion: z.literal(2),
@@ -495,6 +504,7 @@ export const CurrentSessionMetadataSchema = z
     profile: SessionProfileBundleSchema.optional(),
     /** The repository environment this session admitted, for snapshot selection. */
     environment: environmentReferenceSchema.optional(),
+    environmentSetup: MetadataEnvironmentSetupSchema.optional(),
     hostedGitHubRepositories: hostedGitHubRepositoriesSchema.optional(),
     callback: MetadataCallbackSchema.optional(),
     workspace: MetadataWorkspaceSchema.optional(),

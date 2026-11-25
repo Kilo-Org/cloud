@@ -26,6 +26,7 @@ import {
 } from '@/lib/integrations/oauth/app-shell-flow';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
 import { appShellRedirect } from '@/lib/app-shell/redirect';
+import { bindAppShellSession } from '@/lib/app-shell/session';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { Owner } from '@/lib/integrations/core/types';
 
@@ -119,7 +120,10 @@ export async function startGitLabOAuthConnect(
   if (appShell) {
     response.cookies.set(
       APP_SHELL_FLOW_COOKIE,
-      createAppShellFlowToken({ userId: user.id, state }),
+      createAppShellFlowToken({
+        session: bindAppShellSession(user.id, user.web_session_pepper),
+        state,
+      }),
       appShellFlowCookieOptions()
     );
   }
@@ -213,7 +217,10 @@ export async function startGitLabOAuthConnectPost(
     if (appShell) {
       response.cookies.set(
         APP_SHELL_FLOW_COOKIE,
-        createAppShellFlowToken({ userId: user.id, state }),
+        createAppShellFlowToken({
+          session: bindAppShellSession(user.id, user.web_session_pepper),
+          state,
+        }),
         appShellFlowCookieOptions()
       );
     }

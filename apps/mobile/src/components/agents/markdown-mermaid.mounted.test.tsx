@@ -14,12 +14,14 @@ import {
   webViewInstance,
   WebViewType,
 } from './markdown-mermaid.mounted.test-helpers';
-import { darkPieThemeVariables } from './mermaid-pie-theme';
+import { darkPieThemeVariables, lightPieThemeVariables } from './mermaid-pie-theme';
 
-/** The theme a dark diagram is told to paint with. The fills' contrast lives in
- * `mermaid-pie-theme.test.ts`; this suite proves the page is told about them at
- * all, and that a light diagram is told nothing. */
+/** The theme a diagram is told to paint with, one per mode. The fills' contrast
+ * lives in `mermaid-pie-theme.test.ts`; this suite proves the page is told about
+ * them at all, in both modes. */
 const DARK_THEME_VARIABLES = darkPieThemeVariables();
+
+const LIGHT_THEME_VARIABLES = lightPieThemeVariables();
 
 /** What a dark diagram's injection carries: the theme alongside the source and
  * the card it paints. */
@@ -27,13 +29,10 @@ function darkInjection(source: string, background = '#101010') {
   return { source, dark: true, background, themeVariables: DARK_THEME_VARIABLES };
 }
 
-/** The keys an injected state carried, so a case can prove a key is absent
- * rather than merely empty. */
-function stateKeys(state: unknown): string[] {
-  if (typeof state !== 'object' || state === null) {
-    throw new Error('injected state is not an object');
-  }
-  return Object.keys(state);
+/** What a light diagram's injection carries: the same shape with the light
+ * page's own measured fills. */
+function lightInjection(source: string, background = '#f4f4f4') {
+  return { source, dark: false, background, themeVariables: LIGHT_THEME_VARIABLES };
 }
 
 const rnStub = vi.hoisted(() => ({
@@ -122,7 +121,7 @@ describe('MarkdownMermaid page rendering', () => {
 
     await loadPage(renderer);
     expect(injected(webViewMock.injectJavaScript)).toEqual([
-      { source: 'flowchart TD\n  a --> b', dark: false, background: '#f4f4f4' },
+      lightInjection('flowchart TD\n  a --> b'),
     ]);
 
     act(() => {
@@ -187,11 +186,9 @@ describe('MarkdownMermaid page rendering', () => {
 
     expect(webViewInstance(renderer.root)).not.toBe(before);
     await loadPage(renderer);
-    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual({
-      source: 'flowchart TD\n  c --> d',
-      dark: false,
-      background: '#f4f4f4',
-    });
+    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual(
+      lightInjection('flowchart TD\n  c --> d')
+    );
 
     act(() => {
       renderer.unmount();
@@ -267,18 +264,32 @@ describe('MarkdownMermaid page rendering', () => {
     });
   });
 
-  it('tells a light diagram no theme at all', async () => {
+  it('tells a light diagram the measured pie theme', async () => {
     const renderer = await mount('pie title Status\n  "Working" : 3\n  "Idle" : 5');
     await loadPage(renderer);
 
     const [state] = injected(webViewMock.injectJavaScript);
-    // Absent, not empty: an empty map would say a theme override was chosen.
-    expect(stateKeys(state)).toEqual(['source', 'dark', 'background']);
-    expect(state).toEqual({
-      source: 'pie title Status\n  "Working" : 3\n  "Idle" : 5',
-      dark: false,
-      background: '#f4f4f4',
-    });
+    // Twelve slices, the ink the percentage is painted in, full opacity and the
+    // page-coloured stroke: mermaid's own default palette would give a pastel
+    // first slice that fades into the page, and its own 0.7 opacity.
+    expect(Object.keys(LIGHT_THEME_VARIABLES)).toEqual([
+      'pieSectionTextColor',
+      'pieOpacity',
+      'pieStrokeColor',
+      'pie1',
+      'pie2',
+      'pie3',
+      'pie4',
+      'pie5',
+      'pie6',
+      'pie7',
+      'pie8',
+      'pie9',
+      'pie10',
+      'pie11',
+      'pie12',
+    ]);
+    expect(state).toEqual(lightInjection('pie title Status\n  "Working" : 3\n  "Idle" : 5'));
 
     act(() => {
       renderer.unmount();

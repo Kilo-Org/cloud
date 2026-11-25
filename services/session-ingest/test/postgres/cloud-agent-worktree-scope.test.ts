@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDrizzleClient } from '@kilocode/db/client';
 import type { CloudAgentSessionScopeV2 } from '@kilocode/session-ingest-contracts';
+import { cloudAgentOrganizationIdSchema } from '@kilocode/session-ingest-contracts';
 import { sql } from 'drizzle-orm';
 import {
   CLOUD_AGENT_SCOPE_MAX_ANCESTRY_DEPTH,
@@ -12,6 +13,7 @@ vi.mock('@kilocode/worker-utils', () => ({ hasOrganizationAccess: async () => tr
 
 const userId = 'oauth/scope-test';
 const organizationId = '33333333-3333-4333-8333-333333333333';
+const assertedOrganizationId = cloudAgentOrganizationIdSchema.parse(organizationId);
 const scope: CloudAgentSessionScopeV2 = {
   worktreeId: 'worktree_test',
   organizationId: null,
@@ -173,7 +175,7 @@ describe('scoped ancestry PostgreSQL queries', () => {
     await insertSession('root', null, { organizationId });
     await insertSession('parent', 'root');
     await insertSession('child', 'parent', { organizationId });
-    const orgScope = { ...scope, organizationId };
+    const orgScope = { ...scope, organizationId: assertedOrganizationId };
     expect(await resolveChild(orgScope)).toEqual({ kind: 'denied' });
     await client.db.execute(
       sql`UPDATE pg_temp.cli_sessions_v2 SET organization_id = ${organizationId} WHERE session_id = 'parent'`

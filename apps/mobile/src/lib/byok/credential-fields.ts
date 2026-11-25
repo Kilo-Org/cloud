@@ -15,7 +15,6 @@ import { canonicalPrivateKey, type PrivateKeyCause } from './private-key';
  */
 export type BedrockAuthMode = 'apiKey' | 'accessKeys';
 
-/** The values a structured credential is built from, keyed by field. */
 export type CredentialFieldId =
   | 'apiKey'
   | 'resourceName'
@@ -331,10 +330,6 @@ export function readStructuredCredential(input: {
     values: input.values,
     modelMappings,
   };
-  // The private-key refusal names its field, because the field is masked: a
-  // form-wide sentence would leave the reader nothing to look at. Its cause
-  // decides which sentence the form shows, because the two refusals ask for
-  // different things.
   const keyRefusal = privateKeyRefusal(input.providerId, input.values);
   if (credentialProblem(credential)) {
     return keyRefusal === null

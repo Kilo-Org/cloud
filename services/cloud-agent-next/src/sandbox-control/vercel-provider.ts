@@ -11,12 +11,20 @@ import {
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
-import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
 import type { SecretBinding } from '../auth.js';
 import { runtimeProxyOriginProof } from '../runtime-credential-proxy-origin.js';
+import { configuredVercelForwardUrl } from '../scm-broker/targets.js';
+import { verifiedVercelSandboxIdentityContract } from '../scm-broker/vercel-identity.js';
+import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import {
+  buildControlCredentialPolicy,
+  buildControlNetworkPolicy,
+  type SessionCredentialGrant,
+} from './session-credentials.js';
+import { restrictVercelEgress } from './vercel-network-policy.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
-import { ProviderCreationError } from './provider.js';
+import { ProviderCreationError, SandboxNetworkPolicyError } from './provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
@@ -121,9 +129,42 @@ function isNotFound(error: unknown): boolean {
   return error instanceof VercelSandboxRestError && error.status === 404;
 }
 
+/** The egress allowlist of the provider pin, with the logical sandbox that owns the egress route. */
+export type VercelRestrictedEgress = { allowlist: readonly string[]; logicalSandboxId: string };
+
+/**
+ * The network policy of one sandbox, at create and at each credential refresh.
+ * Without an allowlist it is the open policy of today; with one it is the
+ * restricted policy, or `invalid_configuration` when it cannot be built.
+ */
+function buildSandboxNetworkPolicy(
+  grants: readonly SessionCredentialGrant[],
+  handles: ReadonlyMap<string, readonly string[]> | undefined,
+  env: { WORKER_URL?: string } | undefined,
+  restricted: VercelRestrictedEgress | undefined,
+  originProof: string | undefined
+): VercelSandboxNetworkPolicy {
+  if (restricted === undefined) return buildControlNetworkPolicy(grants, handles, env, originProof);
+  const forwardURL = configuredVercelForwardUrl(env ?? {}, restricted.logicalSandboxId);
+  const policy =
+    forwardURL === null || !verifiedVercelSandboxIdentityContract
+      ? null
+      : restrictVercelEgress(
+          buildControlCredentialPolicy(grants, handles, originProof),
+          restricted.allowlist,
+          {
+            forwardURL,
+            workerHost: new URL(forwardURL).hostname,
+          }
+        );
+  if (policy === null) throw new SandboxNetworkPolicyError();
+  return policy;
+}
+
 export function createVercelProviderAdapter(deps: {
   sandboxName: string;
   env?: { WORKER_URL?: string; NEXTAUTH_SECRET?: SecretBinding };
+  restrictedEgress?: VercelRestrictedEgress;
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
@@ -168,10 +209,11 @@ export function createVercelProviderAdapter(deps: {
     const sandboxId = grants[0]?.sandboxId;
     const originProof =
       sandboxId === undefined ? null : await runtimeProxyOriginProof(deps.env ?? {}, sandboxId);
-    return buildControlNetworkPolicy(
+    return buildSandboxNetworkPolicy(
       grants,
       await deps.readAcceptedRuntimeProxyHandles?.(),
       deps.env,
+      deps.restrictedEgress,
       originProof ?? undefined
     );
   };

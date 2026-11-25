@@ -66,8 +66,8 @@ const NOTIFICATIONS_PLUGIN = 'expo-notifications';
 // creates — CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS in
 // src/lib/android-notification-channels.js, which src/lib/notifications.ts
 // builds its writer from — or Android drops the fallback push, and it must be
-// created with sound: the fallback carries needs-input/chat alerts, so the
-// silent progress channel must never be named here.
+// created with sound: the fallback carries needs-input/chat alerts for an
+// unversioned token, so the silent progress channel must never be named here.
 const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
 // expo-task-manager instantiates its headless app loader by name from
 // AndroidManifest metadata. R8 does not keep it (its `@DoNotStrip` is on the
@@ -430,8 +430,11 @@ check(
 // the evaluated config is the only place that shows the entry the plugin
 // composed.
 const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+const fileProviderExtension = appExtensions.find(
+  extension => extension.targetName === 'ArtifactsFileProvider'
+);
 check(
-  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  fileProviderExtension !== undefined,
   'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
 // Dev-only capability, asserted where it would break a release: Apple rejects
@@ -441,9 +444,6 @@ check(
 // would fail here before Apple sees it.
 if (profile === 'production') {
   const FILE_PROVIDER_TESTING_MODE = 'com.apple.developer.fileprovider.testing-mode';
-  const fileProviderExtension = appExtensions.find(
-    extension => extension.targetName === 'ArtifactsFileProvider'
-  );
   check(
     !(FILE_PROVIDER_TESTING_MODE in (config.ios?.entitlements ?? {})),
     `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} app entitlement`
@@ -484,15 +484,10 @@ check(
   notificationsPlugin?.options?.defaultChannel === ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
   `plugins "${NOTIFICATIONS_PLUGIN}" must set defaultChannel: "${ANDROID_DEFAULT_NOTIFICATION_CHANNEL}"`
 );
-// The fallback carries needs-input/chat alerts for an unversioned token, so it
-// must not name a channel the app creates silent. The list is the same one
-// src/lib/notifications.ts writes its channels from.
 check(
   !SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
   `the FCM default channel must not be silent (${SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`
 );
-// Android drops a push addressed to a channel the app never created, so the
-// fallback has to name one the writer sets up.
 check(
   CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
   `the FCM default channel must be a channel the app creates (${CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`

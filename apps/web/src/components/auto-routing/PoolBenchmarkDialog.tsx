@@ -33,6 +33,7 @@ import {
   beginCasePage,
   benchmarkRequestErrorCopy,
   casePageState,
+  keepStartNotice,
   failCasePage,
   mergeCases,
   startFailureCopy,
@@ -59,6 +60,11 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [showQuote, setShowQuote] = useState(false);
   const [startFailure, setStartFailure] = useState<BenchmarkFailureCopy | null>(null);
+  /** What a second confirmation replaced: shown while the request it named is still live. */
+  const [startNoticeFor, setStartNoticeFor] = useState<{
+    requestId: string;
+    copy: BenchmarkFailureCopy;
+  } | null>(null);
   const [pauseFailure, setPauseFailure] = useState<BenchmarkFailureCopy | null>(null);
   const [filter, setFilter] = useState<PaidBenchmarkCaseStatus | 'all'>('all');
   const [pagination, setPagination] = useState<CasePageState | null>(null);
@@ -105,11 +111,28 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
   const startMutation = useMutation(
     trpc.customRouterBenchmarks.start.mutationOptions({
       onSuccess: result => {
-        if (result.status !== 'started') {
-          setStartFailure(startFailureCopy(result));
+        const copy = startFailureCopy(result);
+        const joinedLiveRequest =
+          result.status === 'already_in_progress' ||
+          (result.status === 'started' && result.alreadyInProgress === true);
+        if (joinedLiveRequest) {
+          // Another tab, or a quote taken before this request existed: show the request that
+          // is already staging instead of failing. Nothing new was created or charged. The
+          // notice is bound to that request and drops as soon as it settles.
+          setStartNoticeFor(
+            copy === null || result.request.status === 'empty'
+              ? null
+              : { requestId: result.request.id, copy }
+          );
+          setStartFailure(null);
+        } else if (result.status === 'started') {
+          setStartNoticeFor(null);
+          setStartFailure(null);
+        } else {
+          setStartFailure(copy);
+          setStartNoticeFor(null);
           return;
         }
-        setStartFailure(null);
         setPauseFailure(null);
         setFilter('all');
         setPagination(null);
@@ -171,6 +194,18 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
       });
     }
   }, [progress?.status, organizationId, queryClient, slug, trpc]);
+
+  useEffect(() => {
+    // The second-confirmation notice describes one request in flight and is dropped only when
+    // that request has actually settled. A join can also CHANGE the progress query key (the
+    // dialog had no request before), and then `progressQuery.data` is `undefined` for a render
+    // or two: that is "loading", not "settled", so the notice must survive it.
+    if (
+      startNoticeFor !== null &&
+      !keepStartNotice(startNoticeFor.requestId, progressQuery.data, progressQuery.isError)
+    )
+      setStartNoticeFor(null);
+  }, [startNoticeFor, progressQuery.data, progressQuery.isError]);
 
   const pageState = casePageState(pagination, progressId);
   const extraCases = pageState.kind === 'first' ? [] : pageState.cases;
@@ -270,30 +305,41 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
               </Alert>
             ) : null}
             {showProgress && activeProgress !== undefined ? (
-              <BenchmarkProgressPanel
-                progress={activeProgress}
-                cases={cases}
-                filter={filter}
-                onFilterChange={setFilter}
-                hasMore={nextCursor !== null}
-                loadingMore={loadingMore}
-                onLoadMore={() => void loadMore()}
-                pausePending={pauseMutation.isPending}
-                error={pauseFailure ?? loadMoreFailure}
-                onPause={() => {
-                  if (activeProgress !== undefined) {
-                    pauseMutation.mutate({
-                      slug,
-                      organizationId,
-                      requestId: activeProgress.id,
-                    });
-                  }
-                }}
-                onFreshEstimate={requestFreshEstimate}
-                quotePending={quoteQuery.isFetching}
-                onRefreshProgress={() => void progressQuery.refetch()}
-                refreshPending={progressQuery.isFetching}
-              />
+              <>
+                {startNoticeFor !== null &&
+                startNoticeFor.requestId === activeProgress.id &&
+                (activeProgress.status === 'preparing' || activeProgress.status === 'active') ? (
+                  // Neutral, not an error: the pool's own request is simply already in flight.
+                  <Alert variant="notice">
+                    <AlertTitle>{startNoticeFor.copy.title}</AlertTitle>
+                    <AlertDescription>{startNoticeFor.copy.description}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <BenchmarkProgressPanel
+                  progress={activeProgress}
+                  cases={cases}
+                  filter={filter}
+                  onFilterChange={setFilter}
+                  hasMore={nextCursor !== null}
+                  loadingMore={loadingMore}
+                  onLoadMore={() => void loadMore()}
+                  pausePending={pauseMutation.isPending}
+                  error={pauseFailure ?? loadMoreFailure}
+                  onPause={() => {
+                    if (activeProgress !== undefined) {
+                      pauseMutation.mutate({
+                        slug,
+                        organizationId,
+                        requestId: activeProgress.id,
+                      });
+                    }
+                  }}
+                  onFreshEstimate={requestFreshEstimate}
+                  quotePending={quoteQuery.isFetching}
+                  onRefreshProgress={() => void progressQuery.refetch()}
+                  refreshPending={progressQuery.isFetching}
+                />
+              </>
             ) : progressQuery.isLoading ? (
               <div className="space-y-3" aria-busy="true">
                 <Skeleton className="h-32 w-full" />

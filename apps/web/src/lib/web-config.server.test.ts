@@ -51,3 +51,21 @@ describe('session-sync account-erasure destination', () => {
     });
   });
 });
+
+describe('NEXTAUTH_SECRET', () => {
+  const original = process.env.NEXTAUTH_SECRET;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.NEXTAUTH_SECRET;
+    else process.env.NEXTAUTH_SECRET = original;
+  });
+
+  it('is required when the web app loads its configuration', () => {
+    delete process.env.NEXTAUTH_SECRET;
+    jest.isolateModules(() => {
+      expect(() => jest.requireActual('./web-config.server')).toThrow(
+        'Missing required environment variable NEXTAUTH_SECRET'
+      );
+    });
+  });
+});

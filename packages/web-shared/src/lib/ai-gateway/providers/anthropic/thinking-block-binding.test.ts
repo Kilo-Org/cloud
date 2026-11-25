@@ -437,6 +437,24 @@ describe('dropThinkingBlocksOnPrefixMismatch', () => {
     ]);
   });
 
+  it('carries a cache breakpoint past many assistants emptied by stripping thinking', () => {
+    const emptiedAssistants: Messages = Array.from({ length: 32 }, (): Messages[number] => ({
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: '', signature: 'FAKE_UNIT_TEST_SIGNATURE' },
+        { type: 'text', text: '\n\n', cache_control: cacheControl },
+      ],
+    }));
+    const messages: Messages = [{ role: 'user', content: 'hello' }, ...emptiedAssistants];
+    const before = structuredClone(messages);
+    const { body } = apply('anthropic/claude-haiku-5.5', { type: 'disabled' }, {}, messages);
+
+    expect(body.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'hello', cache_control: cacheControl }] },
+    ]);
+    expect(messages).toEqual(before);
+  });
+
   it('removes an emptied first assistant without inventing a cache target', () => {
     const { body } = apply('anthropic/claude-haiku-5.5', { type: 'disabled' }, {}, [
       {

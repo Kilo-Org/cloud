@@ -1,3 +1,15 @@
+import type { EnvironmentSetupRunData } from './environment-setup-run-data';
+export {
+  environmentSetupRunDataSchema,
+  type EnvironmentSetupRunData,
+  type EnvironmentSetupTargetSettings,
+  type EnvironmentSetupSecretRequest,
+  type EnvironmentSetupNetworkRequest,
+  type EnvironmentSetupCheck,
+  type EnvironmentSetupPendingVerification,
+  type EnvironmentSetupVerification,
+  type EnvironmentSetupPreviousConfiguration,
+} from './environment-setup-run-data';
 import {
   pgTable,
   pgView,
@@ -470,6 +482,10 @@ export type NewCreditCampaign = typeof credit_campaigns.$inferInsert;
  * When adding or removing PII/account-linked columns, update
  * softDeleteUser() in apps/web/src/lib/user/index.ts (and its index.test.ts) to
  * delete, anonymize, or reset the field.
+ *
+ * When adding a secret column (a pepper, token, or key), add it to the omit
+ * list of `toClientUser()` in apps/web/src/lib/user/client-user.ts so it never
+ * reaches a browser.
  */
 export const kilocode_users = pgTable(
   'kilocode_users',
@@ -514,7 +530,9 @@ export const kilocode_users = pgTable(
     blocked_reason: text(),
     blocked_at: timestamp({ withTimezone: true, mode: 'string' }),
     blocked_by_kilo_user_id: text(),
-    api_token_pepper: text(),
+    // New accounts get a pepper, so a rotation revokes every token they can mint.
+    // Existing nulls are rotated separately.
+    api_token_pepper: text().default(sql`gen_random_uuid()::text`),
     web_session_pepper: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),
@@ -5660,7 +5678,7 @@ export const magic_link_tokens = pgTable(
     purpose: text()
       .default('magic_link')
       .notNull()
-      .$type<'magic_link' | 'sign_in_code' | 'data_export_download'>(),
+      .$type<'magic_link' | 'sign_in_code' | 'data_export_download' | 'sign_in_method_change'>(),
     challenge_id: uuid(),
   },
   table => [
@@ -5676,7 +5694,7 @@ export const magic_link_tokens = pgTable(
     // without this constraint the union above is a compile-time fiction.
     check(
       'check_magic_link_tokens_purpose',
-      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download')`
+      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change')`
     ),
   ]
 );
@@ -7537,7 +7555,7 @@ export type CloudAgentSessionRunFailureCode =
 // Runtime container identity for a run. Keep in sync with
 // CloudAgentRunContainerSchema in @kilocode/worker-utils/cloud-agent-queue-report.
 export type CloudAgentRunContainer = {
-  provider: 'cloudflare' | 'vercel' | 'cloudflare-containers';
+  provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' | 'aws';
   sandboxId: string;
   allocationId?: string;
   instanceId?: string;
@@ -7822,6 +7840,10 @@ export const app_shell_handoff_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     /** The allow-listed shell path this token opens, including its query. */
     target_path: text().notNull(),
+    // The account's web-session pepper when the token was minted. Any rotation
+    // (sign-out of browser sessions, an admin sign-out, account recovery)
+    // leaves an unconsumed token unusable. See `revokeWebSessions`.
+    web_session_pepper: text(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -9222,6 +9244,17 @@ export const cloud_agent_environments = pgTable(
     // where an empty list permits only the server-owned Kilo/Git baseline.
     egress_mode: text({ enum: ['unrestricted', 'allowlist'] }),
     egress_allowlist: text().array(),
+    // Draft rows are written by an environment setup run and are invisible to
+    // session matching, lists and builds until they are published.
+    is_draft: boolean().default(false).notNull(),
+    // The existing environment a draft will replace on publish; null for a new
+    // environment. Only a draft may name one.
+    draft_for_environment_id: uuid().references((): AnyPgColumn => cloud_agent_environments.id, {
+      onDelete: 'cascade',
+    }),
+    // Hosts the setup agent found that sessions need. Always included in the
+    // effective allowlist of restricted policies.
+    egress_required_hosts: text().array(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -9257,6 +9290,9 @@ export const cloud_agent_environments = pgTable(
       ),
     index('IDX_cloud_agent_environments_user_id').on(table.owned_by_user_id),
     index('IDX_cloud_agent_environments_org_id').on(table.owned_by_organization_id),
+    index('IDX_cloud_agent_environments_draft_for')
+      .on(table.draft_for_environment_id)
+      .concurrently(),
     check(
       'cloud_agent_environments_owner_check',
       sql`(
@@ -9319,6 +9355,10 @@ export const cloud_agent_environments = pgTable(
         (${table.egress_mode} IS DISTINCT FROM 'allowlist' OR ${table.egress_allowlist} IS NOT NULL)
       )`
     ),
+    check(
+      'cloud_agent_environments_draft_target_check',
+      sql`${table.draft_for_environment_id} IS NULL OR ${table.is_draft}`
+    ),
   ]
 );
 
@@ -9356,6 +9396,93 @@ export const cloud_agent_environment_vars = pgTable(
 );
 
 export type CloudAgentEnvironmentVar = typeof cloud_agent_environment_vars.$inferSelect;
+
+// ============ CLOUD AGENT ENVIRONMENT SETUP RUNS ============
+// One row per attempt to work out and publish a repository environment. The
+// row owns the draft environment, the requests the agent made to the user, the
+// verification evidence, and the publish/revert state in a validated JSON payload.
+
+export const ENVIRONMENT_SETUP_RUN_STATUSES = [
+  'starting',
+  'running',
+  'needs_input',
+  'verifying',
+  'publish_conflict',
+  'failed',
+  'published',
+  'reverted',
+  'cancelled',
+] as const;
+
+export type EnvironmentSetupRunStatus = (typeof ENVIRONMENT_SETUP_RUN_STATUSES)[number];
+
+export const cloud_agent_environment_setup_runs = pgTable(
+  'cloud_agent_environment_setup_runs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text().notNull(),
+    draft_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    target_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    cloud_agent_session_id: text(),
+    status: text().$type<EnvironmentSetupRunStatus>().notNull().default('starting'),
+    data: jsonb().$type<EnvironmentSetupRunData>().notNull(),
+    verification_count: integer().notNull().default(0),
+    verification_limit: integer().notNull().default(6),
+    published_environment_id: uuid().references(() => cloud_agent_environments.id, {
+      onDelete: 'set null',
+    }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_env_setup_runs_user_id').on(table.owned_by_user_id),
+    index('IDX_env_setup_runs_org_id').on(table.owned_by_organization_id),
+    index('IDX_env_setup_runs_target').on(table.target_environment_id),
+    index('IDX_env_setup_runs_published').on(table.published_environment_id),
+    uniqueIndex('UQ_env_setup_runs_session')
+      .on(table.cloud_agent_session_id)
+      .where(sql`${table.cloud_agent_session_id} IS NOT NULL`),
+    uniqueIndex('UQ_env_setup_runs_draft')
+      .on(table.draft_environment_id)
+      .where(sql`${table.draft_environment_id} IS NOT NULL`),
+    // At most one run per target may still change. Published, reverted and
+    // cancelled runs are historical.
+    uniqueIndex('UQ_env_setup_runs_open_target')
+      .on(table.target_environment_id)
+      .where(
+        sql`${table.target_environment_id} IS NOT NULL AND ${table.status} NOT IN ('published', 'reverted', 'cancelled')`
+      ),
+    check(
+      'env_setup_runs_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL))`
+    ),
+    check(
+      'env_setup_runs_status_check',
+      sql`${table.status} IN ('starting', 'running', 'needs_input', 'verifying', 'publish_conflict', 'failed', 'published', 'reverted', 'cancelled')`
+    ),
+    check(
+      'env_setup_runs_verification_check',
+      sql`${table.verification_count} >= 0 AND ${table.verification_limit} >= 0`
+    ),
+  ]
+);
+
+export type CloudAgentEnvironmentSetupRun = typeof cloud_agent_environment_setup_runs.$inferSelect;
 
 // ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
 // Bind a single environment profile to a repository so sessions auto-inherit it

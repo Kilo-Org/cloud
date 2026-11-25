@@ -14,6 +14,7 @@ const SOURCE_WORKSPACE_ID = `workspace_${UUID}` as const;
 const WORKTREE_ID = `worktree_${UUID}` as const;
 
 type SourceSession = {
+  kiloSessionId: string;
   cloudAgentSessionId: string | null;
   worktreeId: string | null;
 };
@@ -72,7 +73,11 @@ describe('createWorktreeChat', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLimit.mockResolvedValue([
-      { cloudAgentSessionId: SOURCE_WORKSPACE_ID, worktreeId: WORKTREE_ID },
+      {
+        kiloSessionId: SOURCE_KILO_SESSION_ID,
+        cloudAgentSessionId: SOURCE_WORKSPACE_ID,
+        worktreeId: WORKTREE_ID,
+      },
     ]);
     mockWorkerCreateWorktreeChat.mockResolvedValue(result);
   });
@@ -236,7 +241,7 @@ describe('createWorktreeChat', () => {
     { cloudAgentSessionId: SOURCE_WORKSPACE_ID, worktreeId: null },
     { cloudAgentSessionId: SOURCE_WORKSPACE_ID, worktreeId: 'worktree_invalid' },
   ])('rejects an ineligible source %j before contacting the Worker', async source => {
-    mockLimit.mockResolvedValueOnce([source]);
+    mockLimit.mockResolvedValueOnce([{ kiloSessionId: SOURCE_KILO_SESSION_ID, ...source }]);
 
     await expect(
       createWorktreeChat({

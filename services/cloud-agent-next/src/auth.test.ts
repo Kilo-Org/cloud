@@ -2,12 +2,9 @@ import { describe, expect, it } from 'vitest';
 import jwt from 'jsonwebtoken';
 import {
   mintPreviewSessionToken,
-  mintWrapperDispatchTicket,
   validatePreviewEntryTicket,
   validatePreviewSessionToken,
   validateStreamTicket,
-  validateWrapperDispatchTicket,
-  type WrapperDispatchTicketClaims,
 } from './auth.js';
 
 const secret = 'test-secret';
@@ -300,141 +297,6 @@ describe('validateStreamTicket', () => {
     expect(validateStreamTicket(ticket, secret, 'cloud-agent-stream')).toEqual({
       success: false,
       error: 'Invalid ticket audience',
-    });
-  });
-});
-
-const wrapperDispatchTicketClaims: WrapperDispatchTicketClaims = {
-  type: 'wrapper_dispatch_ticket',
-  userId: 'user-1',
-  cloudAgentSessionId: 'session-1',
-  kiloSessionId: 'kilo-session-1',
-  wrapperRunId: 'run-1',
-  wrapperGeneration: 2,
-  wrapperConnectionId: 'connection-1',
-};
-
-describe('validateWrapperDispatchTicket', () => {
-  it('returns a configuration error when NEXTAUTH_SECRET is missing', async () => {
-    await expect(validateWrapperDispatchTicket('Bearer ticket', null)).resolves.toEqual({
-      success: false,
-      error: 'NEXTAUTH_SECRET is not configured on the worker',
-    });
-  });
-
-  it('returns an error when the Authorization header is missing or malformed', async () => {
-    await expect(validateWrapperDispatchTicket(null, secret)).resolves.toEqual({
-      success: false,
-      error: 'Missing or malformed Authorization header',
-    });
-    await expect(validateWrapperDispatchTicket('NotBearer ticket', secret)).resolves.toEqual({
-      success: false,
-      error: 'Missing or malformed Authorization header',
-    });
-  });
-
-  it('round-trips a minted ticket, preserving claims exactly', async () => {
-    const ticket = mintWrapperDispatchTicket(wrapperDispatchTicketClaims, secret);
-
-    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
-      success: true,
-      claims: wrapperDispatchTicketClaims,
-    });
-  });
-
-  it('rejects a raw Kilo JWT / stream ticket by its type discriminant', async () => {
-    const streamTicket = jwt.sign(
-      { type: 'stream_ticket', userId: 'user-1', cloudAgentSessionId: 'session-1' },
-      secret,
-      { algorithm: 'HS256', expiresIn: '1 minute' }
-    );
-    const kiloJwt = jwt.sign({ kiloUserId: 'user-1' }, secret, {
-      algorithm: 'HS256',
-      expiresIn: '1 minute',
-    });
-
-    await expect(validateWrapperDispatchTicket(`Bearer ${streamTicket}`, secret)).resolves.toEqual({
-      success: false,
-      error: 'Invalid ticket type',
-    });
-    await expect(validateWrapperDispatchTicket(`Bearer ${kiloJwt}`, secret)).resolves.toEqual({
-      success: false,
-      error: 'Invalid ticket type',
-    });
-  });
-
-  it('rejects a plain Kilo user JWT', async () => {
-    const userToken = jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
-      algorithm: 'HS256',
-      expiresIn: '1 minute',
-    });
-
-    await expect(validateWrapperDispatchTicket(`Bearer ${userToken}`, secret)).resolves.toEqual({
-      success: false,
-      error: 'Invalid ticket type',
-    });
-  });
-
-  it.each([
-    ['the Cloud Agent Next REST audience', 'cloud-agent-next'],
-    ['an array containing the REST audience', ['other-service', 'cloud-agent-next']],
-    ['a different resource audience', 'kilo-gateway'],
-    ['a service audience', 'git-token-service'],
-    ['an explicit null audience', null],
-    ['an explicit empty audience', ''],
-    ['a malformed empty audience list', []],
-    ['a malformed null audience list', [null]],
-    ['a malformed audience object', { audience: 'cloud-agent-next' }],
-  ])('rejects a Kilo user JWT with %s', async (_description, aud) => {
-    const token = jwt.sign({ version: 3, kiloUserId: 'user-1', aud }, secret, {
-      algorithm: 'HS256',
-      expiresIn: '1 minute',
-    });
-
-    await expect(validateWrapperDispatchTicket(`Bearer ${token}`, secret)).resolves.toEqual({
-      success: false,
-      error: 'Invalid ticket type',
-    });
-  });
-
-  it('rejects an expired ticket', async () => {
-    const ticket = jwt.sign(wrapperDispatchTicketClaims, secret, {
-      algorithm: 'HS256',
-      expiresIn: -1,
-    });
-
-    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
-      success: false,
-      error: 'Ticket expired',
-    });
-  });
-
-  it('rejects a malformed ticket', async () => {
-    await expect(validateWrapperDispatchTicket('Bearer not-a-jwt', secret)).resolves.toEqual({
-      success: false,
-      error: 'Invalid ticket signature',
-    });
-  });
-
-  it('rejects a ticket signed with the wrong secret', async () => {
-    const ticket = mintWrapperDispatchTicket(wrapperDispatchTicketClaims, 'other-secret');
-
-    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
-      success: false,
-      error: 'Invalid ticket signature',
-    });
-  });
-
-  it('rejects a Kilo user JWT that carries additional session claims', async () => {
-    const userToken = jwt.sign(
-      { version: 3, kiloUserId: 'user-1', deviceSessionId: 'session-xyz-999' },
-      secret,
-      { algorithm: 'HS256', expiresIn: '1 minute' }
-    );
-
-    await expect(validateWrapperDispatchTicket(`Bearer ${userToken}`, secret)).resolves.toEqual({
-      success: false,
-      error: 'Invalid ticket type',
     });
   });
 });

@@ -25,10 +25,8 @@ import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
 import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
-import {
-  isApiTokenPepperCurrent,
-  requestOrganizationId,
-} from '@kilocode/worker-utils/account-access';
+import { requestOrganizationId } from '@kilocode/worker-utils/account-access';
+import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-token-pepper';
 import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -73,6 +71,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
+  KILO_EXCHANGE_SAFE_CLAIM_NAMES,
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
@@ -126,6 +125,15 @@ export const sessionAuthOptions = {
 } satisfies NextAuthOptions;
 
 /**
+ * False on apps/ai-gateway, whose next.config `env` inlines
+ * `KILO_BROWSER_SESSIONS` at build time. The gateway authenticates by bearer
+ * token only, so every session read there answers "no session".
+ */
+function acceptsBrowserSessions(): boolean {
+  return process.env.KILO_BROWSER_SESSIONS !== 'disabled';
+}
+
+/**
  * Reads the NextAuth session, treating a session read that throws as no
  * session. With the JWT strategy the read only parses and re-serializes request
  * cookies, so a throw means the cookies are unusable, for example a malformed
@@ -133,6 +141,7 @@ export const sessionAuthOptions = {
  * session token. Any other failure is rethrown so it stays visible.
  */
 async function readSession(): Promise<Session | null> {
+  if (!acceptsBrowserSessions()) return null;
   try {
     return await getServerSession(sessionAuthOptions);
   } catch (error) {
@@ -498,10 +507,7 @@ export async function getUserFromBearerForCredentialExchange(
   }
 
   const user = await findUserById(auth.userId, db);
-  if (
-    auth.claims.apiTokenPepper === undefined ||
-    auth.claims.apiTokenPepper !== user?.api_token_pepper
-  ) {
+  if (!user || !isKiloUserCredentialPepperCurrent(auth.claims, user.api_token_pepper)) {
     return authError(401, 'Unauthorized', auth.userId);
   }
 
@@ -519,21 +525,18 @@ export async function getUserFromBearerForCredentialExchange(
   return result;
 }
 
-const accountBearerClaimNames: ReadonlySet<string> = new Set([
-  'version',
-  'kiloUserId',
-  'apiTokenPepper',
-  'env',
-  'iat',
-  'exp',
-  'aud',
-  'tokenPurpose',
-  'credentialExchange',
-  'deviceAuthRequestCode',
+// Spreading the shared `ReadonlySet<string>` widens the literal array to `string[]`, so the
+// `satisfies` that used to type-check the whole allow-list sits on the account-only claims.
+const accountOnlyClaimNames = [
   'deviceSessionId',
   'organizationId',
   'organizationRole',
-] satisfies (keyof KiloTokenPolicyClaims)[]);
+] satisfies (keyof KiloTokenPolicyClaims)[];
+
+const accountBearerClaimNames: ReadonlySet<string> = new Set([
+  ...KILO_EXCHANGE_SAFE_CLAIM_NAMES,
+  ...accountOnlyClaimNames,
+]);
 
 export async function getUserFromAccountBearer(requestHeaders: Headers): Promise<GetAuthResponse> {
   const auth = await verifyKiloApiBearer(requestHeaders);
@@ -555,7 +558,7 @@ export async function getUserFromAccountBearer(requestHeaders: Headers): Promise
   }
 
   const user = await findUserById(userId, db);
-  if (!user || user.is_bot || claims.apiTokenPepper !== user.api_token_pepper) {
+  if (!user || user.is_bot || !isKiloUserCredentialPepperCurrent(claims, user.api_token_pepper)) {
     return authError(401, 'Unauthorized', userId);
   }
   const result = await validateUserAuthorization({
@@ -565,12 +568,19 @@ export async function getUserFromAccountBearer(requestHeaders: Headers): Promise
   });
   if (!result.user) return result;
 
-  if (
-    deviceSessionId !== undefined &&
-    (!uuid.safeParse(deviceSessionId).success ||
-      !(await readActiveDeviceSession(deviceSessionId, userId)))
-  ) {
-    return authError(401, 'Device session is no longer active', userId);
+  if (deviceSessionId !== undefined) {
+    // This path answers immediately, so it reads the primary instead of the
+    // cached answer: a session created moments ago must authenticate its first
+    // request, and a revocation must not wait out the cache window. Its refusal
+    // is plain — the rejected-credential flag is deliberately not set here —
+    // because this path reports only that the account binding no longer works.
+    const session = await checkDeviceSession(deviceSessionId, userId, {
+      read: 'primary',
+      refusal: 'plain',
+    });
+    if (!session.accepted) {
+      return authError(401, DEVICE_SESSION_INACTIVE_MESSAGE, userId);
+    }
   }
 
   // The caller authorizes the requested organization against this signed binding, not a header.
@@ -643,12 +653,7 @@ async function resolveUserFromAuth(
 
     if (
       user &&
-      (scope
-        ? user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
-        : !isApiTokenPepperCurrent(
-            user.api_token_pepper,
-            authorizationValidationResult.apiTokenPepper
-          ))
+      !isKiloUserCredentialPepperCurrent(authorizationValidationResult, user.api_token_pepper)
     ) {
       return authError(401, 'Invalid API token', user.id, {
         credentialsRejected: true,
@@ -699,6 +704,7 @@ async function resolveUserFromAuth(
     return result;
   }
 
+  // On apps/ai-gateway `readSession` finds no session, so this is the anonymous result.
   return resolveUserFromSession(opts, readDb);
 }
 
@@ -898,17 +904,17 @@ async function validateUserAuthorization({
   // `DEVICE_SESSION_CACHE_TTL_MS`, which is the window in which a revocation
   // written by another instance takes effect here; a revocation on this
   // instance invalidates its entry. See `lib/auth/device-session-cache`.
+  // This path refuses with the rejected-credential flag: the caller presented a
+  // credential that no longer works, so the refusal must not degrade into an
+  // anonymous request.
   if (deviceSessionId !== undefined) {
-    const active = uuid.safeParse(deviceSessionId).success
-      ? await isDeviceSessionActive(deviceSessionId, kiloUserId, () =>
-          readActiveDeviceSession(deviceSessionId, kiloUserId)
-        )
-      : false;
-    if (!active) {
-      // The caller presented a credential that no longer works, so this must
-      // not degrade into an anonymous request.
-      return authError(401, 'Device session is no longer active', kiloUserId, {
-        credentialsRejected: true,
+    const session = await checkDeviceSession(deviceSessionId, kiloUserId, {
+      read: 'cached',
+      refusal: 'rejected-credential',
+    });
+    if (!session.accepted) {
+      return authError(401, DEVICE_SESSION_INACTIVE_MESSAGE, kiloUserId, {
+        credentialsRejected: session.credentialsRejected,
         internalApiUse,
         tokenSource,
         cloudAgentAuthority,
@@ -976,6 +982,31 @@ async function readActiveDeviceSession(
     columns: { id: true },
   });
   return session !== undefined;
+}
+
+const DEVICE_SESSION_INACTIVE_MESSAGE = 'Device session is no longer active';
+
+/**
+ * The one rule for whether a device session named by a credential may still
+ * authenticate. A malformed id is never an active session. The two deliberate
+ * differences between the call sites are parameters: `read` selects an
+ * immediate primary read or the per-instance cached answer, and `refusal`
+ * selects whether the caller must treat its credential as rejected.
+ */
+async function checkDeviceSession(
+  deviceSessionId: string,
+  kiloUserId: string,
+  options: { read: 'primary' | 'cached'; refusal: 'rejected-credential' | 'plain' }
+): Promise<{ accepted: true } | { accepted: false; credentialsRejected: boolean }> {
+  const active = uuid.safeParse(deviceSessionId).success
+    ? options.read === 'primary'
+      ? await readActiveDeviceSession(deviceSessionId, kiloUserId)
+      : await isDeviceSessionActive(deviceSessionId, kiloUserId, () =>
+          readActiveDeviceSession(deviceSessionId, kiloUserId)
+        )
+    : false;
+  if (active) return { accepted: true };
+  return { accepted: false, credentialsRejected: options.refusal === 'rejected-credential' };
 }
 
 export const uuidSchema = z.uuid();

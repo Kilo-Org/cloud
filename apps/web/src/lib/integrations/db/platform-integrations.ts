@@ -1456,10 +1456,14 @@ export async function upsertPlatformIntegrationForOwner(
     return transaction ? execute(transaction) : db.transaction(execute);
   }
 
-  // Non-GitHub platforms use the existing per-owner pattern.
+  // Non-GitHub platforms use the existing per-owner pattern. The client is the
+  // caller's transaction when it supplied one, so its read, write and any
+  // work it does beside them commit or roll back together; otherwise each
+  // statement runs on the shared handle as before.
+  const client: typeof db | DrizzleTransaction = transaction ?? db;
   const ownershipCondition = ownerCondition(owner);
 
-  const [existing] = await db
+  const [existing] = await client
     .select()
     .from(platform_integrations)
     .where(
@@ -1472,7 +1476,7 @@ export async function upsertPlatformIntegrationForOwner(
     .limit(1);
 
   if (existing) {
-    await db
+    await client
       .update(platform_integrations)
       .set({
         ...reactivatedIntegrationSetSql(),
@@ -1490,7 +1494,7 @@ export async function upsertPlatformIntegrationForOwner(
       })
       .where(eq(platform_integrations.id, existing.id));
   } else {
-    await db.insert(platform_integrations).values(values);
+    await client.insert(platform_integrations).values(values);
   }
 
   return { ok: true };

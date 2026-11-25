@@ -63,7 +63,7 @@ export function captureTelemetry(event: TelemetryEvent): void {
   try {
     current(event);
   } catch {
-    // Telemetry must never throw into app code.
+    // Intentionally swallowed; the invariant is stated in the module docblock.
   }
 }
 
@@ -100,6 +100,6 @@ export function addTelemetryBreadcrumb(breadcrumb: TelemetryBreadcrumb): void {
   try {
     current(breadcrumb);
   } catch {
-    // Telemetry must never throw into app code.
+    // Intentionally swallowed; the invariant is stated in the module docblock.
   }
 }

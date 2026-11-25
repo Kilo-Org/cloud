@@ -151,6 +151,7 @@ export function classifyControlPlaneFailure(
     case 'environment_stopped':
     case 'credential_containment_unavailable':
     case 'launch_failed':
+    case 'network_policy_failed':
       return dispatchState === 'accepted'
         ? POST_DISPATCH_WRAPPER_DISCONNECTED
         : PRE_DISPATCH_SANDBOX_CONNECT;

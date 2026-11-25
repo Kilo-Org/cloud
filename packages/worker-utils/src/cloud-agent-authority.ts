@@ -3,15 +3,31 @@ import {
   cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   MESSAGE_ID_PATTERN,
+  sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
+import { AttachmentsSchema } from './cloud-agent-attachments';
+import { workspaceArtifactRelativePathSchema } from './cloud-agent-workspace-artifacts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
+import { KILO_TOKEN_VERSION } from './kilo-token-version';
+import {
+  ENVIRONMENT_SETUP_PROCEDURE_PREFIX,
+  environmentSetupAgentOperations,
+  environmentSetupChildOperations,
+  environmentSetupClaimSchema,
+  environmentSetupProcedure,
+} from './environment-setup-authority';
 
 export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
 export const WORKSPACE_SESSION_CALLBACK_PREFIX = 'workspace:';
+export const CLOUD_AGENT_STACK_TARGET_DENIED =
+  'Stack target must be this workspace or a direct child workspace';
 const WORKSPACE_SESSION_CALLBACK_URL_PATTERN =
   /^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const ParentWorkspaceCallbackTargetSchema = z
-  .object({ url: z.literal(PARENT_WORKSPACE_CALLBACK_URL) })
+  .object({
+    url: z.literal(PARENT_WORKSPACE_CALLBACK_URL),
+    launchingSessionId: cloudAgentSessionIdSchema.optional(),
+  })
   .strict()
   .describe(
     'Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback.'
@@ -56,6 +72,7 @@ export const CloudAgentAuthoritySchema = z
     organizationId: z.string().min(1).nullable(),
     authorizationId: z.uuid(),
     expiresAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    environmentSetup: environmentSetupClaimSchema.optional(),
   })
   .strict();
 
@@ -64,7 +81,7 @@ export type CloudAgentAuthority = z.infer<typeof CloudAgentAuthoritySchema>;
 const numericDate = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const scopedTokenClaimsSchema = z
   .object({
-    version: z.literal(3),
+    version: z.literal(KILO_TOKEN_VERSION),
     kiloUserId: z.string().min(1),
     apiTokenPepper: z.string().nullable(),
     env: z.string().optional(),
@@ -118,6 +135,20 @@ export const requestedEnvironmentSchema = z
   })
   .strict();
 
+const repositoryName = z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/);
+const repositoryPlatform = z.enum(['github', 'gitlab', 'bitbucket']);
+const childTarget = z.object({ cloudAgentSessionId: cloudAgentSessionIdSchema }).strict();
+const childSessionTarget = z.object({ sessionId: cloudAgentSessionIdSchema }).strict();
+const discoveryInput = z.object({ forceRefresh: z.boolean().optional() }).strict();
+const nativeId = z.string().min(1).max(256);
+const branchOperationInput = childTarget.extend({
+  baseBranch: z.string().min(1).max(256).optional(),
+  upstreamSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i)
+    .optional(),
+});
+
 /**
  * The one rule for a cloud-agent prompt: non-blank after trim, length-bounded.
  * Every boundary that accepts a first-user-instruction prompt applies it here
@@ -135,7 +166,16 @@ export const cloudAgentPromptSchema = z
 
 const scopedPrepareSessionSchema = z
   .object({
-    githubRepo: z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/),
+    githubRepo: repositoryName.optional(),
+    gitlabProject: z
+      .string()
+      .regex(/^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/)
+      .optional(),
+    bitbucketRepo: z
+      .object({ fullName: repositoryName, workspaceUuid: z.uuid(), repositoryUuid: z.uuid() })
+      .strict()
+      .optional(),
+    publicRepoUrl: z.url({ protocol: /^https$/ }).optional(),
     model: z.string().min(1).max(200),
     mode: z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask', 'build', 'architect']),
     prompt: cloudAgentPromptSchema,
@@ -143,7 +183,7 @@ const scopedPrepareSessionSchema = z
     upstreamBranch: z.string().min(1).max(500).optional(),
     stackOnWorktreeId: cloudAgentWorktreeIdSchema
       .describe(
-        "Stack on a direct child's pushed worktree in the same repository. Use the worktreeId from spawn_session or list_child_sessions. Omit upstreamBranch."
+        "Use this workspace's or a direct child's worktree ID. The server resolves its pushed branch; omit other repository fields and upstreamBranch."
       )
       .optional(),
     autoCommit: z.boolean().optional(),
@@ -154,14 +194,10 @@ const scopedPrepareSessionSchema = z
       .describe('Use a fresh UUID for each child workspace. Reuse it only for the same launch.'),
     callbackTarget: ParentCallbackTargetSchema.optional(),
     requestedEnvironment: requestedEnvironmentSchema.optional(),
+    attachments: AttachmentsSchema.optional(),
+    verificationOf: z.object({ runId: z.uuid() }).strict().optional(),
   })
-  .strict()
-  // Callers add organizationId with extend(). Zod refuses to overwrite a key on a
-  // refined object, so the base shape must not declare it.
-  .refine(input => input.stackOnWorktreeId === undefined || input.upstreamBranch === undefined, {
-    message: 'A stacked workspace cannot use an upstream branch',
-    path: ['upstreamBranch'],
-  });
+  .strict();
 
 // Discovery is scope-neutral; auth context pins any signed organization, and the
 // shared input stays empty so it cannot carry one.
@@ -170,9 +206,13 @@ const modelsListInputSchema = z.object({}).strict();
 // The environment catalog route is shared by personal and organization scope
 // (there is no organizations.* mirror), so authority binding is enforced here.
 const CLOUD_ENVIRONMENTS_LIST_PROCEDURE = 'cloudEnvironments.list';
-const cloudEnvironmentRepositorySchema = z
-  .object({ platform: z.literal('github'), fullName: z.string().min(1).max(500) })
-  .strict();
+const cloudEnvironmentRepositorySchema = z.discriminatedUnion('platform', [
+  z.object({ platform: z.literal('github'), fullName: z.string().min(1).max(500) }).strict(),
+  z.object({ platform: z.literal('gitlab'), projectPath: z.string().min(1).max(500) }).strict(),
+  z
+    .object({ platform: z.literal('bitbucket'), workspaceUuid: z.uuid(), repositoryUuid: z.uuid() })
+    .strict(),
+]);
 const cloudEnvironmentsListInputSchema = z
   .object({ repository: cloudEnvironmentRepositorySchema })
   .strict();
@@ -186,7 +226,7 @@ const scopedChildOperations = {
   },
   getSession: {
     kind: 'query',
-    schema: z.object({ cloudAgentSessionId: cloudAgentSessionIdSchema }).strict(),
+    schema: childTarget.extend({ stackOnWorktreeId: cloudAgentWorktreeIdSchema.optional() }),
   },
   getMessageResult: {
     kind: 'query',
@@ -201,6 +241,89 @@ const scopedChildOperations = {
   interruptSession: {
     kind: 'mutation',
     schema: z.object({ sessionId: cloudAgentSessionIdSchema }).strict(),
+  },
+  getSessionMessagesPage: {
+    kind: 'query',
+    schema: childSessionTarget.extend({
+      cursor: z.string().min(1).max(2048).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+      kiloSessionId: sessionIdSchema.optional(),
+      toolDisplay: z.enum(['full', 'preview']).optional(),
+    }),
+  },
+  getSessionToolPartDetail: {
+    kind: 'query',
+    schema: childSessionTarget.extend({
+      kiloSessionId: sessionIdSchema.optional(),
+      messageId: nativeId,
+      partId: nativeId,
+      callId: nativeId.optional(),
+    }),
+  },
+  getPendingInteractions: { kind: 'query', schema: childTarget },
+  answerQuestion: {
+    kind: 'mutation',
+    schema: childSessionTarget.extend({
+      questionId: z.string().min(1),
+      answers: z.array(z.array(z.string())),
+    }),
+  },
+  rejectQuestion: {
+    kind: 'mutation',
+    schema: childSessionTarget.extend({ questionId: z.string().min(1) }),
+  },
+  listWorkspaceArtifacts: { kind: 'query', schema: childTarget },
+  getWorkspaceArtifactDownloadUrl: {
+    kind: 'query',
+    schema: childTarget.extend({ relativePath: workspaceArtifactRelativePathSchema }),
+  },
+  cancelQueuedMessage: {
+    kind: 'mutation',
+    schema: childSessionTarget.extend({ messageId: z.string().regex(MESSAGE_ID_PATTERN) }),
+  },
+  createWorktreeChat: {
+    kind: 'mutation',
+    schema: childTarget.extend({
+      operationKey: z.uuid(),
+      kiloSessionId: sessionIdSchema.optional(),
+    }),
+  },
+  syncWorktreeBranch: { kind: 'mutation', schema: branchOperationInput },
+  restackWorktreeBranch: { kind: 'mutation', schema: branchOperationInput },
+  listGitHubRepositories: { kind: 'query', schema: discoveryInput },
+  listGitLabRepositories: { kind: 'query', schema: discoveryInput },
+  listBitbucketRepositories: { kind: 'query', schema: discoveryInput },
+  listRepositoryBranches: {
+    kind: 'query',
+    schema: z
+      .object({
+        platform: repositoryPlatform,
+        repository: z.object({ fullName: z.string().min(1).max(500) }).strict(),
+      })
+      .strict(),
+  },
+  getAttachmentUploadUrl: {
+    kind: 'mutation',
+    schema: z
+      .object({
+        messageUuid: z.uuid(),
+        attachmentId: z.uuid(),
+        contentType: z.string().min(1).max(128),
+        contentLength: z
+          .number()
+          .int()
+          .positive()
+          .max(20 * 1024 * 1024),
+        extension: z
+          .string()
+          .regex(/^[a-z0-9]{1,16}$/)
+          .optional(),
+      })
+      .strict(),
+  },
+  releasePendingUploads: {
+    kind: 'mutation',
+    schema: z.object({ objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(5) }).strict(),
   },
   sendMessage: {
     kind: 'mutation',
@@ -217,6 +340,7 @@ const scopedChildOperations = {
             variant: scopedPrepareSessionSchema.shape.variant,
           })
           .strict(),
+        attachments: AttachmentsSchema.optional(),
         autoCommit: z.boolean().optional(),
         expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
       })
@@ -245,10 +369,21 @@ function scopedOperation(procedure: string) {
   }
   const match = /^(?:organizations\.)?cloudAgentNext\.([A-Za-z]+)$/.exec(procedure);
   const name = match?.[1];
-  if (!name || !Object.hasOwn(scopedChildOperations, name)) {
-    throw new Error('Cloud Agent authority does not permit this procedure');
+  if (name && Object.hasOwn(scopedChildOperations, name)) {
+    return scopedChildOperations[name as keyof typeof scopedChildOperations];
   }
-  return scopedChildOperations[name as keyof typeof scopedChildOperations];
+  if (name && Object.hasOwn(environmentSetupChildOperations, name)) {
+    return environmentSetupChildOperations[name as keyof typeof environmentSetupChildOperations];
+  }
+  throw new Error('Cloud Agent authority does not permit this procedure');
+}
+
+function environmentSetupAgentOperation(procedure: string) {
+  if (!procedure.startsWith(ENVIRONMENT_SETUP_PROCEDURE_PREFIX)) return null;
+  const name = procedure.slice(ENVIRONMENT_SETUP_PROCEDURE_PREFIX.length);
+  return Object.hasOwn(environmentSetupAgentOperations, name)
+    ? environmentSetupAgentOperations[name as keyof typeof environmentSetupAgentOperations]
+    : null;
 }
 
 function isModelsListProcedure(procedure: string): boolean {
@@ -319,10 +454,20 @@ export function cloudAgentNextProcedurePrefix(
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
   const prefix = cloudAgentNextProcedurePrefix(authority);
   return [
-    ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
+    ...Object.keys(scopedChildOperations)
+      .filter(name => name !== 'listBitbucketRepositories' || authority.organizationId !== null)
+      .map(name => `${prefix}.${name}`),
     MODELS_LIST_PROCEDURE,
     CLOUD_ENVIRONMENTS_LIST_PROCEDURE,
     ...Object.keys(scopedFolderOperations),
+    ...(authority.environmentSetup
+      ? [
+          `${prefix}.getEgressAudit`,
+          ...Object.keys(environmentSetupAgentOperations).map(name =>
+            environmentSetupProcedure(name as keyof typeof environmentSetupAgentOperations)
+          ),
+        ]
+      : []),
   ];
 }
 
@@ -330,6 +475,8 @@ export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | '
   if (isModelsListProcedure(procedure) || isCloudEnvironmentsListProcedure(procedure)) {
     return 'query';
   }
+  const environmentSetupOperation = environmentSetupAgentOperation(procedure);
+  if (environmentSetupOperation) return environmentSetupOperation.kind;
   return scopedOperation(procedure).kind;
 }
 
@@ -351,8 +498,23 @@ export function cloudAgentAuthorityInputSchema(
       { io: 'input' }
     );
   }
+  const environmentSetupOperation = environmentSetupAgentOperation(procedure);
+  if (environmentSetupOperation) {
+    const jsonSchema = z.toJSONSchema(environmentSetupOperation.schema, { io: 'input' });
+    const properties = { ...jsonSchema.properties };
+    delete properties['runId'];
+    const required = jsonSchema.required?.filter(key => key !== 'runId');
+    return { ...jsonSchema, properties, required: required ?? [] };
+  }
+  const operationSchema =
+    procedure === cloudAgentAuthorityProcedure(authority)
+      ? scopedPrepareSessionSchema.omit({
+          verificationOf: true,
+          ...(authority.environmentSetup ? { requestedEnvironment: true as const } : {}),
+        })
+      : scopedOperation(procedure).schema;
   return z.toJSONSchema(
-    scopedOperation(procedure).schema.extend({
+    operationSchema.extend({
       organizationId: advertisedOrganizationIdField(authority, isFolderProcedure(procedure)),
     }),
     { io: 'input' }
@@ -361,6 +523,46 @@ export function cloudAgentAuthorityInputSchema(
 
 export function cloudAgentAuthorityProcedure(authority: CloudAgentAuthority) {
   return `${cloudAgentNextProcedurePrefix(authority)}.prepareSession`;
+}
+
+function validatePrepareSessionRequest(scope: CloudAgentAuthority, input: unknown) {
+  const request = scopedPrepareSessionSchema
+    .extend({ organizationId: z.string().min(1).optional() })
+    .refine(
+      input =>
+        [
+          input.githubRepo,
+          input.gitlabProject,
+          input.bitbucketRepo,
+          input.publicRepoUrl,
+          input.stackOnWorktreeId,
+        ].filter(value => value !== undefined).length === 1,
+      { message: 'Choose exactly one repository source or stack target' }
+    )
+    .refine(input => input.stackOnWorktreeId === undefined || input.upstreamBranch === undefined, {
+      message: 'A stacked workspace cannot use an upstream branch',
+      path: ['upstreamBranch'],
+    })
+    .parse(input);
+  assertAuthorityOrganization(scope, cloudAgentAuthorityProcedure(scope), request.organizationId);
+  if (request.bitbucketRepo !== undefined && scope.organizationId === null) {
+    throw new Error('Bitbucket requires an organization Cloud Agent workspace');
+  }
+  const environment = request.requestedEnvironment;
+  const verification = request.verificationOf;
+  if (
+    (verification !== undefined && environment === undefined) ||
+    (scope.environmentSetup && environment !== undefined && verification === undefined)
+  ) {
+    throw new Error('Cloud Agent launch exceeds its authority');
+  }
+  if (environment !== undefined && verification !== undefined) {
+    const claim = scope.environmentSetup;
+    if (!claim || environment.id !== claim.environmentId || verification.runId !== claim.runId) {
+      throw new Error('Cloud Agent launch exceeds its authority');
+    }
+  }
+  return request;
 }
 
 export function validateCloudAgentAuthorityRequest(
@@ -382,6 +584,17 @@ export function validateCloudAgentAuthorityRequest(
       .parse(input);
     assertAuthorityOrganization(scope, procedure, request.organizationId);
     return request;
+  }
+  if (procedure.startsWith(ENVIRONMENT_SETUP_PROCEDURE_PREFIX)) {
+    const claim = scope.environmentSetup;
+    const environmentSetupOperation = environmentSetupAgentOperation(procedure);
+    if (!claim || !environmentSetupOperation) {
+      throw new Error('Cloud Agent authority does not permit this procedure');
+    }
+    return environmentSetupOperation.schema.extend({ runId: z.literal(claim.runId) }).parse(input);
+  }
+  if (procedure === cloudAgentAuthorityProcedure(scope)) {
+    return validatePrepareSessionRequest(scope, input);
   }
   const operation = scopedOperation(procedure);
   const request = operation.schema

@@ -9,7 +9,7 @@ import type {
   WorktreeBranchOperationInput,
 } from '../../session/worktree-branch-operation.js';
 import type { WorktreeBranchOperationResult } from '../../shared/worktree-git-operations.js';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import {
   AdoptWorktreeBaseInput,
   AdoptWorktreeBaseOutput,
@@ -34,6 +34,7 @@ export function createSessionWorktreeGitHandlers() {
       env: ctx.env,
       kiloUserId: ctx.userId,
       cloudAgentSessionId,
+      expectedOrganizationId: ctx.cloudAgentAuthority?.organizationId,
     });
     const stub = getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId);
     let response;
@@ -61,7 +62,7 @@ export function createSessionWorktreeGitHandlers() {
   };
 
   return {
-    syncWorktreeBranch: protectedProcedure
+    syncWorktreeBranch: cloudAgentManagedProcedure
       .input(SyncWorktreeBranchInput)
       .output(WorktreeBranchOperationOutput)
       .mutation(({ input, ctx }) =>
@@ -73,7 +74,7 @@ export function createSessionWorktreeGitHandlers() {
         )
       ),
 
-    restackWorktreeBranch: protectedProcedure
+    restackWorktreeBranch: cloudAgentManagedProcedure
       .input(RestackWorktreeBranchInput)
       .output(WorktreeBranchOperationOutput)
       .mutation(({ input, ctx }) =>

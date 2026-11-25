@@ -20,7 +20,7 @@
  * Usage: node tools/i18n/check-catalogs.mjs
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, relative as relativePath, sep } from 'node:path';
+import { dirname, join, relative as relativePath, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
@@ -219,8 +219,8 @@ const WORDED_COUNTS = new Set([
   'nativeRemote.recoveryGaps:two:ar',
   'prReview.discussion.comment:two:ar',
   'prReview.tabs.discussionAccessibility:two:ar',
-  'prReview.hunkRows.fileLoadedCount:two:ar',
-  'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
+  'prReview.fileNavigator.fileLoadedCount:two:ar',
+  'prReview.fileNavigator.fileLoadedOfTotalCount:two:ar',
   'organization.kiloPass.paidSeat:one:ar',
   'organization.kiloPass.paidSeat:two:ar',
 ]);
@@ -1008,7 +1008,12 @@ function checkVisibilitySeparators(values, label) {
   return problems;
 }
 
-/** The agent editor's catalog rules, applied to English and to every locale. */
+/**
+ * The agent editor's catalog rules. The separator rule judges any catalog,
+ * English included. The verbatim rule reads a translated catalog against the
+ * English reference, so it does not run on the English pass, where the two maps
+ * would be the same.
+ */
 function checkAgentEditorCopy(values, english, label) {
   return [
     ...checkVisibilitySeparators(values, label),
@@ -1558,18 +1563,33 @@ function destructiveLabels(object) {
  * All three come from the syntax tree (tools/lib/ast.mjs), so text that only
  * looks like a call — in a comment, in a string, in a type annotation — moves no
  * key, and an apostrophe in prose cannot throw the quote pairing out of step.
+ *
+ * The scan also returns `complete`: false when a file could not be read or
+ * parsed, or when a source root the audit had to have was missing. A key that
+ * sits in such a file is invisible to all three sets, so the dead-key rule
+ * reads this flag and names nothing from an incomplete scan — the same reason
+ * `findOrphanedNoAgreementEntries` in tools/i18n/check-plurals.mjs returns
+ * nothing from a scan with problems. `requiresSourceRoots` says the audit is
+ * reading the repository root itself, where every declared root must be there:
+ * a fixture tree holds only the parts a test gives it, so a root it does not
+ * have has nothing to scan and is skipped without a word. When it is true, the
+ * missing root is reported instead, because there every key under it would
+ * otherwise read as dead.
  */
-function scanSource(catalog, root) {
+function scanSource(catalog, root, requiresSourceRoots) {
   const problems = [];
   const called = new Set();
   const referenced = new Set();
   const keyPrefixes = new Set();
   const destructiveKeys = new Set();
+  let complete = true;
   const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
   for (const sourceRoot of catalog.sourceRoots) {
-    // A fixture tree holds only the parts a test gives it; a root the tree does
-    // not have has nothing to scan.
     if (!existsSync(sourceRoot)) {
+      if (requiresSourceRoots) {
+        problems.push(`${catalog.name}: no source tree at ${relativePath(root, sourceRoot)}`);
+        complete = false;
+      }
       continue;
     }
     for (const { file, program, problems: unparsed } of parseSourceTree(
@@ -1579,9 +1599,14 @@ function scanSource(catalog, root) {
     )) {
       // A file the parser refused has an empty tree, so its keys would leave
       // both sets without a word. `check:i18n` runs oxlint first, so this
-      // normally reports nothing.
+      // normally reports nothing. A read the filesystem refused arrives the
+      // same way, and either one leaves the scan incomplete: the keys of that
+      // file are simply not in the sets.
       for (const problem of unparsed) {
         problems.push(problem);
+      }
+      if (unparsed.length > 0) {
+        complete = false;
       }
       walk(program, node => {
         if (node.type === 'Literal' && typeof node.value === 'string') {
@@ -1624,7 +1649,7 @@ function scanSource(catalog, root) {
       referenced.add(`${prefix}${value}`);
     }
   }
-  return { called, referenced, destructiveKeys, problems };
+  return { called, referenced, destructiveKeys, problems, complete };
 }
 
 /**
@@ -2219,8 +2244,10 @@ function isSerializedJson(value) {
  * config placeholder shows the shape the stored value takes, so its braces and
  * quoted key are the content, not a storage slip. It is registered in
  * `VERBATIM_KEYS` too, because `checkVerbatimLabels` requires the English text.
- * Every other key, verbatim or not, still fails a serialized value — including
- * the English catalog, where `checkVerbatimLabels` cannot see a deviation.
+ * Every other key, verbatim or not, still fails a serialized value. The
+ * verbatim rule reads a locale against the English reference, so it cannot see
+ * a deviation in the English catalog itself, and the storage-slip rule is the
+ * only guard there.
  */
 const JSON_SAMPLE_KEY = 'profiles.mcp.jsonPlaceholder';
 
@@ -2266,7 +2293,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
   const label = `${catalogName}/en`;
   return [
     ...checkEnglishValues({ catalogName, english, englishValues }),
-    ...checkAgentEditorCopy(english, english, label),
+    ...checkVisibilitySeparators(english, label),
     ...checkPullRequestTerm(english, label),
     ...checkChangelogAreaLabels('en', english, label),
   ];
@@ -2277,12 +2304,11 @@ function checkKeyParity({
   label,
   tag,
   selectableCategories,
-  english,
+  englishFacts,
   translated,
-  englishFamilies,
-  englishCountedBases,
   localeFamilies,
 }) {
+  const { english, families: englishFamilies, countedBases: englishCountedBases } = englishFacts;
   const problems = [];
   const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
@@ -2340,7 +2366,8 @@ function checkKeyParity({
  * declares under a flat counted English key is not asked for that form; a
  * family English declares is still covered by the key-parity rule.
  */
-function checkPluralCategories({ label, tag, english, translated, selectableCategories }) {
+function checkPluralCategories({ label, tag, englishFacts, translated, selectableCategories }) {
+  const { english } = englishFacts;
   const problems = [];
   const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
   const selectable = selectableCategories(tag);
@@ -2385,17 +2412,8 @@ function checkUnselectablePluralCategories({ label, tag, translated, selectableC
 }
 
 /** The value rules every translated key passes, in emission order. */
-function checkTranslatedValues({
-  label,
-  tag,
-  english,
-  translated,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  mustTranslateKeys,
-  destructiveChecks,
-}) {
+function checkTranslatedValues({ label, tag, englishFacts, translated }) {
+  const { english, destructiveChecks } = englishFacts;
   const problems = [];
   const ownValues = new Set(translated.values());
   for (const [key, value] of translated) {
@@ -2408,12 +2426,9 @@ function checkTranslatedValues({
         ...checkAddedPluralForm({
           label,
           tag,
-          english,
+          englishFacts,
           key,
           value,
-          englishFamilies,
-          englishCountedBases,
-          englishValues,
           ownValues,
         })
       );
@@ -2424,15 +2439,13 @@ function checkTranslatedValues({
       ...checkTranslatedValue({
         label,
         tag,
-        english,
+        englishFacts,
         key,
         value,
         englishValue,
-        englishValues,
         ownValues,
         cancelValue: translated.get('common.cancel'),
         rejectContainingCancel: destructiveChecks.get(key),
-        mustTranslateKeys,
       })
     );
   }
@@ -2445,17 +2458,13 @@ function checkTranslatedValues({
  * reference for that category. A key that is not an admitted family member is
  * the extra-key rule's finding and passes nothing here.
  */
-function checkAddedPluralForm({
-  label,
-  tag,
-  english,
-  key,
-  value,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  ownValues,
-}) {
+function checkAddedPluralForm({ label, tag, englishFacts, key, value, ownValues }) {
+  const {
+    english,
+    families: englishFamilies,
+    countedBases: englishCountedBases,
+    values: englishValues,
+  } = englishFacts;
   const problems = [];
   const parts = pluralParts(key);
   if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
@@ -2492,16 +2501,15 @@ function checkAddedPluralForm({
 function checkTranslatedValue({
   label,
   tag,
-  english,
+  englishFacts,
   key,
   value,
   englishValue,
-  englishValues,
   ownValues,
   cancelValue,
   rejectContainingCancel,
-  mustTranslateKeys,
 }) {
+  const { english, values: englishValues, mustTranslateKeys } = englishFacts;
   const problems = [];
   const separatorOnly =
     key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
@@ -2785,15 +2793,11 @@ function checkCatalogLocales({
   selectableCategories,
   present,
   supported,
-  english,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  mustTranslateKeys,
-  destructiveChecks,
+  englishFacts,
   sharedWordings,
   wordingExceptions,
 }) {
+  const { english } = englishFacts;
   const problems = [];
   const catalogName = catalog.name;
   const localeValues = new Map();
@@ -2838,16 +2842,14 @@ function checkCatalogLocales({
       ...checkKeyParity({
         label,
         tag,
-        english,
+        englishFacts,
         translated,
-        englishFamilies,
-        englishCountedBases,
         localeFamilies,
         selectableCategories,
       })
     );
     problems.push(
-      ...checkPluralCategories({ label, tag, english, translated, selectableCategories })
+      ...checkPluralCategories({ label, tag, englishFacts, translated, selectableCategories })
     );
     problems.push(
       ...checkUnselectablePluralCategories({ label, tag, translated, selectableCategories })
@@ -2856,13 +2858,8 @@ function checkCatalogLocales({
       ...checkTranslatedValues({
         label,
         tag,
-        english,
+        englishFacts,
         translated,
-        englishFamilies,
-        englishCountedBases,
-        englishValues,
-        mustTranslateKeys,
-        destructiveChecks,
       })
     );
     problems.push(...checkLoginSeparators({ label, tag, translated }));
@@ -2970,13 +2967,35 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
   return problems;
 }
 
-/** Every key the source names exists, and every English key is used. */
+/**
+ * Every key the source names exists, and every English key is used.
+ *
+ * The first rule holds either way: a key the source calls and English does not
+ * define is a real gap, and a scan that missed a file cannot excuse it.
+ *
+ * The second rule needs a complete scan. A file the scan could not read or
+ * parse left its keys out of `referenced`, so reporting an English key as
+ * unused would call a live key dead — a fix that deletes copy a screen still
+ * renders. An incomplete scan therefore proves no key dead and names none; its
+ * own problem lines already say why, which is the same reason
+ * `findOrphanedNoAgreementEntries` in tools/i18n/check-plurals.mjs drops its
+ * per-key lines for a scan with problems.
+ *
+ * The guard reads `source.complete`, not `source.problems.length`. A `t()` call
+ * with a template-literal key reports a problem but leaves its file read and
+ * parsed, so nothing is invisible there and the dead-key rule must keep
+ * running for every other key; a coarse problem count would silently disable
+ * the rule for a whole catalog whenever one call took a template literal.
+ */
 function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies }) {
   const problems = [];
   for (const key of source.called) {
     if (!english.has(key) && !englishFamilies.has(key)) {
       problems.push(`${catalogName}: source uses "${key}", which en.json does not define`);
     }
+  }
+  if (!source.complete) {
+    return problems;
   }
   for (const key of english.keys()) {
     if (!source.referenced.has(key) && !source.referenced.has(baseKeyOf(key))) {
@@ -3101,6 +3120,10 @@ export function checkCatalogs(root = ROOT) {
   const supported = tags === null ? null : new Set(tags);
 
   const catalogs = catalogsOf(root);
+  // An audit of the repository root itself must have every declared source
+  // tree; a fixture tree holds only the parts a test gives it. Read once,
+  // because every catalog's scan needs the same answer.
+  const requiresSourceRoots = resolve(root) === resolve(ROOT);
   // The parsed English map and locale values of each catalog a scan read, keyed
   // by catalog name. A rule that compares the two catalogs reads them here; a
   // catalog whose English parse failed stays out, so the rule cannot compare
@@ -3148,7 +3171,7 @@ export function checkCatalogs(root = ROOT) {
     }
     // One scan of this catalog's own source roots serves the usage check, and
     // its destructive-confirm rule for the mobile catalog.
-    const source = scanSource(catalog, root);
+    const source = scanSource(catalog, root, requiresSourceRoots);
     problems.push(...source.problems);
     // The base each catalog's consumers append their own part to: a plural stem
     // in the app, a `.title`/`.body` part in the push runtime.
@@ -3177,6 +3200,17 @@ export function checkCatalogs(root = ROOT) {
     }
     const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
     const destructiveChecks = destructiveConfirmKeys(source, english);
+    // The English reference one catalog's rules read, built once and never
+    // mutated, so a new rule-specific fact is one field here rather than a
+    // parameter on every rule layer.
+    const englishFacts = Object.freeze({
+      english,
+      families: englishFamilies,
+      countedBases: englishCountedBases,
+      values: englishValues,
+      mustTranslateKeys,
+      destructiveChecks,
+    });
 
     problems.push(...checkEnglishCatalog({ catalogName, english, englishValues }));
 
@@ -3185,12 +3219,7 @@ export function checkCatalogs(root = ROOT) {
       selectableCategories: catalog.selectableCategoriesOf,
       present,
       supported,
-      english,
-      englishFamilies,
-      englishCountedBases,
-      englishValues,
-      mustTranslateKeys,
-      destructiveChecks,
+      englishFacts,
       sharedWordings,
       wordingExceptions,
     });

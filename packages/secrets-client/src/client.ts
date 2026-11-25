@@ -17,19 +17,27 @@ const CACHE_TTL_MS = BUNDLE_CACHE_SECONDS * 1000;
 const REVALIDATE_AFTER_MS = BUNDLE_REVALIDATE_AFTER_SECONDS * 1000;
 const MAX_STALE_MS = BUNDLE_MAX_STALE_SECONDS * 1000;
 /**
- * An attempt that has not settled this long after it started counts as failed: a reader that
- * arrives later starts a new attempt instead of joining it, and a reader that holds a bundle
- * stops waiting and serves that bundle. The attempt keeps running; a success it returns later
+ * An attempt that has not settled this long after it started counts as a failure, and the
+ * next attempt waits out the backoff. The attempt keeps running; a success it returns later
  * still lands unless a newer attempt's success already did.
  */
 export const ATTEMPT_TIMEOUT_MS = 5_000;
 /**
- * The longest a reader with no bundle waits, across restarted attempts, before it fails
- * retryable. It covers STS filling an empty bundle object from the manager.
+ * The isolate's first-load window, from its first attempt. Readers with no bundle wait inside
+ * it, across failed attempts and backoff; it covers STS filling an empty bundle object.
  */
 export const FIRST_LOAD_DEADLINE_MS = 25_000;
-/** Retry floor after a transport error, which carries no `retryAfterSeconds` of its own. */
-const TRANSPORT_RETRY_MS = 5_000;
+const BACKOFF_BASE_MS = 5_000;
+const BACKOFF_CAP_MS = 240_000;
+
+/**
+ * Delay before the attempt that follows the nth consecutive failure: 5 s doubling to 240 s,
+ * minus up to 25 % jitter so instances that failed together spread their retries.
+ */
+function backoffMs(failures: number): number {
+  const step = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (failures - 1));
+  return step - Math.random() * step * 0.25;
+}
 
 type NotModifiedResult = Extract<BundleResult, { status: 'not_modified' }>;
 type UnavailableResult = Extract<BundleResult, { status: 'unavailable' }>;
@@ -60,23 +68,19 @@ type Attempt = {
   outcome: Promise<void>;
 };
 
-/**
- * Revalidation of a held bundle. `running` is the first attempt since the last success, which
- * a reader past the cache lifetime waits for. After a failure the client is degraded:
- * `backing_off` and `retrying` never make a reader wait, they serve the held bundle.
- */
-type Revalidation =
-  | { state: 'idle' }
-  | { state: 'running'; attempt: Attempt }
-  | { state: 'backing_off'; retryAt: number }
-  | { state: 'retrying'; attempt: Attempt };
+/** The failures since the last success; `count` sets the backoff. */
+type Failure = { error: SecretUnavailableError; count: number; retryAt: number };
+
+/** `failure` is null for the first attempt since a success, which a reader past the cache lifetime waits for. */
+type Running = { state: 'running'; attempt: Attempt; failure: Failure | null };
+type BackingOff = { state: 'backing_off'; failure: Failure };
+type Fetch = { state: 'idle' } | Running | BackingOff;
 
 type Cache =
   | { phase: 'empty' }
-  | { phase: 'loading'; attempt: Attempt }
-  | { phase: 'unavailable'; error: SecretUnavailableError; retryAt: number }
-  | { phase: 'denied'; error: SecretUnavailableError }
-  | { phase: 'ready'; bundle: CachedBundle; revalidation: Revalidation };
+  | { phase: 'cold'; windowEndsAt: number; fetch: Running | BackingOff }
+  | { phase: 'ready'; bundle: CachedBundle; fetch: Fetch }
+  | { phase: 'denied'; error: SecretUnavailableError };
 
 export function createSecrets(transport: BundleTransport): Secrets {
   let nextAttemptId = 1;
@@ -84,29 +88,44 @@ export function createSecrets(transport: BundleTransport): Secrets {
   let appliedSuccessId = 0;
   let cache: Cache = { phase: 'empty' };
   let settled = Promise.withResolvers<void>();
+  /** Attempts still awaiting an answer, including abandoned ones whose success can still land. */
+  let inFlight = 0;
 
-  /** The attempt whose failure the cache would record; an older attempt's failure is dropped. */
-  function trackedAttempt(): Attempt | null {
-    if (cache.phase === 'loading') return cache.attempt;
-    if (cache.phase !== 'ready') return null;
-    const revalidation = cache.revalidation;
-    return revalidation.state === 'running' || revalidation.state === 'retrying'
-      ? revalidation.attempt
-      : null;
+  /** The attempt whose failure the cache would record; any other attempt's failure is dropped. */
+  function running(): Running | null {
+    if (cache.phase !== 'cold' && cache.phase !== 'ready') return null;
+    return cache.fetch.state === 'running' ? cache.fetch : null;
   }
 
   function succeed(attempt: Attempt, bundle: CachedBundle): void {
     if (cache.phase === 'denied' || attempt.id <= appliedSuccessId) return;
     appliedSuccessId = attempt.id;
-    cache = { phase: 'ready', bundle, revalidation: { state: 'idle' } };
+    cache = { phase: 'ready', bundle, fetch: { state: 'idle' } };
   }
 
-  function fail(attempt: Attempt, error: SecretUnavailableError, retryAt: number): void {
-    if (trackedAttempt() !== attempt) return;
-    cache =
-      cache.phase === 'ready'
-        ? { phase: 'ready', bundle: cache.bundle, revalidation: { state: 'backing_off', retryAt } }
-        : { phase: 'unavailable', error, retryAt };
+  function fail(
+    attempt: Attempt,
+    error: SecretUnavailableError,
+    at: number,
+    retryAfterMs: number
+  ): void {
+    const current = running();
+    if (current === null || current.attempt !== attempt) return;
+    const count = (current.failure?.count ?? 0) + 1;
+    const failure = { error, count, retryAt: at + Math.max(backoffMs(count), retryAfterMs) };
+    if (cache.phase === 'cold') cache = { ...cache, fetch: { state: 'backing_off', failure } };
+    if (cache.phase === 'ready') cache = { ...cache, fetch: { state: 'backing_off', failure } };
+  }
+
+  function timeOut(current: Running): void {
+    fail(
+      current.attempt,
+      new SecretUnavailableError('unavailable', {
+        cause: new Error(`STS did not answer within ${ATTEMPT_TIMEOUT_MS} ms`),
+      }),
+      current.attempt.startedAt + ATTEMPT_TIMEOUT_MS,
+      0
+    );
   }
 
   function apply(attempt: Attempt, outcome: Outcome): void {
@@ -123,7 +142,8 @@ export function createSecrets(transport: BundleTransport): Secrets {
             new SecretUnavailableError('unavailable', {
               cause: new Error('STS answered not_modified for an ETag this client did not send'),
             }),
-            at + TRANSPORT_RETRY_MS
+            at,
+            0
           );
           return;
         }
@@ -137,40 +157,40 @@ export function createSecrets(transport: BundleTransport): Secrets {
         return;
       }
       case 'denied':
-        if (trackedAttempt() !== attempt) return;
+        if (running()?.attempt !== attempt) return;
         cache = { phase: 'denied', error: new SecretUnavailableError('denied') };
         return;
       case 'unavailable':
         fail(
           attempt,
           new SecretUnavailableError('unavailable'),
-          at + outcome.result.retryAfterSeconds * 1000
+          at,
+          outcome.result.retryAfterSeconds * 1000
         );
         return;
       case 'transport_error':
-        fail(
-          attempt,
-          new SecretUnavailableError('unavailable', { cause: outcome.cause }),
-          at + TRANSPORT_RETRY_MS
-        );
+        fail(attempt, new SecretUnavailableError('unavailable', { cause: outcome.cause }), at, 0);
         return;
     }
   }
 
-  function startAttempt(base: CachedBundle | null, at: number): Attempt {
+  function start(at: number, failure: Failure | null): Running {
+    const base = cache.phase === 'ready' ? cache.bundle : null;
     const attempt: Attempt = {
       id: nextAttemptId++,
       startedAt: at,
       base,
       outcome: Promise.resolve(),
     };
+    inFlight++;
     attempt.outcome = requestBundle(transport, base?.etag).then(outcome => {
+      inFlight--;
       apply(attempt, outcome);
       const waiters = settled;
       settled = Promise.withResolvers<void>();
       waiters.resolve();
     });
-    return attempt;
+    return { state: 'running', attempt, failure };
   }
 
   /** Resolves when any attempt settles or at `deadline`, whichever comes first. */
@@ -194,71 +214,78 @@ export function createSecrets(transport: BundleTransport): Secrets {
   }
 
   async function currentBundle(ctx?: SecretsExecutionContext): Promise<CachedBundle> {
-    const giveUpAt = Date.now() + FIRST_LOAD_DEADLINE_MS;
+    const arrivedAt = Date.now();
     for (;;) {
       const at = Date.now();
       switch (cache.phase) {
-        case 'empty':
-          cache = { phase: 'loading', attempt: startAttempt(null, at) };
-          continue;
         case 'denied':
           throw cache.error;
-        case 'unavailable':
-          if (at < cache.retryAt) throw cache.error;
-          cache = { phase: 'loading', attempt: startAttempt(null, at) };
+        case 'empty':
+          cache = {
+            phase: 'cold',
+            windowEndsAt: at + FIRST_LOAD_DEADLINE_MS,
+            fetch: start(at, null),
+          };
           continue;
-        case 'loading': {
-          if (at >= giveUpAt) {
-            throw new SecretUnavailableError('unavailable', {
-              cause: new Error(`STS sent no bundle within ${FIRST_LOAD_DEADLINE_MS} ms`),
-            });
-          }
-          const timesOutAt = cache.attempt.startedAt + ATTEMPT_TIMEOUT_MS;
-          if (at >= timesOutAt) {
-            cache = { phase: 'loading', attempt: startAttempt(null, at) };
+        case 'cold': {
+          // A reader waits at most until the first-load window ends, or 5 s for an attempt it
+          // finds running after that; outside the window a backoff makes it fail at once.
+          const giveUpAt = Math.max(cache.windowEndsAt, arrivedAt + ATTEMPT_TIMEOUT_MS);
+          const fetch = cache.fetch;
+          if (fetch.state === 'running') {
+            const timesOutAt = fetch.attempt.startedAt + ATTEMPT_TIMEOUT_MS;
+            if (at >= timesOutAt) {
+              timeOut(fetch);
+              continue;
+            }
+            if (at >= giveUpAt) {
+              throw new SecretUnavailableError('unavailable', {
+                cause: new Error('STS sent no bundle before this read gave up'),
+              });
+            }
+            await settledOrAt(Math.min(timesOutAt, giveUpAt));
             continue;
           }
-          await settledOrAt(Math.min(timesOutAt, giveUpAt));
+          const { failure } = fetch;
+          if (at < failure.retryAt) {
+            if (at >= cache.windowEndsAt) throw failure.error;
+            if (failure.retryAt < cache.windowEndsAt) {
+              await settledOrAt(failure.retryAt);
+              continue;
+            }
+            if (inFlight === 0) throw failure.error;
+            await settledOrAt(cache.windowEndsAt);
+            continue;
+          }
+          if (at >= giveUpAt) throw failure.error;
+          cache = { ...cache, fetch: start(at, failure) };
           continue;
         }
         case 'ready': {
           const bundle = cache.bundle;
           const age = at - bundle.receivedAt;
           if (age < REVALIDATE_AFTER_MS) return bundle;
-          const revalidation = cache.revalidation;
-          switch (revalidation.state) {
+          const fetch = cache.fetch;
+          switch (fetch.state) {
             case 'idle':
-              cache = {
-                phase: 'ready',
-                bundle,
-                revalidation: { state: 'running', attempt: startAttempt(bundle, at) },
-              };
+              cache = { ...cache, fetch: start(at, null) };
               continue;
             case 'backing_off':
-              if (at < revalidation.retryAt) return usableStale(bundle, at);
-              cache = {
-                phase: 'ready',
-                bundle,
-                revalidation: { state: 'retrying', attempt: startAttempt(bundle, at) },
-              };
+              if (at < fetch.failure.retryAt) return usableStale(bundle, at);
+              cache = { ...cache, fetch: start(at, fetch.failure) };
               continue;
-            case 'running':
-            case 'retrying': {
-              const timesOutAt = revalidation.attempt.startedAt + ATTEMPT_TIMEOUT_MS;
+            case 'running': {
+              const timesOutAt = fetch.attempt.startedAt + ATTEMPT_TIMEOUT_MS;
               if (at >= timesOutAt) {
-                cache = {
-                  phase: 'ready',
-                  bundle,
-                  revalidation: { state: 'backing_off', retryAt: timesOutAt },
-                };
+                timeOut(fetch);
                 continue;
               }
-              if (age < CACHE_TTL_MS || revalidation.state === 'retrying') {
-                ctx?.waitUntil(revalidation.attempt.outcome);
-                return usableStale(bundle, at);
+              if (fetch.failure === null && age >= CACHE_TTL_MS) {
+                await settledOrAt(timesOutAt);
+                continue;
               }
-              await settledOrAt(timesOutAt);
-              continue;
+              ctx?.waitUntil(fetch.attempt.outcome);
+              return usableStale(bundle, at);
             }
           }
         }

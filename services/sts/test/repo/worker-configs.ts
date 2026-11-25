@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { z } from 'zod';
@@ -450,6 +450,34 @@ export function workerConfigPaths(root: string): string[] {
   return [...new Set(listed.split('\0').filter(Boolean))]
     .filter(path => existsSync(join(root, path)))
     .sort();
+}
+
+/** A `wrangler.json` or `wrangler.jsonc` entry, of any file type, that the deploy job can reach. */
+export type DeployConfigEntry = { path: string; directory: boolean };
+
+/**
+ * Every entry named `wrangler.json` or `wrangler.jsonc` under `services/`, by `lstat` (a broken
+ * symlink and a directory count, symlinked directories are not followed), ignored or not, skipping
+ * `node_modules` as the deploy job's `find` does, plus a `wrangler.json` at the repository root.
+ * The deploy runs Wrangler in `services/<svc>/` with no `--config`, and Wrangler takes the first
+ * `wrangler.json` there or in any parent before it looks for `wrangler.jsonc`.
+ */
+export function deployConfigEntries(root: string): DeployConfigEntry[] {
+  const entries: DeployConfigEntry[] = [];
+  const rootConfig = lstatSync(join(root, 'wrangler.json'), { throwIfNoEntry: false });
+  if (rootConfig) entries.push({ path: 'wrangler.json', directory: rootConfig.isDirectory() });
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+      if (entry.name === 'node_modules') continue;
+      const path = `${dir}/${entry.name}`;
+      if (/^wrangler\.jsonc?$/.test(entry.name)) {
+        entries.push({ path, directory: entry.isDirectory() });
+      }
+      if (entry.isDirectory()) walk(path);
+    }
+  };
+  walk('services');
+  return entries.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 function blockOf(

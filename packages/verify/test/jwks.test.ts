@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   JWKS_FETCH_TIMEOUT_MS,
+  JWKS_MAX_RETRY_MS,
   JWKS_MAX_STALE_MS,
   JWKS_REFRESH_AFTER_MS,
   JWKS_RETRY_MS,
+  JWKS_STALE_WAIT_MS,
   JWKS_TTL_MS,
   UNKNOWN_KID_REFRESH_INTERVAL_MS,
   httpJwksSource,
@@ -13,9 +15,14 @@ import { importKeySet } from '../src/jwks';
 import {
   SCOPE,
   STS_ISSUER,
+  UTS_FEED_KID,
+  UTS_ISSUER,
+  UTS_TOKEN_KID,
   bearer,
   createIssuer,
   drain,
+  fakeAllTimers,
+  freezeHeartbeats,
   gate,
   harness,
   sign,
@@ -144,6 +151,74 @@ describe('the last good set while the issuer is unreachable', () => {
     await verify();
     expect(h.stsJwks.calls).toBe(3);
   });
+
+  it('doubles the retry wait per failure while the last good set serves, up to 60 s', async () => {
+    await verify();
+    h.stsJwks.mode = 'fail';
+    advance(JWKS_TTL_MS);
+    const waits: number[] = [];
+    for (let failures = 1; failures <= 6; failures++) {
+      const calls = h.stsJwks.calls;
+      expect(await verify()).toMatchObject({ ok: true });
+      expect(h.stsJwks.calls).toBe(calls + 1);
+      // The wait: no fetch one millisecond before it, the next fetch at it.
+      const wait = Math.min(JWKS_MAX_RETRY_MS, JWKS_RETRY_MS * 2 ** (failures - 1));
+      advance(wait - 1);
+      await verify();
+      expect(h.stsJwks.calls).toBe(calls + 1);
+      advance(1);
+      waits.push(wait);
+    }
+    expect(waits).toEqual([5_000, 10_000, 20_000, 40_000, 60_000, 60_000]);
+  });
+
+  it('keeps a 5 s retry wait when no set was ever loaded', async () => {
+    h.stsJwks.mode = 'fail';
+    for (let i = 0; i < 3; i++) {
+      expect(await verify()).toMatchObject({ status: 503, headers: { 'retry-after': '5' } });
+      advance(JWKS_RETRY_MS);
+    }
+    expect(h.stsJwks.calls).toBe(3);
+  });
+
+  it('serves the last good set once a refresh of an expired set has not answered in 1 s', async () => {
+    await verify();
+    advance(JWKS_TTL_MS);
+    h.stsJwks.mode = 'hang';
+    const token = await sign(h.sts, stsClaims());
+    fakeAllTimers();
+    let settled = false;
+    const pending = h.verifier
+      .verify(bearer(token), { issuer: 'sts', scope: SCOPE }, h.ctx)
+      .then(result => {
+        settled = true;
+        return result;
+      });
+    await vi.advanceTimersByTimeAsync(JWKS_STALE_WAIT_MS - 1);
+    expect(h.stsJwks.calls).toBe(2);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ ok: true });
+  });
+
+  it('waits the whole fetch timeout for a kid the last good set lacks', async () => {
+    await verify();
+    advance(JWKS_TTL_MS);
+    h.stsJwks.mode = 'hang';
+    const token = await sign(await createIssuer(STS_ISSUER), stsClaims());
+    fakeAllTimers();
+    let settled = false;
+    const pending = h.verifier
+      .verify(bearer(token), { issuer: 'sts', scope: SCOPE }, h.ctx)
+      .then(result => {
+        settled = true;
+        return result;
+      });
+    await vi.advanceTimersByTimeAsync(JWKS_FETCH_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ ok: false, status: 503, reason: 'jwks_unavailable' });
+  });
 });
 
 describe('missing key set', () => {
@@ -233,6 +308,24 @@ describe('unknown kid', () => {
     expect(await verifyWith(stranger)).toMatchObject({ ok: false, reason: 'unknown_kid' });
     expect(fresh.stsJwks.calls).toBe(1);
   });
+
+  it('counts a refresh whose request was cancelled against the limit', async () => {
+    // Each attack request carries an unknown kid and is cancelled while its refresh is in flight.
+    freezeHeartbeats();
+    h.stsJwks.mode = 'hang';
+    const token = await sign(stranger, stsClaims());
+    const results: Promise<VerifyResult>[] = [];
+    // 1.5 s apart: past the 1 s abandonment mark, inside the 5 s fetch timeout, for 3 minutes.
+    for (let step = 0; step < 120; step++) {
+      results.push(h.verifier.verify(bearer(token), { issuer: 'sts', scope: SCOPE }, h.ctx));
+      advance(1_500);
+    }
+    advance(JWKS_FETCH_TIMEOUT_MS);
+    const settled = await Promise.all(results);
+    // The cold fetch and the one unknown-kid refresh; nothing else in 3 minutes.
+    expect(h.stsJwks.calls).toBe(2);
+    expect(settled.slice(1).every(r => !r.ok && r.reason === 'unknown_kid')).toBe(true);
+  });
 });
 
 describe('concurrent refreshes', () => {
@@ -278,13 +371,28 @@ describe('key-set validation', () => {
     ],
     [
       'skips keys marked for another use',
-      (k: Record<string, unknown>) => [{ ...k, kid: 'feed', use: 'enc' }, k],
+      (k: Record<string, unknown>) => [{ ...k, kid: 'other', use: 'enc' }, k],
       1,
     ],
     ['skips keys without kid', (k: Record<string, unknown>) => [{ ...k, kid: undefined }], 0],
+    [
+      'never takes a feed-prefixed key as an STS token key',
+      (k: Record<string, unknown>) => [{ ...k, kid: `${UTS_FEED_KID}x` }],
+      0,
+    ],
   ])('%s', async (_name, build, count) => {
-    const keys = await importKeySet({ keys: build(h.sts.jwk) });
-    expect(keys.size).toBe(count);
+    const keys = await importKeySet({ keys: build(h.sts.jwk) }, 'sts');
+    expect(keys.tokenKeys.size).toBe(count);
+    expect(keys.feedKeys.size).toBe(0);
+  });
+
+  it('splits a UTS set into token keys and feed keys by kid prefix, skipping other kids', async () => {
+    const token = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID);
+    const feed = await createIssuer(UTS_ISSUER, UTS_FEED_KID);
+    const unprefixed = await createIssuer(UTS_ISSUER);
+    const keys = await importKeySet({ keys: [token.jwk, feed.jwk, unprefixed.jwk] }, 'uts');
+    expect([...keys.tokenKeys.keys()]).toEqual([token.kid]);
+    expect([...keys.feedKeys.keys()]).toEqual([feed.kid]);
   });
 
   it.each([
@@ -292,6 +400,6 @@ describe('key-set validation', () => {
     ['a body without keys', () => ({})],
     ['keys that are not an array', () => ({ keys: {} })],
   ])('refuses %s', async (_name, build) => {
-    await expect(importKeySet(build(h.sts.jwk))).rejects.toThrow();
+    await expect(importKeySet(build(h.sts.jwk), 'sts')).rejects.toThrow();
   });
 });

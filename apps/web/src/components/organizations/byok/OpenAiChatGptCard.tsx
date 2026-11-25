@@ -94,8 +94,9 @@ const CARD_ACTION_CLASS = 'w-fit';
 
 /** The declined/failed authorization copy, keyed by the returned error code. */
 function openAiChatGptAuthErrorMessage(code: string): string {
-  // A refused connect start (no recent sign-in) or callback (single sign-on
-  // required) names what the person can do about it.
+  // A refused connect start (no browser session, or a missing or wrong emailed
+  // code) or callback (single sign-on required) names what the person can do
+  // about it.
   const signInMethodChangeMessage = SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[code];
   if (signInMethodChangeMessage) {
     return signInMethodChangeMessage;

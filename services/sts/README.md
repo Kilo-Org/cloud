@@ -164,6 +164,16 @@ gains a key nobody classified. The check fails when:
 - a config that binds STS has an env block whose `name` is neither absent nor `<name>-<env>`, or two
   configs share a top-level `name`;
 - the caller has no `worker-binding` policy listing the environment the binding reaches;
+- in the `sts` config, the `audit-relay` config or any config that binds STS, a block (its own
+  `observability` or the inherited top-level one, `previews` included) does not set
+  `observability.traces.enabled` to exactly `false`: a trace records outbound URLs (a Slack webhook
+  URL is a secret) and Durable Object SQL bindings (STS keeps keys in SQL);
+- a non-production block (any env block or `previews`) of a config that binds STS reads a secret
+  from the production Secrets Store `342a86d9e3a94da698e82d0c6e2a36f0` whose name lacks a `_DEV`,
+  `_DEVELOPMENT`, `_LOCAL`, `_STAGING` or `_TEST` suffix;
+- the top level of a config that binds STS has crons and an env block inherits them (leaves
+  `triggers` out) or, outside `staging`, sets any cron: an accidental `wrangler deploy --env local`
+  must not run production schedules;
 - anything but the STS deployment of that environment (`sts` → `kilo-audit`, `sts-staging` →
   `kilo-audit-staging`, `sts-local` and the test config `sts-test` → `kilo-audit-local`) produces to
   a `kilo-audit*` queue, or anything but the matching `audit-relay*` deployment consumes one or

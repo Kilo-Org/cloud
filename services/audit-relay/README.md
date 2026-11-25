@@ -30,21 +30,24 @@ For an accepted batch the Durable Object, in order:
    bucket-lock rule rejects the write to an existing key; that counts as success only when the
    stored object's `hash` matches. A different hash is a second writer: the batch is dropped and
    the page goes out.
-3. Records the head in the registry object and advances its own head. The archive is the evidence
-   store, so a batch is committed as soon as its object is stored.
+3. Records the head in the registry object, then commits the head **and** a `pending` hot-copy row
+   for `fromSeq..toSeq` in one storage write. The archive is the evidence store, so the batch is
+   committed as soon as its object is stored, and the delivery intent can never be lost behind an
+   advanced head.
 4. Ingests the events into Axiom (`POST {AXIOM_URL}/v1/datasets/{AXIOM_DATASET}/ingest`) with
    `_time` set from the CloudEvents `time`; the event `id` stays in the body as the dedupe key.
+   Success clears the row.
 
-Axiom is the hot copy and cannot hold the stream hostage: when the ingest fails, the Durable Object
-stores a **hot-store gap** row in its own storage — `{ stream, fromSeq, toSeq, reason, recordedAt }`
-with `reason` one of `axiom_rejected`, `axiom_unavailable`, `secrets_denied`,
-`secrets_unavailable`. A retryable failure (`axiom_unavailable`, `secrets_unavailable`) still
-retries the message, and the redelivery finds the head already advanced: it re-ingests the events
-the message carries, clears the gap rows it fully covers, and acks without touching R2. A
-non-retryable failure (`axiom_rejected`, `secrets_denied`) acks the message and pages; the gap row
-stays until a replay job re-ingests that range from the archive (`hotStoreGaps()` to read,
-`clearHotStoreGap(fromSeq, toSeq)` to mark done). One rejected batch therefore never stalls the
-stream: the next batch is archived normally.
+Axiom is the hot copy and cannot hold the stream hostage. The row is
+`{ stream, fromSeq, toSeq, reason, recordedAt }`; a failure replaces `reason` with
+`axiom_rejected`, `axiom_unavailable`, `secrets_denied` or `secrets_unavailable`, leaving
+`pending` only for a range whose ingest was interrupted. A retryable failure
+(`axiom_unavailable`, `secrets_unavailable`) still retries the message, and the redelivery finds the
+head already advanced: it re-ingests the events the message carries, clears the rows it fully
+covers, and acks without touching R2. A non-retryable failure (`axiom_rejected`, `secrets_denied`)
+acks the message and pages; the row stays until a replay job re-ingests that range from the archive
+(`hotStoreGaps()` to read, pending rows included, and `clearHotStoreGap(fromSeq, toSeq)` to mark
+done). One rejected batch therefore never stalls the stream: the next batch is archived normally.
 
 A retry re-runs the same steps idempotently: the archive key already holds the same hash, and Axiom
 receives the same event ids. Secrets come from STS through `SecretSource` (`src/secrets.ts`):
@@ -164,7 +167,8 @@ pnpm lint
 
 The suite covers in-order delivery, duplicates, gap-then-fill, partial overlap, an Axiom failure
 retried without a second archive write, a rejected batch that leaves a hot-store gap while the next
-batch is still archived, a locked key with the same and with a different hash, checkpoint signing
+batch is still archived, a crash between the commit write and the ingest whose owed range the
+redelivery replays, a locked key with the same and with a different hash, checkpoint signing
 verified with the published key, tamper detection above and below the checkpoint, a forged
 checkpoint signature, and each `BundleResult` state of the secrets adapter.
 Axiom and Slack are recorded and answered by a stubbed `fetch`.

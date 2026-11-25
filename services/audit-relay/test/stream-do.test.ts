@@ -1,4 +1,4 @@
-import { abortAllDurableObjects } from 'cloudflare:test';
+import { abortAllDurableObjects, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getStreamDOStub } from '../src/dos/StreamDO';
 import type { StreamOutcome } from '../src/dos/StreamDO';
@@ -181,6 +181,40 @@ describe('StreamDO', () => {
       kind: 'duplicate',
       replayed: true,
     });
+    expect(await stub.hotStoreGaps()).toEqual([]);
+  });
+
+  it('replays an owed hot-copy range left by a crash before delivery', async () => {
+    const stream = uniqueStream('hot-pending');
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const stub = getStreamDOStub(env, stream);
+
+    // Exactly what the commit write leaves if the instance dies before the ingest: the head and
+    // the pending row for the archived range, and nothing delivered.
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put({
+        stream,
+        head: { seq: 2, hash: 'a'.repeat(64) },
+        hot_gaps: [
+          {
+            stream,
+            fromSeq: 1,
+            toSeq: 2,
+            reason: 'pending',
+            recordedAt: new Date().toISOString(),
+          },
+        ],
+      });
+    });
+
+    expect(await stub.acceptBatch(auditBatch(1, 2, stream))).toMatchObject({
+      kind: 'duplicate',
+      replayed: true,
+    });
+    expect(http.requests).toHaveLength(1);
+    expect(requestBodyOf(http.requests[0])).toHaveLength(2);
+    expect(http.requests[0].url).toBe('https://api.axiom.co/v1/datasets/kilo-audit-test/ingest');
     expect(await stub.hotStoreGaps()).toEqual([]);
   });
 });

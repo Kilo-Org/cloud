@@ -70,10 +70,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 ### Internal Durable Objects
 
 `BundleDO`, `RefresherDO` and `SignerDO` are internal. Their methods skip the policy check and the
-audit row that `SecretsBroker` performs, so no other Worker may bind them: a
-`durable_objects.bindings[].script_name` of `sts`, `sts-staging` or `sts-local` in any config
-fails `test/repo/worker-configs.test.ts`, as does an STS service binding at any entrypoint other
-than `SecretsBroker`.
+audit row that `SecretsBroker` performs, so no other Worker may reach them: a
+`durable_objects.bindings[].script_name`, workflow `script_name`, migration `from_script` or export
+`transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe` binding, or an STS service
+binding at any entrypoint other than `SecretsBroker` fails `test/repo/worker-configs.test.ts`.
 
 ## Configuration
 
@@ -129,14 +129,23 @@ Adding a file also means adding it to `src/policy/registry.ts`; the typed import
 checks the directory itself.
 
 `test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
-`wrangler*.toml` in the repository (test fixtures excepted) with Wrangler's own parser, every env
-block included, and fails when:
+`wrangler*.toml` the checkout tracks, or holds untracked and not ignored, test fixtures included
+(`cloud-agent-e2e-deploy.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
+Ignored configs stay out: `wrangler.runtime-generated.json` and
+`.wrangler/wrangler.e2e-test.jsonc` are rendered at deploy time from a tracked `wrangler.jsonc` this
+check already reads. Each file is parsed with Wrangler's own parser, every env block and every
+`previews` block included. Every key Wrangler accepts is either modelled with a strict schema or
+listed as inert in `test/repo/worker-configs.ts`; a key in neither list fails the check, an unknown
+field inside a modelled binding fails the parse, and the suite fails when Wrangler's own schema
+gains a key nobody classified. The check fails when:
 
-- a Durable Object binding names `script_name` `sts`, `sts-*`, `audit-relay` or `audit-relay-*`;
+- any block has an `unsafe` key;
+- a Durable Object binding, workflow, tail consumer, dispatch outbound, migration transfer or export
+  transfer names `sts`, `sts-*`, `audit-relay` or `audit-relay-*`;
 - a service binding to `sts`/`sts-*` uses an entrypoint other than `SecretsBroker`, or any service
   binding targets `audit-relay`/`audit-relay-*`;
-- the top-level (production) block binds anything but `sts`, or an `<env>` block anything but
-  `sts-<env>`;
+- the top-level (production) block binds anything but `sts`, an `<env>` block anything but
+  `sts-<env>`, or a `previews` block binds STS at all (a preview runs unreviewed code);
 - `props.caller` is not the config's top-level `name`, in any block;
 - a config that binds STS has an env block whose `name` is neither absent nor `<name>-<env>`, or two
   configs share a top-level `name`;
@@ -145,7 +154,14 @@ block included, and fails when:
   `kilo-audit-staging`, `sts-local` and the test config `sts-test` → `kilo-audit-local`) produces to
   a `kilo-audit*` queue, or anything but the matching `audit-relay*` deployment consumes one or
   dead-letters into one;
-- a config other than the STS, STS test or relay config deploys under one of their names.
+- anything but the matching relay deployment binds a `kilo-audit-archive*` bucket (`audit-relay` →
+  `kilo-audit-archive`, `audit-relay-staging` → `kilo-audit-archive-staging`, `audit-relay-local` →
+  `kilo-audit-archive-local`, the test config `audit-relay-test` → `kilo-audit-archive-test`), as
+  `bucket_name` or `preview_bucket_name`, or the production or staging binding lacks
+  `"jurisdiction": "eu"`;
+- a route outside the STS or relay config covers one of their hostnames;
+- a config other than the STS, STS test, relay or relay test config deploys under one of their
+  names.
 
 CI runs it whenever any Worker config changes (`scripts/affected-workspaces.mjs` routes every
 `wrangler*` file to this workspace).

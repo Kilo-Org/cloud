@@ -1,8 +1,10 @@
 import { captureException } from '@sentry/nextjs';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import type { Organization } from '@kilocode/db/schema';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   normalizeInferenceProviderId,
@@ -165,17 +167,24 @@ export function relevantChangesIsEmpty(changes: RelevantChanges): boolean {
  *   Added models from provider {slug}: {id1}, {id2}
  *   Removed models (no longer available): {id1}, {id2}
  *   Removed models (no longer offered by any allowed provider): {id1}, {id2}
+ *
+ * When `addedModelsDisabled` is set, the additions were also put on the deny list and read
+ * `Disabled new models from provider {slug}: {id1}, {id2}` instead.
  */
-export function buildAutoChangeMessage(changes: RelevantChanges): string {
+export function buildAutoChangeMessage(
+  changes: RelevantChanges,
+  { addedModelsDisabled = false }: { addedModelsDisabled?: boolean } = {}
+): string {
   const segments: string[] = [];
 
   const sortedProviders = [...changes.addedByReasonProvider.keys()].sort((a, b) =>
     a.localeCompare(b)
   );
+  const addedPrefix = addedModelsDisabled ? 'Disabled new models' : 'Added models';
   for (const providerSlug of sortedProviders) {
     const models = changes.addedByReasonProvider.get(providerSlug);
     if (models && models.length > 0) {
-      segments.push(`Added models from provider ${providerSlug}: ${models.join(', ')}`);
+      segments.push(`${addedPrefix} from provider ${providerSlug}: ${models.join(', ')}`);
     }
   }
 
@@ -219,11 +228,74 @@ const orgHasCurrentEntitlement = sql<boolean>`(
   ), false)
 )`;
 
+const orgDisablesNewModels = sql<boolean>`(${organizations.settings}->>'disable_new_models' = 'true')`;
+
+function auditDetails(changes: RelevantChanges, addedModelsDisabled: boolean) {
+  return {
+    id: 'autoRouting.models' as const,
+    // The mobile detail line reads these as enabled additions, so disabled ones are
+    // left to the message.
+    added: addedModelsDisabled
+      ? []
+      : [...changes.addedByReasonProvider].map(([provider, models]) => ({ provider, models })),
+    removed: [...changes.removedFromCatalog, ...changes.removedFromAllowedProviders],
+  };
+}
+
+/**
+ * Add the models `changes` newly admits to the organization's deny list and record the
+ * change, in one transaction. The policy is read again under the row lock, so an
+ * organization that turned it off since the sync read it only gets the audit row.
+ */
+async function disableAddedModelsAndLog(organizationId: string, changes: RelevantChanges) {
+  const addedModels = [...changes.addedByReasonProvider.values()].flat();
+  await db.transaction(async tx => {
+    // Same lock order as `updateAllowLists`: the group policy revision, then the organization row.
+    await bumpOrganizationGroupPolicyRevision(tx, organizationId, null);
+    let addedModelsDisabled = false;
+    await mutateOrganizationSettings(
+      organizationId,
+      organization => {
+        if (organization.plan !== 'enterprise' || !organization.settings.disable_new_models) {
+          return organization.settings;
+        }
+        addedModelsDisabled = true;
+        const modelDenyList = [
+          ...new Set([...(organization.settings.model_deny_list ?? []), ...addedModels]),
+        ];
+        const defaultModel = organization.settings.default_model;
+        const defaultModelDisabled =
+          defaultModel !== undefined && addedModels.includes(normalizeModelId(defaultModel));
+        return {
+          ...organization.settings,
+          model_deny_list: modelDenyList,
+          ...(defaultModelDisabled ? { default_model: undefined } : {}),
+        };
+      },
+      tx
+    );
+    await createAuditLog({
+      action: 'organization.settings.auto_change',
+      actor_id: null,
+      actor_email: null,
+      actor_name: null,
+      details: auditDetails(changes, addedModelsDisabled),
+      message: buildAutoChangeMessage(changes, { addedModelsDisabled }),
+      organization_id: organizationId,
+      tx,
+    });
+  });
+}
+
 /**
  * Compute the diff between the previous and current OpenRouter snapshots and
  * write one audit log row per active enterprise organization with explicit
  * model/provider restrictions whose effective model availability changed.
  * Attributed to `System` via null actor fields.
+ *
+ * An enterprise organization with the `disable_new_models` advanced policy is
+ * always included, whatever its restrictions or entitlement, and the models that
+ * become available to it are also added to its deny list.
  *
  * Safe to call from inside a background job; individual per-org failures are
  * reported to Sentry and do not break the rest of the loop.
@@ -245,8 +317,7 @@ export async function logAutoModelChangesForAllOrgs(
       and(
         eq(organizations.plan, 'enterprise'),
         isNull(organizations.deleted_at),
-        orgHasModelRestrictions,
-        orgHasCurrentEntitlement
+        or(and(orgHasModelRestrictions, orgHasCurrentEntitlement), orgDisablesNewModels)
       )
     );
 
@@ -257,22 +328,19 @@ export async function logAutoModelChangesForAllOrgs(
 
     const message = buildAutoChangeMessage(changes);
     try {
-      await createAuditLog({
-        action: 'organization.settings.auto_change',
-        actor_id: null,
-        actor_email: null,
-        actor_name: null,
-        details: {
-          id: 'autoRouting.models',
-          added: [...changes.addedByReasonProvider].map(([provider, models]) => ({
-            provider,
-            models,
-          })),
-          removed: [...changes.removedFromCatalog, ...changes.removedFromAllowedProviders],
-        },
-        message,
-        organization_id: organization.id,
-      });
+      if (organization.settings.disable_new_models && changes.addedByReasonProvider.size > 0) {
+        await disableAddedModelsAndLog(organization.id, changes);
+      } else {
+        await createAuditLog({
+          action: 'organization.settings.auto_change',
+          actor_id: null,
+          actor_email: null,
+          actor_name: null,
+          details: auditDetails(changes, false),
+          message,
+          organization_id: organization.id,
+        });
+      }
       logCount++;
     } catch (err) {
       console.error(

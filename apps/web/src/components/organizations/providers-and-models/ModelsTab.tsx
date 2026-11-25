@@ -24,6 +24,7 @@ export function ModelsTab({
   onOpenModelDetails,
   scope = 'organization',
   showDetails = true,
+  newModelsDisabledByDefault = false,
 }: {
   isLoading: boolean;
   canEdit: boolean;
@@ -41,6 +42,7 @@ export function ModelsTab({
   onOpenModelDetails: (modelId: string) => void;
   scope?: 'organization' | 'group';
   showDetails?: boolean;
+  newModelsDisabledByDefault?: boolean;
 }) {
   const modelsToEnable = filteredModelRows
     .filter(row => !row.unavailableReason && !allowedModelIds.has(row.modelId))
@@ -53,7 +55,7 @@ export function ModelsTab({
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
         {scope === 'organization'
-          ? 'Disable specific models for organization members. New models from enabled providers are enabled by default. A group policy in "Specific models and providers" mode gives its own members the models and providers it selects.'
+          ? `Disable specific models for organization members. ${newModelsDisabledByDefault ? 'New models are disabled by default, as set on the Advanced policies tab.' : 'New models from enabled providers are enabled by default.'} A group policy in "Specific models and providers" mode gives its own members the models and providers it selects.`
           : 'Grant specific models in addition to the organization default access.'}
       </p>
 

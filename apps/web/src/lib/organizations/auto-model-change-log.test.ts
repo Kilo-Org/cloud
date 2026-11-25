@@ -366,6 +366,64 @@ describe('buildAutoChangeMessage', () => {
     );
   });
 
+  test('addedModelsDisabled: additions read as disabled, sorted by provider', () => {
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map([
+          ['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']],
+          ['anthropic', ['anthropic/claude-4.6-haiku']],
+        ]),
+        removedFromCatalog: [],
+        removedFromAllowedProviders: [],
+      },
+      { addedModelsDisabled: true }
+    );
+
+    expect(message).toBe(
+      'Disabled new models from provider anthropic: anthropic/claude-4.6-haiku; Disabled new models from provider z-ai: z-ai/glm-5.1, z-ai/glm-5.1-air'
+    );
+  });
+
+  test('addedModelsDisabled: removals keep their wording', () => {
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1']]]),
+        removedFromCatalog: ['z-ai/glm-4.0'],
+        removedFromAllowedProviders: ['openai/gpt-4o'],
+      },
+      { addedModelsDisabled: true }
+    );
+
+    expect(message).toBe(
+      'Disabled new models from provider z-ai: z-ai/glm-5.1; Removed models (no longer available): z-ai/glm-4.0; Removed models (no longer offered by any allowed provider): openai/gpt-4o'
+    );
+  });
+
+  test('addedModelsDisabled: false matches the default wording', () => {
+    const changes = {
+      addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1']]]),
+      removedFromCatalog: [],
+      removedFromAllowedProviders: [],
+    };
+
+    expect(buildAutoChangeMessage(changes, { addedModelsDisabled: false })).toBe(
+      buildAutoChangeMessage(changes)
+    );
+  });
+
+  test('addedModelsDisabled: removal-only changes are unaffected', () => {
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map(),
+        removedFromCatalog: ['z-ai/glm-4.0'],
+        removedFromAllowedProviders: [],
+      },
+      { addedModelsDisabled: true }
+    );
+
+    expect(message).toBe('Removed models (no longer available): z-ai/glm-4.0');
+  });
+
   test('empty input returns empty string', () => {
     const message = buildAutoChangeMessage({
       addedByReasonProvider: new Map(),

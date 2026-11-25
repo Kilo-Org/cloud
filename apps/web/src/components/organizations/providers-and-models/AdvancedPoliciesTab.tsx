@@ -16,7 +16,10 @@ import {
 import type { inferRouterOutputs } from '@trpc/server';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
-import { OrganizationDataRegionSchema } from '@kilocode/db/schema-types';
+import {
+  OrganizationDataRegionSchema,
+  type OrganizationDataRegion,
+} from '@kilocode/db/schema-types';
 import { ORGANIZATION_DATA_REGION_NAMES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 type GatewaySettings =
@@ -35,20 +38,89 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
+  const mutationCallbacks = {
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: trpc.organizations.settings.getGatewaySettings.queryKey({ organizationId }),
+      });
+      toast.success('Advanced policies saved');
+    },
+    onError: (error: { message: string }) => {
+      toast.error(`Could not save advanced policies: ${error.message}`);
+    },
+  };
   const mutation = useMutation(
-    trpc.organizations.settings.updateGatewaySettings.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: trpc.organizations.settings.getGatewaySettings.queryKey({ organizationId }),
-        });
-        toast.success('Advanced policies saved');
-      },
-      onError: error => {
-        toast.error(`Could not save advanced policies: ${error.message}`);
-      },
-    })
+    trpc.organizations.settings.updateGatewaySettings.mutationOptions(mutationCallbacks)
   );
-  const disabled = !canEdit || mutation.isPending;
+  const newModelsMutation = useMutation(
+    trpc.organizations.settings.updateNewModelsPolicy.mutationOptions(mutationCallbacks)
+  );
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>New models</CardTitle>
+          <CardDescription>
+            Control whether models that become available to your organization can be used right
+            away.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex min-h-11 items-center gap-3">
+              <Switch
+                id={`${id}-new-models`}
+                checked={settings.disable_new_models}
+                disabled={!canEdit || newModelsMutation.isPending}
+                aria-describedby={`${id}-new-models-help`}
+                onCheckedChange={checked =>
+                  newModelsMutation.mutate({ organizationId, disable_new_models: checked })
+                }
+              />
+              <Label htmlFor={`${id}-new-models`}>Disable new models by default</Label>
+            </div>
+            <p id={`${id}-new-models-help`} className="text-muted-foreground ml-12 text-sm">
+              {settings.disable_new_models
+                ? 'Models that become available, such as newly released models or models an enabled provider starts serving, are added to the disabled models on the Models tab and recorded in the audit log. Enable them on the Models tab.'
+                : 'Models that become available from enabled providers can be used right away. Turn this on to disable them until an admin enables them on the Models tab.'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {settings.available && (
+        <GatewayPoliciesCard
+          id={id}
+          settings={settings}
+          disabled={!canEdit || mutation.isPending}
+          onChange={input => mutation.mutate({ organizationId, ...input })}
+        />
+      )}
+
+      {!canEdit && (
+        <p className="text-muted-foreground text-sm">
+          Only organization owners and admins can change advanced policies.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function GatewayPoliciesCard({
+  id,
+  settings,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  settings: GatewaySettings;
+  disabled: boolean;
+  onChange: (input: {
+    disable_openrouter?: boolean;
+    data_region?: OrganizationDataRegion | null;
+  }) => void;
+}) {
   const regionName = settings.data_region
     ? ORGANIZATION_DATA_REGION_NAMES[settings.data_region]
     : null;
@@ -58,7 +130,7 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Advanced policies</CardTitle>
+        <CardTitle>Request routing</CardTitle>
         <CardDescription>
           Control where requests paid with Kilo credits are processed. Kilo sends these requests
           through the Vercel AI Gateway or OpenRouter.
@@ -71,8 +143,7 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
             value={settings.data_region ?? GLOBAL_REGION}
             disabled={disabled}
             onValueChange={value =>
-              mutation.mutate({
-                organizationId,
+              onChange({
                 data_region:
                   value === GLOBAL_REGION ? null : OrganizationDataRegionSchema.parse(value),
               })
@@ -110,9 +181,7 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
               checked={openRouterOn}
               disabled={disabled || !!regionName}
               aria-describedby={`${id}-openrouter-help`}
-              onCheckedChange={checked =>
-                mutation.mutate({ organizationId, disable_openrouter: !checked })
-              }
+              onCheckedChange={checked => onChange({ disable_openrouter: !checked })}
             />
             <Label htmlFor={`${id}-openrouter`}>Allow OpenRouter</Label>
           </div>
@@ -148,12 +217,6 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
             error unless they use your organization&apos;s own OpenRouter key.
           </p>
         </div>
-
-        {!canEdit && (
-          <p className="text-muted-foreground text-sm">
-            Only organization owners and admins can change advanced policies.
-          </p>
-        )}
       </CardContent>
     </Card>
   );

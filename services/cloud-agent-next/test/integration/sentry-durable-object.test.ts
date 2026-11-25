@@ -14,6 +14,7 @@ import {
   SandboxControlV2,
   type StoredProviderPin,
 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import { SNAPSHOT_VALIDATOR_REF_KEY } from '../../src/control-plane/sandbox/snapshot-validator.js';
 import { allocation } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { SandboxContainers } from '../../src/sandbox-containers/SandboxContainers.js';
@@ -96,15 +97,15 @@ const FAILED_READ_CAP = 200;
 
 function failingStorageReads(storage: DurableObjectStorage, mode: 'rejects' | 'throws') {
   let failing = false;
-  const failures: Error[] = [];
+  const failures: { key: unknown; error: Error }[] = [];
   const read = storage.get;
   vi.spyOn(storage, 'get').mockImplementation(((...args: unknown[]) => {
     if (!failing) return Reflect.apply(read, storage, args);
     if (failures.length >= FAILED_READ_CAP) return Promise.resolve(undefined);
-    const failure = new Error('private-storage-read-failure');
-    failures.push(failure);
-    if (mode === 'throws') throw failure;
-    return Promise.reject(failure);
+    const error = new Error('private-storage-read-failure');
+    failures.push({ key: args[0], error });
+    if (mode === 'throws') throw error;
+    return Promise.reject(error);
   }) as DurableObjectStorage['get']);
   return {
     failures,
@@ -243,11 +244,15 @@ describe('Cloud Agent Durable Object real SDK boundaries', () => {
         const rejection = await sandbox
           .getSnapshotValidatorStatus()
           .catch((error: unknown) => error);
-        expect(rejection).toBe(failingReads.failures[0]);
+        expect(rejection).toBe(failingReads.failures[0]?.error);
         return failingReads;
       });
-      await runInDurableObject(stub, () => undefined);
-      expect(reads.failures).toHaveLength(2);
+      // The transport runs after beforeSend, so the reader's read has finished here.
+      await waitFor(() => expect(events.length).toBeGreaterThan(0));
+      expect(reads.failures.map(failure => failure.key)).toEqual([
+        SNAPSHOT_VALIDATOR_REF_KEY,
+        'control_plane_owner',
+      ]);
       await captured(1);
       await runInDurableObject(stub, () => undefined);
       expect(events).toHaveLength(1);

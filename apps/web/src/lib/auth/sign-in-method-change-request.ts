@@ -44,12 +44,10 @@ function headerValue(headersList: Headers, name: string): string | null {
   }
 }
 
-/** An approximate location from the Vercel or Cloudflare geolocation headers. */
+/** An approximate location from the Vercel geolocation headers. */
 export function approximateLocation(headersList: Headers): string | null {
-  const city =
-    headerValue(headersList, 'x-vercel-ip-city') ?? headerValue(headersList, 'cf-ipcity');
-  const country =
-    headerValue(headersList, 'x-vercel-ip-country') ?? headerValue(headersList, 'cf-ipcountry');
+  const city = headerValue(headersList, 'x-vercel-ip-city');
+  const country = headerValue(headersList, 'x-vercel-ip-country');
   const parts = [city, country].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? parts.join(', ') : null;
 }

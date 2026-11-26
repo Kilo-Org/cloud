@@ -20,13 +20,14 @@ import type { PendingDevice, UserCodeSource } from './store';
  * app's redirect names that URI's scheme beside `'self'`.
  *
  * A page that runs a passkey ceremony also names `https://<rpId>/.well-known/webauthn` in
- * `connect-src`. The relying-party id is the app host, not the page's host, so the browser fetches
- * that URL itself to check that the page's origin is a related origin (WebAuthn Level 3, section
- * 5.11.1). The specification does not say whether the page's policy governs that fetch (w3c/webauthn
- * issue 2408). Chromium checks the URL and every redirect against the page's enforced `connect-src`
- * (components/webauthn/core/browser/remote_validation.cc) and today only counts a refusal; a page
- * that names the URL keeps working when a browser enforces the check. In development the
- * relying-party id is the page's own host, the browser fetches nothing, and the entry is inert.
+ * `connect-src`. In production the relying-party id is the app host, not the page's host, so the
+ * browser fetches that URL itself to check that the page's origin is a related origin (WebAuthn
+ * Level 3, section 5.11.1). The specification does not say whether the page's policy governs that
+ * fetch (w3c/webauthn issue 2408). Chromium checks the URL and every redirect against the page's
+ * enforced `connect-src` (components/webauthn/core/browser/remote_validation.cc) and today only
+ * counts a refusal; a page that names the URL keeps working when a browser enforces the check. In
+ * staging and development the relying-party id is the page's own host, the browser fetches
+ * nothing, and the entry is inert.
  *
  * No `Permissions-Policy` is needed: the default allowlist of `publickey-credentials-get` and
  * `publickey-credentials-create` is `'self'`, which allows a top-level page. The allowlist names

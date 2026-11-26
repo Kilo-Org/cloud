@@ -11,14 +11,14 @@ import {
  * device endpoints with the session cookie. It runs in every browser that supports passkeys, so
  * it uses no newer JSON helpers of the WebAuthn API.
  *
- * The relying-party id (`data-rp-id`) is the app host. On another host a ceremony needs the
- * browser's related-origin support (WebAuthn Level 3, section 5.11; design 5.14). The script asks
- * `PublicKeyCredential.getClientCapabilities()` first (section 5.1.7): `relatedOrigins: false`, or
- * no WebAuthn at all, hides every `data-passkey` element and shows the page's
- * `passkey-unavailable` notice before any challenge is asked for. A missing key means "not known",
- * and older browsers lack the method; such a browser finds out at the ceremony: when rp.id is not
- * the page's host, `SecurityError` means that the browser has no related-origin support or the
- * related-origin check failed (sections 5.1.3.1 and 5.1.4.3), and the page then shows the same
+ * In production the relying-party id (`data-rp-id`) is the app host. On another host a ceremony
+ * needs the browser's related-origin support (WebAuthn Level 3, section 5.11; design 5.14). The
+ * script asks `PublicKeyCredential.getClientCapabilities()` first (section 5.1.7):
+ * `relatedOrigins: false`, or no WebAuthn at all, hides every `data-passkey` element and shows the
+ * page's `passkey-unavailable` notice before any challenge is asked for. A missing key means "not
+ * known", and older browsers lack the method; such a browser finds out at the ceremony: when rp.id
+ * is not the page's host, `SecurityError` means that the browser has no related-origin support or
+ * the related-origin check failed (sections 5.1.3.1 and 5.1.4.3), and the page then shows the same
  * notice. `NotAllowedError` stays an ordinary failure the user can retry, because the
  * specification also uses it for a cancelled ceremony. So a passkey sign-in or registration on
  * such a browser never fails without saying why.

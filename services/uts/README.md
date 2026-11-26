@@ -552,9 +552,10 @@ provider, SSO or email sign-in ends in a browser session (`__Host-uts_session`, 
 returns to the page that offered it, so an authorization request then issues its code
 (`src/signin/handoff.ts`).
 
-The passkey's relying-party id is the app host (`WEBAUTHN_RP_ID`), so on the issuer host a passkey
-ceremony needs the browser's WebAuthn related-origin support (design 5.14). The page script
-(`src/signin/script.ts`) asks `PublicKeyCredential.getClientCapabilities()`, and treats a
+In production the passkey's relying-party id is the app host (`WEBAUTHN_RP_ID`), so on the issuer
+host a passkey ceremony needs the browser's WebAuthn related-origin support (design 5.14). Staging
+uses its own passkey domain, the issuer host itself, so its ceremonies need no related origin. The
+page script (`src/signin/script.ts`) asks `PublicKeyCredential.getClientCapabilities()`, and treats a
 `SecurityError` from the ceremony the same way: without support, the passkey controls are hidden
 and the page says why and points to the other methods. The add-a-passkey page refuses in the same
 way, before it asks for a challenge when the browser has already answered. The passkey pages'
@@ -1039,8 +1040,8 @@ An unreadable STS key set answers 503, never an admission.
 | `IDENTITY_STORE` | Hyperdrive binding | The identity store's primary config (design 5.2); unset, no OAuth or sign-in endpoint is served |
 | `IDENTITY_STORE_PAT` | Hyperdrive binding | The PAT lookup config (logins `uts_pat_a`, `uts_pat_b`); unset, no PAT lookup is served |
 | `IDENTITY_STORE_REPLICA` | Hyperdrive binding | The read-replica config (logins `uts_reader_a`, `uts_reader_b`) for the account views |
-| `WEBAUTHN_RP_ID` | var | The app host whose passkeys users hold: `app.kilo.ai`, `staging-app.kilo.ai` |
-| `WEBAUTHN_ORIGINS` | var | The issuer origin; the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
+| `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
+| `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
 | `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset, the device grant is not served. Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
 
 ## Identity store

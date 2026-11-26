@@ -74,9 +74,10 @@ const EnvVarsSchema = z
 export const MAX_PAT_LOOKUPS_IN_FLIGHT = 100;
 
 /**
- * The WebAuthn relying party of the sign-in pages (design 5.14). `rpId` is the app host whose
- * passkeys users hold; `origins` are the pages that run the ceremonies, the issuer origin in a
- * deployed environment, which the app host lists as a WebAuthn related origin.
+ * The WebAuthn relying party of the sign-in pages (design 5.14). `rpId` is the host whose passkeys
+ * users hold: the app host in production, the issuer host in staging and development; `origins` are
+ * the pages that run the ceremonies, the issuer origin in a deployed environment, which the
+ * production app host lists as a WebAuthn related origin.
  */
 export type RelyingParty = { rpId: string; origins: readonly string[] };
 

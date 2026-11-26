@@ -94,7 +94,9 @@
         "DO_JURISDICTION": "eu",
         // The staging PAT lookup config's connection limit; per-isolate cap min(100, 36) = 36.
         "PAT_LOOKUP_CONNECTIONS": "12",
-        "WEBAUTHN_RP_ID": "staging-app.kilo.ai",
+        // Staging keeps its own passkeys on the issuer host, so it needs no related-origins list
+        // on the staging app (design 5.14).
+        "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
         "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
       },
       "durable_objects": {

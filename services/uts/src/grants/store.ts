@@ -38,10 +38,14 @@ export type IssueCodeInput = {
   amr: readonly string[];
 };
 
-/** `orgRole`: the caller's role in `orgId` (`uts.org_role`), null without an organization. */
+/**
+ * `orgRole`: the caller's role in `orgId` (`uts.org_role`), null without an organization.
+ * `invalid_scope`: a requested scope is limited to membership roles the caller does not hold
+ * (`uts.scope_org_roles`); nothing was stored.
+ */
 export type IssueCodeResult =
   | { outcome: 'issued'; orgRole: UtsOrgRole | null }
-  | { outcome: 'access_denied' | 'consent_required' };
+  | { outcome: 'access_denied' | 'consent_required' | 'invalid_scope' };
 
 /** `scopes` and `resources` null mean "not named in the request". */
 type TokenSelection = { scopes: readonly string[] | null; resources: readonly string[] | null };
@@ -184,7 +188,7 @@ const failure = <const Outcomes extends readonly [string, ...string[]]>(outcomes
 
 const IssueCodeRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('issued'), ...OrgRoleColumn }),
-  failure(['access_denied', 'consent_required']),
+  failure(['access_denied', 'consent_required', 'invalid_scope']),
 ]);
 
 const ExchangeRowSchema = z.discriminatedUnion('outcome', [

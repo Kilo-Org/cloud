@@ -17,7 +17,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { ORG_ROLES } from '../../src/db/enums';
 import { identifyClient } from '../../src/oauth/clients';
-import { credentialScopeCheck, orgScopeRefusal } from '../../src/scopes/policy';
+import { clientScopeRefusal, credentialScopeCheck, orgScopeRefusal } from '../../src/scopes/policy';
 import { firstPartyClientProblems, scopeRegistryProblems } from './scope-registry';
 
 /** The scope registry as code (design 5.3), checked against its rules. */
@@ -222,28 +222,61 @@ describe('the UTS scope registry', () => {
       .map(([scope]) => scope);
     expect(orgScopes).toContain('ai-attribution:identity.read');
     for (const scope of orgScopes) {
-      expect(orgScopeRefusal(['gateway:models.read', scope], null, null)).toBe(scope);
-      expect(orgScopeRefusal([scope], crypto.randomUUID(), 'owner')).toBeNull();
+      expect(
+        orgScopeRefusal(['session-sync:grants.exchange', scope], null, null, utsScopeEntry)
+      ).toBe(scope);
+      expect(orgScopeRefusal([scope], crypto.randomUUID(), 'owner', utsScopeEntry)).toBeNull();
     }
-    expect(
-      orgScopeRefusal(['session-sync:grants.exchange', 'gateway:unknown.read'], null, null)
-    ).toBeNull();
+    expect(orgScopeRefusal(['session-sync:grants.exchange'], null, null, utsScopeEntry)).toBe(null);
+    // An unregistered scope is refused, never let through.
+    expect(orgScopeRefusal(['gateway:unknown.read'], null, null, utsScopeEntry)).toBe(
+      'gateway:unknown.read'
+    );
   });
 
   it('refuses a scope limited to listed roles to every other role and to a missing role', () => {
     const org = crypto.randomUUID();
     const scope = 'ai-attribution:attributions.write';
-    expect(orgScopeRefusal([scope], org, 'owner')).toBeNull();
-    expect(orgScopeRefusal([scope], org, 'member')).toBeNull();
-    expect(orgScopeRefusal([scope], org, 'admin')).toBe(scope);
-    expect(orgScopeRefusal([scope], org, 'billing_manager')).toBe(scope);
-    expect(orgScopeRefusal([scope], org, null)).toBe(scope);
+    const refusal = (role: (typeof UTS_ORG_ROLES)[number] | null) =>
+      orgScopeRefusal([scope], org, role, utsScopeEntry);
+    expect(refusal('owner')).toBeNull();
+    expect(refusal('member')).toBeNull();
+    expect(refusal('admin')).toBe(scope);
+    expect(refusal('billing_manager')).toBe(scope);
+    expect(refusal(null)).toBe(scope);
     // A scope open to every role of the organization passes any role.
     for (const role of UTS_ORG_ROLES) {
-      expect(orgScopeRefusal(['git-token-service:bitbucket.repositories.read'], org, role)).toBe(
-        null
-      );
+      expect(
+        orgScopeRefusal(['git-token-service:bitbucket.repositories.read'], org, role, utsScopeEntry)
+      ).toBeNull();
     }
+  });
+
+  it('lets each first-party client mint exactly the scopes that list it, and third parties none yet', () => {
+    for (const [scope, entry] of Object.entries(UTS_SCOPE_REGISTRY)) {
+      for (const client of UTS_FIRST_PARTY_CLIENTS) {
+        const refused = clientScopeRefusal(
+          [scope],
+          { kind: 'first_party', clientId: client.clientId },
+          utsScopeEntry
+        );
+        expect(refused).toBe(entry.allowedClients.includes(client.clientId) ? null : scope);
+      }
+      expect(
+        clientScopeRefusal(
+          [scope],
+          { kind: 'third_party', clientId: 'https://client.example.com/metadata.json' },
+          utsScopeEntry
+        )
+      ).toBe(entry.thirdPartySafe ? null : scope);
+    }
+    expect(
+      clientScopeRefusal(
+        ['gateway:unknown.read'],
+        { kind: 'first_party', clientId: 'kilo-cli' },
+        utsScopeEntry
+      )
+    ).toBe('gateway:unknown.read');
   });
 });
 

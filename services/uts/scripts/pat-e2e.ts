@@ -2,12 +2,13 @@
  * Local end-to-end run of PATs and org bot keys against `wrangler dev --env local` and the local
  * identity store (README, "Local development"): sign in the CLI, create a PAT, use it on the probe
  * route, list it, revoke it and time how long until the probe refuses it; a create refused by the
- * tier B gate once the sign-in is 11 minutes old; an org bot key created, listed and revoked; an
- * owner-or-member scope refused to an org admin at `/authorize`, minted for a member with the
- * `org` claim and refused at refresh once the member is an admin again; a 5-minute scope minted for
- * 300 seconds; then the audit rows from the database, checked for credential values and hashes and
- * for each token's lifetime. Synthetic data only; it prints ids and audit references, never a
- * token, a PAT or a key.
+ * tier B gate once the sign-in is 11 minutes old; an org bot key created, listed and revoked; a
+ * web-app-only scope refused to the CLI at `/authorize`; an owner-or-member scope refused to an org
+ * admin at `/authorize` and minted for a member with the `org` claim, then refused at refresh once
+ * the member is an admin again, neither refusal writing an audit row; then the audit rows from the
+ * database, checked for credential values and hashes and for each token's lifetime. It mints only
+ * scopes the registry allows `kilo-cli`. Synthetic data only; it prints ids and audit references,
+ * never a token, a PAT or a key.
  *
  *   UTS_E2E_BASE_URL   the mint Worker, such as http://127.0.0.1:8800
  *   UTS_E2E_ADMIN_URL  admin login to the identity-store database (loopback only), for the seed,
@@ -296,7 +297,17 @@ async function main() {
     'gate refused'
   );
 
-  // Organization roles at mint: the attribution scope is for owners and members only.
+  const lastAuditId = async () =>
+    (await admin.query<{ id: string }>('SELECT coalesce(max(id), 0) AS id FROM uts.audit_events'))
+      .rows[0].id;
+
+  // The scope registry at mint: the CLI may not ask for a scope the registry gives the web app only.
+  const webOnly = await cliGrant('user-data-export:exports.dispatch', null);
+  log('authorize a web-app-only scope as the CLI', { error: webOnly.authorizeError });
+  expectThat(webOnly.authorizeError === 'invalid_scope', 'CLI refused a web-app-only scope');
+
+  // Organization roles at mint: the attribution scope is for owners and members only. A refused
+  // role writes nothing, not even an audit row.
   const attribution = 'ai-attribution:identity.read';
   const setRole = (role: string) =>
     admin.query('UPDATE uts.org_memberships SET role = $3 WHERE org_id = $1 AND account_id = $2', [
@@ -304,9 +315,17 @@ async function main() {
       ACCOUNT,
       role,
     ]);
+  const beforeAdmin = await lastAuditId();
   const asAdmin = await cliGrant(attribution, ORG);
-  log('authorize owner-or-member scope as admin', { error: asAdmin.authorizeError });
-  expectThat(asAdmin.authorizeError === 'invalid_scope', 'org admin refused at /authorize');
+  const adminRows = (await lastAuditId()) === beforeAdmin ? 0 : 'some';
+  log('authorize owner-or-member scope as admin', {
+    error: asAdmin.authorizeError,
+    newAuditRows: adminRows,
+  });
+  expectThat(
+    asAdmin.authorizeError === 'invalid_scope' && adminRows === 0,
+    'org admin refused at /authorize with no row written'
+  );
   await setRole('member');
   const asMember = await cliGrant(attribution, ORG);
   const memberToken =
@@ -317,26 +336,22 @@ async function main() {
     authorizeError: asMember.authorizeError,
     status: asMember.authorizeError === null ? asMember.exchanged.status : null,
     orgClaimIsOrg: memberOrg === ORG,
+    expires_in: memberToken?.expires_in ?? null,
   });
   expectThat(memberOrg === ORG, 'member gets the scope with the org claim');
   await setRole('admin');
+  const beforeDemoted = await lastAuditId();
   const demoted = asMember.authorizeError === null ? await asMember.refresh() : null;
+  const demotedRows = (await lastAuditId()) === beforeDemoted ? 0 : 'some';
   log('refresh after the member became admin', {
     status: demoted?.status ?? null,
     error: demoted?.error ?? null,
+    newAuditRows: demotedRows,
   });
   expectThat(
-    demoted?.status === 400 && demoted.error === 'invalid_grant',
-    'refresh refused once the role is outside the scope'
+    demoted?.status === 400 && demoted.error === 'invalid_scope' && demotedRows === 0,
+    'refresh refused once the role is outside the scope, with no row written'
   );
-
-  // A 5-minute scope: the token lives 300 seconds and its audit row says so.
-  const exportScope = 'user-data-export:exports.dispatch';
-  const exported = await cliGrant(exportScope, null);
-  const exportToken =
-    exported.authorizeError === null ? exported.exchanged.tokens?.issued_tokens[0] : undefined;
-  log('exchange for a 5-minute scope', { expires_in: exportToken?.expires_in ?? null });
-  expectThat(exportToken?.expires_in === 300, 'short scope minted for 300 seconds');
 
   const rows = await admin.query<{
     id: string;
@@ -376,13 +391,9 @@ async function main() {
           JSON.stringify(row.attributes.scopes) === JSON.stringify([scope])
       )
       .map(row => row.attributes.tokenLifetimeSeconds);
-  log('audited token lifetimes', {
-    [exportScope]: lifetimesOf(exportScope),
-    [attribution]: lifetimesOf(attribution),
-  });
+  log('audited token lifetimes', { [attribution]: lifetimesOf(attribution) });
   expectThat(
-    JSON.stringify(lifetimesOf(exportScope)) === JSON.stringify([['300']]) &&
-      JSON.stringify(lifetimesOf(attribution)) === JSON.stringify([['600']]),
+    JSON.stringify(lifetimesOf(attribution)) === JSON.stringify([['600']]),
     'audit rows carry each token lifetime'
   );
   const text = (

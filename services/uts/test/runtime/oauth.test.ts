@@ -311,6 +311,65 @@ describe('token endpoint: refresh_token', () => {
     }
   });
 
+  it.each([
+    ['kilo-cli', 'user-data-export:exports.dispatch'],
+    ['kilo-cli', 'gateway:unknown.read'],
+    [THIRD_PARTY, 'kilo-api:profile.read'],
+    [THIRD_PARTY, 'ai-attribution:identity.read'],
+  ])(
+    'refuses %s a requested scope it may not hold before the statement, and a minted one before signing',
+    async (clientId, scope) => {
+      const firstPartyClient = clientId === 'kilo-cli';
+      const request = async (form: Record<string, string>) => {
+        const grant = await firstParty();
+        const body = {
+          grant_type: 'refresh_token',
+          refresh_token: firstPartyClient ? grant.token : randomCredential(),
+          client_id: clientId,
+          ...form,
+        };
+        return firstPartyClient
+          ? formRequest('/token', body, { DPoP: await dpopProof(grant.key) })
+          : formRequest('/token', body);
+      };
+      const issued = {
+        outcome: 'issued',
+        familyId: crypto.randomUUID(),
+        refreshExpiresAt: new Date(Date.now() + 86_400_000),
+        ...minted({ scopes: [scope] }),
+      } as const;
+
+      const named = fakeGrants({
+        refreshFirstParty: async () => issued,
+        refreshThirdParty: async () => issued,
+      });
+      const before = await call(await request({ scope }), oauthDeps(named.access));
+      expect(before.status).toBe(400);
+      expect(await errorOf(before)).toBe('invalid_scope');
+      expect(named.calls).toEqual([]);
+
+      // A grant that holds such a scope (the registry changed after it was created) signs nothing.
+      const stored = fakeGrants({
+        refreshFirstParty: async () => issued,
+        refreshThirdParty: async () => issued,
+      });
+      let signed = false;
+      const after = await call(
+        await request({}),
+        oauthDeps(stored.access, {
+          sign: async () => {
+            signed = true;
+            return { status: 'unavailable' };
+          },
+        })
+      );
+      expect(after.status).toBe(400);
+      expect(await errorOf(after)).toBe('invalid_scope');
+      expect(stored.calls).toHaveLength(1);
+      expect(signed).toBe(false);
+    }
+  );
+
   it('passes the proof jti to the grant statement and refuses a proof it recorded before', async () => {
     const grant = await firstParty();
     const recorded = new Set<string>();
@@ -738,14 +797,16 @@ describe('authorization endpoint', () => {
         ? { ...decision, approval: { ...decision.approval, orgId: org } }
         : decision;
     };
-    for (const role of ['admin', 'billing_manager'] as const) {
-      const admin = await call(
-        authorizeUrl(scoped),
-        oauthDeps(fakeGrants({ issueCode: issuedAs(role) }).access, { handoff: inOrg })
-      );
-      expect(redirectOf(admin).searchParams.get('error')).toBe('invalid_scope');
-      expect(redirectOf(admin).searchParams.get('code')).toBeNull();
-    }
+    // The code statement refuses a role outside the scope's roles itself (migration 0005), and
+    // the endpoint hands out nothing.
+    const roleRefused = fakeGrants({ issueCode: async () => ({ outcome: 'invalid_scope' }) });
+    const admin = await call(
+      authorizeUrl(scoped),
+      oauthDeps(roleRefused.access, { handoff: inOrg })
+    );
+    expect(redirectOf(admin).searchParams.get('error')).toBe('invalid_scope');
+    expect(redirectOf(admin).searchParams.get('code')).toBeNull();
+    expect(roleRefused.calls.map(item => item.method)).toEqual(['issueCode']);
 
     for (const role of ['owner', 'member'] as const) {
       const withOrg = fakeGrants({ issueCode: issuedAs(role) });
@@ -799,6 +860,45 @@ describe('authorization endpoint', () => {
     );
     expect(lookupFailure.status).toBe(503);
     expect(lookupFailure.headers.get('Location')).toBeNull();
+  });
+
+  it.each([
+    ['an unregistered scope', 'kilo-cli', 'gateway:unknown.read'],
+    ['a scope of another first-party client', 'kilo-cli', 'user-data-export:exports.dispatch'],
+    ['a scope for the web app only', 'kilo-cli', 'uts:security.read'],
+    ['a scope that is not third-party-safe', THIRD_PARTY, 'kilo-api:profile.read'],
+    ['a first-party-only service scope', THIRD_PARTY, 'event-service:events.subscribe'],
+  ])('refuses %s before the hand-off and stores nothing', async (_name, clientId, scope) => {
+    const grants = fakeGrants({
+      findThirdPartyClient: async id => ({
+        clientId: id,
+        name: 'Example',
+        redirectUris: ['https://client.example.com/callback'],
+      }),
+      issueCode: async () => ({ outcome: 'issued', orgRole: null }),
+    });
+    let handedOff = false;
+    const thirdParty = clientId === THIRD_PARTY;
+    const response = await call(
+      authorizeUrl({
+        ...base,
+        client_id: clientId,
+        scope,
+        ...(thirdParty
+          ? { redirect_uri: 'https://client.example.com/callback', dpop_jkt: '' }
+          : {}),
+      }),
+      oauthDeps(grants.access, {
+        handoff: async (request, next) => {
+          handedOff = true;
+          return await approve(request, next);
+        },
+      })
+    );
+    expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
+    expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    expect(handedOff).toBe(false);
+    expect(grants.calls.filter(item => item.method === 'issueCode')).toEqual([]);
   });
 });
 

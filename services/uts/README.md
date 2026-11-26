@@ -153,14 +153,19 @@ UTS_E2E_BASE_URL=http://127.0.0.1:8800/ UTS_E2E_ADMIN_URL=... UTS_E2E_APP_URL=..
 same device key), a code-exchange retry and two concurrent exchanges of one code, third-party
 rotation, reuse (the family is revoked), a blocked third-party client, a streamed oversized body,
 revoke and introspect, prints the audit rows (token ids only), checks that no token value reached
-an audit row, and times the mint path. `scripts/pat-e2e.ts` (`UTS_E2E_BASE_URL`,
+an audit row, and times the mint path. It names fixture scopes (`gateway:models.read`,
+`kilo-chat:messages.read`, `mcp:tools.read`) that the scope registry does not list, so since the
+endpoints apply the registry it is refused at `/authorize`; it runs again once its first-party
+steps name `kilo-cli` scopes and the registry holds a third-party-safe scope for its third-party
+steps. `scripts/pat-e2e.ts` (`UTS_E2E_BASE_URL`,
 `UTS_E2E_ADMIN_URL`) signs the CLI in, creates a PAT, uses it on the probe route, lists and
 revokes it and times until the probe refuses it, creates, lists and revokes an org bot key, shows
-the tier B refusal once the sign-in is 11 minutes old, refuses an owner-or-member scope to an org
-admin at `/authorize`, mints it for a member with the `org` claim and refuses its refresh once the
-member is an admin again (the development hand-off binds the `org` the request names), mints a
-5-minute scope for 300 seconds, checks each token's lifetime in the audit rows, and checks that no
-credential value or hash reached an audit row.
+the tier B refusal once the sign-in is 11 minutes old, refuses a web-app-only scope to the CLI at
+`/authorize`, refuses an owner-or-member scope to an org admin at `/authorize`, mints it for a
+member with the `org` claim and refuses its refresh once the member is an admin again (neither
+refusal writes an audit row; the development hand-off binds the `org` the request names), checks
+each token's lifetime in the audit rows, and checks that no credential value or hash reached an
+audit row. It mints only scopes the registry allows `kilo-cli`.
 
 ## OAuth endpoints
 
@@ -232,16 +237,23 @@ only). A PAT names no session, so it is refused there. Each action is one statem
 grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
 account fails at once, with no feed lookup.
 
-`/authorize` and `/token` check scope syntax and the registry's organization fields. A scope that
-needs the `org` claim is refused without an organization, and a scope limited to listed membership
-roles (`subjects.roles`) is refused when the caller's role is another: the code statement and the
-mint statements return the caller's role in the bound organization from the membership row they
-already read (migration 0005), and `orgScopeRefusal` (`src/scopes/policy.ts`) checks it before
-anything is signed. `/authorize` answers `invalid_scope` (the stored code is never handed out),
-`/token` answers `invalid_grant`. Each refresh reads the role again, so a member whose role changed
-gets no new token for such a scope. They do not apply the registry's allowed clients or
-third-party-safe flag yet. Until they do, the client check above and the `sid` lookup (it finds
-first-party grants only) keep other clients' tokens off the account API.
+`/authorize` and `/token` apply the scope registry (`src/scopes/policy.ts`; the endpoints take it
+as a dependency, `utsScopeEntry` in every deployed Worker):
+
+- **Client:** a scope that is unregistered, whose `allowedClients` does not name the first-party
+  client, or that is not third-party-safe for a third-party client is refused: at `/authorize`
+  with `invalid_scope` before the hand-off, so a code or grant only ever holds scopes its client
+  may hold; at `/token` with `invalid_scope` when requested (before the statement) and when
+  minted (before signing; only a registry change after the grant can reach this).
+- **Organization:** a scope that needs the `org` claim is refused at `/authorize` without an
+  organization, before a code is stored. A scope limited to listed membership roles
+  (`subjects.roles`) is refused inside the code and mint statements when the caller's role in the
+  bound organization is another (migration 0005, `uts.scope_org_roles` mirrors the registry and a
+  DB test holds them equal): the code statement and the exchange answer `invalid_scope` with no
+  code, session, grant or audit row (the exchange leaves the code unused), a first-party refresh
+  answers `invalid_scope` without touching the grant or writing a row, and a third-party refresh,
+  which reads no role, refuses every such scope. Each refresh reads the role again. The statements
+  also return the role, and `/token` checks both again before signing.
 
 Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`, or an origin of
 the environment's table in `UTS_RESOURCE_ORIGINS` (`@kilocode/uts-contracts`), which maps each

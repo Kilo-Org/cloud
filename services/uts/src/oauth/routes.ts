@@ -3,21 +3,25 @@ import {
   UTS_INTROSPECT_PATH,
   UTS_REVOKE_PATH,
   UTS_TOKEN_PATH,
+  utsScopeEntry,
 } from '@kilocode/uts-contracts';
 import type { Env, UtsConfig } from '../env';
 import { grantsAccess, identityStoreBinding } from '../grants/binding';
 import type { GrantsAccess } from '../grants/store';
+import type { ScopeRegistry } from '../scopes/policy';
 import { type SignerAccess, signerAccess } from '../token/mint';
 import { type AuthorizationHandoff, handleAuthorize } from './authorize';
 import { handleIntrospect } from './introspect';
 import { handleRevoke } from './revoke';
 import { type DeviceCodeGrant, handleToken } from './token-endpoint';
 
-/** What an OAuth request needs; the runtime tests pass their own `grants`. */
+/** What an OAuth request needs; the runtime tests pass their own `grants` and `scopes`. */
 export type OAuthDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
   sign: SignerAccess;
+  /** The scope registry the endpoints enforce: `UTS_SCOPE_REGISTRY` in every deployed Worker. */
+  scopes: ScopeRegistry;
   /** Null until the sign-in slice provides one: the authorization endpoint is not served. */
   handoff: AuthorizationHandoff | null;
   /** Null until the device sign-in slice provides one: the device grant is not offered. */
@@ -46,6 +50,7 @@ export function oauthService(
       config,
       grants: grantsAccess(binding.connectionString, ctx),
       sign: sign ?? signerAccess(env, config),
+      scopes: utsScopeEntry,
       handoff,
       deviceCodeGrant: null,
     },

@@ -997,18 +997,48 @@ REVOKE INSERT, UPDATE, DELETE ON
   uts.gate_passes
 FROM uts_app;
 
--- The mint statements of 0004, changed in two ways and otherwise the same:
--- * They return the caller's membership role in the bound organization (`org_role`), from the
---   membership row they already read, so the Worker refuses, before signing, a scope that the
---   scope registry limits to other roles (`subjects.roles`, design 5.3). A third-party refresh
---   returns no role: no third-party-safe scope is limited to roles (`test/repo`), and a null role
---   refuses such a scope.
+-- The mint statements of 0004, changed in three ways and otherwise the same:
+-- * A scope that the scope registry limits to listed membership roles (`subjects.roles`, design
+--   5.3; mirrored by `uts.scope_org_roles`) is refused when the caller's role in the bound
+--   organization is another, before the statement writes anything: the code statement and the
+--   exchange answer `invalid_scope` with no code, session, grant or audit row; a refresh answers
+--   `invalid_scope` without touching the grant or writing a row. A third-party refresh reads no
+--   role, so it refuses every role-limited scope (none is third-party-safe, `test/repo`).
+-- * They return the caller's membership role (`org_role`), from the membership row they already
+--   read, so the Worker checks the role again before signing.
 -- * The audit attribute `tokenLifetimeSeconds` lists each token's lifetime in seconds, in the
 --   order of `tokenRefs`, instead of one fixed 10 minutes. An audit attribute array holds strings
 --   only (`uts.is_audit_event`), so each lifetime is its decimal string.
 -- Their parameters stay the same. A new output column changes the return type, which
 -- `CREATE OR REPLACE` cannot do, so those functions are dropped and created again inside this
 -- migration's transaction, with their grant.
+
+-- The membership roles that may hold `p_scope`, or NULL when the registry does not limit it to
+-- listed roles. It mirrors `subjects.roles` in `UTS_SCOPE_REGISTRY`; `test/db/mint-roles.test.ts`
+-- checks that both agree for every registered scope.
+CREATE FUNCTION uts.scope_org_roles(p_scope text) RETURNS uts.org_role[]
+LANGUAGE sql
+STABLE PARALLEL SAFE
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT CASE $1
+    WHEN 'ai-attribution:identity.read' THEN ARRAY['owner', 'member']::uts.org_role[]
+    WHEN 'ai-attribution:attributions.write' THEN ARRAY['owner', 'member']::uts.org_role[]
+  END
+$$;
+
+-- Whether `p_role` (NULL: no role) may hold every one of `p_scopes`.
+CREATE FUNCTION uts.role_allows_scopes(p_scopes text[], p_role uts.org_role) RETURNS boolean
+LANGUAGE sql
+STABLE PARALLEL SAFE
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT NOT EXISTS (
+    SELECT 1 FROM unnest($1) AS item(scope)
+    WHERE uts.scope_org_roles(item.scope) IS NOT NULL
+      AND ($2 IS NULL OR $2 <> ALL (uts.scope_org_roles(item.scope)))
+  )
+$$;
 
 -- The lifetime of each access token one mint signs, in seconds as decimal strings, in the order of
 -- `p_scopes`: 10 minutes, or the scope's shorter registered maximum. It mirrors
@@ -1039,8 +1069,9 @@ DROP FUNCTION uts.issue_authorization_code(
 -- GET /authorize, after the hand-off approved: stores a 60-second code (PKCE S256, and the DPoP
 -- key thumbprint for a first-party client) and its audit row. Outcomes: `issued`, with the
 -- membership role in `p_org_id` (`org_role`, null without an organization); `access_denied` for an
--- inactive account or an unmet org requirement; `consent_required` for a third-party client
--- without an active consent that covers the scopes.
+-- inactive account or an unmet org requirement; `invalid_scope` when a scope is limited to roles
+-- the caller does not hold (nothing stored, no audit row); `consent_required` for a third-party
+-- client without an active consent that covers the scopes.
 CREATE FUNCTION uts.issue_authorization_code(
   p_environment text,
   p_code_hash bytea,
@@ -1087,6 +1118,11 @@ BEGIN
     OR uts.org_requirement_met(p_org_id, membership_state, enforcement, p_amr::uts.auth_method[]) IS NOT TRUE
   THEN
     outcome := 'access_denied';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  IF NOT uts.role_allows_scopes(p_scopes, member_role) THEN
+    outcome := 'invalid_scope';
     RETURN NEXT;
     RETURN;
   END IF;
@@ -1272,6 +1308,14 @@ BEGIN
     ))
   THEN
     outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  -- Before the code is consumed: a refused role leaves the code unused and writes no session,
+  -- grant or audit row.
+  IF NOT uts.role_allows_scopes(chosen.scopes, member_role) THEN
+    outcome := 'invalid_scope';
     RETURN NEXT;
     RETURN;
   END IF;
@@ -1506,6 +1550,11 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
+  IF NOT uts.role_allows_scopes(chosen.scopes, grant_row.membership_role) THEN
+    outcome := 'invalid_scope';
+    RETURN NEXT;
+    RETURN;
+  END IF;
 
   -- At most once per grant per hour (fillfactor 90 keeps the update on its page).
   IF grant_row.last_used_at < now() - interval '1 hour' THEN
@@ -1626,6 +1675,12 @@ BEGIN
   SELECT * INTO chosen FROM uts.select_token_scopes(presented.scopes, p_scopes, p_resources);
   IF chosen.outcome <> 'ok' THEN
     outcome := chosen.outcome;
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  -- A third-party refresh reads no role, so a role-limited scope is refused before rotation.
+  IF NOT uts.role_allows_scopes(chosen.scopes, NULL) THEN
+    outcome := 'invalid_scope';
     RETURN NEXT;
     RETURN;
   END IF;

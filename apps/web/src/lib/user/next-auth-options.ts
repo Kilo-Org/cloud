@@ -1496,10 +1496,10 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (await isEmailBlacklisted(accountInfo.google_user_email)) {
-          sentryLogger('auth', 'warning')(
-            `SECURITY: Blacklisted: ${accountInfo.google_user_email}`,
-            accountInfo
-          );
+          sentryLogger('auth', 'warning')('SECURITY: Blocked sign-in email', {
+            provider: accountInfo.provider,
+            outcome: 'blocked_email',
+          });
 
           return redirectUrlForCode(`BLOCKED`);
         }
@@ -1628,25 +1628,27 @@ export const authOptions: NextAuthOptions = {
             verifiedToken = jwt.verify(turnstileJwtCookie.value, NEXTAUTH_SECRET, {
               algorithms: ['HS256'],
             }) as unknown as TurnstileJwtPayload;
-          } catch (error) {
-            sentryLogger('turnstile-auth')(
-              'SECURITY: Invalid Turnstile JWT : ' +
-                (error instanceof Error ? error.message : String(error)),
-              accountInfo
-            );
+          } catch {
+            sentryLogger('turnstile-auth')('SECURITY: Invalid Turnstile JWT', {
+              provider: accountInfo.provider,
+              outcome: 'invalid_token',
+            });
             return redirectUrlForCode('INVALID_VERIFICATION');
           }
 
           const currentIP = getTrustedSignupClientIp(requestHeaders);
           if (!currentIP || verifiedToken.ip !== currentIP) {
-            sentryLogger('turnstile-auth')(
-              `SECURITY: IP mismatch - JWT: ${verifiedToken.ip}, Current: ${currentIP ?? 'unresolved'}`,
-              accountInfo
-            );
+            sentryLogger('turnstile-auth')('SECURITY: IP mismatch', {
+              provider: accountInfo.provider,
+              outcome: currentIP ? 'address_mismatch' : 'address_unresolved',
+            });
             return redirectUrlForCode('IP_MISMATCH');
           }
 
-          console.log(`Turnstile verification validated`, accountInfo);
+          console.log('Turnstile verification validated', {
+            provider: accountInfo.provider,
+            outcome: 'validated',
+          });
         }
 
         // Check if this is an account linking operation

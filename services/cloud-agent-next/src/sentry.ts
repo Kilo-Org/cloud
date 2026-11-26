@@ -48,7 +48,7 @@ export function cloudAgentSentryOptions(
     skipOpenTelemetrySetup: true,
     initialScope: { contexts: { cloud_agent: { component, ...identity } } },
     // The hook never throws or rejects: core then sends an internal event about
-    // the failure, and that event skips beforeSend. Any error drops the event.
+    // the failure, and that event skips beforeSend. A sanitize error drops the event.
     beforeSend(event, hint) {
       try {
         if (!shouldCaptureCloudAgentException(hint.originalException)) return null;
@@ -85,9 +85,13 @@ export function cloudAgentSentryOptions(
             }
           );
           if (sanitized) {
-            logger
-              .withFields({ sentryEventId: sanitized.event_id, component, ...identity })
-              .error('Cloud Agent exception captured');
+            try {
+              logger
+                .withFields({ sentryEventId: sanitized.event_id, component, ...identity })
+                .error('Cloud Agent exception captured');
+            } catch {
+              // A failed log line keeps the sanitized event.
+            }
           }
           return sanitized;
         };

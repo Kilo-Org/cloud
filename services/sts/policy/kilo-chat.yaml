@@ -1,0 +1,4 @@
+# Registration only: services/kilo-chat/wrangler.jsonc. No environment, identity or grant.
+workload: kilo-chat
+registered: true
+secrets: []

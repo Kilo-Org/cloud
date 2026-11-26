@@ -4,8 +4,10 @@ import type { CloudflareDeployPins } from '../constants';
 import { sha256Base64Url } from '../crypto/hash';
 import {
   PolicySchema,
+  RegistrationSchema,
   effectivePolicy,
   isLeaseDynamicGrant,
+  isRegistrationDocument,
   policyFileProblems,
   vercelEnvironmentKey,
   type DynamicGrant,
@@ -51,7 +53,9 @@ function dynamicKey(entry: DynamicGrant): string {
 /**
  * The loaded policies. Every per-environment read (`get`, `forEnvironment`, `snapshot`, `hash`,
  * `workloadHash`) answers with each policy's base grants plus that environment's own; `all` returns
- * the files as written, for identity matching only.
+ * the files as written, for identity matching only. A registration is in none of these: STS
+ * answers for a registered name exactly as for a name with no file. `registered` lists the
+ * registered names, for the repository checks only.
  */
 export type PolicyIndex = {
   all(): Policy[];
@@ -62,6 +66,7 @@ export type PolicyIndex = {
   hash(environment: StsEnvironment): Promise<string>;
   /** Hash of one workload's secret grants; a bundle built under another hash is out of date. */
   workloadHash(environment: StsEnvironment, workload: string): Promise<string>;
+  registered(): readonly string[];
 };
 
 function sortedList(values: readonly string[] | undefined): string {
@@ -117,6 +122,7 @@ export function loadPolicies(
   } = {}
 ): PolicyIndex {
   const policies: Policy[] = [];
+  const registered: string[] = [];
   for (const [file, source] of Object.entries(sources)) {
     let document: unknown;
     try {
@@ -124,6 +130,20 @@ export function loadPolicies(
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'unknown parse error';
       throw new Error(`${file} is not valid YAML: ${detail}`);
+    }
+    if (isRegistrationDocument(document)) {
+      const registration = RegistrationSchema.safeParse(document);
+      if (!registration.success) {
+        throw new Error(
+          `${file} does not match the registration schema: ${registration.error.message}`
+        );
+      }
+      const { workload } = registration.data;
+      if (file !== `${workload}.yaml`) {
+        throw new Error(`${file} must be named ${workload}.yaml after its workload`);
+      }
+      registered.push(workload);
+      continue;
     }
     const parsed = PolicySchema.safeParse(document);
     if (!parsed.success) {
@@ -144,6 +164,7 @@ export function loadPolicies(
     policies.push(policy);
   }
   policies.sort((left, right) => left.workload.localeCompare(right.workload));
+  registered.sort((left, right) => left.localeCompare(right));
 
   const workloads = new Set<string>();
   const bindings = new Map<string, string>();
@@ -159,6 +180,12 @@ export function loadPolicies(
       }
       bindings.set(key, policy.workload);
     }
+  }
+  for (const workload of registered) {
+    if (workloads.has(workload)) {
+      throw new Error(`more than one policy file declares workload ${workload}`);
+    }
+    workloads.add(workload);
   }
 
   const snapshotEntry = (policy: Policy): PolicySnapshotEntry => ({
@@ -222,5 +249,6 @@ export function loadPolicies(
       workloadHashes.set(key, hash);
       return hash;
     },
+    registered: () => registered,
   };
 }

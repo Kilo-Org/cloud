@@ -1,0 +1,4 @@
+# Registration only: services/pages/wrangler.jsonc. No environment, identity or grant.
+workload: pages-dev
+registered: true
+secrets: []

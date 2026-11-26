@@ -1625,6 +1625,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (localError !== null) throw localError;
       return null;
     }
+    // A caller without a destination cannot be served under a split issuer
+    // mode, so it never asks the scope members. An invalid mode throws here.
+    if (target === undefined && runtimeTokenAudienceMode(this.env) !== 'combined') {
+      logRuntimeAuthorizationDiagnostic(
+        this.metadata?.identity.sessionId,
+        'renewal',
+        'destination_required'
+      );
+      return null;
+    }
     const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(
       handle,
       originProof,
@@ -1718,11 +1728,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     beforeRenew?: () => Promise<boolean>
   ) {
     const metadata = await this.getMetadata();
-    const audienceMode = runtimeTokenAudienceMode(this.env);
     return renewStoredRuntimeAuthorization({
       metadata,
       beforeRenew,
-      audienceMode,
+      audienceMode: () => runtimeTokenAudienceMode(this.env),
       destination,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
       putAuthorization: authorization =>
@@ -1732,7 +1741,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(updated));
         this.metadata = updated;
       },
-      renew: authorization =>
+      renew: (authorization, audienceMode) =>
         renewRuntimeAuthorization({
           authorization,
           secret,

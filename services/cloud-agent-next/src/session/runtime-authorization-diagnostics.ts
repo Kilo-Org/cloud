@@ -21,6 +21,7 @@ type DiagnosticReason =
   | 'stored_authorization_revoked'
   | 'delegation_expired'
   | 'post_renewal_state_changed'
+  | 'destination_required'
   | 'renewal_revoked'
   | 'renewal_failed'
   | 'revocation_persisted'

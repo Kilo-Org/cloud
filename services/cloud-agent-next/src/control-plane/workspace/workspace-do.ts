@@ -13,7 +13,6 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import type {
   RuntimeAuthorization,
-  RuntimeTokenAudienceMode,
   RuntimeTokens,
 } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
@@ -102,19 +101,16 @@ export type WorkspaceAuthorityDescription = {
 
 type LiveAuthority<T> = { record: WorkspaceAuthorityRecord; value: T };
 
-/** The live renewal checks of the stored delegation, as `renewLive` passes them. */
+/**
+ * The live renewal checks of the stored delegation, as `renewLive` passes them.
+ * It carries no issuer mode: a check that signs nothing never reads it.
+ */
 type LiveRenewalInput = {
   authorization: RuntimeAuthorization;
   secret: string;
   connectionString: string;
-  audienceMode: RuntimeTokenAudienceMode;
   onBindingRejected: (reason: RuntimeAuthorizationBindingRejectionReason) => void;
 };
-
-/** The one token a workspace read needs: the web API's, for balance and MCP pepper. */
-function renewApiToken(input: LiveRenewalInput): Promise<{ token: string }> {
-  return renewRuntimeToken({ ...input, destination: 'kilo-api' });
-}
 
 function denied(): Error {
   return new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
@@ -145,6 +141,14 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     this.ownerId = workspaceSessionId.success && ownerId.length > 0 ? ownerId : null;
   }
 
+  /** The one token a workspace read needs: the web API's, for balance and MCP pepper. */
+  private readonly renewApiToken = (input: LiveRenewalInput): Promise<{ token: string }> =>
+    renewRuntimeToken({
+      ...input,
+      destination: 'kilo-api',
+      audienceMode: runtimeTokenAudienceMode(this.env),
+    });
+
   /** Issues the workspace MCP credential, or nothing when the workspace cannot launch. */
   async issueMcpGrant(
     binding: WorkspaceMcpBinding
@@ -162,7 +166,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     }
     let live: LiveAuthority<{ token: string }>;
     try {
-      live = await this.renewLive(record, renewApiToken);
+      live = await this.renewLive(record, this.renewApiToken);
     } catch (error) {
       if (isDenied(error)) return undefined;
       throw error;
@@ -188,7 +192,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
 
   /** Authority check for a launch, plus the workspace policy the child inherits. */
   async getSpawnContext(authority: unknown): Promise<WorkspaceSpawnContext> {
-    const live = await this.liveAuthority(authority, renewApiToken);
+    const live = await this.liveAuthority(authority, this.renewApiToken);
     return {
       // The caller presents it only to the web API's balance check.
       token: live.value.token,
@@ -458,7 +462,6 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
         authorization: record.authorization,
         secret: await this.secret(),
         connectionString: this.env.HYPERDRIVE.connectionString,
-        audienceMode: runtimeTokenAudienceMode(this.env),
         onBindingRejected: reason => this.diagnostic('binding_check', reason),
       });
     } catch (error) {

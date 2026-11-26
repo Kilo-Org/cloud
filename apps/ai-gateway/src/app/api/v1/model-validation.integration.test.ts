@@ -125,9 +125,10 @@ const { renewStoredRuntimeAuthorization } = jest.requireActual<{
     getMetadata(): Promise<TestSessionMetadata>;
     putMetadata(metadata: TestSessionMetadata): Promise<void>;
     renew(
-      authorization: RuntimeAuthorization
+      authorization: RuntimeAuthorization,
+      audienceMode: 'combined' | 'per-destination'
     ): Promise<{ tokens: RuntimeTokens; expiresAt: string }>;
-    audienceMode: 'combined' | 'per-destination';
+    audienceMode(): 'combined' | 'per-destination';
     destination: RuntimeTokenDestination | undefined;
   }): Promise<string | null>;
 }>('../../../../../../services/cloud-agent-next/src/session/runtime-authorization-persistence');
@@ -379,7 +380,7 @@ describe('cloud-agent model validation through real web authentication', () => {
             metadata = value;
           },
           renew,
-          audienceMode: 'combined',
+          audienceMode: () => 'combined',
           destination,
         })
       );

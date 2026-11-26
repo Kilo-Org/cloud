@@ -40,6 +40,7 @@ export type SignRefusal =
   | 'issuer_mismatch'
   | 'environment_mismatch'
   | 'issued_at_out_of_range'
+  | 'already_expired'
   | 'expires_too_late';
 
 /**
@@ -172,6 +173,9 @@ export class UtsSignerDO extends DurableObject<Env> {
     if (claims.iss !== this.#config.endpoints.issuer) return 'issuer_mismatch';
     if (claims.env !== this.#config.environment) return 'environment_mismatch';
     if (Math.abs(claims.iat - nowSeconds) > IAT_SKEW_SECONDS) return 'issued_at_out_of_range';
+    // An `iat` inside the backward skew allows an `exp` after `iat` that is already past; a
+    // verifier would refuse that token at once, so the signer does not sign it.
+    if (claims.exp <= nowSeconds) return 'already_expired';
     if (claims.exp > nowSeconds + UTS_MAX_TOKEN_LIFETIME_SECONDS) return 'expires_too_late';
     return null;
   }

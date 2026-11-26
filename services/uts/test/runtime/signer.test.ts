@@ -181,6 +181,8 @@ describe('signing', () => {
       [claims({ iss: 'https://uts.kiloapps.io' }), 'issuer_mismatch'],
       [claims({ env: 'production' }), 'environment_mismatch'],
       [claims({ iat: now - 120, exp: now + 600 }), 'issued_at_out_of_range'],
+      [claims({ iat: now - 30, exp: now - 1 }), 'already_expired'],
+      [claims({ iat: now - 30, exp: now }), 'already_expired'],
       [claims({ iat: now + 59, exp: now + 3659 }), 'expires_too_late'],
     ] as const;
     for (const [input, reason] of cases) {

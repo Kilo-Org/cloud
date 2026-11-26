@@ -8,6 +8,7 @@ import {
 } from '@kilocode/sts-contracts';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDenialBuffers } from '../../src/audit/denials';
+import { AuditLog } from '../../src/audit/log';
 import { SecretsBroker } from '../../src/broker';
 import {
   LEASE_CREATE_BUDGET_MS,
@@ -847,16 +848,15 @@ describe('revoke', () => {
     manager.setRevokeStatus(503);
     await broker('bouncer-watch').revokeLease(created.leaseId);
     const stub = getLeaseStub(env, config);
-    await runInDurableObject(stub, (instance, state) => {
+    await runInDurableObject(stub, (_instance, state) => {
       state.storage.sql.exec(
         'UPDATE lease SET expires_at = ?',
         Date.now() - 24 * 60 * 60 * 1000 - 1000
       );
-      const { audit } = instance as unknown as { audit: { append: () => Promise<void> } };
-      vi.spyOn(audit, 'append')
-        .mockRejectedValueOnce(new Error('storage refused'))
-        .mockRejectedValueOnce(new Error('storage refused'));
     });
+    vi.spyOn(AuditLog.prototype, 'append')
+      .mockRejectedValueOnce(new Error('storage refused'))
+      .mockRejectedValueOnce(new Error('storage refused'));
     const nextAlarm = async (): Promise<number | null> =>
       await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -979,10 +979,7 @@ describe('revoke', () => {
     const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
     manager.setRevokeStatus(503);
     const stub = getLeaseStub(env, config);
-    await runInDurableObject(stub, instance => {
-      const { audit } = instance as unknown as { audit: { append: () => Promise<void> } };
-      vi.spyOn(audit, 'append').mockRejectedValueOnce(new Error('storage refused'));
-    });
+    vi.spyOn(AuditLog.prototype, 'append').mockRejectedValueOnce(new Error('storage refused'));
     await broker('bouncer-watch').revokeLease(created.leaseId);
     expect(
       (await leaseEvents()).filter(event => event.type === 'ai.kilo.sts.lease.revoked')

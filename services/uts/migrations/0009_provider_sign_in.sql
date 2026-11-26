@@ -1011,6 +1011,115 @@ BEGIN
 END
 $$;
 
+-- `uts.maintain_sign_in_rows()` (migration 0008) with the two tables this migration adds that
+-- refer to a gate pass: a method row keeps the `method_add` pass that linked it, whose foreign key
+-- would refuse the session cascade, and a link flow names its pass until it ends. A session stays
+-- while either refers to one of its passes, probed through `sign_in_methods_gate_pass_key` and
+-- `sign_in_flows_gate_pass_idx`. Everything else is as in 0008; the grant stays.
+CREATE OR REPLACE FUNCTION uts.maintain_sign_in_rows()
+RETURNS TABLE (kind text, deleted integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  batch CONSTANT integer := 5000;
+BEGIN
+  DELETE FROM uts.webauthn_challenges AS challenge
+  WHERE challenge.challenge_hash IN (
+    SELECT stale.challenge_hash FROM uts.webauthn_challenges AS stale
+    WHERE stale.expires_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'webauthn_challenges';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.device_codes AS code
+  WHERE code.id IN (
+    SELECT stale.id FROM uts.device_codes AS stale
+    WHERE stale.expires_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'device_codes';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.tickets AS ticket
+  WHERE ticket.ticket_hash IN (
+    SELECT stale.ticket_hash FROM uts.tickets AS stale
+    WHERE stale.expires_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'tickets';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.step_ups AS step_up
+  WHERE step_up.id IN (
+    SELECT stale.id FROM uts.step_ups AS stale
+    WHERE stale.expires_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'step_ups';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.account_user_code_failures AS counted
+  WHERE counted.account_id IN (
+    SELECT stale.account_id FROM uts.account_user_code_failures AS stale
+    WHERE stale.window_started_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'account_user_code_failures';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.network_user_code_failures AS counted
+  WHERE counted.client_network IN (
+    SELECT stale.client_network FROM uts.network_user_code_failures AS stale
+    WHERE stale.window_started_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'network_user_code_failures';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  WITH due AS (
+    SELECT ended.id,
+      EXISTS (
+        SELECT 1 FROM uts.gate_passes AS pass
+        WHERE pass.browser_session_id = ended.id
+          AND (
+            EXISTS (SELECT 1 FROM uts.passkey_credentials AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.personal_access_tokens AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.org_bot_keys AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.ci_trust_policies AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.third_party_consents AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.device_codes AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.sign_in_methods AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.sign_in_flows AS r WHERE r.gate_pass_id = pass.id)
+          )
+      ) AS kept
+    FROM uts.browser_sessions AS ended
+    WHERE greatest(
+        least(ended.idle_expires_at, ended.expires_at, coalesce(ended.revoked_at, 'infinity')),
+        coalesce(ended.cleanup_kept_at, '-infinity')
+      ) < now() - interval '1 day'
+    LIMIT batch
+  ),
+  stamped AS (
+    UPDATE uts.browser_sessions AS session SET cleanup_kept_at = now()
+    FROM due WHERE session.id = due.id AND due.kept
+  )
+  DELETE FROM uts.browser_sessions AS session
+  USING due WHERE session.id = due.id AND NOT due.kept;
+  kind := 'browser_sessions';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+END
+$$;
+
 -- Deletes sign-in flows and sign-in emails 1 hour past their 10-minute lifetime, and address
 -- limits whose windows and stop have all ended, at most 5,000 of each kind per call, as
 -- `uts.maintain_sign_in_rows()` does.

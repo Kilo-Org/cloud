@@ -11,6 +11,7 @@ import type { UtsConfig } from '../env';
 import { classifyFailure } from '../oauth/errors';
 import { base64url, isRandomCredential, randomCredential, sha256 } from '../token/credentials';
 import type { SignInMailer } from './email/mailer';
+import { anonymousWriteRefusal } from './limits';
 import { requestNetwork } from './network';
 import { type SignInChoices, continuePage, messagePage, unavailablePage } from './pages';
 import type { SignInConfig } from './providers/config';
@@ -349,6 +350,13 @@ export async function beginFlow(
     };
   } else if (params.intent !== null && params.intent !== 'sign_in') {
     return messagePage('Sign in to Kilo', 'Unknown sign-in request.', 400, params.returnTo);
+  } else {
+    // A sign-in start stores a flow row before anyone is signed in.
+    const limited = anonymousWriteRefusal(
+      requestNetwork(request).clientIp,
+      provider === 'workos' ? 'sso_sign_in_start' : 'provider_sign_in_start'
+    );
+    if (limited !== null) return limited;
   }
   const flow = await newFlow();
   let started;

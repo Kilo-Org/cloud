@@ -337,6 +337,33 @@ describe('linking inside a session', () => {
     expect(rows[0].event.data.attributes).toMatchObject({ linkedBy: 'gate_pass', gatePassId });
   });
 
+  it('keeps an ended session while a method row keeps its pass', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const gatePassId = await insertGatePass(owner, accountId, 'method_add', session.id);
+    const { flow } = await linkFlow('gitlab', session, gatePassId);
+    expect((await complete(flow, {})).result.outcome).toBe('linked');
+    // An idle end two days ago, as in the 0008 maintenance test.
+    await owner.query(
+      `UPDATE uts.browser_sessions SET created_at = now() - interval '20 days',
+              last_seen_at = now() - interval '16 days', idle_expires_at = now() - interval '2 days',
+              expires_at = now() + interval '10 days' WHERE id = $1`,
+      [session.id]
+    );
+    const app = await db.connect('uts_app_a');
+    await app.query('SELECT * FROM uts.maintain_sign_in_rows()');
+    const kept = await owner.query(
+      'SELECT cleanup_kept_at IS NOT NULL AS stamped FROM uts.browser_sessions WHERE id = $1',
+      [session.id]
+    );
+    expect(kept.rows).toEqual([{ stamped: true }]);
+    const method = await owner.query(
+      'SELECT 1 FROM uts.sign_in_methods WHERE account_id = $1 AND gate_pass_id = $2',
+      [accountId, gatePassId]
+    );
+    expect(method.rowCount).toBe(1);
+  });
+
   it('refuses a link without a session or without an open tier A pass of that session', async () => {
     const accountId = await insertAccount(owner);
     const session = await browserSession(accountId);
@@ -471,8 +498,9 @@ describe('WorkOS SSO', () => {
       signedIn: { accountId, accountCreated: false, methodLinked: true },
     });
     const rows = await auditRows(accountId);
-    expect(rows.find(row => row.type === 'ai.kilo.uts.sign_in_method.linked')?.event.data.attributes)
-      .toMatchObject({ provider: 'workos', linkedBy: 'sso_required_domain' });
+    expect(
+      rows.find(row => row.type === 'ai.kilo.uts.sign_in_method.linked')?.event.data.attributes
+    ).toMatchObject({ provider: 'workos', linkedBy: 'sso_required_domain' });
     const notices = await owner.query('SELECT kind FROM uts.notices WHERE account_id = $1', [
       accountId,
     ]);

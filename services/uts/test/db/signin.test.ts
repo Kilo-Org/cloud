@@ -1239,6 +1239,8 @@ describe('sign-in row maintenance', () => {
       'uts.org_bot_keys',
       'uts.passkey_credentials',
       'uts.personal_access_tokens',
+      'uts.sign_in_flows',
+      'uts.sign_in_methods',
       'uts.third_party_consents',
     ]);
   });

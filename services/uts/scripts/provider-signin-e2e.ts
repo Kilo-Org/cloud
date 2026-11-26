@@ -13,6 +13,7 @@
  * 4. Linking refusals: an address GitHub did not verify, SSO with the address of an existing
  *    account, a link without a tier A pass, an address of a domain that requires SSO; and a link
  *    with a tier A pass of the session, which succeeds.
+ * 4b. Anonymous starts from one client address: the 11th in a minute is refused with 429.
  * 5. The audit rows of the run name no token, code, binder or address.
  *
  * Synthetic data only: every key and secret is generated for the run, written to a 0600
@@ -118,9 +119,20 @@ function toWorker(url: string): URL {
   return target;
 }
 
+/**
+ * The client address each request carries (`CF-Connecting-IP`, TEST-NET-3): a new one per request,
+ * so the anonymous write limit sees one writer only where a step pins `pinnedAddress`.
+ */
+let pinnedAddress: string | null = null;
+let addressCount = 0;
+
 async function browse(url: string, init: RequestInit = {}): Promise<Response> {
   const target = toWorker(url);
   const headers = new Headers(init.headers);
+  if (target.origin === base) {
+    addressCount += 1;
+    headers.set('CF-Connecting-IP', pinnedAddress ?? `203.0.113.${(addressCount % 250) + 1}`);
+  }
   if (target.origin === base && jar.size > 0) {
     headers.set('Cookie', [...jar].map(([name, value]) => `${name}=${value}`).join('; '));
   }
@@ -852,6 +864,36 @@ async function run(admin: pg.Client) {
       linkWithoutTierAPass: noPass.status,
       linkWithTierAPass: `${linked.status} (methods: ${methods.rows.map(row => `${row.provider}${row.gate_pass_id === null ? '' : '+pass'}`).join()})`,
     });
+  }
+
+  // 4b. Anonymous starts from one client address: 10 a minute per isolate, then 429.
+  {
+    jar.clear();
+    pinnedAddress = '198.51.100.7';
+    const statuses: number[] = [];
+    for (let start = 0; start < 11; start += 1) {
+      const response = await browse('/signin/oauth/google/start');
+      statuses.push(response.status);
+    }
+    const emailStart = await browse(
+      '/signin/email/start',
+      formPost({ email: keep(`flood-${randomBytes(3).toString('hex')}@example.com`) })
+    );
+    pinnedAddress = null;
+    const other = await browse('/signin/oauth/google/start');
+    check(
+      statuses.slice(0, 10).every(status => status === 302 || status === 303) &&
+        statuses[10] === 429 &&
+        emailStart.status === 429 &&
+        other.status !== 429,
+      `anonymous start limit ${statuses.join()} email ${emailStart.status} other ${other.status}`
+    );
+    log('4b anonymous start limit', {
+      sameAddress: statuses,
+      emailStartSameAddress: emailStart.status,
+      otherAddress: other.status,
+    });
+    jar.clear();
   }
 
   // 5. The audit rows of the run.

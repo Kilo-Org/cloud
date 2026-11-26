@@ -216,7 +216,10 @@ function devEndpoints(
   return parsed.success ? { status: 'set', endpoints: parsed.data } : { status: 'bad' };
 }
 
-const DEV_ENDPOINTS_PROBLEM = { status: 'misconfigured', missing: ['SIGNIN_DEV_ENDPOINTS'] } as const;
+const DEV_ENDPOINTS_PROBLEM = {
+  status: 'misconfigured',
+  missing: ['SIGNIN_DEV_ENDPOINTS'],
+} as const;
 
 /**
  * Reads the sign-in configuration. It never throws: a value that does not parse makes only its
@@ -249,16 +252,13 @@ export function readSignInConfig(env: SignInEnv, config: UtsConfig): SignInConfi
     discord: provider('discord'),
     linkedin: provider('linkedin'),
   };
-  const workos = configured(
-    env,
-    ['SIGNIN_WORKOS_CLIENT_ID', 'SIGNIN_WORKOS_API_KEY'],
-    values => ({
-      clientId: values.SIGNIN_WORKOS_CLIENT_ID,
-      apiKey: values.SIGNIN_WORKOS_API_KEY,
-      endpoints: overrides?.workos ?? WORKOS_ENDPOINTS,
-    })
-  );
-  const sso: SsoConfig = workos.status === 'on' && dev.status === 'bad' ? DEV_ENDPOINTS_PROBLEM : workos;
+  const workos = configured(env, ['SIGNIN_WORKOS_CLIENT_ID', 'SIGNIN_WORKOS_API_KEY'], values => ({
+    clientId: values.SIGNIN_WORKOS_CLIENT_ID,
+    apiKey: values.SIGNIN_WORKOS_API_KEY,
+    endpoints: overrides?.workos ?? WORKOS_ENDPOINTS,
+  }));
+  const sso: SsoConfig =
+    workos.status === 'on' && dev.status === 'bad' ? DEV_ENDPOINTS_PROBLEM : workos;
   const rawKey = configured(env, ['SIGNIN_EMAIL_HASH_KEY'], values => ({
     key: values.SIGNIN_EMAIL_HASH_KEY,
   }));

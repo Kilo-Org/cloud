@@ -3,7 +3,8 @@ import { anonymousWriter } from './network';
 
 /**
  * The limit on anonymous sign-in writes (design 3, "Anonymous sign-in writes"): a passkey sign-in
- * challenge and a device authorization each store a row before anyone is signed in. Each isolate
+ * challenge, a device authorization, and a provider, SSO or email sign-in start each store a row
+ * (the email start also sends mail) before anyone is signed in. Each isolate
  * allows one anonymous writer (`anonymousWriter`: an IPv4 address or an IPv6 /48) `PER_MINUTE`
  * such writes per minute, counted before the statement runs. The count is plain data in the
  * isolate, like the PAT miss limit: a caller spread over many isolates gets more, which the rows'
@@ -17,7 +18,12 @@ const MAX_WRITERS = 10_000;
 type Window = { startedAt: number; count: number };
 const windows = new Map<string, Window>();
 
-export type AnonymousWrite = 'passkey_sign_in_challenge' | 'device_authorization';
+export type AnonymousWrite =
+  | 'passkey_sign_in_challenge'
+  | 'device_authorization'
+  | 'provider_sign_in_start'
+  | 'sso_sign_in_start'
+  | 'email_sign_in_start';
 
 /**
  * Null when the writer of `address` may write now (and counts the write); otherwise the 429 to

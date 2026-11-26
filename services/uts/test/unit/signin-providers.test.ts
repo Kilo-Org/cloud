@@ -158,7 +158,10 @@ describe('configuration', () => {
     // Outside development, or with a remote endpoint, every provider and SSO is misconfigured;
     // the rest of the Worker keeps working.
     const misconfigured = { status: 'misconfigured', missing: ['SIGNIN_DEV_ENDPOINTS'] };
-    const staging = readSignInConfig(env, { ...config, environment: 'staging' });
+    const staging = readSignInConfig(
+      { ...env, SIGNIN_WORKOS_CLIENT_ID: 'client_1', SIGNIN_WORKOS_API_KEY: 'sk_test' },
+      { ...config, environment: 'staging' }
+    );
     expect(staging.providers.github).toEqual(misconfigured);
     expect(staging.sso).toEqual(misconfigured);
     const remote = JSON.stringify({

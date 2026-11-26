@@ -5,21 +5,52 @@ import type { SignResult } from './dos/UtsSignerDO';
 import { readConfig, type Env } from './env';
 import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
+import type { AuthorizationHandoff } from './oauth/authorize';
 import { jsonResponse } from './responses';
 
 /**
- * Signs a caller-supplied claim set, for the local end-to-end check of the signer and the key set.
- * Only `src/dev-index.ts` routes here, and only the `local` block of `wrangler.jsonc` uses that
- * entry (`test/repo` fails a staging or production block that does), so no deployed bundle holds
- * this route. It also answers 404 unless `UTS_ENVIRONMENT` is `development`, and a token signed
- * here names the development issuer, which no staging or production verifier accepts.
+ * Development-only routes and hooks, for the local end-to-end checks. Only `src/dev-index.ts`
+ * reaches this module, and only the `local` block of `wrangler.jsonc` uses that entry (`test/repo`
+ * fails a staging or production block that does), so no deployed bundle holds it. Each part also
+ * stays off unless `UTS_ENVIRONMENT` is `development`, and a token minted here names the
+ * development issuer, which no staging or production verifier accepts.
+ *
+ * * `POST /__dev/sign` signs a caller-supplied claim set through the signer the grant picks.
+ * * The development sign-in hand-off approves every authorization request for one synthetic
+ *   account, `DEV_ACCOUNT_ID`, signed in by passkey now. `dev_decision=deny` on the authorization
+ *   request denies it, and a third-party request names its consent in `dev_consent_id`. The
+ *   account and any consent must exist in the local identity store.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
+
+/** The synthetic account the development hand-off signs in. */
+export const DEV_ACCOUNT_ID = 'dev:uts-local';
 
 const DevSignRequestSchema = z.strictObject({
   grantId: z.string().min(1),
   claims: z.unknown(),
 });
+
+export const developmentHandoff: AuthorizationHandoff = async (request, pending) => {
+  const params = new URL(request.url).searchParams;
+  if (params.get('dev_decision') === 'deny') return { status: 'denied' };
+  const subject = {
+    accountId: DEV_ACCOUNT_ID,
+    browserSessionId: null,
+    authTime: new Date(),
+    amr: ['passkey'] as const,
+    orgId: null,
+  };
+  if (pending.client.kind === 'first_party') {
+    return { status: 'approved', approval: { ...subject, clientKind: 'first_party' } };
+  }
+  const consentId = z.uuid().safeParse(params.get('dev_consent_id'));
+  if (!consentId.success) return { status: 'denied' };
+  return {
+    status: 'approved',
+    approval: { ...subject, clientKind: 'third_party', consentId: consentId.data },
+  };
+};
 
 export async function handleDevRequest(
   request: Request,
@@ -27,8 +58,9 @@ export async function handleDevRequest(
   ctx: ExecutionContext
 ): Promise<Response> {
   const config = readConfig(env);
-  if (new URL(request.url).pathname !== DEV_SIGN_PATH || config.environment !== 'development') {
-    return await handleRequest(request, env, ctx);
+  if (config.environment !== 'development') return await handleRequest(request, env, ctx);
+  if (new URL(request.url).pathname !== DEV_SIGN_PATH) {
+    return await handleRequest(request, env, ctx, { authorizationHandoff: developmentHandoff });
   }
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });

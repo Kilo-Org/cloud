@@ -1,0 +1,290 @@
+import { UTS_GRANT_TYPES, UTS_MAX_TOKENS_PER_CALL, UTS_TOKEN_PATH } from '@kilocode/uts-contracts';
+import { z } from 'zod';
+import type { UtsConfig } from '../env';
+import type { DeviceContext, GrantsAccess, Minted } from '../grants/store';
+import { jsonResponse } from '../responses';
+import {
+  createFirstPartyRefreshToken,
+  grantIdOfFirstPartyRefreshToken,
+  isRandomCredential,
+  randomCredential,
+  sha256,
+} from '../token/credentials';
+import { type SignerAccess, accessTokenClaims, tokenResponseBody } from '../token/mint';
+import { type FirstPartyClient, requestClient } from './clients';
+import { failureResponse, oauthError, temporarilyUnavailable } from './errors';
+import { type Params, audiencesOfResources, parseScopes, readForm, targetMismatch } from './params';
+import { CodeVerifierSchema, s256Challenge } from './pkce';
+import { firstPartyProof, refuseThirdPartyProof } from './proof';
+import type { ReplayAccess } from './replay';
+
+/**
+ * POST /token (design 5.3 and 5.4). Grants: `authorization_code` (DPoP-bound for a first-party
+ * client), `refresh_token` (DPoP-bound first-party grant, or third-party rotation with reuse
+ * detection) and the RFC 8628 device grant through its hook. `client_credentials` is not offered.
+ *
+ * Each call verifies at most one DPoP proof, before the grant read, records its `jti` in the
+ * grant's replay object, runs one SQL statement, and signs one token per scope (up to 8) in the
+ * grant's signer object. A failure after the statement committed leaves the grant as the
+ * statement left it and answers an error; the client retries (a third-party client within the
+ * 60-second grace of its rotated token).
+ */
+
+/** The RFC 8628 device grant, which the device sign-in slice provides. */
+export type DeviceCodeGrant = (request: Request, params: Params) => Promise<Response>;
+
+export type TokenDeps = {
+  config: UtsConfig;
+  grants: GrantsAccess;
+  sign: SignerAccess;
+  replay: ReplayAccess;
+  deviceCodeGrant: DeviceCodeGrant | null;
+};
+
+/** The token endpoint on the issuer origin: the `htu` of every token request's DPoP proof. */
+export function tokenEndpointUrl(config: UtsConfig): string {
+  return `${config.endpoints.issuer}${UTS_TOKEN_PATH}`;
+}
+
+/** Kilo extension parameters of a first-party code exchange, shown in the user's device list. */
+const DeviceParamsSchema = z.strictObject({
+  label: z.optional(z.string().regex(/^[\x20-\x7e]{1,128}$/)),
+  platform: z.optional(z.string().regex(/^[\x21-\x7e]{1,64}$/)),
+});
+const CfSchema = z.looseObject({
+  asn: z.number().int().positive().optional(),
+  country: z.string().optional(),
+  city: z.string().optional(),
+});
+const IpSchema = z.union([z.ipv4(), z.ipv6()]);
+
+const GRANT_ERRORS = {
+  invalid_grant: 'the grant is invalid, expired or revoked',
+  invalid_scope: 'the scopes are not all granted, or there are more than 8',
+  invalid_target: 'each resource must name a Kilo service that a requested scope belongs to',
+} as const;
+
+/**
+ * Every refused grant answers 400. A DPoP key that is not the grant's and a reused third-party
+ * token answer like any invalid grant, so the response tells an attacker nothing more.
+ */
+function grantError(
+  outcome: keyof typeof GRANT_ERRORS | 'dpop_mismatch' | 'reuse_detected'
+): Response {
+  const error =
+    outcome === 'dpop_mismatch' || outcome === 'reuse_detected' ? 'invalid_grant' : outcome;
+  return oauthError(error, 400, GRANT_ERRORS[error]);
+}
+
+type TokenSelection = { scopes: string[] | null; resources: string[] | null };
+
+/** The optional `scope` and `resource` of a token request (RFC 6749 section 6, RFC 8707). */
+function tokenSelection(params: Params): TokenSelection | Response {
+  const scopeParam = params.one('scope');
+  if (scopeParam.status === 'repeated') return oauthError('invalid_request', 400, 'scope repeats');
+  let scopes: string[] | null = null;
+  if (scopeParam.status === 'present') {
+    scopes = parseScopes(scopeParam.value, UTS_MAX_TOKENS_PER_CALL);
+    if (scopes === null) {
+      return oauthError('invalid_scope', 400, 'scope must name at most 8 UTS scopes once each');
+    }
+  }
+  const resourceValues = params.all('resource');
+  let resources: string[] | null = null;
+  if (resourceValues.length > 0) {
+    resources = audiencesOfResources(resourceValues);
+    if (resources === null || (scopes !== null && targetMismatch(scopes, resources))) {
+      return grantError('invalid_target');
+    }
+  }
+  return { scopes, resources };
+}
+
+function required(params: Params, name: string): string | Response {
+  const param = params.one(name);
+  return param.status === 'present'
+    ? param.value
+    : oauthError('invalid_request', 400, `${name} is required once`);
+}
+
+/** Where the device that signs in is, for its device-session row. */
+function deviceContext(
+  request: Request,
+  params: Params,
+  client: FirstPartyClient
+): DeviceContext | Response {
+  const label = params.one('device_label');
+  const platform = params.one('device_platform');
+  const parsed = DeviceParamsSchema.safeParse({
+    label: label.status === 'present' ? label.value : undefined,
+    platform: platform.status === 'present' ? platform.value : undefined,
+  });
+  if (label.status === 'repeated' || platform.status === 'repeated' || !parsed.success) {
+    return oauthError('invalid_request', 400, 'device_label or device_platform is malformed');
+  }
+  const cf = CfSchema.safeParse(request.cf).data;
+  const country = cf?.country;
+  const city = cf?.city;
+  return {
+    label: parsed.data.label ?? client.name,
+    platform: parsed.data.platform ?? 'unknown',
+    clientIp: IpSchema.safeParse(request.headers.get('CF-Connecting-IP')).data ?? null,
+    asn: cf?.asn ?? null,
+    country: country !== undefined && /^[A-Z]{2}$/.test(country) ? country : null,
+    city: city !== undefined && city.length > 0 && city.length <= 128 ? city : null,
+  };
+}
+
+/** Signs the minted tokens and answers the token response. */
+async function completeMint(
+  deps: TokenDeps,
+  clientId: string,
+  grantId: string,
+  minted: Minted,
+  refresh: { token: string; expiresAt: Date } | null
+): Promise<Response> {
+  const nowMs = Date.now();
+  const nowSeconds = Math.floor(nowMs / 1000);
+  const claims = accessTokenClaims(deps.config, clientId, grantId, minted, nowSeconds);
+  const signed = await deps.sign(grantId, claims);
+  if (signed.status === 'unavailable') return temporarilyUnavailable();
+  if (signed.status === 'misconfigured') return oauthError('server_error', 500);
+  return jsonResponse(tokenResponseBody(claims, signed.tokens, refresh, nowMs), 200, {
+    Pragma: 'no-cache',
+  });
+}
+
+async function exchangeCode(request: Request, params: Params, deps: TokenDeps): Promise<Response> {
+  const identity = requestClient(params);
+  if (identity instanceof Response) return identity;
+  const code = required(params, 'code');
+  if (code instanceof Response) return code;
+  const redirectUri = required(params, 'redirect_uri');
+  if (redirectUri instanceof Response) return redirectUri;
+  const verifier = required(params, 'code_verifier');
+  if (verifier instanceof Response) return verifier;
+  if (!CodeVerifierSchema.safeParse(verifier).success) {
+    return oauthError('invalid_request', 400, 'code_verifier is malformed');
+  }
+  const selection = tokenSelection(params);
+  if (selection instanceof Response) return selection;
+  if (!isRandomCredential(code)) return grantError('invalid_grant');
+
+  const grantId = crypto.randomUUID();
+  let binding;
+  let refreshToken: string;
+  if (identity.kind === 'first_party') {
+    const device = deviceContext(request, params, identity.client);
+    if (device instanceof Response) return device;
+    const url = tokenEndpointUrl(deps.config);
+    const proof = await firstPartyProof(request, deps.replay, url, grantId);
+    if (proof instanceof Response) return proof;
+    binding = {
+      kind: 'first_party' as const,
+      dpopJkt: proof.jkt,
+      clientClass: identity.client.clientClass,
+      device,
+    };
+    refreshToken = createFirstPartyRefreshToken(grantId);
+  } else {
+    const refused = refuseThirdPartyProof(request);
+    if (refused !== null) return refused;
+    binding = { kind: 'third_party' as const };
+    refreshToken = randomCredential();
+  }
+  const clientId = identity.kind === 'first_party' ? identity.client.clientId : identity.clientId;
+
+  const result = await deps.grants(async grants =>
+    grants.exchangeCode({
+      environment: deps.config.environment,
+      codeHash: await sha256(code),
+      clientId,
+      redirectUri,
+      codeChallenge: await s256Challenge(verifier),
+      binding,
+      grantId,
+      refreshTokenHash: await sha256(refreshToken),
+      ...selection,
+    })
+  );
+  if (result.outcome !== 'issued') return grantError(result.outcome);
+  return await completeMint(deps, clientId, grantId, result, {
+    token: refreshToken,
+    expiresAt: result.refreshExpiresAt,
+  });
+}
+
+async function refresh(request: Request, params: Params, deps: TokenDeps): Promise<Response> {
+  const identity = requestClient(params);
+  if (identity instanceof Response) return identity;
+  const token = required(params, 'refresh_token');
+  if (token instanceof Response) return token;
+  const selection = tokenSelection(params);
+  if (selection instanceof Response) return selection;
+
+  if (identity.kind === 'first_party') {
+    const grantId = grantIdOfFirstPartyRefreshToken(token);
+    if (grantId === null) return grantError('invalid_grant');
+    const url = tokenEndpointUrl(deps.config);
+    const proof = await firstPartyProof(request, deps.replay, url, grantId);
+    if (proof instanceof Response) return proof;
+    const result = await deps.grants(async grants =>
+      grants.refreshFirstParty({
+        environment: deps.config.environment,
+        tokenHash: await sha256(token),
+        grantId,
+        clientId: identity.client.clientId,
+        dpopJkt: proof.jkt,
+        ...selection,
+      })
+    );
+    if (result.outcome !== 'issued') return grantError(result.outcome);
+    return await completeMint(deps, identity.client.clientId, grantId, result, null);
+  }
+
+  const refused = refuseThirdPartyProof(request);
+  if (refused !== null) return refused;
+  if (!isRandomCredential(token)) return grantError('invalid_grant');
+  const rotated = randomCredential();
+  const result = await deps.grants(async grants =>
+    grants.refreshThirdParty({
+      environment: deps.config.environment,
+      tokenHash: await sha256(token),
+      clientId: identity.clientId,
+      newTokenHash: await sha256(rotated),
+      ...selection,
+    })
+  );
+  if (result.outcome !== 'issued') return grantError(result.outcome);
+  return await completeMint(deps, identity.clientId, result.familyId, result, {
+    token: rotated,
+    expiresAt: result.refreshExpiresAt,
+  });
+}
+
+export async function handleToken(request: Request, deps: TokenDeps): Promise<Response> {
+  if (request.method !== 'POST') {
+    return oauthError('invalid_request', 405, 'use POST', { Allow: 'POST' });
+  }
+  const form = await readForm(request);
+  if (form.status === 'invalid') return oauthError('invalid_request', 400, form.description);
+  const grantType = form.params.one('grant_type');
+  if (grantType.status !== 'present') {
+    return oauthError('invalid_request', 400, 'grant_type is required once');
+  }
+  try {
+    switch (grantType.value) {
+      case UTS_GRANT_TYPES.authorizationCode:
+        return await exchangeCode(request, form.params, deps);
+      case UTS_GRANT_TYPES.refreshToken:
+        return await refresh(request, form.params, deps);
+      case UTS_GRANT_TYPES.deviceCode:
+        if (deps.deviceCodeGrant !== null) return await deps.deviceCodeGrant(request, form.params);
+        return oauthError('unsupported_grant_type', 400);
+      default:
+        return oauthError('unsupported_grant_type', 400);
+    }
+  } catch (error) {
+    return failureResponse(error, 'token');
+  }
+}

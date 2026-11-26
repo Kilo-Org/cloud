@@ -36,10 +36,19 @@
     // Signer objects hold private keys, so production and staging pin them to the EU.
     "DO_JURISDICTION": "eu",
   },
+  // The signer objects, and the DPoP replay objects named by grant id (design 5.7).
   "durable_objects": {
-    "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_REPLAY_DO", "class_name": "UtsReplayDO" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsReplayDO"] },
+  ],
+  // No identity-store Hyperdrive binding yet: the OAuth endpoints and their metadata stay off
+  // until the environment's identity store is provisioned (src/grants/binding.ts).
   "env": {
     "staging": {
       "name": "uts-staging",
@@ -57,7 +66,10 @@
         "DO_JURISDICTION": "eu",
       },
       "durable_objects": {
-        "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+        "bindings": [
+          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+          { "name": "UTS_REPLAY_DO", "class_name": "UtsReplayDO" },
+        ],
       },
     },
     // Local development only; no deploy workflow targets this name. Only this block uses the
@@ -73,8 +85,21 @@
         "DO_JURISDICTION": "none",
       },
       "durable_objects": {
-        "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+        "bindings": [
+          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+          { "name": "UTS_REPLAY_DO", "class_name": "UtsReplayDO" },
+        ],
       },
+      // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo:
+      // set CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE to a URL with the
+      // password you gave uts_app_a (README, "Local development").
+      "hyperdrive": [
+        {
+          "binding": "IDENTITY_STORE",
+          "id": "uts-local-identity-store",
+          "localConnectionString": "postgres://uts_app_a@127.0.0.1:55432/uts",
+        },
+      ],
     },
   },
 }

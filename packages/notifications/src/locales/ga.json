@@ -8,7 +8,8 @@
       "securityFinding": "Teastaíonn aird ar thátal slándála",
       "securityUpdate": "Tá nuashonrú ar sheiceáil slándála",
       "agentBriefing": "Tá do thuarascáil ar ghníomhaíocht an ghníomhaire réidh",
-      "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
+      "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha",
+      "accountSecurity": "Bhí gníomhaíocht slándála ar do chuntas"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Sárú SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Cuireadh eochair phasfhocail le do chuntas"
+      },
+      "passkeyRemoved": {
+        "title": "Baineadh eochair phasfhocail de do chuntas"
+      },
+      "signInMethodLinked": {
+        "title": "Cuireadh modh sínithe isteach le do chuntas"
+      },
+      "signInMethodUnlinked": {
+        "title": "Baineadh modh sínithe isteach de do chuntas"
+      },
+      "deviceSignInApproved": {
+        "title": "Faomhadh síniú isteach ó ghléas"
+      },
+      "apiKeyReset": {
+        "title": "Athshocraíodh an comhartha API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Síníodh amach as gach brabhsálaí"
+      },
+      "deviceSessionRevoked": {
+        "title": "Síníodh gléas amach as do chuntas"
+      },
+      "signInResetBySupport": {
+        "title": "D'athshocraigh tacaíocht Kilo an síniú isteach"
+      },
+      "newSignIn": {
+        "title": "Síniú isteach nua ar do chuntas"
+      },
+      "body": {
+        "deviceAndLocation": "Ó {{device}} gar do {{location}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
+        "device": "Ó {{device}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
+        "location": "Gar do {{location}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
+        "unknown": "Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
+        "selfNamedDevice": "Ó ghléas a thug \"{{name}}\" air féin. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
+        "support": "Rinne tacaíocht Kilo é seo. Mura ndearna tú é a iarraidh, déan teagmháil le tacaíocht."
+      }
     }
   },
   "sessionReady": {

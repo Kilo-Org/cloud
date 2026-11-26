@@ -18,7 +18,7 @@ const USER_ID = 'user-1';
 // The cloud-agent router's heavy runtime deps, mocked exactly as
 // cloud-agent-next-router.test.ts does so the router module loads without
 // network, PostHog, or R2 clients.
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateInternalServiceToken: jest.fn(),
   TOKEN_EXPIRY: 60,
 }));

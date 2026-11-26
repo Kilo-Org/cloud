@@ -12097,6 +12097,48 @@ export const native_attested_keys = pgTable(
 
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
 
+/**
+ * The devices and networks a user has signed in from, so a sign-in from an
+ * unseen device on an unseen network can be noticed. Holds only HMAC-SHA-256
+ * hex digests of the keys, under a key the database does not hold, never a
+ * raw address or cookie value. `key_id` is a fingerprint of that key: only
+ * rows under the current key are read, and the scheduled prune deletes the
+ * others.
+ *
+ * `device` and `network` rows are the sign-in contexts. The single `notice`
+ * row per user records when the last new-sign-in notice was sent
+ * (`last_seen_at`), so the notice is capped per user. The single `history`
+ * row per user and key (`key_hash` = `key_id`) marks that the user has
+ * signed in before; it holds no device or network data. The scheduled prune
+ * deletes device, network, and notice rows not seen for 90 days, and keeps
+ * the history row.
+ */
+export const user_sign_in_contexts = pgTable(
+  'user_sign_in_contexts',
+  {
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kind: text().notNull().$type<'device' | 'network' | 'notice' | 'history'>(),
+    key_hash: text().notNull(),
+    key_id: text().notNull(),
+    first_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.user_id, table.kind, table.key_hash] }),
+    index('IDX_user_sign_in_contexts_key_kind_last_seen').on(
+      table.key_id,
+      table.kind,
+      table.last_seen_at
+    ),
+    check(
+      'user_sign_in_contexts_kind_check',
+      sql`${table.kind} IN ('device', 'network', 'notice', 'history')`
+    ),
+  ]
+);
+
 // ── W3-B operation ledger and analytics outbox (P1-A-08a / P2-A-04) ──────
 
 /**

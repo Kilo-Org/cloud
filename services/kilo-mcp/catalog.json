@@ -29571,7 +29571,8 @@
       "organizationid",
       "pullrequesturl"
     ],
-    "searchBlob": "organizations.reviewAgent.triggerBitbucketCodeReview Manually trigger the Bitbucket code reviewer on a pull request for an organization. Use as an admin to run a review now. organizations reviewagent triggerbitbucketcodereview organizationid pullrequesturl organizationId pullRequestUrl"
+    "searchBlob": "organizations.reviewAgent.triggerBitbucketCodeReview Manually trigger the Bitbucket code reviewer on a pull request for an organization. Use as an admin to run a review now. organizations reviewagent triggerbitbucketcodereview organizationid pullrequesturl organizationId pullRequestUrl",
+    "admin": true
   },
   "organizations.salesDemo.reset": {
     "path": "organizations.salesDemo.reset",

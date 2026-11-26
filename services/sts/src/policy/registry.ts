@@ -6,6 +6,7 @@
 export const POLICY_FILES = [
   'o11y.yaml',
   'audit-relay.yaml',
+  'bouncer-watch.yaml',
   'usage-ingest.yaml',
   'web.yaml',
 ] as const;

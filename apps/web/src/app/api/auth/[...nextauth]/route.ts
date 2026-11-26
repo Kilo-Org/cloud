@@ -1,4 +1,5 @@
 import { nextAuthHttpHandler } from '@/lib/user/next-auth-options';
+import { withWebSignInDevice } from '@/lib/auth/web-sign-in-device';
 import { NextRequest } from 'next/server';
 
 // GitHub recently started appending `&iss=https://github.com/login/oauth` to
@@ -27,7 +28,11 @@ async function handler(request: NextRequest, context: { params: Promise<{ nextau
     }
   }
 
-  return nextAuthHttpHandler(stripGitHubIssParam(request), context);
+  // A sign-in completed by this request sets the browser device cookie on
+  // the response NextAuth builds.
+  return withWebSignInDevice(request, () =>
+    nextAuthHttpHandler(stripGitHubIssParam(request), context)
+  );
 }
 
 export { handler as GET, handler as POST };

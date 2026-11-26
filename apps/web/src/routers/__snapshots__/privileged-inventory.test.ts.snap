@@ -434,6 +434,7 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "organizations.admin.updateFreeTrialEndAt mutation [admin] -> trpc.organizations.admin",
   "organizations.admin.updateKiloEncrypt mutation [admin] -> trpc.organizations.admin",
   "organizations.admin.updateSuppressTrialMessaging mutation [admin] -> trpc.organizations.admin",
+  "organizations.reviewAgent.triggerBitbucketCodeReview mutation [admin] -> trpc.organizations.reviewAgent.triggerBitbucketCodeReview",
   "organizations.seatPurchases query [admin] -> trpc.organizations.seatPurchases",
   "organizations.sso.clearSsoDomain mutation [admin] -> trpc.organizations.sso",
   "organizations.sso.createConfig mutation [admin] -> trpc.organizations.sso",

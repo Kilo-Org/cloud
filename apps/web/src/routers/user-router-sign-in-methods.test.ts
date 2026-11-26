@@ -769,7 +769,7 @@ describe('linkAccountToExistingUser', () => {
       user.google_user_email,
       'GitHub',
       { email: 'notice@example.net', displayName: null },
-      null,
+      { kind: 'added' },
       EXPECTED_DETAILS
     );
   });

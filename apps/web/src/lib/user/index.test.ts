@@ -1807,9 +1807,13 @@ describe('User', () => {
       expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
       expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
-      // The account had no other sign-in method, so the notice names none.
+      // The account had no other sign-in method, so the notice names none,
+      // and it still reports the browser sign-out and points to support.
       expect(mockSendNewSignInMethodEmail).toHaveBeenCalledTimes(1);
-      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toBeNull();
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual({
+        kind: 'sso_settled',
+        replacedMethodNames: [],
+      });
 
       // Signing in again with the same WorkOS profile is not a new link.
       await createOrUpdateUser(
@@ -1870,8 +1874,13 @@ describe('User', () => {
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos-relink');
       // The replaced profile is a new link, so the owner hears of it.
       expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
-      // A stale WorkOS row is the same method, not one the link replaced.
-      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toBeNull();
+      // A stale WorkOS row (such as one directory sync provisioned) is the same
+      // method, not one the link replaced; the browser sign-out and the
+      // support step still apply.
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual({
+        kind: 'sso_settled',
+        replacedMethodNames: [],
+      });
     });
 
     it('names the sign-in methods an SSO link replaced', async () => {
@@ -1903,7 +1912,10 @@ describe('User', () => {
 
       expect(result.success).toBe(true);
       expect(mockSendNewSignInMethodEmail).toHaveBeenCalledTimes(1);
-      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual(['GitHub', 'Google']);
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual({
+        kind: 'sso_settled',
+        replacedMethodNames: ['GitHub', 'Google'],
+      });
       expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
       const providers = await db.query.user_auth_provider.findMany({
         where: eq(user_auth_provider.kilo_user_id, existingUser.id),

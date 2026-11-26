@@ -454,6 +454,21 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     });
   });
 
+  test('sends one notice per reset, even two in a row from one admin session', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const { user } = await insertHeldAccount();
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
+    await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
+
+    expect(mockSendResetEmail).toHaveBeenCalledTimes(2);
+    expect(mockDispatchPush.mock.calls.map(([push]) => push.event)).toEqual([
+      'sign_in_reset_by_support',
+      'sign_in_reset_by_support',
+    ]);
+  });
+
   test('a passkey the prior holder registered no longer signs in after recovery', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();

@@ -31,6 +31,7 @@ import {
   deleteTransactionalEmailLogForUsers,
   insertTestUser,
 } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { newPepperRotation } from '@kilocode/web-shared/lib/auth/pepper-rotation';
 
 import {
   scheduleSecurityNotice,
@@ -44,6 +45,7 @@ const mockDispatchPush = jest.mocked(dispatchAccountSecurityPush);
 const mockSendPasskeyAdded = jest.mocked(email.sendPasskeyAddedEmail);
 const mockSendApiKeyReset = jest.mocked(email.sendApiKeyResetEmail);
 const mockSendBrowserSessionsRevoked = jest.mocked(email.sendBrowserSessionsRevokedEmail);
+const mockSendSupportReset = jest.mocked(email.sendSignInResetBySupportEmail);
 const mockSendRemoved = jest.mocked(email.sendSignInMethodRemovedEmail);
 const mockSendNewSignIn = jest.mocked(email.sendNewSignInEmail);
 
@@ -106,22 +108,27 @@ const EVENTS: Array<[SecurityNoticeEvent, unknown, unknown[]]> = [
       provider: 'github',
       linkedIdentity: { email: 'octo@example.net', displayName: null },
       linkedAt: new Date('2026-03-04T05:06:07.000Z'),
+      change: { kind: 'added' },
     },
     jest.mocked(email.sendNewSignInMethodEmail),
-    ['GitHub', { email: 'octo@example.net', displayName: null }, null, REQUEST],
+    ['GitHub', { email: 'octo@example.net', displayName: null }, { kind: 'added' }, REQUEST],
   ],
   [
-    { type: 'sign_in_method_unlinked', provider: 'github', actingSessionId: 'web-session-1' },
+    {
+      type: 'sign_in_method_unlinked',
+      provider: 'github',
+      removedLinkCreatedAt: ['2026-03-01 10:00:00.123456+00'],
+    },
     jest.mocked(email.sendSignInMethodRemovedEmail),
     ['GitHub', REQUEST],
   ],
   [
-    { type: 'api_key_reset', actingSessionId: 'web-session-1' },
+    { type: 'api_key_reset', rotationId: newPepperRotation().rotationId },
     jest.mocked(email.sendApiKeyResetEmail),
     [REQUEST],
   ],
   [
-    { type: 'browser_sessions_revoked', actingSessionId: 'web-session-1' },
+    { type: 'browser_sessions_revoked', rotationId: newPepperRotation().rotationId },
     jest.mocked(email.sendBrowserSessionsRevokedEmail),
     [REQUEST],
   ],
@@ -181,7 +188,7 @@ describe('scheduleSecurityNotice', () => {
     );
   });
 
-  it('names the sign-in methods an SSO link replaced in its email', async () => {
+  it('names the sign-in methods an SSO settlement replaced and points the email to support', async () => {
     await scheduleSecurityNotice(
       user,
       {
@@ -189,7 +196,7 @@ describe('scheduleSecurityNotice', () => {
         provider: 'workos',
         linkedIdentity: { email: 'owner@example.com', displayName: null },
         linkedAt: new Date('2026-03-04T05:06:07.000Z'),
-        replacedProviders: ['github', 'google'],
+        change: { kind: 'sso_settled', replacedProviders: ['github', 'google'] },
       },
       REQUEST
     );
@@ -198,11 +205,33 @@ describe('scheduleSecurityNotice', () => {
       user.google_user_email,
       'Enterprise SSO',
       { email: 'owner@example.com', displayName: null },
-      ['GitHub', 'Google'],
+      { kind: 'sso_settled', replacedMethodNames: ['GitHub', 'Google'] },
       REQUEST
     );
     expect(mockDispatchPush).toHaveBeenCalledTimes(1);
     expect(await noticeRows(user.id)).toHaveLength(1);
+  });
+
+  it('sends an SSO settlement that replaced only an earlier SSO row as an SSO settlement', async () => {
+    await scheduleSecurityNotice(
+      user,
+      {
+        type: 'sign_in_method_linked',
+        provider: 'workos',
+        linkedIdentity: { email: 'owner@example.com', displayName: null },
+        linkedAt: new Date('2026-03-04T05:06:07.000Z'),
+        change: { kind: 'sso_settled', replacedProviders: [] },
+      },
+      REQUEST
+    );
+
+    expect(jest.mocked(email.sendNewSignInMethodEmail)).toHaveBeenCalledWith(
+      user.google_user_email,
+      'Enterprise SSO',
+      { email: 'owner@example.com', displayName: null },
+      { kind: 'sso_settled', replacedMethodNames: [] },
+      REQUEST
+    );
   });
 
   it('attributes a name the requesting device chose in the approval push, cut short', async () => {
@@ -252,7 +281,7 @@ describe('scheduleSecurityNotice', () => {
 
     await scheduleSecurityNotice(
       user,
-      { type: 'sign_in_reset_by_support', actingSessionId: 'admin-session-1' },
+      { type: 'sign_in_reset_by_support', rotationId: newPepperRotation().rotationId },
       supportRequest
     );
 
@@ -273,6 +302,7 @@ describe('scheduleSecurityNotice', () => {
         provider: 'email',
         linkedIdentity: { email: 'linked-secret@example.net' },
         linkedAt: new Date(),
+        change: { kind: 'added' },
       },
       REQUEST
     );
@@ -295,64 +325,60 @@ describe('scheduleSecurityNotice', () => {
     expect(mockDispatchPush).toHaveBeenCalledTimes(1);
   });
 
-  it('treats repeated resets by one session inside ten minutes as one notice, and a later one as new', async () => {
-    const reset: SecurityNoticeEvent = { type: 'api_key_reset', actingSessionId: 'web-session-a' };
-    await scheduleSecurityNotice(user, reset, at('2026-03-04T05:01:00.000Z'));
-    await scheduleSecurityNotice(user, reset, at('2026-03-04T05:09:00.000Z'));
-    await scheduleSecurityNotice(user, reset, at('2026-03-04T05:11:00.000Z'));
-
-    expect(mockSendApiKeyReset).toHaveBeenCalledTimes(2);
-    expect(mockDispatchPush).toHaveBeenCalledTimes(2);
-  });
-
   it.each([
-    [{ type: 'api_key_reset' } as const, mockSendApiKeyReset],
-    [{ type: 'browser_sessions_revoked' } as const, mockSendBrowserSessionsRevoked],
-  ])(
-    'sends a second %o notice for another session inside the same window',
-    async (event, sender) => {
+    ['api_key_reset', mockSendApiKeyReset],
+    ['browser_sessions_revoked', mockSendBrowserSessionsRevoked],
+    ['sign_in_reset_by_support', mockSendSupportReset],
+  ] as const)(
+    'sends two %s notices for two rotations at the same time from one session, and one for a replay',
+    async (type, sender) => {
+      const first = newPepperRotation();
+      const second = newPepperRotation();
+      const sameTime = at('2026-03-04T05:01:00.000Z');
+      await scheduleSecurityNotice(user, { type, rotationId: first.rotationId }, sameTime);
+      await scheduleSecurityNotice(user, { type, rotationId: second.rotationId }, sameTime);
+      // A replayed schedule of the first rotation, later.
       await scheduleSecurityNotice(
         user,
-        { ...event, actingSessionId: 'web-session-owner' },
-        at('2026-03-04T05:01:00.000Z')
-      );
-      await scheduleSecurityNotice(
-        user,
-        { ...event, actingSessionId: 'web-session-other' },
-        at('2026-03-04T05:02:00.000Z')
+        { type, rotationId: first.rotationId },
+        at('2026-03-04T06:30:00.000Z')
       );
 
       expect(sender).toHaveBeenCalledTimes(2);
-      expect(await noticeRows(user.id)).toHaveLength(2);
+      expect(mockDispatchPush).toHaveBeenCalledTimes(2);
+      const rows = await noticeRows(user.id);
+      expect(rows).toHaveLength(2);
+      // The key holds neither the rotation id nor the pepper behind it.
+      expect(JSON.stringify(rows)).not.toContain(first.rotationId);
+      expect(JSON.stringify(rows)).not.toContain(first.pepper);
     }
   );
 
-  it('keys an unlink on the session: a repeat is one notice, another session is a new one', async () => {
-    const unlink = (actingSessionId: string): SecurityNoticeEvent => ({
+  it('keys an unlink on the removed link row: a replay is one notice, a re-linked row is a new one', async () => {
+    const unlink = (removedLinkCreatedAt: string): SecurityNoticeEvent => ({
       type: 'sign_in_method_unlinked',
       provider: 'github',
-      actingSessionId,
+      removedLinkCreatedAt: [removedLinkCreatedAt],
     });
-    await scheduleSecurityNotice(user, unlink('web-session-a'), at('2026-03-04T05:01:10.000Z'));
-    await scheduleSecurityNotice(user, unlink('web-session-a'), at('2026-03-04T05:01:20.000Z'));
-    await scheduleSecurityNotice(user, unlink('web-session-b'), at('2026-03-04T05:01:30.000Z'));
+    await scheduleSecurityNotice(
+      user,
+      unlink('2026-03-04 05:00:00.100000+00'),
+      at('2026-03-04T05:01:10.000Z')
+    );
+    await scheduleSecurityNotice(
+      user,
+      unlink('2026-03-04 05:00:00.100000+00'),
+      at('2026-03-04T05:09:20.000Z')
+    );
+    // The owner linked GitHub again and removed it inside the same minute.
+    await scheduleSecurityNotice(
+      user,
+      unlink('2026-03-04 05:01:15.200000+00'),
+      at('2026-03-04T05:01:30.000Z')
+    );
 
     expect(mockSendRemoved).toHaveBeenCalledTimes(2);
-  });
-
-  it('treats each reset from a request with no session as its own notice', async () => {
-    await scheduleSecurityNotice(
-      user,
-      { type: 'api_key_reset', actingSessionId: null },
-      at('2026-03-04T05:01:00.000Z')
-    );
-    await scheduleSecurityNotice(
-      user,
-      { type: 'api_key_reset', actingSessionId: null },
-      at('2026-03-04T05:02:00.000Z')
-    );
-
-    expect(mockSendApiKeyReset).toHaveBeenCalledTimes(2);
+    expect(await noticeRows(user.id)).toHaveLength(2);
   });
 
   it('allows one new-sign-in notice per hour bucket, and a later one an hour after the cap claim', async () => {
@@ -404,7 +430,11 @@ describe('scheduleSecurityNotice', () => {
   it('keeps the claim when the email will not send on a retry either', async () => {
     mockSendApiKeyReset.mockResolvedValueOnce({ sent: false, reason: 'neverbounce_rejected' });
 
-    await scheduleSecurityNotice(user, { type: 'api_key_reset', actingSessionId: 's' }, REQUEST);
+    await scheduleSecurityNotice(
+      user,
+      { type: 'api_key_reset', rotationId: newPepperRotation().rotationId },
+      REQUEST
+    );
 
     expect(mockCaptureException).toHaveBeenCalledWith(new Error('security_notice_email_not_sent'), {
       tags: { security_notice: 'api_key_reset' },
@@ -419,7 +449,7 @@ describe('scheduleSecurityNotice', () => {
     await expect(
       scheduleSecurityNotice(
         user,
-        { type: 'browser_sessions_revoked', actingSessionId: 's' },
+        { type: 'browser_sessions_revoked', rotationId: newPepperRotation().rotationId },
         REQUEST
       )
     ).resolves.toBeUndefined();
@@ -435,7 +465,7 @@ describe('scheduleSecurityNotice', () => {
   it('sends the push without a device or location the request did not carry', async () => {
     await scheduleSecurityNotice(
       user,
-      { type: 'api_key_reset', actingSessionId: 's' },
+      { type: 'api_key_reset', rotationId: newPepperRotation().rotationId },
       { actor: 'owner', occurredAt: new Date(), ip: null, location: null, device: '   ' }
     );
 

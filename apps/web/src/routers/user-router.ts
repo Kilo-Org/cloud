@@ -29,7 +29,6 @@ import {
   type SignInMethodChangeCodeBinding,
 } from '@/lib/auth/sign-in-method-change-email-code';
 import {
-  actingSessionIdFromContext,
   currentSecurityNoticeRequest,
   recognisedClientLabel,
   scheduleSecurityNotice,
@@ -120,6 +119,7 @@ import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { newPepperRotation } from '@kilocode/web-shared/lib/auth/pepper-rotation';
 import { revokeUserSessions } from '@/lib/user/session-revocation';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
@@ -1101,7 +1101,7 @@ export const userRouter = createTRPCRouter({
       // A refused unlink must not spend the code.
       assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
       await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
-      const result = assertNoTrpcError(
+      const { removedLinkCreatedAt } = assertNoTrpcError(
         await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
       );
       await recordSignInMethodChange({
@@ -1110,16 +1110,20 @@ export const userRouter = createTRPCRouter({
         provider: input.provider,
         request: { ip: ctx.ip, route: ctx.trpcPath },
       });
-      await scheduleSecurityNotice(
-        ctx.user,
-        {
-          type: 'sign_in_method_unlinked',
-          provider: input.provider,
-          actingSessionId: binding.webSessionId,
-        },
-        await currentSecurityNoticeRequest()
-      );
-      return result;
+      // Only the call that removed the link rows reports them.
+      const [firstRemoved, ...otherRemoved] = removedLinkCreatedAt;
+      if (firstRemoved !== undefined) {
+        await scheduleSecurityNotice(
+          ctx.user,
+          {
+            type: 'sign_in_method_unlinked',
+            provider: input.provider,
+            removedLinkCreatedAt: [firstRemoved, ...otherRemoved],
+          },
+          await currentSecurityNoticeRequest()
+        );
+      }
+      return successResult();
     }),
 
   // Emails a one-time code that authorizes one link or unlink from this
@@ -1176,10 +1180,11 @@ export const userRouter = createTRPCRouter({
     // one transaction: a stolen token or browser session cannot survive it,
     // and a failure part-way leaves the old credentials intact rather than
     // half-evicted.
+    const apiTokenRotation = newPepperRotation();
     const revokedSessionIds = await db.transaction(async tx => {
       await tx
         .update(kilocode_users)
-        .set({ api_token_pepper: crypto.randomUUID(), web_session_pepper: crypto.randomUUID() })
+        .set({ api_token_pepper: apiTokenRotation.pepper, web_session_pepper: crypto.randomUUID() })
         .where(eq(kilocode_users.id, ctx.user.id));
 
       return revokeUserSessions(tx, ctx.user.id, {
@@ -1194,7 +1199,7 @@ export const userRouter = createTRPCRouter({
 
     await scheduleSecurityNotice(
       ctx.user,
-      { type: 'api_key_reset', actingSessionId: actingSessionIdFromContext(ctx) },
+      { type: 'api_key_reset', rotationId: apiTokenRotation.rotationId },
       await currentSecurityNoticeRequest()
     );
 
@@ -1202,12 +1207,14 @@ export const userRouter = createTRPCRouter({
   }),
 
   signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
-    await revokeWebSessions(ctx.user.id);
-    await scheduleSecurityNotice(
-      ctx.user,
-      { type: 'browser_sessions_revoked', actingSessionId: actingSessionIdFromContext(ctx) },
-      await currentSecurityNoticeRequest()
-    );
+    const revocation = await revokeWebSessions(ctx.user.id);
+    if (revocation) {
+      await scheduleSecurityNotice(
+        revocation.user,
+        { type: 'browser_sessions_revoked', rotationId: revocation.rotationId },
+        await currentSecurityNoticeRequest()
+      );
+    }
 
     return successResult();
   }),

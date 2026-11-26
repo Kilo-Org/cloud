@@ -216,12 +216,16 @@ type SendParams = {
   templateName: TemplateName;
   templateVars: TemplateVars;
   subjectOverride?: string;
+  /** Runs the address verifier without its diagnostics, which log the address and attach it to Sentry. */
+  suppressVerifierDiagnostics?: true;
 };
 
 export async function send(params: SendParams): Promise<SendResult> {
   const verificationRecipient = getEmailVerificationRecipient(params.to);
   if (verificationRecipient) {
-    const isSafeToSend = await verifyEmail(verificationRecipient);
+    const isSafeToSend = await verifyEmail(verificationRecipient, {
+      suppressDiagnostics: params.suppressVerifierDiagnostics === true,
+    });
     if (!isSafeToSend) {
       return { sent: false, reason: 'neverbounce_rejected' };
     }
@@ -436,51 +440,74 @@ function actorNoticeVars(request: SecurityNoticeRequest): TemplateVars {
 }
 
 /**
- * The first paragraph's addition and the "If this was not you" step of a
- * new sign-in method notice. A link that replaced the account's other sign-in
- * methods names them and the browser sign-out it caused, and points to
- * support: the owner cannot remove the replacing method themselves.
+ * Sends an account-security notice. Its recipient address never reaches a log
+ * or Sentry from here: the verifier runs without diagnostics, and the caller
+ * reports only the returned reason when the notice is not sent.
  */
-function newSignInMethodReplacementVars(
-  replacedMethodNames: readonly [string, ...string[]] | null
-): TemplateVars {
-  const profileLink = appPageLink('/profile').html;
-  const supportEmail = escapeHtml(SUPPORT_EMAIL);
-  const resetStep = `reset your API token at ${profileLink}, which signs out every browser, the app, and the CLI`;
-  if (replacedMethodNames === null) {
-    return {
-      replaced_note: '',
-      not_you_steps: new RawHtml(
-        `remove this sign-in method at ${appPageLink('/connected-accounts').html}, ${resetStep}, and contact ${supportEmail}.`
-      ),
-    };
-  }
-  return {
-    replaced_note: ` It replaced: ${replacedMethodNames.join(', ')}. Every browser was signed out.`,
-    not_you_steps: new RawHtml(
-      `contact ${supportEmail} to remove this sign-in method, which you cannot remove yourself, and ${resetStep}.`
-    ),
-  };
+function sendSecurityNotice(
+  params: Pick<SendParams, 'to' | 'templateName' | 'templateVars'>
+): Promise<SendResult> {
+  return send({ ...params, suppressVerifierDiagnostics: true });
 }
 
 /**
- * `replacedMethodNames` are the display names of the sign-in methods the link
- * removed, or null when it removed none.
+ * How a new sign-in method came onto the account. `added`: the owner linked a
+ * method they can remove themselves. `sso_settled`: an enterprise SSO sign-in
+ * settled onto the account; it replaced the account's other sign-in methods
+ * (`replacedMethodNames`, display names, possibly none) and signed out every
+ * browser, and only Kilo support can remove it.
  */
+export type NewSignInMethodChange =
+  | { kind: 'added' }
+  | { kind: 'sso_settled'; replacedMethodNames: readonly string[] };
+
+/**
+ * The first paragraph's additions and the "If this was not you" step of a
+ * new sign-in method notice. An SSO settlement names the methods it replaced,
+ * reports the browser sign-out on its own, and points to support, because the
+ * owner cannot remove the SSO method themselves.
+ */
+function newSignInMethodChangeVars(change: NewSignInMethodChange): TemplateVars {
+  const profileLink = appPageLink('/profile').html;
+  const supportEmail = escapeHtml(SUPPORT_EMAIL);
+  const resetStep = `reset your API token at ${profileLink}, which signs out every browser, the app, and the CLI`;
+  switch (change.kind) {
+    case 'added':
+      return {
+        replaced_note: '',
+        sign_out_note: '',
+        not_you_steps: new RawHtml(
+          `remove this sign-in method at ${appPageLink('/connected-accounts').html}, ${resetStep}, and contact ${supportEmail}.`
+        ),
+      };
+    case 'sso_settled':
+      return {
+        replaced_note:
+          change.replacedMethodNames.length === 0
+            ? ''
+            : ` It replaced: ${change.replacedMethodNames.join(', ')}.`,
+        sign_out_note: ' Every browser was signed out.',
+        not_you_steps: new RawHtml(
+          `contact ${supportEmail} to remove this sign-in method, which you cannot remove yourself, and ${resetStep}.`
+        ),
+      };
+  }
+}
+
 export async function sendNewSignInMethodEmail(
   email: string,
   providerName: string,
   linkedIdentity: { email: string; displayName?: string | null },
-  replacedMethodNames: readonly [string, ...string[]] | null,
+  change: NewSignInMethodChange,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
   const displayName = linkedIdentity.displayName?.trim();
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'newSignInMethod',
     templateVars: {
       ...securityNoticeVars(email, request),
-      ...newSignInMethodReplacementVars(replacedMethodNames),
+      ...newSignInMethodChangeVars(change),
       provider_name: providerName,
       linked_identity: displayName
         ? `${displayName} (${linkedIdentity.email})`
@@ -494,7 +521,7 @@ export async function sendSignInMethodRemovedEmail(
   providerName: string,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'signInMethodRemoved',
     templateVars: { ...securityNoticeVars(email, request), provider_name: providerName },
@@ -512,7 +539,7 @@ export async function sendPasskeyAddedEmail(
   passkeyName: string | null,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'passkeyAdded',
     templateVars: {
@@ -527,7 +554,7 @@ export async function sendPasskeyRemovedEmail(
   passkeyName: string | null,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'passkeyRemoved',
     templateVars: {
@@ -600,7 +627,7 @@ export async function sendDeviceSignInApprovedEmail(
   requester: { client: DeviceSignInRequester; ip: string | null },
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'deviceSignInApproved',
     templateVars: {
@@ -626,7 +653,7 @@ export async function sendApiKeyResetEmail(
   email: string,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'apiKeyReset',
     templateVars: {
@@ -641,7 +668,7 @@ export async function sendBrowserSessionsRevokedEmail(
   email: string,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'browserSessionsRevoked',
     templateVars: { ...securityNoticeVars(email, request), ...actorNoticeVars(request) },
@@ -654,7 +681,7 @@ export async function sendDeviceSessionRevokedEmail(
   revokedDevice: string | null,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'deviceSessionRevoked',
     templateVars: {
@@ -668,7 +695,7 @@ export async function sendSignInResetBySupportEmail(
   email: string,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'signInResetBySupport',
     templateVars: securityNoticeVars(email, request),
@@ -681,7 +708,7 @@ export async function sendNewSignInEmail(
   methodName: string | null,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'newSignIn',
     templateVars: {

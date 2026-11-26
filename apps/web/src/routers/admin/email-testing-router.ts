@@ -108,6 +108,7 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         provider_name: 'GitHub',
         linked_identity: 'octocat (user@example.com)',
         replaced_note: '',
+        sign_out_note: '',
         not_you_steps: new RawHtml(
           `remove this sign-in method at <a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>, reset your API token at <a href="${NEXTAUTH_URL}/profile">${NEXTAUTH_URL}/profile</a>, which signs out every browser, the app, and the CLI, and contact ${SUPPORT_EMAIL}.`
         ),

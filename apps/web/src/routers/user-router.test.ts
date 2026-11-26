@@ -8,6 +8,7 @@ import { userRouter } from '@/routers/user-router';
 import { SELF_CLEANUP_PROCEDURES } from '@kilocode/app-shared/auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  admin_action_audit_logs,
   agent_configs,
   app_shell_handoff_tokens,
   cli_sessions_v2,
@@ -49,6 +50,8 @@ import {
   dispatchAccountSecurityPush,
   refreshGlanceableScope,
 } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import type * as FindUserByIdModule from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -85,6 +88,14 @@ jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   dispatchAccountSecurityPush: jest.fn(async () => true),
 }));
 
+// Passes through to the real lookup unless a test makes it fail.
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => {
+  const actual = jest.requireActual<typeof FindUserByIdModule>(
+    '@kilocode/web-shared/lib/user/find-user-by-id'
+  );
+  return { ...actual, findUserById: jest.fn(actual.findUserById) };
+});
+
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
 const mockSendDeletionConfirmation = jest.mocked(sendAccountDeletionConfirmationEmail);
 const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSupportNotification);
@@ -94,6 +105,7 @@ const mockRefreshGlanceableScope = jest.mocked(refreshGlanceableScope);
 const mockDispatchSecurityPush = jest.mocked(dispatchAccountSecurityPush);
 const mockSendApiKeyReset = jest.mocked(sendApiKeyResetEmail);
 const mockSendBrowserSessionsRevoked = jest.mocked(sendBrowserSessionsRevokedEmail);
+const mockFindUserById = jest.mocked(findUserById);
 
 // Users that receive a security notice in this suite. The notice leaves an
 // outbox row that references the user; a later suite in the same worker that
@@ -682,6 +694,66 @@ describe('session and API token reset mutations', () => {
       actor: 'support',
       occurredAt: expect.any(Date),
     });
+  });
+
+  it('sends one notice per admin API token reset, even two in a row from one session', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const target = await insertNoticeRecipient();
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.users.resetAPIKey({ userId: target.id });
+    await caller.admin.users.resetAPIKey({ userId: target.id });
+
+    expect(mockSendApiKeyReset).toHaveBeenCalledTimes(2);
+    expect(securityPushes()).toEqual([
+      { recipientUserId: target.id, event: 'api_key_reset', origin: { actor: 'support' } },
+      { recipientUserId: target.id, event: 'api_key_reset', origin: { actor: 'support' } },
+    ]);
+  });
+
+  it('sends one notice per browser sign-out, even two in a row from one session', async () => {
+    const user = await insertNoticeRecipient();
+    const caller = await createCallerForUser(user.id);
+
+    await caller.user.signOutBrowserSessions();
+    await caller.user.signOutBrowserSessions();
+
+    expect(mockSendBrowserSessionsRevoked).toHaveBeenCalledTimes(2);
+    expect(securityPushes()).toHaveLength(2);
+  });
+
+  it('keeps an admin browser sign-out successful, noticed and audited when a lookup of the user would fail', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const target = await insertNoticeRecipient();
+    const caller = await createCallerForUser(admin.id);
+    const actual = jest.requireActual<typeof FindUserByIdModule>(
+      '@kilocode/web-shared/lib/user/find-user-by-id'
+    );
+    mockFindUserById.mockImplementation(async (userId, fromDb) => {
+      if (userId === target.id) throw new Error('lookup failed');
+      return actual.findUserById(userId, fromDb);
+    });
+
+    try {
+      await expect(
+        caller.admin.users.signOutBrowserSessions({ userId: target.id })
+      ).resolves.toEqual({ success: true });
+    } finally {
+      mockFindUserById.mockImplementation(actual.findUserById);
+    }
+
+    const audits = await db
+      .select({ action: admin_action_audit_logs.action, target: admin_action_audit_logs.target_id })
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    expect(audits).toEqual([{ action: 'user.browser_sessions.revoke', target: target.id }]);
+    expect(securityPushes()).toEqual([
+      {
+        recipientUserId: target.id,
+        event: 'browser_sessions_revoked',
+        origin: { actor: 'support' },
+      },
+    ]);
   });
 });
 

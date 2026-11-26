@@ -89,7 +89,7 @@ Every template must include this branding footer below the content table:
 | `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
 | `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `accountLinkCode.html` | `code`, `provider_name`, `email`, `expires_in`, `year` | — |
-| `newSignInMethod.html` | `provider_name`, `linked_identity`, `replaced_note` (empty, or ` It replaced: <names>. Every browser was signed out.` when the link removed the account's other sign-in methods) and `not_you_steps` (rendered HTML: the "If this was not you" step, which points to support instead of "remove this sign-in method" when the link replaced others), plus the security-notice variables below | — |
+| `newSignInMethod.html` | `provider_name`, `linked_identity`, `replaced_note` (empty, or ` It replaced: <names>.` when an enterprise SSO sign-in removed the account's other sign-in methods), `sign_out_note` (empty, or ` Every browser was signed out.` for every enterprise SSO sign-in that settled onto the account, whether or not it replaced other methods) and `not_you_steps` (rendered HTML: the "If this was not you" step; for an enterprise SSO sign-in it points to support instead of "remove this sign-in method", because the owner cannot remove SSO), plus the security-notice variables below | — |
 | `signInMethodRemoved.html` | `provider_name`, plus the security-notice variables below | — |
 | `passkeyAdded.html` | `passkey_name_note` (rendered HTML: ` (<name>)` when the passkey has a name, else empty, placed right after "A passkey"), plus the security-notice variables below | — |
 | `passkeyRemoved.html` | `passkey_name_note`, as for `passkeyAdded.html`, plus the security-notice variables below | — |

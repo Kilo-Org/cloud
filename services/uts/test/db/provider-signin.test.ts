@@ -1,0 +1,678 @@
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { AuditEventSchema } from '@kilocode/sts-contracts';
+import type pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { IdentityStore } from '../../src/db/client';
+import {
+  type FlowIntent,
+  type FlowProvider,
+  type ProviderIdentity,
+  type ProviderSignInStore,
+  identityStoreProviderSignIn,
+} from '../../src/signin/providers/store';
+import type { NetworkContext } from '../../src/signin/store';
+import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
+
+/**
+ * The provider, SSO and email sign-in functions (migration 0009) through the Worker's own
+ * statements (`src/signin/providers/store.ts`), run as the app login. The Worker checks the
+ * provider's answer before these statements; here the identities are fixtures. Fixtures other
+ * slices write (accounts, SSO connections and domains, sessions, gate passes) are inserted as the
+ * owner.
+ */
+
+let db: TestDatabase;
+let owner: pg.Client;
+let app: pg.Client;
+let store: ProviderSignInStore;
+
+beforeAll(async () => {
+  db = await TestDatabase.create();
+  owner = await db.connectAsOwner();
+  app = await db.connect('uts_app_a');
+  store = identityStoreProviderSignIn(new IdentityStore(app));
+});
+afterAll(() => db.drop());
+
+const environment = 'development';
+const sha256 = (value: string) => createHash('sha256').update(value).digest();
+const token = () => randomBytes(32).toString('base64url');
+const hashKey = randomBytes(32);
+const keyed = (label: string, value: string) =>
+  createHmac('sha256', hashKey).update(`${label}:${value}`).digest();
+const network: NetworkContext = {
+  userAgent: 'test browser',
+  clientIp: '192.0.2.10',
+  asn: 64500,
+  country: 'DE',
+  city: 'Berlin',
+};
+const address = () => `${randomBytes(5).toString('hex')}@example.com`;
+
+const AuditRowSchema = z.object({ event_type: z.string(), event: z.unknown() });
+
+async function auditRows(accountId: string) {
+  const result = await owner.query(
+    'SELECT event_type, event FROM uts.audit_events WHERE account_id = $1 ORDER BY id',
+    [accountId]
+  );
+  return result.rows.map(row => {
+    const parsed = AuditRowSchema.parse(row);
+    return { type: parsed.event_type, event: AuditEventSchema.parse(parsed.event) };
+  });
+}
+
+async function auditTypes(accountId: string): Promise<string[]> {
+  return (await auditRows(accountId)).map(row => row.type);
+}
+
+async function accountWithEmail(email: string, status: 'active' | 'blocked' = 'active') {
+  const id = `oauth/test-${randomUUID()}`;
+  await owner.query(
+    `INSERT INTO uts.accounts (id, primary_email, status, blocked_at)
+     VALUES ($1, $2, $3::uts.account_status, CASE WHEN $3::text = 'blocked' THEN now() END)`,
+    [id, email, status]
+  );
+  return id;
+}
+
+async function browserSession(accountId: string): Promise<{ id: string; token: string }> {
+  const value = token();
+  const result = await owner.query<{ id: string }>(
+    `INSERT INTO uts.browser_sessions (account_id, token_hash, auth_time, amr, idle_expires_at, expires_at)
+     VALUES ($1, $2, now(), '{passkey}', now() + interval '14 days', now() + interval '30 days')
+     RETURNING id`,
+    [accountId, sha256(value)]
+  );
+  return { id: result.rows[0].id, token: value };
+}
+
+type Flow = { state: string; binder: string; provider: FlowProvider };
+
+async function startFlow(
+  provider: FlowProvider,
+  options: { intent?: FlowIntent; ssoDomain?: string; returnTo?: string } = {}
+) {
+  const flow: Flow = { state: token(), binder: token(), provider };
+  const result = await store.startFlow({
+    environment,
+    stateHash: sha256(flow.state),
+    binderHash: sha256(flow.binder),
+    provider,
+    intent: options.intent ?? { kind: 'sign_in' },
+    ssoDomain: options.ssoDomain ?? null,
+    returnTo: options.returnTo ?? '/authorize?client_id=kilo-cli',
+  });
+  return { flow, result };
+}
+
+async function complete(flow: Flow, identity: Partial<ProviderIdentity>, binder = flow.binder) {
+  const sessionToken = token();
+  const result = await store.completeFlow({
+    environment,
+    stateHash: sha256(flow.state),
+    binderHash: sha256(binder),
+    provider: flow.provider,
+    identity: {
+      subject: randomUUID(),
+      email: null,
+      emailProven: false,
+      workosConnectionId: null,
+      ...identity,
+    },
+    sessionTokenHash: sha256(sessionToken),
+    network,
+  });
+  return { result, sessionToken };
+}
+
+async function signIn(provider: FlowProvider, identity: Partial<ProviderIdentity>) {
+  const { flow, result } = await startFlow(provider);
+  expect(result).toEqual({ outcome: 'started', workosConnectionId: null });
+  return (await complete(flow, identity)).result;
+}
+
+async function sessionRow(tokenValue: string) {
+  const result = await owner.query(
+    `SELECT account_id, amr::text[] AS amr, status, host(client_ip) AS client_ip, country
+     FROM uts.browser_sessions WHERE token_hash = $1`,
+    [sha256(tokenValue)]
+  );
+  return result.rows[0];
+}
+
+describe('provider sign-in', () => {
+  it('creates an account for a proven address, opens a session and audits both', async () => {
+    const email = address();
+    const subject = randomUUID();
+    const { flow } = await startFlow('google');
+    const { result, sessionToken } = await complete(flow, { subject, email, emailProven: true });
+    if (result.outcome !== 'signed_in') throw new Error(result.outcome);
+    expect(result.returnTo).toBe('/authorize?client_id=kilo-cli');
+    expect(result.signedIn).toMatchObject({ accountCreated: true, methodLinked: false });
+    const accountId = result.signedIn.accountId;
+    expect(z.uuid().safeParse(accountId).success).toBe(true);
+    expect(await sessionRow(sessionToken)).toEqual({
+      account_id: accountId,
+      amr: ['oauth'],
+      status: 'active',
+      client_ip: '192.0.2.10',
+      country: 'DE',
+    });
+    const methods = await owner.query(
+      'SELECT provider, provider_subject, verified_email, gate_pass_id FROM uts.sign_in_methods WHERE account_id = $1',
+      [accountId]
+    );
+    expect(methods.rows).toEqual([
+      { provider: 'google', provider_subject: subject, verified_email: email, gate_pass_id: null },
+    ]);
+    const rows = await auditRows(accountId);
+    expect(rows.map(row => row.type)).toEqual([
+      'ai.kilo.uts.account.created',
+      'ai.kilo.uts.session.created',
+    ]);
+    expect(rows[1].event.data.attributes).toMatchObject({
+      method: 'oauth',
+      provider: 'google',
+      accountCreated: true,
+      sessionId: result.signedIn.sessionId,
+    });
+    // No audit row names the address.
+    expect(JSON.stringify(rows)).not.toContain(email);
+  });
+
+  it('signs a known method in to its account without creating another', async () => {
+    const subject = randomUUID();
+    const first = await signIn('github', { subject, email: address(), emailProven: true });
+    if (first.outcome !== 'signed_in') throw new Error(first.outcome);
+    const second = await signIn('github', { subject, email: null, emailProven: false });
+    expect(second).toMatchObject({
+      outcome: 'signed_in',
+      signedIn: { accountId: first.signedIn.accountId, accountCreated: false },
+    });
+  });
+
+  it('links a proven address to the one account that holds it and notifies the account', async () => {
+    const email = address();
+    const accountId = await accountWithEmail(email);
+    const result = await signIn('discord', { email, emailProven: true });
+    expect(result).toMatchObject({
+      outcome: 'signed_in',
+      signedIn: { accountId, accountCreated: false, methodLinked: true },
+    });
+    const rows = await auditRows(accountId);
+    expect(rows.map(row => row.type)).toEqual([
+      'ai.kilo.uts.sign_in_method.linked',
+      'ai.kilo.uts.session.created',
+    ]);
+    expect(rows[0].event.data.attributes).toMatchObject({
+      provider: 'discord',
+      linkedBy: 'verified_email',
+    });
+    const notices = await owner.query(
+      'SELECT kind, details FROM uts.notices WHERE account_id = $1',
+      [accountId]
+    );
+    expect(notices.rows).toEqual([
+      { kind: 'sign_in_method_changed', details: { change: 'added', provider: 'discord' } },
+    ]);
+  });
+
+  it('refuses to link an address the provider did not prove, with one denied row a minute', async () => {
+    const email = address();
+    const accountId = await accountWithEmail(email);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      expect(await signIn('anthropic', { email, emailProven: false })).toMatchObject({
+        outcome: 'link_required',
+        returnTo: '/authorize?client_id=kilo-cli',
+      });
+    }
+    const rows = await auditRows(accountId);
+    expect(rows.map(row => row.type)).toEqual(['ai.kilo.uts.sign_in.denied']);
+    expect(rows[0].event.data).toMatchObject({ outcome: 'denied', outcomeDetail: 'link_required' });
+    const methods = await owner.query('SELECT 1 FROM uts.sign_in_methods WHERE account_id = $1', [
+      accountId,
+    ]);
+    expect(methods.rowCount).toBe(0);
+  });
+
+  it('refuses to link when several accounts hold the address', async () => {
+    const email = address();
+    await accountWithEmail(email);
+    await accountWithEmail(email);
+    expect(await signIn('google', { email, emailProven: true })).toMatchObject({
+      outcome: 'link_required',
+    });
+  });
+
+  it('creates no account for an unproven or missing address', async () => {
+    expect(await signIn('anthropic', { email: address(), emailProven: false })).toMatchObject({
+      outcome: 'email_unverified',
+    });
+    expect(await signIn('github', { email: null, emailProven: false })).toMatchObject({
+      outcome: 'email_required',
+    });
+  });
+
+  it('refuses a blocked account', async () => {
+    const email = address();
+    const accountId = await accountWithEmail(email, 'blocked');
+    expect(await signIn('google', { email, emailProven: true })).toMatchObject({
+      outcome: 'account_blocked',
+    });
+    expect(await auditTypes(accountId)).toEqual(['ai.kilo.uts.sign_in.denied']);
+  });
+
+  it('accepts a flow once, for its own provider and binder only', async () => {
+    const { flow } = await startFlow('google');
+    expect((await complete(flow, {}, token())).result).toEqual({ outcome: 'invalid_state' });
+    // The failed attempt consumed the flow: the right binder now fails too.
+    expect((await complete(flow, { email: address(), emailProven: true })).result).toEqual({
+      outcome: 'invalid_state',
+    });
+
+    const other = await startFlow('google');
+    expect(
+      (
+        await complete(
+          { ...other.flow, provider: 'github' },
+          { email: address(), emailProven: true }
+        )
+      ).result
+    ).toEqual({ outcome: 'invalid_state' });
+
+    const expired = await startFlow('google');
+    await owner.query(
+      `UPDATE uts.sign_in_flows SET created_at = now() - interval '11 minutes',
+         expires_at = now() - interval '1 minute' WHERE state_hash = $1`,
+      [sha256(expired.flow.state)]
+    );
+    expect((await complete(expired.flow, { email: address(), emailProven: true })).result).toEqual({
+      outcome: 'invalid_state',
+    });
+  });
+});
+
+describe('linking inside a session', () => {
+  async function linkFlow(provider: FlowProvider, session: { token: string }, gatePassId: string) {
+    return await startFlow(provider, {
+      intent: { kind: 'link', sessionTokenHash: sha256(session.token), gatePassId },
+      returnTo: '/signin/done',
+    });
+  }
+
+  it('adds the method to the session account and consumes the tier A pass', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const gatePassId = await insertGatePass(owner, accountId, 'method_add', session.id);
+    const { flow, result } = await linkFlow('gitlab', session, gatePassId);
+    expect(result.outcome).toBe('started');
+    // The provider's address belongs to nobody here and is not proven: a link needs neither.
+    const linked = await complete(flow, { email: address(), emailProven: false });
+    expect(linked.result).toEqual({ outcome: 'linked', returnTo: '/signin/done' });
+    const pass = await owner.query('SELECT status FROM uts.gate_passes WHERE id = $1', [
+      gatePassId,
+    ]);
+    expect(pass.rows).toEqual([{ status: 'consumed' }]);
+    const methods = await owner.query(
+      `SELECT provider, gate_pass_id, gate_pass_action, verified_email FROM uts.sign_in_methods
+       WHERE account_id = $1`,
+      [accountId]
+    );
+    expect(methods.rows).toEqual([
+      {
+        provider: 'gitlab',
+        gate_pass_id: gatePassId,
+        gate_pass_action: 'method_add',
+        verified_email: null,
+      },
+    ]);
+    // A link opens no session.
+    expect(await sessionRow(linked.sessionToken)).toBeUndefined();
+    const rows = await auditRows(accountId);
+    expect(rows.map(row => row.type)).toEqual(['ai.kilo.uts.sign_in_method.linked']);
+    expect(rows[0].event.data.attributes).toMatchObject({ linkedBy: 'gate_pass', gatePassId });
+  });
+
+  it('refuses a link without a session or without an open tier A pass of that session', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    expect((await linkFlow('google', { token: token() }, randomUUID())).result).toEqual({
+      outcome: 'no_session',
+    });
+    expect((await linkFlow('google', session, randomUUID())).result).toEqual({
+      outcome: 'gate_required',
+    });
+    // A pass of another session of the same account does not serve this one.
+    const otherPass = await insertGatePass(owner, accountId, 'method_add');
+    expect((await linkFlow('google', session, otherPass)).result).toEqual({
+      outcome: 'gate_required',
+    });
+    // A tier B pass does not serve a tier A action.
+    const tierB = await insertGatePass(owner, accountId, 'pat_create', session.id);
+    expect((await linkFlow('google', session, tierB)).result).toEqual({
+      outcome: 'gate_required',
+    });
+    expect(await auditTypes(accountId)).toEqual(['ai.kilo.uts.gate.refused']);
+  });
+
+  it('refuses a pass consumed between start and callback', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const gatePassId = await insertGatePass(owner, accountId, 'method_add', session.id);
+    const { flow } = await linkFlow('google', session, gatePassId);
+    await owner.query(
+      `UPDATE uts.gate_passes SET status = 'consumed', consumed_at = now() WHERE id = $1`,
+      [gatePassId]
+    );
+    expect((await complete(flow, { email: address(), emailProven: true })).result).toMatchObject({
+      outcome: 'gate_required',
+    });
+  });
+
+  it('refuses a method that belongs to another account', async () => {
+    const subject = randomUUID();
+    const taken = await signIn('google', { subject, email: address(), emailProven: true });
+    expect(taken.outcome).toBe('signed_in');
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const gatePassId = await insertGatePass(owner, accountId, 'method_add', session.id);
+    const { flow } = await linkFlow('google', session, gatePassId);
+    expect((await complete(flow, { subject })).result).toMatchObject({ outcome: 'method_in_use' });
+    const pass = await owner.query('SELECT status FROM uts.gate_passes WHERE id = $1', [
+      gatePassId,
+    ]);
+    expect(pass.rows).toEqual([{ status: 'open' }]);
+  });
+});
+
+describe('WorkOS SSO', () => {
+  const orgId = randomUUID();
+  const domain = `${randomBytes(4).toString('hex')}.example.org`;
+  const connection = `conn_${randomBytes(6).toString('hex')}`;
+
+  beforeAll(async () => {
+    await owner.query(
+      `INSERT INTO uts.sso_connections (org_id, workos_connection_id) VALUES ($1, $2)`,
+      [orgId, connection]
+    );
+    await owner.query(
+      `INSERT INTO uts.sso_domains (org_id, domain, status, dns_challenge_hash, verified_at)
+       VALUES ($1, $2, 'verified', $3, now())`,
+      [orgId, domain, randomBytes(32)]
+    );
+    await owner.query(
+      `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, 'required', 1)`,
+      [orgId]
+    );
+  });
+
+  async function ssoFlow() {
+    const started = await startFlow('workos', { ssoDomain: domain });
+    expect(started.result).toEqual({ outcome: 'started', workosConnectionId: connection });
+    return started.flow;
+  }
+
+  it('starts only for a verified domain with one active connection', async () => {
+    expect((await startFlow('workos', { ssoDomain: 'unverified.example.org' })).result).toEqual({
+      outcome: 'no_sso_connection',
+    });
+    await ssoFlow();
+  });
+
+  it('creates an SSO account for a new address of the verified domain', async () => {
+    const flow = await ssoFlow();
+    const { result, sessionToken } = await complete(flow, {
+      email: `new-${randomBytes(3).toString('hex')}@${domain}`,
+      workosConnectionId: connection,
+    });
+    expect(result).toMatchObject({ outcome: 'signed_in', signedIn: { accountCreated: true } });
+    expect((await sessionRow(sessionToken)).amr).toEqual(['sso']);
+  });
+
+  it('refuses a profile of another connection or another domain', async () => {
+    expect(
+      (await complete(await ssoFlow(), { email: `a@${domain}`, workosConnectionId: 'conn_other' }))
+        .result
+    ).toMatchObject({ outcome: 'sso_refused' });
+    expect(
+      (
+        await complete(await ssoFlow(), {
+          email: 'a@elsewhere.example.com',
+          workosConnectionId: connection,
+        })
+      ).result
+    ).toMatchObject({ outcome: 'sso_refused' });
+  });
+
+  it('never links SSO to an existing account by email', async () => {
+    const email = `existing-${randomBytes(3).toString('hex')}@${domain}`;
+    const accountId = await accountWithEmail(email);
+    expect(
+      (await complete(await ssoFlow(), { email, workosConnectionId: connection })).result
+    ).toMatchObject({ outcome: 'link_required' });
+    expect(await auditTypes(accountId)).toEqual(['ai.kilo.uts.sign_in.denied']);
+  });
+
+  it('sends an address of a domain that requires SSO to SSO', async () => {
+    const email = `someone-${randomBytes(3).toString('hex')}@${domain}`;
+    expect(await signIn('google', { email, emailProven: true })).toMatchObject({
+      outcome: 'sso_required',
+    });
+    expect(
+      await store.startEmail({
+        email,
+        emailHash: keyed('kilo-uts-email', email),
+        linkHash: sha256(token()),
+        codeHash: keyed('kilo-uts-email-code', `${email}:123456`),
+        returnTo: '/signin/done',
+      })
+    ).toEqual({ outcome: 'sso_required' });
+  });
+});
+
+describe('email sign-in', () => {
+  async function sendEmail(email: string, code = '123456') {
+    const link = token();
+    const result = await store.startEmail({
+      email,
+      emailHash: keyed('kilo-uts-email', email),
+      linkHash: sha256(link),
+      codeHash: keyed('kilo-uts-email-code', `${email}:${code}`),
+      returnTo: '/signin/done',
+    });
+    return { link, result };
+  }
+
+  async function enter(email: string, code: string) {
+    const sessionToken = token();
+    const result = await store.verifyEmailCode({
+      environment,
+      emailHash: keyed('kilo-uts-email', email),
+      codeHash: keyed('kilo-uts-email-code', `${email}:${code}`),
+      sessionTokenHash: sha256(sessionToken),
+      network,
+    });
+    return { result, sessionToken };
+  }
+
+  async function follow(link: string) {
+    return await store.completeEmailLink({
+      environment,
+      linkHash: sha256(link),
+      sessionTokenHash: sha256(token()),
+      network,
+    });
+  }
+
+  it('signs in with the code, creates the account and its email method once', async () => {
+    const email = address();
+    expect((await sendEmail(email)).result).toMatchObject({ outcome: 'stored', withCode: true });
+    const { result, sessionToken } = await enter(email, '123456');
+    if (result.outcome !== 'signed_in') throw new Error(result.outcome);
+    expect(result).toMatchObject({ returnTo: '/signin/done', signedIn: { accountCreated: true } });
+    expect((await sessionRow(sessionToken)).amr).toEqual(['email_code']);
+    // The same code does not work twice, and its link died with it.
+    expect((await enter(email, '123456')).result).toMatchObject({ outcome: 'invalid_code' });
+
+    const again = await sendEmail(email, '654321');
+    const second = await follow(again.link);
+    expect(second).toMatchObject({
+      outcome: 'signed_in',
+      signedIn: { accountId: result.signedIn.accountId, accountCreated: false },
+    });
+    expect(await follow(again.link)).toEqual({ outcome: 'invalid_link' });
+    const methods = await owner.query(
+      'SELECT provider, provider_subject FROM uts.sign_in_methods WHERE account_id = $1',
+      [result.signedIn.accountId]
+    );
+    expect(methods.rows).toEqual([{ provider: 'email', provider_subject: email }]);
+  });
+
+  it('locks the code after 5 wrong entries, audits each entry, and keeps the link', async () => {
+    const email = address();
+    const accountId = await accountWithEmail(email);
+    const { link } = await sendEmail(email);
+    const outcomes = [];
+    for (let entry = 0; entry < 5; entry += 1) outcomes.push((await enter(email, '000000')).result);
+    expect(outcomes).toEqual([
+      { outcome: 'invalid_code', entriesLeft: 4, returnTo: '/signin/done' },
+      { outcome: 'invalid_code', entriesLeft: 3, returnTo: '/signin/done' },
+      { outcome: 'invalid_code', entriesLeft: 2, returnTo: '/signin/done' },
+      { outcome: 'invalid_code', entriesLeft: 1, returnTo: '/signin/done' },
+      { outcome: 'code_locked', returnTo: '/signin/done' },
+    ]);
+    // The right code no longer works.
+    expect((await enter(email, '123456')).result).toEqual({
+      outcome: 'invalid_code',
+      entriesLeft: 0,
+      returnTo: null,
+    });
+    const rows = await auditRows(accountId);
+    expect(rows.map(row => row.event.data.outcomeDetail)).toEqual([
+      'wrong_code',
+      'wrong_code',
+      'wrong_code',
+      'wrong_code',
+      'code_locked',
+    ]);
+    const stored = await owner.query(
+      'SELECT status, attempts FROM uts.email_codes WHERE email = $1',
+      [email]
+    );
+    expect(stored.rows).toEqual([{ status: 'exhausted', attempts: 5 }]);
+    // Wrong entries by someone else do not lock the owner out: the email's link still signs in,
+    // once.
+    expect(await follow(link)).toMatchObject({ outcome: 'signed_in', signedIn: { accountId } });
+    expect(await follow(link)).toEqual({ outcome: 'invalid_link' });
+  });
+
+  it('refuses an expired code and an expired link', async () => {
+    const email = address();
+    const { link } = await sendEmail(email);
+    await owner.query(
+      `UPDATE uts.email_codes SET created_at = now() - interval '11 minutes',
+         expires_at = now() - interval '1 minute' WHERE email = $1`,
+      [email]
+    );
+    expect((await enter(email, '123456')).result).toMatchObject({ outcome: 'invalid_code' });
+    expect(await follow(link)).toEqual({ outcome: 'invalid_link' });
+  });
+
+  it('stops codes after 5 an hour, sends the link alone, and notifies the account', async () => {
+    const email = address();
+    const accountId = await accountWithEmail(email);
+    const sent = [];
+    for (let request = 0; request < 7; request += 1) sent.push((await sendEmail(email)).result);
+    expect(sent.map(result => result.outcome === 'stored' && result.withCode)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+    const notices = await owner.query('SELECT kind FROM uts.notices WHERE account_id = $1', [
+      accountId,
+    ]);
+    expect(notices.rows).toEqual([{ kind: 'sign_in_code_stopped' }]);
+    // The link of a link-only email still signs in.
+    const linkOnly = await sendEmail(email);
+    expect(await follow(linkOnly.link)).toMatchObject({ outcome: 'signed_in' });
+  });
+
+  it('stops codes after 20 wrong entries in a day', async () => {
+    const email = address();
+    for (let round = 0; round < 4; round += 1) {
+      await sendEmail(email);
+      for (let entry = 0; entry < 5; entry += 1) await enter(email, '000000');
+    }
+    const limits = await owner.query(
+      `SELECT failures_in_day, status FROM uts.email_code_limits WHERE email_hash = $1`,
+      [keyed('kilo-uts-email', email)]
+    );
+    expect(limits.rows).toEqual([{ failures_in_day: 20, status: 'stopped' }]);
+    expect((await sendEmail(email)).result).toMatchObject({ outcome: 'stored', withCode: false });
+  });
+
+  it('refuses a blocked account by code and by link', async () => {
+    const email = address();
+    await accountWithEmail(email, 'blocked');
+    await sendEmail(email);
+    expect((await enter(email, '123456')).result).toMatchObject({ outcome: 'account_blocked' });
+  });
+});
+
+describe('privileges and maintenance', () => {
+  it('leaves the app login no direct write on methods, emails, limits or flows', async () => {
+    const accountId = await insertAccount(owner);
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `INSERT INTO uts.sign_in_methods (account_id, provider, provider_subject) VALUES ($1, 'google', 'x')`,
+          [accountId]
+        )
+      )
+    ).toBe('42501');
+    expect(
+      await sqlStateOf(() => app.query(`DELETE FROM uts.email_codes WHERE purpose = 'sign_in'`))
+    ).toBe('42501');
+    expect(
+      await sqlStateOf(() => app.query('UPDATE uts.email_code_limits SET sent_in_hour = 0'))
+    ).toBe('42501');
+    expect(await sqlStateOf(() => app.query('SELECT 1 FROM uts.sign_in_flows'))).toBe('42501');
+  });
+
+  it('refuses a return path to another origin in the stored flow', async () => {
+    const state = token();
+    expect(
+      await sqlStateOf(() =>
+        owner.query(
+          `INSERT INTO uts.sign_in_flows (state_hash, provider, binder_hash, intent, return_to, expires_at)
+           VALUES ($1, 'google', $2, 'sign_in', '//evil.example.com/', now() + interval '1 minute')`,
+          [sha256(state), sha256(token())]
+        )
+      )
+    ).toBe('23514');
+  });
+
+  it('deletes flows and sign-in emails an hour after they expired', async () => {
+    const { flow } = await startFlow('google');
+    await owner.query(
+      `UPDATE uts.sign_in_flows SET created_at = now() - interval '2 hours',
+         expires_at = now() - interval '110 minutes' WHERE state_hash = $1`,
+      [sha256(flow.state)]
+    );
+    const result = await app.query<{ kind: string; deleted: number }>(
+      'SELECT * FROM uts.maintain_provider_sign_in_rows()'
+    );
+    const deleted = Object.fromEntries(result.rows.map(row => [row.kind, row.deleted]));
+    expect(deleted.sign_in_flows).toBeGreaterThanOrEqual(1);
+    const left = await owner.query('SELECT 1 FROM uts.sign_in_flows WHERE state_hash = $1', [
+      sha256(flow.state),
+    ]);
+    expect(left.rowCount).toBe(0);
+  });
+});

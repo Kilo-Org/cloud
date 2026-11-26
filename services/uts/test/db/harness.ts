@@ -164,8 +164,8 @@ export async function insertDeviceSession(
 
 /**
  * An open gate pass of a new browser session of `accountId`, as the gate slice opens one: tier A
- * for `passkey_add` (a recent sign-in and an email code), tier B otherwise. `sessionId` puts the
- * pass on an existing session instead.
+ * for `passkey_add` and `method_add` (a recent sign-in and an email code), tier B otherwise.
+ * `sessionId` puts the pass on an existing session instead.
  */
 export async function insertGatePass(
   client: pg.Client,
@@ -176,11 +176,12 @@ export async function insertGatePass(
     | 'device_approve'
     | 'third_party_approve'
     | 'ci_policy_create'
-    | 'passkey_add',
+    | 'passkey_add'
+    | 'method_add',
   sessionId?: string
 ): Promise<string> {
   const browserSessionId = sessionId ?? (await insertBrowserSession(client, accountId));
-  const tierA = action === 'passkey_add';
+  const tierA = action === 'passkey_add' || action === 'method_add';
   const result = await client.query<{ id: string }>(
     `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
      VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes')

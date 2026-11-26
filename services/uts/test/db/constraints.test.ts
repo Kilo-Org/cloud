@@ -428,10 +428,23 @@ describe('email codes and limits', () => {
     purpose = 'sign_in',
     account: string | null = null
   ) {
+    // A sign-in email carries its address, its link and its return path; a tier A code none.
+    const signIn = purpose === 'sign_in';
     return writer.query(
-      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at)
-       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END)`,
-      [purpose, randomHash(), account, randomHash(), attempts, status, consumed]
+      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at, email, link_hash, return_to)
+       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END, $8, $9, $10)`,
+      [
+        purpose,
+        randomHash(),
+        account,
+        randomHash(),
+        attempts,
+        status,
+        consumed,
+        signIn ? 'someone@example.com' : null,
+        signIn ? randomHash() : null,
+        signIn ? '/signin/done' : null,
+      ]
     );
   }
 
@@ -439,6 +452,30 @@ describe('email codes and limits', () => {
     await insertEmailCode('pending', 4, false);
     await insertEmailCode('consumed', 1, true);
     await insertEmailCode('exhausted', 5, false);
+  });
+
+  it('tie the address, link and return path to sign-in emails, and a code to tier A', async () => {
+    const insertShape = (purpose: string, email: string | null, code: Buffer | null) =>
+      writer.query(
+        `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, email, link_hash, return_to)
+         VALUES ($1, $2, $3, $4, now() + interval '10 minutes', $5, $6, $7)`,
+        [
+          purpose,
+          randomHash(),
+          accountId,
+          code,
+          email,
+          email === null ? null : randomHash(),
+          email === null ? null : '/signin/done',
+        ]
+      );
+    // A sign-in email without a code: sent while codes are stopped.
+    await insertShape('sign_in', 'someone@example.com', null);
+    expect(await sqlStateOf(() => insertShape('sign_in', null, randomHash()))).toBe(CHECK_VIOLATION);
+    expect(await sqlStateOf(() => insertShape('tier_a', null, null))).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlStateOf(() => insertShape('tier_a', 'someone@example.com', randomHash()))
+    ).toBe(CHECK_VIOLATION);
   });
 
   it.each([

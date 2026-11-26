@@ -44,6 +44,7 @@ export const AccountRowSchema = z.strictObject({
   event_version: z.bigint(),
   created_at: timestamp,
   updated_at: timestamp,
+  sign_in_denied_audited_at: timestamp.nullable(),
 });
 
 export const SsoConnectionRowSchema = z.strictObject({
@@ -91,6 +92,8 @@ export const SignInMethodRowSchema = z.strictObject({
   sso_connection_id: uuid.nullable(),
   added_at: timestamp,
   last_used_at: timestamp.nullable(),
+  gate_pass_id: uuid.nullable(),
+  gate_pass_action: z.enum(enums.GATED_ACTIONS),
 });
 
 export const PasskeyCredentialRowSchema = z.strictObject({
@@ -301,12 +304,15 @@ export const EmailCodeRowSchema = z.strictObject({
   purpose: z.enum(enums.EMAIL_CODE_PURPOSES),
   email_hash: sha256,
   account_id: z.string().nullable(),
-  code_hash: sha256,
+  code_hash: sha256.nullable(),
   attempts: z.number().int(),
   created_at: timestamp,
   expires_at: timestamp,
   status: z.enum(enums.EMAIL_CODE_STATUSES),
   consumed_at: timestamp.nullable(),
+  email: z.string().nullable(),
+  link_hash: sha256.nullable(),
+  return_to: z.string().nullable(),
 });
 
 export const EmailCodeLimitRowSchema = z.strictObject({
@@ -343,6 +349,21 @@ export const WebauthnChallengeRowSchema = z.strictObject({
   account_id: z.string().nullable(),
   browser_session_id: uuid.nullable(),
   user_handle: bytes.nullable(),
+  created_at: timestamp,
+  expires_at: timestamp,
+  status: z.enum(enums.CODE_STATUSES),
+  consumed_at: timestamp.nullable(),
+});
+
+export const SignInFlowRowSchema = z.strictObject({
+  state_hash: sha256,
+  provider: z.enum(enums.SIGN_IN_PROVIDERS),
+  binder_hash: sha256,
+  intent: z.enum(enums.SIGN_IN_INTENTS),
+  link_session_id: uuid.nullable(),
+  gate_pass_id: uuid.nullable(),
+  sso_connection_id: uuid.nullable(),
+  return_to: z.string(),
   created_at: timestamp,
   expires_at: timestamp,
   status: z.enum(enums.CODE_STATUSES),
@@ -496,6 +517,7 @@ export const IDENTITY_STORE_TABLES = {
   email_code_limits: EmailCodeLimitRowSchema,
   tickets: TicketRowSchema,
   webauthn_challenges: WebauthnChallengeRowSchema,
+  sign_in_flows: SignInFlowRowSchema,
   personal_access_tokens: PersonalAccessTokenRowSchema,
   org_bot_keys: OrgBotKeyRowSchema,
   ci_trust_policies: CiTrustPolicyRowSchema,

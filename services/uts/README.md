@@ -1116,6 +1116,28 @@ with Infisical JWT Auth, the way STS logs in as its own identity:
 stand-in manager on loopback (`UTS_E2E_PORT`, default 9470, and +1, +2). The stand-in fetches the key
 set and verifies the login JWT against it, as Infisical does. The run uses no real manager.
 
+#### Emergency removal of the manager login key (runbook)
+
+The login key has no rotation yet. If its storage may be exposed, or UTS must stop writing to the
+manager at once:
+
+1. Cut UTS off in Infisical: remove the JWT Auth method of `uts-rotation-<environment>`, or point
+   it at another key set, and revoke the identity's access tokens. Infisical then refuses every
+   login JWT this key signs; a token issued before lives at most 10 minutes. Until step 3, UTS
+   cannot write recovery copies to `/admin/identity-store`.
+2. Wipe the key: the Worker has no route that deletes it, so ship a reviewed change that renames
+   the class in code (for example `UtsManagerAuthDO` to `UtsManagerAuthV2DO`), points the
+   `UTS_MANAGER_AUTH_DO` binding of every environment at the new name, and adds one migration tag
+   with `deleted_classes: ["UtsManagerAuthDO"]` and `new_sqlite_classes` for the new name. Do not
+   use `renamed_classes`, which keeps the stored key. A delete migration removes every object of
+   the class with its storage
+   (https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/).
+   The next login creates a fresh key.
+3. Restore the JWT Auth method in Infisical with the same key-set URL, issuer, subject and
+   audience, and check that `GET /manager-auth/.well-known/jwks.json` lists only the new `kid`
+   after the first login. An isolate of the old version can serve the old set for up to 60
+   seconds, and the answer allows HTTP caches the same 60 seconds.
+
 ### Platform roles
 
 The UTS role matrix does not cover the roles the platform brings. `PUBLIC` keeps `CONNECT` on the

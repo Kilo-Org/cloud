@@ -118,7 +118,7 @@ describe('receipt queue consumer', () => {
 
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();
-    expect(env.EXPO_ACCESS_TOKEN.get).not.toHaveBeenCalled();
+    expect(env.EXPO_ACCESS_TOKEN?.get).not.toHaveBeenCalled();
     expect(getBundle).not.toHaveBeenCalled();
     expect(checkPushReceipts).not.toHaveBeenCalled();
   });
@@ -131,7 +131,7 @@ describe('receipt queue consumer', () => {
 
     await queue(batch, env, { waitUntil: vi.fn() });
 
-    expect(env.EXPO_ACCESS_TOKEN.get).toHaveBeenCalledOnce();
+    expect(env.EXPO_ACCESS_TOKEN?.get).toHaveBeenCalledOnce();
     expect(checkPushReceipts).toHaveBeenCalledWith(pairs, 'access-token');
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();

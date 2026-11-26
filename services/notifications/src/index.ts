@@ -55,7 +55,7 @@ import {
 } from './lib/notification-history-prune';
 import { skipProviderPush } from './lib/push-gate';
 import { queue } from './queue-consumer';
-import { readNotificationsSecret } from './secrets';
+import { readNotificationsSecret, secretsSource } from './secrets';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
 
@@ -108,6 +108,11 @@ async function hasValidInternalSecret(c: {
   executionCtx: SecretsExecutionContext;
 }): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
+  // A deployment that binds no internal secret (the closed staging environment)
+  // has no caller to authorize: refuse it as unauthorized, not as a failed read.
+  if (secretsSource(c.env) === 'secrets-store' && c.env.INTERNAL_API_SECRET === undefined) {
+    return false;
+  }
   const expected = await readNotificationsSecret(c.env, 'INTERNAL_API_SECRET', c.executionCtx);
   if (!provided || !expected) return false;
 

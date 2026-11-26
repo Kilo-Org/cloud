@@ -163,10 +163,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
     if (input.presenceContext) {
       let inContext = false;
       try {
-        inContext = await this.env.EVENT_SERVICE.isUserInContext(
-          input.userId,
-          input.presenceContext
-        );
+        // An unbound presence service fails like a failed lookup: delivery continues.
+        const eventService = this.env.EVENT_SERVICE;
+        if (eventService === undefined) throw new Error('EVENT_SERVICE binding is missing');
+        inContext = await eventService.isUserInContext(input.userId, input.presenceContext);
       } catch (err) {
         console.warn('Presence lookup failed while dispatching push; continuing delivery', {
           presenceContext: input.presenceContext,
@@ -527,7 +527,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
         const receiptMsg = {
           ticketTokenPairs: record.ticketTokenPairs,
         } satisfies ReceiptCheckMessage;
-        await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+        // An unbound queue fails the bookkeeping like a failed send, so it is repaired.
+        const receipts = this.env.RECEIPTS_QUEUE;
+        if (receipts === undefined) throw new Error('RECEIPTS_QUEUE binding is missing');
+        await receipts.send(receiptMsg, { delaySeconds: 900 });
       }
 
       const ts = Date.now();

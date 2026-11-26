@@ -1000,7 +1000,7 @@ export async function insertUsageRecord(
             // it burned three attempts and rebuilt the statement each time.
             if (attempt >= 2 || isUsageRowConflict(error)) throw error;
             // Never log the raw error: its message is the interpolated statement,
-            // roughly 30KB including prompt prefixes and the client IP.
+            // roughly 30KB including the client IP and user agent.
             sentryLogger('insertUsageRecord', 'warning')('insertUsageRecord concurrency failure', {
               usageId: coreUsageFields.id,
               attempt,

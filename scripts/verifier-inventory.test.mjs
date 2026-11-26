@@ -417,6 +417,36 @@ const EXCEPTIONS = {
     signals: { primitive: 1, 'auth-library-import': 1 },
     pins: ['jwtVerify(value, EmbeddedJWK', 'typ: DPOP_TYPE'],
   },
+  'services/uts/src/account/bearer.ts': {
+    reason:
+      'UTS, the issuer (design section 5): its account API checks the access tokens UTS itself signs, under its own signer keys, for the uts audience; not a phase 4 verifier',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['audience: UTS_ACCOUNT_AUDIENCE', 'issuer: config.endpoints.issuer'],
+  },
+  'services/uts/src/signin/providers/exchange.ts': {
+    reason:
+      'Third party: UTS provider sign-in checks the ID token of an upstream OIDC provider under that provider key set and issuers (src/signin/providers/specs.ts)',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['keySet(spec.endpoints.jwks)', 'issuer: [...spec.endpoints.issuers]'],
+  },
+  'services/uts/src/bff/client-auth.ts': {
+    reason:
+      'UTS, the issuer (design section 5.1): kilo-web client authentication at UTS endpoints, an RFC 7523 private_key_jwt assertion under the KILO_WEB_CLIENT_JWKS keys; not a phase 4 verifier',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['issuer: KILO_WEB_CLIENT_ID', 'KILO_WEB_CLIENT_JWKS'],
+  },
+  'services/uts/src/exchange/endpoint.ts': {
+    reason:
+      'UTS, the issuer (design section 5.9): the RFC 8693 broker exchange checks its subject token, an access token UTS itself signs, under its own signer keys; not a phase 4 verifier',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['issuer: config.endpoints.issuer', 'typ: UTS_ACCESS_TOKEN_TYPE'],
+  },
+  'services/uts/src/dev-clients.ts': {
+    reason:
+      'UTS development entry only (src/dev.ts): stand-in check of STS caller tokens from the local fake STS signer for the local end-to-end run',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ["const DEVELOPMENT_STS_ISSUER = 'http://localhost:8825';", 'DEV_STS_JWKS_URL'],
+  },
   'packages/trpc/src/agent-profiles-mobile.ts': {
     reason: 'Mobile tRPC router composition: createTRPCRouter only; requests run in apps/web',
     signals: { 'web-shared-import': 1 },

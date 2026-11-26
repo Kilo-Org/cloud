@@ -317,11 +317,12 @@ Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata D
   - a cache time of `max-age` bounded to 5 minutes to 24 hours (1 hour without one).
 
   The document must name the same client id. It must not carry a client secret, and every
-  redirect URI must be HTTPS, HTTP loopback or a private-use scheme. A blocked client is never
-  served and keeps its status through a refresh. Each isolate runs one fetch per client id at a
-  time, and after a failure it waits 60 seconds before it fetches that id again. A Worker cannot
-  see the address a name resolves to, so a public name that resolves to a private address relies
-  on Workers not reaching private networks.
+  redirect URI must be HTTPS, HTTP loopback on `127.0.0.1` or `localhost` (never `[::1]`: the
+  confirm page's `form-action` cannot name an IPv6 literal), or a private-use scheme. A blocked
+  client is never served and keeps its status through a refresh. Each isolate runs one fetch per
+  client id at a time, and after a failure it waits 60 seconds before it fetches that id again. A
+  Worker cannot see the address a name resolves to, so a public name that resolves to a private
+  address relies on Workers not reaching private networks.
 - **Consent** (`consent.ts`): the sign-in hand-off sends a third-party request with a browser
   session to the consent screen. An active consent of the account, client and organization that
   covers the scopes approves at once. Otherwise the page shows the client name, the metadata URL,

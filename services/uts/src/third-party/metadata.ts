@@ -79,12 +79,17 @@ const REFUSED_SCHEMES = new Set([
   'wss:',
   'mailto:',
 ]);
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', '[::1]', 'localhost']);
+/**
+ * IPv4 and name loopback only: the confirm page's `form-action` cannot name an IPv6 literal
+ * origin (CSP host sources have no IPv6 form), so a `[::1]` redirect could never complete.
+ */
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 
 /**
- * A redirect URI a third-party client may register: an exact HTTPS URL, an HTTP loopback URL (RFC
- * 8252 section 7.3), or a private-use scheme of a native app (section 7.1); never a fragment or
- * credentials. The authorization endpoint matches the registered string exactly.
+ * A redirect URI a third-party client may register: an exact HTTPS URL, an HTTP loopback URL on
+ * `127.0.0.1` or `localhost` (RFC 8252 section 7.3), or a private-use scheme of a native app
+ * (section 7.1); never a fragment or credentials. The authorization endpoint matches the
+ * registered string exactly.
  */
 export function isAllowedThirdPartyRedirect(uri: string): boolean {
   let url: URL;

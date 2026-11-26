@@ -75,7 +75,6 @@ describe('third-party redirect URIs', () => {
   it.each([
     'https://client.example.com/callback',
     'http://127.0.0.1:33418/callback',
-    'http://[::1]:33418/callback',
     'http://localhost:6274/oauth/callback',
     'cursor://anysphere.cursor-mcp/oauth/callback',
     'com.example.app:/oauth/callback',
@@ -92,6 +91,8 @@ describe('third-party redirect URIs', () => {
     'https://user@client.example.com/callback',
     'HTTPS://client.example.com/callback',
     'relative/callback',
+    // The confirm page's `form-action` cannot name an IPv6 literal origin.
+    'http://[::1]:33418/callback',
   ])('refuses %s', uri => {
     expect(isAllowedThirdPartyRedirect(uri)).toBe(false);
   });
@@ -180,6 +181,11 @@ describe('metadata fetch', () => {
     [
       'a refused redirect URI',
       json(document({ redirect_uris: ['javascript:alert(1)'] })),
+      'document does not validate',
+    ],
+    [
+      'an IPv6 loopback redirect URI',
+      json(document({ redirect_uris: ['http://[::1]:33418/callback'] })),
       'document does not validate',
     ],
     [

@@ -315,7 +315,8 @@ describe('clients', () => {
     if (identity.kind !== 'first_party') throw new Error('kilo-cli is first-party');
     const allowed = (uri: string) => isRegisteredRedirect(identity.client, uri);
     expect(allowed('http://127.0.0.1:4100/callback')).toBe(true);
-    expect(allowed('http://[::1]:61000/callback')).toBe(true);
+    // The confirm page's `form-action` cannot name an IPv6 literal, so `[::1]` is refused.
+    expect(allowed('http://[::1]:61000/callback')).toBe(false);
     expect(allowed('http://localhost:4100/callback')).toBe(false);
     expect(allowed('http://127.0.0.1/callback')).toBe(false);
     expect(allowed('https://127.0.0.1:4100/callback')).toBe(false);

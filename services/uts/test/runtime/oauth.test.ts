@@ -704,6 +704,7 @@ describe('authorization endpoint', () => {
     for (const [params, status, error] of [
       [{ ...base, client_id: 'nobody' }, 401, 'invalid_client'],
       [{ ...base, redirect_uri: 'http://localhost:4100/callback' }, 400, 'invalid_request'],
+      [{ ...base, redirect_uri: 'http://[::1]:4100/callback' }, 400, 'invalid_request'],
       [{ ...base, redirect_uri: '' }, 400, 'invalid_request'],
       [{ ...base, client_id: THIRD_PARTY }, 401, 'invalid_client'],
     ] as const) {

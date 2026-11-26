@@ -44,12 +44,13 @@ export async function signToken(
   return `${input}.${base64url(new Uint8Array(signature))}`;
 }
 
-/** STS's claims for a service token of `workload` for `audience`. */
+/** STS's claims for a service token of `workload` for `audience`; `environment` defaults to production. */
 export function serviceClaims(input: {
   issuer: string;
   workload: string;
   audience: string;
   scope: string;
+  environment?: string;
   issuedAt?: number;
   lifetimeSeconds?: number;
 }): Record<string, unknown> {
@@ -59,7 +60,7 @@ export function serviceClaims(input: {
     sub: `service:${input.workload}`,
     client_id: input.workload,
     req: input.workload,
-    env: 'production',
+    env: input.environment ?? 'production',
     aud: input.audience,
     scope: input.scope,
     jti: crypto.randomUUID(),

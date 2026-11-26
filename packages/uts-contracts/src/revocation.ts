@@ -216,12 +216,20 @@ export type UtsFeedSources = {
 };
 
 /**
+ * `Symbol.dispose` where the runtime has one. ES2024 defines none, so a consumer built for it
+ * reads it here rather than from its lib; workerd and current Node have it.
+ */
+const runtimeDispose: unknown = Reflect.get(Symbol, 'dispose');
+const DISPOSE = typeof runtimeDispose === 'symbol' ? runtimeDispose : undefined;
+
+/**
  * Runs the RPC disposer of `result`, which workerd gives every object an RPC call returns. A
- * result that is not an object carries none.
+ * result that is not an object carries none, nor does any result where the runtime has no
+ * `Symbol.dispose`.
  */
 function disposeResult(result: unknown): void {
-  if (typeof result !== 'object' || result === null || !(Symbol.dispose in result)) return;
-  const dispose = result[Symbol.dispose];
+  if (DISPOSE === undefined || typeof result !== 'object' || result === null) return;
+  const dispose: unknown = Reflect.get(result, DISPOSE);
   if (typeof dispose === 'function') dispose.call(result);
 }
 
@@ -235,7 +243,8 @@ async function rpcCall<Schema extends z.ZodType>(
   signal: AbortSignal
 ): Promise<z.output<Schema>> {
   signal.throwIfAborted();
-  const pending = Promise.try(call);
+  // A call that throws synchronously rejects like one whose promise rejects.
+  const pending = new Promise<unknown>(resolve => resolve(call()));
   const aborted = Promise.withResolvers<never>();
   const onAbort = () => aborted.reject(signal.reason);
   signal.addEventListener('abort', onAbort, { once: true });

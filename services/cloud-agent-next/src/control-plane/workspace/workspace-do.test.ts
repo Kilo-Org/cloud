@@ -27,10 +27,24 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-const { renew } = vi.hoisted(() => ({ renew: vi.fn() }));
+// Every live check goes through `renew`; the wrappers record which kind ran.
+const { renew, checkOnly, singleToken } = vi.hoisted(() => ({
+  renew: vi.fn(),
+  checkOnly: vi.fn(),
+  singleToken: vi.fn(),
+}));
 vi.mock('@kilocode/worker-utils/runtime-authorization', async importActual => ({
   ...(await importActual<typeof RuntimeAuthorizationModule>()),
   renewRuntimeAuthorization: renew,
+  checkRuntimeAuthorization: async (input: unknown) => {
+    checkOnly(input);
+    await renew(input);
+  },
+  renewRuntimeToken: async (input: { destination: 'kilo-api' }) => {
+    singleToken(input);
+    const issued = await renew(input);
+    return { token: issued.tokens[input.destination], expiresAt: issued.expiresAt };
+  },
 }));
 
 const { CloudAgentWorkspaceDO } = await import('./workspace-do.js');
@@ -177,24 +191,41 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(now);
   renew.mockReset();
+  checkOnly.mockReset();
+  singleToken.mockReset();
   renew.mockImplementation(
-    async ({ authorization: record }: { authorization: RuntimeAuthorization }) =>
-      signModernKiloToken({
-        userId: record.userId,
-        pepper: 'current-account-pepper',
-        secret,
-        audience: ['kilo-api', 'kilo-gateway', 'session-ingest'],
-        tokenPurpose: 'delegated-workload',
-        credentialExchange: false,
-        expiresInSeconds: 3600,
-        extra: {
-          runtimeAuthorization: {
-            id: record.id,
-            resourceKind: record.resourceKind,
-            resourceId: record.resourceId,
+    async ({ authorization: record }: { authorization: RuntimeAuthorization }) => {
+      const sign = (audience: string) =>
+        signModernKiloToken({
+          userId: record.userId,
+          pepper: 'current-account-pepper',
+          secret,
+          audience,
+          tokenPurpose: 'delegated-workload',
+          credentialExchange: false,
+          expiresInSeconds: 3600,
+          extra: {
+            runtimeAuthorization: {
+              id: record.id,
+              resourceKind: record.resourceKind,
+              resourceId: record.resourceId,
+            },
           },
+        });
+      const [api, gateway, ingest] = await Promise.all([
+        sign('kilo-api'),
+        sign('kilo-gateway'),
+        sign('session-ingest'),
+      ]);
+      return {
+        tokens: {
+          'kilo-api': api.token,
+          'kilo-gateway': gateway.token,
+          'session-ingest': ingest.token,
         },
-      })
+        expiresAt: api.expiresAt,
+      };
+    }
   );
 });
 
@@ -503,6 +534,10 @@ describe('workspace delegation and child registry', () => {
       authority: scopeOf(issued?.token) as never,
       childSessionId: siblingSessionId,
     });
+    // The authority check signs nothing; the MCP grant signed only the web API token.
+    expect(checkOnly).toHaveBeenCalledTimes(1);
+    expect(singleToken).toHaveBeenCalledTimes(1);
+    expect(singleToken).toHaveBeenCalledWith(expect.objectContaining({ destination: 'kilo-api' }));
     const record = await unsealRuntimeAuthorization(delegated.seal, secret, {
       resourceKind: 'cloud-agent-next',
       resourceId: siblingSessionId,
@@ -511,6 +546,17 @@ describe('workspace delegation and child registry', () => {
     });
     expect(record.delegationExpiresAt).toBe(authorization().delegationExpiresAt);
     expect(record.id).not.toBe(authorizationId);
+    expect(renew).toHaveBeenLastCalledWith(expect.objectContaining({ audienceMode: 'combined' }));
+    expect(delegated.token).toBe(delegated.tokens?.['kilo-api']);
+    for (const destination of ['kilo-api', 'kilo-gateway', 'session-ingest'] as const) {
+      expect(jwt.decode(delegated.tokens?.[destination] ?? '')).toMatchObject({
+        aud: destination,
+        runtimeAuthorization: { id: record.id, resourceId: siblingSessionId },
+      });
+    }
+    const spawn = await workspace.getSpawnContext(scopeOf(issued?.token));
+    expect(jwt.decode(spawn.token)).toMatchObject({ aud: 'kilo-api' });
+    expect(singleToken).toHaveBeenCalledTimes(2);
     await expect(
       workspace.authorizeChild({
         authority: scopeOf(issued?.token) as never,

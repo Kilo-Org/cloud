@@ -1120,6 +1120,86 @@ describe('server runtime credential proxy', () => {
     vi.unstubAllGlobals();
   });
 
+  it('asks for each destination token and never forwards a token for another service', async () => {
+    const env = createEnv();
+    const runtimeAuthorization = {
+      userId: 'usr_proxy',
+      authorizationId: '11111111-1111-4111-8111-111111111111',
+      resourceId: 'workspace_proxy',
+    };
+    const tokenFor = (aud: string) =>
+      jwt.sign({ version: 3, kiloUserId: 'usr_proxy', apiTokenPepper: null, aud }, secret, {
+        algorithm: 'HS256',
+      });
+    const resolve = vi.fn(
+      async (_handle: string, _originProof: string | undefined, destination: string) => ({
+        token: tokenFor(destination),
+        organizationId: 'org_proxy',
+        runtimeAuthorization,
+      })
+    );
+    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn(async (_request: Request) => new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const authorization = `Bearer ${await handle()}`;
+      const requests = [
+        ['backend', 'GET', '/api/profile', 'kilo-api'],
+        ['provider', 'POST', '/api/openrouter/chat/completions', 'kilo-gateway'],
+        ['provider', 'GET', '/api/openrouter/organizations/org_proxy/models', 'kilo-api'],
+        ['ingest', 'POST', '/api/session/kilo_proxy/ingest', 'session-ingest'],
+        ['exa', 'POST', '/api/exa/search', 'kilo-gateway'],
+      ] as const;
+      for (const [route, method, path, destination] of requests) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test/api/runtime-credential-proxy/${route}${path}`, {
+            method,
+            headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+            ...(method === 'POST' ? { body: '{}' } : {}),
+          }),
+          env
+        );
+        expect(response.status).toBe(200);
+        expect(resolve.mock.lastCall?.[2]).toBe(destination);
+        const forwarded = upstream.mock.lastCall?.[0];
+        const bearer = forwarded?.headers.get('authorization')?.slice('Bearer '.length) ?? '';
+        expect(jwt.decode(bearer)).toMatchObject({ aud: destination });
+        await expect(
+          verifyRuntimeProxyAttestation({
+            value: forwarded?.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+            secret,
+            audience: destination,
+            ...runtimeAuthorization,
+            bearer,
+          })
+        ).resolves.toBe(true);
+      }
+      expect(upstream).toHaveBeenCalledTimes(requests.length);
+
+      // A token for another service is refused before any upstream request.
+      resolve.mockResolvedValueOnce({
+        token: tokenFor('kilo-api'),
+        organizationId: 'org_proxy',
+        runtimeAuthorization,
+      });
+      const refused = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(refused.status).toBe(503);
+      expect(upstream).toHaveBeenCalledTimes(requests.length);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('removes every adjacent prohibited header before injecting runtime credentials', async () => {
     const env = createEnv();
     env.SANDBOX_SESSION.get.mockReturnValue({

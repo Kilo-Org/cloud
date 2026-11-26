@@ -54,7 +54,11 @@ function b64url(value: string): string {
 /** A Kilo token that decodes to `runtimeAuthorization` (modern authorization). */
 function runtimeAuthorizedKiloToken(exp?: number, authorizationId = 'ra_1'): string {
   const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
-  const payload = b64url(JSON.stringify({ runtimeAuthorization: { id: authorizationId }, exp }));
+  // The combined audience the test Worker's default issuer mode reuses.
+  const aud = ['kilo-api', 'kilo-gateway', 'session-ingest'];
+  const payload = b64url(
+    JSON.stringify({ runtimeAuthorization: { id: authorizationId }, aud, exp })
+  );
   return `${header}.${payload}.sig`;
 }
 

@@ -14,8 +14,16 @@ import {
   RuntimeAuthorizationRevokedError,
   unsealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
-import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import type {
+  RuntimeAuthorization,
+  RuntimeTokenDestination,
+  RuntimeTokens,
+} from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
+  RuntimeAuthorizationSchema,
+  RuntimeTokenDestinationSchema,
+  RuntimeTokensSchema,
+} from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   isWorkspaceAnchorMetadata,
   workspaceSessionIdForMetadata,
@@ -66,8 +74,10 @@ import { classifyRuntimeProxyFenceError, readRuntimeProxyFence } from './runtime
 import type { ScopeHandleResolution } from '../sandbox/accepted-handles.js';
 import {
   getRuntimeAuthorizationRecoveryState as readRuntimeAuthorizationRecoveryState,
+  issuedRuntimeTokenAuth,
   RUNTIME_AUTHORIZATION_KEY,
   renewStoredRuntimeAuthorization,
+  runtimeTokenAudienceMode,
 } from '../../session/runtime-authorization-persistence.js';
 import { sessionRuntimeLocator } from '../../sandbox-control/worktree-ownership.js';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
@@ -582,6 +592,8 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   resolveScopeHandle(input: {
     handle: string;
     originProof?: string;
+    /** The service that receives the backing token. */
+    destination?: RuntimeTokenDestination;
   }): Promise<ScopeHandleResolution>;
   /** The locator a wiped issuer uses to keep resolving through a survivor. */
   getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
@@ -1518,8 +1530,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     // Read the backing token first so metadata/authorization are read after it and
     // reflect the latest state at issuance time (parity with the legacy
-    // `SandboxSession.ts` token-then-fence read order).
-    const token = await this.getRuntimeToken();
+    // `SandboxSession.ts` token-then-fence read order). Only its expiry is read,
+    // and every destination's token shares it.
+    const token = await this.getRuntimeToken('kilo-api');
     const metadata = await this.getMetadata();
     const authorization = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
@@ -1542,7 +1555,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   async resolveRuntimeCredentialProxyGrant(
     handle: string,
-    originProof?: string
+    originProof?: string,
+    destination?: RuntimeTokenDestination
   ): Promise<{
     token: string;
     organizationId?: string;
@@ -1550,6 +1564,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     scopeView?: ScopeGrantView;
   } | null> {
     await this.initialized;
+    const target = RuntimeTokenDestinationSchema.optional().parse(destination);
     let local: {
       token: string;
       organizationId?: string;
@@ -1590,7 +1605,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           localScopeView = result?.scopeView;
           return result?.fence ?? null;
         },
-        token: (secret, beforeRenew) => this.getStoredRuntimeToken(secret, beforeRenew),
+        token: (secret, beforeRenew) => this.getStoredRuntimeToken(secret, target, beforeRenew),
       });
     } catch (error) {
       const fenceOutcome = classifyRuntimeProxyFenceError(error);
@@ -1610,7 +1625,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (localError !== null) throw localError;
       return null;
     }
-    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle, originProof);
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(
+      handle,
+      originProof,
+      target
+    );
     if (fromScope) return fromScope;
     if (localError !== null) throw localError;
     return null;
@@ -1632,7 +1651,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   private async resolveRuntimeCredentialProxyGrantFromScope(
     handle: string,
-    originProof: string | undefined
+    originProof: string | undefined,
+    destination: RuntimeTokenDestination | undefined
   ): Promise<{
     token: string;
     organizationId?: string;
@@ -1646,7 +1666,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       outcome = await withTimeout(
         withDORetry(
           () => this.scopeResolutionPeer() ?? peer,
-          current => current.resolveScopeHandle({ handle, originProof }),
+          current =>
+            current.resolveScopeHandle({
+              handle,
+              originProof,
+              ...(destination === undefined ? {} : { destination }),
+            }),
           'resolveScopeHandle'
         ),
         this.sessionTimers().scopeResolutionMs,
@@ -1676,18 +1701,29 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId) != null;
   }
 
-  /** C1c model preflight: renew and return the backing runtime token. */
-  async getRuntimeToken(): Promise<string | null> {
+  /**
+   * C1c model preflight: renew and return the backing runtime token for one
+   * destination. Only a caller from an earlier Worker version omits it.
+   */
+  async getRuntimeToken(destination?: RuntimeTokenDestination): Promise<string | null> {
+    const target = RuntimeTokenDestinationSchema.optional().parse(destination);
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
-    return this.getStoredRuntimeToken(secret);
+    return this.getStoredRuntimeToken(secret, target);
   }
 
-  private async getStoredRuntimeToken(secret: string, beforeRenew?: () => Promise<boolean>) {
+  private async getStoredRuntimeToken(
+    secret: string,
+    destination: RuntimeTokenDestination | undefined,
+    beforeRenew?: () => Promise<boolean>
+  ) {
     const metadata = await this.getMetadata();
+    const audienceMode = runtimeTokenAudienceMode(this.env);
     return renewStoredRuntimeAuthorization({
       metadata,
       beforeRenew,
+      audienceMode,
+      destination,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
       putAuthorization: authorization =>
         this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization),
@@ -1701,6 +1737,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           authorization,
           secret,
           connectionString: this.env.HYPERDRIVE.connectionString,
+          audienceMode,
           onBindingRejected: reason =>
             logRuntimeAuthorizationDiagnostic(
               metadata?.identity.sessionId,
@@ -1740,6 +1777,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     sandboxId: string;
     directory: string;
     kiloSessionId: string;
+    /** The service that receives the token. Only an earlier Worker version omits it. */
+    destination?: RuntimeTokenDestination;
   }): Promise<{
     token: string;
     organizationId?: string;
@@ -1749,7 +1788,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!this.runtimeProxyScopeMatches(input)) return null;
     let token: string | null;
     try {
-      token = await this.getRuntimeToken();
+      token = await this.getRuntimeToken(input.destination);
     } catch (error) {
       // Revoked/expired is a known denial for this member; anything else is a
       // real failure the Sandbox DO treats as `unavailable`.
@@ -3282,9 +3321,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     ownerId: string;
     expectedOldId: string;
     runtimeAuthorizationSeal: string;
+    /** The `kilo-api` token, or the combined token from an earlier Worker version. */
     runtimeToken: string;
+    runtimeTokens?: RuntimeTokens;
   }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
     await this.initialized;
+    const runtimeTokens = RuntimeTokensSchema.optional().safeParse(input.runtimeTokens);
+    if (!runtimeTokens.success) return { status: 'denied' };
     return this.enqueue(async () => {
       const metadata = this.metadata;
       if (metadata === null || metadata.identity.userId !== input.ownerId) {
@@ -3342,7 +3385,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, fresh);
       const updated: SessionMetadata = {
         ...latest,
-        auth: { ...latest.auth, kilocodeToken: input.runtimeToken },
+        auth: {
+          ...latest.auth,
+          ...issuedRuntimeTokenAuth({ token: input.runtimeToken, tokens: runtimeTokens.data }),
+        },
       };
       await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(updated));
       this.metadata = updated;

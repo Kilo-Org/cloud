@@ -77,6 +77,7 @@ import {
   runtimeProxyAttestationAudience,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import { runtimeTokenFitsDestination } from './session/runtime-authorization-persistence.js';
 import { readBoundedBody } from './utils/read-bounded-body.js';
 import {
   encodeCloudAgentSessionScopeV2ViewHeaders,
@@ -619,6 +620,9 @@ async function forwardRuntimeCredentialProxy(
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
     if (bodyText === undefined) return rejectRoute(undefined);
   }
+  // The upstream service that verifies the bearer and the attestation. Its own
+  // runtime token is the only one this request may carry.
+  const destination = runtimeProxyAttestationAudience(route, path);
   let credential: {
     token: string;
     organizationId?: string;
@@ -631,7 +635,8 @@ async function forwardRuntimeCredentialProxy(
       session =>
         session.resolveRuntimeCredentialProxyGrant(
           handle,
-          parseRuntimeProxyOriginProof(c.req.header(RUNTIME_PROXY_ORIGIN_HEADER))
+          parseRuntimeProxyOriginProof(c.req.header(RUNTIME_PROXY_ORIGIN_HEADER)),
+          destination
         ),
       'resolveRuntimeCredentialProxyGrant'
     );
@@ -639,6 +644,15 @@ async function forwardRuntimeCredentialProxy(
     return c.text('Credential unavailable', 503);
   }
   if (!credential) return c.text('Unauthorized', 401);
+  if (!runtimeTokenFitsDestination(credential.token, destination)) {
+    logRuntimeProxyRequestFailed({
+      upstreamAttempted: false,
+      rejectionStage: 'token',
+      request: requestShape(credential.organizationId),
+      ...correlation,
+    });
+    return c.text('Credential unavailable', 503);
+  }
   const derivedTargets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
   const targets = derivedTargets.success
     ? derivedTargets.targets
@@ -699,13 +713,12 @@ async function forwardRuntimeCredentialProxy(
   if (!upstream) return rejectRoute(credential.organizationId);
   try {
     // The route allowlist is resolved above before a proof is issued.
-    const audience = runtimeProxyAttestationAudience(route, path);
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
         return value;
       }),
-      audience,
+      audience: destination,
       bearer: credential.token,
       ...credential.runtimeAuthorization,
     });

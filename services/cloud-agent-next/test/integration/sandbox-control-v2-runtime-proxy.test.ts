@@ -175,6 +175,8 @@ async function sealedRuntimeAuthorization(
   const token = jwt.sign(
     {
       runtimeAuthorization: { id: authorizationId },
+      // The combined audience the test Worker's default issuer mode reuses.
+      aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
       exp: Math.floor((now + 60 * 60_000) / 1000),
     },
     SECRET
@@ -436,10 +438,13 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       let membershipReads = 0;
       let membershipGate: Promise<void> | undefined;
       await runInDurableObject(sessionStub, instance => {
-        // Keep the real persisted renewal and binding policy; only the database reads are fake.
-        instance['getStoredRuntimeToken'] = async (secret, beforeRenew) =>
+        // Keep the real persisted renewal and binding policy; only the database reads are
+        // fake. The issuer mints one token per destination here.
+        instance['getStoredRuntimeToken'] = async (secret, destination, beforeRenew) =>
           renewStoredRuntimeAuthorization({
             beforeRenew,
+            audienceMode: 'per-destination',
+            destination,
             metadata: await instance.getMetadata(),
             getAuthorization: () => instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY),
             putAuthorization: authorization =>
@@ -453,6 +458,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
               renewRuntimeAuthorization({
                 authorization,
                 secret,
+                audienceMode: 'per-destination',
                 connectionString: 'fake',
                 now: new Date(Date.now()),
                 adapters: {
@@ -484,6 +490,11 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         `/api/session/${kiloId}/ingest`,
       ];
       const methods = ['POST', 'GET', 'POST'];
+      const audienceOf: Record<string, string> = {
+        '/chat/completions': 'kilo-gateway',
+        '/api/profile': 'kilo-api',
+        [`/api/session/${kiloId}/ingest`]: 'session-ingest',
+      };
       vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
         const request = input instanceof Request ? input : new Request(input);
         const url = new URL(request.url);
@@ -493,6 +504,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         const claims = jwt.verify(bearer, SECRET) as jwt.JwtPayload;
         expect(bearer === token).toBe(false);
         expect(claims.runtimeAuthorization.resourceId).toBe(sessionId);
+        expect(claims.aud).toBe(audienceOf[url.pathname]);
         expect(claims.organizationId).toBe(ORG_ID);
         expect(claims.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
         expect(request.headers.get('x-kilocode-organizationid')).toBe(ORG_ID);

@@ -13,9 +13,13 @@ The issuer, key set URL and local ports of each environment live in
 
 ## Mint Worker
 
-- `GET /.well-known/oauth-authorization-server` serves RFC 8414 metadata: `issuer`, `jwks_uri`
-  (on the feed Worker), and empty `response_types_supported` and `grant_types_supported`. An
-  endpoint joins the document in the change that makes it answer, so no listed endpoint returns 404.
+- `GET /.well-known/oauth-authorization-server` serves RFC 8414 metadata: `issuer` and `jwks_uri`
+  (on the feed Worker) always; the token, revocation and introspection endpoints once the
+  environment binds the identity store (`IDENTITY_STORE`); the authorization endpoint and the code
+  grant once a sign-in hand-off is wired; the device grant once its hook is. An endpoint joins the
+  document when it answers, so no listed endpoint returns 404.
+- The OAuth endpoints (`src/oauth/`, see "OAuth endpoints") run in this fetch handler. Staging and
+  production bind no identity store yet, so they serve none of them.
 - Placement runs the fetch handler next to the identity store's primary in Frankfurt:
   `"placement": { "region": "aws:eu-central-1" }`, a Cloudflare placement hint
   (https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region), which
@@ -98,16 +102,51 @@ curl -s http://localhost:8801/.well-known/jwks.json
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
 only the `local` block runs (`test/repo` fails a deployed block that runs it), and the claim set
-must name the development issuer.
+must name the development issuer. The same entry wires the development sign-in hand-off
+(`src/dev.ts`): it approves every authorization request for the synthetic account `dev:uts-local`.
+
+The local block binds the local identity store as `IDENTITY_STORE`. The UTS logins have no password
+in the repository, so give `uts_app_a` one and pass the URL to wrangler:
+
+```sh
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE=postgres://uts_app_a:<password>@127.0.0.1:55432/uts \
+  pnpm exec wrangler dev --env local
+UTS_E2E_BASE_URL=http://127.0.0.1:8800/ UTS_E2E_ADMIN_URL=... UTS_E2E_APP_URL=... \
+  pnpm exec tsx scripts/oauth-e2e.ts
+```
+
+`scripts/oauth-e2e.ts` runs code, token, refresh, third-party rotation, reuse (the family is
+revoked), revoke and introspect, prints the audit rows (token ids only), checks that no token value
+reached an audit row, and times the mint path.
+
+## OAuth endpoints
+
+| Endpoint | Behaviour | SQL |
+|---|---|---|
+| `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
+| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A second use of a code revokes the grant | `uts.exchange_authorization_code` |
+| `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation, 60-second grace, reuse after the grace revokes the family and writes a feed entry | `uts.refresh_first_party`, `uts.refresh_third_party` |
+| `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
+| `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (read) |
+
+Each call verifies at most one DPoP proof before the grant read and records its `jti` in
+`UtsReplayDO`, one object per grant (`<environment>:replay:<grant id>`, `eu` jurisdiction). A
+first-party refresh grant names its grant id (`kilo_rt_<grant id><32 random bytes>`), so the replay
+object is known before the statement. One call mints one access token per scope, up to 8, each with
+one audience; all are signed by the signer the grant id picks, and `issued_tokens` lists them. The
+claims are exactly `iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
+(`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with `Retry-After`; a
+failure no retry fixes gives 500.
 
 ## Tests
 
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
   `wrangler.test.jsonc`): key lifecycle with time travel, signing and verification with `jose`, key
   persistence across restarts, rotation by alarm, an overdue rotation and a lost alarm, emergency
-  removal by direct call, the RPC surface, the signer-keys route and its caller check, metadata.
+  removal by direct call, the RPC surface, the signer-keys route and its caller check, metadata,
+  DPoP proofs, the replay object, and every OAuth endpoint against a recording grant store.
 - `pnpm test:node`: the repository config check (`test/repo`) and the identity store tests
-  (`test/db`, see "Local database and tests").
+  (`test/db`, see "Local database and tests"), the OAuth grant functions included.
 
 ## Staging proof run (before merge)
 
@@ -203,7 +242,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 | --- | --- | --- | --- |
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, and revocations, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -247,13 +286,13 @@ whether granted directly, through `PUBLIC` or through an inherited role.
   id as history; only `gate_pass_id` becomes NULL when the account's passes go with it.
 - `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour, not on
   every mint; the table leaves 10 percent of each page free (`fillfactor = 90`) for those updates.
-- The app login still writes the credential tables directly. When the mint, refresh and revoke
-  functions land, they become security-definer functions that write the credential row and its
-  audit row together, and the app login loses direct writes on the credential tables, so no
-  credential can change without its audit row. The account-deletion function is one of them: in
-  the same statement, before the delete, it collects the active bot keys the account created (the
-  keys the delete trigger is about to flag) and writes a bot-key-flagged audit row and the org-admin
-  notices for each (design sections 5.8 and 8.1).
+- The app login writes authorization codes, refresh grants, device sessions, third-party families
+  and tokens, and revocations only through the security-definer OAuth functions (migration 0004),
+  which write the credential rows and their audit row together; it keeps SELECT on those tables.
+  The account-deletion function will be one more such function: in the same statement, before the
+  delete, it collects the active bot keys the account created (the keys the delete trigger is about
+  to flag) and writes a bot-key-flagged audit row and the org-admin notices for each (design
+  sections 5.8 and 8.1).
 - `IdentityStoreError` keeps only the SQLSTATE, the constraint, the table, and for a failed
   connection the system error code (`ECONNREFUSED`, `ETIMEDOUT`, ...). The server's error detail can
   quote the refused row, so it never leaves `src/db/client.ts`.
@@ -337,8 +376,8 @@ primary-key probes for the rows that hang off it (`test/db/index-probes.test.ts`
 
 | Read | Indexes |
 | --- | --- |
-| Mint and first-party refresh | `refresh_grants_token_hash_key`, then `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
-| Third-party refresh | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey` |
+| Mint and first-party refresh (`uts.read_refresh_grant`) | `refresh_grants_token_hash_key`, then `device_sessions_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
+| Third-party refresh (`uts.read_third_party_refresh_token`) | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey`, `third_party_consents_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
 | PAT lookup (`uts.lookup_pat`) | `personal_access_tokens_token_hash_key`, then `accounts_pkey` |
 | Org bot key lookup (`uts.lookup_bot_key`) | `org_bot_keys_token_hash_key` |
 | Web session check | `browser_sessions_token_hash_key` |

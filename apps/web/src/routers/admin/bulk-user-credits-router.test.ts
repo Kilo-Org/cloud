@@ -74,7 +74,7 @@ describe('bulk user credits router', () => {
     );
   });
 
-  it('records one admin audit row per credited user', async () => {
+  it('records one admin audit row per requested user, failures included', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipients = await Promise.all([insertTestUser(), insertTestUser()]);
     const caller = await createCallerForUser(admin.id);
@@ -98,18 +98,65 @@ describe('bulk user credits router', () => {
       .from(admin_action_audit_logs)
       .where(eq(admin_action_audit_logs.actor_id, admin.id));
 
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     expect(rows).toEqual(
-      expect.arrayContaining(
-        recipients.map(user => ({
+      expect.arrayContaining([
+        ...recipients.map(user => ({
           action: 'credits.bulk_grant',
           outcome: 'success',
           target_type: 'user',
           target_id: user.id,
           metadata: { amountUsd: 3, expirationDate: null },
-        }))
-      )
+        })),
+        {
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          target_type: null,
+          target_id: null,
+          metadata: { amountUsd: 3, expirationDate: null, errorCode: 'user_not_found' },
+        },
+      ])
     );
+  });
+
+  it('records only failure rows when no grant succeeds, without the addresses', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const blocked = await insertTestUser({ blocked_reason: 'abuse' });
+    const missingEmail = `missing-${crypto.randomUUID()}@example.com`;
+    const caller = await createCallerForUser(admin.id);
+
+    const results = await caller.admin.bulkUserCredits.grantBulkCredits({
+      emails: [blocked.google_user_email, missingEmail],
+      amountUsd: 3,
+    });
+    expect(results.every(result => !result.success)).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          target_type: 'user',
+          target_id: blocked.id,
+          metadata: { amountUsd: 3, expirationDate: null, errorCode: 'user_blocked' },
+        }),
+        expect.objectContaining({
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          target_id: null,
+          metadata: { amountUsd: 3, expirationDate: null, errorCode: 'user_not_found' },
+        }),
+      ])
+    );
+    const stored = JSON.stringify(rows.map(row => [row.target_id, row.message, row.metadata]));
+    expect(stored).not.toContain(blocked.google_user_email);
+    expect(stored).not.toContain(missingEmail);
   });
 
   it('distinguishes an invalid expiration date from a past one', async () => {

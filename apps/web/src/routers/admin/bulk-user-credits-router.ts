@@ -6,8 +6,10 @@ import * as z from 'zod';
 import { inArray } from 'drizzle-orm';
 import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import {
+  adminAuditErrorCode,
   recordAdminActions,
   userActionTarget,
+  type AdminActionEntry,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const BulkUserCreditsInputSchema = z.object({
@@ -125,6 +127,22 @@ export const bulkUserCreditsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<BulkCreditResult[]> => {
       const { emails, amountUsd, expirationDate, description } = input;
       const results: BulkCreditResult[] = [];
+      const metadata = { amountUsd, expirationDate: expirationDate ?? null };
+      // One row per requested address, in request order. A failed row names the
+      // account when one matched and a stable code; never the address or the
+      // error message.
+      const auditEntries: AdminActionEntry[] = [];
+      function pushFailure(result: BulkCreditResult, errorCode: string) {
+        results.push(result);
+        auditEntries.push({
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          errorCode,
+          target: result.userId ? userActionTarget(result.userId) : null,
+          message: 'Failed to grant credits in bulk',
+          metadata,
+        });
+      }
 
       // Normalize emails and deduplicate to prevent double-crediting
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
@@ -142,22 +160,18 @@ export const bulkUserCreditsRouter = createTRPCRouter({
         const user = usersByEmail.get(email);
 
         if (!user) {
-          results.push({
-            email,
-            userId: '',
-            success: false,
-            error: 'User not found',
-          });
+          pushFailure(
+            { email, userId: '', success: false, error: 'User not found' },
+            'user_not_found'
+          );
           continue;
         }
 
         if (user.blocked_reason) {
-          results.push({
-            email,
-            userId: user.id,
-            success: false,
-            error: 'User is blocked',
-          });
+          pushFailure(
+            { email, userId: user.id, success: false, error: 'User is blocked' },
+            'user_blocked'
+          );
           continue;
         }
 
@@ -177,41 +191,41 @@ export const bulkUserCreditsRouter = createTRPCRouter({
               userId: user.id,
               success: true,
             });
+            auditEntries.push({
+              action: 'credits.bulk_grant',
+              target: userActionTarget(user.id),
+              message: 'Granted credits in bulk',
+              metadata,
+            });
           } else {
-            results.push({
+            pushFailure(
+              { email, userId: user.id, success: false, error: creditResult.message },
+              'grant_refused'
+            );
+          }
+        } catch (error) {
+          pushFailure(
+            {
               email,
               userId: user.id,
               success: false,
-              error: creditResult.message,
-            });
-          }
-        } catch (error) {
-          results.push({
-            email,
-            userId: user.id,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+            adminAuditErrorCode(error)
+          );
         }
       }
 
-      const metadata = { amountUsd, expirationDate: expirationDate ?? null };
-      const granted = results.filter(result => result.success);
       await recordAdminActions(
         ctx,
-        granted.length > 0
-          ? granted.map(result => ({
-              action: 'credits.bulk_grant' as const,
-              target: userActionTarget(result.userId),
-              message: 'Granted credits in bulk',
-              metadata,
-            }))
+        auditEntries.length > 0
+          ? auditEntries
           : [
               {
-                action: 'credits.bulk_grant' as const,
+                action: 'credits.bulk_grant',
                 target: null,
                 message: 'Granted no credits in bulk',
-                metadata: { ...metadata, requestedCount: normalizedEmails.length },
+                metadata: { ...metadata, requestedCount: 0 },
               },
             ]
       );

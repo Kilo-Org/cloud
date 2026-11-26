@@ -68,6 +68,19 @@ const testRouter = createTRPCRouter({
     })
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(({ input }) => input.userId),
+  guardedBlock: adminProcedure
+    .use(() => {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Narrower permission required' });
+    })
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user.unblock',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(userInput)
+    .mutation(({ input }) => input.userId),
   setBlock: adminProcedure
     .meta({ adminAudit: { kind: 'handler', actions: ['user.block', 'user.unblock'] } })
     .input(z.object({ userId: z.string(), blocked: z.boolean() }))
@@ -237,6 +250,24 @@ describe('admin audit middleware', () => {
     ]);
   });
 
+  test('records a narrower guard refusal before parsing with no target', async () => {
+    await expect(
+      adminCaller().guardedBlock({ userId: 'someone@customer.test' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'failure',
+        target_type: null,
+        target_id: null,
+        metadata: { errorCode: 'FORBIDDEN' },
+      }),
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('customer.test');
+  });
+
   describe('with step-up enforced', () => {
     const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
     beforeEach(() => {
@@ -246,9 +277,11 @@ describe('admin audit middleware', () => {
       process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
     });
 
-    test('records a step-up refusal as a failure row', async () => {
+    test('records a step-up refusal as a failure row with no target, since input never parsed', async () => {
       // A bearer credential can never complete step-up, so the guard refuses it.
-      const result = adminCaller({ authViaToken: true }).block({ userId: 'user-1' });
+      const result = adminCaller({ authViaToken: true }).block({
+        userId: 'someone@customer.test',
+      });
       await expect(result).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
       const rows = await db.select().from(admin_action_audit_logs);
@@ -257,10 +290,12 @@ describe('admin audit middleware', () => {
           action: 'user.unblock',
           outcome: 'failure',
           actor_id: admin.id,
-          target_id: 'user-1',
+          target_type: null,
+          target_id: null,
           metadata: { errorCode: 'FORBIDDEN' },
         }),
       ]);
+      expect(JSON.stringify(rows)).not.toContain('customer.test');
     });
 
     test('records nothing when the admin guard refuses a non-admin', async () => {

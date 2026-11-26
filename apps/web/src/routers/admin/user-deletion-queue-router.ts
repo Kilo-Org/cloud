@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -21,6 +22,7 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import {
   addAdminAuditMetadata,
   inputFieldTarget,
+  recordAdminAction,
   recordAdminActions,
   userActionTarget,
   type AdminActionContext,
@@ -177,6 +179,25 @@ function statusCounts(results: readonly { status: string }[]): Record<string, nu
   const counts: Record<string, number> = {};
   for (const { status } of results) counts[status] = (counts[status] ?? 0) + 1;
   return counts;
+}
+
+/**
+ * The subject user of each committed deletion request, for its audit row. The
+ * requests are already queued, so a failed lookup is reported and the rows
+ * fall back to the request ids rather than failing the call.
+ */
+async function deletionSubjectUserIds(requestIds: string[]): Promise<Map<string, string | null>> {
+  if (requestIds.length === 0) return new Map();
+  try {
+    const subjects = await db
+      .select({ id: user_deletion_requests.id, userId: user_deletion_requests.user_id })
+      .from(user_deletion_requests)
+      .where(inArray(user_deletion_requests.id, requestIds));
+    return new Map(subjects.map(subject => [subject.id, subject.userId]));
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_deletion_audit_subject_lookup' } });
+    return new Map();
+  }
 }
 
 /** One admin row per deletion request the call created, or one summary row when none. */
@@ -413,14 +434,7 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
       const createdIds = results.flatMap(result =>
         result.status === 'enqueued' ? [result.requestId] : []
       );
-      const subjects =
-        createdIds.length === 0
-          ? []
-          : await db
-              .select({ id: user_deletion_requests.id, userId: user_deletion_requests.user_id })
-              .from(user_deletion_requests)
-              .where(inArray(user_deletion_requests.id, createdIds));
-      const subjectUserIds = new Map(subjects.map(subject => [subject.id, subject.userId]));
+      const subjectUserIds = await deletionSubjectUserIds(createdIds);
       await recordDeletionRequestsCreated(
         ctx,
         createdIds.map(requestId => {
@@ -733,7 +747,7 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
 
   testSubstackCredential: adminProcedure
     .meta({
-      adminAudit: { kind: 'declarative', action: 'user_deletion.substack_credential.test' },
+      adminAudit: { kind: 'handler', actions: ['user_deletion.substack_credential.test'] },
     })
     .input(
       z.object({
@@ -741,14 +755,35 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
         totpSecret: z.string().max(512).optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      if (input.material) {
-        addAdminAuditMetadata({ source: 'material' });
-        return testSubstackCredentialMaterial(input.material, input.totpSecret);
-      }
-      addAdminAuditMetadata({ source: 'stored' });
-      const result = await testStoredSubstackCredential();
-      return { result, refreshedCookie: null };
+    .mutation(async ({ ctx, input }) => {
+      const source = input.material ? 'material' : 'stored';
+      addAdminAuditMetadata({ source });
+      const outcome = input.material
+        ? await testSubstackCredentialMaterial(input.material, input.totpSecret)
+        : { result: await testStoredSubstackCredential(), refreshedCookie: null };
+      // The test resolves with an error result rather than throwing, e.g. when
+      // a refreshed stored cookie could not be saved. Its stable code is the
+      // row's errorCode; the credential and the cookie are never recorded.
+      const { result } = outcome;
+      await recordAdminAction(
+        ctx,
+        result.status === 'error'
+          ? {
+              action: 'user_deletion.substack_credential.test',
+              outcome: 'failure',
+              errorCode: result.errorCode,
+              target: null,
+              message: 'Substack credential test failed',
+              metadata: { source },
+            }
+          : {
+              action: 'user_deletion.substack_credential.test',
+              target: null,
+              message: 'Tested Substack credential',
+              metadata: { source, status: result.status },
+            }
+      );
+      return outcome;
     }),
 
   replaceSubstackCredential: adminProcedure

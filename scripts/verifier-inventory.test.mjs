@@ -417,6 +417,18 @@ const EXCEPTIONS = {
     signals: { primitive: 1, 'auth-library-import': 1 },
     pins: ['jwtVerify(value, EmbeddedJWK', 'typ: DPOP_TYPE'],
   },
+  'services/uts/src/account/bearer.ts': {
+    reason:
+      'UTS, the issuer (design section 5): its account API checks the access tokens UTS itself signs, under its own signer keys, for the uts audience; not a phase 4 verifier',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['audience: UTS_ACCOUNT_AUDIENCE', 'issuer: config.endpoints.issuer'],
+  },
+  'services/uts/src/signin/providers/exchange.ts': {
+    reason:
+      'Third party: UTS provider sign-in checks the ID token of an upstream OIDC provider under that provider key set and issuers (src/signin/providers/specs.ts)',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['keySet(spec.endpoints.jwks)', 'issuer: [...spec.endpoints.issuers]'],
+  },
   'packages/trpc/src/agent-profiles-mobile.ts': {
     reason: 'Mobile tRPC router composition: createTRPCRouter only; requests run in apps/web',
     signals: { 'web-shared-import': 1 },

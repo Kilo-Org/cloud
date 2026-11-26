@@ -229,16 +229,16 @@ describe('the caller check', () => {
     expect(reads.calls).toEqual([]);
   });
 
-  it('admits web and kilo-gateway in development and staging, and no workload in production', () => {
+  it('admits web and ai-gateway in development and staging, and no workload in production', () => {
     expect(UTS_FEED_HTTPS_WORKLOADS).toEqual({
       production: [],
-      staging: ['web', 'kilo-gateway'],
-      development: ['web', 'kilo-gateway'],
+      staging: ['web', 'ai-gateway'],
+      development: ['web', 'ai-gateway'],
     });
     expect(readConfig(envOf({}, feedReads().binding)).https).toEqual({
       status: 'on',
       stsIssuer: TEST_STS_ISSUER,
-      workloads: ['web', 'kilo-gateway'],
+      workloads: ['web', 'ai-gateway'],
     });
     expect(
       readConfig(
@@ -259,7 +259,7 @@ describe('the caller check', () => {
     expect(reads.calls).toEqual([]);
   });
 
-  it.each(['web', 'kilo-gateway'])(
+  it.each(['web', 'ai-gateway'])(
     'serves %s the head, the list and the bootstrap, fetching the STS key set once',
     async workload => {
       const { fetched } = await serveStsKeySet();

@@ -212,7 +212,7 @@ key set on `UTS_E2E_STS_PORT`) and reads as the `web` workload; the feed Worker 
 `UTS_E2E_FEED_URL`, `UTS_E2E_ADMIN_URL`, `UTS_E2E_STS_PORT` and, optionally,
 `UTS_E2E_FEED_OFF_URL` (a feed Worker run with `--var FEED_HTTPS_ENABLED:false`). It checks the
 refusals (no token 401; another workload, audience or scope 403; another environment, an expired
-token or an unknown key 401), the head, list and bootstrap for `web` and `kilo-gateway`, a 304
+token or an unknown key 401), the head, list and bootstrap for `web` and `ai-gateway`, a 304
 for an unchanged head and a held list, `@kilocode/verify` running over the transport (one
 bootstrap per cold start, then the head and list calls of one minute while a revocation changes
 the list, and the revoked subject refused), the CPU of the caller check, and the 503 of the

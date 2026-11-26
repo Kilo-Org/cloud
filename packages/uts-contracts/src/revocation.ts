@@ -59,14 +59,15 @@ export const UTS_FEED_READ_SCOPE = 'uts-feed:revocation.read';
 
 /**
  * The STS workloads whose tokens the HTTPS feed admits, per environment: the web app (`web`, the
- * `kilocode-app` Vercel project) and the AI gateway (`kilo-gateway`, the `kilocode-ai-gateway`
- * project). Production admits none until the HTTPS feed is activated there. A valid token of any
- * other workload is refused with 403.
+ * `kilocode-app` Vercel project) and the AI gateway (`ai-gateway`, the `kilocode-ai-gateway`
+ * project). The names are the STS policy's workload names (decision Q84): the gateway's workload
+ * is `ai-gateway`, while its user audience stays `kilo-gateway`. Production admits none until the
+ * HTTPS feed is activated there. A valid token of any other workload is refused with 403.
  */
 export const UTS_FEED_HTTPS_WORKLOADS: Readonly<Record<UtsEnvironment, readonly string[]>> = {
   production: [],
-  staging: ['web', 'kilo-gateway'],
-  development: ['web', 'kilo-gateway'],
+  staging: ['web', 'ai-gateway'],
+  development: ['web', 'ai-gateway'],
 };
 
 /** Whole seconds since the served head's `iat`, on every HTTPS head and bootstrap answer. */

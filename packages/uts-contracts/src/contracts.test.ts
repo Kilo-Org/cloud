@@ -525,10 +525,11 @@ describe('revocation feed shapes', () => {
   it('name the STS audience, scope and admitted workloads of the HTTPS feed', () => {
     expect(UTS_FEED_AUDIENCE).toBe('uts-feed');
     expect(UTS_FEED_READ_SCOPE).toBe('uts-feed:revocation.read');
+    // The STS policy's workload names (decision Q84); the gateway's policy is p2's, not yet here.
     expect(UTS_FEED_HTTPS_WORKLOADS).toEqual({
       production: [],
-      staging: ['web', 'kilo-gateway'],
-      development: ['web', 'kilo-gateway'],
+      staging: ['web', 'ai-gateway'],
+      development: ['web', 'ai-gateway'],
     });
     expect(UTS_FEED_HEAD_AGE_HEADER).toBe('Kilo-Feed-Head-Age');
   });

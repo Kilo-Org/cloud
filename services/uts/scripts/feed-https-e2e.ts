@@ -8,7 +8,7 @@
  * - refused callers: no token (401 with a Bearer challenge), a workload the environment does not
  *   admit (403), another audience or scope (403), another environment, an expired token or a key
  *   the STS key set does not hold (401);
- * - admitted callers (`web`, `kilo-gateway`): the head verifies under a feed key of the published
+ * - admitted callers (`web`, `ai-gateway`): the head verifies under a feed key of the published
  *   key set, the list matches its hash, the bootstrap carries the key set, its ages and the head age;
  * - a 304 for an unchanged head and for a list the caller holds, also through `httpsFeedSources`;
  * - the verification library itself, as a Vercel verifier would run it, over this transport: one
@@ -142,7 +142,7 @@ async function refusals() {
 }
 
 async function admitted() {
-  for (const workload of ['web', 'kilo-gateway']) {
+  for (const workload of ['web', 'ai-gateway']) {
     const headers = await bearer({ workload });
     const head = await get('/revocation/head', headers);
     const text = new TextDecoder().decode(head.body);
@@ -186,7 +186,7 @@ async function admitted() {
 }
 
 async function conditional() {
-  const headers = await bearer({ workload: 'kilo-gateway' });
+  const headers = await bearer({ workload: 'ai-gateway' });
   // The head changes at each backfill (every 5 s); a few tries find two reads of one head.
   let head304: { status: number; bytes: number } | null = null;
   for (let attempt = 0; attempt < 5 && head304?.status !== 304; attempt += 1) {

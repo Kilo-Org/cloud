@@ -116,7 +116,7 @@ public.
 - **Caller check.** `@kilocode/verify` checks `Authorization: Bearer <STS token>` against the STS
   key set (`httpJwksSource(STS_URL)`, one verifier per isolate): audience `uts-feed`, scope
   `uts-feed:revocation.read`, environment, expiry, signature. Then the token's workload must be in
-  `UTS_FEED_HTTPS_WORKLOADS` for this environment: `web` and `kilo-gateway` in development and
+  `UTS_FEED_HTTPS_WORKLOADS` for this environment: `web` and `ai-gateway` in development and
   staging, none in production until activation. No token: 401 with a Bearer challenge; another
   audience or scope, or a workload not listed: 403; another issuer or environment, an expired or
   badly signed token: 401; an unreachable STS key set: 503 with `Retry-After`. A refusal logs

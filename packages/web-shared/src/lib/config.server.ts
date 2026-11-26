@@ -74,8 +74,9 @@ export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 // The STS issuer of this deployment's environment (https://sts.kiloapps.io, staging
-// https://sts-staging.kiloapps.io): the STS canary route verifies tokens it issued and mints from
-// it with the function's Vercel identity. Empty: the route answers 503.
+// https://sts-staging.kiloapps.io): the STS canary route verifies tokens it issued, for the
+// environment `STS_ISSUERS` names it under, and mints from it with the function's Vercel identity.
+// Empty or not one of `STS_ISSUERS`: the route answers 503.
 export const STS_URL = getEnvVariable('STS_URL') || '';
 
 // Shared secret with the internal token-mint callers: the MCP catalog CI job

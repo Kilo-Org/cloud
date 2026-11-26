@@ -10,6 +10,7 @@ import {
   STS_CANARY_VERIFY_CALLS_MAX,
   STS_CANARY_RUN_HEADER,
   STS_ISSUERS,
+  StsEnvironmentSchema,
   StsCanaryReportSchema,
   StsCanaryRunIdSchema,
   USAGE_INGEST_CANARY_TOKEN,
@@ -17,6 +18,7 @@ import {
   stsCanaryPassed,
   type StsCanaryCheck,
   type StsCanaryReport,
+  type StsEnvironment,
 } from '@kilocode/sts-contracts';
 import {
   createVerifier,
@@ -44,6 +46,8 @@ export type StsCanaryEnv = {
   STS_CANARY_ENABLED?: string;
   /** The STS issuer: the `iss` the verify route accepts and the base of its key-set URL. */
   STS_URL?: string;
+  /** The STS environment, `production` or `staging`: the one `env` claim the verify route accepts. */
+  STS_ENVIRONMENT?: string;
   WEB_STS_CANARY_URL?: string;
   /** Staging only: the web app's staging deployment sits behind Vercel deployment protection. */
   USAGE_WRITER_PROTECTION_BYPASS?: string;
@@ -52,10 +56,11 @@ export type StsCanaryEnv = {
 export const STS_CANARY_JOB_NAME = 'usage_ingest.sts_canary';
 /**
  * The web route's slowest run: a cold key-set fetch to verify this Worker's token
- * (`JWKS_FETCH_TIMEOUT_MS`, 5 s), one mint attempt (`HTTP_ATTEMPT_TIMEOUT_MS`, 30 s), then four
- * calls to this Worker (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each): 5 + 30 + 4 x 10 = 75 s.
- * This Worker waits 5 s past that, 80 s, under the route's 90 s `maxDuration`
- * (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`), so even the slowest run lands its report here.
+ * (`JWKS_FETCH_TIMEOUT_MS`, 5 s), one mint attempt (`HTTP_ATTEMPT_TIMEOUT_MS`, 30 s, both tries
+ * after an identity refusal included), then four calls to this Worker
+ * (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each): 5 + 30 + 4 x 10 = 75 s. This Worker waits 5 s
+ * past that, 80 s, under the route's 90 s `maxDuration` (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`),
+ * so even the slowest run lands its report here.
  */
 export const WEB_CALL_TIMEOUT_MS =
   JWKS_FETCH_TIMEOUT_MS +
@@ -77,13 +82,14 @@ function tokensFor(binding: MintBinding): ServiceTokens {
  */
 let verifier: { key: string; instance: Verifier<false> } | null = null;
 
-function verifierFor(stsUrl: string, origin: string): Verifier<false> {
-  const key = `${stsUrl}|${origin}`;
+function verifierFor(stsUrl: string, environment: StsEnvironment, origin: string): Verifier<false> {
+  const key = `${stsUrl}|${environment}|${origin}`;
   if (verifier?.key !== key) {
     verifier = {
       key,
       instance: createVerifier({
         audience: USAGE_INGEST_CANARY_TOKEN.audience,
+        environment,
         resourceMetadataUrl: `${origin}/.well-known/oauth-protected-resource`,
         sts: { issuer: stsUrl, jwks: httpJwksSource(stsUrl) },
       }),
@@ -109,18 +115,22 @@ export async function handleStsCanaryVerify(
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
   }
-  if (!env.STS_URL) {
-    return Response.json({ error: 'STS_URL is not configured' }, { status: 503 });
+  const environment = StsEnvironmentSchema.safeParse(env.STS_ENVIRONMENT);
+  if (!env.STS_URL || !environment.success) {
+    return Response.json(
+      { error: 'STS_URL and STS_ENVIRONMENT are not configured' },
+      { status: 503 }
+    );
   }
   const waitUntil = (promise: Promise<unknown>) => {
     if (ctx === undefined) void promise;
     else ctx.waitUntil(promise);
   };
-  const result = await verifierFor(env.STS_URL, new URL(request.url).origin).verify(
-    request,
-    { issuer: 'sts', scope: USAGE_INGEST_CANARY_TOKEN.scope },
-    { waitUntil }
-  );
+  const result = await verifierFor(
+    env.STS_URL,
+    environment.data,
+    new URL(request.url).origin
+  ).verify(request, { issuer: 'sts', scope: USAGE_INGEST_CANARY_TOKEN.scope }, { waitUntil });
   const run = runIdOf(request);
   if (!result.ok) {
     logSafely('warn', () => ({
@@ -147,12 +157,15 @@ class StsCanaryError extends Error {
   }
 }
 
+/**
+ * Each check's result and status only. The report's `detail` is text from another service, so it
+ * never reaches this Worker's logs; the web route's own line carries it.
+ */
 function checkMetadata(prefix: string, check: StsCanaryCheck | 'skipped'): ScheduledJobMetadata {
   if (check === 'skipped') return { [`${prefix}_result`]: 'skipped' };
   return {
     [`${prefix}_result`]: check.result,
     [`${prefix}_status`]: check.status ?? undefined,
-    [`${prefix}_detail`]: check.detail,
   };
 }
 

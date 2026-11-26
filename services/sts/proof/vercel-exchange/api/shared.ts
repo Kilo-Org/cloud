@@ -59,8 +59,8 @@ export async function POST(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const rateLimitHeaders: RateLimitHeaders[] = [];
   let exchangedClaims: ClaimSample | undefined;
-  const exchange: Exchange = async (baseToken, audience) => {
-    const result = await exchangeOnce({ baseToken, audience });
+  const exchange: Exchange = async (baseToken, audience, signal) => {
+    const result = await exchangeOnce({ baseToken, audience }, signal);
     if (result.rateLimitHeaders !== undefined) rateLimitHeaders.push(result.rateLimitHeaders);
     if (result.token !== undefined) {
       exchangedClaims = claimSample(result.token, baseToken);
@@ -91,7 +91,6 @@ export async function POST(request: Request): Promise<Response> {
       detail: outcome.status === 'failed' ? outcome.detail : undefined,
       ...outcome.report,
       ...times,
-      tokenExpMatchesBase: times.exchangedExp !== null && times.exchangedExp === times.baseExp,
       rateLimitHeaders,
       exchangedClaims,
     },

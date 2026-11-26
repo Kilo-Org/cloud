@@ -11,7 +11,10 @@ import {
   type Liveness,
 } from './flight';
 
-/** A key set lives 5 minutes (design 7, matching the issuer's `max-age=300`). */
+/**
+ * A key set lives 5 minutes (design 7): the UTS key set's `max-age=300`. STS answers its key set
+ * with `no-store`; the verifier still keeps an STS set for 5 minutes.
+ */
 export const JWKS_TTL_MS = 5 * 60_000;
 /** A request that finds the set older than 4 minutes starts a background refresh. */
 export const JWKS_REFRESH_AFTER_MS = 4 * 60_000;

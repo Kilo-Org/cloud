@@ -1,0 +1,1 @@
+ALTER TABLE `refresher_state` ADD `ci_failed_at` integer;

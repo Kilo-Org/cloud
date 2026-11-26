@@ -12,6 +12,8 @@ import { E2E_SCOPES } from './scopes';
 
 const BASE = 'http://localhost:8827';
 const ISSUER = BASE;
+// STS_ENVIRONMENT of wrangler.sts.jsonc: the `env` claim the test STS writes into every token.
+const ENVIRONMENT = 'development';
 
 function check(condition: boolean, what: string, detail: unknown = ''): void {
   console.log(
@@ -29,6 +31,7 @@ async function mint(audiences: string[]): Promise<MintResult> {
 function verifierFor(audience: string) {
   return createVerifier({
     audience,
+    environment: ENVIRONMENT,
     resourceMetadataUrl: `${BASE}/.well-known/oauth-protected-resource`,
     sts: { issuer: ISSUER, jwks: httpJwksSource(ISSUER), scopeRegistry: E2E_SCOPES },
   });

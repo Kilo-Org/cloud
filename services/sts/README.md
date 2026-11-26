@@ -122,19 +122,25 @@ call should the alarm be late:
 - the current key signs for 30 days;
 - the next key is generated and published 7 days before it becomes current (if the object slept
   through that date, the next key still waits a full 7 days after it is published);
-- a retired key stays published until 10 minutes after the last token it signed expires. The
-  object keeps that latest `exp` per key, rounded up to a whole minute, so it writes it at most
-  once a minute.
+- a retired key drops its private key at once and stays published until 1 minute (the verifier
+  clock skew) after the last token it signed expires; after that no legitimate token verifies
+  under it. The object keeps that latest `exp` per key, rounded up to a whole minute, so it writes
+  it at most once a minute.
 
 Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `created`, `published`,
 `activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys
-with `Cache-Control: public, max-age=300, stale-if-error=86400`. Each isolate serves it from memory
+with `Cache-Control: no-store`: removing a kid from this set is the only recall of an STS token
+(design 6.1), so no HTTP cache may hold it or serve it stale while STS answers 503; a verifier
+keeps its own copy for 5 minutes and never serves it longer. Each isolate serves it from memory
 for 5 minutes, together with the `TOKEN_SIGNING_KIDS_REVOKED` list it was built under; a request
 that finds no fresh copy, or a copy built under another list, calls the four shards itself, in
 parallel (each bounded at 5 s and retried like the manager key set), and stores the plain result
 only when all four answered; otherwise it answers 503 with `Retry-After: 30`. Requests that find the
 copy stale at the same moment each load it, because no promise is shared across requests: a few
-extra shard calls per isolate per 5 minutes, accepted.
+extra shard calls per isolate per 5 minutes, accepted. So a scheduled removal (a retired key
+leaving its ring) reaches verifiers up to 10 minutes later: up to 5 minutes in an isolate copy,
+then up to 5 in the verifier's. An emergency removal is filtered from every answer, so it reaches
+them within 5 minutes (see the runbook below for the rollout of the list itself).
 
 ### Cost per request
 
@@ -188,9 +194,10 @@ key out of service:
 5. Verify: `curl -s https://sts.kiloapps.io/.well-known/jwks.json` no longer lists the kid or its
    shard's old next kid, and a new token's header names another kid.
 
-Worst case for the removed key: a verifier keeps a removed kid until its key-set copy expires
-(max-age 300 s), and a token signed just before the removal lives up to 300 s, so the old key stops
-being accepted everywhere about 10 minutes after the deploy.
+Worst case for the removed key: a verifier keeps a removed kid until its own key-set copy expires
+(5 minutes; the response is `no-store`, so no HTTP cache adds to that), and a token signed just
+before the removal lives up to 300 s, so the old key stops being accepted everywhere about 10
+minutes after the deploy.
 
 Worst case for the fresh key: an isolate of the old version that is still serving during the
 rollout can answer with its copy of the old set for up to one isolate cache period (5 minutes);
@@ -213,7 +220,13 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
   in the bundle's `missing`.
 - **`/ci`.** The refresher reads `/ci` as a third folder, in the same read and with the same rules,
   only in an environment where at least one GitHub policy applies; elsewhere it makes no `/ci` call.
-  A `/ci` read that fails fails the whole read, like the other two folders.
+  A `/ci` read that fails holds back nothing else: `/workloads` and `/shared` are stored and every
+  other bundle is rebuilt as usual, while each CI bundle keeps the last `/ci` copy, marked stale, or
+  stays empty if `/ci` was never read. STS logs `sts: /ci read failed` and retries at the next
+  regular refresh, with no backoff. The refresher records the failure
+  (`refresher_state.ci_failed_at`), so until then a fill of an empty CI bundle object makes no
+  manager read while `/workloads` and `/shared` are current: a refused `/ci` costs at most one read
+  per refresh interval, not one per CI request.
 - **Missing folder.** Infisical answers a folder that does not exist with 404 and error
   `SecretPathNotFound`; STS reads that as an empty folder, not an outage. Only a transport error, a
   timeout, 429, 5xx, a refused login or a malformed response counts as unreachable.
@@ -224,10 +237,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 - **Cadence.** Every 4 minutes. A signed `secrets.modified` webhook opens a 30-second merge window;
   the refresh runs at the window's end and never sooner than 30 seconds after the last refresh. A
   policy change after a deploy refreshes within about 5 seconds.
-- **Backoff.** After a failed read the next attempt waits 15 s, 30 s, 60 s, 120 s, then 240 s
-  (each jittered over its upper half; a 429's `Retry-After` raises it, capped at 4 minutes).
-  Webhooks do not shorten a running backoff. Bundle objects keep serving their copies, marked
-  stale, and an empty object is filled stale from the refresher's last copy.
+- **Backoff.** After a failed read of `/workloads` or `/shared` the next attempt waits 15 s, 30 s,
+  60 s, 120 s, then 240 s (each jittered over its upper half; a 429's `Retry-After` raises it,
+  capped at 4 minutes). Webhooks do not shorten a running backoff. Bundle objects keep serving their
+  copies, marked stale, and an empty object is filled stale from the refresher's last copy.
 - **Token.** The Infisical access token is cached until 60 seconds before it expires; concurrent
   logins merge into one.
 - **Starting the loop.** A cron trigger (`*/5 * * * *` in production and staging, none locally)
@@ -405,12 +418,20 @@ base token the reader holds; on a miss a random wait and a re-read, then a claim
 request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
 exchanging again. A cached token STS refuses is dropped and exchanged once more; when STS refuses
 the fresh one too, a refusal marker stops every instance of the deployment from exchanging for
-that audience for 60 seconds (the client's denied recheck). The cache key is not secret: code that
-can write the same Runtime Cache partition (other deployments of the project in the same scope; a
-custom environment may share the preview partition) can stall a deployment's exchanges, never
-change which token it presents (the reader checks the claims, STS checks the signature);
-production has its own partition. There is no
-early refresh: the exchanged token keeps the base token's `exp`, so
+that audience for 60 seconds (the client's denied recheck). The cache key is not secret and the
+entry holds the whole exchanged token: code that can use the same Runtime Cache partition (other
+deployments of the project in the same environment) can read and present that token and can stall
+a deployment's exchanges, but cannot make a deployment present another deployment's token (the
+reader checks the claims, STS checks the signature). Within one environment a read gains nothing,
+since STS takes no deployment claim. Vercel documents separate partitions only for preview and
+production, so a custom environment may share the preview partition; the client therefore keeps a
+custom environment's token (a base token with `custom_environment_id`, or an `environment` other
+than `preview` and `production`) in instance memory only, never in the Runtime Cache, at the cost
+of one exchange per instance per base-token renewal for custom environments only. Encrypting
+custom-environment entries (AES-GCM under a key only that environment holds, the cache key as
+associated data) is the way to share them through the cache again later. The client refuses
+redirects on `oidc.vercel.com` (a 3xx fails the exchange), so the base token in the request body
+never follows one. There is no early refresh: the exchanged token keeps the base token's `exp`, so
 exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
 the request at once. When the cache is down (the claim marker does not read back), each request
 exchanges once and fails at once on a 429: about 100 requests per 65 seconds get a token and the
@@ -532,25 +553,33 @@ How a token finds its policy, in this order:
    `github:<repository id>`: a workflow file that no policy lists, or a listed one on another ref.
 3. **Exact bindings.** On that policy, `sub` must equal the immutable-format subject
    `repo:<owner>@<owner id>/<repo>@<repository id>:environment:<environment>` (a policy without an
-   `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, and `event_name` must be in
-   `events`. A failure is refused `identity_rejected` and audited under the policy's workload.
+   `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, the matched `jobWorkflowRefs`
+   entry must be pinned to that same `ref`, and `event_name` must be in `events`. A failure is
+   refused `identity_rejected` and audited under the policy's workload.
 
 Rules the loader enforces:
 
 - `jobWorkflowRefs` lists every workflow file whose jobs may use the policy, each as
   `<owner>/<repo>/.github/workflows/<file>@<ref>` with a ref from `refs`, all in the policy's own
-  repository, with no wildcard. A called reusable workflow is its own entry: its jobs carry its own
-  `job_workflow_ref`, while `ref` and `event_name` come from the calling run. STS does not check the
-  caller (`workflow_ref`): any workflow on a listed ref that calls a listed reusable workflow, with
-  a listed event and in the policy's environment, gets the bundle, so list a reusable workflow only
-  when every caller on `main` may hold it.
+  repository, with no wildcard. A token's `job_workflow_ref` must equal an entry whose ref equals the
+  token's own `ref`. A called reusable workflow is its own entry: its jobs carry its own
+  `job_workflow_ref`, at the ref it was called with, while `ref` and `event_name` come from the
+  calling run, so a run on one listed ref that calls a workflow pinned to another listed ref is
+  refused. STS does not check the caller (`workflow_ref`) or compare commits (`workflow_sha`,
+  `job_workflow_sha`): any workflow on a listed ref that calls a listed reusable workflow at that
+  ref, with a listed event and in the policy's environment, gets the bundle, so list a reusable
+  workflow only when every caller on that ref may hold it.
 - `events` is an allowlist of `push`, `schedule`, `workflow_dispatch` and `workflow_run`. No event
   that a fork author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
-  `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed, and a policy that
-  lists `workflow_run` lists no other event.
+  `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that
+  lists `workflow_run` lists no other event, binds an `environment`, and does not grant
+  `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
+  pull request started the upstream run, and STS cannot see that run.
 - A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`; a
   policy with token grants binds an `environment`.
-- The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`).
+- The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`). No
+  other kind of policy may use a `ci-` name, so a workload's name alone fixes its folder and a
+  stored bundle never moves between `/workloads` and `/ci`.
 
 Preconditions on the GitHub side, which STS cannot check:
 
@@ -565,8 +594,11 @@ Preconditions on the GitHub side, which STS cannot check:
   exactly as the policy does.
 
 Denial rows carry `repository_id`, `repository_owner_id`, `repository`, `environment`, `ref`,
-`event_name`, `job_workflow_ref` and `sub`, never the token and never per-run claims such as
-`run_id` (they would make every refusal its own row). A delivery writes the usual
+`event_name`, `job_workflow_ref` and `sub_format`, never the token, the raw `sub`, or per-run
+claims such as `run_id` (they would make every refusal its own row). `sub_format` names the
+subject's shape: `immutable:` or `name-only:` followed by `environment`, `ref` or `pull_request`
+for GitHub's default forms, `custom` for a customized template (which can carry per-run claims),
+or `absent`. A delivery writes the usual
 `ai.kilo.sts.bundle.delivered` row for the policy's workload, plus the verified token's
 `jobWorkflowRef`, `runId` and, when present, `runAttempt` as flat string attributes (a run id or
 attempt that is not 1-20 decimal digits is left out). GitHub tokens carry no job claim, so the row
@@ -972,11 +1004,13 @@ per request that arrives before the first call lands, since requests share only 
 set, never a pending call; while `SignerDO` fails, each request makes its own call (up to 3
 attempts) and nothing is cached.
 
-The identity's project role grants `readValue` on `/workloads/**` and `/shared/**` of its own
-environment in the `kilo` project, and no write. Before the first GitHub policy reaches an
-environment, the role also grants `readValue` on `/ci/**` there. Without that grant the `/ci` read
-fails, which fails every refresh in that environment, so every bundle there goes stale until the
-grant is added. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
+The identity's project role grants `describeSecret` and `readValue` on `/workloads/**` and
+`/shared/**` of its own environment in the `kilo` project, and no write. Infisical reads a value
+only with both: `readValue` requires `describeSecret` as well
+(https://infisical.com/docs/internals/permissions/project-permissions). Before the first GitHub
+policy reaches an environment, the role also grants both on `/ci/**` there. Without that grant the
+`/ci` read fails: CI bundles in that environment stay empty or go stale, and every other bundle
+refreshes as usual. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
 `/ci/minting`. The STS deploy job's own token lives outside it, under `/sts-deploy` (design 4.2).
 Before the first lease in an environment, the role also grants `dynamic-secrets` `lease` on
 `/dynamic/replica-read` and `/dynamic/ci-migration` there ([Database leases](#database-leases));
@@ -1056,9 +1090,9 @@ production. Complete and verify every item below before merging.
    and not the 4-day default. Verify: `wrangler queues info kilo-audit` prints the queue, and the
    Queues API shows `message_retention_period: 1209600`.
 3. **Infisical identity.** The production machine identity `c531ad9b-eec9-4f93-b173-e14d3d94f6ef`
-   exists in the `kilo` project with a role that grants `readValue` on `/workloads/**` and
-   `/shared/**` in `production` and no write. Verify: Infisical → Access Control → Machine
-   Identities → that id → Projects shows `kilo` with the role.
+   exists in the `kilo` project with a role that grants `describeSecret` and `readValue` on
+   `/workloads/**` and `/shared/**` in `production` and no write. Verify: Infisical → Access
+   Control → Machine Identities → that id → Projects shows `kilo` with the role.
 4. **Runtime secrets.** Each policy file's names exist in `production` under
    `/workloads/<workload>` or `/shared`. Verify: Infisical → `kilo` → `production` lists them. A
    missing name is reported in the bundle's `missing` list rather than failing the read, so this
@@ -1085,14 +1119,19 @@ Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, i
 **Before an environment's first GitHub policy deploys** (a `policy/ci-*.yaml` naming that
 environment), in this order:
 
-1. **`/ci` read grant.** Grant the environment's Infisical STS role `readValue` on `/ci/**` there.
-   Without it every refresh in that environment fails and every bundle there goes stale. Verify:
-   Infisical → Access Control → the identity's role lists `/ci/**` for that environment.
-2. **Deploy the policy.** The refresher's stored copy has no `/ci` folder yet, so the first refresh
-   after this deploy needs a fresh manager read for every workload in that environment, not only
-   the CI ones. If the manager is down at that moment, an empty bundle object has no stale copy to
-   fill from until a read succeeds; objects that already hold a bundle keep serving it. Deploy
-   while the manager is up and check the Infisical audit log for the read within 5 minutes.
+1. **`/ci` read grant.** Grant the environment's Infisical STS role `describeSecret` and
+   `readValue` on `/ci/**` there. Without both, the `/ci` read fails and the CI bundles there stay
+   empty (other bundles are not affected). Verify with the STS identity itself, before the deploy:
+   Infisical → `kilo` → Access Control → the STS identity → Assume Privileges
+   (https://infisical.com/docs/documentation/platform/access-controls/assume-privilege), then open
+   that environment's `/ci` and a `/ci/ci-<job>` folder below it: each lists its secrets, and no
+   value shows as hidden. Do not reveal a value. Exit the session. Infisical records the session's
+   actions under your own account.
+2. **Deploy the policy.** The refresher has no `/ci` copy yet, so the CI bundles in that
+   environment stay empty until the first `/ci` read after this deploy succeeds; other bundles are
+   not affected. After the deploy, check the Infisical audit log for the `/ci` read within 5
+   minutes, and that the Worker logs show no `sts: /ci read failed` and no
+   `sts: manager hid secret values`.
 
 ## Tests
 
@@ -1150,11 +1189,13 @@ npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/
 The script signs a job token the way GitHub does and checks that the listed workflow's job gets its
 bundle (its `/ci/ci-e2e-release` value and its `/shared` value, not the `/workloads` or `/ci/minting`
 decoys), that the refresher read `/ci`, and that a job of another workflow file, a `pull_request`
-job and a name-only subject each get 401 `identity_rejected`. It then waits for the
-`bundle.delivered` row, which must carry the job's workflow file, run id and attempt, and for the
-`bundle.denied` rows that name the refused `job_workflow_ref`, `event_name` and `sub` and no run id,
-and checks that no audit row carries a value. It needs empty local state: a bundle kept from an
-earlier run skips the refresher read, so run `rm -rf test/fixtures/e2e/.wrangler/state` before
+job, a name-only subject, a customized subject carrying the run id, and a run on the policy's
+second listed ref (`refs/heads/release`) calling the workflow pinned to `main` each get 401
+`identity_rejected`. It then waits for the `bundle.delivered` row, which must carry the job's
+workflow file, run id and attempt, and for the `bundle.denied` rows that name the refused
+`job_workflow_ref`, `event_name`, `ref` and `sub_format` and no run id or raw subject, and checks
+that no audit row carries a value. It needs empty local state: a bundle kept from an earlier run
+skips the refresher read, so run `rm -rf test/fixtures/e2e/.wrangler/state` before
 `wrangler dev`.
 
 **Local end-to-end check of database leases.** The probe policy also holds `replica-read`

@@ -27,6 +27,7 @@ export type Env = Omit<
   | 'STS'
   | 'STS_CANARY_ENABLED'
   | 'STS_URL'
+  | 'STS_ENVIRONMENT'
   | 'WEB_STS_CANARY_URL'
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;

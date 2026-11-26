@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run --config vitest.node.config.ts --project repo",
+    "dev": "wrangler dev -c wrangler.dev.jsonc",
+    "test": "pnpm run test:workers && pnpm run test:repo",
+    "test:workers": "vitest run",
+    "test:repo": "vitest run --config vitest.node.config.ts --project repo",
     "test:postgres": "vitest run --config vitest.node.config.ts --project db",
     "typecheck": "tsgo --noEmit",
     "db:up": "bash scripts/local-db.sh up",
@@ -15,16 +18,21 @@
   },
   "dependencies": {
     "@kilocode/sts-contracts": "workspace:*",
+    "@kilocode/uts-contracts": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "jose": "catalog:",
     "pg": "8.23.1",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

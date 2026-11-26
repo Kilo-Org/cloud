@@ -1,0 +1,53 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration for vitest-pool-workers. Every value is local and synthetic.
+  "name": "uts-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": false },
+  },
+  "vars": {
+    "UTS_ENVIRONMENT": "development",
+    "DO_JURISDICTION": "none",
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+  ],
+  // The mint Worker's SignerKeys entrypoint as the development feed Worker binds it, and as two
+  // callers it refuses; and the default entrypoint with the feed Worker's props, which serves no
+  // signer keys.
+  "services": [
+    {
+      "binding": "FEED_MINT",
+      "service": "uts-test",
+      "entrypoint": "SignerKeys",
+      "props": { "caller": "uts-feed-local" },
+    },
+    {
+      "binding": "OTHER_MINT",
+      "service": "uts-test",
+      "entrypoint": "SignerKeys",
+      "props": { "caller": "o11y" },
+    },
+    {
+      "binding": "PROPLESS_MINT",
+      "service": "uts-test",
+      "entrypoint": "SignerKeys",
+    },
+    {
+      "binding": "DEFAULT_MINT",
+      "service": "uts-test",
+      "props": { "caller": "uts-feed-local" },
+    },
+  ],
+}

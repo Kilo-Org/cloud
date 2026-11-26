@@ -1,6 +1,230 @@
-# UTS
+# UTS: the user token service
 
-The user token service (design section 5).
+UTS is the OAuth 2.1 authorization server for every token with a user subject. It runs as two
+Cloudflare Workers:
+
+| Worker | Package | Hostname (production / staging) | Placement | Serves |
+|---|---|---|---|---|
+| Mint Worker `uts` | `services/uts` | `uts.kiloapps.io` / `uts-staging.kiloapps.io` | `aws:eu-central-1` | Issuer metadata; later sign-in, token and account endpoints. Binds the signer objects |
+| Feed Worker `uts-feed` | `services/uts-feed` | `uts-feed.kiloapps.io` / `uts-feed-staging.kiloapps.io` | none | The UTS key set; later the revocation feed and the bootstrap endpoint |
+
+The issuer, key set URL and local ports of each environment live in
+`@kilocode/uts-contracts` (`UTS_ENDPOINTS`); verifiers read them from there.
+
+## Mint Worker
+
+- `GET /.well-known/oauth-authorization-server` serves RFC 8414 metadata: `issuer`, `jwks_uri`
+  (on the feed Worker), and empty `response_types_supported` and `grant_types_supported`. An
+  endpoint joins the document in the change that makes it answer, so no listed endpoint returns 404.
+- Placement runs the fetch handler next to the identity store's primary in Frankfurt:
+  `"placement": { "region": "aws:eu-central-1" }`, a Cloudflare placement hint
+  (https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region), which
+  runs the Worker in the data center with the lowest latency to that AWS region. Smart placement is
+  not used: it places only after it has seen traffic from several locations, and it can leave a
+  request where it arrived. Placement does not apply to RPC methods or named entrypoints, so token
+  minting stays a fetch handler.
+- RFC 9728 protected-resource metadata is not served yet: UTS becomes a protected resource with the
+  account API, which publishes its own document at `/.well-known/oauth-protected-resource` then.
+- Traces stay off in every block: a trace records Durable Object storage calls, and the signer
+  objects hold private keys. Logs stay on.
+
+### Signer objects
+
+`UtsSignerDO` has 16 instances, named `<environment>:signer:<00-15>`, created in the `eu`
+jurisdiction with the `weur` location hint (local development runs unscoped). A grant's tokens are
+signed by the object `signerForGrant(grantId)` picks: SHA-256 of the grant id, first 4 bytes,
+modulo 16.
+
+Each object:
+
+- generates its own Ed25519 keys and keeps them in its KV storage, one record, never in SQL rows
+  (a trace would record bound SQL values);
+- exposes only its RPC methods `publicKeys`, `sign` and `removeKid` and the platform's `alarm`.
+  Workers RPC serves every public method of the class, so every other member is `#`-private, and
+  no RPC method returns or accepts a private key (`test/runtime/signer.test.ts` calls the other
+  members through a stub and expects each call to fail);
+- refuses to create keys under any other name or in any other jurisdiction than its environment's,
+  and refuses stored keys in any object but that signer's object of its environment: the id must
+  be the one the signer's name gives in the environment's jurisdiction, a check that needs no name
+  on the id, so it also holds when an alarm starts the object. A refused object answers every call
+  with `misconfigured`, a deploy error that no retry fixes;
+- publishes the public halves under `uts-token-<signer>-<RFC 7638 thumbprint>`;
+- signs with `sign(claims)`: a compact JWS with header `alg: EdDSA`, `typ: at+jwt`, `kid`. It refuses
+  a claim set with another issuer or environment, an `iat` more than 60 seconds from now, an `exp`
+  at or before now, or an `exp` more than 1 hour ahead, the longest UTS token lifetime.
+  `src/keys/claims.ts` is the signer's admission check; the published claim contract is phase 2's
+  `AccessTokenClaimsSchema` (`@kilocode/sts-contracts`), and every claim set the signer accepts
+  also passes it;
+- rotates by alarm: a key signs for 30 days. Each rotation creates the next key at once, to sign
+  30 days later, so every signer always publishes a current and a next key, and the next key is
+  published at least 7 days before it signs (a new object publishes its first two keys at once, the
+  second 30 days ahead). A retired key stays published for 1 hour and 10 minutes, until the last
+  token it signed has been expired for 10 minutes. That is two alarms per 30-day cycle. A change
+  whose alarm never ran (its retries ran out) is applied by the next `publicKeys` or `sign` call,
+  and `publicKeys` also sets a lost alarm again;
+- removes a key at once with `removeKid(kid)`, a direct call, not an alarm. A removed current key
+  is replaced by the published next key, which verifiers already hold, and a new next key is
+  created to sign 30 days later; a removed next key is replaced by a new one published at least 7
+  days before it signs. When the signer's storage itself is exposed, remove the next key first and
+  the current key second: the second removal signs with the key the first removal created.
+  Verifiers hold that key once it has been in the key set for 5 minutes and 17 seconds (the feed
+  Worker's 17 seconds plus the 5-minute `max-age`, while every signer read succeeds), so wait that
+  long between the two removals, and before the second one check that the public key set
+  (`/.well-known/jwks.json` on the feed Worker) lists the signer's new next `kid`; removing at once
+  leaves that signer's new tokens unverifiable for up to that time. The result is
+  the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The object stores the
+  entry with the key change and keeps it until `revokeUntil`, so a repeated call for the same `kid`
+  (after a lost answer, or an alarm write that failed behind a stored removal) answers the same
+  entry and changes nothing. The revocation feed writes it once that feed exists. No route calls
+  `removeKid` yet: it stays unreachable until the revocation-feed slice adds the operator route,
+  which audits and alerts on each removal;
+- logs each rotation and removal as `uts.signer.key_event` (`SignerKeyEvent`, public `kid`s only),
+  the event the UTS audit pipeline will carry (design 8.3).
+
+### The SignerKeys entrypoint and the key-set shards
+
+`signerKeys()` on the named entrypoint `SignerKeys` (`UTS_SIGNER_KEYS_ENTRYPOINT`, in
+`src/signer-keys.ts`) returns plain data (`SignerKeysReadSchema`): `{ status: 'refused' }`,
+`{ status: 'misconfigured' }` when its key-set shard refused to load, or
+`{ status: 'answered', answer }` where `answer` is `{ signers }`, every signer exactly once
+(`SignerKeysAnswerSchema`): its keys with `readAt`, the time they were read from the signer
+object, or its failure, `misconfigured` (the object refused to load) or `unavailable` (the call
+failed after its retries). The feed Worker takes every signer that has keys.
+
+The entrypoint does not read the signer objects itself. It asks one of 8 key-set shards,
+`UtsKeySetDO` (`src/dos/UtsKeySetDO.ts`), named `<environment>:keyset:<0-7>` and created in the
+`eu` jurisdiction with the `weur` hint, like the signer objects; a shard under another name or
+outside its jurisdiction answers `misconfigured`. Each isolate draws its shard at random once, so
+feed isolates spread evenly over the 8 shards. Each shard holds:
+
+- a copy of its last combined answer, in memory, served for 2 seconds, with one read in flight; a
+  request that needs that read polls for it. The 16 signer objects therefore see at most 8 reads
+  per 2 seconds, however many feed isolates ask;
+- every signer's last good keys, in memory and in its KV storage (public keys only). A signer whose
+  call fails, or whose object refuses to load, answers those keys with their own `readAt` while
+  they are under 24 hours old, and its failure after that; each failure is logged with the read
+  time of the keys that stood in. The shard stores them when a signer's kids change and otherwise
+  at most once per 10 minutes, so a restarted shard (a deploy, an eviction) still answers a failing
+  signer's keys, with a `readAt` at most 10 minutes earlier than their last good read: a restart
+  can shorten a hold, never lengthen it. A cold feed isolate whose shard also restarted therefore
+  never builds a key set without them. Only a shard that has never read a signer, which happens
+  only while a new deployment's shards make their first reads, has nothing to stand in for it.
+
+Every signer call of a read, retries included, ends within 5 seconds, and every entrypoint call to
+its shard, retries included, within 8 seconds, so a hung object cannot hold a read past the feed
+Worker's 10-second read guard. Each RPC result, from a signer and from a shard, is copied out and
+disposed.
+
+It answers only a service binding to this entrypoint whose `props.caller` is the feed Worker's
+deployed name for its own environment, and refuses every other binding, with another caller or
+without props, before any shard call. A service binding delivers `props` to a named entrypoint, as
+for the STS broker; a deployed mint Worker did not see them on its default entrypoint, either as a
+plain handler object or as a `WorkerEntrypoint` class. The default entrypoint's fetch handler
+serves no signer keys: a request to the old `/internal/signer-keys` path gets `404 not_found` like
+any unknown path. Placement does not apply to a named entrypoint, so the entrypoint runs where the
+feed Worker runs and makes one call to its shard in the EU per read.
+`test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
+UTS Durable Object class or binds the mint Worker, any feed binding at an entrypoint other than
+`SignerKeys` or whose caller is not the feed block's own name, any config but `wrangler.dev.jsonc`
+that runs the development entry, and any drift in the UTS configs (names, `eu` jurisdiction,
+placement, traces, the development config's deploy guard).
+
+## Local development
+
+```sh
+cd services/uts && pnpm exec wrangler dev -c wrangler.dev.jsonc --persist-to ../../.wrangler-uts
+cd services/uts-feed && pnpm exec wrangler dev --env local --persist-to ../../.wrangler-uts
+curl -s http://localhost:8801/.well-known/jwks.json
+```
+
+Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
+signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
+only `wrangler.dev.jsonc` runs, and the claim set must name the development issuer. That config
+cannot be deployed: its build command, which Wrangler runs before `dev`, `deploy` and
+`versions upload` with `WRANGLER_COMMAND` set to the command, fails for every command but `dev`.
+`wrangler.jsonc` holds only the production and staging blocks.
+
+## Tests
+
+- `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
+  `wrangler.test.jsonc`): key lifecycle with time travel, signing and verification with `jose`, key
+  persistence across restarts, rotation by alarm, an overdue rotation and a lost alarm, emergency
+  removal by direct call, the RPC surface, the SignerKeys entrypoint over real service bindings
+  (its caller check) and the key-set shards (their names, their 2-second copy with one read in
+  flight, at most one signer read per shard per 2 seconds under many concurrent isolates, and the
+  held keys of a failed signer), metadata.
+- `pnpm test:repo`: the repository config check (`test/repo`), with no database.
+- `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
+  tests (`test/db`, see "Local database and tests").
+
+## Staging proof run (before merge)
+
+workerd implements neither jurisdictions nor placement, so these checks run on staging before the
+pull request merges (design 2.4, 5.7). The pull request stays held, out of the merge queue, until
+the results of all three checks are in its body. Deploy both Workers from the branch, the mint
+Worker first, and start a tail of the mint Worker before the first key-set read, which creates all
+16 signer objects:
+
+```sh
+cd services/uts && pnpm exec wrangler deploy --env staging
+cd ../uts-feed && pnpm exec wrangler deploy --env staging
+cd ../uts
+pnpm exec wrangler tail uts-staging --format json > /tmp/uts-staging-tail.json &
+curl -sS -D - https://uts-feed-staging.kiloapps.io/.well-known/jwks.json -o /tmp/jwks.json
+jq '.keys | length' /tmp/jwks.json
+curl -sS https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server
+```
+
+Expect `200`, `cache-control: max-age=300, stale-if-error=<86100 or less>`, `32`, and metadata
+naming `https://uts-staging.kiloapps.io` and the feed key set.
+
+1. **`eu` jurisdiction and location hint together (design 5.7).** Each signer object logs
+   `uts.signer.bootstrapped` once, when it creates its keys, and each key-set shard logs
+   `uts.key_set_shard.started` once per start, both with the jurisdiction and the data center it
+   runs in; an object outside `eu` refuses, and the key set answers 500:
+
+   ```sh
+   jq -r '.logs[]?.message[]? | select(type == "string" and (contains("uts.signer.bootstrapped") or contains("uts.key_set_shard.started")))' /tmp/uts-staging-tail.json | jq -c '{event, signer, shard, jurisdiction, colo}'
+   ```
+
+   Expect 16 signer lines and a line for each shard the read reached (8 once enough feed isolates
+   have asked), each `"jurisdiction":"eu"` with a `colo` in the EU. The jurisdiction is enforced;
+   the `weur` hint is best effort, so an object can land in another EU data center
+   (https://developers.cloudflare.com/durable-objects/reference/data-location/#provide-a-location-hint).
+   Record every colo in the pull request.
+
+2. **Key persistence across real restarts (design 5.7).** A deploy restarts every object. Record
+   the kids, redeploy the mint Worker, wait past the feed Worker's 17-second window, and compare;
+   the tail must show no new `uts.signer.bootstrapped` line:
+
+   ```sh
+   jq -r '.keys[].kid' /tmp/jwks.json | sort > /tmp/kids-before
+   pnpm exec wrangler deploy --env staging
+   sleep 20
+   curl -sS https://uts-feed-staging.kiloapps.io/.well-known/jwks.json | jq -r '.keys[].kid' | sort | diff /tmp/kids-before - && echo same
+   ```
+
+3. **The mint path runs in the placed region (design 5.2).** Cloudflare adds a `cf-placement`
+   header (`remote-<colo>` or `local-<colo>`) to the responses of a placed Worker's fetch handler.
+   Read it from the public metadata response:
+
+   ```sh
+   curl -sS -o /dev/null -D - https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server | grep -i '^cf-placement'
+   ```
+
+   Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt). The signer-keys
+   read is outside this check: it runs on the `SignerKeys` named entrypoint, which placement does
+   not cover, so it runs where the feed Worker runs. The key-set request above proves it answers
+   the feed Worker (`32` keys).
+
+## Deploys
+
+Both Workers deploy through `.github/workflows/deploy-workers.yml`, which discovers every
+`services/*/wrangler.jsonc`. The feed Worker's service binding names the mint Worker, so when both
+change, as on the first deploy of an environment, detection takes them out of the parallel matrix:
+the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` deploys
+`services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
+order). A change to only one of them deploys in the matrix.
 
 ## Identity store
 

@@ -2,9 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // `pnpm test` runs the repo project, which needs no database. It has no files until the
-    // Worker checks land beside these tests.
-    passWithNoTests: true,
+    // `pnpm test` runs the repo project, which needs no database.
     projects: [
       {
         test: {

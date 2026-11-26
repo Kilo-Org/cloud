@@ -46,6 +46,11 @@ on:
         required: false
         default: 'false'
         type: string
+      deploy_uts_feed_after_uts:
+        description: 'Deploy uts and then uts-feed ahead of the parallel matrix'
+        required: false
+        default: 'false'
+        type: string
       source_sha:
         description: 'Exact tested commit to deploy (defaults to the caller SHA)'
         required: false
@@ -61,6 +66,8 @@ on:
         value: ${{ jobs.detect-changes.outputs.matrix }}
       deploy-cloud-agent-after-session-ingest:
         value: ${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}
+      deploy-uts-feed-after-uts:
+        value: ${{ jobs.detect-changes.outputs.deploy-uts-feed-after-uts }}
 
 permissions:
   contents: read
@@ -234,6 +241,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       deploy-cloud-agent-after-session-ingest: ${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-ingest }}
+      deploy-uts-feed-after-uts: ${{ steps.set-matrix.outputs.deploy-uts-feed-after-uts }}
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -398,13 +406,24 @@ jobs:
           fi
           echo "deploy-cloud-agent-after-session-ingest=$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" >> "$GITHUB_OUTPUT"
 
-          # The ordered deployment path owns both workers: session-ingest runs as its
-          # own job and cloud-agent-next needs that job, so neither may also sit in
-          # the parallel matrix.
+          # The UTS feed Worker binds the UTS mint Worker, so when both change (always on the
+          # first deploy of an environment), uts deploys first and uts-feed only after it succeeds.
+          DEPLOY_UTS_FEED_AFTER_UTS=false
+          if [[ " ${CHANGED[*]} " == *" services/uts "* && " ${CHANGED[*]} " == *" services/uts-feed "* ]]; then
+            DEPLOY_UTS_FEED_AFTER_UTS=true
+          fi
+          echo "deploy-uts-feed-after-uts=$DEPLOY_UTS_FEED_AFTER_UTS" >> "$GITHUB_OUTPUT"
+
+          # Each ordered deployment path owns both of its workers: the first runs as its own
+          # job and the second needs that job, so neither may also sit in the parallel matrix.
           FILTERED=()
           for dir in "${CHANGED[@]}"; do
             if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" = true ] \
               && { [ "$dir" = services/session-ingest ] || [ "$dir" = services/cloud-agent-next ]; }; then
+              continue
+            fi
+            if [ "$DEPLOY_UTS_FEED_AFTER_UTS" = true ] \
+              && { [ "$dir" = services/uts ] || [ "$dir" = services/uts-feed ]; }; then
               continue
             fi
             FILTERED+=("$dir")
@@ -749,3 +768,133 @@ jobs:
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: pnpm run sentry:sourcemaps
+
+  deploy-uts:
+    # Guard: this reusable workflow can be invoked from a fork, and the job
+    # deploys to the target environment with inherited repo secrets. Only the
+    # canonical repo may run it. The ordered path comes from the detection call,
+    # because a deploy call does not run detection.
+    if: github.repository == 'Kilo-Org/cloud' && inputs.deploy_uts_feed_after_uts == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    environment: ${{ inputs.target_environment }}
+    name: Deploy uts before uts-feed
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: services/uts
+        # Only the Worker's dependency closure plus the root project; a recursive
+        # workspace install links every unrelated package as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          # A registry download that fails on the runner leaves a lifecycle script
+          # (such as the workerd postinstall) failed; a plain rerun repeats it.
+          for attempt in 1 2 3; do
+            pnpm install --frozen-lockfile "${filters[@]}" && exit 0
+            echo "::warning::pnpm install failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: Deploy uts
+        id: deploy
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/uts
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+      - name: Deploy uts (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/uts
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+  deploy-uts-feed-after-uts:
+    needs: deploy-uts
+    # GitHub skips a dependent job when a needed job fails: uts-feed never
+    # deploys after an unsuccessful uts deployment.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      inputs.deploy_uts_feed_after_uts == 'true' &&
+      needs.deploy-uts.result == 'success'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    environment: ${{ inputs.target_environment }}
+    name: Deploy uts-feed after uts
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: services/uts-feed
+        # Only the Worker's dependency closure plus the root project; a recursive
+        # workspace install links every unrelated package as well.
+        run: |
+          filters=(--filter '{.}...' --filter kilocode-monorepo)
+          if [ -f wrapper/package.json ]; then
+            filters+=(--filter '@kilocode/cloud-agent-wrapper...')
+          fi
+          # A registry download that fails on the runner leaves a lifecycle script
+          # (such as the workerd postinstall) failed; a plain rerun repeats it.
+          for attempt in 1 2 3; do
+            pnpm install --frozen-lockfile "${filters[@]}" && exit 0
+            echo "::warning::pnpm install failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: Deploy uts-feed
+        id: deploy
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/uts-feed
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+
+      - name: Deploy uts-feed (retry)
+        if: steps.deploy.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/uts-feed
+          preCommands: |
+            if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
+          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}

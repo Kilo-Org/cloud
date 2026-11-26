@@ -60,10 +60,11 @@ test('a web .env change selects ai-gateway, which builds with those files', () =
   assert.ok(result.packages.includes('ai-gateway'));
 });
 
-test('a Worker config change in any workspace selects the STS repository suite', () => {
+test('a Worker config change in any workspace selects the STS and UTS repository suites', () => {
   const workers = [
     ...items,
     workspace('cloudflare-sts', 'services/sts'),
+    workspace('cloudflare-uts', 'services/uts'),
     workspace('o11y', 'services/o11y'),
   ];
   const run = changedFiles =>
@@ -75,6 +76,7 @@ test('a Worker config change in any workspace selects the STS repository suite',
     'services/agent/wrapper/wrangler.toml',
   ]) {
     assert.ok(run([file]).dirs.includes('services/sts'), file);
+    assert.ok(run([file]).dirs.includes('services/uts'), file);
   }
   assert.deepEqual(run(['services/o11y/src/index.ts']).dirs, ['services/o11y']);
 });

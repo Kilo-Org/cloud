@@ -160,11 +160,11 @@ reached an audit row, and times the mint path.
 | `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
 
 Each call verifies at most one DPoP proof before the grant read. The grant statement records the
-proof's `jti` in `uts.dpop_proofs` under the grant (primary key grant id and `jti`), so a second
-use of the proof fails that statement with `dpop_replay`, which answers `invalid_dpop_proof`. A
-first-party refresh or introspection records it under the grant the token names; a code exchange
-under the grant the code creates, whose id the endpoint derives from the code
-(`grantIdOfCode`), so every attempt with one code names one grant. A row stays 121 seconds: a
+proof's `jti` in `uts.dpop_proofs` under the RFC 7638 thumbprint of the proof's key (primary key
+`jkt` and `jti`), so a second use of the proof fails that statement with `dpop_replay`, which
+answers `invalid_dpop_proof`. A proof names its key, method and URL, not a grant, so its `jti`
+is scoped to the key: a proof accepted for one grant of a device key is refused at every other
+grant of that key, and the `htu` check keeps it to one endpoint. A row stays 121 seconds: a
 proof's `iat` is at most 60 seconds ahead and it is accepted until 60 seconds after its `iat`. The
 statement records a `jti` only once the grant and the key match, so a caller without the device
 key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant id><32 random

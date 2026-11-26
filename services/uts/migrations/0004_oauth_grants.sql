@@ -9,7 +9,7 @@
 --   (`uts.read_refresh_grant`, `uts.read_third_party_refresh_token`; `test/db/index-probes.test.ts`
 --   plans their bodies).
 -- * `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour.
--- * Each statement that accepts a DPoP proof records the proof's `jti` under its grant
+-- * Each statement that accepts a DPoP proof records the proof's `jti` under the proof's key
 --   (`uts.dpop_proofs`), so a proof is accepted once (RFC 9449 section 11.1, design 5.7).
 -- * An audit row never holds a token value: a JWT is named by its `jti`, an opaque value by the
 --   first 8 characters of the base64url SHA-256 hash (`uts.credential_reference`).
@@ -34,18 +34,19 @@ ALTER TABLE uts.authorization_codes
 CREATE INDEX authorization_codes_consent_idx ON uts.authorization_codes (consent_id)
   WHERE consent_id IS NOT NULL;
 
--- The `jti` of every DPoP proof a statement accepted, under the grant the proof is for: the grant
--- a first-party refresh or introspection names, or the grant a code exchange creates (its id comes
--- from the code, so every attempt with one code names one grant). The primary key refuses a
--- second use of a proof. A proof's `iat` is at most 60 seconds ahead of the Worker clock and is
--- accepted until 60 seconds after it, so no clock accepts a proof 2 minutes after the statement
--- that took it; the row stays 1 second longer. No foreign key: its check would lock the grant row
--- on every refresh.
+-- The `jti` of every DPoP proof a statement accepted, under the RFC 7638 thumbprint of the
+-- proof's key. A token-endpoint proof names its key, its method and its URL (`htm`, `htu`), not a
+-- grant, so the key is the scope of its `jti`: one device key can hold several grants, and a proof
+-- accepted for one of them must not be accepted for another. The Worker accepts a proof only at
+-- the endpoint its `htu` names, so the key and the `jti` identify one proof at one endpoint. The
+-- primary key refuses a second use of a proof. A proof's `iat` is at most 60 seconds ahead of the
+-- Worker clock and is accepted until 60 seconds after it, so no clock accepts a proof 2 minutes
+-- after the statement that took it; the row stays 1 second longer.
 CREATE TABLE uts.dpop_proofs (
-  grant_id uuid NOT NULL,
+  jkt uts.sha256 NOT NULL,
   jti text NOT NULL CHECK (length(jti) BETWEEN 16 AND 128),
   expires_at timestamptz NOT NULL,
-  CONSTRAINT dpop_proofs_pkey PRIMARY KEY (grant_id, jti)
+  CONSTRAINT dpop_proofs_pkey PRIMARY KEY (jkt, jti)
 );
 GRANT SELECT ON uts.dpop_proofs TO uts_app;
 
@@ -447,7 +448,7 @@ $$;
 
 -- POST /token with `authorization_code`: consumes the code and creates the grant in one
 -- statement. A first-party client gets a device session and a DPoP-bound refresh grant (the code
--- and the proof must name the same key, and the proof's `jti` is recorded under the grant); a
+-- and the proof must name the same key, and the proof's `jti` is recorded under that key); a
 -- third-party client gets a grant family and its first rotating refresh token. The caller derives
 -- the new grant id from the code, so every attempt with one code names one grant; the grant id is
 -- the `sid` of every token.
@@ -565,8 +566,8 @@ BEGIN
   END IF;
 
   IF code.client_kind = 'first_party' THEN
-    INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
-    VALUES (p_grant_id, p_dpop_jti, now() + interval '121 seconds')
+    INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+    VALUES (p_dpop_jkt, p_dpop_jti, now() + interval '121 seconds')
     ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
     IF NOT FOUND THEN
       outcome := 'dpop_replay';
@@ -699,7 +700,7 @@ $$;
 
 -- POST /token with `refresh_token` for a first-party client: the caller verified the DPoP proof
 -- and passes its key thumbprint, which must be the grant's, and its `jti`, which the statement
--- records under the grant. A mismatch writes a denied audit row; a recorded `jti` is a replay.
+-- records under the key. A mismatch writes a denied audit row; a recorded `jti` is a replay.
 -- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `dpop_mismatch`,
 -- `dpop_replay`.
 CREATE FUNCTION uts.refresh_first_party(
@@ -763,8 +764,8 @@ BEGIN
     RETURN;
   END IF;
 
-  INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
-  VALUES (grant_row.id, p_dpop_jti, now() + interval '121 seconds')
+  INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+  VALUES (grant_row.dpop_jkt, p_dpop_jti, now() + interval '121 seconds')
   ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
   IF NOT FOUND THEN
     outcome := 'dpop_replay';
@@ -1045,7 +1046,7 @@ $$;
 
 -- POST /introspect (RFC 7662) with a refresh token: `active` while the token is active and was
 -- issued to `p_client_id`. A first-party grant also needs the key thumbprint of a verified DPoP
--- proof, and the statement records the proof's `jti` under the grant (`dpop_replay` when it was
+-- proof, and the statement records the proof's `jti` under the key (`dpop_replay` when it was
 -- recorded before). `inactive` otherwise. It writes no audit row.
 CREATE FUNCTION uts.introspect_refresh_token(
   p_token_hash bytea,
@@ -1089,8 +1090,8 @@ BEGIN
       RETURN NEXT;
       RETURN;
     END IF;
-    INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
-    VALUES (grant_row.id, p_dpop_jti, now() + interval '121 seconds')
+    INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+    VALUES (grant_row.dpop_jkt, p_dpop_jti, now() + interval '121 seconds')
     ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
     IF NOT FOUND THEN
       outcome := 'dpop_replay';
@@ -1207,8 +1208,8 @@ BEGIN
   RETURN NEXT;
 
   DELETE FROM uts.dpop_proofs AS proof
-  WHERE (proof.grant_id, proof.jti) IN (
-    SELECT stale.grant_id, stale.jti FROM uts.dpop_proofs AS stale
+  WHERE (proof.jkt, proof.jti) IN (
+    SELECT stale.jkt, stale.jti FROM uts.dpop_proofs AS stale
     WHERE stale.expires_at < now()
     LIMIT batch
   );

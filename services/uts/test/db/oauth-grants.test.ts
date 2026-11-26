@@ -454,7 +454,7 @@ describe('code exchange', () => {
     expect(result).toMatchObject({ outcome: 'issued', scopes: ['kilo-chat:messages.read'] });
   });
 
-  it('records the proof jti under the grant the code creates, so each proof works once', async () => {
+  it('records the proof jti under the proof key, so each proof works once', async () => {
     const accountId = await insertAccount(owner);
     const fixture = await issueFirstPartyCode(accountId);
     const input = exchangeInput(fixture);
@@ -469,8 +469,8 @@ describe('code exchange', () => {
     });
     expect(fresh.outcome).toBe('issued');
     const stored = await owner.query(
-      'SELECT count(*)::int AS proofs FROM uts.dpop_proofs WHERE grant_id = $1',
-      [input.grantId]
+      'SELECT count(*)::int AS proofs FROM uts.dpop_proofs WHERE jkt = $1',
+      [fixture.jkt]
     );
     expect(stored.rows).toEqual([{ proofs: 2 }]);
   });
@@ -694,7 +694,7 @@ describe('first-party refresh', () => {
       ...overrides,
     });
 
-  it('records the proof jti under the grant and refuses it a second time', async () => {
+  it('records the proof jti under the proof key and refuses it a second time', async () => {
     const accountId = await insertAccount(owner);
     const grant = await firstPartyGrant(accountId);
     const proof = proofOf(grant.jkt);
@@ -704,15 +704,32 @@ describe('first-party refresh', () => {
     expect(await auditRows(accountId)).toHaveLength(before);
     const stored = await owner.query<{ kept: number }>(
       `SELECT extract(epoch FROM expires_at - now()) AS kept FROM uts.dpop_proofs
-       WHERE grant_id = $1 AND jti = $2`,
-      [grant.grantId, proof.jti]
+       WHERE jkt = $1 AND jti = $2`,
+      [grant.jkt, proof.jti]
     );
     expect(Number(stored.rows[0].kept)).toBeGreaterThan(119);
     expect(Number(stored.rows[0].kept)).toBeLessThanOrEqual(121);
-    // The same jti under another grant is another proof.
+    // The same jti under another key is another proof.
     const other = await firstPartyGrant(accountId);
     const sameJti = await refresh(other, { proof: { jkt: other.jkt, jti: proof.jti } });
     expect(sameJti.outcome).toBe('issued');
+  });
+
+  it('refuses a proof accepted for one grant of a device key at another grant of that key', async () => {
+    const accountId = await insertAccount(owner);
+    const first = await firstPartyGrant(accountId);
+    // A second sign-in on the same device: its code and grant bind the same key.
+    const fixture = await issueFirstPartyCode(accountId, {
+      client: { kind: 'first_party', clientId: 'kilo-cli', dpopJkt: first.jkt },
+    });
+    const second = exchangeInput({ ...fixture, jkt: first.jkt });
+    expect((await grants.exchangeCode(second)).outcome).toBe('issued');
+    const proof = proofOf(first.jkt);
+    expect((await refresh(first, { proof })).outcome).toBe('issued');
+    expect(await refresh({ ...second, jkt: first.jkt }, { proof })).toEqual({
+      outcome: 'dpop_replay',
+    });
+    expect((await refresh({ ...second, jkt: first.jkt })).outcome).toBe('issued');
   });
 
   it('records no jti for a proof of another key', async () => {
@@ -1323,8 +1340,8 @@ describe('OAuth row maintenance', () => {
     );
     const staleJti = randomUUID();
     await owner.query(
-      `INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at) VALUES ($1, $2, now() - interval '1 second')`,
-      [grant.grantId, staleJti]
+      `INSERT INTO uts.dpop_proofs (jkt, jti, expires_at) VALUES ($1, $2, now() - interval '1 second')`,
+      [grant.jkt, staleJti]
     );
 
     const first = await counts();
@@ -1360,10 +1377,10 @@ describe('OAuth row maintenance', () => {
     const feed = 'SELECT 1 FROM uts.revocations WHERE subject_id = $1';
     expect(await exists(feed, [staleFeed])).toBe(false);
     expect(await exists(feed, [ended.familyId])).toBe(true);
-    const proof = 'SELECT 1 FROM uts.dpop_proofs WHERE grant_id = $1 AND jti = $2';
-    expect(await exists(proof, [grant.grantId, staleJti])).toBe(false);
+    const proof = 'SELECT 1 FROM uts.dpop_proofs WHERE jkt = $1 AND jti = $2';
+    expect(await exists(proof, [grant.jkt, staleJti])).toBe(false);
     if (grant.binding.kind !== 'first_party') throw new Error('first-party binding expected');
-    expect(await exists(proof, [grant.grantId, grant.binding.proof.jti])).toBe(true);
+    expect(await exists(proof, [grant.jkt, grant.binding.proof.jti])).toBe(true);
     expect(
       (
         await grants.refreshFirstParty({

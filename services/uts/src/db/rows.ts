@@ -406,7 +406,7 @@ export const RevocationRowSchema = z.strictObject({
 });
 
 export const DpopProofRowSchema = z.strictObject({
-  grant_id: uuid,
+  jkt: sha256,
   jti: z.string(),
   expires_at: timestamp,
 });

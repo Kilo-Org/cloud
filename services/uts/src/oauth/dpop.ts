@@ -6,7 +6,7 @@ import { z } from 'zod';
 /**
  * DPoP proof verification at the authorization server (RFC 9449, section 4.3). The token
  * endpoint verifies one proof per call, before it reads the grant; the grant statement then
- * records the proof's `jti` under the grant, so a proof is accepted once (design 5.7).
+ * records the proof's `jti` under the proof's key, so a proof is accepted once (design 5.7).
  */
 
 /** Design 7 allows 60 seconds of clock skew; a proof is accepted while its `iat` is that close. */

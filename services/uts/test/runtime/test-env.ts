@@ -7,12 +7,14 @@ import type {
 import { readConfig, type Env, type UtsConfig } from '../../src/env';
 import type { SignInMethods } from '../../src/signin/flows';
 import { readSignInConfig } from '../../src/signin/providers/config';
+import type { SubjectRevocation } from '../../src/subjects/entrypoint';
 import type { TicketRedeemer } from '../../src/tickets/redeemer';
 
 /**
  * The bindings `wrangler.test.jsonc` adds for the tests: the mint Worker's SignerKeys entrypoint
  * as three callers, its FeedReads entrypoint as the feed Worker and as another caller, its
- * default entrypoint with the feed Worker's props, and its PatLookup entrypoint as three callers.
+ * default entrypoint with the feed Worker's props, its PatLookup entrypoint as three callers, and
+ * its SubjectRevocation entrypoint as three callers.
  */
 export type TestEnv = Env & {
   FEED_MINT: SignerKeysBinding;
@@ -26,6 +28,9 @@ export type TestEnv = Env & {
   OTHER_READS: FeedReadsBinding;
   TICKET_REDEEMER: Service<TicketRedeemer>;
   OTHER_REDEEMER: Service<TicketRedeemer>;
+  SUBJECT_REVOCATION: Service<SubjectRevocation>;
+  OTHER_SUBJECT_REVOCATION: Service<SubjectRevocation>;
+  PROPLESS_SUBJECT_REVOCATION: Service<SubjectRevocation>;
 };
 
 // The runtime env is untyped here; this binds it to the bindings `wrangler.test.jsonc` declares

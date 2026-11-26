@@ -20,19 +20,25 @@ import { jsonResponse } from './responses';
 import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
 import type { SignInMailer } from './signin/email/mailer';
+import { subjectDeps } from './subjects/deps';
+import { handleInternalRequest } from './subjects/routes';
+import { type ServiceTokenVerifier, noServiceTokenVerifier } from './subjects/service-tokens';
 import type { SignerAccess } from './token/mint';
 
 /**
  * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
- * signer for the local end-to-end run, the development fixture scopes on top of the scope registry
- * and a recording mail port for the email sign-in (src/dev.ts). The deployed options are the
- * sign-in pages, the grant's signer, the registry alone and no mail port.
+ * signer for the local end-to-end run, the development fixture scopes on top of the scope registry,
+ * a recording mail port for the email sign-in and a stand-in STS token check for the `/internal/`
+ * routes (src/dev.ts). The deployed options are the sign-in pages, the grant's signer, the
+ * registry alone, no mail port, and no STS token check, so every `/internal/` route answers 503
+ * until the mint Worker carries `@kilocode/verify`.
  */
 export type MintOptions = {
   authorizationHandoff: HandoffChoice | null;
   signer: SignerAccess | null;
   scopes: ScopeRegistry;
   mailer: SignInMailer | null;
+  serviceTokens: ServiceTokenVerifier;
 };
 
 const DEPLOYED: MintOptions = {
@@ -40,6 +46,7 @@ const DEPLOYED: MintOptions = {
   signer: null,
   scopes: utsScopeEntry,
   mailer: null,
+  serviceTokens: noServiceTokenVerifier,
 };
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
@@ -79,11 +86,13 @@ function probeDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): PatProbe
  * The mint Worker's fetch handler. Placement runs it next to the identity store's primary, which
  * applies to fetch handlers only, not to RPC methods or named entrypoints (design 5.2). It serves
  * the issuer metadata; the OAuth endpoints, the sign-in pages, the device grant and the tickets
- * once the identity store is bound (src/oauth/routes.ts); and the account API
- * (src/account/routes.ts) and the PAT probe route (src/pat/probe.ts) once their identity-store
- * configs are bound. Signer keys are served by the `SignerKeys` entrypoint (src/signer-keys.ts),
- * and PAT lookups for verifiers by the `PatLookup` entrypoint (src/pat/entrypoint.ts), never by
- * this handler.
+ * once the identity store is bound (src/oauth/routes.ts); the `/internal/` routes of the web app's
+ * outbox (src/subjects/routes.ts), which answer 503 until both an STS token check and the identity
+ * store exist; and the account API (src/account/routes.ts) and the PAT probe route
+ * (src/pat/probe.ts) once their identity-store configs are bound. Signer keys are served by the
+ * `SignerKeys` entrypoint (src/signer-keys.ts), PAT lookups for verifiers by the `PatLookup`
+ * entrypoint (src/pat/entrypoint.ts) and Worker subject operations by the `SubjectRevocation`
+ * entrypoint (src/subjects/entrypoint.ts), never by this handler.
  */
 export async function handleRequest(
   request: Request,
@@ -126,6 +135,11 @@ export async function handleRequest(
     const response = await handleOAuthRequest(request, pathname, oauth.deps);
     if (response !== null) return response;
   }
+  const internal = await handleInternalRequest(request, pathname, {
+    serviceTokens: options.serviceTokens,
+    subjects: subjectDeps(env, ctx, config),
+  });
+  if (internal !== null) return internal;
   if (account !== null) {
     const response = await handleAccountRequest(request, pathname, account);
     if (response !== null) return response;

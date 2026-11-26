@@ -5,6 +5,7 @@ export { FeedReads } from './feed/reads';
 export { UtsFeedDO } from './feed/UtsFeedDO';
 export { PatLookup } from './pat/entrypoint';
 export { SignerKeys } from './signer-keys';
+export { SubjectRevocation } from './subjects/entrypoint';
 export { TicketRedeemer } from './tickets/redeemer';
 
 import type { Env } from './env';

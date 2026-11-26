@@ -117,5 +117,24 @@
       "entrypoint": "TicketRedeemer",
       "props": { "caller": "o11y" },
     },
+    // The SubjectRevocation entrypoint as the development caller binds it, as a caller it refuses
+    // and as a binding without props.
+    {
+      "binding": "SUBJECT_REVOCATION",
+      "service": "uts-test",
+      "entrypoint": "SubjectRevocation",
+      "props": { "caller": "uts-subjects-test" },
+    },
+    {
+      "binding": "OTHER_SUBJECT_REVOCATION",
+      "service": "uts-test",
+      "entrypoint": "SubjectRevocation",
+      "props": { "caller": "o11y" },
+    },
+    {
+      "binding": "PROPLESS_SUBJECT_REVOCATION",
+      "service": "uts-test",
+      "entrypoint": "SubjectRevocation",
+    },
   ],
 }

@@ -18,8 +18,9 @@ export const UNRELAYED_ALERT_SECONDS = 60;
 /** Today's partition and the next 7 days' exist after every successful maintenance pass. */
 export const PARTITION_RUNWAY_DAYS = 8;
 /**
- * `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()` and
- * `uts.maintain_provider_sign_in_rows()` each delete at most this many rows of each kind per call.
+ * `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()`,
+ * `uts.maintain_provider_sign_in_rows()` and `uts.maintain_subject_operation_rows()` each delete at
+ * most this many rows of each kind per call.
  */
 export const ROW_MAINTENANCE_BATCH = 5_000;
 /**
@@ -153,5 +154,6 @@ export async function runMaintenance(store: IdentityStore): Promise<void> {
   await step('oauth_rows', () => rowMaintenance(store, 'oauth_rows'));
   await step('sign_in_rows', () => rowMaintenance(store, 'sign_in_rows'));
   await step('provider_sign_in_rows', () => rowMaintenance(store, 'provider_sign_in_rows'));
+  await step('subject_operation_rows', () => rowMaintenance(store, 'subject_operation_rows'));
   await step('relay_lag', () => relayLag(store));
 }

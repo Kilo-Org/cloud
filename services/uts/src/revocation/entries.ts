@@ -60,7 +60,7 @@ export const StatementFeedEntriesSchema = z.array(StoredFeedEntrySchema);
 /** Entries keyed by kind and id, as the table's unique key names them. */
 export type FeedEntries = Map<string, FeedEntry>;
 
-function entryKey(entry: FeedEntry): string {
+function entryKey(entry: Pick<FeedEntry, 'kind' | 'id'>): string {
   return `${entry.kind}\u0000${entry.id}`;
 }
 
@@ -68,8 +68,32 @@ function entryKey(entry: FeedEntry): string {
  * Adds `entry`, or raises the held entry's `revokedBefore`, `revokedAt` and `expiresAt` to the
  * later of both, so an entry never loses ground to an older copy of itself (a backfill can bring
  * an entry a publish already brought). Returns whether the held entries changed.
+ *
+ * An unblock (`unblocked_account`) is the one entry that takes another away: it removes the
+ * account's `blocked_account` entry unless that block is newer than the unblock, and while it is
+ * held, an older copy of the block, which a backfill that started before the unblock can still
+ * bring, is not taken. A block newer than the unblock (a block again) wins. The unblock statement
+ * also dates the block entry at its own time and keeps the unblock entry longer, so every reader
+ * of one also reads the other (migration 0014).
  */
 export function mergeEntry(entries: FeedEntries, entry: FeedEntry): boolean {
+  if (entry.kind === 'blocked_account') {
+    const unblocked = entries.get(entryKey({ kind: 'unblocked_account', id: entry.id }));
+    if (unblocked !== undefined && unblocked.revokedAt >= entry.revokedAt) return false;
+  }
+  let removedBlock = false;
+  if (entry.kind === 'unblocked_account') {
+    const blockKey = entryKey({ kind: 'blocked_account', id: entry.id });
+    const blocked = entries.get(blockKey);
+    if (blocked !== undefined && blocked.revokedAt <= entry.revokedAt) {
+      entries.delete(blockKey);
+      removedBlock = true;
+    }
+  }
+  return mergeSame(entries, entry) || removedBlock;
+}
+
+function mergeSame(entries: FeedEntries, entry: FeedEntry): boolean {
   const key = entryKey(entry);
   const held = entries.get(key);
   if (held === undefined) {
@@ -108,8 +132,13 @@ export function dropExpired(entries: FeedEntries, now: number): boolean {
   return dropped;
 }
 
-/** Which list field each entry kind feeds; a token's `sid` names a grant, family or session. */
-const LIST_FIELD: Readonly<Record<IdKind, Exclude<keyof RevocationListWire, 'revoked_before'>>> = {
+/**
+ * Which list field each entry kind feeds; a token's `sid` names a grant, family or session. An
+ * unblock feeds none: it only takes a block away (`mergeEntry`).
+ */
+const LIST_FIELD: Readonly<
+  Record<Exclude<IdKind, 'unblocked_account'>, Exclude<keyof RevocationListWire, 'revoked_before'>>
+> = {
   session: 'revoked_sids',
   grant: 'revoked_sids',
   third_party_family: 'revoked_sids',
@@ -142,7 +171,7 @@ export function serializeList(entries: Iterable<FeedEntry>): SerializedList {
     if (entry.kind === 'subject') {
       const seconds = Math.floor(entry.revokedBefore / 1000);
       revokedBefore.set(entry.id, Math.max(revokedBefore.get(entry.id) ?? 0, seconds));
-    } else {
+    } else if (entry.kind !== 'unblocked_account') {
       ids[LIST_FIELD[entry.kind]].add(entry.id);
     }
   }

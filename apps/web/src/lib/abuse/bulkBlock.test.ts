@@ -9,7 +9,10 @@ describe('bulkBlockUsers (integration)', () => {
   test('blocks 2 via id and 2 via email only when there is no nonsense; with nonsense none are blocked', async () => {
     // Arrange: create 4 users
     const admin = await insertTestUser({ is_admin: true });
-    const uById1 = await insertTestUser({ api_token_pepper: 'pepper-1' });
+    const uById1 = await insertTestUser({
+      api_token_pepper: 'pepper-1',
+      web_session_pepper: 'session-pepper-1',
+    });
     const uById2 = await insertTestUser({ api_token_pepper: 'pepper-2' });
 
     const unique1 = `bulkblock-${Date.now()}-${Math.random()}`;
@@ -75,6 +78,7 @@ describe('bulkBlockUsers (integration)', () => {
         blocked_at: kilocode_users.blocked_at,
         blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
         api_token_pepper: kilocode_users.api_token_pepper,
+        web_session_pepper: kilocode_users.web_session_pepper,
       })
       .from(kilocode_users)
       .where(inArray(kilocode_users.id, [uById1.id, uById2.id, uByEmail1.id, uByEmail2.id]));
@@ -99,6 +103,13 @@ describe('bulkBlockUsers (integration)', () => {
     expect(rotatedPeppers).not.toContain('pepper-2');
     expect(rotatedPeppers).not.toContain('pepper-3');
     expect(rotatedPeppers).not.toContain('pepper-4');
+
+    const rotatedSessionPeppers = rowsB.map(r => r.web_session_pepper);
+    for (const pepper of rotatedSessionPeppers) {
+      expect(pepper).toEqual(expect.any(String));
+    }
+    expect(new Set(rotatedSessionPeppers).size).toBe(4);
+    expect(rotatedSessionPeppers).not.toContain('session-pepper-1');
   });
 
   test('unblocks a grouped bulk block by reason, date, and admin only', async () => {

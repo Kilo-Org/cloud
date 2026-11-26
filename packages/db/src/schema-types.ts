@@ -942,6 +942,7 @@ export const AdminActionAuditAction = z.enum([
   'user.login.reset_to_magic_link',
   'user.email.release',
   'user.personal_account.set_disabled',
+  'user.block',
   'user.unblock',
   'organization.create',
   'organization.delete',

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
+  STS_SECURE_PROXY_FORWARD,
+  STS_USAGE_PUBLISH,
+  STS_USAGE_RECORD,
   isRegisteredStsScope,
   stsScopeRegistryProblems,
   type StsScopeRegistry,
@@ -151,10 +154,10 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes, the reserved probe and the UTS scopes, so every other scope is denied', () => {
+  it('lists only the pilot scopes, the reserved probe, the UTS scopes and the phase 4 service scopes, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
-      web: { scopes: ['web:sts.canary'] },
-      'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
+      web: { scopes: ['web:sts.canary', 'web:usage.record'] },
+      'usage-ingest': { scopes: ['usage-ingest:sts.canary', 'usage-ingest:usage.publish'] },
       canary: { scopes: ['canary:denied-probe'] },
       'uts-feed': { scopes: ['uts-feed:revocation.read'] },
       uts: {
@@ -165,6 +168,7 @@ describe('STS scope registry', () => {
           'uts:token-exchange',
         ],
       },
+      'ai-gateway-secure-proxy': { scopes: ['ai-gateway-secure-proxy:request.forward'] },
     });
     expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
@@ -172,10 +176,26 @@ describe('STS scope registry', () => {
     expect(isRegisteredStsScope('gateway', 'gateway:models.read')).toBe(false);
     expect(isRegisteredStsScope('web', 'usage-ingest:sts.canary')).toBe(false);
     expect(isRegisteredStsScope('uts', 'uts-feed:revocation.read')).toBe(false);
+    expect(isRegisteredStsScope('web', 'usage-ingest:usage.publish')).toBe(false);
+    expect(isRegisteredStsScope('usage-ingest', 'web:usage.record')).toBe(false);
   });
 
   it('lists each shipped scope under its own audience', () => {
     expect(stsScopeRegistryProblems(STS_SCOPE_REGISTRY)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'ai-gateway-secure-proxy:request.forward',
+      'ai-gateway-secure-proxy',
+      STS_SECURE_PROXY_FORWARD,
+    ],
+    ['usage-ingest:usage.publish', 'usage-ingest', STS_USAGE_PUBLISH],
+    ['web:usage.record', 'web', STS_USAGE_RECORD],
+  ])('registers %s under its own audience %s', (scope, audience, pair) => {
+    expect(pair).toEqual({ audience, scope });
+    expect(scopeAudience(pair.scope)).toBe(pair.audience);
+    expect(isRegisteredStsScope(pair.audience, pair.scope)).toBe(true);
   });
 
   it('flags a scope whose prefix is not its audience', () => {

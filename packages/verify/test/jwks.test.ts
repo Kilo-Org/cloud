@@ -7,6 +7,7 @@ import {
   JWKS_RETRY_MS,
   JWKS_STALE_WAIT_MS,
   JWKS_TTL_MS,
+  KEY_SET_OLDEST_AGE_HEADER,
   UNKNOWN_KID_REFRESH_INTERVAL_MS,
   httpJwksSource,
   type VerifyResult,
@@ -369,7 +370,11 @@ describe('the HTTPS key-set source', () => {
       expect(init.signal).toBeInstanceOf(AbortSignal);
       return Response.json({ keys: [] });
     });
-    expect(await source(AbortSignal.timeout(1000))).toEqual({ keys: [] });
+    expect(await source(AbortSignal.timeout(1000))).toEqual({
+      body: { keys: [] },
+      age: null,
+      oldestAge: null,
+    });
     expect(seen).toEqual(['https://sts.test/.well-known/jwks.json']);
   });
 
@@ -379,6 +384,44 @@ describe('the HTTPS key-set source', () => {
   ])('rejects %s', async (_name, answer) => {
     const source = httpJwksSource('https://sts.test', async () => answer());
     await expect(source(AbortSignal.timeout(1000))).rejects.toThrow();
+  });
+
+  // Each row: the `Age` and `Kilo-Key-Set-Oldest-Age` headers sent (absent when undefined), and
+  // the ages the source answers, or 'rejects' (a failed fetch).
+  type AgeRow = [
+    string,
+    string | undefined,
+    string | undefined,
+    [number | null, number | null] | 'rejects',
+  ];
+  it.each<AgeRow>([
+    ['reads both ages', '30', '600', [30, 600]],
+    ['reads zero ages', '0', '0', [0, 0]],
+    ['answers null for absent headers', undefined, undefined, [null, null]],
+    ['answers null for an absent oldest age', '30', undefined, [30, null]],
+    ['answers null for an absent Age', undefined, '600', [null, 600]],
+    ['passes an oldest age below Age on to the cache', '30', '20', [30, 20]],
+    ['rejects a fractional Age', '1.5', '600', 'rejects'],
+    ['rejects a negative Age', '-1', '600', 'rejects'],
+    ['rejects two Age values', '5, 6', '600', 'rejects'],
+    ['rejects an Age that is not a number', 'abc', '600', 'rejects'],
+    ['rejects an empty oldest age', '30', '', 'rejects'],
+    ['rejects a malformed oldest age', '30', '6e2', 'rejects'],
+  ])('%s', async (_name, age, oldest, expected) => {
+    const headers = new Headers();
+    if (age !== undefined) headers.set('age', age);
+    if (oldest !== undefined) headers.set(KEY_SET_OLDEST_AGE_HEADER, oldest);
+    const source = httpJwksSource('https://uts.test', async () =>
+      Response.json({ keys: [] }, { headers })
+    );
+    if (expected === 'rejects') {
+      await expect(source(AbortSignal.timeout(1000))).rejects.toThrow();
+    } else {
+      expect(await source(AbortSignal.timeout(1000))).toMatchObject({
+        age: expected[0],
+        oldestAge: expected[1],
+      });
+    }
   });
 });
 

@@ -52,9 +52,10 @@ describe('createWorkerServiceTokens', () => {
 describe('createHttpServiceTokens', () => {
   it('posts the mint request with the identity token to /v1/token', async () => {
     const calls: { url: string; init: RequestInit }[] = [];
-    const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      calls.push({ url: String(url), init: init ?? {} });
-      const request = JSON.parse(String(init?.body)) as MintRequest;
+    // The client posts a string URL and a JSON string body.
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init: init ?? {} });
+      const request = JSON.parse(init?.body as string) as MintRequest;
       return Response.json(issued(request), { status: 200 });
     });
     const tokens = createHttpServiceTokens({
@@ -68,7 +69,7 @@ describe('createHttpServiceTokens', () => {
     expect(calls[0].url).toBe('https://sts.test/v1/token');
     expect(calls[0].init.method).toBe('POST');
     expect(new Headers(calls[0].init.headers).get('authorization')).toBe('Bearer identity-token');
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({ tokens: [WEB] });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ tokens: [WEB] });
   });
 
   it('maps a 401 identity_rejected to a denial', async () => {
@@ -101,7 +102,7 @@ describe('createHttpServiceTokens', () => {
       stsUrl: 'https://sts.test',
       getIdentityToken: () => 'identity-token',
       fetch: (async (_url: string, init?: RequestInit) =>
-        Response.json(issued(JSON.parse(String(init?.body)) as MintRequest), {
+        Response.json(issued(JSON.parse(init?.body as string) as MintRequest), {
           status: 503,
         })) as typeof fetch,
     });

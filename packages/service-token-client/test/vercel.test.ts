@@ -30,7 +30,9 @@ function memoryCache(): SharedCache {
   return {
     async get(key) {
       const entry = entries.get(key);
-      return entry !== undefined && entry.expiresAt > Date.now() ? structuredClone(entry.value) : null;
+      return entry !== undefined && entry.expiresAt > Date.now()
+        ? structuredClone(entry.value)
+        : null;
     },
     async set(key, value, { ttl }) {
       entries.set(key, { value: structuredClone(value), expiresAt: Date.now() + ttl * 1000 });
@@ -55,7 +57,12 @@ describe('vercelIdentity', () => {
       unsignedJwt({ ...DEPLOYMENT, iat: nowSeconds(), exp: nowSeconds() + 7200 })
     );
     const { exchange } = exchangeLikeVercel();
-    const identity = vercelIdentity({ stsAudience: STS, cache: memoryCache(), getBaseToken, exchange });
+    const identity = vercelIdentity({
+      stsAudience: STS,
+      cache: memoryCache(),
+      getBaseToken,
+      exchange,
+    });
     expect(getBaseToken).not.toHaveBeenCalled();
     await identity();
     await identity();
@@ -111,8 +118,9 @@ describe('vercelIdentity', () => {
 describe('vercelExchange', () => {
   function answering(response: Response) {
     const requests: { url: string; body: unknown }[] = [];
-    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
-      requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+    // The exchange posts a string URL and a JSON string body.
+    const fetchFn = (async (url: string, init?: RequestInit) => {
+      requests.push({ url, body: JSON.parse(init?.body as string) });
       return response;
     }) as typeof fetch;
     return { fetchFn, requests };
@@ -120,16 +128,23 @@ describe('vercelExchange', () => {
 
   it('posts the base token and audience to the exchange and returns its token', async () => {
     const { fetchFn, requests } = answering(Response.json({ token: 'exchanged' }));
-    expect(await vercelExchange(fetchFn)('base', STS)).toEqual({ kind: 'token', token: 'exchanged' });
+    expect(await vercelExchange(fetchFn)('base', STS)).toEqual({
+      kind: 'token',
+      token: 'exchanged',
+    });
     expect(requests).toEqual([{ url: VERCEL_EXCHANGE_URL, body: { token: 'base', aud: STS } }]);
   });
 
   it('tells a 429 from other failures and never returns the error body', async () => {
-    expect(await vercelExchange(answering(new Response('slow down', { status: 429 })).fetchFn)('b', STS)).toEqual({
+    expect(
+      await vercelExchange(answering(new Response('slow down', { status: 429 })).fetchFn)('b', STS)
+    ).toEqual({
       kind: 'rate_limited',
     });
     expect(
-      await vercelExchange(answering(new Response('{"error":"base.payload.sig"}', { status: 401 })).fetchFn)('b', STS)
+      await vercelExchange(
+        answering(new Response('{"error":"base.payload.sig"}', { status: 401 })).fetchFn
+      )('b', STS)
     ).toEqual({ kind: 'failed', detail: 'the exchange answered 401' });
     expect(await vercelExchange(answering(Response.json({})).fetchFn)('b', STS)).toEqual({
       kind: 'failed',

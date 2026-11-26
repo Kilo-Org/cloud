@@ -39,12 +39,12 @@ export const FEED_BACKFILL_STALL_MS = 30 * 1000;
 export const FEED_LIST_KEEP_MS = 30 * 1000;
 
 /**
- * Memory bounds of the old lists, oldest dropped first: at most this many lists, and at most
- * `FEED_MAX_OLD_LIST_BYTES` of list text in all. At the 50,000-entry cap one list is a few
- * megabytes, so the byte bound decides there; at the design's rates the list changes well under
- * once per second and both bounds stay far away.
+ * Memory bound of the old lists: at most this much list text in all, oldest dropped first. There
+ * is no count bound: a list kept for its 30 seconds is one a verifier may still fetch by hash, and
+ * small lists cost little. At the 50,000-entry cap one list is a few megabytes, so this bound
+ * decides there; at the design's rates the list changes well under once per second and the bound
+ * stays far away.
  */
-export const FEED_MAX_OLD_LISTS = 64;
 export const FEED_MAX_OLD_LIST_BYTES = 16 * 1024 * 1024;
 
 /**
@@ -201,7 +201,7 @@ export class FeedLedger {
       replacedAt: now,
       bytes: new TextEncoder().encode(this.#list.text).byteLength,
     };
-    const kept = [replaced, ...this.#oldLists].slice(0, FEED_MAX_OLD_LISTS);
+    const kept = [replaced, ...this.#oldLists];
     let bytes = kept.reduce((total, old) => total + old.bytes, 0);
     while (bytes > FEED_MAX_OLD_LIST_BYTES && kept.length > 0) {
       bytes -= kept.pop()?.bytes ?? 0;

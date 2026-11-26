@@ -168,8 +168,8 @@ only it writes entries. Each one:
   list; a new head is signed for each new list or backfill, and none once that backfill is 30
   seconds old or the object holds more than 50,000 entries. A backfill is given up after 10
   seconds (5 for the connect); expired entries leave the list at most once a minute;
-- serves its current list, and each list it replaced in the last 30 seconds (at most 64 lists and
-  16 MB of old list text, the oldest dropped first), by hash;
+- serves its current list, and each list it replaced in the last 30 seconds (at most 16 MB of old
+  list text, the oldest dropped first), by hash;
 - answers a publish with whether it vouches for its list; a revoke counts as published only when a
   vouching object took its entries, and logs `uts.feed.publish_unvouched` (an alert: the backfill
   is failing) when only objects that vouch for nothing took them. Every write to

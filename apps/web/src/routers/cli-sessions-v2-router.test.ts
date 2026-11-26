@@ -70,8 +70,8 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
   createControlTokenForRequest: jest.fn(async () => ({ token: 'test-cloud-agent-control-token' })),
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@kilocode/web-shared/lib/tokens');
+jest.mock('@/lib/auth/kilo-token-signing', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/auth/kilo-token-signing');
   return {
     ...actual,
     generateApiToken: jest.fn(() => 'test-api-token'),

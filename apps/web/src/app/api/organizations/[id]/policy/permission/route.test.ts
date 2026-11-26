@@ -19,7 +19,7 @@ import {
   generateInternalServiceToken,
   generateOrganizationApiToken,
   TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+} from '@/lib/auth/kilo-token-signing';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';

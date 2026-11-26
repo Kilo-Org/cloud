@@ -39,6 +39,8 @@ After startup or reuse, obtain actual ports from `.dev-port`, `pnpm dev:status -
 
 A worktree on a port offset runs its own database container and starts empty. Run `pnpm test:db` for migrations, then seed the data the task needs. Read the connection string from this worktree's `.env.local`; never assume port 5432.
 
+The model catalog also starts empty, so gateway routing, model lists, and admin custom LLM saves fail until it is filled (the web log shows `[getGatewayModels] no OpenRouter models found in the database`). Sign in as an admin (see "Fake login"), open `/admin/gateway`, and on the Sync Providers tab run **Metadata cache refresh**, then **Provider and model sync**. These syncs fetch live upstream catalogs, so they are not a `pnpm dev:seed` topic. The crons in `apps/web/vercel.json` run every 5 minutes only on Vercel, and nothing schedules them locally, so run these by hand.
+
 Run `pnpm test:db` before `pnpm test` in a worktree. It writes this worktree's database to `apps/web/.env.test.local`, which is the only file the Jest setup loads that can hold it. Without that file, Jest runs against port 5432 and drops a sibling worktree's test databases.
 
 ## Fake login

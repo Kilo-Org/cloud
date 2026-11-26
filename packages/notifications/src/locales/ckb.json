@@ -8,7 +8,8 @@
       "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە",
       "securityUpdate": "پشکنینێکی ئاسایش نوێکارییەکی هەیە",
       "agentBriefing": "ڕاپۆرتی بریکارەکەت ئامادەیە",
-      "activeAgentsGlanceable": "بریکارە چالاکەکان نوێکارییەکیان هەیە"
+      "activeAgentsGlanceable": "بریکارە چالاکەکان نوێکارییەکیان هەیە",
+      "accountSecurity": "چالاکییەکی ئاسایش لە هەژمارەکەتدا هەبوو"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "پێشێلکردنی SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "کلیلی تێپەڕبوون زیادکرا بۆ هەژمارەکەت"
+      },
+      "passkeyRemoved": {
+        "title": "کلیلی تێپەڕبوون لە هەژمارەکەت لابرا"
+      },
+      "signInMethodLinked": {
+        "title": "ڕێگای چوونەژوورەوە زیادکرا بۆ هەژمارەکەت"
+      },
+      "signInMethodUnlinked": {
+        "title": "ڕێگای چوونەژوورەوە لە هەژمارەکەت لابرا"
+      },
+      "deviceSignInApproved": {
+        "title": "چوونەژوورەوەی ئامێر پەسەندکرا"
+      },
+      "apiKeyReset": {
+        "title": "تۆکنی API ڕێکخرایەوە"
+      },
+      "browserSessionsRevoked": {
+        "title": "لە هەموو وێبگەڕەکان چوویتە دەرەوە"
+      },
+      "deviceSessionRevoked": {
+        "title": "ئامێرێک لە هەژمارەکەت چووە دەرەوە"
+      },
+      "signInResetBySupport": {
+        "title": "چوونەژوورەوە لەلایەن پشتگیریی Kilo ڕێکخرایەوە"
+      },
+      "newSignIn": {
+        "title": "چوونەژوورەوەیەکی نوێ بۆ هەژمارەکەت"
+      },
+      "body": {
+        "deviceAndLocation": "لە {{device}} نزیک {{location}}. تۆ نەبوویت؟ ئێستا ئاسایشی هەژمارەکەت پێدابچۆرەوە.",
+        "device": "لە {{device}}. تۆ نەبوویت؟ ئێستا ئاسایشی هەژمارەکەت پێدابچۆرەوە.",
+        "location": "نزیک {{location}}. تۆ نەبوویت؟ ئێستا ئاسایشی هەژمارەکەت پێدابچۆرەوە.",
+        "unknown": "تۆ نەبوویت؟ ئێستا ئاسایشی هەژمارەکەت پێدابچۆرەوە.",
+        "selfNamedDevice": "لە ئامێرێک کە خۆی ناونا \"{{name}}\". تۆ نەبوویت؟ ئێستا ئاسایشی هەژمارەکەت پێدابچۆرەوە.",
+        "support": "لەلایەن پشتگیریی Kilo کرا. ئەگەر داوات نەکردووە، پەیوەندی بە پشتگیرییەوە بکە."
+      }
     }
   },
   "sessionReady": {

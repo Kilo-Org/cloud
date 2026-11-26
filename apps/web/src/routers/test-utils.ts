@@ -1,14 +1,18 @@
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { rootRouter } from '@/routers/root-router';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 
 const createCaller = createCallerFactory(rootRouter);
 
 /** Test-only caller bound to a real user row and an optional device session. */
 export async function createCallerForUser(
   userId: string,
-  opts?: { deviceSessionId?: string; controlPlaneStartedAt?: number }
+  opts?: {
+    deviceSessionId?: string;
+    controlPlaneStartedAt?: number;
+    headers?: Record<string, string>;
+  }
 ) {
   const user = await findUserById(userId);
   if (!user) {
@@ -21,6 +25,7 @@ export async function createCallerForUser(
     // tests set it to exercise the control-plane read budget.
     controlPlaneStartedAt: opts?.controlPlaneStartedAt,
     headersList: new Headers({
+      ...opts?.headers,
       Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
     }),
   });

@@ -23,6 +23,7 @@ import { TRPCError } from '@trpc/server';
 import { sql, count, isNotNull, desc, min, max, eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { createHash } from 'node:crypto';
+import { addAdminAuditMetadata } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 import {
   BLACKLIST_STATS_ROW_LIMIT,
@@ -97,96 +98,108 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     })
   ),
 
-  set: adminProcedure.input(AdminBlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
-    const normalizedDomains = [
-      ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
-    ];
+  set: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'blacklist_domains.set' } })
+    .input(AdminBlacklistDomainsInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const normalizedDomains = [
+        ...new Set(input.domains.map(d => d.toLowerCase().trim()).filter(Boolean)),
+      ];
 
-    let saved;
-    try {
-      saved = await db.transaction(async tx => {
-        // Serializes saves, including the previous-config read.
-        await lockBlacklist(tx, 'EXCLUSIVE');
-        // Deletion locks the user before scrubbing the settings row. Hold the same user lock
-        // through the settings write so an already-authorized save cannot restore deleted PII.
-        const [actor] = await tx
-          .select({ blocked_reason: kilocode_users.blocked_reason })
-          .from(kilocode_users)
-          .where(eq(kilocode_users.id, ctx.user.id))
-          .for('update');
-        if (!actor || isGoneOrDeletingBlockedReason(actor.blocked_reason)) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Blacklist editor account is deleted or being deleted.',
-          });
-        }
-        const previous = await readConfig(tx);
-        if (previous.version !== input.expected_version) {
-          throw new TRPCError({
-            code: 'CONFLICT',
-            message: 'Blacklist changed. Reload the complete list before saving.',
-          });
-        }
-        const previousDomains = new Set(previous.domains);
-        const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
-        const settings = {
-          blocked_signup_tlds: normalizeSignupTlds(
-            input.blocked_tlds ?? previous.settings.blocked_signup_tlds ?? envFallbackSignupTlds
-          ),
-          updated_at: new Date().toISOString(),
-          updated_by: ctx.user.id,
-          updated_by_email: ctx.user.google_user_email,
-        } satisfies BlacklistDomainsSettings;
-        const deadline = Date.now() + 120_000;
-        await tx.delete(blacklisted_domains);
-        for (let offset = 0; offset < normalizedDomains.length; offset += 1000) {
-          if (Date.now() > deadline) throw new Error('Blacklist save timed out');
-          await tx
-            .insert(blacklisted_domains)
-            .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
-        }
-        await tx
-          .insert(blacklisted_domains_settings)
-          .values(settings)
-          .onConflictDoUpdate({ target: blacklisted_domains_settings.id, set: settings });
-        return { settings, addedDomains };
-      });
-    } catch (error) {
-      if (error instanceof TRPCError && (error.code === 'CONFLICT' || error.code === 'FORBIDDEN')) {
-        throw error;
-      }
-      captureException(error, { tags: { source: 'blacklist_domains_save' } });
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Blacklist save failed. Reload the list before retrying.',
-        cause: error,
-      });
-    }
-    const { settings, addedDomains } = saved;
-    clearEmailBlacklistCache();
-    // Cleanup is best effort and cannot be atomic with the Postgres commit.
-    await cleanupLegacySettings();
-
-    // The list is already live for auth checks at this point, so a backfill
-    // failure must not fail the save. Report it and point the admin at the
-    // manual backfill instead.
-    const backfill = { blocked: 0, remaining: false, failed: false };
-    if (addedDomains.length > 0) {
+      let saved;
       try {
-        const result = await backfillBlockBlacklistedDomainsBatch({
-          actorId: ctx.user.id,
-          domains: addedDomains,
+        saved = await db.transaction(async tx => {
+          // Serializes saves, including the previous-config read.
+          await lockBlacklist(tx, 'EXCLUSIVE');
+          // Deletion locks the user before scrubbing the settings row. Hold the same user lock
+          // through the settings write so an already-authorized save cannot restore deleted PII.
+          const [actor] = await tx
+            .select({ blocked_reason: kilocode_users.blocked_reason })
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, ctx.user.id))
+            .for('update');
+          if (!actor || isGoneOrDeletingBlockedReason(actor.blocked_reason)) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Blacklist editor account is deleted or being deleted.',
+            });
+          }
+          const previous = await readConfig(tx);
+          if (previous.version !== input.expected_version) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'Blacklist changed. Reload the complete list before saving.',
+            });
+          }
+          const previousDomains = new Set(previous.domains);
+          const addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
+          const settings = {
+            blocked_signup_tlds: normalizeSignupTlds(
+              input.blocked_tlds ?? previous.settings.blocked_signup_tlds ?? envFallbackSignupTlds
+            ),
+            updated_at: new Date().toISOString(),
+            updated_by: ctx.user.id,
+            updated_by_email: ctx.user.google_user_email,
+          } satisfies BlacklistDomainsSettings;
+          const deadline = Date.now() + 120_000;
+          await tx.delete(blacklisted_domains);
+          for (let offset = 0; offset < normalizedDomains.length; offset += 1000) {
+            if (Date.now() > deadline) throw new Error('Blacklist save timed out');
+            await tx
+              .insert(blacklisted_domains)
+              .values(normalizedDomains.slice(offset, offset + 1000).map(domain => ({ domain })));
+          }
+          await tx
+            .insert(blacklisted_domains_settings)
+            .values(settings)
+            .onConflictDoUpdate({ target: blacklisted_domains_settings.id, set: settings });
+          return { settings, addedDomains };
         });
-        backfill.blocked = result.processed;
-        backfill.remaining = result.remaining;
       } catch (error) {
-        captureException(error, { tags: { source: 'blacklist_domains_auto_backfill' } });
-        backfill.failed = true;
+        if (
+          error instanceof TRPCError &&
+          (error.code === 'CONFLICT' || error.code === 'FORBIDDEN')
+        ) {
+          throw error;
+        }
+        captureException(error, { tags: { source: 'blacklist_domains_save' } });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Blacklist save failed. Reload the list before retrying.',
+          cause: error,
+        });
       }
-    }
+      const { settings, addedDomains } = saved;
+      clearEmailBlacklistCache();
+      // Cleanup is best effort and cannot be atomic with the Postgres commit.
+      await cleanupLegacySettings();
 
-    return { ...settings, domains: normalizedDomains, backfill };
-  }),
+      // The list is already live for auth checks at this point, so a backfill
+      // failure must not fail the save. Report it and point the admin at the
+      // manual backfill instead.
+      const backfill = { blocked: 0, remaining: false, failed: false };
+      if (addedDomains.length > 0) {
+        try {
+          const result = await backfillBlockBlacklistedDomainsBatch({
+            actorId: ctx.user.id,
+            domains: addedDomains,
+          });
+          backfill.blocked = result.processed;
+          backfill.remaining = result.remaining;
+        } catch (error) {
+          captureException(error, { tags: { source: 'blacklist_domains_auto_backfill' } });
+          backfill.failed = true;
+        }
+      }
+
+      addAdminAuditMetadata({
+        domainCount: normalizedDomains.length,
+        addedDomainCount: addedDomains.length,
+        backfillBlocked: backfill.blocked,
+      });
+
+      return { ...settings, domains: normalizedDomains, backfill };
+    }),
 
   stats: adminProcedure.query(async () => {
     // Read-only admin report: the list and the grouped aggregate stay off the primary pool.

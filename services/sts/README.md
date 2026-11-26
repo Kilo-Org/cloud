@@ -329,6 +329,18 @@ Adding a file also means adding it to `src/policy/registry.ts`; the typed import
 `src/policy/index.ts` makes the two disagree at typecheck, and `test/repo/policy-files.test.ts`
 checks the directory itself.
 
+Workloads with a policy, all over `worker-binding`:
+
+| Workload | Environments | Worker config |
+|---|---|---|
+| `o11y` | development, staging, production | `services/o11y/wrangler.jsonc` |
+| `audit-relay` | development, staging, production | `services/audit-relay/wrangler.jsonc` |
+| `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
+
+A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
+`test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
+review covers its STS binding; this repository refuses any config that deploys under the name.
+
 `test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
 `wrangler*.toml` the checkout tracks, or holds untracked and not ignored, test fixtures included
 (`cloud-agent-e2e-deploy.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
@@ -372,7 +384,11 @@ gains a key nobody classified. The check fails when:
   `"jurisdiction": "eu"`;
 - a route outside the STS or relay config covers one of their hostnames;
 - a config other than the STS, STS test, relay or relay test config deploys under one of their
-  names.
+  names;
+- a config deploys under the name of a workload in `EXTERNAL_WORKLOADS`: it would replace that
+  Worker and, through `props.caller`, read its bundle;
+- a `worker-binding` policy names a workload that no config here binds STS as and
+  `EXTERNAL_WORKLOADS` does not list, or the list names a workload without such a policy.
 
 CI runs it whenever any Worker config changes (`scripts/affected-workspaces.mjs` routes every
 `wrangler*` file to this workspace).

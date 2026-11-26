@@ -8,7 +8,8 @@
       "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده",
       "securityUpdate": "یوه امنیتي کتنه تازه معلومات لري",
       "agentBriefing": "ستاسو د ایجنټ د فعالیت راپور چمتو دی",
-      "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري"
+      "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري",
+      "accountSecurity": "ستاسو په حساب کې امنیتي فعالیت شوی و"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "د SLA سرغړونه"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "ستاسو حساب ته د تېرېدو کیلي ورزیاته شوه"
+      },
+      "passkeyRemoved": {
+        "title": "ستاسو له حساب څخه د تېرېدو کیلي لرې شوه"
+      },
+      "signInMethodLinked": {
+        "title": "ستاسو حساب ته د ننوتلو طریقه ورزیاته شوه"
+      },
+      "signInMethodUnlinked": {
+        "title": "ستاسو له حساب څخه د ننوتلو طریقه لرې شوه"
+      },
+      "deviceSignInApproved": {
+        "title": "له وسیلې ننوتل تایید شول"
+      },
+      "apiKeyReset": {
+        "title": "د API ټوکن بیا تنظیم شو"
+      },
+      "browserSessionsRevoked": {
+        "title": "له ټولو براوزرونو څخه ووتلئ"
+      },
+      "deviceSessionRevoked": {
+        "title": "یوه وسیله ستاسو له حساب څخه ووتله"
+      },
+      "signInResetBySupport": {
+        "title": "د Kilo ملاتړ ننوتل بیا تنظیم کړل"
+      },
+      "newSignIn": {
+        "title": "ستاسو حساب ته نوی ننوتل"
+      },
+      "body": {
+        "deviceAndLocation": "د {{location}} سره نږدې له {{device}} څخه. تاسو نه وئ؟ همدا اوس د خپل حساب امنیت وګورئ.",
+        "device": "له {{device}} څخه. تاسو نه وئ؟ همدا اوس د خپل حساب امنیت وګورئ.",
+        "location": "د {{location}} سره نږدې. تاسو نه وئ؟ همدا اوس د خپل حساب امنیت وګورئ.",
+        "unknown": "تاسو نه وئ؟ همدا اوس د خپل حساب امنیت وګورئ.",
+        "selfNamedDevice": "له یوې وسیلې څخه چې ځان یې \"{{name}}\" نومولی. تاسو نه وئ؟ همدا اوس د خپل حساب امنیت وګورئ.",
+        "support": "د Kilo ملاتړ لخوا ترسره شو. که تاسو دا نه وه غوښتې، له ملاتړ سره اړیکه ونیسئ."
+      }
     }
   },
   "sessionReady": {

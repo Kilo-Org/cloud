@@ -1,9 +1,8 @@
 /**
- * Slack notification delivery for SLO, container capacity and queue alerts.
+ * Slack notification delivery for SLO, container allocation and queue alerts.
  */
 
 import type { AlertSeverity } from './slo-config';
-import type { HealthInstances } from './container-capacity';
 import type { ContainerAllocations } from './container-allocations';
 import { readO11ySecret } from '../secrets';
 
@@ -30,19 +29,6 @@ export type SloAlertPayload = {
   // TTFB specific
   currentTtfbFraction?: number;
   ttfbThresholdMs?: number;
-};
-
-export type ContainerCapacityAlertPayload = {
-  alertType: 'container_capacity';
-  severity: AlertSeverity;
-  provider: string;
-  model: string;
-  clientName: string;
-  usedInstances: number;
-  maxInstances: number;
-  utilizationFraction: number;
-  thresholdFraction: number;
-  health?: HealthInstances;
 };
 
 export type ContainerAllocationAlertPayload = {
@@ -85,7 +71,6 @@ export type DeadLetterQueueAlertPayload = {
 
 export type AlertPayload =
   | SloAlertPayload
-  | ContainerCapacityAlertPayload
   | ContainerAllocationAlertPayload
   | QueueBacklogAlertPayload
   | DeadLetterQueueAlertPayload;
@@ -174,67 +159,27 @@ function buildSloSlackBlocks(alert: SloAlertPayload): object[] {
   ];
 }
 
-function buildCapacitySlackBlocks(
-  alert: ContainerCapacityAlertPayload | ContainerAllocationAlertPayload
-): object[] {
+function buildContainerAllocationSlackBlocks(alert: ContainerAllocationAlertPayload): object[] {
   const severityLabel = formatSeverityLabel(alert.severity);
-  if ('allocatedInstances' in alert) {
-    return [
-      {
-        type: 'header',
-        text: { type: 'plain_text', text: `${severityLabel} - Container Allocation Alert` },
-      },
-      {
-        type: 'section',
-        fields: [
-          plainTextField('Application', alert.model),
-          { type: 'mrkdwn', text: `*Allocated containers:*\n${alert.allocatedInstances}` },
-          { type: 'mrkdwn', text: `*Alert threshold:*\n${alert.thresholdCount} containers` },
-          { type: 'mrkdwn', text: `*Running:*\n${alert.counts.running}` },
-        ],
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `Provisioning: ${alert.counts.provisioning}\nStopping: ${alert.counts.stopping}\nAllocation count includes running, provisioning, and stopping containers. Threshold is operational, not a Cloudflare limit.`,
-        },
-      },
-    ];
-  }
-  const utilizationPct = (alert.utilizationFraction * 100).toFixed(1);
-  const thresholdPct = (alert.thresholdFraction * 100).toFixed(1);
-
-  const healthText =
-    alert.health !== undefined
-      ? `\nHealth: active=${alert.health.active}, healthy=${alert.health.healthy}, starting=${alert.health.starting}`
-      : '';
-
   return [
     {
       type: 'header',
-      text: {
-        type: 'plain_text',
-        text: `${severityLabel} — Container Capacity Alert`,
-      },
+      text: { type: 'plain_text', text: `${severityLabel} - Container Allocation Alert` },
     },
     {
       type: 'section',
       fields: [
         plainTextField('Application', alert.model),
-        {
-          type: 'mrkdwn',
-          text: `*Instances:*\n${alert.usedInstances} / ${alert.maxInstances}`,
-        },
-        { type: 'mrkdwn', text: `*Utilization:*\n${utilizationPct}%` },
-        { type: 'mrkdwn', text: `*Threshold:*\n${thresholdPct}%` },
+        { type: 'mrkdwn', text: `*Allocated containers:*\n${alert.allocatedInstances}` },
+        { type: 'mrkdwn', text: `*Alert threshold:*\n${alert.thresholdCount} containers` },
+        { type: 'mrkdwn', text: `*Running:*\n${alert.counts.running}` },
       ],
     },
     {
       type: 'section',
       text: {
-        type: 'plain_text',
-        text: `Container: ${alert.clientName}${healthText}`,
+        type: 'mrkdwn',
+        text: `Provisioning: ${alert.counts.provisioning}\nStopping: ${alert.counts.stopping}\nAllocation count includes running, provisioning, and stopping containers. Threshold is operational, not a Cloudflare limit.`,
       },
     },
   ];
@@ -316,7 +261,7 @@ function buildDeadLetterQueueSlackBlocks(alert: DeadLetterQueueAlertPayload): ob
 export function buildSlackMessage(alert: AlertPayload): object {
   switch (alert.alertType) {
     case 'container_capacity':
-      return { blocks: buildCapacitySlackBlocks(alert) };
+      return { blocks: buildContainerAllocationSlackBlocks(alert) };
     case 'queue_backlog':
       return { blocks: buildQueueBacklogSlackBlocks(alert) };
     case 'dead_letter_queue':

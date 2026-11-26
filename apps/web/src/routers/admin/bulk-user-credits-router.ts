@@ -5,6 +5,12 @@ import { kilocode_users } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { inArray } from 'drizzle-orm';
 import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import {
+  adminAuditErrorCode,
+  recordAdminActions,
+  userActionTarget,
+  type AdminActionEntry,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const BulkUserCreditsInputSchema = z.object({
   emails: z.array(z.string().email()).max(1000),
@@ -62,6 +68,12 @@ export const bulkUserCreditsRouter = createTRPCRouter({
    * Returns matched users and unmatched emails.
    */
   matchUsers: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'mutation-typed read: matches emails to user accounts and writes nothing',
+      },
+    })
     .input(z.object({ emails: z.array(z.string().email()).max(1000) }))
     .mutation(async ({ input }): Promise<MatchUsersResult> => {
       const { emails } = input;
@@ -110,10 +122,27 @@ export const bulkUserCreditsRouter = createTRPCRouter({
    * Uses the standard credit granting function for each user.
    */
   grantBulkCredits: creditManagerProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['credits.bulk_grant'] } })
     .input(BulkUserCreditsInputSchema)
     .mutation(async ({ input, ctx }): Promise<BulkCreditResult[]> => {
       const { emails, amountUsd, expirationDate, description } = input;
       const results: BulkCreditResult[] = [];
+      const metadata = { amountUsd, expirationDate: expirationDate ?? null };
+      // One row per requested address, in request order. A failed row names the
+      // account when one matched and a stable code; never the address or the
+      // error message.
+      const auditEntries: AdminActionEntry[] = [];
+      function pushFailure(result: BulkCreditResult, errorCode: string) {
+        results.push(result);
+        auditEntries.push({
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          errorCode,
+          target: result.userId ? userActionTarget(result.userId) : null,
+          message: 'Failed to grant credits in bulk',
+          metadata,
+        });
+      }
 
       // Normalize emails and deduplicate to prevent double-crediting
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
@@ -131,22 +160,18 @@ export const bulkUserCreditsRouter = createTRPCRouter({
         const user = usersByEmail.get(email);
 
         if (!user) {
-          results.push({
-            email,
-            userId: '',
-            success: false,
-            error: 'User not found',
-          });
+          pushFailure(
+            { email, userId: '', success: false, error: 'User not found' },
+            'user_not_found'
+          );
           continue;
         }
 
         if (user.blocked_reason) {
-          results.push({
-            email,
-            userId: user.id,
-            success: false,
-            error: 'User is blocked',
-          });
+          pushFailure(
+            { email, userId: user.id, success: false, error: 'User is blocked' },
+            'user_blocked'
+          );
           continue;
         }
 
@@ -166,23 +191,44 @@ export const bulkUserCreditsRouter = createTRPCRouter({
               userId: user.id,
               success: true,
             });
+            auditEntries.push({
+              action: 'credits.bulk_grant',
+              target: userActionTarget(user.id),
+              message: 'Granted credits in bulk',
+              metadata,
+            });
           } else {
-            results.push({
+            pushFailure(
+              { email, userId: user.id, success: false, error: creditResult.message },
+              'grant_refused'
+            );
+          }
+        } catch (error) {
+          pushFailure(
+            {
               email,
               userId: user.id,
               success: false,
-              error: creditResult.message,
-            });
-          }
-        } catch (error) {
-          results.push({
-            email,
-            userId: user.id,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+            adminAuditErrorCode(error)
+          );
         }
       }
+
+      await recordAdminActions(
+        ctx,
+        auditEntries.length > 0
+          ? auditEntries
+          : [
+              {
+                action: 'credits.bulk_grant',
+                target: null,
+                message: 'Granted no credits in bulk',
+                metadata: { ...metadata, requestedCount: 0 },
+              },
+            ]
+      );
 
       return results;
     }),

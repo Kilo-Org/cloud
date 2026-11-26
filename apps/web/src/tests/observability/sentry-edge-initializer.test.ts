@@ -163,3 +163,19 @@ describe('edge Sentry initializer console output', () => {
     ).toEqual({ category: 'fetch', data: { url: '/api/models', authorization: '[Filtered]' } });
   });
 });
+
+describe('edge Sentry initializer trace header', () => {
+  test('drops the span name from the dynamic sampling context', async () => {
+    const on = jest.fn();
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('@sentry/nextjs', () => ({ init: jest.fn(() => ({ on })) }));
+      await import('../../../sentry.edge.config');
+    });
+
+    expect(on).toHaveBeenCalledWith('createDsc', expect.any(Function));
+    const dropName = on.mock.calls[0]?.[1] as (dsc: Record<string, string>) => void;
+    const dsc = { trace_id: 't', transaction: 'GET /share/fake-share-path' };
+    dropName(dsc);
+    expect(dsc).toEqual({ trace_id: 't' });
+  });
+});

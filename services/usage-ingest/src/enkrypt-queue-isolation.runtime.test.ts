@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaMessage, exaRecord } from './exa-usage.test-fixture';
 import type { Env } from './publish-usage';
+import { stsStandIn } from './sts-stand-in.test-fixture';
 import { usage } from './usage.test-fixture';
 
 const publishSecret = 'synthetic-isolation-publisher';
@@ -84,6 +85,7 @@ async function withRuntime(
             USAGE_WRITER_SECRET: writerSecret,
           },
         },
+        stsStandIn(environment === 'staging' ? 'staging' : undefined),
       ],
     });
     harness = server;

@@ -108,16 +108,14 @@ describe('deployed STS callers', () => {
     });
   });
 
-  it('refuses a workload the environment does not list, and every caller in production', async () => {
+  it('refuses a workload the environment does not list, and every caller in production, by workload', async () => {
     const intruder = await stsToken('cloud-agent', UTS_AUTHORITY_SCOPE);
     expect(
       await callers('staging').serviceTokens(`Bearer ${intruder}`, UTS_AUTHORITY_SCOPE)
-    ).toEqual({ status: 'insufficient_scope' });
+    ).toEqual({ status: 'workload_refused', workload: 'cloud-agent' });
     const web = await stsToken('web', UTS_AUTHORITY_SCOPE, { environment: 'production' });
     expect(await callers('production').serviceTokens(`Bearer ${web}`, UTS_AUTHORITY_SCOPE)).toEqual(
-      {
-        status: 'insufficient_scope',
-      }
+      { status: 'workload_refused', workload: 'web' }
     );
     // Production offers no exchange while it admits no exchange caller.
     expect(callers('production').stsCallers).toBeNull();

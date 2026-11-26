@@ -132,11 +132,9 @@ export function deployedStsCallers(
         if (result.reason === 'missing_credential') return { status: 'missing' };
         return { status: result.status === 403 ? 'insufficient_scope' : 'invalid' };
       }
-      if (
-        result.caller.kind !== 'service' ||
-        !workloads.internal.includes(result.caller.workload)
-      ) {
-        return { status: 'insufficient_scope' };
+      if (result.caller.kind !== 'service') return { status: 'workload_refused', workload: null };
+      if (!workloads.internal.includes(result.caller.workload)) {
+        return { status: 'workload_refused', workload: result.caller.workload };
       }
       return { status: 'verified', workload: result.caller.workload };
     },

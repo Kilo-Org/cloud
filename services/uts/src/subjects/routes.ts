@@ -195,6 +195,15 @@ async function routeResponse(
   }
 }
 
+/**
+ * A valid token for the route's scope from a caller that may not call it: a bare 403, since the
+ * scope is not what the caller lacks.
+ */
+function workloadRefused(scope: string, workload: string | null): Response {
+  console.warn(JSON.stringify({ event: 'uts.internal.workload_refused', scope, workload }));
+  return jsonResponse({ error: 'insufficient_scope' }, 403);
+}
+
 /** Answers an `/internal/` route, or null for any other path. */
 export async function handleInternalRequest(
   request: Request,
@@ -220,14 +229,13 @@ export async function handleInternalRequest(
       });
     case 'unavailable':
       return unavailable(check.retryAfterSeconds);
+    case 'workload_refused':
+      return workloadRefused(scope, check.workload);
     case 'verified':
       break;
   }
   const workloads: readonly string[] = UTS_INTERNAL_WORKLOADS;
-  if (!workloads.includes(check.workload)) {
-    console.warn(JSON.stringify({ event: 'uts.internal.workload_refused', scope }));
-    return jsonResponse({ error: 'insufficient_scope' }, 403);
-  }
+  if (!workloads.includes(check.workload)) return workloadRefused(scope, check.workload);
   if (deps.subjects === null) return unavailable(NO_VERIFIER_RETRY_SECONDS);
   const body: unknown = await request.json().catch(() => undefined);
   return await routeResponse(route, body, deps.subjects, check.workload);

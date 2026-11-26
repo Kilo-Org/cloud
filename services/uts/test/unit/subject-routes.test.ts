@@ -4,7 +4,7 @@ import {
   SubjectOperationAnswerSchema,
   UTS_SUBJECT_OPERATIONS,
 } from '@kilocode/uts-contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { IdentityStoreError } from '../../src/db/client';
 import type { FeedEntry } from '../../src/revocation/entries';
 import type { FeedPublish } from '../../src/revocation/publish';
@@ -174,6 +174,33 @@ describe('admission', () => {
       403
     );
     expect((await call(post(path, body, 'web uts:browser-sessions.end'), deps())).status).toBe(200);
+  });
+
+  it('answers a refused workload with a bare 403 and logs the scope and the workload', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const refused: ServiceTokenVerifier = async () => ({
+        status: 'workload_refused',
+        workload: 'cloud-agent',
+      });
+      const routeDeps = { ...deps(), serviceTokens: refused };
+      const request = post('/internal/subjects/revoke', operationBody(), REVOKE);
+      const response = await handleInternalRequest(request, '/internal/subjects/revoke', routeDeps);
+      if (response === null) throw new Error('not an internal route');
+      expect(response.status).toBe(403);
+      expect(response.headers.get('WWW-Authenticate')).toBeNull();
+      expect(await response.json()).toEqual({ error: 'insufficient_scope' });
+      expect(routeDeps.published).toEqual([]);
+      expect(warn.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+        {
+          event: 'uts.internal.workload_refused',
+          scope: 'uts:subjects.revoke',
+          workload: 'cloud-agent',
+        },
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('answers 503 while the identity store is not bound', async () => {

@@ -5,11 +5,14 @@
  * * `verified`: the token is valid for this route; `workload` is its subject.
  * * `missing`: no bearer credential. `invalid`: a credential that is not a valid STS token for
  *   audience `uts`. `insufficient_scope`: a valid token for another scope.
+ * * `workload_refused`: a valid token for this scope from a caller the environment does not admit;
+ *   `workload` is its service workload, or null for a caller that is not a service.
  * * `unavailable`: the check cannot run (no verifier, no key set); the route answers 503.
  */
 export type ServiceTokenCheck =
   | { status: 'verified'; workload: string }
   | { status: 'missing' | 'invalid' | 'insufficient_scope' }
+  | { status: 'workload_refused'; workload: string | null }
   | { status: 'unavailable'; retryAfterSeconds: number };
 
 export type ServiceTokenVerifier = (

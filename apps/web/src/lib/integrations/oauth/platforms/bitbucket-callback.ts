@@ -28,6 +28,7 @@ import {
   addAdminAuditMetadata,
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 type CallbackState = { owner: string; returnTo?: string };
@@ -39,6 +40,11 @@ type CallbackPhase =
   | 'store_integration';
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
+/**
+ * Redirects with the callback's result, and names it as the outcome an elevated
+ * organization write records: a `returnTo` with its own query or fragment keeps
+ * the redirect target from saying it reliably.
+ */
 function redirectWithStatus(
   state: CallbackState | null,
   key: 'success' | 'error',
@@ -52,6 +58,9 @@ function redirectWithStatus(
   const path = state?.returnTo
     ? appendIntegrationOAuthRedirectQuery(state.returnTo, `${key}=${encodeURIComponent(value)}`)
     : `${defaultPath}?${key}=${encodeURIComponent(value)}`;
+  setAdminAuditOutcome(
+    key === 'success' ? { outcome: 'success' } : { outcome: 'failure', errorCode: value }
+  );
   return NextResponse.redirect(new URL(path, APP_URL));
 }
 

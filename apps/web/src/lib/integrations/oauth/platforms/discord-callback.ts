@@ -38,6 +38,7 @@ import {
   addAdminAuditMetadata,
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 /**
@@ -148,9 +149,18 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     }
 
     const connect = async () => {
+      // Names the outcome an elevated organization write records: a `returnTo`
+      // with its own query or fragment keeps the redirect target from saying it
+      // reliably.
+      const failWith = (errorCode: string, path: string) => {
+        setAdminAuditOutcome({ outcome: 'failure', errorCode });
+        return NextResponse.redirect(new URL(path, APP_URL));
+      };
+
       if (verified.provider !== PLATFORM.DISCORD || verified.purpose !== 'provider_install') {
-        return NextResponse.redirect(
-          new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+        return failWith(
+          'invalid_state',
+          oauthCallbackRedirectPath(request, '/integrations?error=invalid_state')
         );
       }
 
@@ -190,14 +200,12 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
             extra: { guildId, outcome: selectedPresence.status },
           });
 
-          return NextResponse.redirect(
-            new URL(
-              buildIntegrationOAuthRedirectPathFromState(
-                PLATFORM.DISCORD,
-                state,
-                'error=bot_not_in_server'
-              ),
-              APP_URL
+          return failWith(
+            'bot_not_in_server',
+            buildIntegrationOAuthRedirectPathFromState(
+              PLATFORM.DISCORD,
+              state,
+              'error=bot_not_in_server'
             )
           );
         }
@@ -236,14 +244,12 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
           : await store();
       } catch (error) {
         if (error instanceof DiscordGuildAlreadyConnectedError) {
-          return NextResponse.redirect(
-            new URL(
-              buildIntegrationOAuthRedirectPathFromState(
-                PLATFORM.DISCORD,
-                state,
-                'error=workspace_already_connected'
-              ),
-              APP_URL
+          return failWith(
+            'workspace_already_connected',
+            buildIntegrationOAuthRedirectPathFromState(
+              PLATFORM.DISCORD,
+              state,
+              'error=workspace_already_connected'
             )
           );
         }
@@ -294,14 +300,12 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
             extra: { guildId: recordedGuildId, outcome: presence.status, discarded },
           });
 
-          return NextResponse.redirect(
-            new URL(
-              buildIntegrationOAuthRedirectPathFromState(
-                PLATFORM.DISCORD,
-                state,
-                'error=bot_not_in_server'
-              ),
-              APP_URL
+          return failWith(
+            'bot_not_in_server',
+            buildIntegrationOAuthRedirectPathFromState(
+              PLATFORM.DISCORD,
+              state,
+              'error=bot_not_in_server'
             )
           );
         }
@@ -331,6 +335,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
         ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=discord_installed')
         : buildIntegrationOAuthRedirectPath(PLATFORM.DISCORD, owner, 'success=installed');
 
+      setAdminAuditOutcome({ outcome: 'success' });
       return NextResponse.redirect(new URL(successPath, APP_URL));
     };
 

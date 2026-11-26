@@ -21,9 +21,11 @@ import {
   runElevatedOrganizationWrite,
   setAdminActionSinkForTest,
   setAdminAuditActor,
+  setAdminAuditOutcome,
   userActionTarget,
   type AdminActionContext,
   type AdminActionEvent,
+  type AdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 function ctxFor(overrides: Partial<AdminActionContext> = {}): AdminActionContext {
@@ -417,7 +419,7 @@ describe('runElevatedOrganizationWrite', () => {
       .update(organizations)
       .set({ parent_organization_id: parent.id })
       .where(eq(organizations.id, child.id));
-    return { admin, childId: child.id };
+    return { admin, parentId: parent.id, childId: child.id };
   }
 
   function write<TResult>(
@@ -451,6 +453,25 @@ describe('runElevatedOrganizationWrite', () => {
     const rows = await db.select().from(admin_action_audit_logs);
     expect(rows).toEqual([
       expect.objectContaining({ outcome: 'success', metadata: { heldRoles: [] } }),
+    ]);
+  });
+
+  test('a role held only in a soft-deleted parent counts as no role, as it does for the guard', async () => {
+    const { admin, parentId, childId } = await adminWithInheritedOwnerRole();
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, parentId));
+
+    await expect(write(admin, childId, succeed)).resolves.toBe('done');
+
+    expect(await db.select().from(admin_action_audit_logs)).toEqual([
+      expect.objectContaining({
+        outcome: 'success',
+        target_type: 'organization',
+        target_id: childId,
+        metadata: { heldRoles: [] },
+      }),
     ]);
   });
 
@@ -500,34 +521,57 @@ describe('runElevatedOrganizationWrite', () => {
     expect(JSON.stringify(rows)).not.toContain('secret text');
   });
 
-  test.each([
-    ['a 4xx status', Response.json({ error: 'nope' }, { status: 403 }), 'failure', '403'],
-    [
-      'a redirect carrying an error code',
-      Response.redirect('http://localhost/integrations?error=installation_failed', 302),
-      'failure',
-      'installation_failed',
-    ],
-    [
-      'a redirect carrying provider free text',
-      Response.redirect('http://localhost/integrations?error=The%20user%20said%20no', 302),
-      'failure',
-      'redirect_error',
-    ],
-    [
-      'a success redirect',
-      Response.redirect('http://localhost/integrations?success=installed', 302),
-      'success',
-      undefined,
-    ],
-  ])('judges a response with %s', async (_label, response, outcome, errorCode) => {
+  test('judges a response by its status when the write names no outcome', async () => {
     const admin = await insertTestUser({ is_admin: true });
+    const response = Response.json({ error: 'nope' }, { status: 403 });
 
     await expect(write(admin, crypto.randomUUID(), async () => response)).resolves.toBe(response);
 
     const [row] = await db.select().from(admin_action_audit_logs);
-    expect(row?.outcome).toBe(outcome);
-    expect(row?.metadata).toEqual({ heldRoles: [], ...(errorCode ? { errorCode } : {}) });
+    expect(row?.outcome).toBe('failure');
+    expect(row?.metadata).toEqual({ heldRoles: [], errorCode: '403' });
+  });
+
+  test.each<[string, string, AdminAuditOutcome, Record<string, unknown>]>([
+    [
+      'a failure whose code the return path fragment hides',
+      'http://localhost/integrations#repositories?error=installation_failed',
+      { outcome: 'failure', errorCode: 'installation_failed' },
+      { heldRoles: [], errorCode: 'installation_failed' },
+    ],
+    [
+      'a success whose return path keeps an earlier error parameter',
+      'http://localhost/integrations?error=access_denied&success=installed',
+      { outcome: 'success' },
+      { heldRoles: [] },
+    ],
+  ])('records the outcome a redirect names: %s', async (_label, location, named, metadata) => {
+    const admin = await insertTestUser({ is_admin: true });
+    const response = Response.redirect(location, 302);
+
+    await expect(
+      write(admin, crypto.randomUUID(), async () => {
+        setAdminAuditOutcome(named);
+        return response;
+      })
+    ).resolves.toBe(response);
+
+    const [row] = await db.select().from(admin_action_audit_logs);
+    expect(row?.outcome).toBe(named.outcome);
+    expect(row?.metadata).toEqual(metadata);
+  });
+
+  test('reports a redirecting write that names no outcome as an audit gap and records a failure', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+
+    await expect(
+      write(admin, crypto.randomUUID(), async () =>
+        Response.redirect('http://localhost/integrations?success=installed', 302)
+      )
+    ).rejects.toThrow('Admin audit gap');
+
+    const [row] = await db.select().from(admin_action_audit_logs);
+    expect(row?.outcome).toBe('failure');
   });
 
   test('records with unknown held roles instead of throwing when the membership lookup fails', async () => {

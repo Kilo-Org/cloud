@@ -21,6 +21,7 @@ import { oauthStateHash, validOAuthCode } from '@/lib/integrations/oauth/callbac
 import {
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
@@ -142,6 +143,13 @@ export async function GET(request: NextRequest) {
     }
 
     const connect = async (): Promise<NextResponse> => {
+      // Names the outcome an elevated organization write records: a
+      // `returnTo` with its own query or fragment keeps the redirect target from
+      // saying it reliably.
+      const failWith = (errorCode: string, path: string) => {
+        setAdminAuditOutcome({ outcome: 'failure', errorCode });
+        return NextResponse.redirect(new URL(path, APP_URL));
+      };
       const oauthErrorCode = sanitizeOAuthProviderError(error, errorDescription);
       if (oauthErrorCode) {
         captureMessage('Google OAuth error', {
@@ -150,8 +158,9 @@ export async function GET(request: NextRequest) {
           extra: oauthSentryContext(searchParams),
         });
 
-        return NextResponse.redirect(
-          new URL(buildGoogleRedirectPath(verifiedState, `error=${oauthErrorCode}`), APP_URL)
+        return failWith(
+          'oauth_provider_error',
+          buildGoogleRedirectPath(verifiedState, `error=${oauthErrorCode}`)
         );
       }
 
@@ -163,8 +172,9 @@ export async function GET(request: NextRequest) {
           extra: oauthSentryContext(searchParams),
         });
 
-        return NextResponse.redirect(
-          new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_code'), APP_URL)
+        return failWith(
+          'missing_code',
+          buildGoogleRedirectPath(verifiedState, 'error=missing_code')
         );
       }
 
@@ -180,8 +190,9 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        return NextResponse.redirect(
-          new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_instance'), APP_URL)
+        return failWith(
+          'missing_instance',
+          buildGoogleRedirectPath(verifiedState, 'error=missing_instance')
         );
       }
 
@@ -206,7 +217,7 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
+        return failWith('unauthorized', '/claw/settings?error=unauthorized');
       }
 
       if (verifiedState.owner.type === 'org') {
@@ -220,8 +231,9 @@ export async function GET(request: NextRequest) {
         oauthData = await exchangeGoogleOAuthCode(oauthCode, verifiedState.capabilities);
       } catch (error) {
         if (error instanceof GoogleOAuthCapabilityScopesNotGrantedError) {
-          return NextResponse.redirect(
-            new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_permissions'), APP_URL)
+          return failWith(
+            'missing_permissions',
+            buildGoogleRedirectPath(verifiedState, 'error=missing_permissions')
           );
         }
         throw error;
@@ -257,6 +269,7 @@ export async function GET(request: NextRequest) {
           ? `/organizations/${verifiedState.owner.id}/claw/settings?success=google_connected`
           : '/claw/settings?success=google_connected';
 
+      setAdminAuditOutcome({ outcome: 'success' });
       return NextResponse.redirect(new URL(successPath, APP_URL));
     };
 

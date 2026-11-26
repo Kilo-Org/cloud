@@ -46,6 +46,7 @@ import {
   addAdminAuditMetadata,
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { restoreProviderInstallation } from '@/lib/integrations/oauth/provider-installation-restore';
@@ -324,6 +325,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
 
     const connect = async () => {
       if (verified.provider !== PLATFORM.LINEAR || verified.purpose !== 'provider_install') {
+        setAdminAuditOutcome({ outcome: 'failure', errorCode: 'invalid_state' });
         return NextResponse.redirect(
           new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
         );
@@ -443,6 +445,13 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
         });
       }
 
+      // A `returnTo` with its own query or fragment keeps the redirect target
+      // from saying how the write went, so the outcome is named here.
+      setAdminAuditOutcome(
+        install.installed
+          ? { outcome: 'success' }
+          : { outcome: 'failure', errorCode: 'workspace_already_connected' }
+      );
       return install.response;
     };
 

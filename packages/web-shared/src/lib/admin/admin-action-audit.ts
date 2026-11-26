@@ -3,14 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import {
-  admin_action_audit_logs,
-  organization_memberships,
-  organizations,
-  type User,
-} from '@kilocode/db/schema';
-import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
-import { and, eq, inArray } from 'drizzle-orm';
+import { admin_action_audit_logs, organization_memberships, type User } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 import {
   AdminActionAuditAction,
   type AdminActionAuditOutcome,
@@ -29,6 +23,7 @@ import {
   targetIdFromInput,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -365,14 +360,18 @@ export function organizationActionTarget(organizationId: string): AdminActionTar
  * membership (e.g. self-removal) is judged by the roles it started with. Start
  * it right after the guard admitted the caller. The row is written once `run`
  * ends: a failure row with a stable `errorCode` when it throws (the error is
- * rethrown unchanged) or when `outcomeOf` reports a failure, else a success
- * row. Without `outcomeOf`, a `Response` result is judged by
- * {@link responseAuditOutcome} and any other result is a success.
+ * rethrown unchanged), else the outcome `run` named with
+ * {@link setAdminAuditOutcome}, else the one `outcomeOf` reports. Without
+ * either, a `Response` result is judged by {@link responseAuditOutcome} and any
+ * other result is a success.
  *
  * `requiredRoles` and `membershipScope` must mirror the guard the admin
  * bypassed: some guards accept roles inherited from a parent organization,
- * others only a direct membership. The row's metadata is `metadata`, anything
- * `run` adds with {@link addAdminAuditMetadata}, and the admin's `heldRoles`.
+ * others only a direct membership. The inherited scope reads the admin's roles
+ * through the organization guards' own membership lookup, so a role held only
+ * in a soft-deleted parent counts as no role, as it does for the guard. The
+ * row's metadata is `metadata`, anything `run` adds with
+ * {@link addAdminAuditMetadata}, and the admin's `heldRoles`.
  *
  * Like {@link recordAdminAction}, the audit never fails the write: if the
  * membership lookup fails, the write is recorded with `heldRoles: null`.
@@ -395,6 +394,7 @@ export async function runElevatedOrganizationWrite<TResult>(
     actor: null,
     failureAction: null,
     inputParsingStarted: false,
+    outcome: null,
   };
   const heldRoles = await bypassedOrganizationHeldRoles(ctx, write);
   if (heldRoles === undefined) return adminAuditScope.run(state, run);
@@ -402,11 +402,13 @@ export async function runElevatedOrganizationWrite<TResult>(
   let outcome: AdminAuditOutcome | undefined;
   try {
     const result = await adminAuditScope.run(state, run);
-    outcome = write.outcomeOf
-      ? write.outcomeOf(result)
-      : result instanceof Response
-        ? responseAuditOutcome(result)
-        : { outcome: 'success' };
+    outcome =
+      state.outcome ??
+      (write.outcomeOf
+        ? write.outcomeOf(result)
+        : result instanceof Response
+          ? responseAuditOutcome(result)
+          : { outcome: 'success' });
     return result;
   } catch (error) {
     outcome = { outcome: 'failure', errorCode: adminAuditErrorCode(error) };
@@ -466,40 +468,29 @@ async function bypassedOrganizationHeldRoles(
 export type OrganizationMembershipScope = 'direct' | 'direct_or_inherited';
 
 /**
- * The caller's real roles in an organization: direct memberships, plus roles
- * inherited from a parent organization when `scope` allows, mirroring
- * ensureOrganizationAccess for non-admins.
+ * The caller's real roles in an organization: its direct memberships, or with
+ * the inherited scope the effective roles the organization guards read
+ * (direct memberships in a live organization plus roles inherited from a live
+ * parent), mirroring ensureOrganizationAccess for non-admins.
  */
 async function getOrganizationMembershipRoles(
   userId: string,
   organizationId: string,
   scope: OrganizationMembershipScope
 ): Promise<OrganizationRole[]> {
-  const direct = await db
-    .select({ role: organization_memberships.role })
-    .from(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, userId),
-        eq(organization_memberships.organization_id, organizationId)
-      )
-    );
-  const inherited =
+  const rows =
     scope === 'direct'
-      ? []
-      : await db
+      ? await db
           .select({ role: organization_memberships.role })
-          .from(organizations)
-          .innerJoin(
-            organization_memberships,
+          .from(organization_memberships)
+          .where(
             and(
-              eq(organization_memberships.organization_id, organizations.parent_organization_id),
               eq(organization_memberships.kilo_user_id, userId),
-              inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+              eq(organization_memberships.organization_id, organizationId)
             )
           )
-          .where(eq(organizations.id, organizationId));
-  return [...new Set([...direct, ...inherited].map(row => row.role))];
+      : await loadEffectiveMembershipRows(userId, organizationId);
+  return [...new Set(rows.map(row => row.role))];
 }
 
 /** Audit context for REST route handlers, which have request headers instead of a tRPC context. */
@@ -574,6 +565,8 @@ type AdminAuditScopeState = {
   failureAction: AdminActionAuditAction | null;
   /** Whether the call's input parser has read its input (see {@link AdminAuditRun}). */
   inputParsingStarted: boolean;
+  /** The outcome the call named with {@link setAdminAuditOutcome}, if any. */
+  outcome: AdminAuditOutcome | null;
 };
 
 const adminAuditScope = new AsyncLocalStorage<AdminAuditScopeState>();
@@ -617,6 +610,17 @@ export function setAdminAuditActor(user: AdminAuditActor): void {
   if (state) state.actor = user;
 }
 
+/**
+ * Names the outcome the enclosing audit scope records when the call returns,
+ * in place of judging its result. A handler whose result does not reliably say
+ * how it went, such as a redirect, names it on every branch it returns from. A
+ * throw still records a failure with the thrown value's code.
+ */
+export function setAdminAuditOutcome(outcome: AdminAuditOutcome): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.outcome = outcome;
+}
+
 function noteAdminAuditRecordCall(): void {
   const state = adminAuditScope.getStore();
   if (state) state.recordCalls += 1;
@@ -638,27 +642,23 @@ export type AdminAuditOutcome =
   | { outcome: 'failure'; errorCode: string; inputRejected?: boolean };
 
 /**
- * The outcome of a write answered with a `Response`. A status of 400 or above
- * fails with the status as its code. So does a redirect whose target carries
- * the `errorParam` query parameter, the way OAuth callbacks report a failed
- * connection: its value is the code when it reads as one, else
- * `redirect_error`, since a provider can pass free text through it.
+ * The outcome of a write answered with a `Response` that named none with
+ * {@link setAdminAuditOutcome}. A status of 400 or above fails with the status
+ * as its code. A redirect's target does not reliably say how the write went
+ * (an OAuth callback appends its result to a caller-chosen return path, which
+ * can carry its own query or fragment), so a write answered with a redirect
+ * must name its outcome: one that names none is reported as an audit gap and
+ * recorded as a failure with code `outcome_unrecorded`. Any other response is
+ * a success.
  */
-export function responseAuditOutcome(response: Response, errorParam = 'error'): AdminAuditOutcome {
+function responseAuditOutcome(response: Response): AdminAuditOutcome {
   if (response.status >= 400) return { outcome: 'failure', errorCode: String(response.status) };
-  const location = response.headers.get('location');
-  const redirectError =
-    location === null
-      ? null
-      : new URL(location, 'http://redirect.invalid').searchParams.get(errorParam);
-  if (redirectError === null) return { outcome: 'success' };
-  return {
-    outcome: 'failure',
-    errorCode: REDIRECT_ERROR_CODE_PATTERN.test(redirectError) ? redirectError : 'redirect_error',
-  };
+  if (response.status >= 300) {
+    reportAdminAuditGap('a redirect response named no audit outcome');
+    return { outcome: 'failure', errorCode: 'outcome_unrecorded' };
+  }
+  return { outcome: 'success' };
 }
-
-const REDIRECT_ERROR_CODE_PATTERN = /^[a-z0-9_]{1,64}$/;
 
 export type AdminAuditRun<TResult> = {
   spec: AdminAuditSpec;
@@ -702,6 +702,7 @@ export async function runAdminAuditScope<TResult>(
     actor: null,
     failureAction: null,
     inputParsingStarted: false,
+    outcome: null,
   };
   let result: TResult;
   try {
@@ -715,7 +716,7 @@ export async function runAdminAuditScope<TResult>(
     throw error;
   }
 
-  const outcome = params.outcomeOf(result);
+  const outcome = state.outcome ?? params.outcomeOf(result);
   if (outcome.outcome === 'failure') {
     await recordScopeFailure(params, state, outcome);
   } else if (spec.kind === 'declarative') {

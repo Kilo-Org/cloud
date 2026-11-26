@@ -18,10 +18,10 @@ export type O11ySecretName =
   | 'O11Y_CF_CONTAINERS_API_TOKEN';
 
 /**
- * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads today's bindings,
- * `sts` reads the same names from the STS bundle. Rollback is a redeploy with the variable set
- * back to `secrets-store`; both sources stay bound until the cutover completes. An absent
- * variable means `secrets-store`.
+ * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads the Secrets Store
+ * bindings, `sts` reads the same names from the STS bundle. Production reads `sts`. Rollback is a
+ * redeploy with the variable set back to `secrets-store`; both sources stay bound until the
+ * cutover completes. An absent variable means `secrets-store`.
  */
 export type O11ySecretsEnv = Partial<Record<O11ySecretName, SecretsStoreSecret>> & {
   SECRETS_SOURCE?: string;

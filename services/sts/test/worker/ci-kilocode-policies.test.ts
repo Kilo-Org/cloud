@@ -221,9 +221,10 @@ describe('shipped Kilo-Org/kilocode policies', () => {
       if (policy.workflows.includes(file)) continue;
       const body = claims(policy.environment, 'x.yml', policy.events[0] ?? 'workflow_dispatch');
       body.job_workflow_ref = pinned(file);
-      const outcome = await verify(body);
-      expect(outcome, file).toMatchObject({ status: 'denied' });
-      expect(outcome).not.toMatchObject({ status: 'verified' });
+      expect(await verify(body), file).toMatchObject({
+        status: 'denied',
+        reason: 'identity_rejected',
+      });
     }
   });
 
@@ -260,6 +261,17 @@ describe('shipped Kilo-Org/kilocode policies', () => {
     for (const sub of [
       'repo:Kilo-Org/kilocode:environment:release',
       `repo:Kilo-Org@${OWNER_ID}/kilocode@${REPOSITORY_ID}:ref:refs/heads/main`,
+    ]) {
+      expect(await verify({ ...base, sub }), sub).toMatchObject({
+        status: 'denied',
+        reason: 'identity_rejected',
+        subject: { actor: 'ci-kilocode-release' },
+      });
+    }
+    // The subject names another repository id while the id claims still name kilocode.
+    for (const sub of [
+      `repo:Kilo-Org@${OWNER_ID}/kilocode@1395255492:environment:release`,
+      `repo:Kilo-Org@${OWNER_ID}/bouncer@1395255492:environment:release`,
     ]) {
       expect(await verify({ ...base, sub }), sub).toMatchObject({
         status: 'denied',

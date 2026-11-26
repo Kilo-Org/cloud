@@ -466,6 +466,15 @@ deploy token; their bundles are `/ci/<workload>`:
 `Kilo-Org/kilocode` predates GitHub's immutable subjects and has not opted in yet, so STS refuses
 its tokens (`identity_rejected`) until it does. No policy admits the `v2` branch or `release-v2`.
 
+Two kilocode-side rules hold these policies to what they name:
+
+- None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
+  carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
+  `main` that called it with a listed event would get the bundle.
+- The GitHub environments `automation`, `release` and `release-jetbrains` admit deployments from
+  `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch rule is
+  what makes it mean `main`.
+
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
 review covers its STS binding; this repository refuses any config that deploys under the name.

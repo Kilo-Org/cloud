@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
   isRegisteredStsScope,
   stsScopeRegistryProblems,
@@ -150,12 +151,15 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes, so every other scope is denied', () => {
+  it('lists only the pilot scopes and the reserved probe, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
       web: { scopes: ['web:sts.canary'] },
       'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
+      canary: { scopes: ['canary:denied-probe'] },
     });
+    expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
+    expect(isRegisteredStsScope('canary', 'canary:denied-probe')).toBe(true);
     expect(isRegisteredStsScope('gateway', 'gateway:models.read')).toBe(false);
     expect(isRegisteredStsScope('web', 'usage-ingest:sts.canary')).toBe(false);
   });

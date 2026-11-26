@@ -114,9 +114,12 @@ const revocation: RevocationFeedSource = {
   },
 };
 
+/** The fixture's UTS key set is always freshly read. */
+const KEY_AGES = { newest: 0, oldest: 0 };
+
 const bootstrap: UtsBootstrapSource = async () => {
   await call('bootstrap');
-  return { jwks: utsKeys(), head: await signedHead(), list: LIST_BYTES };
+  return { jwks: utsKeys(), keyAges: KEY_AGES, head: await signedHead(), list: LIST_BYTES };
 };
 
 function config(cold: 'bootstrap' | 'separate') {
@@ -129,7 +132,7 @@ function config(cold: 'bootstrap' | 'separate') {
       scopeRegistry: { 'session-ingest': { scopes: [SCOPE] } },
       jwks: async () => {
         await call('stsJwks');
-        return setup.stsJwks;
+        return { body: setup.stsJwks, age: null, oldestAge: null };
       },
     },
     uts: {
@@ -140,7 +143,7 @@ function config(cold: 'bootstrap' | 'separate') {
           : null,
       jwks: async () => {
         await call('utsJwks');
-        return utsKeys();
+        return { body: utsKeys(), age: 0, oldestAge: 0 };
       },
       revocation,
       bootstrap: cold === 'bootstrap' ? bootstrap : undefined,

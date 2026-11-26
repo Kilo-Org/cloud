@@ -62,14 +62,18 @@ export const STS_CANARY_JOB_NAME = 'usage_ingest.sts_canary';
  * The web route's slowest run: a cold key-set fetch to verify this Worker's token
  * (`JWKS_FETCH_TIMEOUT_MS`, 5 s), one mint attempt (`HTTP_ATTEMPT_TIMEOUT_MS`, 30 s, both tries
  * after an identity refusal included), then four calls to this Worker
- * (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each): 5 + 30 + 4 x 10 = 75 s. This Worker waits 5 s
- * past that, 80 s, under the route's 90 s `maxDuration` (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`),
- * so even the slowest run lands its report here.
+ * (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each) with the denied mint, one more 30 s attempt,
+ * alongside them: 5 + 30 + max(4 x 10, 30) = 75 s. This Worker waits 5 s past that, 80 s, under
+ * the route's 90 s `maxDuration` (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`), so even the slowest
+ * run lands its report here.
  */
 export const WEB_CALL_TIMEOUT_MS =
   JWKS_FETCH_TIMEOUT_MS +
   HTTP_ATTEMPT_TIMEOUT_MS +
-  STS_CANARY_VERIFY_CALLS_MAX * STS_CANARY_VERIFY_CALL_TIMEOUT_MS +
+  Math.max(
+    STS_CANARY_VERIFY_CALLS_MAX * STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
+    HTTP_ATTEMPT_TIMEOUT_MS
+  ) +
   5_000;
 
 /** One client per isolate, keyed by the binding, so every run after the first reuses its token. */
@@ -211,6 +215,7 @@ function reportMetadata(report: StsCanaryReport): ScheduledJobMetadata {
     ...checkMetadata('negative_wrong_audience', report.negatives.wrongAudience),
     ...checkMetadata('negative_forged', report.negatives.forged),
     ...checkMetadata('negative_expired', report.negatives.expired),
+    ...checkMetadata('negative_sts_denied', report.negatives.stsDenied),
   };
 }
 

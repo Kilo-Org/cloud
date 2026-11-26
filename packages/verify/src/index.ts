@@ -23,18 +23,21 @@ export {
 export type { WaitUntil } from './flight';
 export {
   JWKS_FETCH_TIMEOUT_MS,
+  JWKS_JITTER,
   JWKS_MAX_RETRY_MS,
   JWKS_MAX_STALE_MS,
   JWKS_REFRESH_AFTER_MS,
   JWKS_RETRY_MS,
   JWKS_STALE_WAIT_MS,
   JWKS_TTL_MS,
+  KEY_SET_OLDEST_AGE_HEADER,
   UNKNOWN_KID_REFRESH_INTERVAL_MS,
   UTS_FEED_KID_PREFIX,
   UTS_TOKEN_KID_PREFIX,
   httpJwksSource,
   type FetchLike,
   type JwksSource,
+  type KeySetAges,
 } from './jwks';
 export {
   FEED_FETCH_TIMEOUT_MS,

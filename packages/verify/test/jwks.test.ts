@@ -7,11 +7,13 @@ import {
   JWKS_RETRY_MS,
   JWKS_STALE_WAIT_MS,
   JWKS_TTL_MS,
+  KEY_SET_OLDEST_AGE_HEADER,
   UNKNOWN_KID_REFRESH_INTERVAL_MS,
   httpJwksSource,
   type VerifyResult,
 } from '../src/index';
-import { importKeySet } from '../src/jwks';
+import { newCallScope } from '../src/flight';
+import { createKeySetCache, importKeySet } from '../src/jwks';
 import {
   SCOPE,
   STS_ISSUER,
@@ -369,7 +371,11 @@ describe('the HTTPS key-set source', () => {
       expect(init.signal).toBeInstanceOf(AbortSignal);
       return Response.json({ keys: [] });
     });
-    expect(await source(AbortSignal.timeout(1000))).toEqual({ keys: [] });
+    expect(await source(AbortSignal.timeout(1000))).toEqual({
+      body: { keys: [] },
+      age: null,
+      oldestAge: null,
+    });
     expect(seen).toEqual(['https://sts.test/.well-known/jwks.json']);
   });
 
@@ -379,6 +385,91 @@ describe('the HTTPS key-set source', () => {
   ])('rejects %s', async (_name, answer) => {
     const source = httpJwksSource('https://sts.test', async () => answer());
     await expect(source(AbortSignal.timeout(1000))).rejects.toThrow();
+  });
+
+  /** A 302 to another origin, as a fetch that honours `redirect: 'manual'` answers it. */
+  const redirect = () =>
+    new Response(null, { status: 302, headers: { location: 'https://elsewhere.test/jwks.json' } });
+  /** A 200 whose read-only `redirected` or `type` is set, as a followed redirect answers. */
+  const followed = (property: 'redirected' | 'type', value: unknown) => () => {
+    const response = Response.json({ keys: [] });
+    Object.defineProperty(response, property, { value });
+    return response;
+  };
+  it.each([
+    ['a 302', redirect, 'HTTP 302'],
+    ['a response that followed a redirect anyway', followed('redirected', true), 'HTTP 200'],
+    ['an opaque redirect', followed('type', 'opaqueredirect'), 'HTTP 200'],
+  ])('refuses %s, naming only its status', async (_name, answer, detail) => {
+    const source = httpJwksSource('https://uts.test', async () => answer());
+    const refused = await source(AbortSignal.timeout(1000)).then(
+      () => null,
+      (error: unknown) => error
+    );
+    expect(refused).toBeInstanceOf(Error);
+    expect(String(refused)).toBe(`Error: key set answered ${detail}`);
+  });
+
+  it('never follows a redirect: the cache keeps the last good set', async () => {
+    const issuer = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID);
+    const elsewhere = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID);
+    const ages = { age: '0', [KEY_SET_OLDEST_AGE_HEADER]: '0' };
+    let moved = false;
+    const modes: string[] = [];
+    // Once moved, a manual request gets the 302 and a followed one the other origin's valid set.
+    const source = httpJwksSource(UTS_ISSUER, async (_url, init) => {
+      modes.push(init.redirect);
+      if (!moved) return Response.json({ keys: [issuer.jwk] }, { headers: ages });
+      if (init.redirect === 'manual') return redirect();
+      return Response.json({ keys: [elsewhere.jwk] }, { headers: ages });
+    });
+    const keySet = createKeySetCache(source, 'uts');
+    expect(await keySet.key(issuer.kid, newCallScope())).toMatchObject({ status: 'key' });
+    moved = true;
+    advance(JWKS_TTL_MS);
+    expect(await keySet.key(issuer.kid, newCallScope())).toMatchObject({ status: 'key' });
+    expect(await keySet.key(elsewhere.kid, newCallScope())).toMatchObject({
+      status: 'unavailable',
+    });
+    expect(modes).toEqual(['manual', 'manual']);
+  });
+
+  // Each row: the `Age` and `Kilo-Key-Set-Oldest-Age` headers sent (absent when undefined), and
+  // the ages the source answers, or 'rejects' (a failed fetch).
+  type AgeRow = [
+    string,
+    string | undefined,
+    string | undefined,
+    [number | null, number | null] | 'rejects',
+  ];
+  it.each<AgeRow>([
+    ['reads both ages', '30', '600', [30, 600]],
+    ['reads zero ages', '0', '0', [0, 0]],
+    ['answers null for absent headers', undefined, undefined, [null, null]],
+    ['answers null for an absent oldest age', '30', undefined, [30, null]],
+    ['answers null for an absent Age', undefined, '600', [null, 600]],
+    ['passes an oldest age below Age on to the cache', '30', '20', [30, 20]],
+    ['rejects a fractional Age', '1.5', '600', 'rejects'],
+    ['rejects a negative Age', '-1', '600', 'rejects'],
+    ['rejects two Age values', '5, 6', '600', 'rejects'],
+    ['rejects an Age that is not a number', 'abc', '600', 'rejects'],
+    ['rejects an empty oldest age', '30', '', 'rejects'],
+    ['rejects a malformed oldest age', '30', '6e2', 'rejects'],
+  ])('%s', async (_name, age, oldest, expected) => {
+    const headers = new Headers();
+    if (age !== undefined) headers.set('age', age);
+    if (oldest !== undefined) headers.set(KEY_SET_OLDEST_AGE_HEADER, oldest);
+    const source = httpJwksSource('https://uts.test', async () =>
+      Response.json({ keys: [] }, { headers })
+    );
+    if (expected === 'rejects') {
+      await expect(source(AbortSignal.timeout(1000))).rejects.toThrow();
+    } else {
+      expect(await source(AbortSignal.timeout(1000))).toMatchObject({
+        age: expected[0],
+        oldestAge: expected[1],
+      });
+    }
   });
 });
 

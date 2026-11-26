@@ -45,6 +45,13 @@ const WRANGLER_ENVIRONMENTS: ReadonlyMap<string | null, UtsEnvironment> = new Ma
   ['local', 'development'],
 ]);
 
+/** The UTS audit queue of each environment; only the mint Worker of that environment sends to it. */
+const UTS_AUDIT_QUEUES: Readonly<Record<UtsEnvironment, string>> = {
+  production: 'kilo-audit-uts',
+  staging: 'kilo-audit-uts-staging',
+  development: 'kilo-audit-uts-local',
+};
+
 // Prefix match, wider than the deployment lists on purpose: a name that only looks like UTS
 // fails here instead of slipping past an exact-name list.
 const isUtsName = (name: string) => name === 'uts' || name.startsWith('uts-');
@@ -81,6 +88,11 @@ const RouteSchema = z.union([
 const BindingsShape = {
   vars: z.record(z.string(), z.unknown()).optional(),
   services: z.array(ServiceBindingSchema).optional(),
+  queues: z
+    .looseObject({
+      producers: z.array(z.looseObject({ binding: z.string(), queue: z.string() })).optional(),
+    })
+    .optional(),
   durable_objects: z
     .looseObject({
       bindings: z.array(
@@ -414,6 +426,19 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       problems.push(`${MINT_CONFIG} deploys ${deployments(mint)}; expected ${expected}`);
     for (const block of blocksOf(mint)) {
       const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+      // Each block produces only to its own environment's UTS audit queue, the one queue whose
+      // batches the audit relay reads as UTS streams (services/audit-relay/src/relay).
+      if (environment !== undefined && !block.preview) {
+        const produced = (block.bindings.queues?.producers ?? [])
+          .map(producer => `${producer.binding}=${producer.queue}`)
+          .join(', ');
+        const expectedQueue = `AUDIT_QUEUE=${UTS_AUDIT_QUEUES[environment]}`;
+        if (produced !== expectedQueue) {
+          problems.push(
+            `${block.where}: produces to ${produced || 'nothing'}; expected ${expectedQueue}`
+          );
+        }
+      }
       if (environment === 'development') continue;
       const main = block.block?.main ?? mint.config.main;
       if (main !== MINT_DEPLOYED_ENTRY) {
@@ -442,6 +467,9 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       }
       if ((block.bindings.durable_objects?.bindings ?? []).length > 0) {
         problems.push(`${block.where}: the feed Worker binds no Durable Object yet`);
+      }
+      if ((block.bindings.queues?.producers ?? []).length > 0) {
+        problems.push(`${block.where}: the feed Worker produces to no queue`);
       }
       const signerKeys = (block.bindings.services ?? []).filter(binding =>
         isMintName(binding.service)

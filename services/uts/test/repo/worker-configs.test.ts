@@ -232,6 +232,20 @@ describe('the UTS configs themselves', () => {
     ]);
   });
 
+  it('fail a mint block that produces to any queue but its own UTS audit queue', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({
+        ...raw,
+        queues: { producers: [{ binding: 'AUDIT_QUEUE', queue: 'kilo-audit' }] },
+      }))
+    );
+    expect(problems).toEqual([
+      expect.stringContaining(
+        '(top level): produces to AUDIT_QUEUE=kilo-audit; expected AUDIT_QUEUE=kilo-audit-uts'
+      ),
+    ]);
+  });
+
   it('fail placement on the feed Worker', () => {
     const configs = repoConfigs().filter(worker => worker.path !== FEED_CONFIG);
     const feed = configAt(FEED_CONFIG);

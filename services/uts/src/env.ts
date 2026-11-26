@@ -36,7 +36,7 @@ export type Env = {
   UTS_KEY_SET_DO: DurableObjectNamespace<UtsKeySetDO>;
   /** One audit outbox relay object per audit shard (src/audit/relay.ts). */
   UTS_AUDIT_RELAY_DO: DurableObjectNamespace<UtsAuditRelayDO>;
-  /** The environment's shared audit queue, which the audit relay service consumes. */
+  /** The environment's UTS audit queue, which only UTS produces to and the audit relay consumes. */
   AUDIT_QUEUE: Queue;
   /**
    * The identity store's primary Hyperdrive config, bound once the environment's identity store is

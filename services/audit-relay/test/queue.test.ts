@@ -105,32 +105,57 @@ describe('queue handler', () => {
 
   it.each([
     {
-      label: 'an event source of another producer',
-      stream: 'sts:production:bundle:forged',
+      label: 'a UTS stream on the STS queue',
+      queue: 'kilo-audit',
+      stream: 'uts:production:3',
       source: 'kilo:uts:production',
-      reason: 'refused_source_mismatch',
+      reason: 'refused_stream_not_allowed',
     },
     {
-      label: 'an event source of another environment',
-      stream: 'uts:production:3',
+      label: 'an STS stream with UTS sources on the UTS queue',
+      queue: 'kilo-audit-uts',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:uts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'an STS stream on the UTS dead-letter queue',
+      queue: 'kilo-audit-uts-dlq',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:sts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'a UTS stream of another environment',
+      queue: 'kilo-audit-uts',
+      stream: 'uts:staging:3',
       source: 'kilo:uts:staging',
-      reason: 'refused_source_mismatch',
+      reason: 'refused_stream_not_allowed',
     },
     {
       label: 'a UTS stream that is not one of the 8 shards',
+      queue: 'kilo-audit-uts',
       stream: 'uts:production:8',
       source: 'kilo:uts:production',
       reason: 'refused_stream_not_allowed',
     },
     {
-      label: 'a stream of no known producer',
-      stream: 'kilo:production:x',
+      label: 'an event source of another producer',
+      queue: 'kilo-audit',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:uts:production',
+      reason: 'refused_source_mismatch',
+    },
+    {
+      label: 'an unknown audit queue',
+      queue: 'kilo-audit-other',
+      stream: 'sts:production:bundle:forged',
       source: 'kilo:sts:production',
-      reason: 'refused_stream_not_allowed',
+      reason: 'refused_queue_not_allowed',
     },
   ])(
-    'keeps a batch with $label under dead-letter/unknown and never archives it',
-    async ({ stream, source, reason }) => {
+    'keeps $label under dead-letter/unknown and never archives it',
+    async ({ queue, stream, source, reason }) => {
       const http = recordingFetch(axiomOk);
       vi.stubGlobal('fetch', http.impl);
       const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -140,7 +165,7 @@ describe('queue handler', () => {
         events: forged.events.map(event => ({ ...event, source })),
       });
 
-      const { batch, result } = await runQueue('kilo-audit', [body.buffer]);
+      const { batch, result } = await runQueue(queue, [body.buffer]);
 
       expect(result.retryMessages).toEqual([]);
       expect(result.explicitAcks).toHaveLength(1);
@@ -154,7 +179,7 @@ describe('queue handler', () => {
         .map(([line]) => String(line))
         .filter(line => line.startsWith('{"event":"audit_relay.dead_letter_given_up"'))
         .map(line => JSON.parse(line));
-      expect(given).toEqual([expect.objectContaining({ stream, key, reason, toSeq: 2 })]);
+      expect(given).toEqual([expect.objectContaining({ queue, stream, key, reason, toSeq: 2 })]);
       for (const page of pageTexts(http.requests)) {
         expect(page).toContain(`\n${stream} seq 1..2 (${reason}) after 1 attempts at ${key}`);
       }
@@ -162,25 +187,31 @@ describe('queue handler', () => {
     }
   );
 
-  it('archives a batch of one of the 8 UTS shard streams with its own source', async () => {
-    const http = recordingFetch(axiomOk);
-    vi.stubGlobal('fetch', http.impl);
-    const stream = 'uts:development:5';
-    const batch = auditBatch(1, 2, stream);
-    const body = await encodeAuditBatch({
-      ...batch,
-      events: batch.events.map(event => ({
-        ...event,
-        source: 'kilo:uts:development',
-        type: 'ai.kilo.uts.token.issued',
-      })),
-    });
+  it.each([
+    { queue: 'kilo-audit-uts', environment: 'production' },
+    { queue: 'kilo-audit-uts-local', environment: 'development' },
+  ])(
+    'archives a UTS shard stream with its own source from $queue',
+    async ({ queue, environment }) => {
+      const http = recordingFetch(axiomOk);
+      vi.stubGlobal('fetch', http.impl);
+      const stream = `uts:${environment}:5`;
+      const batch = auditBatch(1, 2, stream);
+      const body = await encodeAuditBatch({
+        ...batch,
+        events: batch.events.map(event => ({
+          ...event,
+          source: `kilo:uts:${environment}`,
+          type: 'ai.kilo.uts.token.issued',
+        })),
+      });
 
-    const { result } = await runQueue('kilo-audit', [body.buffer]);
+      const { result } = await runQueue(queue, [body.buffer]);
 
-    expect(result.retryMessages).toEqual([]);
-    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
-  });
+      expect(result.retryMessages).toEqual([]);
+      expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
+    }
+  );
 
   it('archives dead-lettered batches of several streams once their cause is gone', async () => {
     const http = recordingFetch(axiomOk);

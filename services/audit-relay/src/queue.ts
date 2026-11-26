@@ -54,13 +54,13 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env): Promi
   const kept: Message<unknown>[] = [];
   for (const message of batch.messages) {
     const auditBatch = await decodeMessage(message.body);
-    if (auditBatch && streamRefusal(auditBatch) === null)
+    if (auditBatch && streamRefusal(auditBatch, batch.queue) === null)
       await handleBatch(auditBatch, message, env);
     else kept.push(message);
   }
-  // A body `encodeAuditBatch` did not produce never decodes, and a batch whose stream and sources
-  // name different producers is refused (`streamRefusal`); a retry cannot help either, so each is
-  // kept like a dead letter rather than dropped, and never reaches a stream.
+  // A body `encodeAuditBatch` did not produce never decodes, and a batch that is not its queue's
+  // producer's (`streamRefusal`) is refused; a retry cannot help either, so each is kept like a
+  // dead letter rather than dropped, and never reaches a stream.
   if (kept.length > 0) await keepDeadLetters(kept, batch.queue, env);
 }
 
@@ -81,7 +81,7 @@ type DeadLetterFate =
   | { kind: 'recovered'; outcome: 'accepted' | 'duplicate' }
   | { kind: 'waiting'; reason: string; progressing: boolean }
   | { kind: 'lost'; reason: string }
-  /** A batch whose stream name and event sources disagree; it never reaches its named stream. */
+  /** A batch that is not its queue's producer's (`streamRefusal`); it never reaches its stream. */
   | { kind: 'refused'; reason: string };
 
 /** 30 s while the stream's gap is closing (early deliveries only), else 15 minutes. */
@@ -105,7 +105,7 @@ export function deadLetterRetrySeconds(
  * `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (create-only, so a retry rewrites
  * nothing) and a waiting one is retried: after 30 s while its stream's head is advancing, else
  * after 15 minutes. A message that cannot recover (a forged or conflicting copy, an undecodable
- * body, a batch whose stream and event sources name different producers, its final delivery, or
+ * body, a batch that is not its queue's producer's, its final delivery, or
  * bytes that could not be stored by then) is acked and paged; each stream (and the unknown
  * bucket, which also holds every refused batch) pages at most once an hour.
  */
@@ -132,7 +132,7 @@ async function keepDeadLetters(
       let blocked: DeadLetterFate | null = null;
       for (const { message, auditBatch } of group) {
         let fate: DeadLetterFate;
-        const refusal = auditBatch ? streamRefusal(auditBatch) : null;
+        const refusal = auditBatch ? streamRefusal(auditBatch, queue) : null;
         if (!auditBatch) fate = { kind: 'lost', reason: 'undecodable' };
         else if (refusal) fate = { kind: 'refused', reason: `refused_${refusal}` };
         else if (blocked) fate = blocked;

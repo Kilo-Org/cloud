@@ -41,10 +41,13 @@ const ADVANCE_WATERMARK = `SELECT uts.advance_audit_watermark(
 
 /**
  * Each shard's first unrelayed row by (`txid`, `id`), committed or held back behind the horizon,
- * and its age. One index probe per shard, like the partition check. The first row in that order
- * is the one the relay waits for, so its age is how long the shard has been held up.
+ * and its age. The first row in that order is the one the relay waits for, so its age is how long
+ * the shard has been held up. For each of the 8 shards it is a merge of one index probe per
+ * partition (today, the 7 days ahead and up to 7 old days, about 15), each starting after the
+ * watermark, so a run reads about 120 index pages and no relayed row
+ * (`test/db/audit-maintenance.test.ts` checks the plan).
  */
-const UNRELAYED_AGE = `SELECT watermark.shard,
+export const UNRELAYED_AGE = `SELECT watermark.shard,
     extract(epoch FROM now() - first_unrelayed.created_at)::float8 AS age_seconds
   FROM uts.audit_relay_watermarks AS watermark
   CROSS JOIN LATERAL (

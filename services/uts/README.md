@@ -373,13 +373,16 @@ shard (`id % 8`). Each shard publishes as its own audit stream, `uts:<environmen
 
 The relay (`src/audit/relay.ts`) is one Durable Object per shard (`UtsAuditRelayDO`, named
 `<environment>:audit-relay:<shard>`). Its alarm runs every 5 seconds: it reads up to 500 rows past
-the watermark, sends them as one gzipped `AuditBatch` to `AUDIT_QUEUE` (halving any batch the
-encoder refuses, so each message stays under 60 KB), and moves the watermark after each message the
-queue accepted, only from the `last_seq` it read. A run reads at most 10 times; one that reached
-that budget runs again at once. A failed run leaves the watermark in place and retries after 5
-seconds doubling to 60. A batch the queue took before a failure is sent again under the same
-sequence numbers, and the audit relay service dedupes it against its archive, so a shard has no
-gap and no lost row.
+the watermark, sends them as one gzipped `AuditBatch` to `AUDIT_QUEUE`, the environment's UTS
+audit queue `kilo-audit-uts[-staging|-local]` (halving any batch the encoder refuses, so each
+message stays under 60 KB), and moves the watermark after each message the queue accepted, only
+from the `last_seq` it read. Only UTS sends to that queue, so the audit relay service accepts only
+the 8 `uts:<environment>:<shard>` streams from it (design decision Q66). A run reads at most 10
+times; one that reached that budget runs again at once. A failed run leaves the watermark in place
+and retries after 5 seconds doubling to 60. The object keeps its count of failed runs in a row in
+its storage, so the backoff holds when the runtime evicts it between alarms; a good run deletes
+the count. A batch the queue took before a failure is sent again under the same sequence numbers,
+and the audit relay service dedupes it against its archive, so a shard has no gap and no lost row.
 
 The watermark moves only through `uts.advance_audit_watermark()` (migration 0007, SECURITY
 DEFINER); the app login has no UPDATE on the watermarks. The function locks the shard's row and
@@ -503,7 +506,7 @@ needs its own login and Hyperdrive config, and is not provisioned yet. It delete
 | `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end | Each such token fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
 | `rotated_refresh_tokens` | A rotated token of a live family 30 days after its rotation, the longest idle window a token has, oldest first | Reuse detection covers tokens rotated within 30 days; an older one is then unknown (`invalid_grant`) instead of revoking the family. A thief who rotates a stolen token is still caught when the real client next presents its own token, rotated minutes before. Oldest first, a token's child is mostly in the same batch |
 | `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
-| `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
+| `dpop_proofs` | Past `expires_at` (121 seconds), read through `dpop_proofs_expires_idx` (migration 0007), so a call reads only expired proofs | No clock accepts the proof again |
 
 `parent_id` is `ON DELETE SET NULL`, so the order of a batch never decides what it deletes: each
 deleted token whose child stays gives that child one `parent_id` update. Rotated tokens go oldest

@@ -41,22 +41,28 @@ describe('audit relay objects', () => {
     expect(await other.ensureStarted()).toBe(false);
   });
 
-  it('back off after each failed run, doubling to the cap, and log every failure', async () => {
+  it('back off after each failed run, doubling to the cap, across a restart before every run', async () => {
     // The test pool has no identity store (its Hyperdrive binding names a closed port), so every
     // run fails before it reads; an unknown failure counts as retryable.
-    const stub = getAuditRelayStub(env, config, 6);
+    // An aborted object breaks the stub that reached it, so every call takes a new stub.
+    const stub = () => getAuditRelayStub(env, config, 6);
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const delays = await runInDurableObject(stub, async (instance: UtsAuditRelayDO, state) => {
-        const seen: number[] = [];
-        for (let run = 0; run < 6; run += 1) {
-          const before = Date.now();
-          await instance.alarm();
-          const alarm = await state.storage.getAlarm();
-          seen.push(Math.round(((alarm ?? 0) - before) / 1_000) * 1_000);
-        }
-        return seen;
-      });
+      const delays: number[] = [];
+      for (let run = 0; run < 6; run += 1) {
+        // A fresh instance each time, as after an eviction between alarms: only storage remains.
+        await runInDurableObject(stub(), (_instance, state) => state.abort('test restart')).catch(
+          () => undefined
+        );
+        delays.push(
+          await runInDurableObject(stub(), async (instance: UtsAuditRelayDO, state) => {
+            const before = Date.now();
+            await instance.alarm();
+            const alarm = await state.storage.getAlarm();
+            return Math.round(((alarm ?? 0) - before) / 1_000) * 1_000;
+          })
+        );
+      }
       expect(delays).toEqual([
         RELAY_INTERVAL_MS,
         RELAY_INTERVAL_MS * 2,
@@ -65,13 +71,15 @@ describe('audit relay objects', () => {
         RELAY_MAX_BACKOFF_MS,
         RELAY_MAX_BACKOFF_MS,
       ]);
-      const logged = errors.mock.calls.map(([line]) => JSON.parse(String(line)));
-      expect(logged.filter(line => line.event === 'uts.audit_relay.failed')).toHaveLength(6);
-      expect(logged[0]).toMatchObject({
-        stream: 'uts:development:6',
-        failure: 'retryable',
-        failedRuns: 1,
-      });
+      const failed = errors.mock.calls
+        .map(([line]) => String(line))
+        .filter(line => line.startsWith('{"event":"uts.audit_relay.failed"'))
+        .map(line => JSON.parse(line));
+      expect(failed.map(line => line.failedRuns)).toEqual([1, 2, 3, 4, 5, 6]);
+      expect(failed[0]).toMatchObject({ stream: 'uts:development:6', failure: 'retryable' });
+      expect(
+        await runInDurableObject(stub(), (_instance, state) => state.storage.get('failed-runs'))
+      ).toBe(6);
     } finally {
       errors.mockRestore();
     }

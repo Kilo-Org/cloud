@@ -9,6 +9,8 @@
 -- * This supersedes the comment on `uts.audit_relay_watermarks` in 0002: the watermark marks the
 --   newest row the audit queue accepted. Nothing confirms that the archive stored it; UTS cannot
 --   bind the archive. The comment on the table below states this.
+-- * An index on `uts.dpop_proofs (expires_at)`, so the minute OAuth maintenance reads only expired
+--   proofs instead of the whole table.
 
 SET LOCAL ROLE uts_owner;
 
@@ -100,3 +102,9 @@ $$;
 
 GRANT EXECUTE ON FUNCTION uts.advance_audit_watermark(smallint, bigint, xid8, bigint, bigint)
   TO uts_app;
+
+-- `uts.maintain_oauth_rows()` deletes expired DPoP proof `jti`s every minute. Every mint and
+-- refresh inserts one row that lives about 2 minutes, so the table holds about 2 minutes of mints;
+-- without this index each maintenance call scans all of it. With it, the delete reads only the
+-- expired range, which is the oldest end of the index; inserts append at the newest end.
+CREATE INDEX dpop_proofs_expires_idx ON uts.dpop_proofs (expires_at);

@@ -25,7 +25,7 @@
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
     { "tag": "v3", "new_sqlite_classes": ["UtsAuditRelayDO"] },
   ],
-  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }] },
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-local" }] },
   // The OAuth routes are served once this binding exists. Nothing listens on it: the runtime tests
   // pass their own grant store, and test/db runs every statement against the local Postgres.
   "hyperdrive": [

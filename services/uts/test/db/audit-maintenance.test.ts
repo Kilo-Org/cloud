@@ -2,6 +2,7 @@ import { AUDIT_BATCH_MAX_EVENTS } from '@kilocode/sts-contracts';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { UNRELAYED_AGE } from '../../src/audit/outbox';
 import { RELAY_READ, TestDatabase, auditEvent, insertAudit, sqlStateOf } from './harness';
 
 /**
@@ -198,6 +199,64 @@ describe('audit reads at volume', () => {
     const answer = await owner.query<{ exists: boolean }>(query);
     expect(answer.rows).toEqual([{ exists: false }]);
     console.info(`partition check over ${OLD_ROWS} relayed rows: ${executionMs} ms`);
+  });
+
+  it('find each shard first unrelayed row with one index probe per shard and partition', async () => {
+    const { nodes, executionMs } = await explain(owner, UNRELAYED_AGE);
+    const scans = nodes.filter(node => node['Relation Name']?.startsWith('audit_events_'));
+    expect(scans.map(scan => scan['Relation Name']).sort()).toEqual(await partitions());
+    for (const scan of scans) {
+      expect(scan['Node Type']).toBe('Index Scan');
+      expect(scan['Index Name']).toBe(`${scan['Relation Name']}_shard_txid_id_idx`);
+      expect(scan['Index Cond']).toMatch(ROW_COMPARISON);
+    }
+    const relayed = scans.find(scan => scan['Relation Name'] === OLD_PARTITION);
+    expect(relayed?.['Actual Rows']).toBe(0);
+    // The 8 watermark rows are read once; no partition is scanned without its index.
+    expect(
+      nodes.filter(
+        node =>
+          node['Node Type'] === 'Seq Scan' && node['Relation Name'] !== 'audit_relay_watermarks'
+      )
+    ).toEqual([]);
+    console.info(
+      `unrelayed age over ${scans.length} partitions, ${OLD_ROWS} relayed rows: ${executionMs} ms`
+    );
+  });
+});
+
+describe('expired DPoP proofs at volume', () => {
+  it('delete only the expired range through the expires_at index', async () => {
+    const live = 75_000;
+    const expired = 5_000;
+    await owner.query(
+      `INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
+       SELECT gen_random_uuid(), md5(n::text), now() + (60 + n % 60) * interval '1 second'
+       FROM generate_series(1, $1) AS n
+       UNION ALL
+       SELECT gen_random_uuid(), md5(('x' || n)::text), now() - (1 + n % 60) * interval '1 second'
+       FROM generate_series(1, $2) AS n`,
+      [live, expired]
+    );
+    await owner.query('ANALYZE uts.dpop_proofs');
+    const { nodes, executionMs } = await explain(
+      owner,
+      `SELECT stale.grant_id, stale.jti FROM uts.dpop_proofs AS stale
+       WHERE stale.expires_at < now() LIMIT 5000`
+    );
+    const indexScans = nodes.filter(node => node['Index Name'] === 'dpop_proofs_expires_idx');
+    expect(indexScans).toHaveLength(1);
+    expect(indexScans[0]['Actual Rows']).toBe(expired);
+    expect(nodes.filter(node => node['Node Type'] === 'Seq Scan')).toEqual([]);
+    const started = performance.now();
+    const deleted = await owner.query<{ kind: string; deleted: number }>(
+      'SELECT kind, deleted FROM uts.maintain_oauth_rows()'
+    );
+    const callMs = performance.now() - started;
+    expect(deleted.rows.find(row => row.kind === 'dpop_proofs')?.deleted).toBe(expired);
+    console.info(
+      `expired-proof read over ${live} live and ${expired} expired proofs: ${executionMs} ms; maintenance call ${callMs.toFixed(1)} ms`
+    );
   });
 });
 

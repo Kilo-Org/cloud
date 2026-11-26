@@ -48,9 +48,10 @@
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
     { "tag": "v3", "new_sqlite_classes": ["UtsAuditRelayDO"] },
   ],
-  // The audit outbox relay sends each shard's batches to the environment's shared audit queue,
-  // which services/audit-relay consumes (design 8.1).
-  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }] },
+  // The audit outbox relay sends each shard's batches to the environment's UTS audit queue, which
+  // services/audit-relay consumes; only UTS produces to it, so the consumer accepts only UTS
+  // streams from it (design 8.1).
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts" }] },
   // Every minute: keep the 8 audit shard relays running, maintain audit partitions and OAuth rows,
   // and check relay lag (src/scheduled.ts). It does nothing while IDENTITY_STORE is unbound.
   "triggers": { "crons": ["* * * * *"] },
@@ -79,7 +80,7 @@
           { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
         ],
       },
-      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }] },
+      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },
       "triggers": { "crons": ["* * * * *"] },
     },
     // Local development only; no deploy workflow targets this name. Only this block uses the
@@ -101,7 +102,7 @@
           { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
         ],
       },
-      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }] },
+      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-local" }] },
       // No schedule locally; run the cron by hand with `wrangler dev --test-scheduled` and
       // `curl "http://127.0.0.1:8800/__scheduled?cron=*+*+*+*+*"`.
       "triggers": { "crons": [] },

@@ -1,5 +1,6 @@
 import { encodeAuditBatch } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
+import { z } from 'zod';
 import { identityStoreOutbox } from '../audit/outbox';
 import {
   AuditRowTooLargeError,
@@ -18,8 +19,17 @@ export const RELAY_INTERVAL_MS = 5_000;
 /** After a retryable failure: 5 s doubling per failed run, capped here. */
 export const RELAY_MAX_BACKOFF_MS = 60_000;
 
+/**
+ * The count of failed runs in a row lives in storage, not memory: the runtime evicts an idle
+ * object between alarms, and the cron's minute call wakes it again, so a count in memory would
+ * restart the backoff at 5 s after every eviction. Steady state writes nothing; a failure writes
+ * the count, and the first good run after failures deletes it.
+ */
+const FAILED_RUNS_KEY = 'failed-runs';
+const FailedRunsSchema = z.number().int().nonnegative();
+
 type Phase =
-  | { status: 'relaying'; shard: number; stream: string; failedRuns: number }
+  | { status: 'relaying'; shard: number; stream: string }
   | { status: 'refused'; reason: string };
 
 /** What a run's failure means for the next run. */
@@ -46,8 +56,9 @@ function classify(error: unknown): Failure {
  * jurisdiction like every UTS object. Its alarm is the relay loop: a run every 5 seconds, at once
  * again after a run that stopped at its read budget, and with backoff after a failure. One object
  * owns each shard; the watermark's compare-and-set keeps a shard correct even if two runs overlap
- * across a deploy. It stores nothing: the watermark lives in the identity store. The cron
- * (`src/scheduled.ts`) calls `ensureStarted` every minute, which arms a missing alarm.
+ * across a deploy. It stores only its count of failed runs in a row; the watermark lives in the
+ * identity store. The cron (`src/scheduled.ts`) calls `ensureStarted` every minute, which arms a
+ * missing alarm.
  */
 export class UtsAuditRelayDO extends DurableObject<Env> {
   readonly #config: UtsConfig;
@@ -65,7 +76,6 @@ export class UtsAuditRelayDO extends DurableObject<Env> {
         status: 'relaying',
         shard: id.index,
         stream: auditStreamName(this.#config.environment, id.index),
-        failedRuns: 0,
       };
     }
   }
@@ -84,10 +94,11 @@ export class UtsAuditRelayDO extends DurableObject<Env> {
     // The cron starts no relay without a bound identity store, so this only follows an unbind.
     if (binding.kind === 'unprovisioned') return;
 
+    const failedBefore = FailedRunsSchema.parse((await this.ctx.storage.get(FAILED_RUNS_KEY)) ?? 0);
     let delay: number;
     try {
       const result = await this.#run(phase, binding.connectionString);
-      phase.failedRuns = 0;
+      if (failedBefore > 0) await this.ctx.storage.delete(FAILED_RUNS_KEY);
       delay = result.status === 'more' ? 0 : RELAY_INTERVAL_MS;
       if (result.sent > 0) {
         console.log(
@@ -105,18 +116,19 @@ export class UtsAuditRelayDO extends DurableObject<Env> {
         console.warn(JSON.stringify({ event: 'uts.audit_relay.superseded', stream: phase.stream }));
         delay = RELAY_INTERVAL_MS;
       } else {
-        phase.failedRuns += 1;
+        const failedRuns = failedBefore + 1;
+        await this.ctx.storage.put(FAILED_RUNS_KEY, failedRuns);
         delay =
           failure.kind === 'permanent'
             ? RELAY_MAX_BACKOFF_MS
-            : Math.min(RELAY_INTERVAL_MS * 2 ** (phase.failedRuns - 1), RELAY_MAX_BACKOFF_MS);
+            : Math.min(RELAY_INTERVAL_MS * 2 ** Math.min(failedRuns - 1, 16), RELAY_MAX_BACKOFF_MS);
         console.error(
           JSON.stringify({
             event: 'uts.audit_relay.failed',
             stream: phase.stream,
             failure: failure.kind,
             reason: failure.reason,
-            failedRuns: phase.failedRuns,
+            failedRuns,
             retryInMs: delay,
           })
         );

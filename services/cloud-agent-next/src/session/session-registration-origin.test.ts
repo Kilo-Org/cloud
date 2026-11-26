@@ -98,30 +98,35 @@ describe('isEligibleFirstWorktreeSession', () => {
     ).toBe(false);
   });
 
-  it('admits a server-marked clone-only continuation create', () => {
-    expect(
-      isEligibleFirstWorktreeSession(
-        input({
-          options: {
-            clientProvenance: 'agent-manager',
-            createdOnPlatform: 'cloud-agent-web',
-            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-            workspaceContinuation: true,
-          },
-          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
-        }),
-        ctx
-      )
-    ).toBe(true);
-  });
+  it.each(['agent-manager', 'browser'] as const)(
+    'admits a marked continuation from %s',
+    clientProvenance => {
+      expect(
+        isEligibleFirstWorktreeSession(
+          input({
+            options: {
+              clientProvenance,
+              createdOnPlatform: 'cloud-agent-web',
+              operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+              workspaceContinuation: true,
+            },
+            clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+          }),
+          ctx
+        )
+      ).toBe(true);
+    }
+  );
 
-  it('does not admit an unmarked clone-only create, preserving clone behavior', () => {
+  it.each([
+    { clientProvenance: 'browser', createdOnPlatform: 'cloud-agent-web' },
+    { clientProvenance: 'agent-manager', createdOnPlatform: 'agent-manager' },
+  ] as const)('preserves standalone unmarked clone behavior for %j', options => {
     expect(
       isEligibleFirstWorktreeSession(
         input({
           options: {
-            clientProvenance: 'agent-manager',
-            createdOnPlatform: 'agent-manager',
+            ...options,
             operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           },
           clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
@@ -150,7 +155,7 @@ describe('isEligibleFirstWorktreeSession', () => {
   });
 
   it.each([
-    { clientProvenance: 'browser', createdOnPlatform: 'cloud-agent-web' },
+    { clientProvenance: 'browser', createdOnPlatform: 'agent-manager' },
     { clientProvenance: 'agent-manager', createdOnPlatform: 'agent-manager' },
   ] as const)('rejects a continuation with the wrong provenance or platform: %j', options => {
     expect(

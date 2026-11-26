@@ -277,6 +277,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       kilocodeOrganizationId: input.kilocodeOrganizationId,
       createdOnPlatform: input.createdOnPlatform,
       clientProvenance: input.clientProvenance,
+      ...(input.workspaceContinuation ? { workspaceContinuation: true } : {}),
       shallow: input.shallow,
       operationKey: input.operationKey,
       kiloSessionId: 'kiloSessionId' in input ? input.kiloSessionId : undefined,
@@ -304,6 +305,12 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .output(PrepareSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
+      if (input.workspaceContinuation && (ctx.cloudAgentAuthority || ctx.botId !== undefined)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Workspace continuation requires a user session',
+        });
+      }
       const callbackTarget = await validateCallbackTarget(ctx, input.callbackTarget);
       const request = prepareInputToSessionCreateRequest({ ...input, callbackTarget });
       if (ctx.cloudAgentAuthority) {
@@ -343,17 +350,16 @@ const prepareSessionHandler = internalApiProtectedProcedure
           ? 'cloud-agent'
           : requestWithProfile.options?.createdOnPlatform,
       };
-      // Admit into the operation ledger only when the client supplied an
-      // `operationKey` AND the effective `autoInitiate` is true. Otherwise the
-      // key is ignored and the legacy split-flow behavior is preserved.
+      // Workspace continuation uses the ledger to register and clone without a turn.
+      const createImmediately = input.workspaceContinuation || input.autoInitiate === true;
       const result =
-        input.autoInitiate === true && operationKey
+        createImmediately && operationKey
           ? await createSessionWithLedger(requestWithProfile, registrationContext, {
               ...billingOrigin,
               operationKey,
               startedAt: Date.now(),
             })
-          : input.autoInitiate === true
+          : createImmediately
             ? await startNewSession(requestWithProfile, registrationContext, billingOrigin)
             : await registerNewSession(requestWithProfile, registrationContext, billingOrigin);
 

@@ -2084,7 +2084,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     });
   });
 
-  it('forwards cloneFromKiloSessionId to the Worker', async () => {
+  it('forwards a clone-only browser workspace continuation to the Worker', async () => {
     const caller = createCaller({
       user: { id: 'user-1', is_admin: false } as User,
     });
@@ -2092,6 +2092,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
 
     await caller.prepareSession({
       cloneFromKiloSessionId,
+      workspaceContinuation: true,
       autoInitiate: true,
       operationKey: '12345678-1234-4234-9234-123456789abc',
       mode: 'code',
@@ -2101,8 +2102,14 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     });
 
     expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({ cloneFromKiloSessionId })
+      expect.objectContaining({
+        cloneFromKiloSessionId,
+        workspaceContinuation: true,
+        clientProvenance: 'browser',
+        createdOnPlatform: 'cloud-agent-web',
+      })
     );
+    expect(mockPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty('initialPayload');
   });
 
   it('forwards cloneUpToMessageId to the Worker', async () => {

@@ -469,8 +469,8 @@ const requestedEnvironmentSchema = z
  *
  * Discriminated on `cloneFromKiloSessionId`: the non-clone variant keeps the
  * required `prompt` and the current optional initial fields, while the
- * clone-only variant requires the source session, `autoInitiate: true`, and a
- * stable `operationKey`, and forbids any synthetic initial turn fields.
+ * clone-only variant requires a source and an operation key. It admits either
+ * `autoInitiate: true` or a browser workspace continuation, without a turn.
  */
 const PrepareSessionSharedFields = {
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
@@ -648,6 +648,7 @@ const PrepareSessionNonCloneVariant = z.object({
    */
   cloneFromKiloSessionId: z.undefined().optional(),
   cloneUpToMessageId: z.undefined().optional(),
+  workspaceContinuation: z.undefined().optional(),
   /**
    * When `true`, `prepareSession` also enqueues the initial user message
    * (mirroring the unified `start` endpoint) so callers that navigate
@@ -692,13 +693,12 @@ const PrepareSessionCloneVariant = z.object({
   cloneUpToMessageId: MessageIdSchema.optional().describe(
     'Inclusive cut: copy source messages up to and including this message ID; omit to copy the whole session'
   ),
-  autoInitiate: z.literal(true),
+  autoInitiate: z.literal(true).optional(),
+  workspaceContinuation: z.literal(true).optional(),
   operationKey: z
     .string()
     .uuid()
-    .describe(
-      'Client-generated UUID, stable across retries of one user intent. Admitted into the operation ledger only when autoInitiate is also true; otherwise ignored.'
-    ),
+    .describe('Client-generated UUID, stable across retries of one clone intent.'),
   ...PrepareSessionSharedFields,
 });
 
@@ -710,6 +710,27 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
+    if (data.cloneFromKiloSessionId && !data.workspaceContinuation && !data.autoInitiate) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['autoInitiate'],
+        message: 'Clone requires autoInitiate',
+      });
+    }
+    if (
+      data.workspaceContinuation &&
+      (data.autoInitiate !== undefined ||
+        data.clientProvenance !== 'browser' ||
+        data.createdOnPlatform !== 'cloud-agent-web' ||
+        data.parentWorktreeId !== undefined ||
+        data.cloneUpToMessageId !== undefined)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['workspaceContinuation'],
+        message: 'Workspace continuation requires a browser full clone into a new workspace',
+      });
+    }
     if (data.initialPayload?.type === 'prompt' && data.initialPayload.prompt.trim().length === 0) {
       ctx.addIssue({
         code: 'custom',

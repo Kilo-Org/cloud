@@ -90,6 +90,7 @@ import { PermissionUnreadableNotice } from './PermissionUnreadableNotice';
 import { QuestionUnreadableNotice } from './QuestionUnreadableNotice';
 import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
+import { getReadOnlyForkSettings } from './cloud-session-fork';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
 import { OlderMessagesHeader } from './OlderMessagesHeader';
 import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-switch';
@@ -545,6 +546,12 @@ export default function CloudChatPage({
   const messageInfosForCommits = [...staticMessages, ...dynamicMessages].map(
     message => message.info
   );
+  const readOnlyCloudSettings =
+    activeSessionType === 'read-only' &&
+    isCurrentSession &&
+    fetchedSessionData?.organizationId === (organizationId ?? null)
+      ? getReadOnlyForkSettings(composerSettings, observedModel, messageInfosForCommits)
+      : undefined;
   let commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
   if (
     commitsCache !== null &&
@@ -1992,7 +1999,14 @@ export default function CloudChatPage({
                               sessionIdFromParams &&
                               fetchedSessionData &&
                               transcriptPhase !== 'opening' ? (
-                                <SessionContinuationPanel sessionId={sessionIdFromParams} />
+                                <SessionContinuationPanel
+                                  key={sessionIdFromParams}
+                                  sessionId={sessionIdFromParams}
+                                  organizationId={organizationId}
+                                  currentUserId={currentUserId}
+                                  gitUrl={fetchedSessionData.gitUrl}
+                                  cloudSettings={readOnlyCloudSettings}
+                                />
                               ) : null)}
                             <div hidden={isReadOnly}>
                               {setupRunQuery.data && (

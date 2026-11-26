@@ -2474,6 +2474,26 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
       expect(mockPrepareSession).not.toHaveBeenCalled();
     });
 
+    it('refuses a clone when the connected GitLab instance differs from the source', async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
+      mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.example.test');
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await expect(
+        caller.prepareSession({
+          ...gitlabInput,
+          prompt: undefined,
+          cloneFromKiloSessionId: 'ses_12345678901234567890123456',
+          autoInitiate: true,
+          operationKey: '12345678-1234-4234-9234-123456789abc',
+          expectedGitLabInstanceUrl: 'https://gitlab.com',
+        })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+      expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+    });
+
     it('answers a retryable error when the project lookup cannot complete', async () => {
       mockValidateGitLabRepoAccessForOrganization.mockRejectedValue(new Error('cache offline'));
       const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });

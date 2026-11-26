@@ -158,12 +158,11 @@ export type SessionCreateRequest = {
     createdOnPlatform?: string;
     clientProvenance?: 'browser' | 'mobile' | 'agent-manager';
     shallow?: boolean;
-    /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
+    /** Stable per-user-intent UUID for ledger-backed creates. */
     operationKey?: string;
     /**
-     * Server-only marker for a `continueHostedWorkspace` create. It persists on
-     * session metadata and makes the wrapper skip transcript file restoration.
-     * Never set from a client input field.
+     * Set by the hosted continuation handler or a validated browser prepare.
+     * The wrapper uses this marker to skip transcript file restoration.
      */
     workspaceContinuation?: boolean;
     /** Client-proposed Kilo session ID; the Worker generates one when absent. */

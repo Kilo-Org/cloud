@@ -793,11 +793,13 @@ export function isEligibleFirstWorktreeSession(
     return false;
   }
   // A continuation first session is a clone-only create placed in the
-  // workspace worktree. The marker is server-only: only the continuation
-  // handler sets it, so mobile and web clone creates stay standalone.
+  // workspace worktree. Only the hosted continuation handler and the
+  // internal browser prepare path set the marker.
   if (input.options?.workspaceContinuation === true) {
     return (
-      input.options.clientProvenance === 'agent-manager' &&
+      (input.options.clientProvenance === 'agent-manager' ||
+        (input.options.clientProvenance === 'browser' &&
+          input.parentCloudAgentSessionId === undefined)) &&
       input.options.createdOnPlatform === 'cloud-agent-web' &&
       input.initialTurn === undefined &&
       input.clone !== undefined
@@ -1633,7 +1635,6 @@ function buildSessionRegistrationCommand(
             : {}),
         }
       : undefined,
-    // Server-only continuation marker, set only by the continuation handler.
     continuation: input.options?.workspaceContinuation === true ? true : undefined,
     ...(allocation.initialTurn
       ? {
@@ -1965,7 +1966,9 @@ async function registerAllocatedSession(
   options: { billingOrigin?: string } | undefined,
   allocation: NewSessionAllocation,
   ledger: SessionCreationLedgerHooks | undefined
-): Promise<{ cloudAgentSessionId: string; kiloSessionId: string }> {
+): Promise<
+  Pick<LedgerSessionCreateResult, 'cloudAgentSessionId' | 'kiloSessionId' | 'worktreeId'>
+> {
   const command = buildSessionRegistrationCommand(input, ctx, allocation, options);
   let registerResult: { success: boolean; error?: string };
   try {
@@ -2025,6 +2028,7 @@ async function registerAllocatedSession(
   const result = {
     cloudAgentSessionId: allocation.cloudAgentSessionId,
     kiloSessionId: allocation.kiloSessionId,
+    ...(allocation.worktreeId === undefined ? {} : { worktreeId: allocation.worktreeId }),
   };
   if (ledger) {
     await ledger.onSuccess(result);
@@ -2301,6 +2305,9 @@ export async function sessionCreateIntentFingerprint(
                 ? input.options.clientProvenance
                 : undefined,
             shallow: input.options.shallow === true ? true : undefined,
+            ...(input.options.clientProvenance === 'browser' && input.options.workspaceContinuation
+              ? { workspaceContinuation: true }
+              : {}),
           }
         : undefined,
       profile: profileCreateIntent(input.profile),

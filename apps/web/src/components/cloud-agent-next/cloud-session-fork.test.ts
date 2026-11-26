@@ -5,6 +5,8 @@ import {
   continueInNewCloudSession,
   runCloudForkFlow,
   buildCloudChatSessionPath,
+  parsePendingCloudClone,
+  type CloudSessionForkCreateInput,
   type CloudRuntimeConfig,
   type CloudForkRejectionReason,
   type CloudSessionForkRuntimeStateResult,
@@ -423,6 +425,118 @@ describe('continueInNewCloudSession', () => {
       .mockResolvedValue({ kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaa' });
     return { getRuntimeState, createSession };
   };
+
+  const readOnlySource = {
+    ...CLI_SESSION,
+    session_id: 'ses_12345678901234567890123456',
+    git_url: 'git@github.com:example/project.git',
+  };
+  const operationKey = '6b2c3e10-0000-4000-8000-000000000000';
+
+  it('clones a read-only CLI session using a destination model without starting a turn', async () => {
+    const deps = createDeps({ session: readOnlySource, runtimeState: null });
+
+    await expect(
+      continueInNewCloudSession({
+        sessionId: readOnlySource.session_id,
+        operationKey,
+        getReadOnlySettings: async () => ({
+          mode: 'plan',
+          model: 'kilo/test-model',
+          variant: 'high',
+        }),
+        deps,
+      })
+    ).resolves.toEqual({ ok: true, kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaa' });
+    expect(deps.createSession).toHaveBeenCalledWith({
+      mode: 'plan',
+      model: 'kilo/test-model',
+      variant: 'high',
+      githubRepo: 'example/project',
+      autoCommit: false,
+      autoInitiate: true,
+      operationKey,
+      cloneFromKiloSessionId: readOnlySource.session_id,
+      workspaceContinuation: true,
+    });
+  });
+
+  it.each([
+    { git_url: null, reason: 'missing-repository' },
+    { git_url: readOnlySource.git_url, reason: 'missing-model' },
+  ])('rejects a read-only clone with $reason', async ({ git_url, reason }) => {
+    const deps = createDeps({ session: { ...readOnlySource, git_url }, runtimeState: null });
+
+    await expect(
+      continueInNewCloudSession({
+        sessionId: readOnlySource.session_id,
+        operationKey,
+        getReadOnlySettings: async () => ({ mode: 'code' }),
+        deps,
+      })
+    ).resolves.toEqual({ ok: false, reason });
+    expect(deps.createSession).not.toHaveBeenCalled();
+  });
+
+  it('replays the stored request and key after the response is lost', async () => {
+    const deps = createDeps({ session: readOnlySource, runtimeState: null });
+    let stored = '';
+    deps.createSession.mockImplementationOnce(async (input: CloudSessionForkCreateInput) => {
+      stored = JSON.stringify(input);
+      throw new Error('Connection closed');
+    });
+    const getReadOnlySettings = jest
+      .fn()
+      .mockResolvedValueOnce({ mode: 'plan', model: 'kilo/first-model' })
+      .mockResolvedValueOnce({ mode: 'code', model: 'kilo/second-model' });
+    const request = {
+      sessionId: readOnlySource.session_id,
+      operationKey,
+      getReadOnlySettings,
+      deps,
+    };
+
+    await expect(continueInNewCloudSession(request)).rejects.toThrow('Connection closed');
+    await expect(
+      continueInNewCloudSession({
+        ...request,
+        pendingInput: parsePendingCloudClone(stored, readOnlySource.session_id),
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(getReadOnlySettings).toHaveBeenCalledTimes(1);
+    expect(deps.createSession.mock.calls[1][0]).toEqual(deps.createSession.mock.calls[0][0]);
+  });
+
+  it('checks the GitLab instance before deriving its relative project path', async () => {
+    const deps = createDeps({
+      session: { ...readOnlySource, git_url: 'https://gitlab.example.com/scm/group/Project.git' },
+      runtimeState: null,
+    });
+    const request = { sessionId: readOnlySource.session_id, operationKey, deps };
+    const settings = { mode: 'code', model: 'kilo/test-model' };
+    await expect(
+      continueInNewCloudSession({
+        ...request,
+        getReadOnlySettings: async () => ({ ...settings, gitLabInstanceUrl: 'https://gitlab.com' }),
+      })
+    ).resolves.toEqual({ ok: false, reason: 'unparseable-repository' });
+    expect(deps.createSession).not.toHaveBeenCalled();
+
+    await continueInNewCloudSession({
+      ...request,
+      getReadOnlySettings: async () => ({
+        ...settings,
+        gitLabInstanceUrl: 'https://gitlab.example.com/scm',
+      }),
+    });
+    expect(deps.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gitlabProject: 'group/Project',
+        expectedGitLabInstanceUrl: 'https://gitlab.example.com/scm',
+      })
+    );
+  });
 
   it('forks a personal GitHub cloud session through the caller-provided create mutation', async () => {
     const { getRuntimeState, createSession } = createDeps();

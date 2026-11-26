@@ -105,6 +105,7 @@ import { verifyUserOwnsPreviewWorktree } from '@/lib/cloud-agent-next/preview-wo
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
+import { normalizeGitLabInstanceUrl } from '@kilocode/worker-utils/gitlab-url';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
 import {
@@ -251,6 +252,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
       const {
         gitlabProject,
+        expectedGitLabInstanceUrl,
         githubRepo,
         githubIntegrationId,
         publicRepoUrl,
@@ -323,6 +325,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
         }
       } else if (gitlabProject) {
         const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
+        if (
+          expectedGitLabInstanceUrl &&
+          expectedGitLabInstanceUrl !== normalizeGitLabInstanceUrl(instanceUrl)
+        ) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'The connected GitLab instance does not match the source repository.',
+          });
+        }
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
         repository = {

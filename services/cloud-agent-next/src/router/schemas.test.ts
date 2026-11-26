@@ -798,6 +798,25 @@ describe('prepareSession clone-only variant', () => {
     ).toBe(true);
   });
 
+  it('limits workspace continuation to a full browser clone', () => {
+    const input = {
+      ...baseCloneInput,
+      autoInitiate: undefined,
+      cloneFromKiloSessionId: validKiloSessionId,
+      clientProvenance: 'browser',
+      createdOnPlatform: 'cloud-agent-web',
+      workspaceContinuation: true,
+    };
+    expect(PrepareSessionInput.parse(input)).toMatchObject({ workspaceContinuation: true });
+    expect(PrepareSessionInput.safeParse({ ...input, autoInitiate: true }).success).toBe(false);
+    expect(PrepareSessionInput.safeParse({ ...input, clientProvenance: 'mobile' }).success).toBe(
+      false
+    );
+    expect(
+      PrepareSessionInput.safeParse({ ...input, cloneUpToMessageId: validMessageId }).success
+    ).toBe(false);
+  });
+
   it('rejects a clone-only prepare with a prompt', () => {
     expect(
       PrepareSessionInput.safeParse({

@@ -3,14 +3,33 @@
 import { useState, useCallback } from 'react';
 import { Copy, Check, Terminal, ChevronUp } from 'lucide-react';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
+import { Button } from '@/components/ui/button';
+import type { ReadOnlyForkSettings } from './cloud-session-fork';
+import { useCloudSessionFork } from './use-cloud-session-fork';
 
 type SessionContinuationPanelProps = {
   sessionId: string;
+  organizationId?: string;
+  currentUserId: string;
+  gitUrl?: string | null;
+  cloudSettings?: ReadOnlyForkSettings;
 };
 
-function SessionContinuationPanel({ sessionId }: SessionContinuationPanelProps) {
+function SessionContinuationPanel({
+  sessionId,
+  organizationId,
+  currentUserId,
+  gitUrl,
+  cloudSettings,
+}: SessionContinuationPanelProps) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [continued, setContinued] = useState(false);
+  const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(
+    organizationId,
+    currentUserId
+  );
+  const continuing = forkingSessionId === sessionId || continued;
 
   const cliCommand = `kilo --session ${sessionId} --cloud-fork`;
 
@@ -57,9 +76,27 @@ function SessionContinuationPanel({ sessionId }: SessionContinuationPanelProps) 
             </div>
           </div>
 
-          <p className="text-muted-foreground text-xs italic">
-            Continue in Cloud Agent coming soon
-          </p>
+          {cloudSettings && (
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                size="sm"
+                disabled={!gitUrl || continuing}
+                onClick={async () => {
+                  if (await forkSessionToNewCloudSession(sessionId, cloudSettings)) {
+                    setContinued(true);
+                  }
+                }}
+              >
+                {continuing ? 'Opening Cloud Agent…' : 'Continue in Cloud Agent'}
+              </Button>
+              {!gitUrl && (
+                <p className="text-muted-foreground text-xs">
+                  A repository is required to continue in Cloud Agent.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

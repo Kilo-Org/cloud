@@ -171,9 +171,38 @@ Q9 refuses a legacy token that names more than one audience. Before any verifier
    - A surface without such a path stays unmeasured, and a staging control never makes a production surface measured.
    - Covered cohorts are exercised by their own traffic: each mapped cohort and, separately, `benchmark` must produce at least one line that day, or the cohort is unmeasured for it.
 5. **Mapping.** The cohort list is accepted, unchanged for the whole window, and names every subject of each covered cohort. A cohort under a refused or changed list is not eligible for a zero claim. Any `internal_bot_unlisted` line in the window makes every internal-bot zero claim ineligible: an unlisted signed internal bot may be a covered client under a subject the list does not name.
-6. **Loss and precision.** No sampling on the drain or Logpush, and no `unparsed` lines (a line cut by a size limit fails `parse_json`). `dcount` is an estimate and never decides the gate: every number that decides it, and every zero, comes from the exact queries below, which also report the lines without a request id as loss. A zero means `lines = 0` in the exact query, never `requests = 0`: a line without a request id is never ignored, and any such line makes the count nonzero. `request.id` exists in the `vercel` schema but can be null; such lines cannot be joined or deduplicated, so any nonzero loss is reported with the result. Worker lines carry no request id and count verifier passes, not unique calls; one call can pass several verifiers, and a Worker zero means `passes = 0`. Whole dropped lines are not detectable from the event schema; the control lines are the only completeness signal.
+6. **Loss and precision.** No sampling on the drain or Logpush, and no `unparsed` lines (a line cut by a size limit fails `parse_json`). A matched version-day whose Logpush events contain a truncation marker is also unmeasured, per the truncation preflight under Queries: a Logpush field truncation is valid JSON, so `parse_json` does not fail and `unparsed` does not see it. `dcount` is an estimate and never decides the gate: every number that decides it, and every zero, comes from the exact queries below, which also report the lines without a request id as loss. A zero means `lines = 0` in the exact query, never `requests = 0`: a line without a request id is never ignored, and any such line makes the count nonzero. `request.id` exists in the `vercel` schema but can be null; such lines cannot be joined or deduplicated, so any nonzero loss is reported with the result. Worker lines carry no request id and count verifier passes, not unique calls; one call can pass several verifiers, and a Worker zero means `passes = 0`. Whole dropped lines are not detectable from the event schema. A Logpush truncation marker is the one event-level completeness signal; a control line proves that lines reached the dataset, not that no line was dropped.
 
 **Queries** (replace `START`, `END` and the script names; run only with explicit approval). Nothing is subtracted: control lines carry `multi: false` and `cohort: not_internal_bot`, so the gate queries never count them.
+
+**Logpush truncation (run first).** Cloudflare limits the `Logs` and `Exceptions` fields together to 16,384 characters, counted in the order `exception.name`, `exception.message`, then `log.message`. At that limit it replaces or cuts the affected fields with `<<<Logpush: *field* truncated>>>` for one message before it drops the remaining logs or exceptions ([Workers Logpush limits](https://developers.cloudflare.com/workers/observability/logs/logpush/#limits)). A marker, or any text from the marker family, therefore shows that at least one log or exception of that invocation was truncated or dropped. The documented shapes are a standalone log element (`<<<Logpush: messages truncated>>>`), a partial message with the marker appended (`unable to <<<Logpush: exception messages truncated>>>`), and an exception field carrying the marker after all later logs were dropped. Because the budget is shared, exception volume alone can exhaust it and drop the admission line of an invocation that logged little. The marker is valid JSON, so `parse_json` succeeds and `unparsed` stays 0; it can also sit in a log element after `Logs.Message[0]`, which the admission queries do not read. A dataset can store `<` and `>` escaped in the serialized arrays, so the match below uses the case-sensitive marker family `Logpush:` instead of the full literal; an application log that happens to contain that family can only make its day unmeasured.
+
+Run the one query below on the same fixed window, before any admission prefix filter. It selects the matched scripts and the events with no script name before it serializes the arrays, then reads every `Logs` element and the whole `Exceptions` array. Do not infer completeness from absent parsed admission lines, from `unparsed = 0`, from a control 2xx, or by subtracting counts.
+
+```kusto
+// Workers preflight: Logpush truncation-family markers per script, version and day (decides coverage)
+['cloudflare-logpush']
+| where _time between (datetime(START) .. datetime(END))
+| where ScriptName in ('WORKER_A', 'WORKER_B') or isempty(ScriptName)
+| extend logs_text = tostring(Logs), exceptions_text = tostring(Exceptions)
+| where logs_text contains_cs 'Logpush:' or exceptions_text contains_cs 'Logpush:'
+| summarize marker_events = count()
+    by day = bin(_time, 1d), script = ScriptName, version = ['ScriptVersion.ID']
+```
+
+This query decides coverage. It returns only marker-family events; every other event is invisible to it, which is why a zero needs the capture proof below. `marker_events` counts events, not requests.
+
+- A row with `marker_events > 0` and a matched script is unmeasured for that `script|version|day`, whatever its admission counts, `unparsed` count or control result.
+- A row with an empty `version` belongs to no serving version, so every serving version of that script is unmeasured for that day.
+- A row with an empty `script` cannot be attributed; it makes every matched surface unmeasured for that day. The query selects empty names on purpose and cannot filter them out before the marker test.
+- A matched `script|version|day` with no row is usable only when marker capture is established for that script (below). Otherwise it stays unmeasured, because the query cannot distinguish "no truncation" from "no marker recorded".
+
+**Marker capture.** A zero marker count supports a coverage claim only if Cloudflare's marker would have reached the dataset. Capture is established for a script on `['cloudflare-logpush']` only by one of:
+
+- at least one marker-family event from that script observed in an approved, bounded historical window since the last change to the Logpush job, the dataset schema or the ingestion pipeline, using the same query with that window's `START` and `END`; do not scan the full retained history; or
+- a written Cloudflare or Axiom confirmation that the dataset keeps `Logs[].Message[]` and `Exceptions` verbatim, including the marker literal.
+
+Field presence is not capture: an untruncated event exposes `Logs` and `Exceptions` without a marker. This document contains no live query and no observed marker, so marker capture, every version-day count and every truncation-free claim are unmeasured until an approved query establishes them.
 
 ```kusto
 // Vercel: signed bot cohorts at kilo-api, raw lines and an estimate (not for the gate)
@@ -249,7 +278,7 @@ Q9 refuses a legacy token that names more than one audience. Before any verifier
     by day = bin(_time, 1d), surface = ScriptName, version = ['ScriptVersion.ID'], boundary = tostring(m.boundary), policy_audience = tostring(m.policy_audience), aud_set = tostring(m.aud_set), issuer = tostring(m.issuer)
 ```
 
-`multi_lines` and `passes` are exact line counts. A Worker result is reported as raw passes. `Event.RayID` is present only on HTTP invocations; Durable Object, queue and RPC invocations carry none, which `passes_without_ray_id` reports.
+`multi_lines` and `passes` are exact line counts. A Worker result is reported as raw passes. `Event.RayID` is present only on HTTP invocations; Durable Object, queue and RPC invocations carry none, which `passes_without_ray_id` reports. The `unparsed` count here covers only admission-prefixed lines whose JSON does not fully parse, so it cannot observe a Logpush field-truncation marker: the marker is valid JSON and appears outside that prefix. A version-day stays unmeasured from the truncation preflight even when `unparsed = 0` and the control query below finds a 2xx on another invocation.
 
 **Control coverage.** One row per serving version and day; a version or day without a row is unmeasured. On Vercel each accepted control request is identified by the exact key `project|deployment|request id`. The key set is formed first and capped at 1,000; the status side then reads only rows whose key is in that set, so no unrelated row is read and no join runs. Run the preflight first, on the same fixed window:
 
@@ -312,7 +341,7 @@ A control count needs only to be nonzero. A request counts only when it has at l
 
 Non-fetch gap: the Worker query counts only HTTP (`fetch`) invocations, because only they carry a response status. A verifier that runs inside a Durable Object call, an RPC, a queue consumer or a scheduled event is not proved by a control line, even when the same Worker version is; those paths stay unmeasured unless a fetch on the same version reaches the same verifier code path.
 
-Source fields: `message`, `vercel.projectName`, `vercel.environment`, `vercel.deploymentId`, `request.id`, `request.statusCode` (Vercel); `ScriptName`, `ScriptVersion.ID`, `EventType`, `Outcome`, `Event.Response.Status`, `Event.RayID`, `Logs[].Message[0]` (Logpush). The `deployment` and `version` columns are compared against the deployment history of rule 2. Confirm the field names, the `EventType` value for HTTP invocations, and the production project and script names before running.
+Source fields: `message`, `vercel.projectName`, `vercel.environment`, `vercel.deploymentId`, `request.id`, `request.statusCode` (Vercel); `ScriptName`, `ScriptVersion.ID`, `EventType`, `Outcome`, `Event.Response.Status`, `Event.RayID`, `Logs[].Message[0]`, and the whole `Logs` and `Exceptions` arrays for the truncation preflight (Logpush). The `deployment` and `version` columns are compared against the deployment history of rule 2. Confirm the field names, the `EventType` value for HTTP invocations, the `Exceptions` element keys the dataset preserves, and the production project and script names before running.
 
 **Sources.** From source configuration only; nothing here is measured coverage. The combined legacy issuers name only `kilo-api`, `kilo-gateway` and `session-ingest`, so only verifiers of those audiences can receive their tokens:
 

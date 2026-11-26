@@ -7,6 +7,7 @@ import type { Env } from './env';
 import { pageOperator } from './page';
 import { deadLetterKey, putImmutable } from './relay/archive';
 import { errorName } from './relay/error-name';
+import { streamRefusal } from './relay/stream-producer';
 
 const DLQ_SUFFIX = '-dlq';
 /**
@@ -50,15 +51,17 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env): Promi
     return;
   }
 
-  const unreadable: Message<unknown>[] = [];
+  const kept: Message<unknown>[] = [];
   for (const message of batch.messages) {
     const auditBatch = await decodeMessage(message.body);
-    if (auditBatch) await handleBatch(auditBatch, message, env);
-    else unreadable.push(message);
+    if (auditBatch && streamRefusal(auditBatch) === null)
+      await handleBatch(auditBatch, message, env);
+    else kept.push(message);
   }
-  // A body `encodeAuditBatch` did not produce never decodes, so a retry cannot help: it is kept
-  // like a dead letter rather than dropped.
-  if (unreadable.length > 0) await keepDeadLetters(unreadable, batch.queue, env);
+  // A body `encodeAuditBatch` did not produce never decodes, and a batch whose stream and sources
+  // name different producers is refused (`streamRefusal`); a retry cannot help either, so each is
+  // kept like a dead letter rather than dropped, and never reaches a stream.
+  if (kept.length > 0) await keepDeadLetters(kept, batch.queue, env);
 }
 
 async function handleBatch(
@@ -77,7 +80,9 @@ async function handleBatch(
 type DeadLetterFate =
   | { kind: 'recovered'; outcome: 'accepted' | 'duplicate' }
   | { kind: 'waiting'; reason: string; progressing: boolean }
-  | { kind: 'lost'; reason: string };
+  | { kind: 'lost'; reason: string }
+  /** A batch whose stream name and event sources disagree; it never reaches its named stream. */
+  | { kind: 'refused'; reason: string };
 
 /** 30 s while the stream's gap is closing (early deliveries only), else 15 minutes. */
 export function deadLetterRetrySeconds(
@@ -100,8 +105,9 @@ export function deadLetterRetrySeconds(
  * `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (create-only, so a retry rewrites
  * nothing) and a waiting one is retried: after 30 s while its stream's head is advancing, else
  * after 15 minutes. A message that cannot recover (a forged or conflicting copy, an undecodable
- * body, its final delivery, or bytes that could not be stored by then) is acked and paged; each
- * stream (and the unknown bucket) pages at most once an hour.
+ * body, a batch whose stream and event sources name different producers, its final delivery, or
+ * bytes that could not be stored by then) is acked and paged; each stream (and the unknown
+ * bucket, which also holds every refused batch) pages at most once an hour.
  */
 async function keepDeadLetters(
   messages: readonly Message<unknown>[],
@@ -126,7 +132,9 @@ async function keepDeadLetters(
       let blocked: DeadLetterFate | null = null;
       for (const { message, auditBatch } of group) {
         let fate: DeadLetterFate;
+        const refusal = auditBatch ? streamRefusal(auditBatch) : null;
         if (!auditBatch) fate = { kind: 'lost', reason: 'undecodable' };
+        else if (refusal) fate = { kind: 'refused', reason: `refused_${refusal}` };
         else if (blocked) fate = blocked;
         else fate = await offerAgain(auditBatch, env);
         if (fate.kind === 'waiting') blocked = fate;
@@ -163,7 +171,10 @@ async function settleDeadLetter(
   }
 
   const final = message.attempts >= DEAD_LETTER_FINAL_ATTEMPT;
-  const key = deadLetterKey(auditBatch?.stream ?? null, message.timestamp, message.id);
+  // A refused batch names a stream it may not write, so its bytes and its page budget go under
+  // `unknown`, never under that stream.
+  const owner = fate.kind === 'refused' ? null : (auditBatch?.stream ?? null);
+  const key = deadLetterKey(owner, message.timestamp, message.id);
   let reason = fate.reason;
   let where = `at ${key}`;
   try {
@@ -201,7 +212,7 @@ async function settleDeadLetter(
     return null;
   }
 
-  const stub = getStreamDOStub(env, auditBatch?.stream ?? UNKNOWN_STREAM_OBJECT);
+  const stub = getStreamDOStub(env, owner ?? UNKNOWN_STREAM_OBJECT);
   const page = await stub.claimDeadLetterPage();
   console.error(
     JSON.stringify({

@@ -23,9 +23,16 @@ export const OAUTH_MAINTENANCE_BATCH = 5_000;
 export const MAX_PARTITION_STEPS = 32;
 export const MAX_OAUTH_CALLS = 20;
 
+/** `IdentityStoreError` keeps no row value, so every field here is safe to log. */
 function errorFields(error: unknown): Record<string, string | undefined> {
   if (error instanceof IdentityStoreError) {
-    return { error: error.name, failure: error.failure, sqlState: error.sqlState };
+    return {
+      error: error.name,
+      failure: error.failure,
+      sqlState: error.sqlState,
+      constraint: error.constraint,
+      table: error.table,
+    };
   }
   return { error: error instanceof Error ? error.name : 'unknown' };
 }

@@ -13,6 +13,14 @@ The same Worker serves STS now and UTS later; neither producer lives here.
 
 ## Message path
 
+Before any stream sees a batch, the consumer checks that its stream name and its events' `source`
+name the same producer and environment (`src/relay/stream-producer.ts`): `uts:<env>:<0-7>`, one
+of the 8 UTS audit shards, with `kilo:uts:<env>`, or `sts:<env>:<rest>` with `kilo:sts:<env>`. A
+batch that fails is refused like an undecodable body: its bytes go to `dead-letter/unknown/`, it
+pages (`refused_stream_not_allowed` or `refused_source_mismatch`) through the unknown bucket's
+hourly budget, and it is acked. A queue message names no producer, so this catches a producer
+bug, not a compromised producer.
+
 One `StreamDO` per audit stream (`idFromName(stream)`) is the single writer for that stream. It
 holds the head `{ seq, hash }` and decides what a batch means before any sink is touched:
 

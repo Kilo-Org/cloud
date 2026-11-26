@@ -170,6 +170,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     ],
     ['insert a watermark row', 'INSERT INTO uts.audit_relay_watermarks (shard) VALUES (0)'],
     ['delete a watermark row', 'DELETE FROM uts.audit_relay_watermarks'],
+    ['move a watermark directly', 'UPDATE uts.audit_relay_watermarks SET last_id = last_id + 1'],
     [
       'call partition maintenance with a chosen time',
       `SELECT uts.audit_partition_maintenance_at(now() + interval '30 days', 7)`,
@@ -402,11 +403,6 @@ describe('table privileges', () => {
         privilege: 'INSERT',
       })),
       { grantee: 'uts_app', relation: 'uts.audit_relay_watermarks', privilege: 'SELECT' },
-      ...['last_id', 'last_seq', 'last_txid', 'updated_at'].map(column => ({
-        grantee: 'uts_app',
-        relation: `uts.audit_relay_watermarks(${column})`,
-        privilege: 'UPDATE',
-      })),
       ...views.rows.map(view => ({
         grantee: 'uts_reader',
         relation: `uts_read.${view.relname}`,
@@ -433,6 +429,7 @@ describe('functions', () => {
        ORDER BY 1, 2`
     );
     expect(result.rows).toEqual([
+      { routine: 'advance_audit_watermark', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },

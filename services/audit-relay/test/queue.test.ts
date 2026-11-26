@@ -103,6 +103,85 @@ describe('queue handler', () => {
     expect(pages[0]).toContain(`\nunknown stream (undecodable) after 1 attempts at ${key}`);
   });
 
+  it.each([
+    {
+      label: 'an event source of another producer',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:uts:production',
+      reason: 'refused_source_mismatch',
+    },
+    {
+      label: 'an event source of another environment',
+      stream: 'uts:production:3',
+      source: 'kilo:uts:staging',
+      reason: 'refused_source_mismatch',
+    },
+    {
+      label: 'a UTS stream that is not one of the 8 shards',
+      stream: 'uts:production:8',
+      source: 'kilo:uts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'a stream of no known producer',
+      stream: 'kilo:production:x',
+      source: 'kilo:sts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+  ])(
+    'keeps a batch with $label under dead-letter/unknown and never archives it',
+    async ({ stream, source, reason }) => {
+      const http = recordingFetch(axiomOk);
+      vi.stubGlobal('fetch', http.impl);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const forged = auditBatch(1, 2, stream);
+      const body = await encodeAuditBatch({
+        ...forged,
+        events: forged.events.map(event => ({ ...event, source })),
+      });
+
+      const { batch, result } = await runQueue('kilo-audit', [body.buffer]);
+
+      expect(result.retryMessages).toEqual([]);
+      expect(result.explicitAcks).toHaveLength(1);
+      expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
+      const [message] = batch.messages;
+      const key = deadLetterKey(null, message.timestamp, message.id);
+      expect(await storedBytes(key)).toEqual(body);
+      // Refused batches share the unknown bucket's hourly page with every other test here, so the
+      // log line, which every refusal writes, is what this checks; a page carries the same text.
+      const given = errors.mock.calls
+        .map(([line]) => String(line))
+        .filter(line => line.startsWith('{"event":"audit_relay.dead_letter_given_up"'))
+        .map(line => JSON.parse(line));
+      expect(given).toEqual([expect.objectContaining({ stream, key, reason, toSeq: 2 })]);
+      for (const page of pageTexts(http.requests)) {
+        expect(page).toContain(`\n${stream} seq 1..2 (${reason}) after 1 attempts at ${key}`);
+      }
+      errors.mockRestore();
+    }
+  );
+
+  it('archives a batch of one of the 8 UTS shard streams with its own source', async () => {
+    const http = recordingFetch(axiomOk);
+    vi.stubGlobal('fetch', http.impl);
+    const stream = 'uts:development:5';
+    const batch = auditBatch(1, 2, stream);
+    const body = await encodeAuditBatch({
+      ...batch,
+      events: batch.events.map(event => ({
+        ...event,
+        source: 'kilo:uts:development',
+        type: 'ai.kilo.uts.token.issued',
+      })),
+    });
+
+    const { result } = await runQueue('kilo-audit', [body.buffer]);
+
+    expect(result.retryMessages).toEqual([]);
+    expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
+  });
+
   it('archives dead-lettered batches of several streams once their cause is gone', async () => {
     const http = recordingFetch(axiomOk);
     vi.stubGlobal('fetch', http.impl);

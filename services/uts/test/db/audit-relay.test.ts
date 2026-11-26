@@ -10,7 +10,9 @@ import {
 } from '../../src/audit/outbox';
 import { auditStreamName, relayShard, type AuditOutbox } from '../../src/audit/relay';
 import { type IdentityStore, withIdentityStore } from '../../src/db/client';
-import { TestDatabase, auditEvent, insertAudit } from './harness';
+import { TestDatabase, auditEvent, insertAudit, sqlStateOf } from './harness';
+
+const INVALID_PARAMETER = '22023';
 
 let db: TestDatabase;
 let app: pg.Client;
@@ -214,4 +216,103 @@ describe('audit outbox relay against the identity store', () => {
       ]);
     });
   });
+});
+
+describe('uts.advance_audit_watermark', () => {
+  const ADVANCE = `SELECT uts.advance_audit_watermark($1, $2, $3::text::xid8, $4, $5) AS advanced`;
+
+  /**
+   * Every row of `shard` past its watermark, oldest first, once all of them are below the horizon.
+   * Earlier tests leave rows in every shard, so the count is read, not assumed.
+   */
+  async function finalRows(shard: number) {
+    return await vi.waitFor(
+      async () => {
+        const result = await app.query<{ txid: bigint; id: bigint; final: boolean }>(
+          `SELECT event.txid, event.id,
+             event.txid < pg_snapshot_xmin(pg_current_snapshot()) AS final
+           FROM uts.audit_relay_watermarks AS watermark
+           JOIN uts.audit_events AS event ON event.shard = watermark.shard
+             AND (event.txid, event.id) > (watermark.last_txid, watermark.last_id)
+           WHERE watermark.shard = $1
+           ORDER BY event.txid, event.id`,
+          [shard]
+        );
+        expect(result.rows.every(row => row.final)).toBe(true);
+        return result.rows;
+      },
+      { timeout: 30_000, interval: 200 }
+    );
+  }
+
+  async function advance(
+    shard: number,
+    fromSeq: number,
+    to: { txid: bigint; id: bigint },
+    toSeq: number
+  ) {
+    return await app.query<{ advanced: boolean }>(ADVANCE, [
+      shard,
+      fromSeq,
+      to.txid.toString(),
+      to.id,
+      toSeq,
+    ]);
+  }
+
+  it('refuses a move that skips a row, goes back, targets no final row or moves too far', async () => {
+    const shard = 6;
+    await insertIntoShard(app, shard, 3);
+    const [first, second, third] = await finalRows(shard);
+
+    // Past two rows numbered as one: the skipped row would never be sent.
+    expect(await sqlStateOf(() => advance(shard, 0, second, 1))).toBe(INVALID_PARAMETER);
+    // A row that does not exist in the shard.
+    expect(
+      await sqlStateOf(() => advance(shard, 0, { txid: third.txid, id: third.id + 1_000_000n }, 3))
+    ).toBe(INVALID_PARAMETER);
+    // More than one batch.
+    expect(await sqlStateOf(() => advance(shard, 0, third, 501))).toBe(INVALID_PARAMETER);
+
+    expect((await advance(shard, 0, first, 1)).rows).toEqual([{ advanced: true }]);
+    // Back to the old position, and a stale starting sequence.
+    expect(await sqlStateOf(() => advance(shard, 1, first, 2))).toBe(INVALID_PARAMETER);
+    expect((await advance(shard, 0, second, 2)).rows).toEqual([{ advanced: false }]);
+    expect((await advance(shard, 1, third, 3)).rows).toEqual([{ advanced: true }]);
+  }, 35_000);
+
+  it('refuses a row whose transaction is still open', async () => {
+    const shard = 7;
+    const open = await db.connect('uts_app_a');
+    await open.query('BEGIN');
+    try {
+      let row = await insertAudit(open, auditEvent());
+      while (row.shard !== shard) row = await insertAudit(open, auditEvent());
+      expect(await sqlStateOf(() => advance(shard, 0, row, 1))).toBe(INVALID_PARAMETER);
+    } finally {
+      await open.query('ROLLBACK');
+    }
+  });
+
+  it('turns a move without a send into a sequence gap the archive refuses', async () => {
+    const shard = 3;
+    const stream = auditStreamName('development', shard);
+    const sink = archive(stream);
+    await insertIntoShard(app, shard, 2);
+    const [first] = await finalRows(shard);
+
+    // The row is numbered 1 but never sent, so the next batch starts at 2.
+    expect((await advance(shard, 0, first, 1)).rows).toEqual([{ advanced: true }]);
+    await withStore(async store => {
+      await expect(
+        relayShard({
+          outbox: identityStoreOutbox(store),
+          shard,
+          stream,
+          send: batch => sink.send(batch),
+        })
+      ).rejects.toThrow('expected 2 to be less than or equal to 1');
+    });
+    expect(sink.events).toEqual([]);
+  }, 35_000);
 });

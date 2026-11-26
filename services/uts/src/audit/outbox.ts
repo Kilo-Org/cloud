@@ -32,12 +32,12 @@ export const RelayReadRowSchema = AuditEventRowSchema.extend({ watermark_seq: z.
 
 /**
  * Moves one shard's watermark only from the sequence number the relay read it at, so a second
- * runner of the same shard (an overlapping deploy) can never move it back or skip a range.
+ * runner of the same shard (an overlapping deploy) can never move it back or skip a range, and
+ * only by the exact count of rows it passes (`uts.advance_audit_watermark`, migration 0007).
  */
-const ADVANCE_WATERMARK = `UPDATE uts.audit_relay_watermarks
-  SET last_txid = $3::xid8, last_id = $4, last_seq = $5, updated_at = now()
-  WHERE shard = $1 AND last_seq = $2
-  RETURNING shard`;
+const ADVANCE_WATERMARK = `SELECT uts.advance_audit_watermark(
+    $1::smallint, $2::bigint, $3::xid8, $4::bigint, $5::bigint
+  ) AS advanced`;
 
 /**
  * Each shard's first unrelayed row by (`txid`, `id`), committed or held back behind the horizon,
@@ -80,7 +80,7 @@ const PartitionStepSchema = z.strictObject({
 });
 const RunwaySchema = z.strictObject({ days: z.number().int() });
 const OAuthStepSchema = z.strictObject({ kind: z.string(), deleted: z.number().int() });
-const ShardRowSchema = z.strictObject({ shard: z.number().int() });
+const AdvancedRowSchema = z.strictObject({ advanced: z.boolean() });
 
 export type PartitionStep = z.output<typeof PartitionStepSchema>;
 export type OAuthStep = z.output<typeof OAuthStepSchema>;
@@ -106,7 +106,7 @@ export function identityStoreOutbox(store: IdentityStore): AuditOutbox {
       };
     },
     async advance(shard: number, fromSeq: bigint, to: ShardWatermark): Promise<boolean> {
-      const moved = await store.maybeOne(
+      const [row] = await store.rows(
         {
           text: ADVANCE_WATERMARK,
           values: [
@@ -117,9 +117,9 @@ export function identityStoreOutbox(store: IdentityStore): AuditOutbox {
             to.seq.toString(),
           ],
         },
-        ShardRowSchema
+        AdvancedRowSchema
       );
-      return moved !== null;
+      return row?.advanced === true;
     },
   };
 }

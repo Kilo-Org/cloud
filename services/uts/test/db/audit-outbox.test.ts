@@ -456,8 +456,10 @@ describe('the credential check on audit rows', () => {
 
 describe('relay batches', () => {
   it('split a 500-row read of realistic mint events into messages under 60 KB', async () => {
-    // Start shard 3 after the rows that earlier tests wrote.
-    await app.query(
+    // Start shard 3 after the rows that earlier tests wrote; only the owner moves a watermark
+    // outside `uts.advance_audit_watermark`.
+    const owner = await db.connectAsOwner();
+    await owner.query(
       `UPDATE uts.audit_relay_watermarks AS watermark
        SET last_txid = newest.txid, last_id = newest.id
        FROM (SELECT txid, id FROM uts.audit_events WHERE shard = 3

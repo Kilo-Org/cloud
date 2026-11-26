@@ -19,6 +19,12 @@ export const FEED_CONFIG = 'services/uts-feed/wrangler.jsonc';
 export const FEED_TEST_CONFIG = 'services/uts-feed/wrangler.test.jsonc';
 const UTS_CONFIGS = new Set([MINT_CONFIG, MINT_TEST_CONFIG, FEED_CONFIG, FEED_TEST_CONFIG]);
 
+/** The one name each test config deploys as, in the Workers test pool only. */
+const TEST_CONFIG_NAMES: ReadonlyMap<string, string> = new Map([
+  [MINT_TEST_CONFIG, 'uts-test'],
+  [FEED_TEST_CONFIG, 'uts-feed-test'],
+]);
+
 /** Every UTS Durable Object class and the configs that alone may bind it. */
 export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['UtsSignerDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
@@ -446,6 +452,17 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
         );
       }
     }
+  }
+  // The test configs run only in the Workers test pool; each deploys only its own name, so neither
+  // can take a deployed UTS name and the rights (an audit queue producer) granted to that name.
+  for (const [path, name] of TEST_CONFIG_NAMES) {
+    const worker = byPath.get(path);
+    if (worker === undefined) continue;
+    const names = blocksOf(worker)
+      .map(block => String(block.deployedName))
+      .sort()
+      .join(', ');
+    if (names !== name) problems.push(`${path} deploys ${names}; expected only ${name}`);
   }
   return problems;
 }

@@ -103,6 +103,12 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
   ...AUDIT_RELAY_DEPLOYMENTS.map((name): [string, string] => [name, 'audit-relay']),
   ['sts-test', 'sts-test'],
   ['audit-relay-test', 'audit-relay-test'],
+  // The UTS mint Worker holds an audit queue producer grant under these names, so only its own
+  // configs may deploy as them (services/uts/test/repo pins the rest of the UTS names).
+  ['uts', 'uts'],
+  ['uts-staging', 'uts'],
+  ['uts-local', 'uts'],
+  ['uts-test', 'uts-test'],
 ]);
 
 const STS_ENTRYPOINT = 'SecretsBroker';
@@ -682,8 +688,12 @@ function grantProblem(
 }
 
 /**
- * An audit batch is trusted as the producing STS deployment's own stream, so a foreign producer
- * could forge one, and a foreign consumer (or dead-letter target) would take batches from the relay.
+ * A queue message carries no producer identity: the audit relay trusts a batch's stream name, and
+ * checks only that its events' `source` names the same producer and environment (and that a UTS
+ * stream is one of the 8 shards), which catches a producer bug but not a compromised producer.
+ * So only the STS and UTS deployments of an environment may produce to its audit queue, and each
+ * can still write the other's streams. A foreign consumer (or dead-letter target) would take
+ * batches from the relay.
  */
 function auditQueueProblems(block: Block): string[] {
   const worker = block.deployedName;

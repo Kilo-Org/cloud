@@ -309,7 +309,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` and `uts.maintain_oauth_rows()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()` and `uts.maintain_oauth_rows()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -381,9 +381,20 @@ seconds doubling to 60. A batch the queue took before a failure is sent again un
 sequence numbers, and the audit relay service dedupes it against its archive, so a shard has no
 gap and no lost row.
 
+The watermark moves only through `uts.advance_audit_watermark()` (migration 0007, SECURITY
+DEFINER); the app login has no UPDATE on the watermarks. The function locks the shard's row and
+accepts a move only from the current `last_seq`, forward, to a row of the shard below the oldest
+open transaction, and only when the sequence advances by exactly the count of the shard's rows it
+passes (1 to 500, one index range read). A login that moves a watermark without sending therefore
+leaves a sequence gap, which the audit relay service holds and pages, rather than a silently
+skipped row.
+
 There is no archive confirmation: UTS cannot bind the archive or the audit relay service. A
 partition is dropped only when every row in it is relayed and it is past the 7-day tier, which
-leaves the audit relay service days to retry on top of the queue's own retries.
+leaves the audit relay service days to retry on top of the queue's own retries. The comment in
+`0002_audit_outbox.sql` that calls the watermark "the newest row ... the archive has confirmed" is
+superseded by migration 0007 and the table comment it sets: the watermark marks the newest row the
+queue accepted.
 
 The relay read for one shard has this shape (`RELAY_READ` in `src/audit/outbox.ts`;
 `test/db/audit-maintenance.test.ts` checks the plan):
@@ -420,7 +431,7 @@ partition maintenance, OAuth row maintenance and the lag check. It does nothing 
 | `uts.audit_partitions.kept_unrelayed` | A partition past the 7-day tier still holds an unrelayed row |
 | `uts.audit_partitions.runway_short` | Fewer than today's and the next 7 days' partitions exist |
 | `uts.oauth_rows.behind` | A kind still deleted a full batch on the run's last maintenance call |
-| `uts.maintenance.failed` | A cron step failed (`step`, `sqlState`) |
+| `uts.maintenance.failed` | A cron step failed (`step`, `sqlState`, `constraint`, `table`) |
 
 `uts.maintain_audit_partitions()` runs one step per call: it creates the first missing partition of
 the next 7 days. Otherwise it takes the first partition whose rows are all older than 7 days and all

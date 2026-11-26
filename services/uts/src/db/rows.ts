@@ -124,6 +124,7 @@ export const BrowserSessionRowSchema = z.strictObject({
   status: z.enum(enums.SESSION_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  device_key_hash: sha256.nullable(),
 });
 
 export const DeviceSessionRowSchema = z.strictObject({
@@ -419,10 +420,53 @@ export const NoticeRowSchema = z.strictObject({
   audit_event_id: uuid.nullable(),
   created_at: timestamp,
   delivery: z.enum(enums.NOTICE_DELIVERIES),
-  delivered_via: z.enum(enums.NOTICE_CHANNELS).nullable(),
   delivered_at: timestamp.nullable(),
   failed_at: timestamp.nullable(),
   read_at: timestamp.nullable(),
+  next_attempt_at: timestamp,
+  rounds: z.number().int().min(0).max(3),
+  claim_id: uuid.nullable(),
+  claimed_at: timestamp.nullable(),
+  old_email: z.string().nullable(),
+});
+
+export const NoticeAttemptRowSchema = z.strictObject({
+  notice_id: uuid,
+  round: z.number().int().min(1).max(3),
+  position: z.number().int().min(1).max(2),
+  channel: z.enum(enums.NOTICE_CHANNELS),
+  outcome: z.enum(enums.NOTICE_ATTEMPT_OUTCOMES),
+  attempted_at: timestamp,
+});
+
+export const KnownDeviceRowSchema = z.strictObject({
+  account_id: z.string(),
+  device_key: sha256,
+  first_seen_at: timestamp,
+  last_seen_at: timestamp,
+});
+
+export const KnownNetworkRowSchema = z.strictObject({
+  account_id: z.string(),
+  network_key: z.string(),
+  first_seen_at: timestamp,
+  last_seen_at: timestamp,
+});
+
+export const SignInRowSchema = z.strictObject({
+  id: uuid,
+  account_id: z.string(),
+  session_kind: z.enum(enums.SIGN_IN_SESSION_KINDS),
+  browser_session_id: uuid.nullable(),
+  device_session_id: uuid.nullable(),
+  signed_in_at: timestamp,
+  amr,
+  device_label: z.string().nullable(),
+  platform: z.string().nullable(),
+  ...network,
+  new_device: z.boolean(),
+  new_network: z.boolean(),
+  notice_id: uuid.nullable(),
 });
 
 export const AuditEventRowSchema = z.strictObject({
@@ -474,6 +518,10 @@ export const IDENTITY_STORE_TABLES = {
   revocations: RevocationRowSchema,
   dpop_proofs: DpopProofRowSchema,
   notices: NoticeRowSchema,
+  notice_attempts: NoticeAttemptRowSchema,
+  known_devices: KnownDeviceRowSchema,
+  known_networks: KnownNetworkRowSchema,
+  sign_ins: SignInRowSchema,
   audit_events: AuditEventRowSchema,
   audit_relay_watermarks: AuditRelayWatermarkRowSchema,
 } as const;

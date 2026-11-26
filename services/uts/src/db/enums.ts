@@ -102,9 +102,18 @@ export const NOTICE_KINDS = [
   'sessions_revoked',
   'suspicious_sign_in',
   'sign_in_code_stopped',
+  'bot_key_flagged',
 ] as const;
 export const NOTICE_CHANNELS = ['push', 'email', 'in_app'] as const;
-export const NOTICE_DELIVERIES = ['pending', 'delivered', 'failed'] as const;
+export const NOTICE_DELIVERIES = ['pending', 'sending', 'delivered', 'failed'] as const;
+export const NOTICE_ATTEMPT_OUTCOMES = [
+  'sent',
+  'no_target',
+  'not_configured',
+  'retryable_failure',
+  'permanent_failure',
+] as const;
+export const SIGN_IN_SESSION_KINDS = ['browser', 'device'] as const;
 
 /** Each enum by its type name in the `uts` schema. */
 export const IDENTITY_STORE_ENUMS = {
@@ -141,4 +150,6 @@ export const IDENTITY_STORE_ENUMS = {
   notice_kind: NOTICE_KINDS,
   notice_channel: NOTICE_CHANNELS,
   notice_delivery: NOTICE_DELIVERIES,
+  notice_attempt_outcome: NOTICE_ATTEMPT_OUTCOMES,
+  sign_in_session_kind: SIGN_IN_SESSION_KINDS,
 } as const;

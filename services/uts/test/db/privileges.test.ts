@@ -14,7 +14,10 @@ import {
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 
-/** Tables the app login writes only through the OAuth grant functions (migration 0004). */
+/**
+ * Tables the app login writes only through security-definer functions: the OAuth grant functions
+ * (migration 0004) and the notice and sign-in functions and triggers (migration 0010).
+ */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
   'refresh_grants',
@@ -23,10 +26,21 @@ const FUNCTION_WRITTEN_TABLES = [
   'third_party_refresh_tokens',
   'revocations',
   'dpop_proofs',
+  'notice_attempts',
+  'known_devices',
+  'known_networks',
+  'sign_ins',
 ];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
-const UPDATE_COLUMN: Partial<Record<string, string>> = { revocations: 'kind', dpop_proofs: 'jti' };
+const UPDATE_COLUMN: Partial<Record<string, string>> = {
+  revocations: 'kind',
+  dpop_proofs: 'jti',
+  notice_attempts: 'outcome',
+  known_devices: 'last_seen_at',
+  known_networks: 'last_seen_at',
+  sign_ins: 'new_device',
+};
 
 let db: TestDatabase;
 let todayPartition: string;
@@ -433,7 +447,11 @@ describe('functions', () => {
        ORDER BY 1, 2`
     );
     expect(result.rows).toEqual([
+      { routine: 'claim_credential_notice', grantee: 'uts_app' },
+      { routine: 'claim_due_notices', grantee: 'uts_app' },
+      { routine: 'claim_notice', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'finish_notice', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },

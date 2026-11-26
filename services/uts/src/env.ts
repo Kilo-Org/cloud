@@ -5,7 +5,6 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
-import type { UtsReplayDO } from './dos/UtsReplayDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 
 /**
@@ -32,7 +31,6 @@ export type Env = {
   UTS_ENVIRONMENT: string;
   DO_JURISDICTION: string;
   UTS_SIGNER_DO: DurableObjectNamespace<UtsSignerDO>;
-  UTS_REPLAY_DO: DurableObjectNamespace<UtsReplayDO>;
   /**
    * The identity store's primary Hyperdrive config, bound once the environment's identity store is
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.

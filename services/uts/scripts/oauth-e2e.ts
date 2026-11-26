@@ -283,12 +283,13 @@ async function main() {
   ).rows[0].id;
   for (let run = 0; run < timingRuns; run += 1) {
     const started = performance.now();
-    await app.query('SELECT * FROM uts.refresh_first_party($1, $2, $3, $4, $5, $6, $7)', [
+    await app.query('SELECT * FROM uts.refresh_first_party($1, $2, $3, $4, $5, $6, $7, $8)', [
       'development',
       sha256(grant),
       grantId,
       'kilo-cli',
       Buffer.from(device.jkt, 'base64url'),
+      randomUUID(),
       ['gateway:models.read'],
       null,
     ]);

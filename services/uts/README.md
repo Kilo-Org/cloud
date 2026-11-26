@@ -129,14 +129,21 @@ reached an audit row, and times the mint path.
 | `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A second use of a code revokes the grant | `uts.exchange_authorization_code` |
 | `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation, 60-second grace, reuse after the grace revokes the family and writes a feed entry | `uts.refresh_first_party`, `uts.refresh_third_party` |
 | `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
-| `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (read) |
+| `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
 
-Each call verifies at most one DPoP proof before the grant read and records its `jti` in
-`UtsReplayDO`, one object per grant (`<environment>:replay:<grant id>`, `eu` jurisdiction). A
-first-party refresh grant names its grant id (`kilo_rt_<grant id><32 random bytes>`), so the replay
-object is known before the statement. One call mints one access token per scope, up to 8, each with
-one audience; all are signed by the signer the grant id picks, and `issued_tokens` lists them. The
-claims are exactly `iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
+Each call verifies at most one DPoP proof before the grant read. The grant statement records the
+proof's `jti` in `uts.dpop_proofs` under the grant (primary key grant id and `jti`), so a second
+use of the proof fails that statement with `dpop_replay`, which answers `invalid_dpop_proof`. A
+first-party refresh or introspection records it under the grant the token names; a code exchange
+under the grant the code creates, whose id the endpoint derives from the code
+(`grantIdOfCode`), so every attempt with one code names one grant. A row stays 121 seconds: a
+proof's `iat` is at most 60 seconds ahead and it is accepted until 60 seconds after its `iat`. The
+statement records a `jti` only once the grant and the key match, so a caller without the device
+key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant id><32 random
+bytes>`), so the endpoint knows the grant and its signer before the statement. One call mints one
+access token per scope, up to 8, each with one audience; one `signMany` call to the signer the
+grant id picks signs all of them, and `issued_tokens` lists them. The claims are exactly
+`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
 (`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with `Retry-After`; a
 failure no retry fixes gives 500.
 
@@ -146,9 +153,11 @@ failure no retry fixes gives 500.
   `wrangler.test.jsonc`): key lifecycle with time travel, signing and verification with `jose`, key
   persistence across restarts, rotation by alarm, an overdue rotation and a lost alarm, emergency
   removal by direct call, the RPC surface, the signer-keys route and its caller check, metadata,
-  DPoP proofs, the replay object, and every OAuth endpoint against a recording grant store.
+  DPoP proofs, the signer's batch signing, and every OAuth endpoint against a recording grant
+  store.
 - `pnpm test:node`: the repository config check (`test/repo`) and the identity store tests
-  (`test/db`, see "Local database and tests"), the OAuth grant functions included.
+  (`test/db`, see "Local database and tests"), the OAuth grant functions and the DPoP `jti`
+  check included.
 
 ## Staging proof run (before merge)
 
@@ -244,7 +253,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 | --- | --- | --- | --- |
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, and revocations, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -289,8 +298,9 @@ whether granted directly, through `PUBLIC` or through an inherited role.
 - `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour, not on
   every mint; the table leaves 10 percent of each page free (`fillfactor = 90`) for those updates.
 - The app login writes authorization codes, refresh grants, device sessions, third-party families
-  and tokens, and revocations only through the security-definer OAuth functions (migration 0004),
-  which write the credential rows and their audit row together; it keeps SELECT on those tables.
+  and tokens, revocations and DPoP proof `jti`s only through the security-definer OAuth functions
+  (migration 0004), which write the credential rows and their audit row together; it keeps SELECT
+  on those tables.
   The account-deletion function will be one more such function: in the same statement, before the
   delete, it collects the active bot keys the account created (the keys the delete trigger is about
   to flag) and writes a bot-key-flagged audit row and the org-admin notices for each (design

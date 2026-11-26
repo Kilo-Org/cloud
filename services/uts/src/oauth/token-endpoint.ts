@@ -1,10 +1,11 @@
 import { UTS_GRANT_TYPES, UTS_MAX_TOKENS_PER_CALL, UTS_TOKEN_PATH } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { UtsConfig } from '../env';
-import type { DeviceContext, GrantsAccess, Minted } from '../grants/store';
+import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
 import {
   createFirstPartyRefreshToken,
+  grantIdOfCode,
   grantIdOfFirstPartyRefreshToken,
   isRandomCredential,
   randomCredential,
@@ -15,18 +16,17 @@ import { type FirstPartyClient, requestClient } from './clients';
 import { failureResponse, oauthError, temporarilyUnavailable } from './errors';
 import { type Params, audiencesOfResources, parseScopes, readForm, targetMismatch } from './params';
 import { CodeVerifierSchema, s256Challenge } from './pkce';
-import { firstPartyProof, refuseThirdPartyProof } from './proof';
-import type { ReplayAccess } from './replay';
+import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './proof';
 
 /**
  * POST /token (design 5.3 and 5.4). Grants: `authorization_code` (DPoP-bound for a first-party
  * client), `refresh_token` (DPoP-bound first-party grant, or third-party rotation with reuse
  * detection) and the RFC 8628 device grant through its hook. `client_credentials` is not offered.
  *
- * Each call verifies at most one DPoP proof, before the grant read, records its `jti` in the
- * grant's replay object, runs one SQL statement, and signs one token per scope (up to 8) in the
- * grant's signer object. A failure after the statement committed leaves the grant as the
- * statement left it and answers an error; the client retries (a third-party client within the
+ * Each call verifies at most one DPoP proof, before the grant read, runs one SQL statement, which
+ * also records the proof's `jti` under the grant, and signs one token per scope (up to 8) in one
+ * call to the grant's signer object. A failure after the statement committed leaves the grant as
+ * the statement left it and answers an error; the client retries (a third-party client within the
  * 60-second grace of its rotated token).
  */
 
@@ -37,7 +37,6 @@ export type TokenDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
   sign: SignerAccess;
-  replay: ReplayAccess;
   deviceCodeGrant: DeviceCodeGrant | null;
 };
 
@@ -66,11 +65,13 @@ const GRANT_ERRORS = {
 
 /**
  * Every refused grant answers 400. A DPoP key that is not the grant's and a reused third-party
- * token answer like any invalid grant, so the response tells an attacker nothing more.
+ * token answer like any invalid grant, so the response tells an attacker nothing more. A proof
+ * whose `jti` the grant recorded before answers `invalid_dpop_proof`, as a refused proof does.
  */
 function grantError(
-  outcome: keyof typeof GRANT_ERRORS | 'dpop_mismatch' | 'reuse_detected'
+  outcome: keyof typeof GRANT_ERRORS | 'dpop_mismatch' | 'reuse_detected' | 'dpop_replay'
 ): Response {
+  if (outcome === 'dpop_replay') return replayedDpopProof();
   const error =
     outcome === 'dpop_mismatch' || outcome === 'reuse_detected' ? 'invalid_grant' : outcome;
   return oauthError(error, 400, GRANT_ERRORS[error]);
@@ -170,18 +171,17 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
   if (selection instanceof Response) return selection;
   if (!isRandomCredential(code)) return grantError('invalid_grant');
 
-  const grantId = crypto.randomUUID();
-  let binding;
+  const grantId = await grantIdOfCode(code);
+  let binding: ExchangeCodeInput['binding'];
   let refreshToken: string;
   if (identity.kind === 'first_party') {
     const device = deviceContext(request, params, identity.client);
     if (device instanceof Response) return device;
-    const url = tokenEndpointUrl(deps.config);
-    const proof = await firstPartyProof(request, deps.replay, url, grantId);
+    const proof = await firstPartyProof(request, tokenEndpointUrl(deps.config));
     if (proof instanceof Response) return proof;
     binding = {
-      kind: 'first_party' as const,
-      dpopJkt: proof.jkt,
+      kind: 'first_party',
+      proof,
       clientClass: identity.client.clientClass,
       device,
     };
@@ -189,7 +189,7 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
   } else {
     const refused = refuseThirdPartyProof(request);
     if (refused !== null) return refused;
-    binding = { kind: 'third_party' as const };
+    binding = { kind: 'third_party' };
     refreshToken = randomCredential();
   }
   const clientId = identity.kind === 'first_party' ? identity.client.clientId : identity.clientId;
@@ -225,8 +225,7 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
   if (identity.kind === 'first_party') {
     const grantId = grantIdOfFirstPartyRefreshToken(token);
     if (grantId === null) return grantError('invalid_grant');
-    const url = tokenEndpointUrl(deps.config);
-    const proof = await firstPartyProof(request, deps.replay, url, grantId);
+    const proof = await firstPartyProof(request, tokenEndpointUrl(deps.config));
     if (proof instanceof Response) return proof;
     const result = await deps.grants(async grants =>
       grants.refreshFirstParty({
@@ -234,7 +233,7 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
         tokenHash: await sha256(token),
         grantId,
         clientId: identity.client.clientId,
-        dpopJkt: proof.jkt,
+        proof,
         ...selection,
       })
     );

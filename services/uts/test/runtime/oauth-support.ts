@@ -2,7 +2,6 @@ import { Buffer } from 'node:buffer';
 import { type JWK, SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import { IdentityStoreError } from '../../src/db/client';
 import type { GrantStore, GrantsAccess, Minted } from '../../src/grants/store';
-import { replayAccess } from '../../src/oauth/replay';
 import type { OAuthDeps } from '../../src/oauth/routes';
 import { signerAccess } from '../../src/token/mint';
 import { config, env } from './test-env';
@@ -107,13 +106,12 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   };
 }
 
-/** Endpoint dependencies with the real signer and replay objects of the test pool. */
+/** Endpoint dependencies with the real signer objects of the test pool. */
 export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
   return {
     config,
     grants,
     sign: signerAccess(env, config),
-    replay: replayAccess(env, config),
     handoff: null,
     deviceCodeGrant: null,
     ...overrides,

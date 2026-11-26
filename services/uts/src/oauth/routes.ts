@@ -10,7 +10,6 @@ import type { GrantsAccess } from '../grants/store';
 import { type SignerAccess, signerAccess } from '../token/mint';
 import { type AuthorizationHandoff, handleAuthorize } from './authorize';
 import { handleIntrospect } from './introspect';
-import { type ReplayAccess, replayAccess } from './replay';
 import { handleRevoke } from './revoke';
 import { type DeviceCodeGrant, handleToken } from './token-endpoint';
 
@@ -19,7 +18,6 @@ export type OAuthDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
   sign: SignerAccess;
-  replay: ReplayAccess;
   /** Null until the sign-in slice provides one: the authorization endpoint is not served. */
   handoff: AuthorizationHandoff | null;
   /** Null until the device sign-in slice provides one: the device grant is not offered. */
@@ -43,7 +41,6 @@ export function oauthService(
       config,
       grants: grantsAccess(binding.connectionString, ctx),
       sign: signerAccess(env, config),
-      replay: replayAccess(env, config),
       handoff,
       deviceCodeGrant: null,
     },

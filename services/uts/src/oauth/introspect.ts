@@ -1,13 +1,12 @@
 import { type IntrospectionResponse, UTS_INTROSPECT_PATH } from '@kilocode/uts-contracts';
 import type { UtsConfig } from '../env';
-import type { GrantsAccess } from '../grants/store';
+import type { GrantsAccess, ProofBinding } from '../grants/store';
 import { jsonResponse } from '../responses';
 import { grantIdOfFirstPartyRefreshToken, isRandomCredential, sha256 } from '../token/credentials';
 import { requestClient } from './clients';
 import { failureResponse, oauthError } from './errors';
 import { readForm } from './params';
-import { firstPartyProof, refuseThirdPartyProof } from './proof';
-import type { ReplayAccess } from './replay';
+import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './proof';
 
 /**
  * POST /introspect (RFC 7662): the synchronous liveness answer for the refresh credentials UTS
@@ -16,10 +15,11 @@ import type { ReplayAccess } from './replay';
  * this endpoint, which must match the grant's key; a third-party client holds the token itself,
  * 32 random bytes that cannot be guessed. An access token, like any unknown, expired, revoked or
  * foreign token, answers `{ active: false }`: services verify access tokens locally (design 7).
- * The endpoint runs one read statement and writes nothing.
+ * The endpoint runs one statement, which writes no audit row; for a first-party grant it records
+ * the proof's `jti`, so the proof is accepted once.
  */
 
-export type IntrospectDeps = { config: UtsConfig; grants: GrantsAccess; replay: ReplayAccess };
+export type IntrospectDeps = { config: UtsConfig; grants: GrantsAccess };
 
 const INACTIVE: IntrospectionResponse = { active: false };
 
@@ -40,20 +40,17 @@ export async function handleIntrospect(request: Request, deps: IntrospectDeps): 
     return oauthError('invalid_request', 400, 'token is required once');
   }
 
-  let dpopJkt: Uint8Array | null = null;
+  let proof: ProofBinding | null = null;
   let clientId: string;
   if (identity.kind === 'first_party') {
     clientId = identity.client.clientId;
-    const grantId = grantIdOfFirstPartyRefreshToken(token.value);
-    if (grantId === null) return answer(INACTIVE);
-    const proof = await firstPartyProof(
+    if (grantIdOfFirstPartyRefreshToken(token.value) === null) return answer(INACTIVE);
+    const verified = await firstPartyProof(
       request,
-      deps.replay,
-      `${deps.config.endpoints.issuer}${UTS_INTROSPECT_PATH}`,
-      grantId
+      `${deps.config.endpoints.issuer}${UTS_INTROSPECT_PATH}`
     );
-    if (proof instanceof Response) return proof;
-    dpopJkt = proof.jkt;
+    if (verified instanceof Response) return verified;
+    proof = verified;
   } else {
     clientId = identity.clientId;
     const refused = refuseThirdPartyProof(request);
@@ -62,20 +59,22 @@ export async function handleIntrospect(request: Request, deps: IntrospectDeps): 
   }
 
   try {
-    const active = await deps.grants(async grants =>
-      grants.introspect({ tokenHash: await sha256(token.value), clientId, dpopJkt })
+    const result = await deps.grants(async grants =>
+      grants.introspect({ tokenHash: await sha256(token.value), clientId, proof })
     );
-    if (active === null) return answer(INACTIVE);
+    if (result.outcome !== 'active') {
+      return result.outcome === 'dpop_replay' ? replayedDpopProof() : answer(INACTIVE);
+    }
     return answer({
       active: true,
       token_type: 'refresh_token',
       client_id: clientId,
-      sub: active.subjectId,
-      scope: active.scopes.join(' '),
-      iat: Math.floor(active.issuedAt.getTime() / 1000),
-      exp: Math.floor(active.expiresAt.getTime() / 1000),
+      sub: result.subjectId,
+      scope: result.scopes.join(' '),
+      iat: Math.floor(result.issuedAt.getTime() / 1000),
+      exp: Math.floor(result.expiresAt.getTime() / 1000),
       iss: deps.config.endpoints.issuer,
-      sid: active.grantId,
+      sid: result.grantId,
     });
   } catch (error) {
     return failureResponse(error, 'introspect');

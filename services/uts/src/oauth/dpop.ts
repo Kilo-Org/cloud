@@ -5,12 +5,12 @@ import { z } from 'zod';
 
 /**
  * DPoP proof verification at the authorization server (RFC 9449, section 4.3). The token
- * endpoint verifies one proof per call, before it reads the grant; the caller then records the
- * proof's `jti` in the replay object of the grant (design 5.7).
+ * endpoint verifies one proof per call, before it reads the grant; the grant statement then
+ * records the proof's `jti` under the grant, so a proof is accepted once (design 5.7).
  */
 
 /** Design 7 allows 60 seconds of clock skew; a proof is accepted while its `iat` is that close. */
-export const DPOP_IAT_WINDOW_SECONDS = 60;
+const DPOP_IAT_WINDOW_SECONDS = 60;
 
 const DPOP_TYPE = 'dpop+jwt';
 /** A proof holds one public key and a few claims; anything larger is refused unread. */
@@ -50,7 +50,6 @@ export type DpopProof = {
   /** RFC 7638 SHA-256 thumbprint of the proof key, as the raw 32 bytes the grant stores. */
   jkt: Uint8Array;
   jti: string;
-  iat: number;
 };
 
 export type DpopCheck =
@@ -116,10 +115,7 @@ export async function verifyDpopProof(
       : { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y },
     'sha256'
   );
-  return {
-    status: 'valid',
-    proof: { jkt: Buffer.from(thumbprint, 'base64url'), jti: claims.jti, iat: claims.iat },
-  };
+  return { status: 'valid', proof: { jkt: Buffer.from(thumbprint, 'base64url'), jti: claims.jti } };
 }
 
 /** The raw thumbprint a `dpop_jkt` authorization parameter names (RFC 9449, section 10). */

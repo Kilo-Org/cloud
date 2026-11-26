@@ -404,6 +404,12 @@ export const RevocationRowSchema = z.strictObject({
   feed_expires_at: timestamp,
 });
 
+export const DpopProofRowSchema = z.strictObject({
+  grant_id: uuid,
+  jti: z.string(),
+  expires_at: timestamp,
+});
+
 export const NoticeRowSchema = z.strictObject({
   id: uuid,
   account_id: z.string(),
@@ -465,6 +471,7 @@ export const IDENTITY_STORE_TABLES = {
   ci_trust_policies: CiTrustPolicyRowSchema,
   sandbox_grants: SandboxGrantRowSchema,
   revocations: RevocationRowSchema,
+  dpop_proofs: DpopProofRowSchema,
   notices: NoticeRowSchema,
   audit_events: AuditEventRowSchema,
   audit_relay_watermarks: AuditRelayWatermarkRowSchema,

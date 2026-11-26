@@ -9,6 +9,8 @@
 --   (`uts.read_refresh_grant`, `uts.read_third_party_refresh_token`; `test/db/index-probes.test.ts`
 --   plans their bodies).
 -- * `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour.
+-- * Each statement that accepts a DPoP proof records the proof's `jti` under its grant
+--   (`uts.dpop_proofs`), so a proof is accepted once (RFC 9449 section 11.1, design 5.7).
 -- * An audit row never holds a token value: a JWT is named by its `jti`, an opaque value by the
 --   first 8 characters of the base64url SHA-256 hash (`uts.credential_reference`).
 -- * A revocation writes its feed entry (`uts.revocations`) in the same statement. A `grant` or
@@ -28,6 +30,21 @@ ALTER TABLE uts.authorization_codes
     CHECK ((status = 'consumed') = (grant_id IS NOT NULL));
 CREATE INDEX authorization_codes_consent_idx ON uts.authorization_codes (consent_id)
   WHERE consent_id IS NOT NULL;
+
+-- The `jti` of every DPoP proof a statement accepted, under the grant the proof is for: the grant
+-- a first-party refresh or introspection names, or the grant a code exchange creates (its id comes
+-- from the code, so every attempt with one code names one grant). The primary key refuses a
+-- second use of a proof. A proof's `iat` is at most 60 seconds ahead of the Worker clock and is
+-- accepted until 60 seconds after it, so no clock accepts a proof 2 minutes after the statement
+-- that took it; the row stays 1 second longer. No foreign key: its check would lock the grant row
+-- on every refresh.
+CREATE TABLE uts.dpop_proofs (
+  grant_id uuid NOT NULL,
+  jti text NOT NULL CHECK (length(jti) BETWEEN 16 AND 128),
+  expires_at timestamptz NOT NULL,
+  CONSTRAINT dpop_proofs_pkey PRIMARY KEY (grant_id, jti)
+);
+GRANT SELECT ON uts.dpop_proofs TO uts_app;
 
 -- The audit reference of an opaque credential: the first 8 characters of the base64url SHA-256
 -- hash (design section 8.2). It is never a lookup key.
@@ -378,10 +395,11 @@ $$;
 
 -- POST /token with `authorization_code`: consumes the code and creates the grant in one
 -- statement. A first-party client gets a device session and a DPoP-bound refresh grant (the code
--- and the proof must name the same key); a third-party client gets a grant family and its first
--- rotating refresh token. The caller supplies the new grant id, which is the `sid` of every token.
--- A second use of a consumed code revokes the grant it created and fails.
--- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`.
+-- and the proof must name the same key, and the proof's `jti` is recorded under the grant); a
+-- third-party client gets a grant family and its first rotating refresh token. The caller derives
+-- the new grant id from the code, so every attempt with one code names one grant; the grant id is
+-- the `sid` of every token. A second use of a consumed code revokes the grant it created and fails.
+-- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `dpop_replay`.
 CREATE FUNCTION uts.exchange_authorization_code(
   p_environment text,
   p_code_hash bytea,
@@ -389,6 +407,7 @@ CREATE FUNCTION uts.exchange_authorization_code(
   p_redirect_uri text,
   p_code_challenge text,
   p_dpop_jkt bytea,
+  p_dpop_jti text,
   p_grant_id uuid,
   p_refresh_token_hash bytea,
   p_client_class uts.client_class,
@@ -460,6 +479,17 @@ BEGIN
     outcome := 'invalid_grant';
     RETURN NEXT;
     RETURN;
+  END IF;
+
+  IF code.client_kind = 'first_party' THEN
+    INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
+    VALUES (p_grant_id, p_dpop_jti, now() + interval '121 seconds')
+    ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
+    IF NOT FOUND THEN
+      outcome := 'dpop_replay';
+      RETURN NEXT;
+      RETURN;
+    END IF;
   END IF;
 
   SELECT * INTO chosen FROM uts.select_token_scopes(code.scopes, p_scopes, p_resources);
@@ -549,14 +579,17 @@ END
 $$;
 
 -- POST /token with `refresh_token` for a first-party client: the caller verified the DPoP proof
--- and passes its key thumbprint, which must be the grant's. A mismatch writes a denied audit row.
--- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `dpop_mismatch`.
+-- and passes its key thumbprint, which must be the grant's, and its `jti`, which the statement
+-- records under the grant. A mismatch writes a denied audit row; a recorded `jti` is a replay.
+-- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `dpop_mismatch`,
+-- `dpop_replay`.
 CREATE FUNCTION uts.refresh_first_party(
   p_environment text,
   p_token_hash bytea,
   p_grant_id uuid,
   p_client_id text,
   p_dpop_jkt bytea,
+  p_dpop_jti text,
   p_scopes text[],
   p_resources text[]
 ) RETURNS TABLE (
@@ -602,6 +635,15 @@ BEGIN
       )
     );
     outcome := 'dpop_mismatch';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
+  VALUES (grant_row.id, p_dpop_jti, now() + interval '121 seconds')
+  ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
+  IF NOT FOUND THEN
+    outcome := 'dpop_replay';
     RETURN NEXT;
     RETURN;
   END IF;
@@ -847,11 +889,17 @@ BEGIN
 END
 $$;
 
--- POST /introspect (RFC 7662) with a refresh token: one row while the token is active and was
--- issued to `p_client_id`; a first-party grant also needs the DPoP key thumbprint of a verified
--- proof. No row otherwise. It writes nothing.
-CREATE FUNCTION uts.introspect_refresh_token(p_token_hash bytea, p_client_id text, p_dpop_jkt bytea)
-RETURNS TABLE (
+-- POST /introspect (RFC 7662) with a refresh token: `active` while the token is active and was
+-- issued to `p_client_id`. A first-party grant also needs the key thumbprint of a verified DPoP
+-- proof, and the statement records the proof's `jti` under the grant (`dpop_replay` when it was
+-- recorded before). `inactive` otherwise. It writes no audit row.
+CREATE FUNCTION uts.introspect_refresh_token(
+  p_token_hash bytea,
+  p_client_id text,
+  p_dpop_jkt bytea,
+  p_dpop_jti text
+) RETURNS TABLE (
+  outcome text,
   grant_kind uts.client_kind,
   grant_id uuid,
   subject_id text,
@@ -859,28 +907,53 @@ RETURNS TABLE (
   issued_at timestamptz,
   expires_at timestamptz
 )
-LANGUAGE sql
-STABLE
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
-  SELECT 'first_party'::uts.client_kind, grant_row.id, grant_row.account_id,
-    grant_row.allowed_scopes, grant_row.created_at,
-    least(grant_row.idle_expires_at, grant_row.expires_at)
-  FROM uts.read_refresh_grant($1) AS grant_row
-  WHERE grant_row.client_id = $2
-    AND grant_row.dpop_jkt = $3
-    AND grant_row.grant_status = 'active'
-    AND grant_row.session_status = 'active'
-    AND grant_row.account_status = 'active'
-    AND grant_row.expires_at > now()
-    AND grant_row.idle_expires_at > now()
-    AND uts.org_requirement_met(
-      grant_row.org_id, grant_row.membership_status, grant_row.sso_enforcement, grant_row.amr
-    )
-  UNION ALL
-  SELECT 'third_party'::uts.client_kind, family.id, family.account_id, family.scopes,
-    token.issued_at, least(token.idle_expires_at, family.expires_at)
+DECLARE
+  grant_row record;
+BEGIN
+  IF p_dpop_jkt IS NOT NULL THEN
+    SELECT * INTO grant_row FROM uts.read_refresh_grant(p_token_hash);
+    IF NOT FOUND
+      OR grant_row.client_id <> p_client_id
+      OR grant_row.dpop_jkt <> p_dpop_jkt
+      OR grant_row.grant_status <> 'active'
+      OR grant_row.session_status <> 'active'
+      OR grant_row.account_status <> 'active'
+      OR grant_row.expires_at <= now()
+      OR grant_row.idle_expires_at <= now()
+      OR NOT uts.org_requirement_met(
+        grant_row.org_id, grant_row.membership_status, grant_row.sso_enforcement, grant_row.amr
+      )
+    THEN
+      outcome := 'inactive';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+    INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
+    VALUES (grant_row.id, p_dpop_jti, now() + interval '121 seconds')
+    ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
+    IF NOT FOUND THEN
+      outcome := 'dpop_replay';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+    outcome := 'active';
+    grant_kind := 'first_party';
+    grant_id := grant_row.id;
+    subject_id := grant_row.account_id;
+    granted_scopes := grant_row.allowed_scopes;
+    issued_at := grant_row.created_at;
+    expires_at := least(grant_row.idle_expires_at, grant_row.expires_at);
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  SELECT 'third_party', family.id, family.account_id, family.scopes, token.issued_at,
+    least(token.idle_expires_at, family.expires_at)
+  INTO grant_kind, grant_id, subject_id, granted_scopes, issued_at, expires_at
   FROM uts.third_party_refresh_tokens AS token
   JOIN uts.third_party_grant_families AS family ON family.id = token.family_id
   JOIN uts.third_party_consents AS consent ON consent.id = family.consent_id
@@ -888,16 +961,18 @@ AS $$
   LEFT JOIN uts.org_memberships AS membership
     ON membership.org_id = family.org_id AND membership.account_id = family.account_id
   LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = family.org_id
-  WHERE token.token_hash = $1
-    AND family.client_id = $2
-    AND $3 IS NULL
+  WHERE token.token_hash = p_token_hash
+    AND family.client_id = p_client_id
     AND token.status = 'active'
     AND token.idle_expires_at > now()
     AND family.status = 'active'
     AND family.expires_at > now()
     AND consent.status = 'active'
     AND account.status = 'active'
-    AND uts.org_requirement_met(family.org_id, membership.status, policy.enforcement, family.amr)
+    AND uts.org_requirement_met(family.org_id, membership.status, policy.enforcement, family.amr);
+  outcome := CASE WHEN FOUND THEN 'active' ELSE 'inactive' END;
+  RETURN NEXT;
+END
 $$;
 
 GRANT EXECUTE ON FUNCTION
@@ -906,13 +981,13 @@ GRANT EXECUTE ON FUNCTION
     timestamptz, text[], uuid
   ),
   uts.exchange_authorization_code(
-    text, bytea, text, text, text, bytea, uuid, bytea, uts.client_class, text, text, inet, integer,
-    text, text, text[], text[]
+    text, bytea, text, text, text, bytea, text, uuid, bytea, uts.client_class, text, text, inet,
+    integer, text, text, text[], text[]
   ),
-  uts.refresh_first_party(text, bytea, uuid, text, bytea, text[], text[]),
+  uts.refresh_first_party(text, bytea, uuid, text, bytea, text, text[], text[]),
   uts.refresh_third_party(text, bytea, text, bytea, text[], text[]),
   uts.revoke_refresh_token(text, bytea, text),
-  uts.introspect_refresh_token(bytea, text, bytea)
+  uts.introspect_refresh_token(bytea, text, bytea, text)
 TO uts_app;
 
 -- The functions above are now the only writers of these tables (README, "Rules for statements").

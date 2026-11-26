@@ -42,6 +42,12 @@ export type IssueCodeResult = 'issued' | 'access_denied' | 'consent_required';
 /** `scopes` and `resources` null mean "not named in the request". */
 type TokenSelection = { scopes: readonly string[] | null; resources: readonly string[] | null };
 
+/**
+ * A verified DPoP proof: the RFC 7638 thumbprint of its key, as the raw 32 bytes a grant stores,
+ * and its `jti`, which the statement records under the grant so the proof is accepted once.
+ */
+export type ProofBinding = { jkt: Uint8Array; jti: string };
+
 export type ExchangeCodeInput = TokenSelection & {
   environment: UtsEnvironment;
   codeHash: Uint8Array;
@@ -51,11 +57,12 @@ export type ExchangeCodeInput = TokenSelection & {
   binding:
     | {
         kind: 'first_party';
-        dpopJkt: Uint8Array;
+        proof: ProofBinding;
         clientClass: 'desktop' | 'mobile';
         device: DeviceContext;
       }
     | { kind: 'third_party' };
+  /** Derived from the code (`grantIdOfCode`), so every attempt with one code names one grant. */
   grantId: string;
   refreshTokenHash: Uint8Array;
 };
@@ -65,7 +72,7 @@ export type FirstPartyRefreshInput = TokenSelection & {
   tokenHash: Uint8Array;
   grantId: string;
   clientId: string;
-  dpopJkt: Uint8Array;
+  proof: ProofBinding;
 };
 
 export type ThirdPartyRefreshInput = TokenSelection & {
@@ -88,12 +95,13 @@ export type Minted = {
 
 type SelectionFailure = 'invalid_grant' | 'invalid_scope' | 'invalid_target';
 
+/** `dpop_replay`: the proof's `jti` was recorded under the grant before. */
 export type ExchangeResult =
   | ({ outcome: 'issued'; refreshExpiresAt: Date } & Minted)
-  | { outcome: SelectionFailure };
+  | { outcome: SelectionFailure | 'dpop_replay' };
 export type FirstPartyRefreshResult =
   | ({ outcome: 'issued' } & Minted)
-  | { outcome: SelectionFailure | 'dpop_mismatch' };
+  | { outcome: SelectionFailure | 'dpop_mismatch' | 'dpop_replay' };
 export type ThirdPartyRefreshResult =
   | ({ outcome: 'issued'; familyId: string; refreshExpiresAt: Date } & Minted)
   | { outcome: SelectionFailure | 'reuse_detected' };
@@ -104,8 +112,8 @@ export type RevokeResult = 'revoked' | 'already_revoked' | 'unknown' | 'client_m
 export type IntrospectInput = {
   tokenHash: Uint8Array;
   clientId: string;
-  /** The verified DPoP key of a first-party request; null for a third-party client. */
-  dpopJkt: Uint8Array | null;
+  /** The verified DPoP proof of a first-party request; null for a third-party client. */
+  proof: ProofBinding | null;
 };
 export type ActiveRefreshToken = {
   kind: (typeof CLIENT_KINDS)[number];
@@ -115,6 +123,9 @@ export type ActiveRefreshToken = {
   issuedAt: Date;
   expiresAt: Date;
 };
+export type IntrospectResult =
+  | ({ outcome: 'active' } & ActiveRefreshToken)
+  | { outcome: 'inactive' | 'dpop_replay' };
 
 export type ThirdPartyClientRecord = { clientId: string; name: string; redirectUris: string[] };
 
@@ -125,7 +136,7 @@ export type GrantStore = {
   refreshFirstParty(input: FirstPartyRefreshInput): Promise<FirstPartyRefreshResult>;
   refreshThirdParty(input: ThirdPartyRefreshInput): Promise<ThirdPartyRefreshResult>;
   revoke(input: RevokeInput): Promise<RevokeResult>;
-  introspect(input: IntrospectInput): Promise<ActiveRefreshToken | null>;
+  introspect(input: IntrospectInput): Promise<IntrospectResult>;
 };
 
 /** Runs `work` with the grant store of one request's identity-store connection. */
@@ -162,12 +173,12 @@ const IssueCodeRowSchema = z.object({
 
 const ExchangeRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('issued'), ...MintedColumns, refresh_expires_at: z.date() }),
-  failure(['invalid_grant', 'invalid_scope', 'invalid_target']),
+  failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_replay']),
 ]);
 
 const FirstPartyRefreshRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('issued'), ...MintedColumns }),
-  failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_mismatch']),
+  failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_mismatch', 'dpop_replay']),
 ]);
 
 const ThirdPartyRefreshRowSchema = z.discriminatedUnion('outcome', [
@@ -184,14 +195,18 @@ const RevokeRowSchema = z.object({
   outcome: z.enum(['revoked', 'already_revoked', 'unknown', 'client_mismatch']),
 });
 
-const IntrospectRowSchema = z.object({
-  grant_kind: z.enum(CLIENT_KINDS),
-  grant_id: z.uuid(),
-  subject_id: z.string(),
-  granted_scopes: z.array(z.string()).min(1),
-  issued_at: z.date(),
-  expires_at: z.date(),
-});
+const IntrospectRowSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    outcome: z.literal('active'),
+    grant_kind: z.enum(CLIENT_KINDS),
+    grant_id: z.uuid(),
+    subject_id: z.string(),
+    granted_scopes: z.array(z.string()).min(1),
+    issued_at: z.date(),
+    expires_at: z.date(),
+  }),
+  failure(['inactive', 'dpop_replay']),
+]);
 
 const ThirdPartyClientRowSchema = z.object({
   client_name: z.string(),
@@ -251,19 +266,21 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
     },
 
     async exchangeCode(input) {
-      const device = input.binding.kind === 'first_party' ? input.binding.device : null;
+      const firstParty = input.binding.kind === 'first_party' ? input.binding : null;
+      const device = firstParty?.device ?? null;
       const row = await one(
-        'SELECT * FROM uts.exchange_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)',
+        'SELECT * FROM uts.exchange_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)',
         [
           input.environment,
           input.codeHash,
           input.clientId,
           input.redirectUri,
           input.codeChallenge,
-          input.binding.kind === 'first_party' ? input.binding.dpopJkt : null,
+          firstParty?.proof.jkt ?? null,
+          firstParty?.proof.jti ?? null,
           input.grantId,
           input.refreshTokenHash,
-          input.binding.kind === 'first_party' ? input.binding.clientClass : null,
+          firstParty?.clientClass ?? null,
           device?.label ?? null,
           device?.platform ?? null,
           device?.clientIp ?? null,
@@ -281,13 +298,14 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
 
     async refreshFirstParty(input) {
       const row = await one(
-        'SELECT * FROM uts.refresh_first_party($1, $2, $3, $4, $5, $6, $7)',
+        'SELECT * FROM uts.refresh_first_party($1, $2, $3, $4, $5, $6, $7, $8)',
         [
           input.environment,
           input.tokenHash,
           input.grantId,
           input.clientId,
-          input.dpopJkt,
+          input.proof.jkt,
+          input.proof.jti,
           input.scopes,
           input.resources,
         ],
@@ -329,23 +347,21 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
     },
 
     async introspect(input) {
-      const row = await store.maybeOne(
-        {
-          text: 'SELECT * FROM uts.introspect_refresh_token($1, $2, $3)',
-          values: [input.tokenHash, input.clientId, input.dpopJkt],
-        },
+      const row = await one(
+        'SELECT * FROM uts.introspect_refresh_token($1, $2, $3, $4)',
+        [input.tokenHash, input.clientId, input.proof?.jkt ?? null, input.proof?.jti ?? null],
         IntrospectRowSchema
       );
-      return row === null
-        ? null
-        : {
-            kind: row.grant_kind,
-            grantId: row.grant_id,
-            subjectId: row.subject_id,
-            scopes: row.granted_scopes,
-            issuedAt: row.issued_at,
-            expiresAt: row.expires_at,
-          };
+      if (row.outcome !== 'active') return { outcome: row.outcome };
+      return {
+        outcome: 'active',
+        kind: row.grant_kind,
+        grantId: row.grant_id,
+        subjectId: row.subject_id,
+        scopes: row.granted_scopes,
+        issuedAt: row.issued_at,
+        expiresAt: row.expires_at,
+      };
     },
   };
 }

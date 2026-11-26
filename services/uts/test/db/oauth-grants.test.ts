@@ -7,8 +7,10 @@ import { IdentityStore } from '../../src/db/client';
 import {
   type DeviceContext,
   type ExchangeCodeInput,
+  type FirstPartyRefreshInput,
   type GrantStore,
   type IssueCodeInput,
+  type ProofBinding,
   identityStoreGrants,
 } from '../../src/grants/store';
 import { TestDatabase, insertAccount, insertGatePass } from './harness';
@@ -37,6 +39,8 @@ const environment = 'development';
 const sha256 = (value: string) => createHash('sha256').update(value).digest();
 const reference = (value: string) => sha256(value).toString('base64url').slice(0, 8);
 const token = () => randomBytes(32).toString('base64url');
+/** A verified DPoP proof of the key `jkt`, with a fresh `jti`. */
+const proofOf = (jkt: Buffer): ProofBinding => ({ jkt, jti: randomUUID() });
 const device: DeviceContext = {
   label: 'Kilo CLI',
   platform: 'linux',
@@ -115,7 +119,7 @@ function exchangeInput(
     clientId: 'kilo-cli',
     redirectUri: 'http://127.0.0.1:4100/callback',
     codeChallenge: fixture.challenge,
-    binding: { kind: 'first_party', dpopJkt: fixture.jkt, clientClass: 'desktop', device },
+    binding: { kind: 'first_party', proof: proofOf(fixture.jkt), clientClass: 'desktop', device },
     grantId: randomUUID(),
     refreshTokenHash: sha256(refreshToken),
     scopes: null,
@@ -129,7 +133,7 @@ function exchangeInput(
 async function firstPartyGrant(accountId: string, clientClass: 'desktop' | 'mobile' = 'desktop') {
   const fixture = await issueFirstPartyCode(accountId);
   const input = exchangeInput(fixture, {
-    binding: { kind: 'first_party', dpopJkt: fixture.jkt, clientClass, device },
+    binding: { kind: 'first_party', proof: proofOf(fixture.jkt), clientClass, device },
   });
   const result = await grants.exchangeCode(input);
   expect(result.outcome).toBe('issued');
@@ -403,7 +407,7 @@ describe('code exchange', () => {
         ...input,
         binding: {
           kind: 'first_party' as const,
-          dpopJkt: randomBytes(32),
+          proof: proofOf(randomBytes(32)),
           clientClass: 'desktop' as const,
           device,
         },
@@ -445,6 +449,27 @@ describe('code exchange', () => {
     });
     const result = await grants.exchangeCode(exchangeInput(fixture, { resources: ['kilo-chat'] }));
     expect(result).toMatchObject({ outcome: 'issued', scopes: ['kilo-chat:messages.read'] });
+  });
+
+  it('records the proof jti under the grant the code creates, so each proof works once', async () => {
+    const accountId = await insertAccount(owner);
+    const fixture = await issueFirstPartyCode(accountId);
+    const input = exchangeInput(fixture);
+    // A refused scope still uses the proof up.
+    expect(await grants.exchangeCode({ ...input, scopes: ['gateway:chat.write'] })).toEqual({
+      outcome: 'invalid_scope',
+    });
+    expect(await grants.exchangeCode(input)).toEqual({ outcome: 'dpop_replay' });
+    const fresh = await grants.exchangeCode({
+      ...input,
+      binding: { kind: 'first_party', proof: proofOf(fixture.jkt), clientClass: 'desktop', device },
+    });
+    expect(fresh.outcome).toBe('issued');
+    const stored = await owner.query(
+      'SELECT count(*)::int AS proofs FROM uts.dpop_proofs WHERE grant_id = $1',
+      [input.grantId]
+    );
+    expect(stored.rows).toEqual([{ proofs: 2 }]);
   });
 
   it('revokes the grant a code created when the code is used again', async () => {
@@ -491,17 +516,47 @@ describe('code exchange', () => {
 });
 
 describe('first-party refresh', () => {
-  const refresh = (grant: GrantFixture, overrides = {}) =>
+  const refresh = (grant: GrantFixture, overrides: Partial<FirstPartyRefreshInput> = {}) =>
     grants.refreshFirstParty({
       environment,
       tokenHash: sha256(grant.refreshToken),
       grantId: grant.grantId,
       clientId: 'kilo-cli',
-      dpopJkt: grant.jkt,
+      proof: proofOf(grant.jkt),
       scopes: null,
       resources: null,
       ...overrides,
     });
+
+  it('records the proof jti under the grant and refuses it a second time', async () => {
+    const accountId = await insertAccount(owner);
+    const grant = await firstPartyGrant(accountId);
+    const proof = proofOf(grant.jkt);
+    expect((await refresh(grant, { proof })).outcome).toBe('issued');
+    const before = (await auditRows(accountId)).length;
+    expect(await refresh(grant, { proof })).toEqual({ outcome: 'dpop_replay' });
+    expect(await auditRows(accountId)).toHaveLength(before);
+    const stored = await owner.query<{ kept: number }>(
+      `SELECT extract(epoch FROM expires_at - now()) AS kept FROM uts.dpop_proofs
+       WHERE grant_id = $1 AND jti = $2`,
+      [grant.grantId, proof.jti]
+    );
+    expect(Number(stored.rows[0].kept)).toBeGreaterThan(119);
+    expect(Number(stored.rows[0].kept)).toBeLessThanOrEqual(121);
+    // The same jti under another grant is another proof.
+    const other = await firstPartyGrant(accountId);
+    const sameJti = await refresh(other, { proof: { jkt: other.jkt, jti: proof.jti } });
+    expect(sameJti.outcome).toBe('issued');
+  });
+
+  it('records no jti for a proof of another key', async () => {
+    const accountId = await insertAccount(owner);
+    const grant = await firstPartyGrant(accountId);
+    const stolen = proofOf(randomBytes(32));
+    expect(await refresh(grant, { proof: stolen })).toEqual({ outcome: 'dpop_mismatch' });
+    const stored = await owner.query('SELECT 1 FROM uts.dpop_proofs WHERE jti = $1', [stolen.jti]);
+    expect(stored.rows).toEqual([]);
+  });
 
   it('mints one token per granted scope and audits each jti', async () => {
     const accountId = await insertAccount(owner);
@@ -557,7 +612,7 @@ describe('first-party refresh', () => {
   it('refuses another DPoP key and writes a denied audit row', async () => {
     const accountId = await insertAccount(owner);
     const grant = await firstPartyGrant(accountId);
-    expect(await refresh(grant, { dpopJkt: randomBytes(32) })).toEqual({
+    expect(await refresh(grant, { proof: proofOf(randomBytes(32)) })).toEqual({
       outcome: 'dpop_mismatch',
     });
     expect((await auditRows(accountId)).at(-1)).toMatchObject({
@@ -779,50 +834,64 @@ describe('introspection', () => {
   it('answers for an active first-party grant only with its own DPoP key', async () => {
     const accountId = await insertAccount(owner);
     const grant = await firstPartyGrant(accountId);
-    const introspect = (dpopJkt: Buffer | null, clientId = 'kilo-cli') =>
-      grants.introspect({ tokenHash: sha256(grant.refreshToken), clientId, dpopJkt });
+    const introspect = (jkt: Buffer | null, clientId = 'kilo-cli') =>
+      grants.introspect({
+        tokenHash: sha256(grant.refreshToken),
+        clientId,
+        proof: jkt === null ? null : proofOf(jkt),
+      });
     expect(await introspect(grant.jkt)).toMatchObject({
+      outcome: 'active',
       kind: 'first_party',
       grantId: grant.grantId,
       subjectId: accountId,
       scopes: ['gateway:models.read', 'kilo-chat:messages.read'],
     });
-    expect(await introspect(randomBytes(32))).toBeNull();
-    expect(await introspect(null)).toBeNull();
-    expect(await introspect(grant.jkt, 'kilo-other')).toBeNull();
+    expect(await introspect(randomBytes(32))).toEqual({ outcome: 'inactive' });
+    expect(await introspect(null)).toEqual({ outcome: 'inactive' });
+    expect(await introspect(grant.jkt, 'kilo-other')).toEqual({ outcome: 'inactive' });
     await grants.revoke({
       environment,
       tokenHash: sha256(grant.refreshToken),
       clientId: 'kilo-cli',
     });
-    expect(await introspect(grant.jkt)).toBeNull();
+    expect(await introspect(grant.jkt)).toEqual({ outcome: 'inactive' });
   });
 
   it('answers for the active third-party token, not for a rotated one', async () => {
     const accountId = await insertAccount(owner);
     const family = await thirdPartyFamily(accountId);
-    const introspect = (presented: string, dpopJkt: Buffer | null = null) =>
-      grants.introspect({ tokenHash: sha256(presented), clientId: family.clientId, dpopJkt });
+    const introspect = (presented: string, jkt: Buffer | null = null) =>
+      grants.introspect({
+        tokenHash: sha256(presented),
+        clientId: family.clientId,
+        proof: jkt === null ? null : proofOf(jkt),
+      });
     expect(await introspect(family.refreshToken)).toMatchObject({
+      outcome: 'active',
       kind: 'third_party',
       grantId: family.familyId,
     });
-    expect(await introspect(family.refreshToken, randomBytes(32))).toBeNull();
+    expect(await introspect(family.refreshToken, randomBytes(32))).toEqual({
+      outcome: 'inactive',
+    });
     const first = refreshThirdParty(family.clientId, family.refreshToken);
     await first.result;
-    expect(await introspect(family.refreshToken)).toBeNull();
-    expect(await introspect(first.next)).not.toBeNull();
+    expect(await introspect(family.refreshToken)).toEqual({ outcome: 'inactive' });
+    expect(await introspect(first.next)).toMatchObject({ outcome: 'active' });
   });
 
-  it('writes nothing', async () => {
+  it('writes no audit row, records the first-party proof jti and refuses it again', async () => {
     const accountId = await insertAccount(owner);
     const grant = await firstPartyGrant(accountId);
     const before = (await auditRows(accountId)).length;
-    await grants.introspect({
+    const input = {
       tokenHash: sha256(grant.refreshToken),
       clientId: 'kilo-cli',
-      dpopJkt: grant.jkt,
-    });
+      proof: proofOf(grant.jkt),
+    };
+    expect(await grants.introspect(input)).toMatchObject({ outcome: 'active' });
+    expect(await grants.introspect(input)).toEqual({ outcome: 'dpop_replay' });
     expect(await auditRows(accountId)).toHaveLength(before);
   });
 });

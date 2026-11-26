@@ -7,13 +7,14 @@ import {
   signerOfTokenKid,
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
-import { createLocalJWKSet, jwtVerify } from 'jose';
+import { createLocalJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { describe, expect, it } from 'vitest';
 import { handleDevRequest } from '../../src/dev';
 import type { Env } from '../../src/env';
 import type {
   ExchangeCodeInput,
   FirstPartyRefreshInput,
+  IntrospectInput,
   IssueCodeInput,
 } from '../../src/grants/store';
 import { handleRequest } from '../../src/http';
@@ -21,7 +22,11 @@ import { signerForGrant } from '../../src/keys/signer-choice';
 import type { AuthorizationHandoff, PendingAuthorization } from '../../src/oauth/authorize';
 import { type OAuthDeps, handleOAuthRequest } from '../../src/oauth/routes';
 import { s256Challenge } from '../../src/oauth/pkce';
-import { createFirstPartyRefreshToken, randomCredential } from '../../src/token/credentials';
+import {
+  createFirstPartyRefreshToken,
+  grantIdOfCode,
+  randomCredential,
+} from '../../src/token/credentials';
 import { keySet } from './support';
 import {
   INTROSPECT_URL,
@@ -98,7 +103,8 @@ describe('token endpoint: authorization_code', () => {
       device: { label: 'Work laptop', platform: 'unknown', clientIp: '192.0.2.44' },
     });
     if (exchange.binding.kind !== 'first_party') throw new Error('first-party binding expected');
-    expect(Buffer.from(exchange.binding.dpopJkt)).toEqual(key.thumbprint);
+    expect(Buffer.from(exchange.binding.proof.jkt)).toEqual(key.thumbprint);
+    expect(exchange.grantId).toBe(await grantIdOfCode(code));
     expect(body.refresh_token).toMatch(/^kilo_rt_/);
     expect(body.refresh_token_expires_in).toBeGreaterThan(29 * 86_400);
 
@@ -210,14 +216,19 @@ describe('token endpoint: refresh_token', () => {
       scopes: ['gateway:models.read'],
       resources: null,
     });
-    expect(Buffer.from(input.dpopJkt)).toEqual(grant.key.thumbprint);
+    expect(Buffer.from(input.proof.jkt)).toEqual(grant.key.thumbprint);
     expect((await verifiedClaims(body.access_token, 'gateway')).claims.sid).toBe(grant.grantId);
   });
 
-  it('refuses a replayed proof before the grant read', async () => {
+  it('passes the proof jti to the grant statement and refuses a proof it recorded before', async () => {
     const grant = await firstParty();
+    const recorded = new Set<string>();
     const grants = fakeGrants({
-      refreshFirstParty: async () => ({ outcome: 'issued', ...minted() }),
+      refreshFirstParty: async input => {
+        if (recorded.has(input.proof.jti)) return { outcome: 'dpop_replay' };
+        recorded.add(input.proof.jti);
+        return { outcome: 'issued', ...minted() };
+      },
     });
     const proof = await dpopProof(grant.key);
     const send = () =>
@@ -231,8 +242,10 @@ describe('token endpoint: refresh_token', () => {
       );
     expect((await send()).status).toBe(200);
     const replayed = await send();
+    expect(replayed.status).toBe(400);
+    expect(replayed.headers.get('WWW-Authenticate')).toMatch(/^DPoP error="invalid_dpop_proof"/);
     expect(await errorOf(replayed)).toBe('invalid_dpop_proof');
-    expect(grants.calls).toHaveLength(1);
+    expect([...recorded]).toEqual([decodeJwt(proof).jti]);
   });
 
   it('answers invalid_grant for a key mismatch, reuse and a malformed token', async () => {
@@ -298,7 +311,7 @@ describe('token endpoint: refresh_token', () => {
     expect(claims).toMatchObject({ sid: familyId, client_id: THIRD_PARTY });
   });
 
-  it('answers 503 for a retryable store failure, a replay object or a signer that does not answer', async () => {
+  it('answers 503 for a retryable store failure or a signer that does not answer', async () => {
     const failing = fakeGrants({
       refreshThirdParty: async () => {
         throw storeFailure('retryable');
@@ -328,17 +341,6 @@ describe('token endpoint: refresh_token', () => {
       oauthDeps(issued.access, { sign: async () => ({ status: 'unavailable' }) })
     );
     expect(unsigned.status).toBe(503);
-
-    const grant = await firstParty();
-    const noReplay = await call(
-      formRequest(
-        '/token',
-        { grant_type: 'refresh_token', refresh_token: grant.token, client_id: 'kilo-cli' },
-        { DPoP: await dpopProof(grant.key) }
-      ),
-      oauthDeps(fakeGrants().access, { replay: async () => 'unavailable' })
-    );
-    expect(noReplay.status).toBe(503);
   });
 
   it('answers 500 for a permanent store failure and a misconfigured signer', async () => {
@@ -744,14 +746,13 @@ describe('introspection endpoint', () => {
 
   it('answers an active first-party grant to its own client with a DPoP proof', async () => {
     const key = await dpopKey();
-    const grants = fakeGrants({ introspect: async () => ({ kind: 'first_party', ...active }) });
+    const grants = fakeGrants({
+      introspect: async () => ({ outcome: 'active', kind: 'first_party', ...active }),
+    });
     const token = createFirstPartyRefreshToken(active.grantId);
+    const proof = await dpopProof(key, INTROSPECT_URL);
     const response = await call(
-      formRequest(
-        '/introspect',
-        { token, client_id: 'kilo-cli' },
-        { DPoP: await dpopProof(key, INTROSPECT_URL) }
-      ),
+      formRequest('/introspect', { token, client_id: 'kilo-cli' }, { DPoP: proof }),
       oauthDeps(grants.access)
     );
     expect(IntrospectionResponseSchema.parse(await response.json())).toEqual({
@@ -765,6 +766,23 @@ describe('introspection endpoint', () => {
       iss: config.endpoints.issuer,
       sid: active.grantId,
     });
+    const input = grants.calls[0].input as IntrospectInput;
+    expect(input.proof?.jti).toBe(decodeJwt(proof).jti);
+    expect(Buffer.from(input.proof?.jkt ?? [])).toEqual(key.thumbprint);
+  });
+
+  it('refuses a first-party proof the statement recorded before', async () => {
+    const grants = fakeGrants({ introspect: async () => ({ outcome: 'dpop_replay' }) });
+    const response = await call(
+      formRequest(
+        '/introspect',
+        { token: createFirstPartyRefreshToken(active.grantId), client_id: 'kilo-cli' },
+        { DPoP: await dpopProof(await dpopKey(), INTROSPECT_URL) }
+      ),
+      oauthDeps(grants.access)
+    );
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toBe('invalid_dpop_proof');
   });
 
   it('needs the proof for the introspection URL from a first-party client', async () => {
@@ -781,7 +799,7 @@ describe('introspection endpoint', () => {
   });
 
   it('answers inactive for an access token, an unknown token and a foreign one', async () => {
-    const none = fakeGrants({ introspect: async () => null });
+    const none = fakeGrants({ introspect: async () => ({ outcome: 'inactive' }) });
     const inactive = async (token: string, clientId = THIRD_PARTY) =>
       (
         await call(

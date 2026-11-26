@@ -10,6 +10,7 @@ import {
 import { s256Challenge } from '../../src/oauth/pkce';
 import {
   createFirstPartyRefreshToken,
+  grantIdOfCode,
   grantIdOfFirstPartyRefreshToken,
   isRandomCredential,
   randomCredential,
@@ -117,6 +118,17 @@ describe('credentials', () => {
     expect(isRandomCredential(first)).toBe(true);
     expect(first).not.toBe(randomCredential());
     expect(isRandomCredential(`${first}A`)).toBe(false);
+  });
+
+  it('derive one version 8 grant id per code', async () => {
+    const code = randomCredential();
+    const grantId = await grantIdOfCode(code);
+    expect(grantId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(await grantIdOfCode(code)).toBe(grantId);
+    expect(await grantIdOfCode(randomCredential())).not.toBe(grantId);
+    expect(grantIdOfFirstPartyRefreshToken(createFirstPartyRefreshToken(grantId))).toBe(grantId);
   });
 
   it('compute the RFC 7636 S256 challenge (appendix B)', async () => {

@@ -22,7 +22,11 @@ const FUNCTION_WRITTEN_TABLES = [
   'third_party_grant_families',
   'third_party_refresh_tokens',
   'revocations',
+  'dpop_proofs',
 ];
+
+/** A column each table has, for the refused UPDATE; `status` unless named here. */
+const UPDATE_COLUMN: Partial<Record<string, string>> = { revocations: 'kind', dpop_proofs: 'jti' };
 
 let db: TestDatabase;
 let todayPartition: string;
@@ -175,7 +179,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     async table => {
       const app = await db.connect(login);
       await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
-      const column = table === 'revocations' ? 'kind' : 'status';
+      const column = UPDATE_COLUMN[table] ?? 'status';
       for (const statement of [
         `INSERT INTO uts.${table} DEFAULT VALUES`,
         `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,

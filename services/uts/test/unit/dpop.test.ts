@@ -41,13 +41,14 @@ const verify = (input: Request, url = TOKEN_URL) => verifyDpopProof(input, 'POST
 
 describe('DPoP proof verification', () => {
   it.each(['EdDSA', 'ES256'] as const)(
-    'accepts a %s proof and returns its key thumbprint',
+    'accepts a %s proof and returns its key thumbprint and jti',
     async alg => {
-      const { token, thumbprint } = await proof({ alg });
+      const jti = crypto.randomUUID();
+      const { token, thumbprint } = await proof({ alg, jti });
       const check = await verify(request(token));
       if (check.status !== 'valid') throw new Error(JSON.stringify(check));
       expect(Buffer.from(check.proof.jkt).toString('base64url')).toBe(thumbprint);
-      expect(check.proof.iat).toBe(NOW);
+      expect(check.proof.jti).toBe(jti);
     }
   );
 

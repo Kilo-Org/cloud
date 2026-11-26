@@ -5,13 +5,14 @@ jest.mock('./served-models', () => ({
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { legacyCiphertextDigestSql } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { isChatGptUserNotEligible, probeOpenAiChatGptEligibility } from './eligibility';
 import {
+  getOpenAiChatGptConnection,
   getOpenAiChatGptStoredConnection,
   markOpenAiChatGptNotEligible,
   saveOpenAiChatGptConnection,
@@ -129,7 +130,24 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
     expect(stored?.connection).toMatchObject({ status: 'connected', access_token: 'reconnected' });
   });
 
-  it('writes the refusal in both stored forms, with the tokens cleared and the system actor recorded', async () => {
+  async function readPayloadColumns() {
+    const [row] = await db
+      .select({
+        obsolete: openai_chatgpt_connections.encrypted_connection,
+        envelope: openai_chatgpt_connections.encrypted_connection_envelope,
+        isEnabled: openai_chatgpt_connections.is_enabled,
+      })
+      .from(openai_chatgpt_connections)
+      .where(
+        and(
+          eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string),
+          isNull(openai_chatgpt_connections.organization_id)
+        )
+      );
+    return row;
+  }
+
+  it('writes the refusal as an envelope without tokens, the placeholder in the obsolete column and the system actor recorded', async () => {
     await saveOpenAiChatGptConnection(
       owner,
       connection('refused-both'),
@@ -139,26 +157,12 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
 
     await markOpenAiChatGptNotEligible(owner, 'refused-both', 'not eligible');
 
-    const [row] = await db
-      .select({
-        legacy: openai_chatgpt_connections.encrypted_connection,
-        envelope: openai_chatgpt_connections.encrypted_connection_envelope,
-        digest: sql<string>`${legacyCiphertextDigestSql(openai_chatgpt_connections.encrypted_connection)}`,
-      })
-      .from(openai_chatgpt_connections)
-      .where(
-        and(
-          eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string),
-          isNull(openai_chatgpt_connections.organization_id)
-        )
-      );
-    for (const stored of [row.legacy, row.envelope]) {
-      const serialized = JSON.stringify(stored);
-      expect(serialized).not.toContain('refused-both');
-      expect(serialized).not.toContain('refresh-refused-both');
-    }
-    // The envelope names the static-key ciphertext written with it, as Postgres computes it.
-    expect(row.envelope?.legacy_digest).toBe(row.digest);
+    const row = await readPayloadColumns();
+    expect(row.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+    expect(row.envelope).not.toBeNull();
+    const serialized = JSON.stringify(row);
+    expect(serialized).not.toContain('refused-both');
+    expect(serialized).not.toContain('refresh-refused-both');
     expect(kms.requests.find(request => request.path === '/data-key')?.body).toMatchObject({
       owner_type: 'user',
       owner_id: owner.kiloUserId,
@@ -173,23 +177,7 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
   });
 
   describe('when the KMS service cannot create a data key', () => {
-    async function readPayloadColumns() {
-      const [row] = await db
-        .select({
-          legacy: openai_chatgpt_connections.encrypted_connection,
-          envelope: openai_chatgpt_connections.encrypted_connection_envelope,
-        })
-        .from(openai_chatgpt_connections)
-        .where(
-          and(
-            eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string),
-            isNull(openai_chatgpt_connections.organization_id)
-          )
-        );
-      return row;
-    }
-
-    it('still records the refusal, as a static-key copy without tokens and without an envelope', async () => {
+    it('disables the row and removes the credential, so it reads as no connection', async () => {
       await saveOpenAiChatGptConnection(owner, connection('kms-down'), owner.kiloUserId as string);
       kms.fail('/data-key');
 
@@ -199,34 +187,39 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
 
       const after = await readPayloadColumns();
       expect(after.envelope).toBeNull();
-      expect(JSON.stringify(after.legacy)).not.toContain('kms-down');
-      // Readers use the static-key copy, so the card shows the refusal.
-      const stored = await getOpenAiChatGptStoredConnection(owner);
-      expect(stored?.isEnabled).toBe(false);
-      expect(stored?.connection).toMatchObject({
-        status: 'error',
-        error_message: 'not eligible',
-        access_token: '',
-      });
-      expect(stored?.connection.refresh_token).toBeUndefined();
+      expect(after.isEnabled).toBe(false);
+      expect(after.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+      expect(JSON.stringify(after)).not.toContain('kms-down');
+      await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toBeNull();
+      await expect(getOpenAiChatGptConnection(owner)).resolves.toBeNull();
     });
 
-    it('records the refusal even when the KMS service cannot open the stored envelope either', async () => {
+    it('leaves the row untouched, and logs, when the KMS service cannot open the stored envelope either', async () => {
       await saveOpenAiChatGptConnection(
         owner,
         connection('kms-fully-down'),
         owner.kiloUserId as string
       );
+      const before = await readPayloadColumns();
       kms.fail('/data-key');
       kms.fail('/decrypt');
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      await markOpenAiChatGptNotEligible(owner, 'kms-fully-down', 'not eligible');
+      try {
+        await expect(
+          markOpenAiChatGptNotEligible(owner, 'kms-fully-down', 'not eligible')
+        ).resolves.toBeUndefined();
 
-      const after = await readPayloadColumns();
-      expect(after.envelope).toBeNull();
-      const stored = await getOpenAiChatGptStoredConnection(owner);
-      expect(stored?.isEnabled).toBe(false);
-      expect(stored?.connection).toMatchObject({ status: 'error', access_token: '' });
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringContaining('report not applied'),
+          expect.any(String),
+          expect.any(String)
+        );
+        expect(JSON.stringify(consoleError.mock.calls)).not.toContain('kms-fully-down');
+      } finally {
+        consoleError.mockRestore();
+      }
+      await expect(readPayloadColumns()).resolves.toEqual(before);
     });
 
     it('leaves a connection made after the refused request untouched', async () => {

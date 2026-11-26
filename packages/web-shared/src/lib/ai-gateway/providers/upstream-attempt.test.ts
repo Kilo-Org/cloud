@@ -24,6 +24,9 @@ jest.mock('./preferred-provider-order-config', () => ({
 
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
+import { eq } from 'drizzle-orm';
+import { openai_chatgpt_connections } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -505,10 +508,17 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     );
 
     expect(result.type === 'success' && result.response.status).toBe(403);
-    const stored = await getOpenAiChatGptStoredConnection(owner);
-    expect(stored?.isEnabled).toBe(false);
-    // The refusal is recorded without an envelope, so the card explains it.
-    expect(stored?.connection).toMatchObject({ status: 'error', access_token: '' });
+    // The refusal cannot be sealed, so the credential is removed and the row disabled: it reads
+    // as no connection.
+    const [row] = await db
+      .select({
+        isEnabled: openai_chatgpt_connections.is_enabled,
+        envelope: openai_chatgpt_connections.encrypted_connection_envelope,
+      })
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string));
+    expect(row).toEqual({ isEnabled: false, envelope: null });
+    await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toBeNull();
   });
 
   it('keeps the connection on another 403', async () => {

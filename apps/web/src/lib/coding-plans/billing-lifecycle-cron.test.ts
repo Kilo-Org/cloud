@@ -1,8 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
 
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   processCodingPlanCancellationAtPeriodEnd,
   processCodingPlanRenewal,
@@ -17,6 +15,7 @@ import {
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { sealedInventoryColumns } from '@/tests/helpers/coding-plan-inventory.helper';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import {
   byok_api_keys,
@@ -85,7 +84,7 @@ async function createGrandfatheredMiniMaxSubscription(planId: CodingPlanId, cost
       plan_id: planId,
       provider_id: 'minimax',
       upstream_plan_id: `minimax-grandfathered-${crypto.randomUUID()}`,
-      encrypted_api_key: encryptApiKey(`grandfathered-${crypto.randomUUID()}`, BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns(`grandfathered-${crypto.randomUUID()}`),
       credential_fingerprint: crypto.randomUUID(),
       status: 'assigned',
       assigned_to_user_id: user.id,
@@ -359,6 +358,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.installed_byok_key_id).not.toBeNull();
     expect(credential.status).toBe('assigned');
     expect(credential.encrypted_api_key).not.toBeNull();
+    expect(credential.encrypted_api_key_envelope).not.toBeNull();
   });
 
   it('rechecks an extended renewal deadline after a stale sweep selection', async () => {

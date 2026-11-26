@@ -10,12 +10,14 @@ import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { useFakeByokKmsForSuite } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { staticKeyOpenAiChatGptConnection } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { openAiChatGptConnectorGone } from './connector';
 import {
   clearOpenAiChatGptConnection,
   clearOpenAiChatGptUsageLimit,
   getOpenAiChatGptStoredConnection,
+  getOpenAiChatGptStoredConnectionFromPrimary,
   openAiChatGptSharedServicesOwner,
   readOpenAiChatGptConnectionRow,
   readOpenAiChatGptUsageLimit,
@@ -73,7 +75,7 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
   let owner: User;
   let member: User;
   let organization: { id: string };
-  useFakeByokKmsForSuite();
+  const kms = useFakeByokKmsForSuite();
 
   beforeAll(async () => {
     process.env.OPENAI_CHATGPT_API_KEY = 'partner-project-key';
@@ -360,6 +362,91 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
 
     await clearOpenAiChatGptUsageLimit(personalOwner, REPLACEMENT_ACCESS_TOKEN);
     await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
+  });
+
+  it('reads a row without an envelope as no connection, even if the obsolete column holds a static-key ciphertext', async () => {
+    const person = await insertTestUser({
+      google_user_email: `static-key-only-${randomUUID()}@example.com`,
+    });
+    const personalOwner: OpenAiChatGptOwner = { kiloUserId: person.id, organizationId: null };
+    await db.insert(openai_chatgpt_connections).values({
+      kilo_user_id: person.id,
+      organization_id: null,
+      encrypted_connection: staticKeyOpenAiChatGptConnection(connection('static-only@example.com')),
+      encrypted_connection_envelope: null,
+      created_by: person.id,
+    });
+
+    await expect(getOpenAiChatGptStoredConnection(personalOwner)).resolves.toBeNull();
+    await expect(getOpenAiChatGptStoredConnectionFromPrimary(personalOwner)).resolves.toBeNull();
+    expect(kms.requests).toEqual([]);
+  });
+
+  describe('when the KMS service cannot open the stored connection', () => {
+    async function connectedPerson(label: string) {
+      const person = await insertTestUser({
+        google_user_email: `usage-limit-kms-down-${label}-${randomUUID()}@example.com`,
+      });
+      const personalOwner: OpenAiChatGptOwner = { kiloUserId: person.id, organizationId: null };
+      await saveOpenAiChatGptConnection(
+        personalOwner,
+        connection(`${label}@example.com`),
+        person.id
+      );
+      return personalOwner;
+    }
+
+    it('skips and logs a usage limit report instead of writing it', async () => {
+      const personalOwner = await connectedPerson('record');
+      kms.fail('/decrypt');
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await expect(
+          recordOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN, {
+            code: null,
+            resetsAt: Date.now() + 60 * 60 * 1000,
+          })
+        ).resolves.toBeUndefined();
+
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringContaining('report not applied'),
+          expect.any(String),
+          expect.any(String)
+        );
+        expect(JSON.stringify(consoleError.mock.calls)).not.toContain(ACCESS_TOKEN);
+      } finally {
+        consoleError.mockRestore();
+      }
+      await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
+    });
+
+    it('skips and logs clearing a recorded usage limit', async () => {
+      const personalOwner = await connectedPerson('clear');
+      await recordOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN, {
+        code: null,
+        resetsAt: Date.now() + 60 * 60 * 1000,
+      });
+      kms.fail('/decrypt');
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await expect(
+          clearOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN)
+        ).resolves.toBeUndefined();
+
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringContaining('report not applied'),
+          expect.any(String),
+          expect.any(String)
+        );
+      } finally {
+        consoleError.mockRestore();
+      }
+      await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toMatchObject({
+        resetsAt: expect.any(String),
+      });
+    });
   });
 
   it('takes no row lock and writes nothing when a success finds no recorded limit', async () => {

@@ -2082,7 +2082,9 @@ dynamic:${value.grant}
     const index = load(policyFile());
     const grant = index.get('production', 'ci-deploy-x')?.dynamic[0];
     expect(grant).toMatchObject({ grant: 'cloudflare-deploy', ttlSeconds: 3600, zones: [] });
-    expect(index.snapshot()[0].dynamic).toEqual(['cloudflare-deploy:x-deploy:3600:1:2:aaaaaaaa:']);
+    expect(index.snapshot('production')[0].dynamic).toEqual([
+      'cloudflare-deploy:x-deploy:3600:1:2:aaaaaaaa:',
+    ]);
   });
 
   it.each([

@@ -193,7 +193,7 @@ describe('worker-binding entry', () => {
       secrets: { O11Y_CF_AE_API_TOKEN: { value: 'ae-token', version: 7, id: 'id-ae' } },
       missing: [],
       fetchedAt: new Date().toISOString(),
-      policyHash: await workloadPolicyHash('o11y'),
+      policyHash: await workloadPolicyHash('development', 'o11y'),
       stale: false,
     });
 

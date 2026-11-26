@@ -305,7 +305,7 @@ export class BundleDO extends DurableObject<Env> {
    * removed grant is never served (design 4.4: STS refuses any read the policy does not list).
    */
   private async serve(row: BundleRow, policy: Policy): Promise<ServedBundle | null> {
-    const policyHash = await this.policies.workloadHash(policy.workload);
+    const policyHash = await this.policies.workloadHash(this.config.environment, policy.workload);
     if (row.policyHash === policyHash) return { kind: 'stored', row };
     const stored = await this.open(row);
     if (stored === null) return null;

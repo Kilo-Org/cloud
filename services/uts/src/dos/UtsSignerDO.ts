@@ -22,6 +22,7 @@ import {
   type SignerKeyEvent,
   type SignerState,
 } from '../keys/lifecycle';
+import { dataCenter } from './data-center';
 import { signerOfObjectId } from './stubs';
 
 /**
@@ -89,22 +90,6 @@ type Step<R> = (
 
 const KidSchema = z.string().min(1);
 
-/**
- * The Cloudflare data center this object runs in, from the edge trace of an outbound request, or
- * null when the trace does not answer within 2 seconds. A Durable Object never moves, so a signer
- * asks once, when it creates its first keys.
- */
-async function dataCenter(): Promise<string | null> {
-  try {
-    const response = await fetch('https://www.cloudflare.com/cdn-cgi/trace', {
-      signal: AbortSignal.timeout(2000),
-    });
-    return /^colo=([A-Z]{3})$/m.exec(await response.text())?.[1] ?? null;
-  } catch {
-    return null;
-  }
-}
-
 function logEvents(events: readonly SignerKeyEvent[]): void {
   for (const event of events) {
     console.log(JSON.stringify({ event: 'uts.signer.key_event', ...event }));
@@ -147,8 +132,9 @@ export class UtsSignerDO extends DurableObject<Env> {
   async publicKeys(): Promise<PublicKeysResult> {
     const phase = await this.#current();
     if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
-    // The feed Worker reads at most a few times per second, so this read also checks the stored
-    // alarm and sets it again when it is gone. `sign` runs far more often and skips that read.
+    // Each of the 8 key-set shards reads each object at most once per 2 seconds (its copy), so
+    // this read can also check the stored alarm and set it again when it is gone. `sign` runs far
+    // more often and skips that read.
     await this.#scheduleAlarm(phase.state, 'confirm');
     return { status: 'ok', signer: phase.state.signer, keys: publishedKeys(phase.state) };
   }
@@ -280,7 +266,7 @@ export class UtsSignerDO extends DurableObject<Env> {
       this.#phase = id;
       return;
     }
-    await this.#scheduleAlarm(await this.#bootstrap(id.signer, now));
+    await this.#scheduleAlarm(await this.#bootstrap(id.index, now));
   }
 
   async #advanceStored(stored: SignerState, now: number): Promise<SignerState> {

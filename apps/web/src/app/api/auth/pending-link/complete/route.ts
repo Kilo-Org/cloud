@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import * as z from 'zod';
+import type { PendingAuthLink, User } from '@kilocode/db/schema';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { isSameOrigin } from '@/lib/auth/same-origin';
@@ -10,7 +12,65 @@ import {
   pendingLinkPageUrl,
   readPendingLinkSecret,
 } from '@/lib/auth/pending-link';
+import { authorizeSignInMethodChange } from '@/lib/auth/sign-in-method-change';
+import { consumeSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
+import {
+  SIGN_IN_METHOD_CHANGE_CODE_LENGTH,
+  SIGN_IN_METHOD_CHANGE_REFUSAL_CODES,
+  type SignInMethodChangeRefusal,
+} from '@/lib/auth/sign-in-method-change-codes';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+
+const codeProofSchema = z.object({
+  code: z.string().regex(new RegExp(`^\\d{${SIGN_IN_METHOD_CHANGE_CODE_LENGTH}}$`)),
+  challengeId: z.uuid(),
+});
+
+function refused(refusal: SignInMethodChangeRefusal, status: number): NextResponse {
+  return NextResponse.json({ error: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES[refusal] }, { status });
+}
+
+/**
+ * An existing-account link adds a sign-in method to the signed-in account, so,
+ * like a link started from Connected accounts, it needs the code emailed to the
+ * account's primary address for that change, bound to this browser session. A
+ * session cookie alone does not prove the mailbox, and the identity being added
+ * may have an email claim that its provider never verified. An explicit link
+ * spent its code when it started, so it needs none here.
+ *
+ * Returns the refusal, or null once the code is spent. The account checks run
+ * first, so a refused request does not spend the code.
+ */
+async function refuseUnprovenExistingAccountLink(
+  request: Request,
+  row: PendingAuthLink,
+  sessionUser: User,
+  webSessionId: string | undefined
+): Promise<NextResponse | null> {
+  if (sessionUser.id !== row.kilo_user_id) {
+    return NextResponse.json({ error: 'WRONG_ACCOUNT' }, { status: 403 });
+  }
+  if (!webSessionId) return refused('sessionReauthRequired', 403);
+  const policyRefusal = await authorizeSignInMethodChange({ user: sessionUser, change: 'link' });
+  if (policyRefusal) return refused(policyRefusal, 403);
+
+  const proof = codeProofSchema.safeParse(await request.json().catch(() => undefined));
+  if (!proof.success) return refused('codeInvalid', 400);
+  const result = await consumeSignInMethodChangeCode(
+    {
+      userId: sessionUser.id,
+      email: sessionUser.google_user_email,
+      change: 'link',
+      provider: row.provider,
+      webSessionId,
+    },
+    proof.data.code,
+    proof.data.challengeId
+  );
+  if (result === 'invalid') return refused('codeInvalid', 400);
+  if (result === 'locked') return refused('codeLocked', 429);
+  return null;
+}
 
 /**
  * Redirect to a path on whatever origin the browser actually uses.
@@ -68,9 +128,20 @@ export const POST = withRestTiming('/api/auth/pending-link/complete', async (req
     return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
   }
 
-  const sessionUser = (await getUserFromSessionForCredentialIssuance()).user;
+  const session = await getUserFromSessionForCredentialIssuance();
+  const sessionUser = session.user;
   if (!sessionUser) {
     return NextResponse.json({ error: 'SESSION_REQUIRED' }, { status: 401 });
+  }
+
+  if (row.kind === 'existing_account') {
+    const refusal = await refuseUnprovenExistingAccountLink(
+      request,
+      row,
+      sessionUser,
+      session.webSessionId
+    );
+    if (refusal) return refusal;
   }
 
   const completed = await completePendingLink(secret, sessionUser.id);

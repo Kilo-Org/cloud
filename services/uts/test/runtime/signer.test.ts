@@ -24,7 +24,7 @@ async function storedAlarm(): Promise<number | null> {
   return await runInDurableObject(signer(), (_instance, state) => state.storage.getAlarm());
 }
 
-/** The published keys over RPC, as the mint Worker's signer-keys route reads them. */
+/** The published keys over RPC, as a key-set shard reads them. */
 async function published() {
   const result = await signer().publicKeys();
   if (result.status !== 'ok') throw new Error(`answered ${result.status}`);

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 const cookieStore = new Map<string, { name: string; value: string }>();
 jest.mock('next/headers', () => ({
@@ -21,6 +21,7 @@ jest.mock('@/lib/user', () => ({
   linkAccountToExistingUser: jest.fn(),
 }));
 jest.mock('@/lib/account-linking-session', () => ({
+  ...(jest.requireActual('@/lib/account-linking-session') as object),
   getAccountLinkingSession: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
@@ -35,9 +36,18 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
+// A completed ChatGPT link stores the delegated credential; the eligibility
+// probe would call OpenAI.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility', () => ({
+  ...(jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility'
+  ) as object),
+  probeOpenAiChatGptEligibility: jest.fn(async () => true),
+}));
 import jwt from 'jsonwebtoken';
 import { encode, type JWT } from 'next-auth/jwt';
-import { authOptions } from '@/lib/user/next-auth-options';
+import { NextRequest } from 'next/server';
+import { authOptions, nextAuthHttpHandler } from '@/lib/user/next-auth-options';
 import { createOrUpdateUser, getUserAuthProviders, linkAccountToExistingUser } from '@/lib/user';
 import type * as UserModule from '@/lib/user';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -49,10 +59,12 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { user_auth_provider } from '@kilocode/db/schema';
+import { user_auth_provider, type User } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -85,6 +97,51 @@ async function setSessionCookie(userId: string, claims: Partial<JWT> = {}) {
       token: { kiloUserId: userId, sub: randomUUID(), ...claims },
     }),
   });
+}
+
+/** A real account whose live web session starts a link. */
+async function insertLinkOwner() {
+  return insertTestUser({
+    google_user_email: `link-owner-${randomUUID()}@example.com`,
+    web_session_pepper: randomUUID(),
+  });
+}
+
+/** The browser session that starts the link in these suites. */
+const OWNER_WEB_SESSION_ID = 'web-session-link-owner';
+const OWNER_WEB_SESSION_ID_HASH = hashWebSessionId(OWNER_WEB_SESSION_ID);
+
+async function setOwnerSessionCookie(owner: User, claims: Partial<JWT> = {}) {
+  await setSessionCookie(owner.id, {
+    webSessionPepper: owner.web_session_pepper,
+    webSessionId: OWNER_WEB_SESSION_ID,
+    ...claims,
+  });
+}
+
+/** An organization whose SSO policy the mocked domain authority names. */
+async function insertSsoOrganization(ownerId: string, allowNonSsoSignInMethods: boolean) {
+  return createTestOrganization('SSO policy org', ownerId, 0, {
+    allow_non_sso_sign_in_methods: allowNonSsoSignInMethods,
+  });
+}
+
+type SignInParams = Parameters<typeof signIn>[0];
+
+/** The callback of a ChatGPT authorization that completes a link. */
+function openAiLinkCallback(email: string, subject: string): SignInParams {
+  return {
+    user: { id: 'x', email, name: 'Link', image: '' },
+    account: {
+      provider: 'openai',
+      providerAccountId: subject,
+      type: 'oauth',
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+      scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+    },
+    profile: { sub: subject, email },
+  } as unknown as SignInParams;
 }
 
 // These suites exercise a request the way a local run serves it: the client
@@ -195,6 +252,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'apple',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
 
@@ -222,6 +280,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'apple',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
 
@@ -248,6 +307,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
       targetProvider: 'apple',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
 
@@ -399,39 +459,83 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
-  it('skips ordinary SSO enforcement during provider-account linking', async () => {
-    mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
+  it('refuses a link for an SSO domain whose organization does not allow other methods', async () => {
+    const owner = await insertLinkOwner();
+    const organization = await insertSsoOrganization(owner.id, false);
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
       status: 'required',
       domain: 'example.com',
-      sourceOrganizationId: 'sso-org',
+      sourceOrganizationId: organization.id,
     });
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: owner.id,
       targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
-    mockLinkAccountToExistingUser.mockResolvedValueOnce({
-      success: true,
-      user: { id: 'existing-user', blocked_reason: null },
-    } as never);
-    await setSessionCookie('existing-user');
+    await setOwnerSessionCookie(owner);
 
-    const result = await signIn({
-      user: { id: 'x', email: 'sso-link@example.com', name: 'SSO Link', image: '' },
-      account: {
-        provider: 'openai',
-        providerAccountId: 'openai-account',
-        type: 'oauth',
-        access_token: 'access-token',
-        refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
-      },
-      profile: { sub: 'openai-sub', email: 'sso-link@example.com' },
-    } as never);
+    const result = await signIn(openAiLinkCallback('sso-link@example.net', 'openai-sso-sub'));
 
-    expect(result).toBe(true);
-    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+    expect(result).toBe('/connected-accounts?error=SIGN-IN-METHOD-SSO-REQUIRED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('links for an SSO domain whose organization allows other methods, without a new session', async () => {
+    const owner = await insertLinkOwner();
+    const organization = await insertSsoOrganization(owner.id, true);
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: organization.id,
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
+    await setOwnerSessionCookie(owner);
+
+    const result = await signIn(openAiLinkCallback('sso-link@example.net', 'openai-sso-ok-sub'));
+
+    // A redirect, not `true`: NextAuth issues no session token for the link.
+    expect(result).toBe('/connected-accounts?linked=openai');
     expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a link that another browser session of the same user finishes', async () => {
+    const owner = await insertLinkOwner();
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+      createdAt: Date.now(),
+    });
+    await setOwnerSessionCookie(owner, { webSessionId: 'web-session-other-browser' });
+
+    const result = await signIn(openAiLinkCallback('other-session@example.net', 'openai-other'));
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a link from a session that has no browser session id', async () => {
+    const owner = await insertLinkOwner();
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+      createdAt: Date.now(),
+    });
+    await setSessionCookie(owner.id, { webSessionPepper: owner.web_session_pepper });
+
+    const result = await signIn(openAiLinkCallback('no-session-id@example.net', 'openai-no-id'));
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
   });
 
   it('requires the web session to name the same user as the pending link', async () => {
@@ -515,17 +619,22 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
   });
 
-  it('carries the linking session organization onto the profile for an OpenAI connection', async () => {
+  it('carries the linking session organization onto the profile and returns to its BYOK page', async () => {
+    const owner = await insertLinkOwner();
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: owner.id,
       targetProvider: 'openai',
       organizationId: '00000000-0000-4000-8000-000000000001',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
-    mockLinkAccountToExistingUser.mockResolvedValueOnce({
-      success: true,
-      user: { id: 'existing-user', blocked_reason: null },
-    } as never);
-    await setSessionCookie('existing-user');
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
+    await setOwnerSessionCookie(owner);
+    // The connect started from the organization's BYOK card, which NextAuth
+    // keeps as the callback URL.
+    cookieStore.set('next-auth.callback-url', {
+      name: 'next-auth.callback-url',
+      value: 'http://localhost:3000/organizations/00000000-0000-4000-8000-000000000001/byok',
+    });
 
     const profile: Record<string, unknown> = {
       sub: 'openai-org-sub',
@@ -533,51 +642,51 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     };
 
     const result = await signIn({
-      user: { id: 'x', email: 'org-link@example.com', name: 'Org Link', image: '' },
-      account: {
-        provider: 'openai',
-        providerAccountId: 'openai-account',
-        type: 'oauth',
-        access_token: 'access-token',
-        refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
-      },
+      ...openAiLinkCallback('org-link@example.com', 'openai-org-sub'),
       profile,
     } as never);
 
-    expect(result).toBe(true);
+    expect(result).toBe('/organizations/00000000-0000-4000-8000-000000000001/byok');
     expect(profile.openAiChatGptOrganizationId).toBe('00000000-0000-4000-8000-000000000001');
+  });
+
+  it('never redirects a completed link off the site', async () => {
+    const owner = await insertLinkOwner();
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
+    await setOwnerSessionCookie(owner);
+    cookieStore.set('next-auth.callback-url', {
+      name: 'next-auth.callback-url',
+      value: 'https://attacker.example/steal?x=1',
+    });
+
+    await expect(
+      signIn(openAiLinkCallback('offsite-link@example.com', 'openai-offsite-sub'))
+    ).resolves.toBe('/steal?x=1');
   });
 
   // The link start authorized the connect, but the OpenAI consent round-trip
   // can outlive that role, so the callback re-reads the current membership
-  // before the jwt callback stores the organization's shared-services
-  // connection.
+  // before it stores the organization's shared-services connection.
   async function openAiSharedServicesSignIn() {
+    const owner = await insertLinkOwner();
     mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
+      existingUserId: owner.id,
       targetProvider: 'openai',
       organizationId: SHARED_SERVICES_ORGANIZATION_ID,
       chatGptScope: 'shared_services',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
-    mockLinkAccountToExistingUser.mockResolvedValueOnce({
-      success: true,
-      user: { id: 'existing-user', blocked_reason: null },
-    } as never);
-    await setSessionCookie('existing-user');
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
+    await setOwnerSessionCookie(owner);
 
-    return signIn({
-      user: { id: 'x', email: 'shared-services@example.com', name: 'Shared', image: '' },
-      account: {
-        provider: 'openai',
-        providerAccountId: 'openai-account',
-        type: 'oauth',
-        access_token: 'access-token',
-        refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
-      },
-      profile: { sub: 'openai-shared-services-sub', email: 'shared-services@example.com' },
-    } as never);
+    return signIn(
+      openAiLinkCallback('shared-services@example.com', 'openai-shared-services-sub') as never
+    );
   }
 
   it('refuses the shared-services connect when the connector role was revoked', async () => {
@@ -602,7 +711,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     ]);
     mockGetOrganizationById.mockResolvedValueOnce({ parent_organization_id: null } as never);
 
-    await expect(openAiSharedServicesSignIn()).resolves.toBe(true);
+    await expect(openAiSharedServicesSignIn()).resolves.toBe('/connected-accounts?linked=openai');
   });
 
   it('admits the shared-services connect for a manager of the parent organization', async () => {
@@ -616,7 +725,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       parent_organization_id: '00000000-0000-4000-8000-000000000003',
     } as never);
 
-    await expect(openAiSharedServicesSignIn()).resolves.toBe(true);
+    await expect(openAiSharedServicesSignIn()).resolves.toBe('/connected-accounts?linked=openai');
   });
 });
 
@@ -709,7 +818,11 @@ describe('authOptions.callbacks.signIn for Claude', () => {
 });
 
 describe('Claude explicit linking persistence', () => {
-  beforeEach(() => {
+  // The owners' domain requires SSO, and its organization allows linking
+  // other sign-in methods.
+  let ssoOrganizationId: string;
+
+  beforeEach(async () => {
     cookieStore.clear();
     mockCreateOrUpdateUser.mockReset();
     mockLinkAccountToExistingUser
@@ -718,10 +831,11 @@ describe('Claude explicit linking persistence', () => {
         jest.requireActual<typeof UserModule>('@/lib/user').linkAccountToExistingUser
       );
     mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    ssoOrganizationId = (await insertSsoOrganization((await insertTestUser()).id, true)).id;
     mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
       status: 'required',
       domain: 'example.com',
-      sourceOrganizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      sourceOrganizationId: ssoOrganizationId,
     });
   });
 
@@ -732,13 +846,15 @@ describe('Claude explicit linking persistence', () => {
     });
     async function start() {
       await setSessionCookie(owner.id, {
+        webSessionId: OWNER_WEB_SESSION_ID,
         authProvider: 'workos',
         webSessionPepper: owner.web_session_pepper,
-        ssoSourceOrganizationId: SHARED_SERVICES_ORGANIZATION_ID,
+        ssoSourceOrganizationId: ssoOrganizationId,
       });
       mockGetAccountLinkingSession.mockResolvedValueOnce({
         existingUserId: owner.id,
         targetProvider: 'claude',
+        webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
         createdAt: Date.now(),
       });
     }
@@ -782,6 +898,7 @@ describe('Claude explicit linking persistence', () => {
       } else {
         const sessionUser = sessionState === 'different' ? await insertTestUser() : link.owner;
         await setSessionCookie(sessionUser.id, {
+          webSessionId: OWNER_WEB_SESSION_ID,
           webSessionPepper:
             sessionState === 'revoked' ? randomUUID() : sessionUser.web_session_pepper,
         });
@@ -806,13 +923,16 @@ describe('Claude explicit linking persistence', () => {
         status: 'not_required',
         domain: 'example.net',
       });
-      mockGetAccountLinkingSession
-        .mockReset()
-        .mockResolvedValue(
-          intentState === 'different'
-            ? { existingUserId: link.owner.id, targetProvider: 'google', createdAt: Date.now() }
-            : null
-        );
+      mockGetAccountLinkingSession.mockReset().mockResolvedValue(
+        intentState === 'different'
+          ? {
+              existingUserId: link.owner.id,
+              targetProvider: 'google',
+              webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+              createdAt: Date.now(),
+            }
+          : null
+      );
       // Settlement finds the existing account that owns this email and another
       // provider's subject.
       mockCreateOrUpdateUser.mockResolvedValue({
@@ -861,6 +981,7 @@ describe('Claude explicit linking persistence', () => {
     mockGetAccountLinkingSession.mockReset().mockResolvedValueOnce({
       existingUserId: original.owner.id,
       targetProvider: 'claude',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
       createdAt: Date.now(),
     });
     await original.start();
@@ -886,5 +1007,89 @@ describe('Claude explicit linking persistence', () => {
         provider_account_id: `${CLAUDE_OIDC_ISSUER}#${link.subject}`,
       }),
     ]);
+  });
+});
+
+// The whole NextAuth callback, through the app's route handler: a link must
+// leave the browser on the session it already has. A session that signed in
+// long ago (a copied cookie) must not come back from a link with a new token,
+// a new expiry, or a new sign-in time.
+describe('the NextAuth callback for an account link', () => {
+  const SESSION_COOKIE = 'next-auth.session-token';
+
+  beforeEach(() => {
+    cookieStore.clear();
+    mockCreateOrUpdateUser.mockReset();
+    mockLinkAccountToExistingUser.mockReset();
+    mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  /** Posts the fake-login credentials callback with a valid CSRF pair. */
+  async function postFakeLoginCallback(email: string): Promise<Response> {
+    const csrfToken = randomUUID();
+    const csrfHash = createHash('sha256').update(`${csrfToken}${NEXTAUTH_SECRET}`).digest('hex');
+    cookieStore.set('next-auth.csrf-token', {
+      name: 'next-auth.csrf-token',
+      value: `${csrfToken}|${csrfHash}`,
+    });
+    const request = new NextRequest('http://localhost:3000/api/auth/callback/fake-login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ email, csrfToken }).toString(),
+    });
+    return nextAuthHttpHandler(request, {
+      params: Promise.resolve({ nextauth: ['callback', 'fake-login'] }),
+    });
+  }
+
+  function setsSessionCookie(response: Response): boolean {
+    return response.headers.getSetCookie().some(cookie => cookie.startsWith(`${SESSION_COOKIE}=`));
+  }
+
+  it('issues a session for a plain sign-in, so the check below can see one', async () => {
+    const email = `plain-${randomUUID()}@example.com`;
+    const user = await insertTestUser({ google_user_email: email });
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: user.id,
+      provider: 'fake-login',
+      provider_account_id: `fake-${email}`,
+      email,
+      avatar_url: '',
+    });
+    mockCreateOrUpdateUser.mockResolvedValueOnce({ success: true, user, isNew: false });
+
+    const response = await postFakeLoginCallback(email);
+
+    expect(setsSessionCookie(response)).toBe(true);
+  });
+
+  it('keeps the existing session when a link completes', async () => {
+    const owner = await insertLinkOwner();
+    const signedInLongAgo = Math.floor(Date.now() / 1000) - 20 * 24 * 60 * 60;
+    await setOwnerSessionCookie(owner, { authenticatedAt: signedInLongAgo });
+    const sessionBefore = cookieStore.get(SESSION_COOKIE)?.value;
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'fake-login',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+      createdAt: Date.now(),
+    });
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
+
+    const response = await postFakeLoginCallback(`linked-${randomUUID()}@example.net`);
+
+    expect(mockLinkAccountToExistingUser).toHaveBeenCalledWith(
+      owner.id,
+      expect.objectContaining({ provider: 'fake-login' })
+    );
+    expect(setsSessionCookie(response)).toBe(false);
+    expect(new URL(response.headers.get('location') ?? '', 'http://localhost:3000').pathname).toBe(
+      '/connected-accounts'
+    );
+    expect(cookieStore.get(SESSION_COOKIE)?.value).toBe(sessionBefore);
   });
 });

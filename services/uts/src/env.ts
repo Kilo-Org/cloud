@@ -5,6 +5,7 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { UtsKeySetDO } from './dos/UtsKeySetDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 
 /**
@@ -31,6 +32,7 @@ export type Env = {
   UTS_ENVIRONMENT: string;
   DO_JURISDICTION: string;
   UTS_SIGNER_DO: DurableObjectNamespace<UtsSignerDO>;
+  UTS_KEY_SET_DO: DurableObjectNamespace<UtsKeySetDO>;
   /**
    * The identity store's primary Hyperdrive config, bound once the environment's identity store is
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.
@@ -46,8 +48,8 @@ export const MINT_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {
 };
 
 /**
- * The feed Worker's deployed name in each environment. It is the only caller the internal
- * signer-keys route answers, and the `props.caller` its binding carries.
+ * The feed Worker's deployed name in each environment. It is the only caller the `SignerKeys`
+ * entrypoint answers, and the `props.caller` its binding carries.
  */
 export const FEED_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {
   production: 'uts-feed',

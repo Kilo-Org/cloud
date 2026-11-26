@@ -5,8 +5,10 @@ import { applyMigrations, loadMigrations } from './migrator';
 
 /**
  * Applies pending identity-store migrations.
- * `UTS_MIGRATION_DATABASE_URL` is a direct connection as the database's admin login; a host other
- * than loopback needs `sslmode=verify-full` and `sslrootcert` (see `connection.ts`).
+ * `UTS_MIGRATION_DATABASE_URL` connects as the database's admin login, directly or through the
+ * Supabase session pooler (session mode, port 5432), never through Hyperdrive or the transaction
+ * pooler. A host other than loopback needs `sslmode=verify-full` and `sslrootcert` set to the
+ * Supabase CA, `Supabase Root 2021 CA` (see `connection.ts`).
  */
 
 const environment = z

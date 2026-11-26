@@ -1,13 +1,9 @@
-import {
-  UTS_AUTHORIZATION_SERVER_METADATA_PATH,
-  UTS_SIGNER_KEYS_PATH,
-} from '@kilocode/uts-contracts';
+import { UTS_AUTHORIZATION_SERVER_METADATA_PATH } from '@kilocode/uts-contracts';
 import { readConfig, type Env } from './env';
 import { authorizationServerMetadata } from './metadata/authorization-server';
 import type { AuthorizationHandoff } from './oauth/authorize';
 import { handleOAuthRequest, oauthService } from './oauth/routes';
 import { jsonResponse } from './responses';
-import { signerKeysResponse } from './signer-keys';
 import type { SignerAccess } from './token/mint';
 
 /**
@@ -24,8 +20,9 @@ const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null };
 /**
  * The mint Worker's fetch handler. Placement runs it next to the identity store's primary, which
  * applies to fetch handlers only, not to RPC methods or named entrypoints (design 5.2). It serves
- * the issuer metadata, the feed Worker's internal signer-keys read, and the OAuth endpoints once
- * the identity store is bound (src/oauth/routes.ts).
+ * the issuer metadata and the OAuth endpoints once the identity store is bound
+ * (src/oauth/routes.ts). Signer keys are served by the `SignerKeys` entrypoint
+ * (src/signer-keys.ts), never by this handler.
  */
 export async function handleRequest(
   request: Request,
@@ -35,9 +32,6 @@ export async function handleRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
-  if (pathname === UTS_SIGNER_KEYS_PATH) {
-    return await signerKeysResponse(request, env, config, ctx.props);
-  }
   const oauth = oauthService(env, ctx, config, options.authorizationHandoff, options.signer);
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {

@@ -14,6 +14,7 @@ import {
   consumeInstallStateWithoutSession,
 } from '@/lib/integrations/github/install-state';
 import { createAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
+import { bindAppShellSession } from '@/lib/app-shell/session';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
   connectVerifiedGitHubInstallation,
@@ -2103,7 +2104,7 @@ describe('GET /api/integrations/github/callback app shell flow', () => {
     });
     try {
       const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({
-        userId,
+        session: bindAppShellSession(userId, null),
         state: 'a-different-attempt-token',
       })}`;
       const { GET } = await import('./route');
@@ -2127,7 +2128,10 @@ describe('GET /api/integrations/github/callback app shell flow', () => {
       githubAppType: 'standard',
       returnTo: '/app-shell/github-app',
     });
-    const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+    const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({
+      session: bindAppShellSession(userId, null),
+      state: token,
+    })}`;
     await deleteShellState(token);
     try {
       const { GET } = await import('./route');
@@ -2154,7 +2158,10 @@ describe('GET /api/integrations/github/callback app shell flow', () => {
       .set({ blocked_at: new Date().toISOString(), blocked_reason: 'abuse' })
       .where(eq(kilocode_users.id, userId));
     try {
-      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({
+        session: bindAppShellSession(userId, null),
+        state: token,
+      })}`;
       const { GET } = await import('./route');
       const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
 
@@ -2175,7 +2182,10 @@ describe('GET /api/integrations/github/callback app shell flow', () => {
       returnTo: '/app-shell/github-app',
     });
     try {
-      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({
+        session: bindAppShellSession(userId, null),
+        state: token,
+      })}`;
       const { GET } = await import('./route');
       const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
 
@@ -2185,6 +2195,34 @@ describe('GET /api/integrations/github/callback app shell flow', () => {
         .from(github_install_states)
         .where(eq(github_install_states.token, token));
       expect(state.consumedAt).not.toBeNull();
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a flow cookie minted before the web-session pepper rotated lands on the shell terminal page', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({
+      session: bindAppShellSession(userId, null),
+      state: token,
+    })}`;
+    await db
+      .update(kilocode_users)
+      .set({ web_session_pepper: randomUUID() })
+      .where(eq(kilocode_users.id, userId));
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/expired');
     } finally {
       await deleteShellState(token);
       await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));

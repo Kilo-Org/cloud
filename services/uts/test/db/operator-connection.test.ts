@@ -5,11 +5,19 @@ import { NonLocalDatabaseError, adminUrl } from './connection';
 
 const readCa = (path: string) => `ca from ${path}`;
 
+/** `url` with a synthetic login, built from parts so the source holds no credential URL. */
+function withLogin(url: string, user = 'admin', password = 'secret'): string {
+  const parsed = new URL(url);
+  parsed.username = user;
+  parsed.password = password;
+  return parsed.toString();
+}
+
 describe('operator connections', () => {
   it.each([
-    'postgres://admin:secret@127.0.0.1:55432/uts',
-    'postgres://admin:secret@localhost/uts',
-    'postgresql://admin:secret@[::1]:5432/uts',
+    withLogin('postgres://127.0.0.1:55432/uts'),
+    withLogin('postgres://localhost/uts'),
+    withLogin('postgresql://[::1]:5432/uts'),
   ])('allow plaintext to the loopback host in %s', url => {
     expect(operatorClientConfig(url, readCa)).toMatchObject({ ssl: false });
   });
@@ -17,7 +25,11 @@ describe('operator connections', () => {
   it('use verified TLS with the given CA for a remote host', () => {
     expect(
       operatorClientConfig(
-        'postgres://admin:p%40ss@db.example.com:6543/postgres?sslmode=verify-full&sslrootcert=/etc/ca.pem',
+        withLogin(
+          'postgres://db.example.com:6543/postgres?sslmode=verify-full&sslrootcert=/etc/ca.pem',
+          'admin',
+          'p@ss'
+        ),
         readCa
       )
     ).toEqual({
@@ -31,21 +43,21 @@ describe('operator connections', () => {
   });
 
   it.each([
-    ['plaintext to a remote host', 'postgres://admin:secret@db.example.com/postgres'],
-    ['an unverified TLS mode', 'postgres://admin:secret@db.example.com/postgres?sslmode=require'],
+    ['plaintext to a remote host', withLogin('postgres://db.example.com/postgres')],
+    ['an unverified TLS mode', withLogin('postgres://db.example.com/postgres?sslmode=require')],
     [
       'verify-full without a CA',
-      'postgres://admin:secret@db.example.com/postgres?sslmode=verify-full',
+      withLogin('postgres://db.example.com/postgres?sslmode=verify-full'),
     ],
     [
       'a CA without verify-full',
-      'postgres://admin:secret@db.example.com/postgres?sslrootcert=/etc/ca.pem',
+      withLogin('postgres://db.example.com/postgres?sslrootcert=/etc/ca.pem'),
     ],
     [
       'another URL parameter',
-      'postgres://admin:secret@db.example.com/postgres?sslmode=verify-full&sslrootcert=/ca&ssl=0',
+      withLogin('postgres://db.example.com/postgres?sslmode=verify-full&sslrootcert=/ca&ssl=0'),
     ],
-    ['another protocol', 'mysql://admin:secret@127.0.0.1/uts'],
+    ['another protocol', withLogin('mysql://127.0.0.1/uts')],
   ])('refuse %s', (_name, url) => {
     expect(() => operatorClientConfig(url, readCa)).toThrow(ConnectionPolicyError);
   });
@@ -70,20 +82,24 @@ describe('the test database guard', () => {
   });
 
   it('refuse an admin URL whose host is not loopback', () => {
-    vi.stubEnv('UTS_TEST_ADMIN_URL', 'postgres://postgres:secret@db.example.com:5432/postgres');
+    vi.stubEnv(
+      'UTS_TEST_ADMIN_URL',
+      withLogin('postgres://db.example.com:5432/postgres', 'postgres')
+    );
     expect(() => adminUrl()).toThrow(NonLocalDatabaseError);
   });
 
   it('refuse a loopback admin URL with a query parameter, which could name another host', () => {
     vi.stubEnv(
       'UTS_TEST_ADMIN_URL',
-      'postgres://postgres:secret@127.0.0.1:5432/postgres?host=db.example.com'
+      withLogin('postgres://127.0.0.1:5432/postgres?host=db.example.com', 'postgres')
     );
     expect(() => adminUrl()).toThrow(NonLocalDatabaseError);
   });
 
   it('accept a loopback admin URL', () => {
-    vi.stubEnv('UTS_TEST_ADMIN_URL', 'postgres://uts_admin:local@localhost:55432/uts');
-    expect(adminUrl()).toBe('postgres://uts_admin:local@localhost:55432/uts');
+    const url = withLogin('postgres://localhost:55432/uts', 'uts_admin', 'local');
+    vi.stubEnv('UTS_TEST_ADMIN_URL', url);
+    expect(adminUrl()).toBe(url);
   });
 });

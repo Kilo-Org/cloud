@@ -15,7 +15,7 @@ function request(path: string, init?: RequestInit): Request {
   return new Request(`${config.endpoints.issuer}${path}`, init);
 }
 
-/** An internet request: its execution context carries no binding props. */
+/** An internet request to the default entrypoint's fetch handler. */
 const fetchMint = (input: Request, target: Env = env) =>
   handleRequest(input, target, createExecutionContext());
 

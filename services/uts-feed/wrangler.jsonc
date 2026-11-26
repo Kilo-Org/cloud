@@ -31,13 +31,14 @@
   "vars": {
     "UTS_ENVIRONMENT": "production",
   },
-  // The mint Worker's default entrypoint: its placed fetch handler serves the internal signer-keys
-  // route only to the caller named here, which must be this block's deployed name
-  // (services/uts/test/repo checks both).
+  // The mint Worker's SignerKeys entrypoint. It answers only the caller named here, which must be
+  // this block's deployed name (services/uts/test/repo checks both). Placement does not apply to a
+  // named entrypoint, so the key read runs where this Worker runs.
   "services": [
     {
       "binding": "UTS_MINT",
       "service": "uts",
+      "entrypoint": "SignerKeys",
       "props": { "caller": "uts-feed" },
     },
   ],
@@ -59,6 +60,7 @@
         {
           "binding": "UTS_MINT",
           "service": "uts-staging",
+          "entrypoint": "SignerKeys",
           "props": { "caller": "uts-feed-staging" },
         },
       ],
@@ -75,6 +77,7 @@
         {
           "binding": "UTS_MINT",
           "service": "uts-local",
+          "entrypoint": "SignerKeys",
           "props": { "caller": "uts-feed-local" },
         },
       ],

@@ -34,6 +34,25 @@ describe('createWorkerSecrets', () => {
     expect(getBundle.mock.calls[0][0]).toEqual({});
   });
 
+  it('disposes the RPC result once it has the bundle', async () => {
+    const dispose = vi.fn();
+    const getBundle = vi.fn<(request: BundleRequest) => Promise<BundleResult>>(async () => ({
+      status: 'ok',
+      workload: 'o11y',
+      environment: 'production',
+      etag: ETAG,
+      stale: false,
+      fetchedAt: '2026-11-25T00:00:00.000Z',
+      secrets: { [SECRET]: { value: 'binding-token', version: 7 } },
+      missing: [],
+      [Symbol.dispose]: dispose,
+    }));
+    const secrets = createWorkerSecrets({ getBundle });
+
+    expect(await secrets.get(SECRET)).toBe('binding-token');
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a binding result that does not match the contract', async () => {
     const getBundle = vi.fn<(request: BundleRequest) => Promise<BundleResult>>(
       async () => ({ status: 'ok' }) as BundleResult

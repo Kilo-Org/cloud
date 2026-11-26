@@ -128,9 +128,9 @@ const REUSED_COMPONENTS: {
   },
   {
     file: join(WEB_SRC, 'components/profile/LoginMethodsCard.tsx'),
-    allowedNonShellPaths: ['/connected-accounts'],
+    allowedNonShellPaths: ['/connected-accounts', 'kilo.ai'],
     reason:
-      'The default callback path; the shell passes `/app-shell/connected-accounts` so the round trip returns inside the shell.',
+      'The default callback path; the shell passes `/app-shell/connected-accounts` so the round trip returns inside the shell. `app.kilo.ai` is plain text shown when the shell sets `readOnly`.',
   },
   {
     file: join(WEB_SRC, 'components/profile/ConnectedAccountsCard.tsx'),

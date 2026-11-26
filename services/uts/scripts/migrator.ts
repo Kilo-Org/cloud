@@ -9,9 +9,10 @@ import type pg from 'pg';
  * each in its own transaction. Each applied file is recorded with its SHA-256, so a second run
  * applies nothing and a file that changed after it was applied stops the run.
  *
- * An operator runs it (design section 5.2) over a direct connection as the database's admin login,
- * under the TLS rules in `connection.ts`, never through Hyperdrive, so its multi-statement
- * transactions do not reach the Worker paths.
+ * An operator runs it (design section 5.2) as the database's admin login, directly or through the
+ * Supabase session pooler (session mode, port 5432), with `sslmode=verify-full` and the Supabase CA
+ * (`Supabase Root 2021 CA`) under the TLS rules in `connection.ts`. It never goes through Hyperdrive
+ * or the transaction pooler, so its multi-statement transactions do not reach the Worker paths.
  */
 
 export const MIGRATIONS_DIR = fileURLToPath(new URL('../migrations', import.meta.url).href);

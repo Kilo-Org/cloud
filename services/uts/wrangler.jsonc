@@ -13,8 +13,8 @@
     "local_protocol": "http",
   },
   // The fetch handler runs next to the identity store's primary in Frankfurt (AWS eu-central-1).
-  // Placement covers fetch handlers only, so the feed Worker reads signer keys through the default
-  // entrypoint's fetch handler (src/signer-keys.ts), not over RPC.
+  // Placement covers fetch handlers only; the SignerKeys entrypoint (src/signer-keys.ts), which the
+  // feed Worker calls for signer keys, runs where the feed Worker runs.
   "placement": { "region": "aws:eu-central-1" },
   // Traces stay off: a trace records Durable Object storage calls and outbound requests, and the
   // signer objects hold private keys. Every env block inherits this.
@@ -37,9 +37,15 @@
     "DO_JURISDICTION": "eu",
   },
   "durable_objects": {
-    "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+  ],
   // No identity-store Hyperdrive binding yet: the OAuth endpoints and their metadata stay off
   // until the environment's identity store is provisioned (src/grants/binding.ts).
   "env": {
@@ -59,7 +65,10 @@
         "DO_JURISDICTION": "eu",
       },
       "durable_objects": {
-        "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+        "bindings": [
+          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+          { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+        ],
       },
     },
     // Local development only; no deploy workflow targets this name. Only this block uses the
@@ -75,7 +84,10 @@
         "DO_JURISDICTION": "none",
       },
       "durable_objects": {
-        "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+        "bindings": [
+          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+          { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+        ],
       },
       // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo:
       // set CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE to a URL with the

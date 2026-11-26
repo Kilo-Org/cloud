@@ -14,7 +14,6 @@ import {
 type UnlinkAccountDialogProps = {
   open: boolean;
   providerName: string;
-  isUnlinking: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -22,7 +21,6 @@ type UnlinkAccountDialogProps = {
 export function UnlinkAccountDialog({
   open,
   providerName,
-  isUnlinking,
   onConfirm,
   onCancel,
 }: UnlinkAccountDialogProps) {
@@ -36,15 +34,15 @@ export function UnlinkAccountDialog({
           </div>
           <DialogDescription>
             Are you sure you want to unlink your {providerName} account? You will no longer be able
-            to sign in using this method.
+            to sign in using this method. We will email you a code to confirm the change.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={onCancel} disabled={isUnlinking}>
+          <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={isUnlinking}>
-            {isUnlinking ? 'Unlinking...' : 'Yes, Unlink Account'}
+          <Button variant="destructive" onClick={onConfirm}>
+            Yes, Unlink Account
           </Button>
         </DialogFooter>
       </DialogContent>

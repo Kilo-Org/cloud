@@ -14,9 +14,15 @@
     "DO_JURISDICTION": "none",
   },
   "durable_objects": {
-    "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+  ],
   // The OAuth routes are served once this binding exists. Nothing listens on it: the runtime tests
   // pass their own grant store, and test/db runs every statement against the local Postgres.
   "hyperdrive": [
@@ -26,22 +32,31 @@
       "localConnectionString": "postgres://uts_app_a:unused@127.0.0.1:1/uts",
     },
   ],
-  // The mint Worker's default entrypoint as the development feed Worker binds it, and as two
-  // callers the signer-keys route refuses.
+  // The mint Worker's SignerKeys entrypoint as the development feed Worker binds it, and as two
+  // callers it refuses; and the default entrypoint with the feed Worker's props, which serves no
+  // signer keys.
   "services": [
     {
       "binding": "FEED_MINT",
       "service": "uts-test",
+      "entrypoint": "SignerKeys",
       "props": { "caller": "uts-feed-local" },
     },
     {
       "binding": "OTHER_MINT",
       "service": "uts-test",
+      "entrypoint": "SignerKeys",
       "props": { "caller": "o11y" },
     },
     {
       "binding": "PROPLESS_MINT",
       "service": "uts-test",
+      "entrypoint": "SignerKeys",
+    },
+    {
+      "binding": "DEFAULT_MINT",
+      "service": "uts-test",
+      "props": { "caller": "uts-feed-local" },
     },
   ],
 }

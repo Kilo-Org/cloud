@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // `pnpm test` runs the repo project, which needs no database.
     projects: [
       {
         test: {
@@ -11,7 +12,8 @@ export default defineConfig({
         },
       },
       {
-        // Needs the local identity-store Postgres: `pnpm db:up` (see README, "Identity store").
+        // `pnpm test:postgres`. Needs the identity-store Postgres: `pnpm db:up` (see README,
+        // "Local database and tests").
         test: {
           name: 'db',
           environment: 'node',

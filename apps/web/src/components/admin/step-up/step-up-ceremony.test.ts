@@ -6,41 +6,28 @@ describe('runStepUpCeremony', () => {
   const options = { challenge: 'stored-challenge' } as never;
   it('verifies once with the minted options', async () => {
     const submitAssertion = jest.fn(async (_challengeId: string, _response: unknown) => true);
-    const enroll = jest.fn(async () => {});
 
     const result = await runStepUpCeremony({
       requestOptions: async () => ({ ok: true, challengeId: 'c1', options }),
       startAuthentication: async () => ({ id: 'assertion' }),
       submitAssertion,
-      enroll,
     });
 
     expect(result).toEqual({ ok: true });
     expect(submitAssertion).toHaveBeenCalledWith('c1', { id: 'assertion' });
-    expect(enroll).not.toHaveBeenCalled();
   });
 
-  it('enrolls once and mints options again when no passkey exists', async () => {
-    const requestOptions = jest
-      .fn<
-        () => Promise<
-          { ok: true; challengeId: string; options: never } | { ok: false; code: string }
-        >
-      >()
-      .mockResolvedValueOnce({ ok: false, code: 'NOT_ENROLLED' })
-      .mockResolvedValueOnce({ ok: true, challengeId: 'c2', options });
-    const enroll = jest.fn(async () => {});
+  it('hands an account without a passkey back to the caller to enroll', async () => {
+    const startAuthentication = jest.fn(async () => ({}));
 
     const result = await runStepUpCeremony({
-      requestOptions,
-      startAuthentication: async () => ({}),
+      requestOptions: async () => ({ ok: false, code: 'NOT_ENROLLED' }),
+      startAuthentication,
       submitAssertion: async () => true,
-      enroll,
     });
 
-    expect(result).toEqual({ ok: true });
-    expect(enroll).toHaveBeenCalledTimes(1);
-    expect(requestOptions).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ ok: false, code: 'NOT_ENROLLED' });
+    expect(startAuthentication).not.toHaveBeenCalled();
   });
 
   it('treats a cancelled passkey sheet as terminal and does not retry', async () => {
@@ -53,7 +40,6 @@ describe('runStepUpCeremony', () => {
         throw Object.assign(new Error('user dismissed'), { name: 'NotAllowedError' });
       },
       submitAssertion,
-      enroll: async () => {},
     });
 
     expect(result).toEqual({ ok: false, code: 'CANCELLED' });
@@ -68,7 +54,6 @@ describe('runStepUpCeremony', () => {
         throw Object.assign(new Error('authenticator unavailable'), { name: 'InvalidStateError' });
       },
       submitAssertion: async () => true,
-      enroll: async () => {},
     });
 
     expect(result).toEqual({ ok: false, code: 'VERIFICATION_FAILED' });
@@ -79,7 +64,6 @@ describe('runStepUpCeremony', () => {
       requestOptions: async () => ({ ok: false, code: 'SESSION_UNBOUND' }),
       startAuthentication: async () => ({}),
       submitAssertion: async () => true,
-      enroll: async () => {},
     });
 
     expect(result).toEqual({ ok: false, code: 'SESSION_UNBOUND' });

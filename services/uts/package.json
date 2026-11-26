@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --env local",
-    "test": "vitest run && pnpm run test:node",
+    "test": "pnpm run test:workers && pnpm run test:repo",
     "test:workers": "vitest run",
-    "test:node": "vitest run --config vitest.node.config.ts",
+    "test:repo": "vitest run --config vitest.node.config.ts --project repo",
+    "test:postgres": "vitest run --config vitest.node.config.ts --project db",
     "typecheck": "tsgo --noEmit",
     "db:up": "bash scripts/local-db.sh up",
     "db:down": "bash scripts/local-db.sh down",

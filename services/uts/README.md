@@ -69,29 +69,57 @@ Each object:
   created to sign 30 days later; a removed next key is replaced by a new one published at least 7
   days before it signs. When the signer's storage itself is exposed, remove the next key first and
   the current key second: the second removal signs with the key the first removal created.
-  Verifiers hold that key once it has been in the key set for 5 minutes and 15 seconds (the feed
-  Worker's 15 seconds plus the 5-minute `max-age`), so wait that long between the two removals;
-  removing at once leaves that signer's new tokens unverifiable for up to that time. The result is
+  Verifiers hold that key once it has been in the key set for 5 minutes and 17 seconds (the feed
+  Worker's 17 seconds plus the 5-minute `max-age`, while every signer read succeeds), so wait that
+  long between the two removals, and before the second one check that the public key set
+  (`/.well-known/jwks.json` on the feed Worker) lists the signer's new next `kid`; removing at once
+  leaves that signer's new tokens unverifiable for up to that time. The result is
   the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The revocation feed
   writes it once that feed exists. No route calls `removeKid` yet: it stays unreachable until the
   revocation-feed slice adds the operator route, which audits and alerts on each removal;
 - logs each rotation and removal as `uts.signer.key_event` (`SignerKeyEvent`, public `kid`s only),
   the event the UTS audit pipeline will carry (design 8.3).
 
-### The internal signer-keys route
+### The SignerKeys entrypoint and the key-set shards
 
-`GET /internal/signer-keys` (`UTS_SIGNER_KEYS_PATH`) returns every signer's published keys:
-`200 { status: "ok", signers }`, `500 { status: "misconfigured" }` when a signer object refused to
-load, or `503 { status: "unavailable" }` when a signer call failed after its retries. It is a route
-of the mint Worker's fetch handler, so placement runs it next to the identity store's primary and
-its 16 signer calls start next to the signer objects; an RPC method or a named entrypoint would run
-in the caller's data center. It answers only a service binding to the default entrypoint whose
-`props.caller` is the feed Worker's deployed name for its own environment; every other request,
-from the internet or another binding, gets the same `404 not_found` as an unknown path.
+`signerKeys()` on the named entrypoint `SignerKeys` (`UTS_SIGNER_KEYS_ENTRYPOINT`, in
+`src/signer-keys.ts`) returns plain data (`SignerKeysReadSchema`): `{ status: 'refused' }`,
+`{ status: 'misconfigured' }` when its key-set shard refused to load, or
+`{ status: 'answered', answer }` where `answer` is `{ signers }`, every signer exactly once
+(`SignerKeysAnswerSchema`): its keys with `readAt`, the time they were read from the signer
+object, or its failure, `misconfigured` (the object refused to load) or `unavailable` (the call
+failed after its retries). The feed Worker takes every signer that has keys.
+
+The entrypoint does not read the signer objects itself. It asks one of 8 key-set shards,
+`UtsKeySetDO` (`src/dos/UtsKeySetDO.ts`), named `<environment>:keyset:<0-7>` and created in the
+`eu` jurisdiction with the `weur` hint, like the signer objects; a shard under another name or
+outside its jurisdiction answers `misconfigured`. Each isolate draws its shard at random once, so
+feed isolates spread evenly over the 8 shards. Each shard holds, as plain data in memory:
+
+- a copy of its last combined answer, served for 2 seconds, with one read in flight; a request
+  that needs that read polls for it. The 16 signer objects therefore see at most 8 reads per 2
+  seconds, however many feed isolates ask;
+- every signer's last good keys. A signer whose call fails, or whose object refuses to load,
+  answers those keys with their own `readAt` while they are under 24 hours old, and its failure
+  after that; each failure is logged with the read time of the keys that stood in.
+
+Every signer call of a read, retries included, ends within 5 seconds, and every entrypoint call to
+its shard, retries included, within 8 seconds, so a hung object cannot hold a read past the feed
+Worker's 10-second read guard. Each RPC result, from a signer and from a shard, is copied out and
+disposed. A shard stores nothing: a restarted shard reads the signers again.
+
+It answers only a service binding to this entrypoint whose `props.caller` is the feed Worker's
+deployed name for its own environment, and refuses every other binding, with another caller or
+without props, before any shard call. A service binding delivers `props` to a named entrypoint, as
+for the STS broker; a deployed mint Worker did not see them on its default entrypoint, either as a
+plain handler object or as a `WorkerEntrypoint` class. The default entrypoint's fetch handler
+serves no signer keys: a request to the old `/internal/signer-keys` path gets `404 not_found` like
+any unknown path. Placement does not apply to a named entrypoint, so the entrypoint runs where the
+feed Worker runs and makes one call to its shard in the EU per read.
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
-UTS Durable Object class or binds the mint Worker, any feed binding at a named entrypoint or whose
-caller is not the feed block's own name, and any drift in the UTS configs (names, `eu`
-jurisdiction, placement, traces).
+UTS Durable Object class or binds the mint Worker, any feed binding at an entrypoint other than
+`SignerKeys` or whose caller is not the feed block's own name, and any drift in the UTS configs
+(names, `eu` jurisdiction, placement, traces).
 
 ## Local development
 
@@ -166,19 +194,23 @@ failed signing no token carries those ids, and the retry's row (`token.issued`, 
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
   `wrangler.test.jsonc`): key lifecycle with time travel, signing and verification with `jose`, key
   persistence across restarts, rotation by alarm, an overdue rotation and a lost alarm, emergency
-  removal by direct call, the RPC surface, the signer-keys route and its caller check, metadata,
-  DPoP proofs, the signer's batch signing, and every OAuth endpoint against a recording grant
-  store.
-- `pnpm test:node`: the repository config check (`test/repo`) and the identity store tests
-  (`test/db`, see "Local database and tests"), the OAuth grant functions and the DPoP `jti`
+  removal by direct call, the RPC surface, the SignerKeys entrypoint over real service bindings
+  (its caller check) and the key-set shards (their names, their 2-second copy with one read in
+  flight, at most one signer read per shard per 2 seconds under many concurrent isolates, and the
+  held keys of a failed signer), metadata, DPoP proofs, the signer's batch signing, and every OAuth
+  endpoint against a recording grant store.
+- `pnpm test:repo`: the repository config check (`test/repo`), with no database.
+- `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
+  tests (`test/db`, see "Local database and tests"), the OAuth grant functions and the DPoP `jti`
   check included.
 
 ## Staging proof run (before merge)
 
 workerd implements neither jurisdictions nor placement, so these checks run on staging before the
-pull request merges (design 2.4, 5.7). Deploy both Workers from the branch, the mint Worker first,
-and start a tail of the mint Worker before the first key-set read, which creates all 16 signer
-objects:
+pull request merges (design 2.4, 5.7). The pull request stays held, out of the merge queue, until
+the results of all three checks are in its body. Deploy both Workers from the branch, the mint
+Worker first, and start a tail of the mint Worker before the first key-set read, which creates all
+16 signer objects:
 
 ```sh
 cd services/uts && pnpm exec wrangler deploy --env staging
@@ -193,19 +225,23 @@ curl -sS https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server
 Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and metadata naming
 `https://uts-staging.kiloapps.io` and the feed key set.
 
-1. **`eu` jurisdiction and location hint together (design 5.7).** Each object logs
-   `uts.signer.bootstrapped` once, when it creates its keys, with its jurisdiction and the data
-   center it runs in; an object outside `eu` creates no keys and the key set answers 500:
+1. **`eu` jurisdiction and location hint together (design 5.7).** Each signer object logs
+   `uts.signer.bootstrapped` once, when it creates its keys, and each key-set shard logs
+   `uts.key_set_shard.started` once per start, both with the jurisdiction and the data center it
+   runs in; an object outside `eu` refuses, and the key set answers 500:
 
    ```sh
-   jq -r '.logs[]?.message[]? | select(type == "string" and contains("uts.signer.bootstrapped"))' /tmp/uts-staging-tail.json | jq -c '{signer, jurisdiction, colo}'
+   jq -r '.logs[]?.message[]? | select(type == "string" and (contains("uts.signer.bootstrapped") or contains("uts.key_set_shard.started")))' /tmp/uts-staging-tail.json | jq -c '{event, signer, shard, jurisdiction, colo}'
    ```
 
-   Expect 16 lines, each `"jurisdiction":"eu"` and a `colo` in western Europe (the `weur` hint),
-   such as `FRA`, `AMS` or `CDG`.
+   Expect 16 signer lines and a line for each shard the read reached (8 once enough feed isolates
+   have asked), each `"jurisdiction":"eu"` with a `colo` in the EU. The jurisdiction is enforced;
+   the `weur` hint is best effort, so an object can land in another EU data center
+   (https://developers.cloudflare.com/durable-objects/reference/data-location/#provide-a-location-hint).
+   Record every colo in the pull request.
 
 2. **Key persistence across real restarts (design 5.7).** A deploy restarts every object. Record
-   the kids, redeploy the mint Worker, wait past the feed Worker's 15-second window, and compare;
+   the kids, redeploy the mint Worker, wait past the feed Worker's 17-second window, and compare;
    the tail must show no new `uts.signer.bootstrapped` line:
 
    ```sh
@@ -215,19 +251,18 @@ Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and meta
    curl -sS https://uts-feed-staging.kiloapps.io/.well-known/jwks.json | jq -r '.keys[].kid' | sort | diff /tmp/kids-before - && echo same
    ```
 
-3. **The mint path and the signer-keys route run in the placed region (design 5.2).** Cloudflare
-   adds a `cf-placement` request header (`remote-<colo>` or `local-<colo>`) to every request of a
-   placed Worker. Check it on a public request and on the feed Worker's internal read:
+3. **The mint path runs in the placed region (design 5.2).** Cloudflare adds a `cf-placement`
+   header (`remote-<colo>` or `local-<colo>`) to the responses of a placed Worker's fetch handler.
+   Read it from the public metadata response:
 
    ```sh
-   curl -sS -o /dev/null https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server
-   jq -r 'select(.event.request.url? | tostring | test("oauth-authorization-server|internal/signer-keys")) | [.event.request.url, .event.request.headers["cf-placement"]] | @tsv' /tmp/uts-staging-tail.json
+   curl -sS -o /dev/null -D - https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server | grep -i '^cf-placement'
    ```
 
-   Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt) on both URLs. If
-   the internal read shows no `cf-placement` header, placement does not cover service-binding
-   fetches: record that in the pull request, because each key-set read then makes its 16 signer
-   calls from the feed Worker's data center.
+   Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt). The signer-keys
+   read is outside this check: it runs on the `SignerKeys` named entrypoint, which placement does
+   not cover, so it runs where the feed Worker runs. The key-set request above proves it answers
+   the feed Worker (`32` keys).
 
 4. **The mint path's p95 under placement is a staging gate (design 3, 5.2).** No environment binds
    the identity store yet, so this branch measures the mint statement and `POST /token` only
@@ -253,7 +288,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 ### Layout
 
 | Path | Contents |
-| --- | --- |
+|---|---|
 | `migrations/` | Ordered SQL migrations, `NNNN_name.sql` |
 | `scripts/migrator.ts` | Applies the migrations and records each file's SHA-256 |
 | `scripts/migrate.ts` | Command-line entry point for the migrator |
@@ -266,13 +301,13 @@ its Hyperdrive configs, and those configs run with caching disabled.
 ### Schemas and roles
 
 | Schema | Owner | Contents |
-| --- | --- | --- |
+|---|---|---|
 | `uts` | `uts_owner` | Every table, type and function |
 | `uts_read` | `uts_owner` | Read-only account views without hashes, keys or client addresses |
 | `uts_migrations` | admin login | The migrator's record of applied files |
 
 | Role | Logins | Hyperdrive config | Privileges |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations |
 | `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` and `uts.maintain_oauth_rows()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
@@ -393,7 +428,7 @@ A mint audit row takes about 1 KB of table space and about 80 bytes in its two i
 per active client every 8 minutes:
 
 | Active clients | Rows per day | 7-day tier, table | 7-day tier, indexes |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | 10k | 1.8M | ~13 GB | ~1 GB |
 | 50k | 9M | ~63 GB | ~5 GB |
 | 200k | 36M | ~250 GB | ~20 GB |
@@ -409,7 +444,7 @@ minutes = 5,400 rotated tokens plus its current one. As an upper bound, with eve
 refreshing every 8 minutes for 30 days:
 
 | Active third-party families | Token rows | Table and indexes |
-| --- | --- | --- |
+|---|---|---|
 | 10k | 54M | ~16 GB |
 | 50k | 270M | ~81 GB |
 | 200k | 1.08B | ~324 GB |
@@ -425,7 +460,7 @@ every delete is time-gated, so a caller can only remove dead rows sooner. Slice 
 dedicated maintenance role. It deletes:
 
 | Rows | When | Why that is safe |
-| --- | --- | --- |
+|---|---|---|
 | `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
 | `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end | Each such token fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
 | `rotated_refresh_tokens` | A rotated token of a live family 30 days after its rotation, the longest idle window a token has, oldest first | Reuse detection covers tokens rotated within 30 days; an older one is then unknown (`invalid_grant`) instead of revoking the family. A thief who rotates a stolen token is still caught when the real client next presents its own token, rotated minutes before. Oldest first, a token's child is mostly in the same batch |
@@ -459,7 +494,7 @@ Each hot-path read reaches its credential through one unique-index probe on the 
 primary-key probes for the rows that hang off it (`test/db/index-probes.test.ts` checks the plans):
 
 | Read | Indexes |
-| --- | --- |
+|---|---|
 | Mint and first-party refresh (`uts.read_refresh_grant`) | `refresh_grants_token_hash_key`, then `device_sessions_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
 | Third-party refresh (`uts.read_third_party_refresh_token`) | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey`, `third_party_consents_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
 | PAT lookup (`uts.lookup_pat`) | `personal_access_tokens_token_hash_key`, then `accounts_pkey` |
@@ -474,9 +509,10 @@ Supabase's `postgres` login, so the migrations are proven not to need a superuse
 passwords are synthetic, and the tests give the UTS logins a random password on each run.
 
 ```sh
+pnpm test                        # the suites that need no database
 pnpm db:up                       # start the container; prints UTS_MIGRATION_DATABASE_URL
 UTS_MIGRATION_DATABASE_URL=... pnpm db:migrate
-pnpm test:node                   # migrates a template database, then clones it per test file
+pnpm test:postgres               # migrates a template database, then clones it per test file
 pnpm db:down
 ```
 
@@ -485,14 +521,22 @@ pnpm db:down
 changes cluster-wide roles and drops databases, so it refuses any host other than 127.0.0.1,
 localhost and ::1.
 
+In CI, the `test (cloudflare-uts)` job runs `pnpm test`, and the `uts-postgres` job runs
+`pnpm test:postgres` against a `postgres:17.12` service container. That job runs `pnpm db:up`
+with `UTS_PG_CONTAINER` set to the service container, so the container gets the same admin login
+and `uts` database as the local one, and it sets `UTS_TEST_ADMIN_URL` to the container's loopback
+port.
+
 ### Migrations
 
 Migrations are plain SQL, not generated by drizzle-kit, because the identity store needs roles,
 grants, a partitioned table, an `xid8` column and stored functions, which drizzle-kit cannot
-express. The migrator runs each file in its own transaction over a direct connection as the
-database's admin login, records it with its SHA-256, and refuses to continue when an applied file
-changed, disappeared, or a new file sorts before an applied one. Add new files at the end; never
-edit an applied file.
+express. The migrator runs each file in its own transaction as the database's admin login, over a
+connection made directly or through the Supabase session pooler (session mode, port 5432), never
+through Hyperdrive or the transaction pooler, and always with `sslmode=verify-full` and the Supabase
+CA (`Supabase Root 2021 CA`). It records each file with its SHA-256, and refuses to continue when
+an applied file changed, disappeared, or a new file sorts before an applied one. Add new files at
+the end; never edit an applied file.
 
 An operator runs the migrator (design section 5.2): a break-glass read of the admin login's password
 from `/admin/identity-store`, approved by a secret admin, and a run that raises the same alert as

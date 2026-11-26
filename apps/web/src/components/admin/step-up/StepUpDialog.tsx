@@ -9,7 +9,10 @@ import {
 } from '@simplewebauthn/browser';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { PasskeyRegistrationError, registerNewPasskey } from '@/components/profile/PasskeysCard';
+import {
+  PasskeyEnrollmentSteps,
+  usePasskeyEnrollment,
+} from '@/components/profile/PasskeyEnrollment';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   stepUpDialogDescription,
@@ -68,6 +71,11 @@ async function submitAssertion(
   return verify.ok;
 }
 
+/** The enrollment step's description. The dialog's own description already names the dialog. */
+function StepDescription({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-muted-foreground">{children}</p>;
+}
+
 function errorMessage(code?: string): string {
   switch (code) {
     case 'NOT_ENROLLED':
@@ -113,7 +121,6 @@ export function StepUpCeremonyContent({
   const [isRunning, setIsRunning] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reauthRequired, setReauthRequired] = useState(false);
   const errorRef = useRef<HTMLParagraphElement | null>(null);
   const statusQuery = useQuery({
     ...trpc.stepUp.getStatus.queryOptions(),
@@ -129,45 +136,53 @@ export function StepUpCeremonyContent({
     current.code === 'REAUTH_REQUIRED' ||
     (statusKnown && statusQuery.data?.sessionBound === false);
 
+  // An account without a passkey adds one first, with a code from its email,
+  // then verifies with it. The dialog stays busy from the enrollment through
+  // the status refresh, so its button can not send a second code meanwhile.
+  const enrollment = usePasskeyEnrollment(async () => {
+    setIsRunning(true);
+    setError(null);
+    try {
+      await statusQuery.refetch();
+      await verifyWithPasskey();
+    } finally {
+      setIsRunning(false);
+    }
+  });
+  const enrolling = enrollment.phase.step !== 'idle';
+
   async function runCeremony() {
     if (isRunning) return;
     setIsRunning(true);
     setError(null);
-    setReauthRequired(false);
+    try {
+      await verifyWithPasskey();
+    } finally {
+      setIsRunning(false);
+    }
+  }
 
+  async function verifyWithPasskey() {
     try {
       const result = await runStepUpCeremony({
         requestOptions: () => requestOptions(requirement),
         startAuthentication: options => startAuthentication({ optionsJSON: options }),
         submitAssertion: (challengeId, response) =>
           submitAssertion(requirement, challengeId, response),
-        enroll: registerNewPasskey,
       });
       if (result.ok) {
         onVerified();
         return;
       }
-      if (result.code === 'CANCELLED') {
+      if (result.code === 'NOT_ENROLLED') {
+        enrollment.start();
+      } else if (result.code === 'CANCELLED') {
         setError('Passkey verification was cancelled. No verification was recorded.');
       } else {
         setError(errorMessage(result.code));
       }
-    } catch (caught) {
-      if (caught instanceof PasskeyRegistrationError && caught.failure === 'cancelled') {
-        setError('Passkey creation was cancelled. No passkey was added.');
-      } else if (
-        caught instanceof PasskeyRegistrationError &&
-        caught.failure === 'reauth_required'
-      ) {
-        setReauthRequired(true);
-        setError(
-          'Sign in again before adding a passkey to an admin account. Signing out signs you out of every browser.'
-        );
-      } else {
-        setError('Passkey verification did not complete. Try again.');
-      }
-    } finally {
-      setIsRunning(false);
+    } catch {
+      setError('Passkey verification did not complete. Try again.');
     }
   }
 
@@ -175,9 +190,10 @@ export function StepUpCeremonyContent({
     if (error) errorRef.current?.focus();
   }, [error]);
 
+  const running = isRunning || enrollment.phase.step === 'registering';
   useEffect(() => {
-    onRunningChange?.(isRunning);
-  }, [isRunning, onRunningChange]);
+    onRunningChange?.(running);
+  }, [running, onRunningChange]);
 
   async function retryStatus() {
     if (isRetrying) return;
@@ -246,30 +262,42 @@ export function StepUpCeremonyContent({
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-wrap justify-end gap-2">
-        {needsSignIn || reauthRequired ? (
-          <StepUpSignInAgainButton size="default" />
-        ) : (
-          <Button
-            onClick={() => (statusFailed || unavailable ? void retryStatus() : void runCeremony())}
-            disabled={actionDisabled}
-          >
-            {isRunning || retrying ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                {retrying ? 'Checking...' : 'Waiting for your passkey...'}
-              </>
-            ) : (
-              actionLabel
-            )}
-          </Button>
-        )}
-        {dismissible ? (
-          <Button variant="outline" onClick={onCancel} disabled={isRunning}>
-            Cancel
-          </Button>
-        ) : null}
-      </div>
+      {enrolling ? (
+        <div className="mt-6">
+          <PasskeyEnrollmentSteps enrollment={enrollment} Description={StepDescription} />
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          {needsSignIn ? (
+            <StepUpSignInAgainButton size="default" />
+          ) : (
+            <Button
+              onClick={() =>
+                statusFailed || unavailable
+                  ? void retryStatus()
+                  : enrolled
+                    ? void runCeremony()
+                    : enrollment.start()
+              }
+              disabled={actionDisabled}
+            >
+              {isRunning || retrying ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  {retrying ? 'Checking...' : 'Waiting for your passkey...'}
+                </>
+              ) : (
+                actionLabel
+              )}
+            </Button>
+          )}
+          {dismissible ? (
+            <Button variant="outline" onClick={onCancel} disabled={isRunning}>
+              Cancel
+            </Button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

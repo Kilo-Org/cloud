@@ -1,4 +1,3 @@
-import { timingSafeEqual } from '@kilocode/encryption';
 import { and, eq, type SQL } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -6,7 +5,7 @@ import { z } from 'zod';
 
 import { byoc_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { matchesInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { applyVercelComputeStatusProjection } from '@/lib/cloud-agent-next/vercel-compute-status';
 
 import {
@@ -74,11 +73,8 @@ function unauthorized(): NextResponse {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: responseHeaders() });
 }
 
-function isAuthorized(request: NextRequest): boolean {
-  const presented = request.headers.get('x-internal-api-key');
-  return Boolean(
-    INTERNAL_API_SECRET && presented && timingSafeEqual(presented, INTERNAL_API_SECRET)
-  );
+function isAuthorized(request: NextRequest): Promise<boolean> {
+  return matchesInternalApiSecret(request.headers.get('x-internal-api-key'));
 }
 
 function toCredentialResponse(row: VercelComputeConnection) {
@@ -121,7 +117,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ credentialId: string }> }
 ): Promise<NextResponse> {
-  if (!isAuthorized(request)) return unauthorized();
+  if (!(await isAuthorized(request))) return unauthorized();
 
   const { credentialId } = await params;
   if (!z.uuid().safeParse(credentialId).success) {
@@ -184,7 +180,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ credentialId: string }> }
 ): Promise<NextResponse> {
-  if (!isAuthorized(request)) return unauthorized();
+  if (!(await isAuthorized(request))) return unauthorized();
 
   const { credentialId } = await params;
   if (!z.uuid().safeParse(credentialId).success) {

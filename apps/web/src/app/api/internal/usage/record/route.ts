@@ -38,7 +38,7 @@ const POOL_WAITING_SAMPLE_INTERVAL_MS = 100;
 const QUEUE_ADMISSION_MAX_WAIT_MS = 250;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   // Phase timings, paired with the in-process pool gauges, are what identified that

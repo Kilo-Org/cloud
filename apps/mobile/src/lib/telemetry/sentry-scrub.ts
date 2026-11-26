@@ -504,8 +504,10 @@ export function scrubEvent<T>(event: T): T {
     }
 
     return event;
-  } catch {
-    return event;
+  } catch (error) {
+    // A failed scrub must not send the event unscrubbed: every caller drops an
+    // event whose scrub throws.
+    throw new Error('Sentry event scrub failed', { cause: error });
   }
 }
 
@@ -537,6 +539,7 @@ export function scrubBreadcrumb<T>(breadcrumb: T): T | null {
 
     return breadcrumb;
   } catch {
-    return breadcrumb;
+    // A failed scrub drops the breadcrumb rather than attaching it unscrubbed.
+    return null;
   }
 }

@@ -42,8 +42,8 @@ function withoutNativeUrlParts(breadcrumb: Record<string, unknown>) {
   return { ...breadcrumb, data: Object.fromEntries(kept) };
 }
 
-// A breadcrumb is dropped when an error escapes its scrub step. The scrub module
-// itself still catches its own errors and returns the input (until #12856).
+// A breadcrumb that cannot be read or scrubbed is dropped rather than sent
+// unscrubbed.
 function scrubOneBreadcrumb(breadcrumb: Record<string, unknown>) {
   try {
     const scrubbed = scrubBreadcrumb(withoutNativeUrlParts(breadcrumb));
@@ -74,8 +74,7 @@ export type BeforeSendHint = { originalException?: unknown };
  * a malformed App Attest diagnostic). An App Attest event is projected to its
  * allowlisted fields before it leaves; everything else is scrubbed. Never
  * throws: a malformed hint keeps the event rather than dropping a real crash,
- * and an error that escapes a scrub step drops the event. The scrub module
- * itself still catches its own errors and returns the input (until #12856).
+ * and a scrub that throws drops the event rather than sending it unscrubbed.
  */
 export function beforeSendScrubbedEvent<T>(event: T, hint?: BeforeSendHint): T | null {
   try {

@@ -1,56 +1,58 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-// The scrub module is replaced by throwing doubles. The real `scrubEvent` and
-// `scrubBreadcrumb` catch their own errors and return the input, so today these
-// cases cover only an error that reaches beforeSend from outside the scrub
-// module (the breadcrumb parse, the App Attest projection, or a future scrub
-// that rethrows). The scrub module change lands with #12856.
-const scrub = vi.hoisted(() => ({
-  scrubEvent: vi.fn((event: unknown) => event),
-  scrubBreadcrumb: vi.fn((breadcrumb: unknown) => breadcrumb),
-}));
+import { beforeSendScrubbedEvent } from './sentry-before-send';
+import { scrubBreadcrumb } from './sentry-scrub';
 
-vi.mock('@/lib/telemetry/sentry-scrub', () => scrub);
-
-const { beforeSendScrubbedEvent } = await import('./sentry-before-send');
-
+// These cases run the real scrub module. Each input holds a throwing getter at a
+// place only the scrub reads, so the scrub itself fails and nothing unscrubbed
+// may come back.
 const fakeSecret = 'fake-unscrubbed-value-0000';
 
-function capturedEvent() {
-  return {
-    exception: { values: [{ type: 'Error', value: `request failed with ${fakeSecret}` }] },
-    breadcrumbs: [
-      { category: 'fetch', data: { url: `https://api.kilo.ai/x?sig=${fakeSecret}` } },
-      { category: 'navigation', data: { to: '/home' } },
-    ],
-  };
-}
+describe('Sentry scrubbing fails closed', () => {
+  it('drops the event when the event scrub throws', () => {
+    const event = {
+      message: `request failed with ${fakeSecret}`,
+      exception: { values: [{ type: 'Error', value: `request failed with ${fakeSecret}` }] },
+      get request(): unknown {
+        throw new Error('unreadable request');
+      },
+    };
 
-describe('beforeSendScrubbedEvent when an error reaches it from a scrub step', () => {
-  beforeEach(() => {
-    scrub.scrubEvent.mockImplementation(event => event);
-    scrub.scrubBreadcrumb.mockImplementation(breadcrumb => breadcrumb);
+    expect(beforeSendScrubbedEvent(event)).toBeNull();
   });
 
-  it('drops the event when a scrub step throws', () => {
-    scrub.scrubEvent.mockImplementation(() => {
-      throw new Error('scrub failed');
-    });
+  it('drops a breadcrumb when the breadcrumb scrub throws', () => {
+    const breadcrumb = {
+      category: 'fetch',
+      message: `GET with ${fakeSecret}`,
+      data: {
+        get url(): unknown {
+          throw new Error('unreadable url');
+        },
+      },
+    };
 
-    expect(beforeSendScrubbedEvent(capturedEvent())).toBeNull();
+    expect(scrubBreadcrumb(breadcrumb)).toBeNull();
   });
 
-  it('drops a breadcrumb whose scrub throws and keeps the others', () => {
-    scrub.scrubBreadcrumb.mockImplementation(breadcrumb => {
-      if (JSON.stringify(breadcrumb).includes(fakeSecret)) {
-        throw new Error('scrub failed');
-      }
-      return breadcrumb;
-    });
+  it('drops merged breadcrumbs that cannot be read and keeps the others', () => {
+    const event = {
+      exception: { values: [{ type: 'Error', value: 'request failed' }] },
+      breadcrumbs: [
+        {
+          category: 'fetch',
+          data: {
+            get url(): unknown {
+              throw new Error('unreadable url');
+            },
+          },
+        },
+        { category: 'navigation', data: { to: '/home' } },
+      ],
+    };
 
-    const result = beforeSendScrubbedEvent(capturedEvent());
+    const result = beforeSendScrubbedEvent(event);
 
     expect(result?.breadcrumbs).toEqual([{ category: 'navigation', data: { to: '/home' } }]);
-    expect(JSON.stringify(result?.breadcrumbs)).not.toContain(fakeSecret);
   });
 });

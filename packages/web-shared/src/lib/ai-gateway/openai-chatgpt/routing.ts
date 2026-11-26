@@ -15,6 +15,7 @@ import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } fro
 import { openAiChatGptConnectorGone } from './connector';
 import {
   getOpenAiChatGptStoredConnection,
+  openAiChatGptOwnerKey,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
   type OpenAiChatGptStoredConnection,
@@ -239,7 +240,19 @@ async function readServableStoredConnection(
   owner: OpenAiChatGptOwner,
   onSharedConnectorGone?: (organizationId: string, connectorId: string) => void
 ): Promise<OpenAiChatGptStoredConnection | null> {
-  const stored = await getOpenAiChatGptStoredConnection(owner);
+  let stored: OpenAiChatGptStoredConnection | null;
+  try {
+    stored = await getOpenAiChatGptStoredConnection(owner);
+  } catch (error) {
+    // The KMS service could not open the payload. Like a transient refresh failure, the
+    // request keeps its existing route; only the error type is logged.
+    console.error(
+      '[openai-chatgpt] stored connection unreadable: %s (%s)',
+      error instanceof Error ? error.name : 'UnknownError',
+      openAiChatGptOwnerKey(owner)
+    );
+    return null;
+  }
   if (!isUsableStoredConnection(stored)) return null;
 
   if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {

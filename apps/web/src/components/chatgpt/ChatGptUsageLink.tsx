@@ -8,10 +8,11 @@ import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/
  * requests do not use the plan.
  */
 export async function ChatGptUsageLink({ kiloUserId }: { kiloUserId: string }) {
+  // A payload the KMS service cannot open hides the link instead of failing the page.
   const connection = await getOpenAiChatGptConnection({
     kiloUserId,
     organizationId: null,
-  });
+  }).catch(() => null);
   if (connection?.status !== 'connected') return null;
 
   return <ChatGptUsageLinkView />;

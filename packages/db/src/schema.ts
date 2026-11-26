@@ -178,6 +178,8 @@ import type {
   AuditLogAction,
   BYOKApiKeyEnvelope,
   CustomLlmCredentialsEnvelope,
+  CodingPlanInventoryCredentialEnvelope,
+  OpenAiChatGptConnectionEnvelope,
   EncryptedData,
   ByocCredentialEnvelope,
   ByocSetupStatus,
@@ -8058,6 +8060,11 @@ export const openai_chatgpt_connections = pgTable(
       onDelete: 'cascade',
     }),
     encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
+    /**
+     * The same payload encrypted through the BYOK KMS service. Readers prefer it while it
+     * still matches `encrypted_connection`, which stays written for rollback.
+     */
+    encrypted_connection_envelope: jsonb().$type<OpenAiChatGptConnectionEnvelope>(),
     is_enabled: boolean().default(true).notNull(),
     /**
      * True for the organization's shared-services connection: one row per
@@ -11109,6 +11116,11 @@ export const coding_plan_key_inventory = pgTable(
     upstream_plan_id: text().notNull(),
     upstream_usage_id: text(),
     encrypted_api_key: jsonb().$type<EncryptedData>(),
+    /**
+     * The same credential encrypted through the BYOK KMS service. Readers prefer it while it
+     * still matches `encrypted_api_key`, which stays written for rollback.
+     */
+    encrypted_api_key_envelope: jsonb().$type<CodingPlanInventoryCredentialEnvelope>(),
     credential_fingerprint: text().notNull(),
     status: text().$type<CodingPlanCredentialStatus>().notNull().default('available'),
     assigned_to_user_id: text().references(() => kilocode_users.id, {

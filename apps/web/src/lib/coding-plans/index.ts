@@ -5,7 +5,10 @@ import { addDays } from 'date-fns';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
-import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import type {
+  CodingPlanInventoryCredentialEnvelope,
+  EncryptedData,
+} from '@kilocode/db/schema-types';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { getByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
@@ -14,6 +17,12 @@ import {
   type ByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
+import {
+  CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
+  createCodingPlanInventoryDataKey,
+  openCodingPlanInventoryCredential,
+  sealCodingPlanInventoryCredential,
+} from '@/lib/coding-plans/inventory-credential-encryption';
 import {
   getCodingPlanValidationResult,
   type CodingPlanCredentialValidationInput,
@@ -94,6 +103,15 @@ function databaseConstraint(error: unknown): string | null {
 // the upstream provider with one unbounded burst of requests.
 const INVENTORY_VALIDATION_CONCURRENCY = 10;
 const BYTEPLUS_INVENTORY_VALIDATION_CONCURRENCY = 2;
+// Each uploaded credential gets its own KMS data key; bound the fan-out the same way.
+const INVENTORY_DATA_KEY_CONCURRENCY = 10;
+
+/** The credential columns a raw `RETURNING` clause yields for a claimed inventory row. */
+type ClaimedInventoryCredential = {
+  id: string;
+  encrypted_api_key: EncryptedData | null;
+  encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope | null;
+};
 
 type CancellationReason =
   | 'user_canceled'
@@ -118,11 +136,13 @@ export async function getAssignedCodingPlanUsageContext(input: {
 }): Promise<CodingPlanUsageAssignmentContext | null> {
   const [assignment] = await db
     .select({
+      id: coding_plan_key_inventory.id,
       planId: coding_plan_key_inventory.plan_id,
       providerId: coding_plan_key_inventory.provider_id,
       status: coding_plan_key_inventory.status,
       assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
       encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
+      encryptedApiKeyEnvelope: coding_plan_key_inventory.encrypted_api_key_envelope,
       upstreamUsageId: coding_plan_key_inventory.upstream_usage_id,
     })
     .from(coding_plan_key_inventory)
@@ -146,11 +166,16 @@ export async function getAssignedCodingPlanUsageContext(input: {
 
   if (assignment.providerId !== 'minimax' || !assignment.encryptedApiKey) return null;
   try {
-    return {
-      providerId: 'minimax',
-      apiKey: decryptApiKey(assignment.encryptedApiKey, BYOK_ENCRYPTION_KEY),
-    };
-  } catch {
+    const apiKey = await openCodingPlanInventoryCredential({
+      id: assignment.id,
+      encrypted_api_key: assignment.encryptedApiKey,
+      encrypted_api_key_envelope: assignment.encryptedApiKeyEnvelope,
+    });
+    return apiKey === null ? null : { providerId: 'minimax', apiKey };
+  } catch (error) {
+    logError('Coding plan usage credential could not be decrypted', {
+      error: error instanceof Error ? error.name : 'UnknownError',
+    });
     return null;
   }
 }
@@ -310,10 +335,7 @@ export async function subscribeToCodingPlan(
       original_baseline_microdollars_used: Number(lockedUser.microdollars_used),
       created_at: periodStartIso,
     });
-    const { rows: inventoryRows } = await tx.execute<{
-      id: string;
-      encrypted_api_key: { iv: string; data: string; authTag: string } | null;
-    }>(sql`
+    const { rows: inventoryRows } = await tx.execute<ClaimedInventoryCredential>(sql`
       UPDATE coding_plan_key_inventory
       SET status = 'assigned',
           assigned_to_user_id = ${userId},
@@ -326,14 +348,16 @@ export async function subscribeToCodingPlan(
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
-      RETURNING id, encrypted_api_key
+      RETURNING id, encrypted_api_key, encrypted_api_key_envelope
     `);
     const inventoryKey = inventoryRows[0];
-    if (!inventoryKey?.encrypted_api_key) {
+    // The claimed row is only known under the lock, so its KMS decrypt runs inside the
+    // transaction. A KMS failure rolls the purchase back before anything is charged.
+    const plaintext = inventoryKey ? await openCodingPlanInventoryCredential(inventoryKey) : null;
+    if (!inventoryKey || plaintext === null) {
       throw new Error(`No managed credential is available for plan "${plan.planId}".`);
     }
 
-    const plaintext = decryptApiKey(inventoryKey.encrypted_api_key, BYOK_ENCRYPTION_KEY);
     const [installedByok] = await tx
       .insert(byok_api_keys)
       .values({
@@ -472,7 +496,7 @@ export async function terminateCodingPlanImmediately(
         .update(coding_plan_key_inventory)
         .set({
           status: 'revocation_pending',
-          encrypted_api_key: null,
+          ...CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
           revocation_requested_at: sql`now()`,
           last_revocation_error: null,
         })
@@ -589,10 +613,7 @@ export async function reassignSubscriptionCredential(
         throw credentialReassignmentError('Credential is not eligible for reassignment.');
       }
 
-      const { rows: claimedRows } = await tx.execute<{
-        id: string;
-        encrypted_api_key: { iv: string; data: string; authTag: string } | null;
-      }>(sql`
+      const { rows: claimedRows } = await tx.execute<ClaimedInventoryCredential>(sql`
         UPDATE coding_plan_key_inventory
         SET status = 'assigned',
             assigned_to_user_id = ${subscription.userId},
@@ -606,16 +627,17 @@ export async function reassignSubscriptionCredential(
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, encrypted_api_key
+        RETURNING id, encrypted_api_key, encrypted_api_key_envelope
       `);
       const claimed = claimedRows[0];
-      if (!claimed?.encrypted_api_key) {
+      // As in subscribeToCodingPlan, the claimed row is only known under the lock.
+      const plaintext = claimed ? await openCodingPlanInventoryCredential(claimed) : null;
+      if (!claimed || plaintext === null) {
         throw credentialReassignmentError(
           `No available credential in the pool for plan "${subscription.planId}".`
         );
       }
 
-      const plaintext = decryptApiKey(claimed.encrypted_api_key, BYOK_ENCRYPTION_KEY);
       const byokUpdateResult = await tx
         .update(byok_api_keys)
         .set({ encrypted_api_key_envelope: encryptByokWithDataKey(plaintext, byokDataKey) })
@@ -640,7 +662,7 @@ export async function reassignSubscriptionCredential(
         .update(coding_plan_key_inventory)
         .set({
           status: 'revocation_pending',
-          encrypted_api_key: null,
+          ...CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
           revocation_requested_at: sql`now()`,
           last_revocation_error: null,
         })
@@ -705,6 +727,7 @@ export async function uploadKeysToInventory(
   providerId: string,
   planId: CodingPlanId,
   rawEntries: string[],
+  adminUserId: string,
   options: InventoryUploadOptions = {}
 ): Promise<{ inserted: number }> {
   const plan = getCodingPlanPrice(planId);
@@ -748,6 +771,25 @@ export async function uploadKeysToInventory(
     );
   }
 
+  // Every row's data key is bound to its id, so the ids are chosen here and the keys are
+  // created before the transaction.
+  const inventoryIds = entries.map(() => crypto.randomUUID());
+  const dataKeyLimit = pLimit(INVENTORY_DATA_KEY_CONCURRENCY);
+  let dataKeys: ByokDataKey[];
+  try {
+    dataKeys = await Promise.all(
+      inventoryIds.map(id => dataKeyLimit(() => createCodingPlanInventoryDataKey(id, adminUserId)))
+    );
+  } catch (error) {
+    logError('Coding plan inventory upload could not create data keys', {
+      planId,
+      error: error instanceof Error ? error.name : 'UnknownError',
+    });
+    throw new CodingPlanInventoryUploadError(
+      'Unable to create encryption keys for the credentials. Try again.'
+    );
+  }
+
   let inserted: number;
   try {
     inserted = await db.transaction(async tx => {
@@ -755,11 +797,12 @@ export async function uploadKeysToInventory(
         .insert(coding_plan_key_inventory)
         .values(
           entries.map((entry, index) => ({
+            id: inventoryIds[index],
             plan_id: plan.planId,
             provider_id: providerId,
             upstream_plan_id: entry.upstreamPlanId,
             upstream_usage_id: normalizedResults[index]?.upstreamUsageId ?? null,
-            encrypted_api_key: encryptApiKey(entry.apiKey, BYOK_ENCRYPTION_KEY),
+            ...sealCodingPlanInventoryCredential(entry.apiKey, dataKeys[index]),
             credential_fingerprint: codingPlanCredentialFingerprint(entry.apiKey),
             status: 'available' as const,
           }))
@@ -921,6 +964,7 @@ export async function queueAvailableInventoryForRevocation(
     UPDATE coding_plan_key_inventory
     SET status = 'revocation_pending',
         encrypted_api_key = NULL,
+        encrypted_api_key_envelope = NULL,
         revocation_requested_at = now(),
         updated_at = now()
     WHERE id IN (
@@ -1134,7 +1178,6 @@ export async function replaceInventoryCredential(
     );
   }
 
-  const encryptedApiKey = encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY);
   const nextUpstreamUsageId =
     plan.providerId === 'byteplus-coding'
       ? validationResult.upstreamUsageId
@@ -1165,7 +1208,9 @@ export async function replaceInventoryCredential(
       )
     );
   const dataKeys = new Map<string, ByokDataKey>();
+  let inventoryDataKey: ByokDataKey;
   try {
+    inventoryDataKey = await createCodingPlanInventoryDataKey(inventoryKeyId, adminUserId);
     await Promise.all(
       previewKeys.map(async installedKey => {
         dataKeys.set(
@@ -1219,7 +1264,7 @@ export async function replaceInventoryCredential(
       const result = await tx
         .update(coding_plan_key_inventory)
         .set({
-          encrypted_api_key: encryptedApiKey,
+          ...sealCodingPlanInventoryCredential(normalizedApiKey, inventoryDataKey),
           credential_fingerprint: replacementFingerprint,
           upstream_usage_id: nextUpstreamUsageId,
         })

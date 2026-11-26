@@ -216,7 +216,9 @@ async function hasOpenAiChatGptByokForModel(params: {
   owners.push({ kiloUserId: params.user.id, organizationId: params.organizationId ?? null });
 
   for (const owner of owners) {
-    const stored = await getOpenAiChatGptStoredConnection(owner);
+    // A payload the KMS service cannot open counts as no usable connection, so the
+    // ordinary balance check applies.
+    const stored = await getOpenAiChatGptStoredConnection(owner).catch(() => null);
     if (!stored?.isEnabled || stored.connection.status !== 'connected') continue;
     // The shared row bills the organization only while the person who connected
     // it is usable. A row that records no connector still counts.

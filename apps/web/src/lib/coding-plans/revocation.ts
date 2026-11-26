@@ -2,9 +2,14 @@ import 'server-only';
 
 import { and, asc, desc, eq, inArray, isNotNull, max, ne, sql } from 'drizzle-orm';
 
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import type { ByokDataKey } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
+import {
+  CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
+  createCodingPlanInventoryDataKey,
+  sealCodingPlanInventoryCredential,
+} from '@/lib/coding-plans/inventory-credential-encryption';
 import {
   getCodingPlanValidationResult,
   type CodingPlanCredentialValidationInput,
@@ -122,7 +127,7 @@ export async function markCredentialManuallyRevoked(inventoryKeyId: string): Pro
     .update(coding_plan_key_inventory)
     .set({
       status: 'revoked',
-      encrypted_api_key: null,
+      ...CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
       revoked_at: sql`now()`,
       revocation_attempt_count: sql`${coding_plan_key_inventory.revocation_attempt_count} + 1`,
       last_revocation_error: null,
@@ -142,6 +147,7 @@ export async function markCredentialManuallyRevoked(inventoryKeyId: string): Pro
 export async function replaceManualCredentialRevocation(
   inventoryKeyId: string,
   apiKey: string,
+  adminUserId: string,
   options: ManualCredentialReplacementOptions = {}
 ): Promise<void> {
   if (!BYOK_ENCRYPTION_KEY) {
@@ -219,13 +225,20 @@ export async function replaceManualCredentialRevocation(
     );
   }
 
+  let dataKey: ByokDataKey;
+  try {
+    dataKey = await createCodingPlanInventoryDataKey(inventoryKeyId, adminUserId);
+  } catch {
+    throw replacementError('Unable to create an encryption key for the credential. Try again.');
+  }
+
   let result: { rowCount?: number | null };
   try {
     result = await db
       .update(coding_plan_key_inventory)
       .set({
         status: 'available',
-        encrypted_api_key: encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY),
+        ...sealCodingPlanInventoryCredential(normalizedApiKey, dataKey),
         credential_fingerprint: replacementFingerprint,
         upstream_usage_id:
           plan.providerId === 'byteplus-coding'
@@ -265,7 +278,7 @@ export async function markCredentialManualRevocationFailed(
     .update(coding_plan_key_inventory)
     .set({
       status: 'revocation_failed',
-      encrypted_api_key: null,
+      ...CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
       revocation_attempt_count: sql`${coding_plan_key_inventory.revocation_attempt_count} + 1`,
       last_revocation_error: sanitizedReason,
     })
@@ -286,7 +299,7 @@ export async function requeueManualCredentialRevocation(inventoryKeyId: string):
     .update(coding_plan_key_inventory)
     .set({
       status: 'revocation_pending',
-      encrypted_api_key: null,
+      ...CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
       revocation_requested_at: sql`now()`,
       last_revocation_error: null,
     })

@@ -12,7 +12,7 @@ import {
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 
-/** The `provider_id` ChatGPT connection data keys are bound to in the KMS encryption context. */
+/** The prefix of the `provider_id` ChatGPT connection data keys are bound to; see `openAiChatGptKmsOwnerFor`. */
 export const OPENAI_CHATGPT_KMS_PROVIDER_ID = 'openai-chatgpt-oauth';
 
 /** Recorded by the KMS service as the actor of data keys a token refresh creates. */
@@ -22,10 +22,36 @@ export const OPENAI_CHATGPT_REFRESH_KMS_ACTOR = 'system:openai-chatgpt-refresh';
 export const OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR = 'system:openai-chatgpt-eligibility';
 
 /**
- * Whom a connection's data keys belong to: the organization for its shared-services row,
- * which no member owns, and otherwise the person whose delegated account the row holds.
+ * Whom a connection's data keys belong to and which of the owner's connections they seal:
+ * the organization for its shared-services row, which no member owns, and otherwise the
+ * person whose delegated account the row holds. One person can hold a personal row and a
+ * row per organization, so `provider_id` names the account the row is scoped to, and an
+ * envelope copied to another of the person's rows does not decrypt.
  */
-export type OpenAiChatGptKmsOwner = Pick<ByokKmsContext, 'owner_type' | 'owner_id'>;
+export type OpenAiChatGptKmsOwner = Pick<ByokKmsContext, 'owner_type' | 'owner_id' | 'provider_id'>;
+
+/** The KMS owner of a connection, from the account it is scoped to. */
+export function openAiChatGptKmsOwnerFor(
+  scope:
+    | { kind: 'shared_services'; organizationId: string }
+    | { kind: 'member'; kiloUserId: string; organizationId: string | null }
+): OpenAiChatGptKmsOwner {
+  if (scope.kind === 'shared_services') {
+    return {
+      owner_type: 'organization',
+      owner_id: scope.organizationId,
+      provider_id: `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:shared-services`,
+    };
+  }
+  return {
+    owner_type: 'user',
+    owner_id: scope.kiloUserId,
+    provider_id:
+      scope.organizationId === null
+        ? `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:personal`
+        : `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:organization:${scope.organizationId}`,
+  };
+}
 
 /** The identity columns of a connection row, which decide its KMS owner. */
 export type OpenAiChatGptConnectionOwnerColumns = {
@@ -49,14 +75,20 @@ export function openAiChatGptKmsOwnerOfRow(
 ): OpenAiChatGptKmsOwner | null {
   if (row.is_shared_services) {
     return row.organization_id
-      ? { owner_type: 'organization', owner_id: row.organization_id }
+      ? openAiChatGptKmsOwnerFor({ kind: 'shared_services', organizationId: row.organization_id })
       : null;
   }
-  return row.kilo_user_id ? { owner_type: 'user', owner_id: row.kilo_user_id } : null;
+  return row.kilo_user_id
+    ? openAiChatGptKmsOwnerFor({
+        kind: 'member',
+        kiloUserId: row.kilo_user_id,
+        organizationId: row.organization_id,
+      })
+    : null;
 }
 
 function openAiChatGptKmsContext(owner: OpenAiChatGptKmsOwner, keyId: string): ByokKmsContext {
-  return { key_id: keyId, ...owner, provider_id: OPENAI_CHATGPT_KMS_PROVIDER_ID };
+  return { key_id: keyId, ...owner };
 }
 
 /** A data key for one connection write, created before the write's transaction. */

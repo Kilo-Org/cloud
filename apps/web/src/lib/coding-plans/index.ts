@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { addDays } from 'date-fns';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
@@ -112,6 +113,63 @@ type ClaimedInventoryCredential = {
   encrypted_api_key: EncryptedData | null;
   encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope | null;
 };
+
+/** An available inventory credential decrypted before the claiming transaction. */
+type PreparedInventoryCredential = { row: ClaimedInventoryCredential; plaintext: string };
+
+/**
+ * Decrypts one available credential of the plan before the claiming transaction, so the
+ * KMS round trip does not run while the transaction holds the user, subscription and
+ * inventory row locks. The claim prefers this row; when a concurrent claim took it, or it
+ * changed, the claimed row is decrypted under the lock instead. A KMS failure here is not
+ * final: the claim retries the decrypt under the lock, which decides.
+ */
+async function prepareAvailableInventoryCredential(
+  planId: string,
+  providerId: string
+): Promise<PreparedInventoryCredential | null> {
+  const [row] = await db
+    .select({
+      id: coding_plan_key_inventory.id,
+      encrypted_api_key: coding_plan_key_inventory.encrypted_api_key,
+      encrypted_api_key_envelope: coding_plan_key_inventory.encrypted_api_key_envelope,
+    })
+    .from(coding_plan_key_inventory)
+    .where(
+      and(
+        eq(coding_plan_key_inventory.plan_id, planId),
+        eq(coding_plan_key_inventory.provider_id, providerId),
+        eq(coding_plan_key_inventory.status, 'available')
+      )
+    )
+    .limit(1);
+  if (!row) return null;
+  try {
+    const plaintext = await openCodingPlanInventoryCredential(row);
+    return plaintext === null ? null : { row, plaintext };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The plaintext of the row a claim locked: the prepared plaintext while the row still holds
+ * the exact ciphertext it was decrypted from, and otherwise a decrypt under the lock.
+ */
+async function openClaimedInventoryCredential(
+  claimed: ClaimedInventoryCredential,
+  prepared: PreparedInventoryCredential | null
+): Promise<string | null> {
+  if (
+    prepared &&
+    claimed.id === prepared.row.id &&
+    isDeepStrictEqual(claimed.encrypted_api_key, prepared.row.encrypted_api_key) &&
+    isDeepStrictEqual(claimed.encrypted_api_key_envelope, prepared.row.encrypted_api_key_envelope)
+  ) {
+    return prepared.plaintext;
+  }
+  return await openCodingPlanInventoryCredential(claimed);
+}
 
 type CancellationReason =
   | 'user_canceled'
@@ -238,6 +296,7 @@ export async function subscribeToCodingPlan(
     },
     actorUserId: userId,
   });
+  const prepared = await prepareAvailableInventoryCredential(plan.planId, plan.providerId);
   const outcome = await db.transaction(async tx => {
     await reconcileCreditExpirationsInTransaction({ type: 'user', id: userId }, tx);
     const { rows: lockedUsers } = await tx.execute<{
@@ -345,15 +404,17 @@ export async function subscribeToCodingPlan(
         SELECT id FROM coding_plan_key_inventory
         WHERE plan_id = ${plan.planId}
           AND status = 'available'
+        ORDER BY (id = ${prepared?.row.id ?? null}::uuid) IS TRUE DESC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
       RETURNING id, encrypted_api_key, encrypted_api_key_envelope
     `);
     const inventoryKey = inventoryRows[0];
-    // The claimed row is only known under the lock, so its KMS decrypt runs inside the
-    // transaction. A KMS failure rolls the purchase back before anything is charged.
-    const plaintext = inventoryKey ? await openCodingPlanInventoryCredential(inventoryKey) : null;
+    // A KMS failure rolls the purchase back before anything is charged.
+    const plaintext = inventoryKey
+      ? await openClaimedInventoryCredential(inventoryKey, prepared)
+      : null;
     if (!inventoryKey || plaintext === null) {
       throw new Error(`No managed credential is available for plan "${plan.planId}".`);
     }
@@ -532,12 +593,16 @@ export async function reassignSubscriptionCredential(
   const [preview] = await db
     .select({
       userId: coding_plan_subscriptions.user_id,
+      planId: coding_plan_subscriptions.plan_id,
       providerId: coding_plan_subscriptions.provider_id,
       installedByokKeyId: coding_plan_subscriptions.installed_byok_key_id,
     })
     .from(coding_plan_subscriptions)
     .where(eq(coding_plan_subscriptions.id, subscriptionId))
     .limit(1);
+  const prepared = preview
+    ? await prepareAvailableInventoryCredential(preview.planId, preview.providerId)
+    : null;
   let byokDataKey: ByokDataKey | null = null;
   if (preview?.installedByokKeyId) {
     try {
@@ -624,14 +689,14 @@ export async function reassignSubscriptionCredential(
           WHERE plan_id = ${subscription.planId}
             AND provider_id = ${subscription.providerId}
             AND status = 'available'
+          ORDER BY (id = ${prepared?.row.id ?? null}::uuid) IS TRUE DESC
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
         RETURNING id, encrypted_api_key, encrypted_api_key_envelope
       `);
       const claimed = claimedRows[0];
-      // As in subscribeToCodingPlan, the claimed row is only known under the lock.
-      const plaintext = claimed ? await openCodingPlanInventoryCredential(claimed) : null;
+      const plaintext = claimed ? await openClaimedInventoryCredential(claimed, prepared) : null;
       if (!claimed || plaintext === null) {
         throw credentialReassignmentError(
           `No available credential in the pool for plan "${subscription.planId}".`

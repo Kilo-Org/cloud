@@ -57,6 +57,8 @@ export type CredentialKmsBackfillStoreSummary = {
    * itself failed, which is unknown rather than zero.
    */
   remaining: number | null;
+  /** True when the pass reached the last candidate row instead of stopping at the deadline. */
+  reachedEnd: boolean;
   /** The sanitized name of an error that stopped this store's pass, if any. */
   errorName: string | null;
 };
@@ -274,6 +276,7 @@ function emptySummary(store: CredentialKmsBackfillStoreName): CredentialKmsBackf
     skippedConcurrentWrite: 0,
     failed: { legacy_unreadable: 0, kms: 0, database: 0 },
     remaining: null,
+    reachedEnd: false,
     errorName: null,
   };
 }
@@ -291,7 +294,10 @@ async function backfillStore<Row extends BackfillRow>(
     const limit = pLimit(concurrency);
     while (Date.now() < deadlineAt) {
       const rows = await store.selectBatch(afterId, batchSize);
-      if (rows.length === 0) break;
+      if (rows.length === 0) {
+        summary.reachedEnd = true;
+        break;
+      }
       // Keyset paging past this batch: a row that keeps failing cannot starve the ones after it.
       afterId = rows[rows.length - 1].id;
 
@@ -309,7 +315,10 @@ async function backfillStore<Row extends BackfillRow>(
           })
         )
       );
-      if (rows.length < batchSize) break;
+      if (rows.length < batchSize) {
+        summary.reachedEnd = Date.now() < deadlineAt;
+        break;
+      }
     }
   } catch (error) {
     summary.errorName = sanitizedExceptionName(error);

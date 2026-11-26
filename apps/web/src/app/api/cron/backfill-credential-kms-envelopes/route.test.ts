@@ -29,6 +29,7 @@ function summary(
     skippedConcurrentWrite: 0,
     failed: { legacy_unreadable: 0, kms: 0, database: 0 },
     remaining: 0,
+    reachedEnd: true,
     errorName: null,
     ...overrides,
   };
@@ -148,6 +149,31 @@ test('reports row failures by category and marks the run failed', async () => {
     coding_plan_inventory_failed_kms_count: 2,
     coding_plan_inventory_remaining_count: 3,
     openai_chatgpt_connections_completed: true,
+  });
+});
+
+test('counts unreadable static-key copies without failing the run', async () => {
+  jest.mocked(backfillCredentialKmsEnvelopes).mockResolvedValue([
+    summary('coding_plan_inventory', {
+      scanned: 2,
+      failed: { legacy_unreadable: 2, kms: 0, database: 0 },
+      remaining: 2,
+    }),
+    summary('openai_chatgpt_connections'),
+  ]);
+
+  const response = await GET(request('Bearer cron-secret'));
+
+  expect(response.status).toBe(200);
+  expect(error).not.toHaveBeenCalled();
+  expect(loggedEvent(info)).toMatchObject({
+    outcome: 'succeeded',
+    backfill_completed: false,
+    coding_plan_inventory_failed_legacy_unreadable_count: 2,
+    coding_plan_inventory_remaining_count: 2,
+    coding_plan_inventory_completed: false,
+    coding_plan_inventory_only_unreadable_remaining: true,
+    openai_chatgpt_connections_only_unreadable_remaining: false,
   });
 });
 

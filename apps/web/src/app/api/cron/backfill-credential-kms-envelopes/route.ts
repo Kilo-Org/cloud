@@ -28,6 +28,25 @@ function failedCount(summary: CredentialKmsBackfillStoreSummary): number {
   return summary.failed.legacy_unreadable + summary.failed.kms + summary.failed.database;
 }
 
+/**
+ * Failures a later run can fix. A static-key copy that does not decrypt is a standing fact:
+ * readers already treat it as no credential, and retrying cannot change it, so it is reported
+ * by count without failing every run.
+ */
+function retryableFailedCount(summary: CredentialKmsBackfillStoreSummary): number {
+  return summary.failed.kms + summary.failed.database;
+}
+
+/** Every row left is one whose static-key copy does not decrypt and needs manual cleanup. */
+function onlyUnreadableRemain(summary: CredentialKmsBackfillStoreSummary): boolean {
+  return (
+    summary.reachedEnd &&
+    summary.remaining !== null &&
+    summary.remaining > 0 &&
+    summary.remaining === summary.failed.legacy_unreadable
+  );
+}
+
 function storeMetadata(summary: CredentialKmsBackfillStoreSummary): ScheduledJobMetadata {
   const prefix = summary.store;
   return {
@@ -42,6 +61,7 @@ function storeMetadata(summary: CredentialKmsBackfillStoreSummary): ScheduledJob
     [`${prefix}_remaining_known`]: summary.remaining !== null,
     [`${prefix}_remaining_count`]: summary.remaining ?? undefined,
     [`${prefix}_completed`]: summary.remaining === 0,
+    [`${prefix}_only_unreadable_remaining`]: onlyUnreadableRemain(summary),
     [`${prefix}_error`]: summary.errorName ?? undefined,
   };
 }
@@ -50,9 +70,11 @@ function storeMetadata(summary: CredentialKmsBackfillStoreSummary): ScheduledJob
  * Creates the KMS envelope of existing Coding Plan inventory credentials and ChatGPT
  * connection payloads, a bounded pass per tick, until no row lacks a current one. Every
  * authorized tick logs one `scheduled_job.completed` event with each store's remaining
- * count; `backfill_completed: true` means both stores report zero remaining. Failures mark
- * the event failed with per-category counts, and a store whose count could not be taken
- * reports `<store>_remaining_known: false` instead of a count. Once complete, a tick is a
+ * count; `backfill_completed: true` means both stores report zero remaining. KMS and
+ * database failures mark the event failed with per-category counts, and a store whose count
+ * could not be taken reports `<store>_remaining_known: false` instead of a count. Rows whose
+ * static-key copy does not decrypt are counted on every tick without failing it, and
+ * `<store>_only_unreadable_remaining: true` says nothing else is left in that store. Once complete, a tick is a
  * couple of counting queries, so the schedule can stay until the job is removed.
  */
 export async function GET(request: Request) {
@@ -88,7 +110,8 @@ export async function GET(request: Request) {
   for (const summary of summaries) Object.assign(metadata, storeMetadata(summary));
 
   const failed = summaries.some(
-    summary => failedCount(summary) > 0 || summary.remaining === null || summary.errorName !== null
+    summary =>
+      retryableFailedCount(summary) > 0 || summary.remaining === null || summary.errorName !== null
   );
   const body = {
     completed,

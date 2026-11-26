@@ -232,14 +232,14 @@ describe('backfillCredentialKmsEnvelopes', () => {
           key_id: personal.encrypted_connection_envelope?.key_id,
           owner_type: 'user',
           owner_id: user.id,
-          provider_id: OPENAI_CHATGPT_KMS_PROVIDER_ID,
+          provider_id: `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:personal`,
           actor_user_id: CREDENTIAL_KMS_BACKFILL_ACTOR,
         },
         {
           key_id: shared.encrypted_connection_envelope?.key_id,
           owner_type: 'organization',
           owner_id: organization.id,
-          provider_id: OPENAI_CHATGPT_KMS_PROVIDER_ID,
+          provider_id: `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:shared-services`,
           actor_user_id: CREDENTIAL_KMS_BACKFILL_ACTOR,
         },
       ])
@@ -497,6 +497,7 @@ describe('backfillCredentialKmsEnvelopes', () => {
       failed: { legacy_unreadable: 1, kms: 0, database: 0 },
       remaining: 1,
     });
+    expect(inventory.reachedEnd).toBe(true);
     expect(kms.requests).toEqual([]);
   });
 
@@ -518,6 +519,7 @@ describe('backfillCredentialKmsEnvelopes', () => {
 
     expect(inventory.scanned).toBe(0);
     expect(inventory.remaining).toBe(1);
+    expect(inventory.reachedEnd).toBe(false);
   });
 
   test('pages through more rows than one batch', async () => {

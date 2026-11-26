@@ -7,6 +7,7 @@ import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/dri
 import {
   createOpenAiChatGptSealingKey,
   OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR,
+  openAiChatGptKmsOwnerFor,
   openOpenAiChatGptConnection,
   sealOpenAiChatGptConnection,
   type OpenAiChatGptEncryptedConnectionColumns,
@@ -167,8 +168,12 @@ function openAiChatGptOwnerShape(owner: OpenAiChatGptOwner): OpenAiChatGptOwnerS
  */
 export function openAiChatGptKmsOwner(owner: OpenAiChatGptOwner): OpenAiChatGptKmsOwner {
   return owner.scope === 'shared_services'
-    ? { owner_type: 'organization', owner_id: owner.organizationId }
-    : { owner_type: 'user', owner_id: owner.kiloUserId };
+    ? openAiChatGptKmsOwnerFor({ kind: 'shared_services', organizationId: owner.organizationId })
+    : openAiChatGptKmsOwnerFor({
+        kind: 'member',
+        kiloUserId: owner.kiloUserId,
+        organizationId: owner.organizationId,
+      });
 }
 
 /**
@@ -613,8 +618,17 @@ export async function markOpenAiChatGptNotEligible(
   const sealingKey = await createOpenAiChatGptConnectionSealingKey(
     owner,
     OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR
-  );
-  await withConnectionHoldingToken(owner, refusedAccessToken, (tx, connection) =>
-    markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey)
-  );
+  ).catch(() => null);
+  await withConnectionHoldingToken(owner, refusedAccessToken, async (tx, connection) => {
+    if (sealingKey) {
+      await markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey);
+      return;
+    }
+    // Without a data key the payload cannot be rewritten, but the refused account must still
+    // stop serving requests. The payload is left as it is, so its envelope stays current.
+    await tx
+      .update(openai_chatgpt_connections)
+      .set({ is_enabled: false })
+      .where(openAiChatGptOwnerWhere(owner));
+  });
 }

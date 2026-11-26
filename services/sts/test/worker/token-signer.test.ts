@@ -11,9 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditLog } from '../../src/audit/log';
 import { TOKEN_AUDIT_RETENTION_MS } from '../../src/constants';
 import { getTokenSignerStub } from '../../src/dos/stubs';
-import { TokenSignerDO, type TokenSignRequest } from '../../src/dos/TokenSignerDO';
+import {
+  TokenSignerDO,
+  type TokenSignRequest,
+  type TokenSignResult,
+} from '../../src/dos/TokenSignerDO';
 import { handleRequest } from '../../src/http';
-import { recordSignedExp, type KeyRing } from '../../src/tokens/key-ring';
+import type { KeyRing } from '../../src/tokens/key-ring';
 import { stubOfflineNetwork } from './manager';
 import { resetTokenSignerObject } from './reset';
 import { config, env } from './test-env';
@@ -154,6 +158,25 @@ describe('token signer', () => {
     });
   });
 
+  it('exposes only mint, getJwks and alarm to a stub, so no caller reaches a key', async () => {
+    expect(Object.getOwnPropertyNames(TokenSignerDO.prototype).sort()).toEqual([
+      'alarm',
+      'constructor',
+      'getJwks',
+      'mint',
+    ]);
+    // An internal method name is refused over RPC, not answered with the key record. Awaited
+    // directly: handing the RPC promise to `expect(...).rejects` left an unhandled rejection.
+    const stub = signer() as unknown as { currentKey(): Promise<unknown> };
+    let refusal: unknown = null;
+    try {
+      await stub.currentKey();
+    } catch (error) {
+      refusal = error;
+    }
+    expect(String(refusal)).toContain('does not implement "currentKey"');
+  });
+
   it('keeps its key across an object restart and records the key creation once', async () => {
     const before = await signer().getJwks();
     expect(before.keys).toHaveLength(1);
@@ -236,24 +259,31 @@ describe('token signer', () => {
 
   it('keeps a latest exp a mint records while a rotation is writing its audit rows', async () => {
     const [{ kid }] = (await signer().getJwks()).keys;
-    const exp = Math.floor(Date.now() / 1000) + 300;
-    const stored = await runInDurableObject(signer(), async (instance, state) => {
-      const inner = instance as unknown as { ring: KeyRing; advance(now: number): Promise<void> };
+    const after = await runInDurableObject(signer(), async (instance, state) => {
       const append = AuditLog.prototype.append;
-      // A mint that read the current key before the rotation finishes in its first await.
+      let minted: TokenSignResult | undefined;
+      // 24 days on, the next call publishes the next key.
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 24 * 24 * 60 * 60 * 1000);
+      // A mint that read the current key before the rotation records its exp in the rotation's
+      // first await.
       vi.spyOn(AuditLog.prototype, 'append').mockImplementationOnce(async function (
         this: AuditLog,
         ...args
       ) {
-        recordSignedExp(inner.ring, kid, exp);
+        clock.mockRestore();
+        minted = await instance.mint(signRequest());
         return await append.apply(this, args);
       });
-      // 24 days on, the rotation publishes the next key.
-      await inner.advance(Date.now() + 24 * 24 * 60 * 60 * 1000);
-      return (await state.storage.get<KeyRing>('token-key-ring'))?.keys;
+      await instance.getJwks();
+      return { minted, keys: (await state.storage.get<KeyRing>('token-key-ring'))?.keys };
     });
-    expect(stored?.map(key => key.state)).toEqual(['current', 'next']);
-    expect(stored?.find(key => key.kid === kid)?.maxExp).toBe(Math.ceil(exp / 60) * 60);
+    if (after.minted?.status !== 'signed') throw new Error('expected the racing mint to sign');
+    const [token] = after.minted.tokens;
+    expect(decodeProtectedHeader(token.token).kid).toBe(kid);
+    expect(after.keys?.map(key => key.state)).toEqual(['current', 'next']);
+    expect(after.keys?.find(key => key.kid === kid)?.maxExp).toBe(
+      Math.ceil(token.expiresAt / 60) * 60
+    );
   });
 });
 

@@ -84,10 +84,8 @@ Vercel workload, and it passed.**
    no deployment claim). Vercel documents separate partitions for `preview` and `production` only,
    so a custom environment such as `staging` may share the preview partition, and any preview
    deployment could then read the staging token. The proof audience is not an STS issuer, so this
-   harness exposes nothing STS accepts. Before the phase 2 slice-4 client caches STS-audience
-   tokens of a custom environment, a proof run checks whether a preview deployment reads an entry
-   a custom-environment deployment wrote; if it does, the client encrypts the entry with a key that
-   only that environment holds.
+   harness exposes nothing STS accepts; the phase 2 slice-4 client encrypts every
+   custom-environment entry (below).
 3. Instance memory, then the Runtime Cache: a hit is used. On a miss, a base token with under 60 s
    left fails the request at once: no exchange, no waiting.
 4. Miss: wait a random 0 to 500 ms, read again.
@@ -103,13 +101,20 @@ Vercel workload, and it passed.**
    without a token, one poller claims again: at most one exchange per 10 seconds per key.
 8. No token after 20 seconds: the request fails, and the caller's STS call fails with it. Every
    cache call, wait and exchange ends at that deadline; one still running is abandoned (the
-   exchange is aborted), so no token arrives later than it.
+   exchange is aborted). A token the exchange returned in time is handed out even when its cache
+   write is cut short, at the deadline at the latest.
 
 **Degraded mode (cache down).** When the marker does not read back (the Runtime Cache throws or
 keeps nothing), the request exchanges itself, once per request; on a 429 in that mode it fails at
 once instead of polling a cache that cannot bring a token. Cost: about 100 requests per 65 s get a
 token, the rest of a cold wave fail fast (no 20 s of function time each), and their STS calls fail
 until the cache is back.
+
+**Carried into the phase 2 slice-4 client.** It encrypts every custom-environment entry,
+whether or not that environment shares the preview partition: AES-GCM under a key only that
+environment holds, with the cache key as associated data, so an entry decrypts only under the key
+it was written for. Its fetches to `oidc.vercel.com` use `redirect: 'error'`, so the base token in
+the request body never follows a redirect.
 
 **Cache cost.** A memory hit reads nothing. A cache hit is 1 read. A miss that reaches the claim is
 4 reads (read, read after the random wait, claim check, read-back) and 1 write (2 for the

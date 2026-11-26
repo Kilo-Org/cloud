@@ -393,10 +393,15 @@ renews the base token during a deployment's life, even mid-wave, so the token it
 key); memory, then the cache, a cached token used until its own `exp` minus 60 seconds whatever
 base token the reader holds; on a miss a random wait and a re-read, then a claim marker so one
 request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
-exchanging again. The cache key is not secret: code that can write the same Runtime Cache
-partition (other deployments of the project in the same scope; a custom environment may share the
-preview partition) can stall a deployment's exchanges, never change which token it presents (the
-reader checks the claims, STS checks the signature); production has its own partition. There is no
+exchanging again. The cache key is not secret and the entry holds the whole exchanged token: code
+that can use the same Runtime Cache partition (other deployments of the project in the same
+environment) can read and present that token and can stall a deployment's exchanges, but cannot
+make a deployment present another deployment's token (the reader checks the claims, STS checks the
+signature). Within one environment a read gains nothing, since STS takes no deployment claim.
+Vercel documents separate partitions only for preview and production, so a custom environment may
+share the preview partition; the phase 2 slice-4 client therefore encrypts every custom-environment
+entry (AES-GCM under a key only that environment holds, the cache key as associated data) and
+fetches `oidc.vercel.com` with `redirect: 'error'`. There is no
 early refresh: the exchanged token keeps the base token's `exp`, so
 exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
 the request at once. When the cache is down (the claim marker does not read back), each request

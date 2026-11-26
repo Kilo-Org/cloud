@@ -13,7 +13,6 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
-import { redactSecretValues } from '@kilocode/web-shared/lib/observability/sentry-secret-patterns';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
@@ -910,6 +909,33 @@ function describeRequestFields(request: unknown): Record<string, string> {
 }
 
 const ERROR_BODY_DIAGNOSTIC_LIMIT = 16 * 1024;
+const UPSTREAM_ERROR_FIELD_LIMIT = 512;
+
+// The error fields that the common provider error schemas (OpenAI, Anthropic,
+// OpenRouter, Google) carry as short identifiers. Free-text fields such as the
+// message are left out: an upstream can echo request input or a credential there.
+const UPSTREAM_ERROR_FIELDS = {
+  type: 'upstreamErrorType',
+  code: 'upstreamErrorCode',
+  param: 'upstreamErrorParam',
+  status: 'upstreamErrorStatus',
+} as const;
+
+function describeUpstreamError(responseText: string): Record<string, string> {
+  const parsed = parseJson(responseText);
+  if (!('value' in parsed) || !isRecord(parsed.value) || !isRecord(parsed.value.error)) {
+    return {};
+  }
+  const error = parsed.value.error;
+  const fields: Record<string, string> = {};
+  for (const [field, name] of Object.entries(UPSTREAM_ERROR_FIELDS)) {
+    const value = error[field];
+    if (typeof value === 'string' || typeof value === 'number') {
+      fields[name] = String(value).slice(0, UPSTREAM_ERROR_FIELD_LIMIT);
+    }
+  }
+  return fields;
+}
 
 // An upstream error body can be very large, so only the prefix the diagnostics
 // use is read and the rest of the stream is cancelled.
@@ -970,15 +996,15 @@ export async function captureProxyError(params: {
         ...describeRequestFields(request),
       };
 
+      // Only the length of the body and allowlisted error fields leave this
+      // process; the body text itself is never sent.
       try {
         const responseText = await readTextPrefix(response.clone(), ERROR_BODY_DIAGNOSTIC_LIMIT);
-        extraErrorData.first4kOfResponse = redactSecretValues(responseText, 4096);
-        const parsed = parseJson(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT));
-        if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
-          const { param, code } = parsed.value.error;
-          if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);
-          if (typeof code === 'string') extraErrorData.upstreamErrorCode = code.slice(0, 512);
-        }
+        extraErrorData.responseBodyReadLength = responseText.length;
+        Object.assign(
+          extraErrorData,
+          describeUpstreamError(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT))
+        );
       } catch {
         // ignore errors when already handling errors...
       }

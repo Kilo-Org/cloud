@@ -6,13 +6,14 @@ import {
   type UtsPatLookupResult,
 } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
+import { type Env, MAX_PAT_LOOKUPS_IN_FLIGHT, patLookupsInFlight, readConfig } from '../../src/env';
 import { handleRequest } from '../../src/http';
 import { LOOKUPS_PER_SECOND_PER_ADDRESS } from '../../src/pat/address-limit';
 import { PatLookup } from '../../src/pat/entrypoint';
 import * as deployed from '../../src/index';
 import * as development from '../../src/dev-index';
 import { createSecret, hexOfHash, secretHash } from '../../src/pat/format';
-import { PAT_LOOKUPS_IN_FLIGHT, type PatRow, lookupPatHash } from '../../src/pat/lookup';
+import { type PatRow, lookupPatHash } from '../../src/pat/lookup';
 import { type PatProbeDeps, handlePatProbe } from '../../src/pat/probe';
 import { storeFailure } from './oauth-support';
 import { config, env } from './test-env';
@@ -38,10 +39,14 @@ describe('the PAT lookup', () => {
     const found = row();
     const seen: Uint8Array[] = [];
     const pat = createSecret('pat');
-    const result = await lookupPatHash(await hashOf(pat), async hash => {
-      seen.push(hash);
-      return found;
-    });
+    const result = await lookupPatHash(
+      await hashOf(pat),
+      async hash => {
+        seen.push(hash);
+        return found;
+      },
+      MAX_PAT_LOOKUPS_IN_FLIGHT
+    );
     expect(result).toEqual({
       status: 'found',
       record: {
@@ -54,7 +59,9 @@ describe('the PAT lookup', () => {
       },
     });
     expect(seen).toEqual([await secretHash(pat)]);
-    expect(await lookupPatHash(await hashOf(pat), async () => null)).toEqual({
+    expect(
+      await lookupPatHash(await hashOf(pat), async () => null, MAX_PAT_LOOKUPS_IN_FLIGHT)
+    ).toEqual({
       status: 'not_found',
     });
     for (const malformed of [
@@ -63,41 +70,79 @@ describe('the PAT lookup', () => {
       'g'.repeat(64),
       await hashOf(pat).then(h => h.toUpperCase()),
     ]) {
-      expect(await lookupPatHash(malformed, async () => found)).toEqual({ status: 'not_found' });
+      expect(await lookupPatHash(malformed, async () => found, MAX_PAT_LOOKUPS_IN_FLIGHT)).toEqual({
+        status: 'not_found',
+      });
     }
   });
 
   it('answers unavailable when the identity store fails, whatever the failure', async () => {
     for (const failure of ['retryable', 'permanent'] as const) {
-      const result = await lookupPatHash(await hashOf(createSecret('pat')), async () => {
-        throw storeFailure(failure);
-      });
+      const result = await lookupPatHash(
+        await hashOf(createSecret('pat')),
+        async () => {
+          throw storeFailure(failure);
+        },
+        MAX_PAT_LOOKUPS_IN_FLIGHT
+      );
       expect(result).toEqual({ status: 'unavailable', retryAfterSeconds: 2 });
     }
   });
 
-  it('runs at most 100 lookups at once and answers rate_limited above that', async () => {
-    const limiter = { inFlight: 0 };
-    const { promise: gate, resolve } = Promise.withResolvers<void>();
-    const hash = await hashOf(createSecret('pat'));
-    const held = Array.from({ length: PAT_LOOKUPS_IN_FLIGHT }, () =>
-      lookupPatHash(
-        hash,
-        async () => {
-          await gate;
-          return row();
-        },
-        limiter
-      )
-    );
-    expect(limiter.inFlight).toBe(PAT_LOOKUPS_IN_FLIGHT);
-    expect(await lookupPatHash(hash, async () => row(), limiter)).toEqual({
-      status: 'rate_limited',
-      retryAfterSeconds: 1,
-    });
-    resolve();
-    expect((await Promise.all(held)).every(result => result.status === 'found')).toBe(true);
-    expect(limiter.inFlight).toBe(0);
+  it.each([
+    ['production', '32', 96],
+    ['staging', '12', 36],
+    ['development', '34', 100],
+  ] as const)(
+    'derives the cap in %s from PAT_LOOKUP_CONNECTIONS %s: %i lookups at once, then rate_limited',
+    async (environment, connections, cap) => {
+      const target: Env = {
+        ...env,
+        UTS_ENVIRONMENT: environment,
+        DO_JURISDICTION: environment === 'development' ? 'none' : 'eu',
+        PAT_LOOKUP_CONNECTIONS: connections,
+      };
+      expect(patLookupsInFlight(target)).toBe(cap);
+      const limiter = { inFlight: 0 };
+      const { promise: gate, resolve } = Promise.withResolvers<void>();
+      const hash = await hashOf(createSecret('pat'));
+      const held = Array.from({ length: cap }, () =>
+        lookupPatHash(
+          hash,
+          async () => {
+            await gate;
+            return row();
+          },
+          patLookupsInFlight(target),
+          limiter
+        )
+      );
+      expect(limiter.inFlight).toBe(cap);
+      expect(
+        await lookupPatHash(hash, async () => row(), patLookupsInFlight(target), limiter)
+      ).toEqual({ status: 'rate_limited', retryAfterSeconds: 1 });
+      resolve();
+      expect((await Promise.all(held)).every(result => result.status === 'found')).toBe(true);
+      expect(limiter.inFlight).toBe(0);
+    }
+  );
+
+  it('refuses to start staging or production without a valid PAT_LOOKUP_CONNECTIONS', () => {
+    for (const environment of ['production', 'staging'] as const) {
+      const missing: Env = {
+        ...env,
+        UTS_ENVIRONMENT: environment,
+        DO_JURISDICTION: 'eu',
+        PAT_LOOKUP_CONNECTIONS: undefined,
+      };
+      expect(() => readConfig(missing)).toThrow(/PAT_LOOKUP_CONNECTIONS/);
+      for (const invalid of ['0', '-3', '12.5', 'twelve', '']) {
+        expect(() => readConfig({ ...missing, PAT_LOOKUP_CONNECTIONS: invalid })).toThrow();
+      }
+    }
+    const development: Env = { ...env, PAT_LOOKUP_CONNECTIONS: undefined };
+    expect(readConfig(development).environment).toBe('development');
+    expect(patLookupsInFlight(development)).toBe(MAX_PAT_LOOKUPS_IN_FLIGHT);
   });
 });
 
@@ -162,7 +207,9 @@ describe('the PAT probe route', () => {
   it('answers whose PAT it is for a live probe PAT', async () => {
     const pat = createSecret('pat');
     const found = row();
-    const deps = probeDeps(async () => lookupPatHash(await hashOf(pat), async () => found));
+    const deps = probeDeps(async () =>
+      lookupPatHash(await hashOf(pat), async () => found, MAX_PAT_LOOKUPS_IN_FLIGHT)
+    );
     const response = await handlePatProbe(
       probeRequest({ Authorization: `Bearer ${pat}`, ...ADDRESS }),
       deps
@@ -189,7 +236,11 @@ describe('the PAT probe route', () => {
     const other = await handlePatProbe(
       probeRequest({ Authorization: `Bearer ${pat}`, ...ADDRESS }),
       probeDeps(async hash =>
-        lookupPatHash(hash, async () => row({ audience: 'gateway', scope: 'gateway:models.read' }))
+        lookupPatHash(
+          hash,
+          async () => row({ audience: 'gateway', scope: 'gateway:models.read' }),
+          MAX_PAT_LOOKUPS_IN_FLIGHT
+        )
       )
     );
     expect(other.status).toBe(403);

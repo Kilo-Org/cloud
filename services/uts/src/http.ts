@@ -7,7 +7,7 @@ import { shardAccessTokenKeys } from './account/bearer';
 import { type AccountDeps, handleAccountRequest } from './account/routes';
 import { identityStoreAccount } from './account/store';
 import { withIdentityStore } from './db/client';
-import { readConfig, type Env, type UtsConfig } from './env';
+import { patLookupsInFlight, readConfig, type Env, type UtsConfig } from './env';
 import { identityStoreBinding } from './grants/binding';
 import { authorizationServerMetadata } from './metadata/authorization-server';
 import { protectedResourceMetadata } from './metadata/protected-resource';
@@ -53,9 +53,10 @@ function probeDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): PatProbe
   const binding = patStoreBinding(env);
   if (binding.kind === 'unprovisioned') return null;
   const store = identityStorePatLookup(binding.connectionString, ctx);
+  const inFlightCap = patLookupsInFlight(env);
   return {
     config,
-    lookup: hash => lookupPatHash(hash, store),
+    lookup: hash => lookupPatHash(hash, store, inFlightCap),
     windows: probeWindows,
     now: Date.now,
   };

@@ -1,6 +1,6 @@
 import type { UtsEnvironment, UtsPatLookupResult } from '@kilocode/uts-contracts';
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { readConfig, type Env } from '../env';
+import { patLookupsInFlight, readConfig, type Env } from '../env';
 import { callerOf } from '../signer-keys';
 import {
   UNSERVED_RETRY_SECONDS,
@@ -44,7 +44,8 @@ export class PatLookup extends WorkerEntrypoint<Env> {
     }
     return await lookupPatHash(
       typeof hash === 'string' ? hash : '',
-      identityStorePatLookup(binding.connectionString, this.ctx)
+      identityStorePatLookup(binding.connectionString, this.ctx),
+      patLookupsInFlight(this.env)
     );
   }
 }

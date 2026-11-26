@@ -35,6 +35,9 @@
     "UTS_ENVIRONMENT": "production",
     // Signer objects hold private keys, so production and staging pin them to the EU.
     "DO_JURISDICTION": "eu",
+    // The PAT lookup Hyperdrive config's connection limit: 20 percent of max_connections 160. The
+    // per-isolate PAT lookup cap is min(100, 3 x this) = 96 (src/env.ts, design 3).
+    "PAT_LOOKUP_CONNECTIONS": "32",
   },
   "durable_objects": {
     "bindings": [
@@ -64,6 +67,8 @@
       "vars": {
         "UTS_ENVIRONMENT": "staging",
         "DO_JURISDICTION": "eu",
+        // The staging PAT lookup config's connection limit; per-isolate cap min(100, 36) = 36.
+        "PAT_LOOKUP_CONNECTIONS": "12",
       },
       "durable_objects": {
         "bindings": [
@@ -83,6 +88,7 @@
         "UTS_ENVIRONMENT": "development",
         // workerd enforces no data residency, so local development keeps objects unscoped.
         "DO_JURISDICTION": "none",
+        "PAT_LOOKUP_CONNECTIONS": "34",
       },
       "durable_objects": {
         "bindings": [

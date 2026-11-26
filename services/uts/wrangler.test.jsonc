@@ -12,6 +12,7 @@
   "vars": {
     "UTS_ENVIRONMENT": "development",
     "DO_JURISDICTION": "none",
+    "PAT_LOOKUP_CONNECTIONS": "34",
   },
   "durable_objects": {
     "bindings": [

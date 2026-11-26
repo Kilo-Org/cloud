@@ -8,13 +8,13 @@ import { hashOfHex } from './format';
  * The PAT lookup at UTS (design 5.2, 7): one `uts.lookup_pat` statement through the PAT
  * Hyperdrive config, which serves nothing else, so a lookup flood cannot starve sign-in. A lookup
  * finds only a live PAT of an active account; `not_found` covers unknown, revoked and expired PATs
- * and PATs of blocked accounts alike. Each mint isolate runs at most 100 lookups at once and
- * answers `rate_limited` above that, before it opens a connection; the PAT config's own connection
- * limit bounds the lookups that reach Postgres at once over all isolates. Sizing rule (design 3):
- * the PAT config has at least 34 connections, so one isolate's 100 is at most 3 times them.
+ * and PATs of blocked accounts alike. Each mint isolate runs at most `inFlightCap` lookups at once
+ * and answers `rate_limited` above that, before it opens a connection; the PAT config's own
+ * connection limit bounds the lookups that reach Postgres at once over all isolates. The cap is
+ * min(100, 3 × `PAT_LOOKUP_CONNECTIONS`) (`patLookupsInFlight` in src/env.ts, design 3), so one
+ * isolate queues at most 3 lookups per PAT config connection.
  */
 
-export const PAT_LOOKUPS_IN_FLIGHT = 100;
 /** Seconds a verifier waits after a `rate_limited` answer. */
 const RATE_LIMITED_RETRY_SECONDS = 1;
 /** Seconds a verifier waits after the identity store failed. */
@@ -71,14 +71,18 @@ export function identityStorePatLookup(
     });
 }
 
-/** The answer for `hash`, the lowercase-hex SHA-256 of the whole PAT. */
+/**
+ * The answer for `hash`, the lowercase-hex SHA-256 of the whole PAT, with at most `inFlightCap`
+ * lookups of this isolate in flight.
+ */
 export async function lookupPatHash(
   hash: string,
   store: PatLookupStore,
+  inFlightCap: number,
   limiter: LookupLimiter = ISOLATE_LIMITER
 ): Promise<UtsPatLookupResult> {
   if (!PatHashSchema.safeParse(hash).success) return { status: 'not_found' };
-  if (limiter.inFlight >= PAT_LOOKUPS_IN_FLIGHT) {
+  if (limiter.inFlight >= inFlightCap) {
     return { status: 'rate_limited', retryAfterSeconds: RATE_LIMITED_RETRY_SECONDS };
   }
   limiter.inFlight += 1;

@@ -259,8 +259,9 @@ a query answers `invalid_target`.
 - `PatLookup` (`src/pat/entrypoint.ts`) is the lookup port of `@kilocode/verify` for Worker
   verifiers: the lowercase-hex SHA-256 in, `found`, `not_found`, `rate_limited` or `unavailable`
   out (`UtsPatLookupResultSchema`). It answers only callers its environment lists
-  (`PAT_LOOKUP_CALLERS`), runs at most 100 lookups at once per isolate, and sends one statement
-  through the PAT config.
+  (`PAT_LOOKUP_CALLERS`), runs at most min(100, 3 × `PAT_LOOKUP_CONNECTIONS`) lookups at once per
+  isolate (see "Deploys"), and sends one statement through the PAT config. The probe route uses the
+  same cap.
 - The scope registry is `UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`; `test/repo` checks every
   entry against the rules of design 5.3 (no PAT carries a privileged, step-up, staff,
   credential-changing or session-bound scope; a privileged scope needs a step-up and lives at most
@@ -362,10 +363,13 @@ the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` dep
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
 order). A change to only one of them deploys in the matrix.
 
-Provisioning the identity store's Hyperdrive configs for an environment: the PAT lookup config
-(`IDENTITY_STORE_PAT`) needs at least 34 connections, so that one isolate's 100 lookups in flight
-are at most 3 times its connections (design 3, "PAT lookups"). At 20 percent of
-`max_connections`, that is a database with `max_connections` of 170 or more.
+Provisioning the identity store's Hyperdrive configs for an environment: the mint Worker's var
+`PAT_LOOKUP_CONNECTIONS` holds the PAT lookup config's (`IDENTITY_STORE_PAT`) connection limit, and
+each isolate runs at most min(100, 3 × `PAT_LOOKUP_CONNECTIONS`) PAT lookups at once
+(`patLookupsInFlight` in `src/env.ts`, design 3, "PAT lookups"). Staging sets 12 (cap 36);
+production sets 32 (cap 96), the PAT config's 20 percent of `max_connections` 160. A change to the
+config's connection limit changes the var in the same deploy. Staging and production refuse to
+start without a valid var; development may leave it out (cap 100).
 
 ## Identity store
 

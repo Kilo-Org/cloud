@@ -3197,7 +3197,7 @@ describe('api_request_log_2 storage', () => {
       scan: 'blocking',
       part: 'conversation',
       request: {
-        text: 'curl -H "Authorization: Bearer sk-secret"',
+        text: 'curl -H "Authorization: Bearer kilo_0123456789abcdef"',
         detectors: {},
         user_metadata: { organization_id: organizationId },
       },
@@ -3214,7 +3214,7 @@ describe('api_request_log_2 storage', () => {
           kind: 'responses',
           body: {
             model: 'kilo-internal/my-model',
-            input: 'curl -H "Authorization: Bearer sk-secret"',
+            input: 'curl -H "Authorization: Bearer kilo_0123456789abcdef"',
             tools: [
               {
                 type: 'mcp',
@@ -3236,7 +3236,7 @@ describe('api_request_log_2 storage', () => {
       },
       enkrypt: [{ request: { text: 'curl -H "Authorization: Bearer [redacted]"' } }],
     });
-    expect(call.request.text).toBe('curl -H "Authorization: Bearer sk-secret"');
+    expect(call.request.text).toBe('curl -H "Authorization: Bearer kilo_0123456789abcdef"');
     expect(logging.request.body).toMatchObject({ tools: [{ authorization: 'mcp-token' }] });
   });
 

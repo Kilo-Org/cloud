@@ -129,7 +129,7 @@ async function firstPartyGrant(): Promise<{ refreshToken: string; grantId: strin
     redirect_uri: CALLBACK,
     code_challenge: createHash('sha256').update(verifier).digest('base64url'),
     code_challenge_method: 'S256',
-    scope: 'gateway:models.read',
+    scope: 'kilo-api:profile.read',
     state: 'feed-e2e',
     dpop_jkt: device.jkt,
   })) {

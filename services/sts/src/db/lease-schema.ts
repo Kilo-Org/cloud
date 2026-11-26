@@ -34,8 +34,9 @@ export const lease = sqliteTable(
     /** When the row stopped counting: revoked, failed, or (unset) at `expiresAt`. */
     endedAt: integer('ended_at'),
     /**
-     * Set while a revocation is owed and Infisical could not be reached: the alarm retries it until
-     * it succeeds or the lease expires. The cause its `lease.revoked` rows carry.
+     * Set while a revocation is owed and Infisical has not confirmed it: the alarm retries it until
+     * Infisical does, for at most a day past the lease's expiry. The cause its `lease.revoked` rows
+     * carry.
      */
     revokeCause: text('revoke_cause').$type<LeaseRevokeCause>(),
     /**

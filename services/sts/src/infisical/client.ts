@@ -57,7 +57,26 @@ export type LeaseCreation =
   | { status: 'created'; leaseId: string; expiresAt: number; username: string; password: string }
   | { status: 'unreachable'; detail: string; retryAfterMs: number | null };
 
-/** `gone`: Infisical no longer has the lease (it expired, or was revoked before). */
+/**
+ * What Infisical answers a lease revocation with: the lease row it deleted, or, when the revocation
+ * statement failed, the row it kept with `status` "Failed to delete" (still HTTP 200; Infisical
+ * retries it itself every few hours). Only `status` and the id are read; `statusDetails` holds the
+ * database error and is never kept.
+ */
+const LeaseRevokedSchema = z.object({
+  lease: z.object({ id: z.string(), status: z.string().nullish() }),
+});
+
+/** The 404 Infisical answers for a lease it does not have; other 404s are a misconfiguration. */
+const LeaseNotFoundSchema = z.object({
+  message: z.string().regex(/^Dynamic secret lease with ID '[^']*' not found$/),
+});
+
+/**
+ * `revoked`: Infisical ran the revocation statement and deleted the lease. `gone`: Infisical no
+ * longer has the lease (it expired and Infisical revoked it, or it was revoked before). Anything
+ * else, a 200 that reports the lease kept included, is `unreachable`: the revocation stays owed.
+ */
 export type LeaseRevocation =
   | { status: 'revoked' }
   | { status: 'gone' }
@@ -259,7 +278,13 @@ export class InfisicalClient {
     }
   }
 
-  /** Revokes one lease: Infisical runs the revocation statement, then forgets the lease. */
+  /**
+   * Revokes one lease: Infisical runs the revocation statement, then deletes the lease. Success is
+   * only a 200 whose lease row carries no failure status, or the 404 Infisical answers for a lease it
+   * no longer has. A 200 with a status (a row that stayed after an earlier failure included: the
+   * next attempt then gets the 404), a malformed body or any other 404 keeps the revocation owed.
+   * No body is logged.
+   */
   async revokeLease(secret: DynamicSecretRef, leaseId: string): Promise<LeaseRevocation> {
     try {
       const response = await this.managerCall(
@@ -267,12 +292,22 @@ export class InfisicalClient {
         `/api/v1/dynamic-secrets/leases/${encodeURIComponent(leaseId)}`,
         { method: 'DELETE', body: this.leaseScope(secret) }
       );
+      const body: unknown = await response.json().catch(() => null);
       if (response.status === 404) {
-        await response.body?.cancel();
-        return { status: 'gone' };
+        if (LeaseNotFoundSchema.safeParse(body).success) return { status: 'gone' };
+        throw unreachableFor(response, 'lease revoke');
       }
       if (!response.ok) throw unreachableFor(response, 'lease revoke');
-      await response.body?.cancel();
+      const parsed = LeaseRevokedSchema.safeParse(body);
+      if (!parsed.success || parsed.data.lease.id !== leaseId) {
+        throw new ManagerUnreachableError('manager lease revoke response did not match', null);
+      }
+      if (parsed.data.lease.status != null) {
+        throw new ManagerUnreachableError(
+          'manager kept the lease: its revocation statement failed',
+          null
+        );
+      }
       return { status: 'revoked' };
     } catch (error) {
       return unreachableOutcome(error);

@@ -28,6 +28,7 @@ import {
   LEASE_CREATES_PER_MINUTE,
   LEASE_EXPIRY_TOLERANCE_MS,
   LEASE_RETRY_AFTER_SECONDS,
+  LEASE_REVOKE_CLEANUP_MS,
   LEASE_REVOKE_RETRIES_PER_ALARM,
   LEASE_REVOKE_RETRY_MS,
   LEASE_ROW_RETENTION_MS,
@@ -136,9 +137,10 @@ function errorName(error: unknown): string {
  * password), enforces each workload's active and per-minute limits, and owns the
  * `sts:<environment>:leases` audit stream. A lease is returned only with its `lease.created` row
  * committed; one STS cannot hand over (too late, an unexpected expiry, or a failed audit append) is
- * revoked at once. A revocation Infisical cannot take is audited as `revoke_failed` and retried by
- * the alarm until it succeeds or the lease expires. Leases are few (a few hundred a day), so one
- * object serves the environment.
+ * revoked at once. A revocation Infisical does not confirm is audited as `revoke_failed` and retried
+ * by the alarm until Infisical confirms it, also after the lease expired (expiry stops new logins,
+ * not open sessions), for at most a day past the expiry; then it is audited as `unconfirmed` and
+ * logged as an error. Leases are few (a few hundred a day), so one object serves the environment.
  */
 export class LeaseDO extends DurableObject<Env> {
   private readonly config: StsConfig;
@@ -297,7 +299,9 @@ export class LeaseDO extends DurableObject<Env> {
   /**
    * Revokes one of the caller's own leases. A lease id STS never handed to this workload is
    * `not_found`, whoever holds it, and so is a GitHub run's lease asked for by another run. A lease
-   * of the caller's that already ended answers `revoked` without a manager call.
+   * STS already revoked answers `revoked` without a manager call; an expired one still goes to
+   * Infisical, since expiry alone does not end an open session (Infisical answers 404 once its own
+   * expiry revocation succeeded).
    */
   async revoke(raw: LeaseRevokeRequest): Promise<LeaseRevokeOutcome> {
     const input = LeaseRevokeRequestSchema.parse(raw);
@@ -316,7 +320,7 @@ export class LeaseDO extends DurableObject<Env> {
     if (row.runId !== null && row.runId !== (input.caller.run?.runId ?? null)) {
       return { status: 'not_found', reason: 'other_run' };
     }
-    if (row.state === 'revoked' || row.expiresAt <= Date.now()) return { status: 'revoked' };
+    if (row.state === 'revoked') return { status: 'revoked' };
 
     if (row.revokeCause === null) {
       // Owed from now on: the alarm retries it if Infisical cannot take it.
@@ -345,13 +349,17 @@ export class LeaseDO extends DurableObject<Env> {
     }
     await this.retryOwedRevocations();
     const now = Date.now();
+    await this.stopUnconfirmedRevocations(now);
     this.audit.pruneIfDue(now);
     this.db
       .delete(schema.lease)
       .where(
-        lt(
-          sql`coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt})`,
-          now - LEASE_ROW_RETENTION_MS
+        and(
+          isNull(schema.lease.revokeCause),
+          lt(
+            sql`coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt})`,
+            now - LEASE_ROW_RETENTION_MS
+          )
         )
       )
       .run();
@@ -433,12 +441,13 @@ export class LeaseDO extends DurableObject<Env> {
     const result: LeaseRevocationResult =
       revocation.status === 'unreachable' ? 'revoke_failed' : revocation.status;
     if (revocation.status === 'unreachable') {
-      console.error('sts: lease revocation failed; the lease object retries it', {
-        workload: row.workload,
-        grant: row.grant,
-        cause,
-        detail: revocation.detail,
-      });
+      const expired = row.expiresAt <= Date.now();
+      console.error(
+        expired
+          ? 'sts: lease revocation still unconfirmed after the lease expired; its sessions may still be open, the lease object retries it'
+          : 'sts: lease revocation failed; the lease object retries it',
+        { workload: row.workload, grant: row.grant, cause, detail: revocation.detail }
+      );
       if (revocation.retryAfterMs !== null && revocation.retryAfterMs > LEASE_REVOKE_RETRY_MS) {
         this.setRevokeRetryAt(row.slot, Date.now() + revocation.retryAfterMs);
       }
@@ -489,8 +498,9 @@ export class LeaseDO extends DurableObject<Env> {
   }
 
   /**
-   * The owed revocations of unexpired leases (Infisical drops an expired one itself) that are due
-   * by `dueBy`, least recently tried first.
+   * The owed revocations that are due by `dueBy`, least recently tried first: those of unexpired
+   * leases and of leases that expired less than `LEASE_REVOKE_CLEANUP_MS` ago, since expiry ends no
+   * open session.
    */
   private owedRevocations(now: number, dueBy: number, limit: number): LeaseRow[] {
     return this.db
@@ -501,7 +511,7 @@ export class LeaseDO extends DurableObject<Env> {
           isNotNull(schema.lease.revokeCause),
           isNotNull(schema.lease.leaseId),
           inArray(schema.lease.state, ['active', 'failed']),
-          gt(schema.lease.expiresAt, now),
+          gt(schema.lease.expiresAt, now - LEASE_REVOKE_CLEANUP_MS),
           or(isNull(schema.lease.revokeRetryAt), lte(schema.lease.revokeRetryAt, dueBy))
         )
       )
@@ -518,6 +528,57 @@ export class LeaseDO extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Stops the owed revocations whose lease expired `LEASE_REVOKE_CLEANUP_MS` ago with no attempt
+   * confirmed: each gets a `lease.revoked` row with result `unconfirmed` and an error log, for a
+   * person to end the role's sessions by hand. One whose row cannot be written stays owed, and the
+   * next alarm tries the row again.
+   */
+  private async stopUnconfirmedRevocations(now: number): Promise<void> {
+    const rows = this.db
+      .select()
+      .from(schema.lease)
+      .where(
+        and(
+          isNotNull(schema.lease.revokeCause),
+          isNotNull(schema.lease.leaseId),
+          lte(schema.lease.expiresAt, now - LEASE_REVOKE_CLEANUP_MS)
+        )
+      )
+      .all();
+    for (const row of rows) {
+      if (row.leaseId === null || row.revokeCause === null) continue;
+      console.error(
+        'sts: lease revocation unconfirmed a day after the lease expired; the lease object stopped retrying, end the role sessions by hand',
+        { workload: row.workload, grant: row.grant, cause: row.revokeCause, leaseId: row.leaseId }
+      );
+      try {
+        await this.audit.append(
+          this.stream,
+          leaseRevokedEvent({
+            environment: this.config.environment,
+            caller: CallerSchema.parse(JSON.parse(row.caller)),
+            grant: row.grant,
+            leaseId: row.leaseId,
+            cause: row.revokeCause,
+            result: 'unconfirmed',
+          })
+        );
+      } catch (error) {
+        console.error('sts: lease revocation audit append failed', {
+          workload: row.workload,
+          reason: errorName(error),
+        });
+        continue;
+      }
+      this.db
+        .update(schema.lease)
+        .set({ endedAt: now, revokeCause: null, revokeRetryAt: null })
+        .where(eq(schema.lease.slot, row.slot))
+        .run();
+    }
+  }
+
   private end(slot: number, state: 'failed' | 'revoked', at: number): void {
     this.db
       .update(schema.lease)
@@ -526,15 +587,20 @@ export class LeaseDO extends DurableObject<Env> {
       .run();
   }
 
-  /** The earliest time a lease row is due for deletion, or null for none. */
-  private nextRowPruneAt(): number | null {
+  /**
+   * The earliest time a lease row is due for deletion, or for an owed revocation to stop (a day
+   * after its lease expired), or null for none.
+   */
+  private nextRowDueAt(): number | null {
     const row = this.db
       .select({
-        end: sql<number | null>`min(coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt}))`,
+        prune: sql<
+          number | null
+        >`min(case when ${schema.lease.revokeCause} is null then coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt}) + ${LEASE_ROW_RETENTION_MS} else ${schema.lease.expiresAt} + ${LEASE_REVOKE_CLEANUP_MS} end)`,
       })
       .from(schema.lease)
       .get();
-    return row === undefined || row.end === null ? null : row.end + LEASE_ROW_RETENTION_MS;
+    return row === undefined || row.prune === null ? null : row.prune;
   }
 
   private async scheduleAlarm(now: number, failed: boolean): Promise<void> {
@@ -549,8 +615,8 @@ export class LeaseDO extends DurableObject<Env> {
       const due = nextRevocation.revokeRetryAt ?? now;
       target = Math.min(target, Math.max(now + 1_000, due));
     }
-    const rowPrune = this.nextRowPruneAt();
-    if (rowPrune !== null) target = Math.min(target, Math.max(now + 1_000, rowPrune));
+    const rowDue = this.nextRowDueAt();
+    if (rowDue !== null) target = Math.min(target, Math.max(now + 1_000, rowDue));
     if (target === Number.POSITIVE_INFINITY) return;
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > target || current < now) {

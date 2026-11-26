@@ -98,6 +98,7 @@ beforeAll(async () => {
       vars: {
         STS_CANARY_ENABLED: 'true',
         STS_URL: base,
+        STS_ENVIRONMENT: 'production',
         WEB_STS_CANARY_URL: `${base}/api/internal/sts-canary`,
         // Node exports `alg: "Ed25519"`, which workerd's importKey refuses for an Ed25519 key.
         TEST_SIGNING_JWK: JSON.stringify({

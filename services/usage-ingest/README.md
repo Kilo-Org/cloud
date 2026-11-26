@@ -802,9 +802,10 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
    `StsCanaryCheckFailed` or `StsCanaryNotConfigured`. No token appears in any log line.
 
 `POST /sts-canary/verify` is matched before the publish routes and their 404 guard. It verifies
-the bearer token with `@kilocode/verify` (issuer `STS_URL`, audience `usage-ingest`, scope
-`usage-ingest:sts.canary`, key set from `STS_URL` over HTTPS) and answers 204 or the section 7
-refusal (401 `invalid_token`, 403 `insufficient_scope`, 503 `temporarily_unavailable`). Each
+the bearer token with `@kilocode/verify` (issuer `STS_URL`, environment `STS_ENVIRONMENT`,
+audience `usage-ingest`, scope `usage-ingest:sts.canary`, key set from `STS_URL` over HTTPS) and
+answers 204 or the section 7 refusal (401 `invalid_token`, 403 `insufficient_scope`, 503
+`temporarily_unavailable`; 503 also while `STS_URL` or `STS_ENVIRONMENT` is not configured). Each
 outcome logs `sts_canary_verify_accepted` or `sts_canary_verify_refused` (status, error, reason,
 the run id), never the token. The route works whether or not the flag is on.
 
@@ -812,6 +813,7 @@ the run id), never the token. The route works whether or not the flag is on.
 |---|---|---|
 | `STS_CANARY_ENABLED` | `"false"` | `"false"` |
 | `STS_URL` | `https://sts.kiloapps.io` | `https://sts-staging.kiloapps.io` |
+| `STS_ENVIRONMENT` | `"production"` | `"staging"` |
 | `WEB_STS_CANARY_URL` | `https://app.kilo.ai/api/internal/sts-canary` | `https://staging-app.kilo.ai/api/internal/sts-canary` |
 
 Binding STS turns `observability.traces` off in every block (see [Observability](#observability));

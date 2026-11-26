@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCache } from '@vercel/functions';
-import { STS_CANARY_VERIFY_PATH } from '@kilocode/sts-contracts';
+import { STS_CANARY_VERIFY_PATH, STS_ENVIRONMENTS, STS_ISSUERS } from '@kilocode/sts-contracts';
 import { createHttpServiceTokens } from '@kilocode/service-token-client';
 import { vercelIdentity } from '@kilocode/service-token-client/vercel';
 import { createVerifier, httpJwksSource } from '@kilocode/verify';
@@ -26,17 +26,20 @@ let handler: ((request: Request) => Promise<Response>) | null = null;
 /**
  * Built on the first request, once per instance, so the verifier's key set, the token client's
  * tokens and the shared Vercel identity serve every later request. A missing or invalid setting
- * leaves it unbuilt and answers 503.
+ * leaves it unbuilt and answers 503; so does an `STS_URL` that is not one of `STS_ISSUERS`, since
+ * the environment the verifier accepts is the one whose STS that is.
  */
 function canaryHandler(): ((request: Request) => Promise<Response>) | null {
   if (handler !== null) return handler;
   const verifyUrl = usageIngestSiblingUrl(USAGE_INGEST_URL, STS_CANARY_VERIFY_PATH);
-  if (!STS_URL || verifyUrl === undefined) return null;
+  const environment = STS_ENVIRONMENTS.find(name => STS_ISSUERS[name] === STS_URL);
+  if (verifyUrl === undefined || environment === undefined) return null;
   const waitUntil = (promise: Promise<unknown>) => after(promise);
   try {
     handler = createStsCanaryHandler({
       verifier: createVerifier({
         audience: 'web',
+        environment,
         // RFC 9728 metadata URL of this app, from configuration, never from a request's Host; it
         // appears only in 401 challenges.
         resourceMetadataUrl: `${new URL(APP_URL).origin}/.well-known/oauth-protected-resource`,
@@ -66,7 +69,10 @@ export async function POST(request: NextRequest): Promise<Response> {
   const canary = canaryHandler();
   if (canary === null) {
     return NextResponse.json(
-      { error: 'sts canary is not configured: STS_URL and USAGE_INGEST_URL are required' },
+      {
+        error:
+          'sts canary is not configured: USAGE_INGEST_URL and an STS_URL from STS_ISSUERS are required',
+      },
       { status: 503, headers: { 'cache-control': 'no-store' } }
     );
   }

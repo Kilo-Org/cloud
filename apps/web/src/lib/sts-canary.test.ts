@@ -50,6 +50,7 @@ async function stsToken(workload: string, audience: string, scope: string): Prom
 function verifierFor(audience: string) {
   return createVerifier({
     audience,
+    environment: 'production',
     resourceMetadataUrl: `https://${audience}.test/.well-known/oauth-protected-resource`,
     sts: { issuer: STS, jwks: async () => jwks },
   });

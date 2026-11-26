@@ -39,6 +39,8 @@
     // STS canary switch: exactly "true" runs the 5-minute canary; anything else skips it.
     "STS_CANARY_ENABLED": "false",
     "STS_URL": "https://sts.kiloapps.io",
+    // The one `env` claim the STS canary verify route accepts; matches STS_URL's environment.
+    "STS_ENVIRONMENT": "production",
     "WEB_STS_CANARY_URL": "https://app.kilo.ai/api/internal/sts-canary",
   },
   "queues": {
@@ -101,6 +103,7 @@
         "USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED": "true",
         "STS_CANARY_ENABLED": "false",
         "STS_URL": "https://sts-staging.kiloapps.io",
+        "STS_ENVIRONMENT": "staging",
         "WEB_STS_CANARY_URL": "https://staging-app.kilo.ai/api/internal/sts-canary",
       },
       "triggers": { "crons": ["*/5 * * * *"] },

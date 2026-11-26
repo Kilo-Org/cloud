@@ -294,6 +294,44 @@ describe('uts.advance_audit_watermark', () => {
     }
   });
 
+  it('refuses a committed row behind an older open transaction until that transaction ends', async () => {
+    const shard = 7;
+    // Session A takes its transaction id first, so it is older than the row B commits.
+    const older = await db.connect('uts_app_a');
+    await older.query('BEGIN');
+    await older.query('SELECT pg_current_xact_id()');
+    try {
+      await insertIntoShard(app, shard, 1);
+      const pending = await owner.query<{ txid: bigint; id: bigint; last_seq: bigint }>(
+        `SELECT event.txid, event.id, watermark.last_seq
+         FROM uts.audit_relay_watermarks AS watermark
+         JOIN uts.audit_events AS event ON event.shard = watermark.shard
+           AND (event.txid, event.id) > (watermark.last_txid, watermark.last_id)
+         WHERE watermark.shard = $1
+         ORDER BY event.txid, event.id`,
+        [shard]
+      );
+      const target = pending.rows[pending.rows.length - 1];
+      const fromSeq = Number(target.last_seq);
+      const toSeq = fromSeq + pending.rows.length;
+
+      expect(await sqlStateOf(() => advance(shard, fromSeq, target, toSeq))).toBe(
+        INVALID_PARAMETER
+      );
+
+      await older.query('COMMIT');
+      // Other test files' transactions can hold the server-wide horizon a little longer.
+      await vi.waitFor(
+        async () => {
+          expect((await advance(shard, fromSeq, target, toSeq)).rows).toEqual([{ advanced: true }]);
+        },
+        { timeout: 30_000, interval: 200 }
+      );
+    } finally {
+      await older.query('ROLLBACK').catch(() => undefined);
+    }
+  }, 35_000);
+
   it('turns a move without a send into a sequence gap the archive refuses', async () => {
     const shard = 3;
     const stream = auditStreamName('development', shard);

@@ -378,11 +378,22 @@ audit queue `kilo-audit-uts[-staging|-local]` (halving any batch the encoder ref
 message stays under 60 KB), and moves the watermark after each message the queue accepted, only
 from the `last_seq` it read. Only UTS sends to that queue, so the audit relay service accepts only
 the 8 `uts:<environment>:<shard>` streams from it (design decision Q66). A run reads at most 10
-times; one that reached that budget runs again at once. A failed run leaves the watermark in place
-and retries after 5 seconds doubling to 60. The object keeps its count of failed runs in a row in
-its storage, so the backoff holds when the runtime evicts it between alarms; a good run deletes
-the count. A batch the queue took before a failure is sent again under the same sequence numbers,
-and the audit relay service dedupes it against its archive, so a shard has no gap and no lost row.
+times; one that reached that budget runs again at once. A failed run leaves the watermark in place.
+What comes next depends on the failure (`src/audit/relay-schedule.ts`):
+
+- **Retryable** (a connection, lock or statement timeout, or a queue send that threw): the next run
+  waits 5 seconds, doubling per failed run in a row up to 60.
+- **Permanent** (the database refused a statement, or a single row does not fit a message): the
+  next run waits 60 seconds at once. The run logs `uts.audit_relay.failed` with
+  `failure: "permanent"`, which pages; retrying sooner cannot help.
+- **Superseded** (another runner moved the watermark first, as during an overlapping deploy):
+  nothing failed, so the next run comes after the usual 5 seconds, the failure count stays as it
+  was, and the run logs only a `uts.audit_relay.superseded` warning.
+
+The object keeps its count of failed runs in a row in its storage, so the backoff holds when the
+runtime evicts it between alarms; a good run deletes the count. A batch the queue took before a
+failure is sent again under the same sequence numbers, and the audit relay service dedupes it
+against its archive, so a shard has no gap and no lost row.
 
 The watermark moves only through `uts.advance_audit_watermark()` (migration 0007, SECURITY
 DEFINER); the app login has no UPDATE on the watermarks. The function locks the shard's row and
@@ -423,13 +434,16 @@ partition's (`shard`, `txid`, `id`) index and the read never touches a relayed r
 filters on the watermark instead walks every relayed row of the shard on each read.
 
 The minute cron (`src/scheduled.ts`) arms the 8 relay objects and, on one connection, runs
-partition maintenance, OAuth row maintenance and the lag check. It does nothing while
-`IDENTITY_STORE` is unbound. Its error log lines are the alert signals for an Axiom monitor:
+partition maintenance, the partition alerts, OAuth row maintenance and the lag check
+(`src/audit/maintenance.ts`). Each step logs its own failure and the next step still runs, so a
+partition call that gives up still leaves the kept-partition alerts and the runway check to run.
+It does nothing while `IDENTITY_STORE` is unbound. Its error log lines are the alert signals for
+an Axiom monitor:
 
 | Log event | Meaning |
 |---|---|
 | `uts.audit_relay.lagging` | A shard's first unrelayed row is over 60 seconds old (`shard`, `ageSeconds`) |
-| `uts.audit_relay.failed` | A relay run failed (`stream`, `failure`, `failedRuns`, `retryInMs`) |
+| `uts.audit_relay.failed` | A relay run failed (`stream`, `failure`: `retryable` or `permanent`, `reason`, `failedRuns`, `retryInMs`) |
 | `uts.audit_relay.not_started` | The cron could not arm a shard's relay object |
 | `uts.audit_partitions.kept_unrelayed` | A partition past the 7-day tier still holds an unrelayed row |
 | `uts.audit_partitions.runway_short` | Fewer than today's and the next 7 days' partitions exist |

@@ -2,22 +2,17 @@ import { encodeAuditBatch } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { identityStoreOutbox } from '../audit/outbox';
+import { auditStreamName, relayShard, type RelayRunResult } from '../audit/relay';
 import {
-  AuditRowTooLargeError,
-  auditStreamName,
-  relayShard,
-  WatermarkMovedError,
-  type RelayRunResult,
-} from '../audit/relay';
-import { IdentityStoreError, withIdentityStore } from '../db/client';
+  classifyRelayFailure,
+  nextRelayRun,
+  type NextRelayRun,
+  type RelayRunOutcome,
+} from '../audit/relay-schedule';
+import { withIdentityStore } from '../db/client';
 import { readConfig, type Env, type UtsConfig } from '../env';
 import { identityStoreBinding } from '../grants/binding';
 import { auditShardOfObjectId } from './stubs';
-
-/** A run that found nothing, or sent everything it found, runs again after this (design 8.1). */
-export const RELAY_INTERVAL_MS = 5_000;
-/** After a retryable failure: 5 s doubling per failed run, capped here. */
-export const RELAY_MAX_BACKOFF_MS = 60_000;
 
 /**
  * The count of failed runs in a row lives in storage, not memory: the runtime evicts an idle
@@ -32,33 +27,44 @@ type Phase =
   | { status: 'relaying'; shard: number; stream: string }
   | { status: 'refused'; reason: string };
 
-/** What a run's failure means for the next run. */
-type Failure =
-  | { kind: 'retryable'; reason: string }
-  | { kind: 'superseded' }
-  | { kind: 'permanent'; reason: string };
-
-function classify(error: unknown): Failure {
-  if (error instanceof WatermarkMovedError) return { kind: 'superseded' };
-  if (error instanceof AuditRowTooLargeError) return { kind: 'permanent', reason: error.name };
-  if (error instanceof IdentityStoreError) {
-    const reason = error.message;
-    return error.failure === 'retryable'
-      ? { kind: 'retryable', reason }
-      : { kind: 'permanent', reason };
+function logOutcome(stream: string, outcome: RelayRunOutcome, next: NextRelayRun): void {
+  if (outcome.kind === 'ran') {
+    if (outcome.result.sent === 0) return;
+    console.log(
+      JSON.stringify({
+        event: 'uts.audit_relay.sent',
+        stream,
+        rows: outcome.result.sent,
+        status: outcome.result.status,
+      })
+    );
+    return;
   }
-  // A queue send that threw: the queue may or may not hold the message, and a resend is deduped.
-  return { kind: 'retryable', reason: error instanceof Error ? error.name : 'unknown' };
+  const { failure } = outcome;
+  if (failure.kind === 'superseded') {
+    console.warn(JSON.stringify({ event: 'uts.audit_relay.superseded', stream }));
+    return;
+  }
+  console.error(
+    JSON.stringify({
+      event: 'uts.audit_relay.failed',
+      stream,
+      failure: failure.kind,
+      reason: failure.reason,
+      failedRuns: next.failedRuns,
+      retryInMs: next.delayMs,
+    })
+  );
 }
 
 /**
  * The relay for one audit shard, named `<environment>:audit-relay:<0-7>`, in the `eu`
  * jurisdiction like every UTS object. Its alarm is the relay loop: a run every 5 seconds, at once
- * again after a run that stopped at its read budget, and with backoff after a failure. One object
- * owns each shard; the watermark's compare-and-set keeps a shard correct even if two runs overlap
- * across a deploy. It stores only its count of failed runs in a row; the watermark lives in the
- * identity store. The cron (`src/scheduled.ts`) calls `ensureStarted` every minute, which arms a
- * missing alarm.
+ * again after a run that stopped at its read budget, and with backoff after a failure
+ * (`src/audit/relay-schedule.ts`). One object owns each shard; the watermark's compare-and-set
+ * keeps a shard correct even if two runs overlap across a deploy. It stores only its count of
+ * failed runs in a row; the watermark lives in the identity store. The cron (`src/scheduled.ts`)
+ * calls `ensureStarted` every minute, which arms a missing alarm.
  */
 export class UtsAuditRelayDO extends DurableObject<Env> {
   readonly #config: UtsConfig;
@@ -95,46 +101,18 @@ export class UtsAuditRelayDO extends DurableObject<Env> {
     if (binding.kind === 'unprovisioned') return;
 
     const failedBefore = FailedRunsSchema.parse((await this.ctx.storage.get(FAILED_RUNS_KEY)) ?? 0);
-    let delay: number;
+    let outcome: RelayRunOutcome;
     try {
-      const result = await this.#run(phase, binding.connectionString);
-      if (failedBefore > 0) await this.ctx.storage.delete(FAILED_RUNS_KEY);
-      delay = result.status === 'more' ? 0 : RELAY_INTERVAL_MS;
-      if (result.sent > 0) {
-        console.log(
-          JSON.stringify({
-            event: 'uts.audit_relay.sent',
-            stream: phase.stream,
-            rows: result.sent,
-            status: result.status,
-          })
-        );
-      }
+      outcome = { kind: 'ran', result: await this.#run(phase, binding.connectionString) };
     } catch (error) {
-      const failure = classify(error);
-      if (failure.kind === 'superseded') {
-        console.warn(JSON.stringify({ event: 'uts.audit_relay.superseded', stream: phase.stream }));
-        delay = RELAY_INTERVAL_MS;
-      } else {
-        const failedRuns = failedBefore + 1;
-        await this.ctx.storage.put(FAILED_RUNS_KEY, failedRuns);
-        delay =
-          failure.kind === 'permanent'
-            ? RELAY_MAX_BACKOFF_MS
-            : Math.min(RELAY_INTERVAL_MS * 2 ** Math.min(failedRuns - 1, 16), RELAY_MAX_BACKOFF_MS);
-        console.error(
-          JSON.stringify({
-            event: 'uts.audit_relay.failed',
-            stream: phase.stream,
-            failure: failure.kind,
-            reason: failure.reason,
-            failedRuns,
-            retryInMs: delay,
-          })
-        );
-      }
+      outcome = { kind: 'failed', failure: classifyRelayFailure(error) };
     }
-    await this.ctx.storage.setAlarm(Date.now() + delay);
+    const next = nextRelayRun(outcome, failedBefore);
+    if (next.failedRuns === 0 && failedBefore > 0) await this.ctx.storage.delete(FAILED_RUNS_KEY);
+    if (next.failedRuns > failedBefore)
+      await this.ctx.storage.put(FAILED_RUNS_KEY, next.failedRuns);
+    logOutcome(phase.stream, outcome, next);
+    await this.ctx.storage.setAlarm(Date.now() + next.delayMs);
   }
 
   async #run(

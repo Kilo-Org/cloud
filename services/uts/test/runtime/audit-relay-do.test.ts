@@ -1,12 +1,45 @@
 import { runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
+import { RELAY_INTERVAL_MS, RELAY_MAX_BACKOFF_MS } from '../../src/audit/relay-schedule';
 import { getAuditRelayStub } from '../../src/dos/stubs';
-import {
-  RELAY_INTERVAL_MS,
-  RELAY_MAX_BACKOFF_MS,
-  type UtsAuditRelayDO,
-} from '../../src/dos/UtsAuditRelayDO';
+import type { UtsAuditRelayDO } from '../../src/dos/UtsAuditRelayDO';
+import { startRelays } from '../../src/scheduled';
 import { config, env } from './test-env';
+
+describe('the cron starting the relays', () => {
+  it('logs not_started for every shard whose relay object refuses', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      // Objects named for another environment than the Worker's refuse to run.
+      await startRelays(env, { ...config, environment: 'staging' });
+      const notStarted = errors.mock.calls
+        .map(([line]) => String(line))
+        .filter(line => line.startsWith('{"event":"uts.audit_relay.not_started"'))
+        .map(line => JSON.parse(line));
+      expect(notStarted).toEqual(
+        Array.from({ length: 8 }, (_, shard) => ({
+          event: 'uts.audit_relay.not_started',
+          shard,
+          error: 'refused',
+        }))
+      );
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('logs nothing when every relay object starts', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await startRelays(env, config);
+      expect(
+        errors.mock.calls.filter(([line]) => String(line).includes('uts.audit_relay.not_started'))
+      ).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+});
 
 describe('audit relay objects', () => {
   it('keep one alarm armed however often ensureStarted runs', async () => {
@@ -48,6 +81,11 @@ describe('audit relay objects', () => {
     const stub = () => getAuditRelayStub(env, config, 6);
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
+      // An earlier test may have armed this object, and its own alarm may have failed already.
+      await runInDurableObject(stub(), async (_instance, state) => {
+        await state.storage.deleteAlarm();
+        await state.storage.deleteAll();
+      });
       const delays: number[] = [];
       for (let run = 0; run < 6; run += 1) {
         // A fresh instance each time, as after an eviction between alarms: only storage remains.

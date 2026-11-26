@@ -252,11 +252,6 @@
       "path": "/api/cron/backfill-users",
       "requestMethod": "GET"
     },
-    "backfill-credential-kms-envelopes": {
-      "schedule": "*/10 * * * *",
-      "path": "/api/cron/backfill-credential-kms-envelopes",
-      "requestMethod": "GET"
-    },
     "recover-code-reviews": {
       "schedule": "*/15 * * * *",
       "path": "/api/cron/recover-code-reviews",

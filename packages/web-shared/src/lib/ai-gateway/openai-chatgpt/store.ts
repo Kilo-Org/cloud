@@ -4,12 +4,13 @@ import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { type IndexColumn } from 'drizzle-orm/pg-core';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import {
+  CLEARED_OPENAI_CHATGPT_CONNECTION_PAYLOAD,
   createOpenAiChatGptSealingKey,
   OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR,
   openAiChatGptKmsOwnerFor,
   openOpenAiChatGptConnection,
-  openOpenAiChatGptConnectionForComparison,
   sealOpenAiChatGptConnection,
   type OpenAiChatGptEncryptedConnectionColumns,
   type OpenAiChatGptKmsOwner,
@@ -213,7 +214,6 @@ export async function readOpenAiChatGptConnectionRow(
 ) {
   const query = fromDb
     .select({
-      encrypted_connection: openai_chatgpt_connections.encrypted_connection,
       encrypted_connection_envelope: openai_chatgpt_connections.encrypted_connection_envelope,
       kilo_user_id: openai_chatgpt_connections.kilo_user_id,
       organization_id: openai_chatgpt_connections.organization_id,
@@ -236,9 +236,8 @@ export async function readOpenAiChatGptConnectionRow(
 }
 
 /**
- * Decrypts and parses a stored payload, preferring its KMS envelope. A static-key
- * payload encrypted with a rotated key, a truncated blob or a payload written by an
- * older shape returns null instead of throwing, so a corrupt row can never take down the
+ * Decrypts and parses a stored payload. A row without an envelope or a payload written by
+ * an older shape returns null instead of throwing, so a corrupt row can never take down the
  * sign-in or a request. A KMS failure throws; `openOpenAiChatGptConnection` explains why.
  */
 export async function decryptOpenAiChatGptConnection(
@@ -485,9 +484,21 @@ async function withConnectionHoldingToken(
     if (!row) return;
     // Decrypting may wait on the KMS service while the lock is held; the data key cache
     // usually answers, since the request that produced this report read the same row.
-    // The payload is only compared with the token the caller holds, so a KMS outage falls
-    // back to the static-key copy written with the envelope.
-    const connection = await openOpenAiChatGptConnectionForComparison(row);
+    let connection: OpenAiChatGptConnection | null;
+    try {
+      connection = await decryptOpenAiChatGptConnection(row);
+    } catch (error) {
+      // Without the payload the report cannot be matched to the credential that produced
+      // it, and writing it anyway could land on a connection made since. During a KMS outage
+      // routing cannot open the connection either, so no request is served through it.
+      if (!(error instanceof CredentialKmsError)) throw error;
+      console.error(
+        '[openai-chatgpt] report not applied: stored connection unreadable: %s (%s)',
+        error.causeName,
+        openAiChatGptOwnerKey(owner)
+      );
+      return;
+    }
     if (!connection || connection.access_token !== accessToken) return;
     await write(tx, connection);
   });
@@ -582,16 +593,14 @@ export async function clearOpenAiChatGptUsageLimit(
  * through. The refresh path calls this inside the transaction that holds the
  * `SELECT ... FOR UPDATE` row lock, so a reconnect that lands between the
  * rejected token exchange and this write cannot be erased by a stale failure.
- * `sealingKey` is created before that lock is taken. Null only when the KMS service could
- * not create one: the errored payload carries no tokens, so it is then stored as a
- * static-key copy alone, and the backfill adds its envelope later.
+ * `sealingKey` is created before that lock is taken.
  */
 export async function markOpenAiChatGptConnectionErrored(
   fromDb: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
   connection: OpenAiChatGptConnection,
   message: string,
-  sealingKey: OpenAiChatGptSealingKey | null
+  sealingKey: OpenAiChatGptSealingKey
 ): Promise<void> {
   const { refresh_token: _refreshToken, ...withoutTokens } = connection;
   const errored: OpenAiChatGptConnection = {
@@ -625,15 +634,23 @@ export async function markOpenAiChatGptNotEligible(
     OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR
   ).catch((error: unknown) => {
     console.error(
-      '[openai-chatgpt] no data key for the refusal; recording it without an envelope: %s (%s)',
+      '[openai-chatgpt] no data key for the refusal; dropping the refused credential: %s (%s)',
       error instanceof Error ? error.name : 'UnknownError',
       openAiChatGptOwnerKey(owner)
     );
     return null;
   });
-  // A KMS outage must not keep a refused account serving requests: the refusal is then
-  // recorded without an envelope, which the errored payload's cleared tokens allow.
-  await withConnectionHoldingToken(owner, refusedAccessToken, (tx, connection) =>
-    markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey)
-  );
+  await withConnectionHoldingToken(owner, refusedAccessToken, async (tx, connection) => {
+    if (sealingKey) {
+      await markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey);
+      return;
+    }
+    // A refusal that cannot be sealed must still stop the account serving requests, so the
+    // refused tokens are removed and the row disabled. The row then reads as disconnected
+    // rather than showing the refusal reason.
+    await tx
+      .update(openai_chatgpt_connections)
+      .set({ ...CLEARED_OPENAI_CHATGPT_CONNECTION_PAYLOAD, is_enabled: false })
+      .where(openAiChatGptOwnerWhere(owner));
+  });
 }

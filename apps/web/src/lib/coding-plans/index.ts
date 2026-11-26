@@ -6,10 +6,7 @@ import { addDays } from 'date-fns';
 import { and, eq, inArray, isNotNull, ne, notInArray, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
-import type {
-  CodingPlanInventoryCredentialEnvelope,
-  EncryptedData,
-} from '@kilocode/db/schema-types';
+import type { CodingPlanInventoryCredentialEnvelope } from '@kilocode/db/schema-types';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { getByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
@@ -18,7 +15,7 @@ import {
   type ByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
-import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import {
   CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
   createCodingPlanInventoryDataKey,
@@ -112,7 +109,6 @@ const INVENTORY_DATA_KEY_CONCURRENCY = 10;
 /** The credential columns a raw `RETURNING` clause yields for a claimed inventory row. */
 type ClaimedInventoryCredential = {
   id: string;
-  encrypted_api_key: EncryptedData | null;
   encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope | null;
 };
 
@@ -139,7 +135,7 @@ const PREPARED_INVENTORY_BUDGET_MS = 2_000;
  * KMS round trip does not run while the transaction holds the user, subscription and
  * inventory row locks. The claim prefers this row; when a concurrent claim took it, or it
  * changed, the claimed row is decrypted under the lock instead. A row whose credential
- * does not open is skipped, within a bound, and never read from its static-key copy.
+ * does not open is skipped, within a bound.
  */
 async function prepareAvailableInventoryCredential(
   planId: string,
@@ -156,7 +152,6 @@ async function prepareAvailableInventoryCredential(
     const [row] = await db
       .select({
         id: coding_plan_key_inventory.id,
-        encrypted_api_key: coding_plan_key_inventory.encrypted_api_key,
         encrypted_api_key_envelope: coding_plan_key_inventory.encrypted_api_key_envelope,
       })
       .from(coding_plan_key_inventory)
@@ -212,7 +207,6 @@ async function openClaimedInventoryCredential(
   if (
     candidate &&
     claimed.id === candidate.row.id &&
-    isDeepStrictEqual(claimed.encrypted_api_key, candidate.row.encrypted_api_key) &&
     isDeepStrictEqual(claimed.encrypted_api_key_envelope, candidate.row.encrypted_api_key_envelope)
   ) {
     return candidate.plaintext;
@@ -248,7 +242,6 @@ export async function getAssignedCodingPlanUsageContext(input: {
       providerId: coding_plan_key_inventory.provider_id,
       status: coding_plan_key_inventory.status,
       assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
-      encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
       encryptedApiKeyEnvelope: coding_plan_key_inventory.encrypted_api_key_envelope,
       upstreamUsageId: coding_plan_key_inventory.upstream_usage_id,
     })
@@ -271,11 +264,10 @@ export async function getAssignedCodingPlanUsageContext(input: {
       : null;
   }
 
-  if (assignment.providerId !== 'minimax' || !assignment.encryptedApiKey) return null;
+  if (assignment.providerId !== 'minimax' || !assignment.encryptedApiKeyEnvelope) return null;
   try {
     const apiKey = await openCodingPlanInventoryCredential({
       id: assignment.id,
-      encrypted_api_key: assignment.encryptedApiKey,
       encrypted_api_key_envelope: assignment.encryptedApiKeyEnvelope,
     });
     return apiKey === null ? null : { providerId: 'minimax', apiKey };
@@ -458,7 +450,7 @@ export async function subscribeToCodingPlan(
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
-      RETURNING id, encrypted_api_key, encrypted_api_key_envelope
+      RETURNING id, encrypted_api_key_envelope
     `);
     const inventoryKey = inventoryRows[0];
     // A KMS failure rolls the purchase back before anything is charged.
@@ -744,7 +736,7 @@ export async function reassignSubscriptionCredential(
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, encrypted_api_key, encrypted_api_key_envelope
+        RETURNING id, encrypted_api_key_envelope
       `);
       const claimed = claimedRows[0];
       const plaintext = claimed ? await openClaimedInventoryCredential(claimed, prepared) : null;

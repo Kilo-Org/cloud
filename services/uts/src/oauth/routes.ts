@@ -27,7 +27,7 @@ import { signInChoices } from '../signin/flows';
 import { requestSession, signInHandoff } from '../signin/handoff';
 import { messagePage, passkeysPage, signInPage, unavailablePage } from '../signin/pages';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../signin/passkey/ceremonies';
-import { readSignInConfig } from '../signin/providers/config';
+import { signInConfigFor } from '../signin/providers/config';
 import { handleProviderRequest } from '../signin/providers/routes';
 import { providerSignInAccess } from '../signin/providers/store';
 import { signInScript } from '../signin/script';
@@ -89,7 +89,7 @@ export function oauthService(
     signIn: signInAccess(binding.connectionString, ctx),
     methods: {
       config,
-      settings: readSignInConfig(env, config),
+      settings: signInConfigFor(env, config),
       store: providerSignInAccess(binding.connectionString, ctx),
       mailer,
     },

@@ -251,26 +251,51 @@ flow's `nonce`); `jose` keeps each key set per isolate and refetches it on an un
   keeps. Any other new method on an existing address is refused (`link_required`): the user signs
   in with a method the account has and links the new one.
 - SSO accepts a profile only of the flow's connection and in a domain that connection's org
-  verified, and it never links by email.
+  verified, and outside a domain whose org requires SSO it never links by email. Inside such a
+  domain every other method is refused, so SSO settles onto the one account that holds the
+  address (`linkedBy: sso_required_domain`, with a notice): otherwise a member whose account
+  existed before the org required SSO would be locked out (Q48 notices).
 - A new account needs a proven address, so nobody can create an account under an address they do
   not control and wait for its owner to sign in. An SSO profile counts as proven by its domain.
+  Its id is `uts_` and 26 lower-case base32 characters of 128 random bits, a form no app user id
+  has, so accounts imported from the app keep their ids.
+- Settling a new method takes a transaction-scoped advisory lock on the address first, so two
+  first sign-ins of one address settle one after the other and only one account results.
 - A refusal that names an account writes at most one denied row per account per minute; a link
   writes `ai.kilo.uts.sign_in_method.linked` and an in-app notice.
+- A provider or SSO callback that comes back with `error` (the user cancelled) clears the flow's
+  binder cookie; the flow row expires unused.
+- The SSO start is a form post; it answers with a page that navigates to WorkOS (`continuePage`)
+  instead of a redirect, because a browser applies the page's `form-action` to every redirect of a
+  form submission, and WorkOS redirects on to the org's identity provider.
 
 Email: one email carries a link and, unless codes are stopped for the address, a six-digit code;
-both live 10 minutes. The fifth wrong code entry exhausts the code (each wrong entry writes a
-denied row when the address has an account), but the email's link keeps working, so wrong entries
-by someone else cannot lock the owner out. At most 5 codes per address per hour; past that cap, or
-after 20 wrong entries in a day, codes stop for 1 hour and the account gets a notice. The address
-and the code are stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`. Deployed Workers wire
-no mail sender yet (`src/signin/email/mailer.ts`), so the email sign-in is offered only where one
-is wired; the development entry records each message (`GET /__dev/mail?to=`).
+both live 10 minutes. Only the newest code of an address counts: a new email exhausts every
+earlier pending code (their links keep working). The fifth wrong code entry exhausts the code
+(each wrong entry writes a denied row when the address has an account), but the email's link
+keeps working, so wrong entries by someone else cannot lock the owner out. At most 5 codes per
+address per hour; past that cap codes stop for 1 hour. The 20th wrong entry in a day stops codes
+until that day window ends, exhausts every pending code, and gives the account a notice; while
+codes are stopped every code entry is refused (`codes_stopped`). The link page names the address
+(`p…@example.com`). The email start sets a binder cookie, like a flow's; a link opened in a browser
+without it says so and signs in only after a second confirmation, so a link someone else asked
+for cannot sign the reader into that person's account in one click. The address and the code are
+stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`. Deployed Workers wire no mail sender
+yet (`src/signin/email/mailer.ts`), so the email sign-in is offered only where one is wired; the
+development entry records each message (`GET /__dev/mail?to=`).
 
-Open item before a mail sender is wired: past the code cap every sign-in email still carries the
-link, so an address can be sent many emails. Wiring a sender needs first a per-network cap on
-unauthenticated `POST /signin/email/start` requests and a Turnstile check on the email start form
-(its secret is production configuration). A total cap per address is not used, because anyone
-could then spend the owner's emails and lock the owner out.
+Open items before deploy:
+
+- Before a mail sender is wired: past the code cap every sign-in email still carries the link, so
+  an address can be sent many emails. Wiring a sender needs first a per-network cap on
+  unauthenticated `POST /signin/email/start` requests and a Turnstile check on the email start form
+  (its secret is production configuration). A total cap per address is not used, because anyone
+  could then spend the owner's emails and lock the owner out.
+- The provider and SSO starts are unauthenticated too, and each stores a flow row: the same
+  per-network cap covers `GET /signin/oauth/<provider>/start` and `POST /signin/sso/start`.
+- The UTS cron (slice 3.9) must call `uts.maintain_provider_sign_in_rows()` beside
+  `uts.maintain_sign_in_rows()` before any environment offers these methods; without it flow and
+  email rows grow without bound.
 
 ### Configuration
 

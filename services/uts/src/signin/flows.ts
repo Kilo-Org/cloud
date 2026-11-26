@@ -12,7 +12,7 @@ import { classifyFailure } from '../oauth/errors';
 import { base64url, isRandomCredential, randomCredential, sha256 } from '../token/credentials';
 import type { SignInMailer } from './email/mailer';
 import { requestNetwork } from './network';
-import { type SignInChoices, messagePage, unavailablePage } from './pages';
+import { type SignInChoices, continuePage, messagePage, unavailablePage } from './pages';
 import type { SignInConfig } from './providers/config';
 import type { FlowValues, IdentityResult } from './providers/exchange';
 import type { FlowIntent, FlowProvider, ProviderSignInAccess } from './providers/store';
@@ -50,10 +50,7 @@ export function signInChoices(methods: SignInMethods, returnTo: string): SignInC
       provider => settings.providers[provider].status === 'on'
     ).map(provider => ({ provider, name: PROVIDER_NAMES[provider] })),
     email: settings.emailHashKey.status === 'on' && methods.mailer !== null,
-    sso:
-      settings.sso.status === 'on'
-        ? { origin: new URL(settings.sso.endpoints.authorization).origin }
-        : null,
+    sso: settings.sso.status === 'on',
   };
 }
 
@@ -169,19 +166,6 @@ export function flowBinder(request: Request, name: string): string | null {
   return isRandomCredential(value) ? value : null;
 }
 
-/**
- * Form posts of the sign-in pages: the browser's `Origin` must be the issuer's own, so another
- * site cannot post a code or a link and sign the visitor into an account the other site chose.
- */
-export function isSameOriginPost(request: Request): boolean {
-  const fetchSite = request.headers.get('Sec-Fetch-Site');
-  return (
-    request.method === 'POST' &&
-    request.headers.get('Origin') === new URL(request.url).origin &&
-    (fetchSite === null || fetchSite === 'same-origin')
-  );
-}
-
 /** Why a finished sign-in was refused; each has its page text. */
 export type SignInRefusal =
   | 'invalid_state'
@@ -196,7 +180,8 @@ export type SignInRefusal =
   | 'method_in_use'
   | 'no_sso_connection'
   | 'invalid_link'
-  | 'code_locked';
+  | 'code_locked'
+  | 'codes_stopped';
 
 const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   invalid_state: {
@@ -245,7 +230,36 @@ const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
     status: 403,
     message: 'Too many wrong codes. This code no longer works; use the link in the email.',
   },
+  codes_stopped: {
+    status: 429,
+    message: 'Too many wrong codes for this address. Use the link in the email.',
+  },
 };
+
+const BASE32 = 'abcdefghijklmnopqrstuvwxyz234567';
+
+/**
+ * The id of an account a sign-in creates: `uts_` and 26 lower-case base32 characters (RFC 4648
+ * alphabet) of 128 random bits. No app user id has this form, so accounts imported from the app
+ * keep their own ids without a collision.
+ */
+export function newAccountId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let bits = 0;
+  let value = 0;
+  let text = '';
+  for (const byte of bytes) {
+    value = ((value << 8) | byte) & 0xfff;
+    bits += 8;
+    while (bits >= 5) {
+      text += BASE32[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  // 128 bits leave 3; the last character carries them, padded with zeros.
+  text += BASE32[(value << (5 - bits)) & 31];
+  return `uts_${text}`;
+}
 
 /** The page of a refused sign-in, with a way back to where the sign-in started. */
 export function refusalPage(refusal: SignInRefusal, returnTo: string | null): Response {
@@ -313,6 +327,11 @@ export async function beginFlow(
     intent: string | null;
     gatePass: string | null;
     ssoDomain: string | null;
+    /**
+     * `redirect` for a link's GET start; `page` for a form post's start, which answers with a page
+     * that navigates on (`continuePage`), so no form-submission redirect chain reaches the provider.
+     */
+    answer: 'redirect' | 'page';
   },
   /** Null when the stored flow cannot reach the provider, a failure no retry fixes. */
   providerUrl: (values: FlowValues, workosConnectionId: string | null) => URL | null
@@ -361,9 +380,23 @@ export async function beginFlow(
     console.error(JSON.stringify({ event: 'uts.signin.start_failed', provider }));
     return messagePage('Sign in to Kilo', 'The sign-in could not be started.', 500, null);
   }
-  return redirectWithCookies(url.toString(), [
-    flowCookie(flowCookieName(flow.stateHash), flow.binder),
-  ]);
+  const cookie = flowCookie(flowCookieName(flow.stateHash), flow.binder);
+  if (params.answer === 'redirect') return redirectWithCookies(url.toString(), [cookie]);
+  const response = continuePage("Continuing to your organization's sign-in.", url.toString());
+  response.headers.append('Set-Cookie', cookie);
+  return response;
+}
+
+/**
+ * A callback that came back with `error` (the user cancelled, or the provider refused): the flow
+ * expires unused, and the answer clears its binder cookie.
+ */
+export async function cancelledFlowPage(state: string | null, message: string): Promise<Response> {
+  const response = messagePage('Sign in to Kilo', message, 400, null);
+  if (state !== null && isRandomCredential(state)) {
+    response.headers.append('Set-Cookie', clearedFlowCookie(flowCookieName(await sha256(state))));
+  }
+  return response;
 }
 
 /** A log line for a sign-in that ended without a session; ids and outcomes only. */
@@ -420,6 +453,7 @@ export async function finishFlow(
         provider,
         identity: identity.identity,
         sessionTokenHash: await sha256(sessionToken),
+        newAccountId: newAccountId(),
         network: requestNetwork(request),
       })
     );

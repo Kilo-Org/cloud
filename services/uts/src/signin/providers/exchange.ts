@@ -15,19 +15,25 @@ import type { ProviderIdentity } from './store';
 
 /**
  * The provider side of a sign-in: the authorization request, the code exchange at the token
- * endpoint, and the identity check. Every outbound call ends within 10 seconds. Nothing here logs
- * or returns a provider token; only the checked identity leaves.
+ * endpoint, and the identity check. Every outbound call ends within 10 seconds; the calls of one
+ * callback run one after another (the token call, then the key set or the user reads), so a cold
+ * isolate's OpenID Connect callback can wait up to 20 seconds. Nothing here logs or returns a
+ * provider token; only the checked identity leaves.
  *
  * * OpenID Connect: the ID token from the token endpoint is verified against the provider's key
  *   set (signature, `iss`, `aud` = client id, `exp`, `iat`, and `nonce` = the flow's nonce).
- *   `createRemoteJWKSet` keeps each key set in the isolate and refetches it on an unknown `kid`, at
- *   most once per 30 seconds.
+ *   `createRemoteJWKSet` keeps each key set in the isolate for 10 minutes (`cacheMaxAge`) and
+ *   refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`), so an
+ *   isolate fetches a provider's key set at most once per 10 minutes plus those refetches, and
+ *   never more than once per callback.
  * * GitHub has no OpenID Connect: the access token reads `/user` and `/user/emails`, and only the
  *   primary address counts.
  * * Discord: the access token reads the user object.
  */
 
 const CALL_TIMEOUT_MS = 10_000;
+const KEY_SET_CACHE_MS = 10 * 60 * 1000;
+const KEY_SET_COOLDOWN_MS = 30 * 1000;
 /** An Apple client secret or a Claude client assertion covers one request plus clock skew. */
 const CLIENT_JWT_LIFETIME_SECONDS = 300;
 const APPLE_AUDIENCE = 'https://appleid.apple.com';
@@ -209,7 +215,11 @@ const keySets = new Map<string, JWTVerifyGetKey>();
 function keySet(jwksUri: string): JWTVerifyGetKey {
   let keys = keySets.get(jwksUri);
   if (keys === undefined) {
-    keys = createRemoteJWKSet(new URL(jwksUri), { timeoutDuration: CALL_TIMEOUT_MS });
+    keys = createRemoteJWKSet(new URL(jwksUri), {
+      timeoutDuration: CALL_TIMEOUT_MS,
+      cacheMaxAge: KEY_SET_CACHE_MS,
+      cooldownDuration: KEY_SET_COOLDOWN_MS,
+    });
     keySets.set(jwksUri, keys);
   }
   return keys;

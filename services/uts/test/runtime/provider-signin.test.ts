@@ -1,4 +1,6 @@
+import { createExecutionContext } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { handleRequest } from '../../src/http';
 import type { SignInEmail } from '../../src/signin/email/mailer';
 import { handleEmailRequest } from '../../src/signin/email/routes';
 import { type SignInMethods, flowCookieName } from '../../src/signin/flows';
@@ -8,7 +10,7 @@ import { handleProviderRequest } from '../../src/signin/providers/routes';
 import type { ProviderSignInStore } from '../../src/signin/providers/store';
 import { handleSsoRequest } from '../../src/signin/sso/routes';
 import { sha256 } from '../../src/token/credentials';
-import { config } from './test-env';
+import { config, env } from './test-env';
 
 /**
  * The sign-in routes of providers, SSO and email against a recording store: what each request
@@ -36,6 +38,7 @@ function methodsWith(implementation: Partial<ProviderSignInStore>, mail: SignInE
     startEmail: record('startEmail', implementation.startEmail),
     verifyEmailCode: record('verifyEmailCode', implementation.verifyEmailCode),
     completeEmailLink: record('completeEmailLink', implementation.completeEmailLink),
+    readEmailLink: record('readEmailLink', implementation.readEmailLink),
   };
   const methods: SignInMethods = {
     config,
@@ -149,7 +152,7 @@ describe('provider routes', () => {
 });
 
 describe('SSO routes', () => {
-  it('starts with the domain of the address and sends the connection to WorkOS', async () => {
+  it('starts with the domain of the address and answers a page that navigates to WorkOS', async () => {
     const { methods, calls } = methodsWith({
       startFlow: async () => ({ outcome: 'started', workosConnectionId: 'conn_1' }),
     });
@@ -162,9 +165,19 @@ describe('SSO routes', () => {
       '/signin/sso/start',
       methods
     );
-    const location = new URL(response?.headers.get('Location') ?? '');
+    // No redirect: a form submission's redirect chain would put WorkOS's own redirect to the
+    // org's identity provider under the sign-in page's form-action.
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get('Location')).toBeNull();
+    expect(response?.headers.get('Content-Security-Policy')).toContain("form-action 'self';");
+    expect(response?.headers.get('Content-Security-Policy')).toContain("default-src 'none'");
+    expect(setCookies(response ?? new Response())[0]).toMatch(/^__Host-uts_flow_[0-9a-f]{16}=/);
+    const html = (await response?.text()) ?? '';
+    const target = /<meta http-equiv="refresh" content="0;url=([^"]+)">/.exec(html)?.[1] ?? '';
+    const location = new URL(target.replaceAll('&amp;', '&'));
     expect(location.origin + location.pathname).toBe('https://api.workos.com/sso/authorize');
     expect(location.searchParams.get('connection')).toBe('conn_1');
+    expect(html).toContain('id="continue"');
     expect(calls).toMatchObject([
       { method: 'startFlow', input: { provider: 'workos', ssoDomain: 'corp.example' } },
     ]);
@@ -244,8 +257,10 @@ describe('email routes', () => {
     expect(mail[0].code).toBeNull();
   });
 
-  it('shows a confirmation page for the link and stores nothing until it is posted', async () => {
-    const { methods, calls } = methodsWith({});
+  it('shows the address on the link page, warns in another browser, and consumes nothing', async () => {
+    const { methods, calls } = methodsWith({
+      readEmailLink: async () => ({ email: 'person@example.com', binderHash: new Uint8Array(32) }),
+    });
     const token = 'T'.repeat(43);
     const response = await handleEmailRequest(
       new Request(`${ISSUER}/signin/email/link?token=${token}`),
@@ -253,8 +268,12 @@ describe('email routes', () => {
       methods
     );
     expect(response?.status).toBe(200);
-    expect(await response?.text()).toContain(`name="token" value="${token}"`);
-    expect(calls).toEqual([]);
+    const html = (await response?.text()) ?? '';
+    expect(html).toContain(`name="token" value="${token}"`);
+    expect(html).toContain('p…@example.com');
+    // This request carries no binder cookie of the email, so the page warns and confirms.
+    expect(html).toContain('another browser');
+    expect(calls.map(call => call.method)).toEqual(['readEmailLink']);
   });
 
   it('signs in with the right code and sets the session cookie', async () => {
@@ -305,20 +324,47 @@ describe('email routes', () => {
 });
 
 describe('sign-in page', () => {
-  it('lists the configured methods and lets the SSO form reach WorkOS', async () => {
+  it('lists the configured methods, and its form-action stays on the issuer', async () => {
     const response = signInPage({
       returnTo: '/authorize?client_id=kilo-cli&state=a"b',
       providers: [{ provider: 'google', name: 'Google' }],
       email: true,
-      sso: { origin: 'https://api.workos.com' },
+      sso: true,
     });
     const html = await response.text();
     expect(html).toContain(
       'href="/signin/oauth/google/start?return_to=%2Fauthorize%3Fclient_id%3Dkilo-cli%26state%3Da%22b"'
     );
     expect(html).toContain('value="/authorize?client_id=kilo-cli&amp;state=a&quot;b"');
-    expect(response.headers.get('Content-Security-Policy')).toContain(
-      "form-action 'self' https://api.workos.com;"
+    expect(html).toContain('action="/signin/sso/start"');
+    expect(response.headers.get('Content-Security-Policy')).toContain("form-action 'self';");
+  });
+});
+
+describe('configuration', () => {
+  it('keeps the token and metadata routes working with a bad sign-in setting', async () => {
+    const badEnv = { ...env, SIGNIN_EMAIL_HASH_KEY: 'not-a-key', SIGNIN_DEV_ENDPOINTS: '{' };
+    const ctx = createExecutionContext();
+    const metadata = await handleRequest(
+      new Request(`${ISSUER}/.well-known/oauth-authorization-server`),
+      badEnv,
+      ctx
     );
+    expect(metadata.status).toBe(200);
+    const token = await handleRequest(
+      new Request(`${ISSUER}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=unknown',
+      }),
+      badEnv,
+      ctx
+    );
+    expect(token.status).toBe(400);
+    const settings = readSignInConfig(badEnv, config);
+    expect(settings.emailHashKey).toEqual({
+      status: 'misconfigured',
+      missing: ['SIGNIN_EMAIL_HASH_KEY'],
+    });
   });
 });

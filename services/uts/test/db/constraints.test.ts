@@ -428,11 +428,12 @@ describe('email codes and limits', () => {
     purpose = 'sign_in',
     account: string | null = null
   ) {
-    // A sign-in email carries its address, its link and its return path; a tier A code none.
+    // A sign-in email carries its address, its link, its return path and the binder hash of the
+    // browser that asked for it; a tier A code none of them.
     const signIn = purpose === 'sign_in';
     return writer.query(
-      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at, email, link_hash, return_to)
-       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END, $8, $9, $10)`,
+      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at, email, link_hash, return_to, binder_hash)
+       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END, $8, $9, $10, $11)`,
       [
         purpose,
         randomHash(),
@@ -444,6 +445,7 @@ describe('email codes and limits', () => {
         signIn ? 'someone@example.com' : null,
         signIn ? randomHash() : null,
         signIn ? '/signin/done' : null,
+        signIn ? randomHash() : null,
       ]
     );
   }
@@ -454,11 +456,11 @@ describe('email codes and limits', () => {
     await insertEmailCode('exhausted', 5, false);
   });
 
-  it('tie the address, link and return path to sign-in emails, and a code to tier A', async () => {
+  it('tie the address, link, return path and binder to sign-in emails, and a code to tier A', async () => {
     const insertShape = (purpose: string, email: string | null, code: Buffer | null) =>
       writer.query(
-        `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, email, link_hash, return_to)
-         VALUES ($1, $2, $3, $4, now() + interval '10 minutes', $5, $6, $7)`,
+        `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, email, link_hash, return_to, binder_hash)
+         VALUES ($1, $2, $3, $4, now() + interval '10 minutes', $5, $6, $7, $8)`,
         [
           purpose,
           randomHash(),
@@ -467,6 +469,7 @@ describe('email codes and limits', () => {
           email,
           email === null ? null : randomHash(),
           email === null ? null : '/signin/done',
+          email === null ? null : randomHash(),
         ]
       );
     // A sign-in email without a code: sent while codes are stopped.

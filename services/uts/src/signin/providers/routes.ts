@@ -3,6 +3,7 @@ import { jsonResponse } from '../../responses';
 import {
   type SignInMethods,
   beginFlow,
+  cancelledFlowPage,
   finishFlow,
   readForm,
   refusalPage,
@@ -53,6 +54,7 @@ export async function handleProviderRequest(
         intent: params.get('intent'),
         gatePass: params.get('gate_pass'),
         ssoDomain: null,
+        answer: 'redirect',
       },
       values => authorizationUrl(spec, credentials.clientId, redirectUri, values)
     );
@@ -68,7 +70,7 @@ export async function handleProviderRequest(
   const code = params.get('code');
   if (params.get('error') !== null || code === null) {
     // The user cancelled at the provider, or the provider refused; the flow expires unused.
-    return messagePage('Sign in to Kilo', 'The sign-in was not completed.', 400, null);
+    return await cancelledFlowPage(params.get('state'), 'The sign-in was not completed.');
   }
   return await finishFlow(request, methods, provider.data, params.get('state'), secrets =>
     providerIdentity(spec, credentials, {

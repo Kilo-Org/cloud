@@ -3,11 +3,12 @@ import { jsonResponse } from '../../responses';
 import {
   type SignInMethods,
   beginFlow,
+  cancelledFlowPage,
   finishFlow,
-  isSameOriginPost,
   readForm,
   returnPathOf,
 } from '../flows';
+import { isSameOriginPost } from '../requests';
 import { messagePage } from '../pages';
 import { logMisconfigured } from '../providers/config';
 import { normalizeEmail, workosIdentity } from '../providers/exchange';
@@ -57,6 +58,7 @@ export async function handleSsoRequest(
         intent: form.get('intent'),
         gatePass: form.get('gate_pass'),
         ssoDomain: email.split('@')[1],
+        answer: 'page',
       },
       (values, connection) => {
         // The start statement returns the connection of every SSO flow it stores.
@@ -78,7 +80,7 @@ export async function handleSsoRequest(
   const params = new URL(request.url).searchParams;
   const code = params.get('code');
   if (params.get('error') !== null || code === null) {
-    return messagePage('Sign in to Kilo', 'The single sign-on was not completed.', 400, null);
+    return await cancelledFlowPage(params.get('state'), 'The single sign-on was not completed.');
   }
   return await finishFlow(request, methods, 'workos', params.get('state'), () =>
     workosIdentity(sso.endpoints.token, sso.clientId, sso.apiKey, code)

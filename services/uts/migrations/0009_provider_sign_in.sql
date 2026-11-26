@@ -89,12 +89,16 @@ ALTER TABLE uts.email_codes
   ADD COLUMN email uts.email,
   ADD COLUMN link_hash uts.sha256,
   ADD COLUMN return_to text CHECK (length(return_to) <= 4096 AND return_to ~ '^/([^/\\]|$)'),
+  -- The SHA-256 of the binder cookie of the browser that asked for the sign-in email.
+  ADD COLUMN binder_hash uts.sha256,
   ALTER COLUMN code_hash DROP NOT NULL,
   ADD CONSTRAINT email_codes_link_hash_key UNIQUE (link_hash),
   ADD CONSTRAINT email_codes_purpose_shape CHECK (
     CASE purpose
       WHEN 'sign_in' THEN email IS NOT NULL AND link_hash IS NOT NULL AND return_to IS NOT NULL
-      ELSE email IS NULL AND link_hash IS NULL AND return_to IS NULL AND code_hash IS NOT NULL
+        AND binder_hash IS NOT NULL
+      ELSE email IS NULL AND link_hash IS NULL AND return_to IS NULL AND binder_hash IS NULL
+        AND code_hash IS NOT NULL
     END
   );
 
@@ -256,9 +260,18 @@ $$;
 
 -- Settles the account of a sign-in whose method is new. Outcomes: `ok` with the account;
 -- `email_required` (the provider gave no address); `link_required` (an account holds the address
--- and the sign-in may not link to it: SSO, or an address the provider did not prove);
--- `email_unverified` (a new account without a proven address); `sso_required`;
--- `account_blocked`.
+-- and the sign-in may not link to it: SSO outside a domain that requires it, or an address the
+-- provider did not prove); `email_unverified` (a new account without a proven address);
+-- `sso_required`; `account_blocked`.
+--
+-- * A per-address advisory lock, held until the statement's transaction ends, makes two sign-ins
+--   for one new address settle one after the other, so they cannot create two accounts.
+-- * An SSO profile in a domain whose org requires SSO (its connection and verified domain were
+--   checked by `uts.complete_provider_sign_in`) settles onto the one account holding the address,
+--   with the method-added notice: once the org requires SSO it is that account's only way in
+--   (decision Q48). Outside such a domain SSO never links by email.
+-- * A new account takes `p_new_account_id`, which the Worker generates: `uts_` and 26 base32
+--   characters of 128 random bits, a format no app user id has, so imported accounts keep theirs.
 CREATE FUNCTION uts.settle_new_method(
   p_environment text,
   p_provider uts.sign_in_provider,
@@ -266,6 +279,7 @@ CREATE FUNCTION uts.settle_new_method(
   p_email text,
   p_email_proven boolean,
   p_sso_connection_id uuid,
+  p_new_account_id text,
   OUT outcome text,
   OUT settled_account text,
   OUT account_created boolean,
@@ -276,6 +290,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   holder record;
+  sso_settles boolean;
   attributes jsonb := jsonb_build_object('method', CASE p_provider
     WHEN 'workos' THEN 'sso' WHEN 'email' THEN 'email' ELSE 'oauth' END, 'provider', p_provider);
 BEGIN
@@ -285,6 +300,10 @@ BEGIN
     outcome := 'email_required';
     RETURN;
   END IF;
+  IF p_new_account_id !~ '^uts_[a-z2-7]{26}$' THEN
+    RAISE EXCEPTION 'a new account id is uts_ and 26 base32 characters' USING ERRCODE = '22023';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('uts.primary_email:' || p_email, 0));
   IF p_provider <> 'workos' AND uts.sso_required_for(p_email) THEN
     SELECT * INTO holder FROM uts.account_of_email(p_email);
     PERFORM uts.audit_account_refusal(
@@ -293,9 +312,13 @@ BEGIN
     outcome := 'sso_required';
     RETURN;
   END IF;
+  sso_settles := p_provider = 'workos' AND uts.sso_required_for(p_email);
   SELECT * INTO holder FROM uts.account_of_email(p_email);
   IF FOUND OR EXISTS (SELECT 1 FROM uts.accounts AS account WHERE account.primary_email = p_email) THEN
-    IF holder.id IS NULL OR p_provider = 'workos' OR NOT p_email_proven THEN
+    IF holder.id IS NULL
+      OR (p_provider = 'workos' AND NOT sso_settles)
+      OR (p_provider <> 'workos' AND NOT p_email_proven)
+    THEN
       PERFORM uts.audit_account_refusal(
         p_environment, holder.id, 'ai.kilo.uts.sign_in.denied', 3002, 1, attributes, 'link_required'
       );
@@ -310,7 +333,8 @@ BEGIN
       RETURN;
     END IF;
     PERFORM uts.add_sign_in_method(
-      p_environment, holder.id, p_provider, p_subject, p_email, NULL, NULL, 'verified_email'
+      p_environment, holder.id, p_provider, p_subject, p_email, p_sso_connection_id, NULL,
+      CASE WHEN sso_settles THEN 'sso_required_domain' ELSE 'verified_email' END
     );
     outcome := 'ok';
     settled_account := holder.id;
@@ -322,7 +346,7 @@ BEGIN
     outcome := 'email_unverified';
     RETURN;
   END IF;
-  INSERT INTO uts.accounts (id, primary_email) VALUES (gen_random_uuid()::text, p_email)
+  INSERT INTO uts.accounts (id, primary_email) VALUES (p_new_account_id, p_email)
   RETURNING id INTO settled_account;
   PERFORM uts.write_audit_event(
     p_environment, 'ai.kilo.uts.account.created', 3001, 1, 'success', NULL, settled_account,
@@ -353,6 +377,7 @@ CREATE FUNCTION uts.sign_in_with_method(
   p_asn integer,
   p_country text,
   p_city text,
+  p_new_account_id text,
   OUT outcome text,
   OUT session_id uuid,
   OUT session_account text,
@@ -399,7 +424,8 @@ BEGIN
   ELSE
     SELECT * INTO settled
     FROM uts.settle_new_method(
-      p_environment, p_provider, p_subject, p_email, p_email_proven, p_sso_connection_id
+      p_environment, p_provider, p_subject, p_email, p_email_proven, p_sso_connection_id,
+      p_new_account_id
     );
     IF settled.outcome <> 'ok' THEN
       outcome := settled.outcome;
@@ -522,7 +548,8 @@ CREATE FUNCTION uts.complete_provider_sign_in(
   p_client_ip inet,
   p_asn integer,
   p_country text,
-  p_city text
+  p_city text,
+  p_new_account_id text
 ) RETURNS TABLE (
   outcome text,
   flow_return_to text,
@@ -634,7 +661,7 @@ BEGIN
   FROM uts.sign_in_with_method(
     p_environment, p_provider, p_subject, p_email, p_email_proven, flow.sso_connection_id,
     CASE WHEN p_provider = 'workos' THEN 'sso' ELSE 'oauth' END::uts.auth_method,
-    p_session_token_hash, p_user_agent, p_client_ip, p_asn, p_country, p_city
+    p_session_token_hash, p_user_agent, p_client_ip, p_asn, p_country, p_city, p_new_account_id
   );
   outcome := signed.outcome;
   IF signed.outcome = 'signed_in' THEN
@@ -650,13 +677,17 @@ $$;
 
 -- POST /signin/email/start: stores a 10-minute sign-in email with its link and, unless codes are
 -- stopped for the address, its code. Codes stop for 1 hour when a sixth code is asked for within
--- the hour, and the account (when the address has one) gets a notice. Outcomes: `stored` (with
--- whether a code was stored); `sso_required`.
+-- the hour, and the account (when the address has one) gets a notice. Every earlier pending code
+-- of the address is exhausted first (its link keeps working), so only the newest code can be
+-- guessed: 5 entries per code, never 5 per pending code. `p_binder_hash` is the SHA-256 of the
+-- starting browser's binder cookie, which the link checks (`uts.complete_email_link`). Outcomes:
+-- `stored` (with whether a code was stored); `sso_required`.
 CREATE FUNCTION uts.start_email_sign_in(
   p_email text,
   p_email_hash bytea,
   p_link_hash bytea,
   p_code_hash bytea,
+  p_binder_hash bytea,
   p_return_to text
 ) RETURNS TABLE (outcome text, with_code boolean, email_expires_at timestamptz)
 LANGUAGE plpgsql
@@ -713,11 +744,16 @@ BEGIN
     END IF;
   END IF;
 
+  UPDATE uts.email_codes AS stored SET status = 'exhausted', attempts = 5
+  WHERE stored.email_hash = p_email_hash
+    AND stored.purpose = 'sign_in'
+    AND stored.status = 'pending'
+    AND stored.code_hash IS NOT NULL;
   INSERT INTO uts.email_codes (
-    purpose, email_hash, email, link_hash, code_hash, return_to, expires_at
+    purpose, email_hash, email, link_hash, code_hash, binder_hash, return_to, expires_at
   ) VALUES (
     'sign_in', p_email_hash, p_email, p_link_hash, CASE WHEN with_code THEN p_code_hash END,
-    p_return_to, now() + interval '10 minutes'
+    p_binder_hash, p_return_to, now() + interval '10 minutes'
   ) RETURNING expires_at INTO email_expires_at;
   outcome := 'stored';
   RETURN NEXT;
@@ -735,7 +771,8 @@ CREATE FUNCTION uts.finish_email_sign_in(
   p_client_ip inet,
   p_asn integer,
   p_country text,
-  p_city text
+  p_city text,
+  p_new_account_id text
 ) RETURNS TABLE (
   outcome text,
   session_id uuid,
@@ -752,7 +789,7 @@ BEGIN
   SELECT * INTO signed
   FROM uts.sign_in_with_method(
     p_environment, 'email', p_email, p_email, true, NULL, p_method, p_session_token_hash,
-    p_user_agent, p_client_ip, p_asn, p_country, p_city
+    p_user_agent, p_client_ip, p_asn, p_country, p_city, p_new_account_id
   );
   outcome := signed.outcome;
   IF signed.outcome = 'signed_in' THEN
@@ -765,8 +802,9 @@ BEGIN
 END
 $$;
 
--- Counts a wrong sign-in code entry for the address: 20 in a day stop codes for 1 hour, and the
--- account (when the address has one) gets a notice.
+-- Counts a wrong sign-in code entry for the address. The 20th in a day stops codes until that day
+-- window ends, exhausts every pending code of the address (their links keep working), and gives
+-- the account (when the address has one) a notice.
 CREATE FUNCTION uts.count_email_code_failure(p_email text, p_email_hash bytea) RETURNS void
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
@@ -786,8 +824,13 @@ BEGIN
     AND (limits.status = 'open' OR limits.stopped_until <= now())
   THEN
     UPDATE uts.email_code_limits AS stored
-    SET status = 'stopped', stopped_until = now() + interval '1 hour'
+    SET status = 'stopped', stopped_until = limits.day_started_at + interval '1 day'
     WHERE stored.purpose = 'sign_in' AND stored.email_hash = p_email_hash;
+    UPDATE uts.email_codes AS stored SET status = 'exhausted', attempts = 5
+    WHERE stored.email_hash = p_email_hash
+      AND stored.purpose = 'sign_in'
+      AND stored.status = 'pending'
+      AND stored.code_hash IS NOT NULL;
     SELECT * INTO holder FROM uts.account_of_email(p_email);
     IF FOUND THEN
       INSERT INTO uts.notices (account_id, kind, details)
@@ -797,11 +840,12 @@ BEGIN
 END
 $$;
 
--- POST /signin/email/code: the newest pending code sent to the address. A wrong code counts an
--- entry; the fifth wrong entry exhausts the code (`code_locked`), and only the email's link can
--- still sign in. Each wrong entry writes a denied row for the address's account, when it has
--- one. Outcomes: `signed_in` with the session; `invalid_code` with the entries left;
--- `code_locked`; and the refusals of `uts.sign_in_with_method`.
+-- POST /signin/email/code: the newest pending code sent to the address, refused while codes are
+-- stopped for it (`codes_stopped`). A wrong code counts an entry; the fifth wrong entry exhausts
+-- the code (`code_locked`), and only the email's link can still sign in. Each wrong entry writes a
+-- denied row for the address's account, when it has one. Outcomes: `signed_in` with the session;
+-- `invalid_code` with the entries left; `code_locked`; `codes_stopped`; and the refusals of
+-- `uts.sign_in_with_method`.
 CREATE FUNCTION uts.verify_email_code(
   p_environment text,
   p_email_hash bytea,
@@ -811,7 +855,8 @@ CREATE FUNCTION uts.verify_email_code(
   p_client_ip inet,
   p_asn integer,
   p_country text,
-  p_city text
+  p_city text,
+  p_new_account_id text
 ) RETURNS TABLE (
   outcome text,
   code_return_to text,
@@ -830,6 +875,18 @@ DECLARE
   holder record;
   finished record;
 BEGIN
+  IF EXISTS (
+    SELECT 1 FROM uts.email_code_limits AS limits
+    WHERE limits.purpose = 'sign_in'
+      AND limits.email_hash = p_email_hash
+      AND limits.status = 'stopped'
+      AND limits.stopped_until > now()
+  ) THEN
+    outcome := 'codes_stopped';
+    entries_left := 0;
+    RETURN NEXT;
+    RETURN;
+  END IF;
   SELECT * INTO code FROM uts.email_codes AS stored
   WHERE stored.email_hash = p_email_hash
     AND stored.purpose = 'sign_in'
@@ -874,7 +931,7 @@ BEGIN
   SELECT * INTO finished
   FROM uts.finish_email_sign_in(
     p_environment, code.email, 'email_code', p_session_token_hash, p_user_agent, p_client_ip,
-    p_asn, p_country, p_city
+    p_asn, p_country, p_city, p_new_account_id
   );
   outcome := finished.outcome;
   session_id := finished.session_id;
@@ -886,17 +943,25 @@ END
 $$;
 
 -- POST /signin/email/link: the unexpired, unused sign-in email whose link hash this is; a link
--- works after its code was exhausted, because only the address's owner holds the link. Outcomes:
--- `signed_in` with the session; `invalid_link`; and the refusals of `uts.sign_in_with_method`.
+-- works after its code was exhausted, because only the address's owner holds the link. A link
+-- opened in another browser than the one that asked for the email (`p_binder_hash` is the SHA-256
+-- of the request's binder cookie, or NULL) signs in only with `p_other_browser`, which the
+-- confirmation page sends after it showed the address, so a link someone else asked for and sent
+-- cannot sign the reader into that person's account in one click. Outcomes: `signed_in` with the
+-- session; `confirm_other_browser` (nothing consumed); `invalid_link`; and the refusals of
+-- `uts.sign_in_with_method`.
 CREATE FUNCTION uts.complete_email_link(
   p_environment text,
   p_link_hash bytea,
+  p_binder_hash bytea,
+  p_other_browser boolean,
   p_session_token_hash bytea,
   p_user_agent text,
   p_client_ip inet,
   p_asn integer,
   p_country text,
-  p_city text
+  p_city text,
+  p_new_account_id text
 ) RETURNS TABLE (
   outcome text,
   link_return_to text,
@@ -913,22 +978,29 @@ DECLARE
   code uts.email_codes%ROWTYPE;
   finished record;
 BEGIN
-  UPDATE uts.email_codes AS stored SET status = 'consumed', consumed_at = now()
+  SELECT * INTO code FROM uts.email_codes AS stored
   WHERE stored.link_hash = p_link_hash
     AND stored.purpose = 'sign_in'
     AND stored.status IN ('pending', 'exhausted')
     AND stored.expires_at > now()
-  RETURNING * INTO code;
+  FOR UPDATE;
   IF NOT FOUND THEN
     outcome := 'invalid_link';
     RETURN NEXT;
     RETURN;
   END IF;
   link_return_to := code.return_to;
+  IF code.binder_hash IS DISTINCT FROM p_binder_hash AND NOT p_other_browser THEN
+    outcome := 'confirm_other_browser';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  UPDATE uts.email_codes AS stored SET status = 'consumed', consumed_at = now()
+  WHERE stored.id = code.id;
   SELECT * INTO finished
   FROM uts.finish_email_sign_in(
     p_environment, code.email, 'email_link', p_session_token_hash, p_user_agent, p_client_ip,
-    p_asn, p_country, p_city
+    p_asn, p_country, p_city, p_new_account_id
   );
   outcome := finished.outcome;
   session_id := finished.session_id;
@@ -993,11 +1065,11 @@ GRANT EXECUTE ON FUNCTION
   ),
   uts.complete_provider_sign_in(
     text, bytea, bytea, uts.sign_in_provider, text, text, boolean, text, bytea, text, inet,
-    integer, text, text
+    integer, text, text, text
   ),
-  uts.start_email_sign_in(text, bytea, bytea, bytea, text),
-  uts.verify_email_code(text, bytea, bytea, bytea, text, inet, integer, text, text),
-  uts.complete_email_link(text, bytea, bytea, text, inet, integer, text, text),
+  uts.start_email_sign_in(text, bytea, bytea, bytea, bytea, text),
+  uts.verify_email_code(text, bytea, bytea, bytea, text, inet, integer, text, text, text),
+  uts.complete_email_link(text, bytea, bytea, boolean, bytea, text, inet, integer, text, text, text),
   uts.maintain_provider_sign_in_rows()
 TO uts_app;
 

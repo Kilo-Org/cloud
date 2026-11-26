@@ -52,6 +52,8 @@ export type CompleteFlowInput = {
   identity: ProviderIdentity;
   sessionTokenHash: Uint8Array;
   network: NetworkContext;
+  /** The id an account created by this sign-in takes (`newAccountId`, src/signin/flows.ts). */
+  newAccountId: string;
 };
 
 /** A sign-in that ended in a new browser session. */
@@ -84,6 +86,8 @@ export type StartEmailInput = {
   emailHash: Uint8Array;
   linkHash: Uint8Array;
   codeHash: Uint8Array;
+  /** The SHA-256 of the starting browser's binder cookie, which the link checks. */
+  binderHash: Uint8Array;
   returnTo: string;
 };
 
@@ -97,25 +101,36 @@ export type VerifyCodeInput = {
   codeHash: Uint8Array;
   sessionTokenHash: Uint8Array;
   network: NetworkContext;
+  newAccountId: string;
 };
 
 export type VerifyCodeResult =
   | { outcome: 'signed_in'; returnTo: string; signedIn: SignedIn }
   | { outcome: 'invalid_code'; entriesLeft: number; returnTo: string | null }
+  | { outcome: 'codes_stopped' }
   | { outcome: 'code_locked'; returnTo: string }
   | { outcome: AccountRefusal; returnTo: string };
 
 export type EmailLinkInput = {
   environment: UtsEnvironment;
   linkHash: Uint8Array;
+  /** The SHA-256 of the request's binder cookie for this email, or null without one. */
+  binderHash: Uint8Array | null;
+  /** The user confirmed a link opened in another browser than the one that asked for it. */
+  otherBrowser: boolean;
   sessionTokenHash: Uint8Array;
   network: NetworkContext;
+  newAccountId: string;
 };
 
 export type EmailLinkResult =
   | { outcome: 'signed_in'; returnTo: string; signedIn: SignedIn }
   | { outcome: 'invalid_link' }
+  | { outcome: 'confirm_other_browser'; returnTo: string }
   | { outcome: AccountRefusal; returnTo: string };
+
+/** What the link's confirmation page shows: the address, and whether this browser asked. */
+export type EmailLinkRead = { email: string; binderHash: Uint8Array } | null;
 
 export type ProviderSignInStore = {
   startFlow(input: StartFlowInput): Promise<StartFlowResult>;
@@ -123,6 +138,7 @@ export type ProviderSignInStore = {
   startEmail(input: StartEmailInput): Promise<StartEmailResult>;
   verifyEmailCode(input: VerifyCodeInput): Promise<VerifyCodeResult>;
   completeEmailLink(input: EmailLinkInput): Promise<EmailLinkResult>;
+  readEmailLink(linkHash: Uint8Array): Promise<EmailLinkRead>;
 };
 
 /** Runs `work` with the statements of one request's identity-store connection. */
@@ -190,14 +206,23 @@ const VerifyCodeRowSchema = z.discriminatedUnion('outcome', [
     entries_left: z.number().int().min(0),
     code_return_to: z.string().nullable(),
   }),
+  z.object({ outcome: z.literal('codes_stopped') }),
   z.object({ outcome: z.enum(['code_locked', ...ACCOUNT_REFUSALS]), code_return_to: z.string() }),
 ]);
 
 const EmailLinkRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('signed_in'), link_return_to: z.string(), ...SignedInColumns }),
   z.object({ outcome: z.literal('invalid_link') }),
-  z.object({ outcome: z.enum(ACCOUNT_REFUSALS), link_return_to: z.string() }),
+  z.object({
+    outcome: z.enum(['confirm_other_browser', ...ACCOUNT_REFUSALS]),
+    link_return_to: z.string(),
+  }),
 ]);
+
+const EmailLinkReadRowSchema = z.object({
+  email: z.string(),
+  binder_hash: z.instanceof(Uint8Array),
+});
 
 function signedInOf(
   row: z.output<z.ZodObject<typeof SignedInColumns>>,
@@ -250,7 +275,7 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
 
     async completeFlow(input) {
       const row = await one(
-        'SELECT * FROM uts.complete_provider_sign_in($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)',
+        'SELECT * FROM uts.complete_provider_sign_in($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
         [
           input.environment,
           input.stateHash,
@@ -262,6 +287,7 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
           input.identity.workosConnectionId,
           input.sessionTokenHash,
           ...networkValues(input.network),
+          input.newAccountId,
         ],
         CompleteFlowRowSchema
       );
@@ -278,8 +304,15 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
 
     async startEmail(input) {
       const row = await one(
-        'SELECT * FROM uts.start_email_sign_in($1, $2, $3, $4, $5)',
-        [input.email, input.emailHash, input.linkHash, input.codeHash, input.returnTo],
+        'SELECT * FROM uts.start_email_sign_in($1, $2, $3, $4, $5, $6)',
+        [
+          input.email,
+          input.emailHash,
+          input.linkHash,
+          input.codeHash,
+          input.binderHash,
+          input.returnTo,
+        ],
         StartEmailRowSchema
       );
       if (row.outcome === 'sso_required') return { outcome: 'sso_required' };
@@ -288,13 +321,14 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
 
     async verifyEmailCode(input) {
       const row = await one(
-        'SELECT * FROM uts.verify_email_code($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        'SELECT * FROM uts.verify_email_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
         [
           input.environment,
           input.emailHash,
           input.codeHash,
           input.sessionTokenHash,
           ...networkValues(input.network),
+          input.newAccountId,
         ],
         VerifyCodeRowSchema
       );
@@ -308,17 +342,21 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
           returnTo: row.code_return_to,
         };
       }
+      if (row.outcome === 'codes_stopped') return { outcome: 'codes_stopped' };
       return { outcome: row.outcome, returnTo: row.code_return_to };
     },
 
     async completeEmailLink(input) {
       const row = await one(
-        'SELECT * FROM uts.complete_email_link($1, $2, $3, $4, $5, $6, $7, $8)',
+        'SELECT * FROM uts.complete_email_link($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
         [
           input.environment,
           input.linkHash,
+          input.binderHash,
+          input.otherBrowser,
           input.sessionTokenHash,
           ...networkValues(input.network),
+          input.newAccountId,
         ],
         EmailLinkRowSchema
       );
@@ -327,6 +365,19 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
       }
       if (row.outcome === 'invalid_link') return { outcome: 'invalid_link' };
       return { outcome: row.outcome, returnTo: row.link_return_to };
+    },
+
+    async readEmailLink(linkHash) {
+      const row = await store.maybeOne(
+        {
+          text: `SELECT email, binder_hash FROM uts.email_codes
+                 WHERE link_hash = $1 AND purpose = 'sign_in'
+                   AND status IN ('pending', 'exhausted') AND expires_at > now()`,
+          values: [linkHash],
+        },
+        EmailLinkReadRowSchema
+      );
+      return row === null ? null : { email: row.email, binderHash: row.binder_hash };
     },
   };
 }

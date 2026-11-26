@@ -11,6 +11,7 @@ import {
   type ProviderSignInStore,
   identityStoreProviderSignIn,
 } from '../../src/signin/providers/store';
+import { newAccountId } from '../../src/signin/flows';
 import type { NetworkContext } from '../../src/signin/store';
 import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
 
@@ -123,6 +124,7 @@ async function complete(flow: Flow, identity: Partial<ProviderIdentity>, binder 
     },
     sessionTokenHash: sha256(sessionToken),
     network,
+    newAccountId: newAccountId(),
   });
   return { result, sessionToken };
 }
@@ -152,7 +154,7 @@ describe('provider sign-in', () => {
     expect(result.returnTo).toBe('/authorize?client_id=kilo-cli');
     expect(result.signedIn).toMatchObject({ accountCreated: true, methodLinked: false });
     const accountId = result.signedIn.accountId;
-    expect(z.uuid().safeParse(accountId).success).toBe(true);
+    expect(accountId).toMatch(/^uts_[a-z2-7]{26}$/);
     expect(await sessionRow(sessionToken)).toEqual({
       account_id: accountId,
       amr: ['oauth'],
@@ -391,26 +393,34 @@ describe('WorkOS SSO', () => {
   const orgId = randomUUID();
   const domain = `${randomBytes(4).toString('hex')}.example.org`;
   const connection = `conn_${randomBytes(6).toString('hex')}`;
+  const optionalOrg = randomUUID();
+  const optionalDomain = `${randomBytes(4).toString('hex')}.example.org`;
+  const optionalConnection = `conn_${randomBytes(6).toString('hex')}`;
 
   beforeAll(async () => {
-    await owner.query(
-      `INSERT INTO uts.sso_connections (org_id, workos_connection_id) VALUES ($1, $2)`,
-      [orgId, connection]
-    );
-    await owner.query(
-      `INSERT INTO uts.sso_domains (org_id, domain, status, dns_challenge_hash, verified_at)
-       VALUES ($1, $2, 'verified', $3, now())`,
-      [orgId, domain, randomBytes(32)]
-    );
-    await owner.query(
-      `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, 'required', 1)`,
-      [orgId]
-    );
+    for (const [org, orgDomain, orgConnection, enforcement] of [
+      [orgId, domain, connection, 'required'],
+      [optionalOrg, optionalDomain, optionalConnection, 'optional'],
+    ]) {
+      await owner.query(
+        `INSERT INTO uts.sso_connections (org_id, workos_connection_id) VALUES ($1, $2)`,
+        [org, orgConnection]
+      );
+      await owner.query(
+        `INSERT INTO uts.sso_domains (org_id, domain, status, dns_challenge_hash, verified_at)
+         VALUES ($1, $2, 'verified', $3, now())`,
+        [org, orgDomain, randomBytes(32)]
+      );
+      await owner.query(
+        `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, $2, 1)`,
+        [org, enforcement]
+      );
+    }
   });
 
-  async function ssoFlow() {
-    const started = await startFlow('workos', { ssoDomain: domain });
-    expect(started.result).toEqual({ outcome: 'started', workosConnectionId: connection });
+  async function ssoFlow(flowDomain = domain, flowConnection = connection) {
+    const started = await startFlow('workos', { ssoDomain: flowDomain });
+    expect(started.result).toEqual({ outcome: 'started', workosConnectionId: flowConnection });
     return started.flow;
   }
 
@@ -446,11 +456,39 @@ describe('WorkOS SSO', () => {
     ).toMatchObject({ outcome: 'sso_refused' });
   });
 
-  it('never links SSO to an existing account by email', async () => {
-    const email = `existing-${randomBytes(3).toString('hex')}@${domain}`;
+  it('settles SSO onto the one account of an address whose domain requires SSO, with a notice', async () => {
+    // The account existed before the org required SSO; every other method of it is now refused,
+    // so its member is not locked out.
+    const email = `member-${randomBytes(3).toString('hex')}@${domain}`;
     const accountId = await accountWithEmail(email);
+    expect(await signIn('google', { email, emailProven: true })).toMatchObject({
+      outcome: 'sso_required',
+    });
     expect(
       (await complete(await ssoFlow(), { email, workosConnectionId: connection })).result
+    ).toMatchObject({
+      outcome: 'signed_in',
+      signedIn: { accountId, accountCreated: false, methodLinked: true },
+    });
+    const rows = await auditRows(accountId);
+    expect(rows.find(row => row.type === 'ai.kilo.uts.sign_in_method.linked')?.event.data.attributes)
+      .toMatchObject({ provider: 'workos', linkedBy: 'sso_required_domain' });
+    const notices = await owner.query('SELECT kind FROM uts.notices WHERE account_id = $1', [
+      accountId,
+    ]);
+    expect(notices.rows).toEqual([{ kind: 'sign_in_method_changed' }]);
+  });
+
+  it('never links SSO to an existing account by email where the domain does not require SSO', async () => {
+    const email = `existing-${randomBytes(3).toString('hex')}@${optionalDomain}`;
+    const accountId = await accountWithEmail(email);
+    expect(
+      (
+        await complete(await ssoFlow(optionalDomain, optionalConnection), {
+          email,
+          workosConnectionId: optionalConnection,
+        })
+      ).result
     ).toMatchObject({ outcome: 'link_required' });
     expect(await auditTypes(accountId)).toEqual(['ai.kilo.uts.sign_in.denied']);
   });
@@ -466,6 +504,7 @@ describe('WorkOS SSO', () => {
         emailHash: keyed('kilo-uts-email', email),
         linkHash: sha256(token()),
         codeHash: keyed('kilo-uts-email-code', `${email}:123456`),
+        binderHash: sha256(token()),
         returnTo: '/signin/done',
       })
     ).toEqual({ outcome: 'sso_required' });
@@ -473,13 +512,19 @@ describe('WorkOS SSO', () => {
 });
 
 describe('email sign-in', () => {
+  /** The binder each sent email's browser holds, by link. */
+  const binders = new Map<string, string>();
+
   async function sendEmail(email: string, code = '123456') {
     const link = token();
+    const binder = token();
+    binders.set(link, binder);
     const result = await store.startEmail({
       email,
       emailHash: keyed('kilo-uts-email', email),
       linkHash: sha256(link),
       codeHash: keyed('kilo-uts-email-code', `${email}:${code}`),
+      binderHash: sha256(binder),
       returnTo: '/signin/done',
     });
     return { link, result };
@@ -493,18 +538,51 @@ describe('email sign-in', () => {
       codeHash: keyed('kilo-uts-email-code', `${email}:${code}`),
       sessionTokenHash: sha256(sessionToken),
       network,
+      newAccountId: newAccountId(),
     });
     return { result, sessionToken };
   }
 
-  async function follow(link: string) {
+  /** Opens the link in the browser that asked for it, or in another one. */
+  async function follow(link: string, browser: 'same' | 'other' | 'other_confirmed' = 'same') {
+    const binder = binders.get(link);
     return await store.completeEmailLink({
       environment,
       linkHash: sha256(link),
+      binderHash: browser === 'same' && binder !== undefined ? sha256(binder) : null,
+      otherBrowser: browser === 'other_confirmed',
       sessionTokenHash: sha256(token()),
       network,
+      newAccountId: newAccountId(),
     });
   }
+
+  it('refuses guesses across older codes: a new email exhausts every earlier code', async () => {
+    const email = address();
+    const first = await sendEmail(email, '111111');
+    await sendEmail(email, '222222');
+    expect((await enter(email, '111111')).result).toMatchObject({ outcome: 'invalid_code' });
+    // Five wrong entries exhaust the newest code; no older code takes over.
+    for (let entry = 0; entry < 5; entry += 1) await enter(email, '000000');
+    expect((await enter(email, '111111')).result).toEqual({
+      outcome: 'invalid_code',
+      entriesLeft: 0,
+      returnTo: null,
+    });
+    // The older email's link still works.
+    expect(await follow(first.link)).toMatchObject({ outcome: 'signed_in' });
+  });
+
+  it('asks for a confirmation when a link is opened in another browser', async () => {
+    const email = address();
+    const { link } = await sendEmail(email);
+    expect(await follow(link, 'other')).toEqual({
+      outcome: 'confirm_other_browser',
+      returnTo: '/signin/done',
+    });
+    expect(await follow(link, 'other_confirmed')).toMatchObject({ outcome: 'signed_in' });
+    expect(await store.readEmailLink(sha256(link))).toBeNull();
+  });
 
   it('signs in with the code, creates the account and its email method once', async () => {
     const email = address();
@@ -615,6 +693,14 @@ describe('email sign-in', () => {
     );
     expect(limits.rows).toEqual([{ failures_in_day: 20, status: 'stopped' }]);
     expect((await sendEmail(email)).result).toMatchObject({ outcome: 'stored', withCode: false });
+    // A stop refuses every code until the day window ends, even a right one.
+    expect((await enter(email, '123456')).result).toEqual({ outcome: 'codes_stopped' });
+    const stop = await owner.query<{ stopped_for_hours: number }>(
+      `SELECT round(extract(epoch FROM stopped_until - day_started_at) / 3600)::int AS stopped_for_hours
+       FROM uts.email_code_limits WHERE email_hash = $1`,
+      [keyed('kilo-uts-email', email)]
+    );
+    expect(stop.rows).toEqual([{ stopped_for_hours: 24 }]);
   });
 
   it('refuses a blocked account by code and by link', async () => {
@@ -622,6 +708,52 @@ describe('email sign-in', () => {
     await accountWithEmail(email, 'blocked');
     await sendEmail(email);
     expect((await enter(email, '123456')).result).toMatchObject({ outcome: 'account_blocked' });
+  });
+});
+
+describe('concurrent sign-ins', () => {
+  it('settle two first sign-ins of one address one after the other, so one account results', async () => {
+    const email = address();
+    const firstClient = await db.connect('uts_app_a');
+    const secondClient = await db.connect('uts_app_b');
+    const firstStore = identityStoreProviderSignIn(new IdentityStore(firstClient));
+    const secondStore = identityStoreProviderSignIn(new IdentityStore(secondClient));
+    const google = await startFlow('google');
+    const github = await startFlow('github');
+    const completion = (target: ProviderSignInStore, flow: Flow) =>
+      target.completeFlow({
+        environment,
+        stateHash: sha256(flow.state),
+        binderHash: sha256(flow.binder),
+        provider: flow.provider,
+        identity: { subject: randomUUID(), email, emailProven: true, workosConnectionId: null },
+        sessionTokenHash: sha256(token()),
+        network,
+        newAccountId: newAccountId(),
+      });
+    // The first sign-in's transaction stays open, holding the address's lock.
+    await firstClient.query('BEGIN');
+    const first = await completion(firstStore, google.flow);
+    const second = completion(secondStore, github.flow);
+    // The second sign-in waits on that lock: the server shows its advisory lock not granted.
+    let waiting = 0;
+    for (let probe = 0; probe < 200 && waiting === 0; probe += 1) {
+      const locks = await owner.query<{ waiting: number }>(
+        `SELECT count(*)::int AS waiting FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`
+      );
+      waiting = locks.rows[0].waiting;
+    }
+    expect(waiting).toBe(1);
+    await firstClient.query('COMMIT');
+    if (first.outcome !== 'signed_in') throw new Error(first.outcome);
+    expect(await second).toMatchObject({
+      outcome: 'signed_in',
+      signedIn: { accountId: first.signedIn.accountId, accountCreated: false, methodLinked: true },
+    });
+    const accounts = await owner.query('SELECT id FROM uts.accounts WHERE primary_email = $1', [
+      email,
+    ]);
+    expect(accounts.rowCount).toBe(1);
   });
 });
 

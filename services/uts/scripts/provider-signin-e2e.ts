@@ -104,6 +104,14 @@ function storeCookies(response: Response) {
   }
 }
 
+/** The URL a continue page (the answer to an SSO start form) navigates to. */
+async function continueTarget(response: Response): Promise<string> {
+  const html = await response.text();
+  const target = /<meta http-equiv="refresh" content="0;url=([^"]+)">/.exec(html)?.[1];
+  if (target === undefined) throw new Error(`no continue target (status ${response.status})`);
+  return target.replaceAll('&amp;', '&');
+}
+
 function toWorker(url: string): URL {
   const target = new URL(url, base);
   if (target.origin === issuer) return new URL(`${target.pathname}${target.search}`, base);
@@ -605,7 +613,8 @@ async function run(admin: pg.Client) {
       '/signin/sso/start',
       formPost({ email: ssoEmail, return_to: returnTo })
     );
-    const toWorkos = new URL(start.headers.get('Location') ?? '');
+    check(start.status === 200 && start.headers.get('Location') === null, 'SSO start is a page');
+    const toWorkos = new URL(await continueTarget(start));
     check(
       toWorkos.searchParams.get('connection') === SSO_CONNECTION,
       'SSO start names the connection'
@@ -721,6 +730,18 @@ async function run(admin: pg.Client) {
     const third = await mail();
     const confirm = await browse(third.link);
     const linkToken = new URL(third.link).searchParams.get('token') ?? '';
+    const confirmText = await confirm.text();
+    check(confirmText.includes(`Sign in as ${email.slice(0, 1)}…@`), 'link page names the address');
+    // The same link opened in another browser (no binder cookie) needs a second confirmation.
+    const binders = [...jar.entries()];
+    jar.clear();
+    const otherPage = await (await browse(third.link)).text();
+    const otherUnconfirmed = await browse('/signin/email/link', formPost({ token: linkToken }));
+    check(
+      otherPage.includes('another browser') && otherUnconfirmed.status === 409,
+      'another browser must confirm'
+    );
+    for (const [name, value] of binders) jar.set(name, value);
     const viaLink = await browse('/signin/email/link', formPost({ token: linkToken }));
     const reuse = await browse('/signin/email/link', formPost({ token: linkToken }));
     check(
@@ -736,6 +757,7 @@ async function run(admin: pg.Client) {
       code: signedIn.status,
       tokens: tokens.count,
       linkConfirmPage: confirm.status,
+      otherBrowserUnconfirmed: otherUnconfirmed.status,
       link: viaLink.status,
       linkReuse: reuse.status,
       foreignOrigin: foreign.status,
@@ -774,7 +796,7 @@ async function run(admin: pg.Client) {
       verified: false,
     });
     const ssoStart = await browse('/signin/sso/start', formPost({ email: ssoExisting }));
-    const ssoRefused = await providerSignIn(ssoStart.headers.get('Location') ?? '');
+    const ssoRefused = await providerSignIn(await continueTarget(ssoStart));
 
     jar.clear();
     queued.push({

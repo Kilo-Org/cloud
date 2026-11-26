@@ -197,27 +197,46 @@ const HashKeySchema = z
   .transform(value => new Uint8Array(Buffer.from(value, 'base64url')));
 
 /**
- * Reads the sign-in configuration. `SIGNIN_DEV_ENDPOINTS` counts only in development, and there
- * it must parse; anywhere else it is a configuration error.
+ * The development endpoint overrides: `none` when unset, `bad` when set outside development or not
+ * valid, which makes every provider and SSO misconfigured rather than failing other routes.
+ */
+function devEndpoints(
+  env: SignInEnv,
+  config: UtsConfig
+): { status: 'none' } | { status: 'set'; endpoints: DevEndpoints } | { status: 'bad' } {
+  if (env.SIGNIN_DEV_ENDPOINTS === undefined) return { status: 'none' };
+  if (config.environment !== 'development') return { status: 'bad' };
+  let value: unknown;
+  try {
+    value = JSON.parse(env.SIGNIN_DEV_ENDPOINTS);
+  } catch {
+    return { status: 'bad' };
+  }
+  const parsed = DevEndpointsSchema.safeParse(value);
+  return parsed.success ? { status: 'set', endpoints: parsed.data } : { status: 'bad' };
+}
+
+const DEV_ENDPOINTS_PROBLEM = { status: 'misconfigured', missing: ['SIGNIN_DEV_ENDPOINTS'] } as const;
+
+/**
+ * Reads the sign-in configuration. It never throws: a value that does not parse makes only its
+ * method misconfigured, so a bad sign-in setting cannot fail the token or metadata routes.
+ * `SIGNIN_DEV_ENDPOINTS` counts only in development; set anywhere else, or not valid, it makes
+ * every provider and SSO misconfigured.
  */
 export function readSignInConfig(env: SignInEnv, config: UtsConfig): SignInConfig {
-  let dev: DevEndpoints | null = null;
-  if (env.SIGNIN_DEV_ENDPOINTS !== undefined) {
-    if (config.environment !== 'development') {
-      throw new Error('SIGNIN_DEV_ENDPOINTS is a development setting');
-    }
-    dev = DevEndpointsSchema.parse(JSON.parse(env.SIGNIN_DEV_ENDPOINTS));
-  }
+  const dev = devEndpoints(env, config);
+  const overrides = dev.status === 'set' ? dev.endpoints : null;
   const provider = (id: UtsOAuthProvider): ProviderConfig => {
     const credentials = credentialsOf(id, env);
-    return credentials.status === 'on'
-      ? {
-          status: 'on',
-          provider: id,
-          spec: specWithEndpoints(id, dev),
-          credentials: credentials.credentials,
-        }
-      : credentials;
+    if (credentials.status !== 'on') return credentials;
+    if (dev.status === 'bad') return DEV_ENDPOINTS_PROBLEM;
+    return {
+      status: 'on',
+      provider: id,
+      spec: specWithEndpoints(id, overrides),
+      credentials: credentials.credentials,
+    };
   };
   const providers: Record<UtsOAuthProvider, ProviderConfig> = {
     google: provider('google'),
@@ -230,15 +249,44 @@ export function readSignInConfig(env: SignInEnv, config: UtsConfig): SignInConfi
     discord: provider('discord'),
     linkedin: provider('linkedin'),
   };
-  const sso = configured(env, ['SIGNIN_WORKOS_CLIENT_ID', 'SIGNIN_WORKOS_API_KEY'], values => ({
-    clientId: values.SIGNIN_WORKOS_CLIENT_ID,
-    apiKey: values.SIGNIN_WORKOS_API_KEY,
-    endpoints: dev?.workos ?? WORKOS_ENDPOINTS,
+  const workos = configured(
+    env,
+    ['SIGNIN_WORKOS_CLIENT_ID', 'SIGNIN_WORKOS_API_KEY'],
+    values => ({
+      clientId: values.SIGNIN_WORKOS_CLIENT_ID,
+      apiKey: values.SIGNIN_WORKOS_API_KEY,
+      endpoints: overrides?.workos ?? WORKOS_ENDPOINTS,
+    })
+  );
+  const sso: SsoConfig = workos.status === 'on' && dev.status === 'bad' ? DEV_ENDPOINTS_PROBLEM : workos;
+  const rawKey = configured(env, ['SIGNIN_EMAIL_HASH_KEY'], values => ({
+    key: values.SIGNIN_EMAIL_HASH_KEY,
   }));
-  const emailHashKey = configured(env, ['SIGNIN_EMAIL_HASH_KEY'], values => ({
-    hashKey: HashKeySchema.parse(values.SIGNIN_EMAIL_HASH_KEY),
-  }));
+  let emailHashKey: EmailHashKey;
+  if (rawKey.status === 'on') {
+    const key = HashKeySchema.safeParse(rawKey.key);
+    emailHashKey = key.success
+      ? { status: 'on', hashKey: key.data }
+      : { status: 'misconfigured', missing: ['SIGNIN_EMAIL_HASH_KEY'] };
+  } else {
+    emailHashKey = rawKey;
+  }
   return { providers, sso, emailHashKey };
+}
+
+const configs = new WeakMap<object, SignInConfig>();
+
+/**
+ * The sign-in configuration of one `env`, read once per isolate: an isolate keeps one `env`
+ * object, so the token and metadata routes pay for no parse after the first request.
+ */
+export function signInConfigFor(env: SignInEnv, config: UtsConfig): SignInConfig {
+  let settings = configs.get(env);
+  if (settings === undefined) {
+    settings = readSignInConfig(env, config);
+    configs.set(env, settings);
+  }
+  return settings;
 }
 
 /** Logs a misconfigured sign-in method once per request that reaches it; names only. */

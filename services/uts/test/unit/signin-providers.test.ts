@@ -155,9 +155,12 @@ describe('configuration', () => {
     expect(readSignInConfig(env, config).providers.github).toMatchObject({
       spec: { endpoints: { api: 'http://127.0.0.1:9003/api' } },
     });
-    expect(() => readSignInConfig(env, { ...config, environment: 'staging' })).toThrow(
-      'SIGNIN_DEV_ENDPOINTS is a development setting'
-    );
+    // Outside development, or with a remote endpoint, every provider and SSO is misconfigured;
+    // the rest of the Worker keeps working.
+    const misconfigured = { status: 'misconfigured', missing: ['SIGNIN_DEV_ENDPOINTS'] };
+    const staging = readSignInConfig(env, { ...config, environment: 'staging' });
+    expect(staging.providers.github).toEqual(misconfigured);
+    expect(staging.sso).toEqual(misconfigured);
     const remote = JSON.stringify({
       github: {
         authorization: 'https://github.example/a',
@@ -165,7 +168,9 @@ describe('configuration', () => {
         api: 'https://github.example',
       },
     });
-    expect(() => readSignInConfig({ ...env, SIGNIN_DEV_ENDPOINTS: remote }, config)).toThrow();
+    expect(
+      readSignInConfig({ ...env, SIGNIN_DEV_ENDPOINTS: remote }, config).providers.github
+    ).toEqual(misconfigured);
   });
 });
 

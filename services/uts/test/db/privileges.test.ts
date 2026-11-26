@@ -121,6 +121,19 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     expect(result.rowCount).toBe(1);
   });
 
+  it('runs OAuth row maintenance', async () => {
+    const app = await db.connect(login);
+    const maintenance = await app.query<{ kind: string }>(
+      'SELECT kind FROM uts.maintain_oauth_rows()'
+    );
+    expect(maintenance.rows.map(row => row.kind)).toEqual([
+      'authorization_codes',
+      'third_party_refresh_tokens',
+      'revocations',
+      'dpop_proofs',
+    ]);
+  });
+
   it('inserts audit rows and runs partition maintenance', async () => {
     const app = await db.connect(login);
     await insertAudit(app);
@@ -428,6 +441,7 @@ describe('functions', () => {
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
+      { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
       { routine: 'refresh_first_party', grantee: 'uts_app' },
       { routine: 'refresh_third_party', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },

@@ -1110,6 +1110,73 @@ BEGIN
 END
 $$;
 
+-- Every token of a family, for the family's revocation and for `uts.maintain_oauth_rows()`.
+CREATE INDEX third_party_refresh_tokens_family_idx ON uts.third_party_refresh_tokens (family_id);
+
+-- Deletes OAuth rows that no statement reads again, at most 5,000 of each kind per call (README,
+-- "OAuth row maintenance"). The UTS cron calls it through the app role until every count is under
+-- 5,000; each call is one statement, so through Hyperdrive each batch is its own short
+-- transaction. It never deletes a grant, a family, a live token, or a code within its lifetime:
+-- * authorization codes 1 hour past their 60-second lifetime, used or not (until then a second
+--   use of a used code still revokes its grant);
+-- * every refresh token of a third-party family that ended (revoked, or past its 90-day end):
+--   such a token already fails, so no reuse check needs it. While a family lives, each rotated
+--   token stays, so a reuse is detected however old the token is. Newest first, so a deleted
+--   token never cascades to a child token outside the batch;
+-- * revocation feed entries past `feed_expires_at`;
+-- * DPoP proof `jti`s past `expires_at`, which no clock accepts again.
+CREATE FUNCTION uts.maintain_oauth_rows()
+RETURNS TABLE (kind text, deleted integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  batch CONSTANT integer := 5000;
+BEGIN
+  DELETE FROM uts.authorization_codes AS code
+  WHERE code.code_hash IN (
+    SELECT stale.code_hash FROM uts.authorization_codes AS stale
+    WHERE stale.expires_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'authorization_codes';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.third_party_refresh_tokens AS token
+  WHERE token.id IN (
+    SELECT ended.id
+    FROM uts.third_party_grant_families AS family
+    JOIN uts.third_party_refresh_tokens AS ended ON ended.family_id = family.id
+    WHERE family.status = 'revoked' OR family.expires_at <= now()
+    ORDER BY ended.issued_at DESC
+    LIMIT batch
+  );
+  kind := 'third_party_refresh_tokens';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.revocations AS entry
+  WHERE entry.id IN (
+    SELECT stale.id FROM uts.revocations AS stale WHERE stale.feed_expires_at < now() LIMIT batch
+  );
+  kind := 'revocations';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.dpop_proofs AS proof
+  WHERE (proof.grant_id, proof.jti) IN (
+    SELECT stale.grant_id, stale.jti FROM uts.dpop_proofs AS stale
+    WHERE stale.expires_at < now()
+    LIMIT batch
+  );
+  kind := 'dpop_proofs';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+END
+$$;
+
 GRANT EXECUTE ON FUNCTION
   uts.issue_authorization_code(
     text, bytea, text, uts.client_kind, text, uuid, text, text[], text[], uuid, text, bytea,
@@ -1122,7 +1189,8 @@ GRANT EXECUTE ON FUNCTION
   uts.refresh_first_party(text, bytea, uuid, text, bytea, text, text[], text[]),
   uts.refresh_third_party(text, bytea, text, bytea, text[], text[]),
   uts.revoke_refresh_token(text, bytea, text),
-  uts.introspect_refresh_token(bytea, text, bytea, text)
+  uts.introspect_refresh_token(bytea, text, bytea, text),
+  uts.maintain_oauth_rows()
 TO uts_app;
 
 -- The functions above are now the only writers of these tables (README, "Rules for statements").

@@ -227,6 +227,13 @@ Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and meta
    fetches: record that in the pull request, because each key-set read then makes its 16 signer
    calls from the feed Worker's data center.
 
+4. **The mint path's p95 under placement is a staging gate (design 3, 5.2).** No environment binds
+   the identity store yet, so this branch measures the mint statement and `POST /token` only
+   through local `wrangler dev`. The slice that binds the staging Hyperdrive config must measure
+   the server-side p95 of `POST /token` refresh in staging, with placement, the production-shaped
+   Hyperdrive pool and the signer objects in their EU data center, and block its merge until the
+   p95 is under 150 ms.
+
 ## Deploys
 
 Both Workers deploy through `.github/workflows/deploy-workers.yml`, which discovers every
@@ -265,7 +272,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 | --- | --- | --- | --- |
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` and `uts.maintain_oauth_rows()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -392,6 +399,36 @@ per active client every 8 minutes:
 The relay reads only the newest rows, so the tier needs disk more than memory. The identity store
 moves up one compute size when its buffer cache hit ratio stays below 99 percent for an hour at
 peak, and its disk grows before data and indexes pass 70 percent of it.
+
+### OAuth row maintenance
+
+The app login cannot delete credential rows, so `uts.maintain_oauth_rows()` (SECURITY DEFINER,
+granted to `uts_app`) removes the rows no statement reads again. Each call deletes at most 5,000
+rows of each kind and returns one `(kind, deleted)` row per kind; the cron calls it until every
+count is under 5,000. It deletes:
+
+| Rows | When | Why that is safe |
+| --- | --- | --- |
+| `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
+| `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end, newest first | Each such token fails anyway. While a family lives, every rotated token stays, so a reuse is detected however old the token is |
+| `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
+| `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
+
+It never deletes a grant, a family row, a live token, or a code within its lifetime
+(`test/db/oauth-grants.test.ts`). At one mint per active client every 8 minutes, the DPoP rows
+arrive at 21, 104 and 417 per second for 10k, 50k and 200k clients: 1,250, 6,250 and 25,000 per
+minute, so a cron that runs every minute makes 1 to 5 calls.
+
+### Third-party grace window
+
+A rotated third-party token stays usable for 60 seconds (OAuth 2.1 section 4.3.3), so a client
+that lost a response can retry. A presentation inside the grace rotates the family's current
+token, so two holders can briefly hold tokens of one family: a client and a thief who presents a
+just-rotated token inside the grace each get a token, and the legitimate client's current token
+is rotated away. Reuse is then detected when either side later presents a rotated token after
+its grace: the whole family is revoked and a feed entry is written (`test/db/oauth-grants.test.ts`,
+"third-party grace window"). First-party grants do not rotate; their DPoP key is the sender
+constraint.
 
 ### Hot-path index probes
 

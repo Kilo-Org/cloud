@@ -1077,3 +1077,133 @@ describe('introspection', () => {
     expect(await auditRows(accountId)).toHaveLength(before);
   });
 });
+
+describe('third-party grace window', () => {
+  it.each([
+    ['the token presented twice', 'first'],
+    ['its child, which the grace presentation rotated', 'child'],
+  ] as const)(
+    'revokes the family when, after a second presentation in grace, %s comes back after the grace',
+    async (_name, presentedLater) => {
+      const accountId = await insertAccount(owner);
+      const family = await thirdPartyFamily(accountId);
+      const child = refreshThirdParty(family.clientId, family.refreshToken);
+      expect((await child.result).outcome).toBe('issued');
+      // The second presentation in grace (a lost response, or a stolen copy) rotates the child.
+      const grace = refreshThirdParty(family.clientId, family.refreshToken);
+      expect((await grace.result).outcome).toBe('issued');
+      await owner.query(
+        `UPDATE uts.third_party_refresh_tokens
+         SET rotated_at = now() - interval '2 minutes', grace_until = now() - interval '1 minute'
+         WHERE family_id = $1 AND status = 'rotated'`,
+        [family.familyId]
+      );
+      const later = presentedLater === 'first' ? family.refreshToken : child.next;
+      expect(await refreshThirdParty(family.clientId, later).result).toEqual({
+        outcome: 'reuse_detected',
+      });
+      expect(await refreshThirdParty(family.clientId, grace.next).result).toEqual({
+        outcome: 'invalid_grant',
+      });
+      const stored = await owner.query(
+        'SELECT status, revoke_reason FROM uts.third_party_grant_families WHERE id = $1',
+        [family.familyId]
+      );
+      expect(stored.rows).toEqual([{ status: 'revoked', revoke_reason: 'reuse_detected' }]);
+    }
+  );
+});
+
+describe('OAuth row maintenance', () => {
+  const counts = async () => {
+    const result = await app.query<{ kind: string; deleted: number }>(
+      'SELECT kind, deleted FROM uts.maintain_oauth_rows()'
+    );
+    return Object.fromEntries(result.rows.map(row => [row.kind, row.deleted]));
+  };
+  const exists = async (sql: string, values: unknown[]) =>
+    (await owner.query<{ found: boolean }>(`SELECT EXISTS (${sql}) AS found`, values)).rows[0]
+      .found;
+
+  it('deletes stale codes, tokens of ended families, old feed entries and proofs, nothing live', async () => {
+    const accountId = await insertAccount(owner);
+    const liveCode = await issueFirstPartyCode(accountId);
+    const grant = await firstPartyGrant(accountId);
+    const live = await thirdPartyFamily(accountId);
+    await refreshThirdParty(live.clientId, live.refreshToken).result;
+
+    const staleCode = await issueFirstPartyCode(accountId);
+    await owner.query(
+      `UPDATE uts.authorization_codes
+       SET created_at = now() - interval '2 hours', expires_at = now() - interval '119 minutes'
+       WHERE code_hash = $1`,
+      [sha256(staleCode.code)]
+    );
+    const ended = await thirdPartyFamily(accountId);
+    await refreshThirdParty(ended.clientId, ended.refreshToken).result;
+    expect(
+      await grants.revoke({
+        environment,
+        tokenHash: sha256(ended.refreshToken),
+        clientId: ended.clientId,
+      })
+    ).toBe('revoked');
+    const staleFeed = randomUUID();
+    await owner.query(
+      `INSERT INTO uts.revocations (kind, subject_id, revoked_at, feed_expires_at)
+       VALUES ('grant', $1, now() - interval '1 hour', now() - interval '40 minutes')`,
+      [staleFeed]
+    );
+    const staleJti = randomUUID();
+    await owner.query(
+      `INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at) VALUES ($1, $2, now() - interval '1 second')`,
+      [grant.grantId, staleJti]
+    );
+
+    const first = await counts();
+    expect(Object.keys(first).sort()).toEqual([
+      'authorization_codes',
+      'dpop_proofs',
+      'revocations',
+      'third_party_refresh_tokens',
+    ]);
+    expect(first.authorization_codes).toBeGreaterThanOrEqual(1);
+    expect(first.third_party_refresh_tokens).toBeGreaterThanOrEqual(2);
+    expect(first.revocations).toBeGreaterThanOrEqual(1);
+    expect(first.dpop_proofs).toBeGreaterThanOrEqual(1);
+    expect(await counts()).toEqual({
+      authorization_codes: 0,
+      dpop_proofs: 0,
+      revocations: 0,
+      third_party_refresh_tokens: 0,
+    });
+
+    const code = 'SELECT 1 FROM uts.authorization_codes WHERE code_hash = $1';
+    expect(await exists(code, [sha256(staleCode.code)])).toBe(false);
+    expect(await exists(code, [sha256(liveCode.code)])).toBe(true);
+    expect(await exists(code, [grant.codeHash])).toBe(true);
+    const tokens = 'SELECT 1 FROM uts.third_party_refresh_tokens WHERE family_id = $1';
+    expect(await exists(tokens, [ended.familyId])).toBe(false);
+    expect(await exists(tokens, [live.familyId])).toBe(true);
+    const family = 'SELECT 1 FROM uts.third_party_grant_families WHERE id = $1';
+    expect(await exists(family, [ended.familyId])).toBe(true);
+    const feed = 'SELECT 1 FROM uts.revocations WHERE subject_id = $1';
+    expect(await exists(feed, [staleFeed])).toBe(false);
+    expect(await exists(feed, [ended.familyId])).toBe(true);
+    const proof = 'SELECT 1 FROM uts.dpop_proofs WHERE grant_id = $1 AND jti = $2';
+    expect(await exists(proof, [grant.grantId, staleJti])).toBe(false);
+    if (grant.binding.kind !== 'first_party') throw new Error('first-party binding expected');
+    expect(await exists(proof, [grant.grantId, grant.binding.proof.jti])).toBe(true);
+    expect(
+      (await grants.refreshFirstParty({
+        environment,
+        tokenHash: sha256(grant.refreshToken),
+        grantId: grant.grantId,
+        clientId: 'kilo-cli',
+        proof: proofOf(grant.jkt),
+        scopes: null,
+        resources: null,
+      })).outcome
+    ).toBe('issued');
+  });
+});

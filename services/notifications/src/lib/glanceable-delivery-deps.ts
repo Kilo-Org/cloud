@@ -2,9 +2,11 @@ import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snap
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_activity_tokens, user_push_tokens } from '@kilocode/db/schema';
 import { pushDataSchema, SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { readNotificationsSecret, secretsSource } from '../secrets';
 import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity';
 import { sendWidgetApns } from './apns-widget';
 import { sendPushNotifications } from './expo-push';
@@ -16,8 +18,14 @@ const deliveryExtrasSchema = z.object({
   sessionCards: sessionCardSourceSchema.array().optional(),
 });
 
-/** Per-refresh I/O dependencies, shared by every entrypoint through the user DO. */
-export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
+/**
+ * Per-refresh I/O dependencies, shared by every entrypoint through the user DO. `ctx` is that
+ * Durable Object's state: secret reads run under its lifetime.
+ */
+export function glanceableDeliveryDeps(
+  env: Env,
+  ctx: SecretsExecutionContext
+): GlanceableDeliveryDeps {
   let db: ReturnType<typeof getWorkerDb> | undefined;
   const getDbForCall = () => (db ??= getWorkerDb(env.HYPERDRIVE.connectionString));
   const iosTargets = new Map<
@@ -51,7 +59,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       }
       let internalApiSecret: string | undefined;
       try {
-        internalApiSecret = await env.INTERNAL_API_SECRET.get();
+        internalApiSecret = await readNotificationsSecret(env, 'INTERNAL_API_SECRET', ctx);
       } catch {
         internalApiSecret = undefined;
       }
@@ -166,7 +174,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       );
     },
     sendIosSessionLiveActivity: async (send, timestampSeconds, isCurrent) => {
-      const credentials = await readApnsCredentials(env);
+      const credentials = await readApnsCredentials(env, ctx);
       if (credentials === null || (isCurrent && !(await isCurrent()))) return false;
       const nowSeconds = Math.floor(Date.now() / 1000);
       const result = await sendLiveActivityApns({
@@ -208,7 +216,11 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       );
     },
     sendAndroidSessionLiveUpdate: async (send, isCurrent) => {
-      const accessToken = await env.EXPO_ACCESS_TOKEN.get();
+      const accessToken = await readNotificationsSecret(
+        env,
+        'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+        ctx
+      );
       if (isCurrent && !(await isCurrent())) return false;
       const result = await sendPushNotifications(
         [sessionLiveUpdateExpoMessage(send)],
@@ -279,7 +291,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       onStarted,
       relevanceScore
     ) => {
-      const credentials = await readApnsCredentials(env);
+      const credentials = await readApnsCredentials(env, ctx);
       if (credentials === null || (isCurrent && !(await isCurrent()))) return;
       const result = await sendLiveActivityApns({
         credentials,
@@ -324,7 +336,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
             eq(user_activity_tokens.kind, 'ios_widget')
           )
         );
-      const credentials = await readApnsCredentials(env);
+      const credentials = await readApnsCredentials(env, ctx);
       if (!credentials || (isCurrent && !(await isCurrent()))) return;
       await sendWidgetApns({
         credentials,
@@ -384,23 +396,32 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       return row !== undefined;
     },
     sendExpoPush: async (messages, isCurrent) => {
-      const accessToken = await env.EXPO_ACCESS_TOKEN.get();
+      const accessToken = await readNotificationsSecret(
+        env,
+        'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+        ctx
+      );
       if (isCurrent && !(await isCurrent())) return;
       await sendPushNotifications(messages, accessToken, isCurrent);
     },
   };
 }
 
-async function readApnsCredentials(env: Env): Promise<ApnsCredentials | null> {
+async function readApnsCredentials(
+  env: Env,
+  ctx: SecretsExecutionContext
+): Promise<ApnsCredentials | null> {
   const { APNS_TEAM_ID: teamId, APNS_KEY_ID: keyId, APNS_TOPIC: topic } = env;
-  const privateKeyBinding = env.APNS_PRIVATE_KEY;
-  if (!teamId || !keyId || !topic || !privateKeyBinding) {
+  // The Secrets Store binding is optional; the STS bundle holds the key or reports it unavailable,
+  // which skips delivery below like a failed Secrets Store read.
+  const keyBound = secretsSource(env) === 'sts' || env.APNS_PRIVATE_KEY !== undefined;
+  if (!teamId || !keyId || !topic || !keyBound) {
     console.warn('APNs Live Activity credentials missing; skipping Live Activity delivery');
     return null;
   }
   let privateKeyPem: string;
   try {
-    privateKeyPem = await privateKeyBinding.get();
+    privateKeyPem = await readNotificationsSecret(env, 'NOTIFICATIONS_APNS_PRIVATE_KEY', ctx);
   } catch {
     console.warn('APNs Live Activity private key read failed; skipping Live Activity delivery');
     return null;

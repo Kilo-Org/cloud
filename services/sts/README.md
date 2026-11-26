@@ -351,6 +351,7 @@ Workloads with a policy, all over `worker-binding`:
 | `o11y` | development, staging, production | `services/o11y/wrangler.jsonc` |
 | `audit-relay` | development, staging, production | `services/audit-relay/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
+| `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's

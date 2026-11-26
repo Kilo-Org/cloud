@@ -1,12 +1,12 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { getTableName } from 'drizzle-orm';
-import type { DispatchPushInput, PushData } from '@kilocode/notifications';
+import type { DispatchPushInput, DispatchPushOutcome, PushData } from '@kilocode/notifications';
 
 import { sendPushNotifications } from '../lib/expo-push';
 import { setPushSinkModeForTesting } from '../lib/push-sink';
 import * as dbClient from '@kilocode/db/client';
-import type { NotificationChannelDO } from '../dos/NotificationChannelDO';
+import { NotificationChannelDO } from '../dos/NotificationChannelDO';
 
 vi.mock('../lib/expo-push', () => ({
   sendPushNotifications: vi.fn(async () => ({
@@ -2126,5 +2126,84 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     expect(result.kind).toBe('delivered');
     expect(state.historyInserts).toHaveLength(1);
     log.mockRestore();
+  });
+});
+
+describe('NotificationChannelDO.dispatchPush — secrets source', () => {
+  // Synthetic values; each source holds a different one, so a read of the
+  // wrong source, or a fallback to it, cannot pass.
+  const STORE_TOKEN = 'store-expo-fixture';
+  const BUNDLE_TOKEN = 'bundle-expo-fixture';
+
+  function stsBinding(secrets: Record<string, string>, missing: string[] = []) {
+    const getBundle = vi.fn(async () => ({
+      status: 'ok' as const,
+      workload: 'notifications',
+      environment: 'production' as const,
+      etag: '"0123456789abcdef"',
+      stale: false,
+      fetchedAt: '2026-11-26T00:00:00.000Z',
+      secrets: Object.fromEntries(
+        Object.entries(secrets).map(([name, value]) => [name, { value, version: 1 }])
+      ),
+      missing,
+    }));
+    return { getBundle };
+  }
+
+  /** Runs a fresh object on the real storage with the given source and STS binding. */
+  function dispatchWith(
+    source: string,
+    sts: { getBundle(): Promise<unknown> },
+    userId: string
+  ): Promise<DispatchPushOutcome> {
+    const objectEnv = {
+      HYPERDRIVE: env.HYPERDRIVE,
+      EVENT_SERVICE: env.EVENT_SERVICE,
+      RECEIPTS_QUEUE: env.RECEIPTS_QUEUE,
+      PUSH_SINK_MODE: '',
+      EXPO_ACCESS_TOKEN: env.EXPO_ACCESS_TOKEN,
+      SECRETS_SOURCE: source,
+      STS: sts,
+    };
+    return runInDurableObject(getDO(userId), (_instance, state) =>
+      new NotificationChannelDO(state, objectEnv as never).dispatchPush(
+        baseInput({ userId, idempotencyKey: `k-${userId}`, presenceContext: null })
+      )
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ['secrets-store', STORE_TOKEN],
+    ['sts', BUNDLE_TOKEN],
+  ])('sends with the Expo token of the selected source (%s)', async (source, expected) => {
+    const userId = `user-source-${source}`;
+    installDbMock({ tokens: [{ user_id: userId, token: 'tok1' }] });
+    const storeRead = vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue(STORE_TOKEN);
+    const sts = stsBinding({ NOTIFICATIONS_EXPO_ACCESS_TOKEN: BUNDLE_TOKEN });
+
+    const result = await dispatchWith(source, sts, userId);
+
+    expect(result.kind).toBe('delivered');
+    expect(vi.mocked(sendPushNotifications).mock.calls[0]?.[1]).toBe(expected);
+    expect(storeRead).toHaveBeenCalledTimes(source === 'sts' ? 0 : 1);
+    expect(sts.getBundle).toHaveBeenCalledTimes(source === 'sts' ? 1 : 0);
+  });
+
+  it('fails under sts when the bundle lacks the token, without reading the store', async () => {
+    const userId = 'user-source-missing';
+    installDbMock({ tokens: [{ user_id: userId, token: 'tok1' }] });
+    const storeRead = vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue(STORE_TOKEN);
+    const sts = stsBinding({}, ['NOTIFICATIONS_EXPO_ACCESS_TOKEN']);
+
+    await expect(dispatchWith('sts', sts, userId)).rejects.toThrow(
+      /NOTIFICATIONS_EXPO_ACCESS_TOKEN/
+    );
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    expect(storeRead).not.toHaveBeenCalled();
   });
 });

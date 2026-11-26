@@ -44,13 +44,17 @@ Each object:
   no RPC method returns or accepts a private key (`test/runtime/signer.test.ts` calls the other
   members through a stub and expects each call to fail);
 - refuses to create keys under any other name or in any other jurisdiction than its environment's,
-  and then answers every call with `misconfigured`, a deploy error that no retry fixes;
+  and refuses stored keys in any object but that signer's object of its environment: the id must
+  be the one the signer's name gives in the environment's jurisdiction, a check that needs no name
+  on the id, so it also holds when an alarm starts the object. A refused object answers every call
+  with `misconfigured`, a deploy error that no retry fixes;
 - publishes the public halves under `uts-token-<signer>-<RFC 7638 thumbprint>`;
 - signs with `sign(claims)`: a compact JWS with header `alg: EdDSA`, `typ: at+jwt`, `kid`. It refuses
-  a claim set with another issuer or environment, an `iat` more than 60 seconds from now, or an
-  `exp` more than 1 hour ahead, the longest UTS token lifetime. `src/keys/claims.ts` is the
-  signer's admission check; the published claim contract is phase 2's `AccessTokenClaimsSchema`
-  (`@kilocode/sts-contracts`), and every claim set the signer accepts also passes it;
+  a claim set with another issuer or environment, an `iat` more than 60 seconds from now, an `exp`
+  at or before now, or an `exp` more than 1 hour ahead, the longest UTS token lifetime.
+  `src/keys/claims.ts` is the signer's admission check; the published claim contract is phase 2's
+  `AccessTokenClaimsSchema` (`@kilocode/sts-contracts`), and every claim set the signer accepts
+  also passes it;
 - rotates by alarm: a key signs for 30 days. Each rotation creates the next key at once, to sign
   30 days later, so every signer always publishes a current and a next key, and the next key is
   published at least 7 days before it signs (a new object publishes its first two keys at once, the
@@ -68,9 +72,12 @@ Each object:
   long between the two removals, and before the second one check that the public key set
   (`/.well-known/jwks.json` on the feed Worker) lists the signer's new next `kid`; removing at once
   leaves that signer's new tokens unverifiable for up to that time. The result is
-  the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The revocation feed
-  writes it once that feed exists. No route calls `removeKid` yet: it stays unreachable until the
-  revocation-feed slice adds the operator route, which audits and alerts on each removal;
+  the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The object stores the
+  entry with the key change and keeps it until `revokeUntil`, so a repeated call for the same `kid`
+  (after a lost answer, or an alarm write that failed behind a stored removal) answers the same
+  entry and changes nothing. The revocation feed writes it once that feed exists. No route calls
+  `removeKid` yet: it stays unreachable until the revocation-feed slice adds the operator route,
+  which audits and alerts on each removal;
 - logs each rotation and removal as `uts.signer.key_event` (`SignerKeyEvent`, public `kid`s only),
   the event the UTS audit pipeline will carry (design 8.3).
 
@@ -88,19 +95,25 @@ The entrypoint does not read the signer objects itself. It asks one of 8 key-set
 `UtsKeySetDO` (`src/dos/UtsKeySetDO.ts`), named `<environment>:keyset:<0-7>` and created in the
 `eu` jurisdiction with the `weur` hint, like the signer objects; a shard under another name or
 outside its jurisdiction answers `misconfigured`. Each isolate draws its shard at random once, so
-feed isolates spread evenly over the 8 shards. Each shard holds, as plain data in memory:
+feed isolates spread evenly over the 8 shards. Each shard holds:
 
-- a copy of its last combined answer, served for 2 seconds, with one read in flight; a request
-  that needs that read polls for it. The 16 signer objects therefore see at most 8 reads per 2
-  seconds, however many feed isolates ask;
-- every signer's last good keys. A signer whose call fails, or whose object refuses to load,
-  answers those keys with their own `readAt` while they are under 24 hours old, and its failure
-  after that; each failure is logged with the read time of the keys that stood in.
+- a copy of its last combined answer, in memory, served for 2 seconds, with one read in flight; a
+  request that needs that read polls for it. The 16 signer objects therefore see at most 8 reads
+  per 2 seconds, however many feed isolates ask;
+- every signer's last good keys, in memory and in its KV storage (public keys only). A signer whose
+  call fails, or whose object refuses to load, answers those keys with their own `readAt` while
+  they are under 24 hours old, and its failure after that; each failure is logged with the read
+  time of the keys that stood in. The shard stores them when a signer's kids change and otherwise
+  at most once per 10 minutes, so a restarted shard (a deploy, an eviction) still answers a failing
+  signer's keys, with a `readAt` at most 10 minutes earlier than their last good read: a restart
+  can shorten a hold, never lengthen it. A cold feed isolate whose shard also restarted therefore
+  never builds a key set without them. Only a shard that has never read a signer, which happens
+  only while a new deployment's shards make their first reads, has nothing to stand in for it.
 
 Every signer call of a read, retries included, ends within 5 seconds, and every entrypoint call to
 its shard, retries included, within 8 seconds, so a hung object cannot hold a read past the feed
 Worker's 10-second read guard. Each RPC result, from a signer and from a shard, is copied out and
-disposed. A shard stores nothing: a restarted shard reads the signers again.
+disposed.
 
 It answers only a service binding to this entrypoint whose `props.caller` is the feed Worker's
 deployed name for its own environment, and refuses every other binding, with another caller or
@@ -112,21 +125,24 @@ any unknown path. Placement does not apply to a named entrypoint, so the entrypo
 feed Worker runs and makes one call to its shard in the EU per read.
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
 UTS Durable Object class or binds the mint Worker, any feed binding at an entrypoint other than
-`SignerKeys` or whose caller is not the feed block's own name, and any drift in the UTS configs
-(names, `eu` jurisdiction, placement, traces).
+`SignerKeys` or whose caller is not the feed block's own name, any config but `wrangler.dev.jsonc`
+that runs the development entry, and any drift in the UTS configs (names, `eu` jurisdiction,
+placement, traces, the development config's deploy guard).
 
 ## Local development
 
 ```sh
-cd services/uts && pnpm exec wrangler dev --env local --persist-to ../../.wrangler-uts
+cd services/uts && pnpm exec wrangler dev -c wrangler.dev.jsonc --persist-to ../../.wrangler-uts
 cd services/uts-feed && pnpm exec wrangler dev --env local --persist-to ../../.wrangler-uts
 curl -s http://localhost:8801/.well-known/jwks.json
 ```
 
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
-only the `local` block runs (`test/repo` fails a deployed block that runs it), and the claim set
-must name the development issuer.
+only `wrangler.dev.jsonc` runs, and the claim set must name the development issuer. That config
+cannot be deployed: its build command, which Wrangler runs before `dev`, `deploy` and
+`versions upload` with `WRANGLER_COMMAND` set to the command, fails for every command but `dev`.
+`wrangler.jsonc` holds only the production and staging blocks.
 
 ## Tests
 
@@ -159,8 +175,8 @@ jq '.keys | length' /tmp/jwks.json
 curl -sS https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server
 ```
 
-Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and metadata naming
-`https://uts-staging.kiloapps.io` and the feed key set.
+Expect `200`, `cache-control: max-age=300, stale-if-error=<86100 or less>`, `32`, and metadata
+naming `https://uts-staging.kiloapps.io` and the feed key set.
 
 1. **`eu` jurisdiction and location hint together (design 5.7).** Each signer object logs
    `uts.signer.bootstrapped` once, when it creates its keys, and each key-set shard logs

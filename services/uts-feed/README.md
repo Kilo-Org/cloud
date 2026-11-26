@@ -10,8 +10,8 @@ near itself.
 (32 keys), plus, for 1 hour and 10 minutes after each rotation, the key that retired (48 keys right
 after the 16 signers rotate together).
 
-- `Cache-Control: max-age=300, stale-if-error=86400` (design 5.7), unchanged on every response,
-  with two ages in whole seconds beside it:
+- `Cache-Control: max-age=<at most 300>, stale-if-error=<at most 86400>` (design 5.7), with two
+  ages in whole seconds beside it:
   - `Age` (RFC 9111 section 5.1): the seconds since the newest keys in the set were read from their
     signer object, which is when the set last got fresh keys. A verifier counts its 5-minute
     lifetime from it, so one failing signer does not make every response arrive expired, and
@@ -19,6 +19,13 @@ after the 16 signers rotate together).
   - `Kilo-Key-Set-Oldest-Age`: the seconds since the oldest keys in the set were read. A verifier
     counts its 24-hour last-good limit from it, so it keeps no key longer than 24 hours after that
     signer's last good read (design 7, decision Q55).
+  - A standard HTTP cache reads only `Age` and `Cache-Control`: it serves the response fresh for
+    `max-age` minus `Age` after it arrives, and on error for `stale-if-error` after that (RFC
+    5861). So the limits are cut to end there no later than the oldest keys' hold:
+    `max-age = min(300, Age + left)` and `stale-if-error = min(86400, left - (max-age - Age))`,
+    where `left` is 86400 minus the oldest age, in whole seconds rounded down. While the oldest
+    keys are as old as the newest (every signer read succeeds), that is `max-age=300` and
+    `stale-if-error=86100`.
 - The keys come from `signerKeys()` on the mint Worker's `SignerKeys` entrypoint, called over the
   `UTS_MINT` service binding. The binding carries this Worker's deployed name as `props.caller`;
   the mint Worker refuses any other caller. Placement does not apply to a named entrypoint, so the
@@ -48,7 +55,10 @@ after the 16 signers rotate together).
   - any failed read (a failed or timed-out call, a refused caller, a result that is not a valid
     signer-keys read) keeps the held set serving;
   - a signer the mint Worker answers without keys keeps the keys this isolate holds for it, so the
-    other signers stay current. Each signer's keys serve for up to 24 hours after its last good
+    other signers stay current. A new isolate holds none, but the mint Worker's key-set shards
+    keep each signer's last good keys in their storage across restarts and answer them with their
+    read time, so a cold isolate whose shard also restarted still serves a failing signer's keys
+    instead of a set without them. Each signer's keys serve for up to 24 hours after its last good
     read; then that signer drops out of the set, its tokens fail verification, and the isolate logs
     `uts_feed.key_set.signers_missing`;
   - with no signer's keys held, a failed call answers `503 temporarily_unavailable` with
@@ -60,5 +70,5 @@ after the 16 signers rotate together).
 
 ## Local development
 
-`pnpm dev` runs `wrangler dev --env local` on port 8801; run the mint Worker (`services/uts`) on port
-8800 beside it.
+`pnpm dev` runs `wrangler dev --env local` on port 8801; run the mint Worker (`services/uts`,
+`pnpm dev`, which runs `wrangler.dev.jsonc`) on port 8800 beside it.

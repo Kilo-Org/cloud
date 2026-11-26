@@ -1,7 +1,8 @@
 /**
  * The part of a Worker `ExecutionContext` (or of `@vercel/functions`) the client uses. A renewal or
  * an unanswered call is passed to `waitUntil` so the runtime keeps the instance alive until it
- * settles.
+ * settles. Without it, a read that starts a renewal waits for it before it returns: a renewal
+ * runs in the background only with a lifetime extension.
  */
 export type ServiceTokensExecutionContext = {
   waitUntil(promise: Promise<unknown>): void;

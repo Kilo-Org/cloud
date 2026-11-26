@@ -18,9 +18,16 @@ export type MintTransport = (request: MintRequest) => Promise<MintResult>;
 /**
  * How long a read that needs a mint waits for other reads to join its call: reads of one request
  * (`Promise.all` over its audiences) and of concurrent requests in the isolate share one STS call
- * of up to 8 tokens. Paid once per cold start and never on a renewal, which runs in the background.
+ * of up to 8 tokens. Paid once per cold start and never on a renewal a read hands to `waitUntil`.
  */
 export const MINT_BATCH_WINDOW_MS = 10;
+/**
+ * An attempt still open this long after it opened lost its batch timer: workerd cancels the timers
+ * of a request that ended, and nothing else sends the attempt. The next read that needs a mint opens
+ * a new attempt instead of joining it. Far above the window, so a busy event loop that fires the
+ * timer late costs no extra call.
+ */
+export const OPEN_ATTEMPT_STALE_MS = 1_000;
 /**
  * A held token is served while renewal fails until this many seconds before its `exp`, never
  * later: the request that presents it needs time to reach the callee. A 300 s token renews at
@@ -214,9 +221,14 @@ export function createServiceTokens(
     await Promise.all(splitIntoCalls(batch).map(calls => call(attempt, calls)));
   }
 
-  /** Puts `entry` in the open attempt, or opens one that the calling read owns. */
+  /**
+   * Puts `entry` in the open attempt, or opens one that the calling read owns. An open attempt past
+   * `OPEN_ATTEMPT_STALE_MS` is never joined; its own `send`, if it ever runs, mints only the entries
+   * still running on it.
+   */
   function start(entry: Entry, at: number, owned: Owned[]): Attempt {
     const failure = entry.fetch.state === 'backing_off' ? entry.fetch.failure : null;
+    if (open !== null && at >= open.startedAt + OPEN_ATTEMPT_STALE_MS) open = null;
     let attempt = open;
     if (attempt === null) {
       attempt = { id: nextAttemptId++, startedAt: at, entries: [] };
@@ -335,7 +347,16 @@ export function createServiceTokens(
       }
       const owned: Owned[] = [];
       try {
-        return await read(entryFor(target), owned);
+        const token = await read(entryFor(target), owned);
+        // A read that returns a held token can still own the renewal it started. Without a
+        // lifetime extension the renewal runs before the read returns: a runtime that ends the
+        // request, as workerd does, would cancel it, and only `waitUntil` lets it run on after.
+        if (ctx === undefined) {
+          await Promise.all(
+            owned.filter(own => own.pending).map(own => withinKeepAlive(own.settled))
+          );
+        }
+        return token;
       } finally {
         // Every exit hands this read's unsent or unanswered attempts to its own `waitUntil`, each
         // for a bounded time: a call whose request ends is cancelled. Another request's attempt is

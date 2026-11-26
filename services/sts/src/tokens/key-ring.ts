@@ -9,32 +9,40 @@ import {
 /**
  * The token-signing key ring of one environment (design 5.7). Exactly one `current` key signs. A
  * `next` key is generated and published `TOKEN_KEY_PUBLISH_AHEAD_MS` before it becomes current, so
- * every verifier holds it first; the current key it replaces turns `retired` and stays published
- * until `TOKEN_KEY_RETIRED_GRACE_MS` after the last token it signed expires. Every function here
- * takes the time as an argument, so the timeline is tested without a clock.
+ * every verifier holds it first; the current key it replaces turns `retired`, drops its private
+ * key at once, and stays published until `TOKEN_KEY_RETIRED_GRACE_MS` (the verifier clock skew)
+ * after the last token it signed expires. Every function here takes the time as an argument, so
+ * the timeline is tested without a clock.
  */
 export type TokenKeyState = 'next' | 'current' | 'retired';
 
-const TokenKeySchema = z.strictObject({
-  kid: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  /** The Ed25519 private key, PKCS#8, base64url. Never leaves the token signer object. */
-  pkcs8: z.string().min(1),
-  /** The public key, base64url (JWK `x`). */
-  x: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  state: z.enum(['next', 'current', 'retired']),
-  createdAt: z.number().int().nonnegative(),
-  /** When a next key becomes current; when a current or retired key did. */
-  activatesAt: z.number().int().nonnegative(),
-  retiredAt: z.number().int().nonnegative().nullable(),
-  /** Latest `exp` (seconds) of a token this key signed, rounded up to a whole minute; 0 for none. */
-  maxExp: z.number().int().nonnegative(),
-});
+const TokenKeySchema = z
+  .strictObject({
+    kid: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    /**
+     * The Ed25519 private key, PKCS#8, base64url; null once retired, since a retired key never
+     * signs again. Never leaves the token signer object.
+     */
+    pkcs8: z.string().min(1).nullable(),
+    /** The public key, base64url (JWK `x`). */
+    x: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    state: z.enum(['next', 'current', 'retired']),
+    createdAt: z.number().int().nonnegative(),
+    /** When a next key becomes current; when a current or retired key did. */
+    activatesAt: z.number().int().nonnegative(),
+    retiredAt: z.number().int().nonnegative().nullable(),
+    /** Latest `exp` (seconds) of a token this key signed, rounded up to a whole minute; 0 for none. */
+    maxExp: z.number().int().nonnegative(),
+  })
+  .refine(key => (key.pkcs8 === null) === (key.state === 'retired'), {
+    message: 'a retired key, and only a retired key, has no private key',
+  });
 export type TokenKey = z.infer<typeof TokenKeySchema>;
 
 export const KeyRingSchema = z.strictObject({ keys: z.array(TokenKeySchema).max(16) });
 export type KeyRing = z.infer<typeof KeyRingSchema>;
 
-export type GeneratedKey = Pick<TokenKey, 'kid' | 'pkcs8' | 'x'>;
+export type GeneratedKey = { kid: string; pkcs8: string; x: string };
 
 /** One scheduled change, audited as `ai.kilo.sts.token_key.rotated`. */
 export type KeyRingChange =
@@ -64,7 +72,10 @@ function newKey(generated: GeneratedKey, state: TokenKeyState, now: number, acti
   return { ...generated, state, createdAt: now, activatesAt, retiredAt: null, maxExp: 0 };
 }
 
-/** When a retired key leaves the key set: the grace period after its last token expires. */
+/**
+ * When a retired key leaves the key set: once its last token, or its retirement if later, is past
+ * the verifier clock skew. No legitimate token verifies under it after that.
+ */
 function removalAt(key: TokenKey): number {
   return Math.max(key.maxExp * 1000, key.retiredAt ?? key.activatesAt) + TOKEN_KEY_RETIRED_GRACE_MS;
 }
@@ -145,6 +156,7 @@ export async function advanceKeyRing(
     if (now < next.activatesAt) break;
     current.state = 'retired';
     current.retiredAt = now;
+    current.pkcs8 = null;
     next.state = 'current';
     changes.push({ change: 'activated', kid: next.kid, retiredKid: current.kid });
   }

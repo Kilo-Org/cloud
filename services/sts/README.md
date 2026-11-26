@@ -120,9 +120,10 @@ call should the alarm be late:
 - the current key signs for 30 days;
 - the next key is generated and published 7 days before it becomes current (if the object slept
   through that date, the next key still waits a full 7 days after it is published);
-- a retired key stays published until 10 minutes after the last token it signed expires. The
-  object keeps that latest `exp` per key, rounded up to a whole minute, so it writes it at most
-  once a minute.
+- a retired key drops its private key at once and stays published until 1 minute (the verifier
+  clock skew) after the last token it signed expires; after that no legitimate token verifies
+  under it. The object keeps that latest `exp` per key, rounded up to a whole minute, so it writes
+  it at most once a minute.
 
 Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `created`, `published`,
 `activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys

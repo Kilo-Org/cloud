@@ -1,3 +1,5 @@
+import { TOKEN_CLOCK_SKEW_SECONDS } from '@kilocode/sts-contracts';
+
 /** Refresher cadence: one read of each manager folder every four minutes (design 4.4). */
 export const REFRESH_INTERVAL_MS = 4 * 60 * 1000;
 
@@ -114,8 +116,11 @@ export const TOKEN_KEY_CURRENT_MS = 30 * 24 * 60 * 60 * 1000;
 /** The next key is published this long before it signs, so every verifier holds it first. */
 export const TOKEN_KEY_PUBLISH_AHEAD_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** A retired key stays published this long after the last token it signed expires. */
-export const TOKEN_KEY_RETIRED_GRACE_MS = 10 * 60 * 1000;
+/**
+ * A retired key stays published this long after the last token it signed expires: the verifier
+ * clock skew, past which no legitimate token verifies under it.
+ */
+export const TOKEN_KEY_RETIRED_GRACE_MS = TOKEN_CLOCK_SKEW_SECONDS * 1000;
 
 /** Each isolate serves the token key set from memory this long; the response itself is no-store. */
 export const TOKEN_JWKS_CACHE_MS = 5 * 60 * 1000;

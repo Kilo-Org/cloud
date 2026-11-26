@@ -245,6 +245,7 @@ export class TokenSignerDO extends DurableObject<Env> {
   async #signingKey(key: TokenKey): Promise<CryptoKey> {
     const cached = this.#signingKeys.get(key.kid);
     if (cached !== undefined) return cached;
+    if (key.pkcs8 === null) throw new Error('a retired token key keeps no private key');
     const imported = await crypto.subtle.importKey(
       'pkcs8',
       new Uint8Array(base64urlToBytes(key.pkcs8)),
@@ -286,8 +287,11 @@ export class TokenSignerDO extends DurableObject<Env> {
       keepLatestSignedExp(result.ring, this.#ring);
       await this.ctx.storage.put(KEY_RING_NAME, result.ring);
       this.#ring = result.ring;
+      // A retired key keeps no private key, so its imported signing key goes too.
       for (const kid of this.#signingKeys.keys()) {
-        if (!result.ring.keys.some(key => key.kid === kid)) this.#signingKeys.delete(kid);
+        if (!result.ring.keys.some(key => key.kid === kid && key.pkcs8 !== null)) {
+          this.#signingKeys.delete(kid);
+        }
       }
     }
     await this.#scheduleAlarm(now, false);

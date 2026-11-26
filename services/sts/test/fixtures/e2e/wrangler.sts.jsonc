@@ -33,6 +33,7 @@
     "DO_JURISDICTION": "none",
     "TOKEN_SIGNING_KIDS_REVOKED": "",
     "LEASE_CI_MIGRATION_TARGET": "db.e2e-primary.invalid:5432/postgres",
+    "CF_DEPLOY_ACCOUNT_ID": "e2e0000000000000000000000000acc1",
   },
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "secrets-broker-e2e-audit" }],
@@ -45,6 +46,7 @@
       { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
       { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
       { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+      { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
     ],
   },
   "migrations": [
@@ -52,5 +54,6 @@
     { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
     { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
     { "tag": "v4", "new_sqlite_classes": ["LeaseDO"] },
+    { "tag": "v5", "new_sqlite_classes": ["DeployTokenDO"] },
   ],
 }

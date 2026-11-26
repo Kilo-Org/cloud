@@ -19,6 +19,10 @@ type SentryConsentOptions = {
   readonly profilesSampleRate: number;
   readonly attachScreenshot: boolean;
   readonly attachViewHierarchy: boolean;
+  // The error screenshot's own masking. The RN SDK and both native SDKs mask all
+  // text and images by default; it is pinned so a default change cannot unmask
+  // a screen that shows a secret.
+  readonly screenshot?: { readonly maskAllText: true; readonly maskAllImages: true };
 };
 
 // Profile sampling applies on top of `tracesSampleRate: 0.1`, so 1% of all
@@ -48,6 +52,7 @@ export function sentryOptionsForConsent(optionalConsented: boolean): SentryConse
     tracesSampleRate: 0.1,
     profilesSampleRate: PROFILES_SAMPLE_RATE,
     attachScreenshot: true,
+    screenshot: { maskAllText: true, maskAllImages: true },
     attachViewHierarchy: false,
   };
 }

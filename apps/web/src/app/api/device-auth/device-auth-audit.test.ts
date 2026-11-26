@@ -228,4 +228,39 @@ describe('device authorization audit rows', () => {
       }),
     ]);
   });
+
+  /** A cancel by the device itself: the poll secret, no viewer token. */
+  function cancelFromDevice(pollSecret: string) {
+    return denyOrCancel(
+      new Request(`${APP_URL}/api/device-auth/codes/${pollSecret}`, { method: 'DELETE' }),
+      { params: Promise.resolve({ code: pollSecret }) }
+    );
+  }
+
+  async function cancelRows() {
+    return db
+      .select()
+      .from(auth_audit_logs)
+      .where(eq(auth_audit_logs.action, 'auth.device_auth.cancel'));
+  }
+
+  it('keeps a device cancel out of the table, as one log line, and records nothing for a repeat', async () => {
+    const pairing = await createDeviceAuthRequest({ ipAddress: '198.51.100.24' });
+
+    expect((await cancelFromDevice(pairing.code)).status).toBe(200);
+    // The request is already cancelled, so a repeat changes nothing.
+    expect((await cancelFromDevice(pairing.code)).status).toBe(200);
+
+    expect(await cancelRows()).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.device_auth.cancel',
+        outcome: 'success',
+        userId: null,
+        stored: false,
+        persisted: false,
+      }),
+    ]);
+    expect(JSON.stringify(events)).not.toContain(pairing.code);
+  });
 });

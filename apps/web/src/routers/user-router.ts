@@ -58,7 +58,11 @@ import {
   SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES,
   type SignInMethodChangeRefusal,
 } from '@/lib/auth/sign-in-method-change-codes';
-import { auditAuthProcedure, type AuthAuditAttempt } from '@/lib/auth/auth-audit';
+import {
+  auditAuthProcedure,
+  markAuthAuditLockout,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
@@ -845,6 +849,7 @@ async function spendSignInMethodChangeCode(
   }
   const result = await consumeSignInMethodChangeCode(binding, code, challengeId);
   if (result === 'invalid') throw signInMethodChangeRefused('codeInvalid');
+  if (result === 'locked_now') throw markAuthAuditLockout(signInMethodChangeRefused('codeLocked'));
   if (result === 'locked') throw signInMethodChangeRefused('codeLocked');
 }
 

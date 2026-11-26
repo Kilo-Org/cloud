@@ -13,6 +13,7 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
 import {
   auditAuthRoute,
   authAuditRequestFromHeaders,
+  isAuthAuditLockout,
   type AuthAuditAttempt,
 } from '@/lib/auth/auth-audit';
 
@@ -113,6 +114,7 @@ async function approve(request: Request, attempt: AuthAuditAttempt): Promise<Res
   } catch (error) {
     if (error instanceof DeviceAuthRefusalError) {
       if (error.requestId) attempt.metadata = { deviceAuthRequestId: error.requestId };
+      if (isAuthAuditLockout(error)) attempt.lockout = true;
       const status = APPROVAL_REFUSAL_STATUS[error.code];
       if (status !== undefined) {
         return NextResponse.json(

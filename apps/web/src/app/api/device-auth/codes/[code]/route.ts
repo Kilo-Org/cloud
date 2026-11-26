@@ -141,6 +141,10 @@ async function cancelFromDevice(
   try {
     const cancelled = await cancelDeviceAuthRequest(code);
     attempt.metadata = { deviceAuthRequestId: cancelled.requestId };
+    // A repeated cancel changes nothing, so it records nothing. A cancel that
+    // did change the request names no account (no one approved it), so it is
+    // the log line only.
+    if (!cancelled.changed) attempt.skipSuccessRow = true;
   } catch (error) {
     return deviceAuthFailureResponse(
       error,

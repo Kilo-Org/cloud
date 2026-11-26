@@ -52,7 +52,8 @@ async function refuseUnprovenExistingAccountLink(
   request: Request,
   row: PendingAuthLink,
   sessionUser: User,
-  webSessionId: string | undefined
+  webSessionId: string | undefined,
+  attempt: AuthAuditAttempt
 ): Promise<NextResponse | null> {
   if (sessionUser.id !== row.kilo_user_id) {
     return NextResponse.json({ error: 'WRONG_ACCOUNT' }, { status: 403 });
@@ -75,7 +76,8 @@ async function refuseUnprovenExistingAccountLink(
     proof.data.challengeId
   );
   if (result === 'invalid') return refused('codeInvalid', 400);
-  if (result === 'locked') return refused('codeLocked', 429);
+  if (result === 'locked_now') attempt.lockout = true;
+  if (result === 'locked' || result === 'locked_now') return refused('codeLocked', 429);
   return null;
 }
 
@@ -171,7 +173,8 @@ async function attachPendingLink(request: Request, attempt: AuthAuditAttempt): P
       request,
       row,
       sessionUser,
-      session.webSessionId
+      session.webSessionId,
+      attempt
     );
     if (refusal) return refusal;
   }

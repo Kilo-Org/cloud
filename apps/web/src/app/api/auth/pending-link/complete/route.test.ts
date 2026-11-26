@@ -213,17 +213,20 @@ describe('/api/auth/pending-link/complete', () => {
     expect(mockComplete).not.toHaveBeenCalled();
   });
 
-  it('POST refuses a locked account without attaching', async () => {
-    mockConsumeCode.mockResolvedValue('locked');
+  it.each(['locked', 'locked_now'] as const)(
+    'POST refuses a %s account without attaching',
+    async result => {
+      mockConsumeCode.mockResolvedValue(result);
 
-    const response = await postComplete(codeProof);
+      const response = await postComplete(codeProof);
 
-    expect(response.status).toBe(429);
-    expect(await response.json()).toEqual({
-      error: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked,
-    });
-    expect(mockComplete).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({
+        error: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked,
+      });
+      expect(mockComplete).not.toHaveBeenCalled();
+    }
+  );
 
   it('POST asks a session without a session id to sign in again', async () => {
     mockSession.mockResolvedValue({ user: sessionUser } as never);
@@ -286,16 +289,22 @@ describe('/api/auth/pending-link/complete', () => {
     const rowsFor = (userId: string) =>
       db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
 
-    it("stores a lockout, though answered with 429, under the linked account's email hash", async () => {
+    it("stores the lockout once, though answered with 429, under the linked account's email hash", async () => {
       const owner = {
         id: `link-${randomUUID()}`,
         google_user_email: `owner-${randomUUID()}@example.com`,
       };
       mockGetPending.mockResolvedValue({ ...(liveRow as object), kilo_user_id: owner.id } as never);
       mockSession.mockResolvedValue({ user: owner, webSessionId: 'web-session-1' } as never);
-      mockConsumeCode.mockResolvedValue('locked');
+      // The wrong code that locks the account, then two tries while it stays locked.
+      mockConsumeCode
+        .mockResolvedValueOnce('locked_now')
+        .mockResolvedValueOnce('locked')
+        .mockResolvedValueOnce('locked');
 
-      expect((await postComplete(codeProof)).status).toBe(429);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        expect((await postComplete(codeProof)).status).toBe(429);
+      }
 
       expect(await rowsFor(owner.id)).toEqual([
         expect.objectContaining({

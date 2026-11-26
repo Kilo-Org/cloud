@@ -373,6 +373,7 @@ async function registerPasskey(request: NextRequest, attempt: AuthAuditAttempt):
   if (input.action === 'send_code') attempt.action = 'auth.passkey.enrollment_code.send';
   const refuseEmailCode = (refusal: PasskeyEnrollmentCodeRefusal): NextResponse => {
     attempt.action = 'auth.passkey.enrollment_code.verify';
+    if (refusal.status === 'locked' && refusal.lockedByThisAttempt) attempt.lockout = true;
     return emailCodeRefused(refusal);
   };
 

@@ -25,6 +25,10 @@ import {
 import { headers } from 'next/headers';
 import { POST } from './route';
 import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
+import { eq } from 'drizzle-orm';
+import { auth_audit_logs } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { setAuthActionSinkForTest, type AuthActionEvent } from '@/lib/auth/auth-audit';
 
 const mockCreate = jest.mocked(createDeviceAuthRequest);
 const mockHeaders = jest.mocked(headers);
@@ -297,6 +301,45 @@ describe('POST /api/device-auth/codes', () => {
     await POST(new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' }));
 
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ ipAddress: undefined }));
+  });
+
+  test('keeps a pairing the device creates out of the audit table, as one log line', async () => {
+    const events: AuthActionEvent[] = [];
+    setAuthActionSinkForTest(event => events.push(event));
+    mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    try {
+      const response = await POST(
+        new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' })
+      );
+      expect(response.status).toBe(200);
+    } finally {
+      setAuthActionSinkForTest(null);
+    }
+
+    // No one has approved the pairing yet, so it names no account.
+    expect(
+      await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.action, 'auth.device_auth.create'))
+    ).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.device_auth.create',
+        outcome: 'success',
+        userId: null,
+        stored: false,
+        persisted: false,
+      }),
+    ]);
   });
 
   test('re-throws unexpected errors to the global 500 handler', async () => {

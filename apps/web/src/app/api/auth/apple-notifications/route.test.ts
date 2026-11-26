@@ -217,6 +217,40 @@ describe('POST /api/auth/apple-notifications', () => {
     ]);
   });
 
+  it('keeps the unlink and its row when the email lookup for the row fails after commit', async () => {
+    const user = await insertTestUser();
+    await insertAppleProvider(user.id, SUB);
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        events: JSON.stringify({ type: 'account-delete', sub: SUB, event_time: 1_700_000_000 }),
+      })
+    );
+    // The unlink commits through its own transaction; the first pool read
+    // after it is the email lookup for the audit row.
+    const lookupError = new Error('read failed');
+    const select = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+      throw lookupError;
+    });
+
+    const response = await POST(applePost()).finally(() => select.mockRestore());
+
+    expect(response.status).toBe(200);
+    expect(await providerRow(SUB)).toBeUndefined();
+    expect(
+      await db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, user.id))
+    ).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.unlink',
+        outcome: 'success',
+        subject_email_hash: null,
+        metadata: { reason: 'account_delete' },
+      }),
+    ]);
+    expect(mockCaptureException).toHaveBeenCalledWith(lookupError, {
+      tags: { operation: 'apple_unlink_audit_email' },
+    });
+  });
+
   it('rolls back the provider delete and session revocation when a later statement throws', async () => {
     const user = await insertTestUser({ web_session_pepper: 'old-web-pepper' });
     await insertAppleProvider(user.id, SUB);

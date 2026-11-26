@@ -264,7 +264,7 @@ describe('DELETE /api/device-auth/codes/[code] (cancel from the device)', () => 
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCancel.mockResolvedValue({ requestId: 'device-auth-request-1' });
+    mockCancel.mockResolvedValue({ requestId: 'device-auth-request-1', changed: true });
   });
 
   function createRequest(code: string) {

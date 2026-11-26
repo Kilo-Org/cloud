@@ -38,7 +38,26 @@ function extractAppleEvent(payload: Record<string, unknown>): AppleEvent {
 }
 
 /** An account whose Apple sign-in a notification removed, with its email for the audit row. */
-type UnlinkedAccount = { userId: string; email: string };
+type UnlinkedAccount = { userId: string; email: string | null };
+
+/**
+ * The email of each unlinked account, for its audit row only. The unlink has
+ * committed, so a failed read is reported and the rows go without the hash.
+ */
+async function unlinkedAccountsWithEmail(userIds: string[]): Promise<UnlinkedAccount[]> {
+  if (userIds.length === 0) return [];
+  try {
+    const rows = await db
+      .select({ userId: kilocode_users.id, email: kilocode_users.google_user_email })
+      .from(kilocode_users)
+      .where(inArray(kilocode_users.id, userIds));
+    const emails = new Map(rows.map(row => [row.userId, row.email]));
+    return userIds.map(userId => ({ userId, email: emails.get(userId) ?? null }));
+  } catch (error) {
+    captureException(error, { tags: { operation: 'apple_unlink_audit_email' } });
+    return userIds.map(userId => ({ userId, email: null }));
+  }
+}
 
 /** Applies one Apple event and returns the accounts whose Apple sign-in it removed. */
 async function handleAppleEvent(event: AppleEvent): Promise<UnlinkedAccount[]> {
@@ -49,7 +68,7 @@ async function handleAppleEvent(event: AppleEvent): Promise<UnlinkedAccount[]> {
   if (type === 'consent-revoked' || type === 'account-delete') {
     // Compatibility: the old handler deleted the provider row only. Keep the
     // extra web/device revocation until Apple stops sending these events.
-    const unlinkedAccounts = await db.transaction(async tx => {
+    const unlinkedUserIds = await db.transaction(async tx => {
       const deletedProviders = await tx
         .delete(user_auth_provider)
         .where(
@@ -87,18 +106,10 @@ async function handleAppleEvent(event: AppleEvent): Promise<UnlinkedAccount[]> {
             )
           );
       }
-      return tx
-        .select({ userId: kilocode_users.id, email: kilocode_users.google_user_email })
-        .from(kilocode_users)
-        .where(
-          inArray(
-            kilocode_users.id,
-            deletedProviders.map(provider => provider.kilo_user_id)
-          )
-        );
+      return [...new Set(deletedProviders.map(provider => provider.kilo_user_id))];
     });
     logExceptInTest(`Removed apple auth provider for sub=${sub} (${type})`);
-    return unlinkedAccounts;
+    return unlinkedAccountsWithEmail(unlinkedUserIds);
   }
   // email-disabled and email-enabled are informational — no action needed
   return [];

@@ -43,7 +43,9 @@ describe('an OAuth callback refusal outside tests', () => {
     } as never);
 
     expect(mockAfterTasks).toHaveLength(1);
-    await Promise.all(mockAfterTasks.map(task => task()));
+    // Like the runtime, also run the work that scheduled work schedules: the
+    // audit write is itself scheduled after the response.
+    for (let task = mockAfterTasks.shift(); task; task = mockAfterTasks.shift()) await task();
 
     expect(events).toEqual([
       expect.objectContaining({

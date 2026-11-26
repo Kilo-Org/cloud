@@ -1081,7 +1081,7 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     expect(await passkeyCount()).toBe(1);
   });
 
-  it('records each code send, failed send, wrong code and lockout as one auth row', async () => {
+  it('records each code send, failed send and wrong code, and the lockout once, as auth rows', async () => {
     mockSendCodeEmail.mockResolvedValueOnce({ sent: false, reason: 'provider_not_configured' });
     expect((await POST(createRequest({ action: 'send_code' }))).status).toBe(502);
     const emailCode = await sendCode();
@@ -1089,6 +1089,8 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     for (let attempt = 0; attempt < 5; attempt++) {
       await POST(createRequest({ action: 'options', emailCode: wrong }));
     }
+    // While the account stays locked: a code check and a send are log lines only.
+    expect((await POST(createRequest({ action: 'options', emailCode: wrong }))).status).toBe(429);
     expect((await POST(createRequest({ action: 'send_code' }))).status).toBe(429);
 
     const rows = await db
@@ -1110,7 +1112,6 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
       wrongCodeRow,
       wrongCodeRow,
       [verify, 'failure', 'email_code_locked', 'options'],
-      [send, 'failure', 'email_code_locked', 'send_code'],
     ]);
     expect(rows.every(row => row.method === 'session' && row.subject_email_hash === null)).toBe(
       true

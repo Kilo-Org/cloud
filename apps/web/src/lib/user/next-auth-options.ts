@@ -421,9 +421,11 @@ type SignInDecision =
   | { outcome: 'deferred' };
 
 /**
- * Records the final decision of one signIn callback run: one `auth.sign_in`
- * row per sign-in, or one `auth.sign_in_method.link` row for a refused link.
- * A completed link writes no row here: `recordSignInMethodChange` records it.
+ * Records a refusal by one signIn callback run: one `auth.sign_in` row, or one
+ * `auth.sign_in_method.link` row for a refused link. A success writes no row
+ * here: a sign-in is recorded when its session is issued (the jwt callback,
+ * {@link recordSessionIssued}), and a completed link by
+ * `recordSignInMethodChange`.
  */
 async function recordSignInDecision(
   decision: SignInDecision | null,
@@ -435,23 +437,34 @@ async function recordSignInDecision(
     });
     return;
   }
-  if (decision.outcome === 'deferred') return;
-  if (subject.linking && decision.outcome === 'success') return;
-  const entry = {
-    action: subject.linking ? ('auth.sign_in_method.link' as const) : ('auth.sign_in' as const),
+  if (decision.outcome !== 'failure') return;
+  await recordAuthEvent(await authAuditRequestFromCurrentRequest(), {
+    action: subject.linking ? 'auth.sign_in_method.link' : 'auth.sign_in',
     userId: subject.userId,
     method: subject.method,
     email: subject.email,
-  };
+    outcome: 'failure',
+    failureReason: authAuditCode(decision.failureReason) ?? decision.failureReason,
+  });
+}
+
+/**
+ * Records the end of a sign-in at the jwt callback, where NextAuth issues the
+ * session: the sign-in's one success row, or, when the callback throws after
+ * the signIn callback accepted, its one failure row. The error itself is
+ * rethrown unchanged by the caller.
+ */
+async function recordSessionIssued(
+  method: string,
+  subject: { userId: string | null; email: string | null },
+  failureReason?: string
+): Promise<void> {
+  const entry = { action: 'auth.sign_in' as const, method, ...subject };
   await recordAuthEvent(
     await authAuditRequestFromCurrentRequest(),
-    decision.outcome === 'success'
+    failureReason === undefined
       ? { ...entry, outcome: 'success' }
-      : {
-          ...entry,
-          outcome: 'failure',
-          failureReason: authAuditCode(decision.failureReason) ?? decision.failureReason,
-        }
+      : { ...entry, outcome: 'failure', failureReason }
   );
 }
 
@@ -472,6 +485,25 @@ async function recordCredentialsSignInFailure(
     failureReason,
     userId: userId ?? null,
   });
+}
+
+/**
+ * Runs a Credentials `authorize`. A throw, such as a failed lookup after the
+ * ticket was spent, records `internal_error` for the account `authorize` had
+ * resolved (`subject.userId`), if any, and is rethrown unchanged; NextAuth
+ * runs no signIn callback after it either.
+ */
+async function authorizeWithAudit<T>(
+  method: 'email' | 'passkey',
+  authorize: (subject: { userId?: string }) => Promise<T>
+): Promise<T> {
+  const subject: { userId?: string } = {};
+  try {
+    return await authorize(subject);
+  } catch (error) {
+    await recordCredentialsSignInFailure(method, 'internal_error', subject.userId);
+    throw error;
+  }
 }
 
 function createAppleAccountInfo(
@@ -1154,27 +1186,28 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         token: { label: 'Token', type: 'text' },
       },
-      async authorize(credentials) {
-        if (!credentials?.token) {
-          await recordCredentialsSignInFailure('email', 'missing_token');
-          return null;
-        }
+      authorize: credentials =>
+        authorizeWithAudit('email', async () => {
+          if (!credentials?.token) {
+            await recordCredentialsSignInFailure('email', 'missing_token');
+            return null;
+          }
 
-        const tokenData = await verifyAndConsumeMagicLinkToken(credentials.token);
+          const tokenData = await verifyAndConsumeMagicLinkToken(credentials.token);
 
-        if (!tokenData) {
-          // Unknown, expired, or already used.
-          await recordCredentialsSignInFailure('email', 'invalid_token');
-          return null;
-        }
+          if (!tokenData) {
+            // Unknown, expired, or already used.
+            await recordCredentialsSignInFailure('email', 'invalid_token');
+            return null;
+          }
 
-        return {
-          id: `email-${tokenData.email}`,
-          email: tokenData.email,
-          name: tokenData.email.split('@')[0],
-          image: '',
-        };
-      },
+          return {
+            id: `email-${tokenData.email}`,
+            email: tokenData.email,
+            name: tokenData.email.split('@')[0],
+            image: '',
+          };
+        }),
     }),
     // Passkey sign-in. The authenticate route verifies the WebAuthn assertion
     // against a server-stored challenge and mints a one-time ticket; redeeming
@@ -1185,33 +1218,35 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         ticket: { label: 'Ticket', type: 'text' },
       },
-      async authorize(credentials) {
-        if (!credentials?.ticket) {
-          await recordCredentialsSignInFailure('passkey', 'missing_ticket');
-          return null;
-        }
+      authorize: credentials =>
+        authorizeWithAudit('passkey', async subject => {
+          if (!credentials?.ticket) {
+            await recordCredentialsSignInFailure('passkey', 'missing_ticket');
+            return null;
+          }
 
-        const ticket = await consumeSignInTicket(credentials.ticket);
-        if (!ticket) {
-          // Unknown, expired, or already redeemed: a replayed ticket yields no
-          // user, so NextAuth mints no session for it.
-          await recordCredentialsSignInFailure('passkey', 'invalid_ticket');
-          return null;
-        }
+          const ticket = await consumeSignInTicket(credentials.ticket);
+          if (!ticket) {
+            // Unknown, expired, or already redeemed: a replayed ticket yields no
+            // user, so NextAuth mints no session for it.
+            await recordCredentialsSignInFailure('passkey', 'invalid_ticket');
+            return null;
+          }
+          subject.userId = ticket.kilo_user_id;
 
-        const user = await findUserById(ticket.kilo_user_id);
-        if (!user) {
-          await recordCredentialsSignInFailure('passkey', 'user_not_found', ticket.kilo_user_id);
-          return null;
-        }
+          const user = await findUserById(ticket.kilo_user_id);
+          if (!user) {
+            await recordCredentialsSignInFailure('passkey', 'user_not_found', ticket.kilo_user_id);
+            return null;
+          }
 
-        return {
-          id: user.id,
-          email: user.google_user_email,
-          name: user.google_user_name || user.google_user_email.split('@')[0],
-          image: user.google_user_image_url,
-        };
-      },
+          return {
+            id: user.id,
+            email: user.google_user_email,
+            name: user.google_user_name || user.google_user_email.split('@')[0],
+            image: user.google_user_image_url,
+          };
+        }),
     }),
     // Fake login provider for development and testing
     ...(allow_fake_login
@@ -1571,14 +1606,6 @@ export const authOptions: NextAuthOptions = {
             refuse(new URL(result, 'http://localhost').searchParams.get('error') ?? 'sso_refused');
             return preserveSignInRedirectContext(result, redirectContext);
           }
-          // The first SSO sign-in creates the account, which existed for no
-          // lookup above; its new provider row names it.
-          if (!auditUserId) {
-            auditUserId = await findUserIdByAuthProvider('workos', accountInfo.provider_account_id);
-            auditSignInEmail = auditUserId
-              ? ((await findUserById(auditUserId))?.google_user_email ?? null)
-              : null;
-          }
           decision = { outcome: 'success' };
           return result;
         }
@@ -1799,6 +1826,7 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, account, user, trigger, profile }) {
       let accountInfo: CreateOrUpdateUserArgs | undefined = undefined;
+      let signedInUser: { id: string; google_user_email: string } | null = null;
       try {
         if (!trigger) return token;
         if (!account) throw new Error(`TRAP: No account found: ${trigger}`);
@@ -1807,6 +1835,7 @@ export const authOptions: NextAuthOptions = {
         const existingUser = await findAndSyncExistingUser(accountInfo);
 
         assert(existingUser, `TRAP: No existing user found for ${accountInfo.google_user_email}`);
+        signedInUser = existingUser;
 
         token.kiloUserId = existingUser.id;
 
@@ -1854,6 +1883,13 @@ export const authOptions: NextAuthOptions = {
             })
           );
         }
+
+        // The session is issued once this callback returns; recording never
+        // throws, so it cannot turn the sign-in into a failure.
+        await recordSessionIssued(account.provider, {
+          userId: existingUser.id,
+          email: existingUser.google_user_email,
+        });
       } catch (error) {
         captureException(error, {
           tags: {
@@ -1864,6 +1900,17 @@ export const authOptions: NextAuthOptions = {
         });
 
         console.error('Failed to create or update user JWT:', error);
+        // A sign-in the signIn callback accepted ends here without a session.
+        if (account) {
+          await recordSessionIssued(
+            account.provider,
+            {
+              userId: signedInUser?.id ?? null,
+              email: signedInUser?.google_user_email ?? accountInfo?.google_user_email ?? null,
+            },
+            'session_issue_failed'
+          );
+        }
         throw error;
       }
       return token;

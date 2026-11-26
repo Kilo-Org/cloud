@@ -19,6 +19,7 @@ import {
   type PendingLinkResult,
 } from '@/lib/auth/pending-link';
 import { consumeSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
+import { markAuthAuditLockout } from '@/lib/auth/auth-audit';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
@@ -111,6 +112,11 @@ async function spendPendingLinkCode(
   );
   if (result === 'invalid') {
     throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid, requestId);
+  }
+  if (result === 'locked_now') {
+    throw markAuthAuditLockout(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked, requestId)
+    );
   }
   if (result === 'locked') {
     throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked, requestId);
@@ -545,9 +551,12 @@ export async function denyDeviceAuthRequest(userCode: string): Promise<{ request
  * Cancel a request from the device that started it. The poll secret is that
  * device's proof of ownership: it already authorises polling the request and
  * no browser session exists in the client that started it. Returns the
- * cancelled row's id.
+ * cancelled row's id, and whether this call cancelled it (`changed`) or found
+ * it already denied or expired.
  */
-export async function cancelDeviceAuthRequest(code: string): Promise<{ requestId: string }> {
+export async function cancelDeviceAuthRequest(
+  code: string
+): Promise<{ requestId: string; changed: boolean }> {
   const [cancelled] = await db
     .update(device_auth_requests)
     .set({ status: 'denied' })
@@ -555,7 +564,7 @@ export async function cancelDeviceAuthRequest(code: string): Promise<{ requestId
     .returning({ id: device_auth_requests.id });
 
   if (cancelled) {
-    return { requestId: cancelled.id };
+    return { requestId: cancelled.id, changed: true };
   }
 
   const [request] = await db
@@ -570,7 +579,7 @@ export async function cancelDeviceAuthRequest(code: string): Promise<{ requestId
 
   // A request the approver denied, or that already expired, is cancelled.
   if (request.status === 'denied' || request.status === 'expired') {
-    return { requestId: request.id };
+    return { requestId: request.id, changed: false };
   }
 
   throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending, request.id);

@@ -63,6 +63,8 @@ jest.mock('@/lib/auth/native-token-rate-limit', () => ({
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
   NEXTAUTH_SECRET: 'native-token-test-secret',
+  // The audit write runs inline, as it does under the real test config.
+  IS_IN_AUTOMATED_TEST: true,
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
@@ -3057,8 +3059,10 @@ describe('POST /api/auth/native/token', () => {
   });
 
   describe('audit row email', () => {
-    const rowsFor = (column: 'user_id' | 'subject_email_hash', value: string) =>
-      db.select().from(auth_audit_logs).where(eq(auth_audit_logs[column], value));
+    const rowsFor = (column: 'user_id' | 'subject_email_hash', value: string | null) => {
+      if (value === null) throw new Error('the test environment has no email hash key');
+      return db.select().from(auth_audit_logs).where(eq(auth_audit_logs[column], value));
+    };
     const appleBody = { provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' };
 
     it("hashes the resolved account's email, not the ID token's", async () => {

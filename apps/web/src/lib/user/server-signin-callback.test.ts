@@ -1125,10 +1125,9 @@ describe('sign-in audit rows', () => {
   });
 
   async function rowsForEmail(email: string) {
-    return db
-      .select()
-      .from(auth_audit_logs)
-      .where(eq(auth_audit_logs.subject_email_hash, authAuditEmailHash(email)));
+    const hash = authAuditEmailHash(email);
+    if (hash === null) throw new Error('the test environment has no email hash key');
+    return db.select().from(auth_audit_logs).where(eq(auth_audit_logs.subject_email_hash, hash));
   }
 
   function googleSignIn(email: string) {
@@ -1139,18 +1138,38 @@ describe('sign-in audit rows', () => {
     } as never);
   }
 
-  it('records a successful sign-in with the settled user and only a hash of the email', async () => {
-    const email = `audit-success-${randomUUID()}@example.com`;
+  /** The jwt callback NextAuth runs after an accepted signIn: it issues the session. */
+  function issueSession(callback: SignInParams) {
+    return authOptions.callbacks!.jwt!({
+      token: {},
+      ...(callback as object),
+      trigger: 'signIn',
+      isNewUser: false,
+      session: undefined,
+    } as never);
+  }
+
+  it('records a sign-in once its session is issued, with the account and only a hash of the email', async () => {
+    const { account, callback } = await insertAccountWithGoogleIdentity();
+    mockCreateOrUpdateUser.mockResolvedValueOnce({
+      success: true,
+      user: account,
+      isNew: false,
+    } as never);
     setValidTurnstileCookie();
 
-    await expect(googleSignIn(email)).resolves.toBe(true);
+    await expect(signIn(callback)).resolves.toBe(true);
+    // The signIn callback accepted; no session exists yet, so no row either.
+    expect(await rowsForEmail(account.google_user_email)).toEqual([]);
 
-    const rows = await rowsForEmail(email);
+    await issueSession(callback);
+
+    const rows = await rowsForEmail(account.google_user_email);
     expect(rows).toEqual([
       expect.objectContaining({
         action: 'auth.sign_in',
         outcome: 'success',
-        user_id: 'settled-user',
+        user_id: account.id,
         method: 'google',
         failure_reason: null,
       }),
@@ -1159,11 +1178,11 @@ describe('sign-in audit rows', () => {
       expect.objectContaining({
         action: 'auth.sign_in',
         outcome: 'success',
-        userId: 'settled-user',
+        userId: account.id,
         ip: '203.0.113.7',
       }),
     ]);
-    expect(JSON.stringify({ rows, events })).not.toContain(email.split('@')[0]);
+    expect(JSON.stringify({ rows, events })).not.toContain(account.google_user_email.split('@')[0]);
   });
 
   it('records a refusal that resolved no account under a hash of the presented address', async () => {
@@ -1277,6 +1296,7 @@ describe('sign-in audit rows', () => {
     setValidTurnstileCookie();
 
     await expect(signIn(callback)).resolves.toBe(true);
+    await issueSession(callback);
 
     expect(await rowsForEmail(providerEmail)).toEqual([]);
     expect(await rowsForEmail(account.google_user_email)).toEqual([

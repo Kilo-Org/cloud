@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { createHmac } from 'node:crypto';
+import { sql } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import { auth_audit_logs } from '@kilocode/db/schema';
 import * as drizzle from '@kilocode/web-shared/lib/drizzle';
 import {
+  auditAuthProcedure,
   auditAuthRoute,
   authAuditEmailHash,
+  markAuthAuditLockout,
   recordAuthEvent,
   setAuthActionSinkForTest,
   type AuthActionEvent,
@@ -185,15 +189,22 @@ describe('recordAuthEvent', () => {
     expect(events).toEqual([expect.objectContaining({ stored: true, persisted: true })]);
   });
 
-  test('stores a success that names no subject', async () => {
-    await recordAuthEvent(request, { action: 'auth.sign_out', outcome: 'success' });
+  test('keeps a success that names no subject out of the table, with one log line', async () => {
+    await recordAuthEvent(request, { action: 'auth.device_auth.create', outcome: 'success' });
 
-    expect(await db.select().from(auth_audit_logs)).toHaveLength(1);
-    expect(events).toEqual([expect.objectContaining({ stored: true, persisted: true })]);
+    expect(await db.select().from(auth_audit_logs)).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.device_auth.create',
+        stored: false,
+        persisted: false,
+      }),
+    ]);
   });
 
   test('still emits the log line, flagged unpersisted, when the insert fails', async () => {
-    const insert = jest.spyOn(db, 'insert').mockImplementationOnce(() => {
+    // The insert runs in its own transaction, which bounds its statement time.
+    const transaction = jest.spyOn(db, 'transaction').mockImplementationOnce(async () => {
       throw new Error('database unavailable');
     });
     try {
@@ -201,7 +212,7 @@ describe('recordAuthEvent', () => {
         recordAuthEvent(request, { action: 'auth.sign_out', outcome: 'success', userId: 'user-1' })
       ).resolves.toBeUndefined();
     } finally {
-      insert.mockRestore();
+      transaction.mockRestore();
     }
 
     expect(events).toEqual([
@@ -214,6 +225,67 @@ describe('recordAuthEvent', () => {
         persisted: false,
       }),
     ]);
+  });
+
+  test('answers without waiting on a blocked audit table, and gives up on the insert', async () => {
+    const scheduled: (() => Promise<void>)[] = [];
+    const captureException = jest.fn();
+    // Another transaction holds the audit table, so an insert blocks.
+    const lock = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      await tx.execute(sql`LOCK TABLE auth_audit_logs IN ACCESS EXCLUSIVE MODE`);
+      lock.resolve();
+      await release.promise;
+    });
+    await lock.promise;
+    let flushMs = 0;
+    try {
+      await jest.isolateModulesAsync(async () => {
+        // Next's `after()`: the work runs once the response is sent, here when
+        // the test flushes it.
+        jest.doMock('@/lib/after-response', () => ({
+          runAfterResponse: async (work: () => Promise<void>) => {
+            scheduled.push(work);
+          },
+        }));
+        jest.doMock('@sentry/nextjs', () => ({
+          ...jest.requireActual<object>('@sentry/nextjs'),
+          captureException,
+        }));
+        jest.doMock('@kilocode/web-shared/lib/drizzle', () => drizzle);
+        // Loaded again inside the isolated registry so it schedules through the mock.
+        const deferred = await import('@/lib/auth/auth-audit');
+        deferred.setAuthActionSinkForTest(event => events.push(event));
+
+        const response = await deferred.auditAuthRoute(
+          request,
+          { action: 'auth.sign_out', userId: 'user-1' },
+          async () => Response.json({ ok: true })
+        );
+        expect(response.status).toBe(200);
+        expect(scheduled).toHaveLength(1);
+        expect(events).toEqual([]);
+
+        const flushStarted = Date.now();
+        await Promise.all(scheduled.map(work => work()));
+        flushMs = Date.now() - flushStarted;
+      });
+    } finally {
+      release.resolve();
+      await holder;
+    }
+
+    // The statement timeout, not the lock holder, ended the insert.
+    expect(flushMs).toBeLessThan(10_000);
+    expect(events).toEqual([
+      expect.objectContaining({ action: 'auth.sign_out', stored: true, persisted: false }),
+    ]);
+    expect(captureException).toHaveBeenCalledWith(expect.anything(), {
+      tags: { operation: 'auth_audit_insert' },
+      extra: { action: 'auth.sign_out' },
+    });
+    expect(await db.select().from(auth_audit_logs)).toEqual([]);
   });
 });
 
@@ -237,18 +309,23 @@ describe('auditAuthRoute', () => {
   });
 
   test.each(['EMAIL_CODE_LOCKED', 'sign_in_method_code_locked'])(
-    'stores a %s lockout of a known account, though answered with 429',
+    'stores a %s lockout once, for the wrong code that locked the account',
     async code => {
-      const attempt = { action: 'auth.passkey.add' as const, userId: 'user-1' };
+      const locked = async () => Response.json({ error: code }, { status: 429 });
 
-      await auditAuthRoute(request, attempt, async () =>
-        Response.json({ error: code }, { status: 429 })
+      await auditAuthRoute(
+        request,
+        { action: 'auth.passkey.add', userId: 'user-1', lockout: true },
+        locked
       );
+      // Every later refusal while the account stays locked.
+      await auditAuthRoute(request, { action: 'auth.passkey.add', userId: 'user-1' }, locked);
+      await auditAuthRoute(request, { action: 'auth.passkey.add', userId: 'user-1' }, locked);
 
       expect(await db.select().from(auth_audit_logs)).toEqual([
         expect.objectContaining({ user_id: 'user-1', failure_reason: code.toLowerCase() }),
       ]);
-      expect(events).toEqual([expect.objectContaining({ stored: true, persisted: true })]);
+      expect(events.map(event => event.stored)).toEqual([true, false, false]);
     }
   );
 
@@ -262,5 +339,33 @@ describe('auditAuthRoute', () => {
     expect(await db.select().from(auth_audit_logs)).toEqual([
       expect.objectContaining({ user_id: 'user-1', failure_reason: 'code_send_refused' }),
     ]);
+  });
+});
+
+describe('auditAuthProcedure', () => {
+  const lockedRefusal = () =>
+    new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'SIGN_IN_METHOD_CODE_LOCKED' });
+
+  test('stores a TOO_MANY_REQUESTS refusal only when marked as the locking attempt', async () => {
+    const attempt = { action: 'auth.sign_in_method.link' as const, userId: 'user-1' };
+
+    await expect(
+      auditAuthProcedure({}, attempt, async () => {
+        throw markAuthAuditLockout(lockedRefusal());
+      })
+    ).rejects.toBeInstanceOf(TRPCError);
+    await expect(
+      auditAuthProcedure({}, attempt, async () => {
+        throw lockedRefusal();
+      })
+    ).rejects.toBeInstanceOf(TRPCError);
+
+    expect(await db.select().from(auth_audit_logs)).toEqual([
+      expect.objectContaining({
+        user_id: 'user-1',
+        failure_reason: 'sign_in_method_code_locked',
+      }),
+    ]);
+    expect(events.map(event => event.stored)).toEqual([true, false]);
   });
 });

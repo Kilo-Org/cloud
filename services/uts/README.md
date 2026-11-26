@@ -174,18 +174,27 @@ Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and meta
    ```
 
 3. **The mint path and the signer-keys route run in the placed region (design 5.2).** Cloudflare
-   adds a `cf-placement` request header (`remote-<colo>` or `local-<colo>`) to every request of a
-   placed Worker. Check it on a public request and on the feed Worker's internal read:
+   adds a `cf-placement` header (`remote-<colo>` or `local-<colo>`) to the responses of a placed
+   Worker. Read it from the public metadata response, and from the feed Worker's
+   `uts_feed.signer_keys.read` line, which logs the header of the internal signer-keys response as
+   the feed Worker received it. Start the feed tail, then make the feed Worker read (a new
+   deploy starts new isolates, which read at their first request):
 
    ```sh
-   curl -sS -o /dev/null https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server
-   jq -r 'select(.event.request.url? | tostring | test("oauth-authorization-server|internal/signer-keys")) | [.event.request.url, .event.request.headers["cf-placement"]] | @tsv' /tmp/uts-staging-tail.json
+   curl -sS -o /dev/null -D - https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server | grep -i '^cf-placement'
+   (cd ../uts-feed && pnpm exec wrangler tail uts-feed-staging --format json > /tmp/uts-feed-staging-tail.json &)
+   sleep 5
+   (cd ../uts-feed && pnpm exec wrangler deploy --env staging)
+   curl -sS -o /dev/null https://uts-feed-staging.kiloapps.io/.well-known/jwks.json
+   sleep 5
+   jq -r '.logs[]?.message[]? | select(type == "string" and contains("uts_feed.signer_keys.read"))' /tmp/uts-feed-staging-tail.json | jq -c '{status, placement}'
    ```
 
-   Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt) on both URLs. If
-   the internal read shows no `cf-placement` header, placement does not cover service-binding
-   fetches: record that in the pull request, because each key-set read then makes its 16 signer
-   calls from the feed Worker's data center.
+   Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt) on the metadata
+   response and `"status":200` with the same placement on each read line. A `null` placement on a
+   read line means placement does not cover service-binding fetches: record that in the pull
+   request, because each key-set read then makes its 16 signer calls from the feed Worker's data
+   center.
 
 ## Deploys
 

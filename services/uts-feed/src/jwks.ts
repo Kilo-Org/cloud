@@ -115,6 +115,15 @@ async function readFromMint(mint: Fetcher, environment: UtsEnvironment): Promise
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.failed', error: String(error) }));
     return { status: 'unavailable' };
   }
+  // One line per read, no key material: where the mint Worker ran the route (the `cf-placement`
+  // response header, `remote-<colo>` or `local-<colo>`, absent without placement).
+  console.log(
+    JSON.stringify({
+      event: 'uts_feed.signer_keys.read',
+      status: response.status,
+      placement: response.headers.get('cf-placement'),
+    })
+  );
   if (response.status === 404) {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.refused' }));
     return { status: 'misconfigured', reason: 'refused' };

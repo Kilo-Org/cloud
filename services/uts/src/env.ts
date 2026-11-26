@@ -5,6 +5,7 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { UtsAuditRelayDO } from './dos/UtsAuditRelayDO';
 import type { UtsKeySetDO } from './dos/UtsKeySetDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 
@@ -33,6 +34,10 @@ export type Env = {
   DO_JURISDICTION: string;
   UTS_SIGNER_DO: DurableObjectNamespace<UtsSignerDO>;
   UTS_KEY_SET_DO: DurableObjectNamespace<UtsKeySetDO>;
+  /** One audit outbox relay object per audit shard (src/audit/relay.ts). */
+  UTS_AUDIT_RELAY_DO: DurableObjectNamespace<UtsAuditRelayDO>;
+  /** The environment's shared audit queue, which the audit relay service consumes. */
+  AUDIT_QUEUE: Queue;
   /**
    * The identity store's primary Hyperdrive config, bound once the environment's identity store is
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.

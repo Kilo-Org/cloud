@@ -23,6 +23,7 @@ const UTS_CONFIGS = new Set([MINT_CONFIG, MINT_TEST_CONFIG, FEED_CONFIG, FEED_TE
 export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['UtsSignerDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
   ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsAuditRelayDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
 ]);
 
 /** The placement region of the identity store's primary (Frankfurt). */

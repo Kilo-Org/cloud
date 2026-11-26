@@ -427,7 +427,7 @@ describe('worker config rules', () => {
     expect(internalWorkerProblems(configs)).toEqual([]);
   });
 
-  it('refuses a producer on an audit queue outside the STS deployment of that environment', () => {
+  it('refuses a producer on an audit queue outside the STS and UTS deployments of that environment', () => {
     const audit = (queue: string) => ({ producers: [{ binding: 'AUDIT', queue }] });
     const foreign = consumer({
       queues: {
@@ -453,11 +453,11 @@ describe('worker config rules', () => {
       queues: audit('kilo-audit'),
     });
     expect(problemsOf(foreign, crossed, relay)).toEqual([
-      `${PATH} (top level): AUDIT produces to kilo-audit; only sts may`,
-      `${PATH} (env.staging): AUDIT produces to kilo-audit-staging; only sts-staging may`,
+      `${PATH} (top level): AUDIT produces to kilo-audit; only sts, uts may`,
+      `${PATH} (env.staging): AUDIT produces to kilo-audit-staging; only sts-staging, uts-staging may`,
       `${PATH} (env.local): AUDIT produces to kilo-audit-local-dlq; no Worker may`,
-      'services/sts/wrangler.jsonc (top level): AUDIT produces to kilo-audit-staging; only sts-staging may',
-      'services/audit-relay/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
+      'services/sts/wrangler.jsonc (top level): AUDIT produces to kilo-audit-staging; only sts-staging, uts-staging may',
+      'services/audit-relay/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts, uts may',
     ]);
   });
 
@@ -547,7 +547,7 @@ describe('worker config rules', () => {
       },
     });
     expect(problemsOf(config)).toEqual([
-      `${PATH} (top level) previews: AUDIT produces to kilo-audit; only sts may`,
+      `${PATH} (top level) previews: AUDIT produces to kilo-audit; only sts, uts may`,
       `${PATH} (top level) previews: A names kilo-audit-archive in bucket_name; only audit-relay may`,
       `${PATH} (top level) previews: STS binds sts; a preview runs unreviewed code and binds no STS`,
     ]);

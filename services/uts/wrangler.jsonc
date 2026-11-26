@@ -40,12 +40,20 @@
     "bindings": [
       { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
       { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+      { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["UtsAuditRelayDO"] },
   ],
+  // The audit outbox relay sends each shard's batches to the environment's shared audit queue,
+  // which services/audit-relay consumes (design 8.1).
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }] },
+  // Every minute: keep the 8 audit shard relays running, maintain audit partitions and OAuth rows,
+  // and check relay lag (src/scheduled.ts). It does nothing while IDENTITY_STORE is unbound.
+  "triggers": { "crons": ["* * * * *"] },
   // No identity-store Hyperdrive binding yet: the OAuth endpoints and their metadata stay off
   // until the environment's identity store is provisioned (src/grants/binding.ts).
   "env": {
@@ -68,8 +76,11 @@
         "bindings": [
           { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+          { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
         ],
       },
+      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }] },
+      "triggers": { "crons": ["* * * * *"] },
     },
     // Local development only; no deploy workflow targets this name. Only this block uses the
     // development entry, which adds the local signing route (src/dev.ts).
@@ -87,8 +98,13 @@
         "bindings": [
           { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+          { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
         ],
       },
+      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }] },
+      // No schedule locally; run the cron by hand with `wrangler dev --test-scheduled` and
+      // `curl "http://127.0.0.1:8800/__scheduled?cron=*+*+*+*+*"`.
+      "triggers": { "crons": [] },
       // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo:
       // set CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE to a URL with the
       // password you gave uts_app_a (README, "Local development").

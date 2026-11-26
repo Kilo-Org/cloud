@@ -27,13 +27,21 @@ export const AUDIT_RELAY_DEPLOYMENTS: readonly string[] = [
 /** [deployed Worker name, resource]: one right on an audit queue or archive bucket. */
 type Grant = readonly [worker: string, resource: string];
 
-/** Each STS deployment produces only to its own environment's audit queue. */
+/**
+ * Each STS deployment, and each UTS mint deployment (its audit outbox relay), produces only to its
+ * own environment's audit queue.
+ */
 export const AUDIT_QUEUE_PRODUCERS: readonly Grant[] = [
   ['sts', 'kilo-audit'],
   ['sts-staging', 'kilo-audit-staging'],
   ['sts-local', 'kilo-audit-local'],
   // services/sts/wrangler.test.jsonc, which only the Workers test pool runs.
   ['sts-test', 'kilo-audit-local'],
+  ['uts', 'kilo-audit'],
+  ['uts-staging', 'kilo-audit-staging'],
+  ['uts-local', 'kilo-audit-local'],
+  // services/uts/wrangler.test.jsonc, which only the Workers test pool runs.
+  ['uts-test', 'kilo-audit-local'],
 ];
 
 /**

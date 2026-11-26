@@ -20,8 +20,9 @@ export type UtsFirstPartyClient =
       clientClass: 'desktop' | 'mobile';
       redirect: { kind: 'loopback'; path: string } | { kind: 'private_use_scheme'; uri: string };
       /**
-       * `required`: design 5.5 asks the client for device attestation, which UTS does not verify
-       * yet, so the authorization endpoint serves it in development only (decision Q67).
+       * `required`: design 5.5 asks the client for device attestation (`attestation.ts`), so the
+       * authorization endpoint serves it only where the environment's attestation config is
+       * complete, or in development with no attestation config at all (decision Q67).
        */
       attestation: 'required' | 'none';
     }

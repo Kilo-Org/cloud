@@ -80,6 +80,7 @@
         "device": "Da {{device}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
         "location": "Vicino a {{location}}. Non sei stato tu? Controlla subito la sicurezza del tuo account.",
         "unknown": "Non sei stato tu? Controlla subito la sicurezza del tuo account.",
+        "selfNamedDevice": "Da un dispositivo che si è chiamato \"{{name}}\". Non sei stato tu? Controlla subito la sicurezza del tuo account.",
         "support": "Eseguito dall'assistenza Kilo. Se non l'hai richiesto, contatta l'assistenza."
       }
     }

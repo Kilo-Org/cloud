@@ -80,6 +80,7 @@
         "device": "De pe {{device}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
         "location": "Lângă {{location}}. Nu ai fost tu? Verifică acum securitatea contului tău.",
         "unknown": "Nu ai fost tu? Verifică acum securitatea contului tău.",
+        "selfNamedDevice": "De pe un dispozitiv care și-a spus „{{name}}”. Nu ai fost tu? Verifică acum securitatea contului tău.",
         "support": "Realizat de asistența Kilo. Dacă nu ai cerut asta, contactează asistența."
       }
     }

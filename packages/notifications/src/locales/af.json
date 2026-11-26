@@ -80,6 +80,7 @@
         "device": "Vanaf {{device}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
         "location": "Naby {{location}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
         "unknown": "Nie jy nie? Hersien nou jou rekeningsekuriteit.",
+        "selfNamedDevice": "Vanaf 'n toestel wat homself \"{{name}}\" genoem het. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
         "support": "Gedoen deur Kilo-ondersteuning. As jy nie hierom gevra het nie, kontak ondersteuning."
       }
     }

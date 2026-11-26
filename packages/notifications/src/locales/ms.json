@@ -80,6 +80,7 @@
         "device": "Daripada {{device}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
         "location": "Berhampiran {{location}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
         "unknown": "Bukan anda? Semak keselamatan akaun anda sekarang.",
+        "selfNamedDevice": "Daripada peranti yang menamakan dirinya \"{{name}}\". Bukan anda? Semak keselamatan akaun anda sekarang.",
         "support": "Dilakukan oleh sokongan Kilo. Jika anda tidak memintanya, hubungi sokongan."
       }
     }

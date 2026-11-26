@@ -547,6 +547,18 @@ export async function accountHasVerifiedPrimaryAddress(userId: string): Promise<
   return providers.length === 0 || hasVerifiedPrimaryAddress(user.google_user_email, providers);
 }
 
+/**
+ * The sign-in methods an enterprise SSO link removed, each named once in a
+ * stable order, or undefined when it removed none. A stale WorkOS row the
+ * link replaces is the same method, so it is not one of them.
+ */
+function replacedSignInMethods(
+  removed: readonly AuthProviderId[]
+): readonly [AuthProviderId, ...AuthProviderId[]] | undefined {
+  const [first, ...rest] = [...new Set(removed.filter(provider => provider !== 'workos'))].sort();
+  return first === undefined ? undefined : [first, ...rest];
+}
+
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
@@ -645,9 +657,10 @@ export async function createOrUpdateUser(
           p => p.provider === 'workos' && p.provider_account_id === args.provider_account_id
         );
         const settled = await db.transaction(async tx => {
-          await tx
+          const removed = await tx
             .delete(user_auth_provider)
-            .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+            .where(eq(user_auth_provider.kilo_user_id, userByEmail.id))
+            .returning({ provider: user_auth_provider.provider });
           const [linked] = await tx
             .insert(user_auth_provider)
             .values({
@@ -670,7 +683,11 @@ export async function createOrUpdateUser(
           if (!updatedUser || !linked) {
             throw new Error('Failed to rotate web sessions for WorkOS user');
           }
-          return { user: updatedUser, linkedAt: linked.created_at };
+          return {
+            user: updatedUser,
+            linkedAt: linked.created_at,
+            replacedProviders: replacedSignInMethods(removed.map(row => row.provider)),
+          };
         });
         linkedUser = settled.user;
         if (isNewWorkosLink) {
@@ -684,6 +701,9 @@ export async function createOrUpdateUser(
                 displayName: args.display_name ?? null,
               },
               linkedAt: new Date(settled.linkedAt),
+              ...(settled.replacedProviders
+                ? { replacedProviders: settled.replacedProviders }
+                : {}),
             },
             await currentSecurityNoticeRequest()
           );

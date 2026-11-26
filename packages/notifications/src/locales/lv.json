@@ -80,6 +80,7 @@
         "device": "No {{device}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
         "location": "Netālu no {{location}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
         "unknown": "Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
+        "selfNamedDevice": "No ierīces, kas sevi nosauca par \"{{name}}\". Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
         "support": "To izdarīja Kilo atbalsts. Ja jūs to nepieprasījāt, sazinieties ar atbalstu."
       }
     }

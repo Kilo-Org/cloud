@@ -80,6 +80,7 @@
         "device": "Från {{device}}. Var det inte du? Granska din kontosäkerhet nu.",
         "location": "Nära {{location}}. Var det inte du? Granska din kontosäkerhet nu.",
         "unknown": "Var det inte du? Granska din kontosäkerhet nu.",
+        "selfNamedDevice": "Från en enhet som kallade sig ”{{name}}”. Var det inte du? Granska din kontosäkerhet nu.",
         "support": "Utfört av Kilos support. Om du inte bad om detta, kontakta supporten."
       }
     }

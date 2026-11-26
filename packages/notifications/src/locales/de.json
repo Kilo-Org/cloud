@@ -80,6 +80,7 @@
         "device": "Von {{device}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
         "location": "In der Nähe von {{location}}. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
         "unknown": "Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
+        "selfNamedDevice": "Von einem Gerät, das sich selbst „{{name}}“ nannte. Warst du das nicht? Prüfe jetzt die Sicherheit deines Kontos.",
         "support": "Vom Kilo-Support durchgeführt. Wenn du das nicht angefordert hast, kontaktiere den Support."
       }
     }

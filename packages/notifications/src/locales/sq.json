@@ -80,6 +80,7 @@
         "device": "Nga {{device}}. Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
         "location": "Pranë {{location}}. Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
         "unknown": "Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
+        "selfNamedDevice": "Nga një pajisje që e quajti veten \"{{name}}\". Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
         "support": "U krye nga mbështetja e Kilo. Nëse nuk e ke kërkuar, kontakto mbështetjen."
       }
     }

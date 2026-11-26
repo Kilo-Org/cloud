@@ -80,6 +80,7 @@
         "device": "Mula sa {{device}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
         "location": "Malapit sa {{location}}. Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
         "unknown": "Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
+        "selfNamedDevice": "Mula sa isang device na tinawag ang sarili na \"{{name}}\". Hindi ikaw? Suriin ngayon ang seguridad ng iyong account.",
         "support": "Ginawa ng suporta ng Kilo. Kung hindi mo ito hiniling, makipag-ugnayan sa suporta."
       }
     }

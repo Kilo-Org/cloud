@@ -80,6 +80,7 @@
         "device": "Seadmest {{device}}. Polnud sina? Vaata kohe üle oma konto turvalisus.",
         "location": "Asukoha {{location}} lähedalt. Polnud sina? Vaata kohe üle oma konto turvalisus.",
         "unknown": "Polnud sina? Vaata kohe üle oma konto turvalisus.",
+        "selfNamedDevice": "Seadmest, mis nimetas end „{{name}}“. Polnud sina? Vaata kohe üle oma konto turvalisus.",
         "support": "Tegi Kilo tugi. Kui sa seda ei palunud, võta ühendust toega."
       }
     }

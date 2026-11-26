@@ -80,6 +80,7 @@
         "device": "Vanaf {{device}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
         "location": "In de buurt van {{location}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
         "unknown": "Was jij dit niet? Controleer nu de beveiliging van je account.",
+        "selfNamedDevice": "Vanaf een apparaat dat zichzelf \"{{name}}\" noemde. Was jij dit niet? Controleer nu de beveiliging van je account.",
         "support": "Gedaan door Kilo-support. Heb je hier niet om gevraagd, neem dan contact op met support."
       }
     }

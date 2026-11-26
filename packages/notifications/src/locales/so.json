@@ -80,6 +80,7 @@
         "device": "Laga soo galay {{device}}. Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
         "location": "Meel u dhow {{location}}. Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
         "unknown": "Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
+        "selfNamedDevice": "Laga soo galay qalab isku magacaabay \"{{name}}\". Adiga ma ahayn? Hadda dib u eeg amniga akoonkaaga.",
         "support": "Waxaa sameeyay taageerada Kilo. Haddii aadan codsan, la xiriir taageerada."
       }
     }

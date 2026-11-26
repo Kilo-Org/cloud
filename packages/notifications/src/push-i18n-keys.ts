@@ -81,14 +81,17 @@ export const ACCOUNT_SECURITY_PUSH_TITLE_KEYS = {
  * What an account-security notice can say about where the action came from.
  * For the owner's own action the device label and the approximate location
  * are each optional, so the body has one sentence per combination rather than
- * a template with an empty hole in it. An action Kilo support took names
- * support and nothing about the staff member's request.
+ * a template with an empty hole in it. A device sign-in whose requesting
+ * device named itself has its own sentence that attributes the name to the
+ * device. An action Kilo support took names support and nothing about the
+ * staff member's request.
  */
 export const ACCOUNT_SECURITY_PUSH_CONTEXTS = [
   'deviceAndLocation',
   'device',
   'location',
   'unknown',
+  'selfNamedDevice',
   'support',
 ] as const;
 export type AccountSecurityPushContext = (typeof ACCOUNT_SECURITY_PUSH_CONTEXTS)[number];
@@ -99,6 +102,7 @@ export const ACCOUNT_SECURITY_PUSH_BODY_KEYS = {
   device: 'internal.accountSecurity.body.device',
   location: 'internal.accountSecurity.body.location',
   unknown: 'internal.accountSecurity.body.unknown',
+  selfNamedDevice: 'internal.accountSecurity.body.selfNamedDevice',
   support: 'internal.accountSecurity.body.support',
 } as const satisfies Record<AccountSecurityPushContext, PushCatalogKey>;
 

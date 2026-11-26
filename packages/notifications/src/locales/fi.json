@@ -80,6 +80,7 @@
         "device": "Laitteelta {{device}}. Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
         "location": "Läheltä sijaintia {{location}}. Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
         "unknown": "Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
+        "selfNamedDevice": "Laitteelta, joka kutsui itseään nimellä \"{{name}}\". Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
         "support": "Kilon tuen tekemä. Jos et pyytänyt tätä, ota yhteyttä tukeen."
       }
     }

@@ -57,10 +57,11 @@ const APPROVAL_REFUSAL_STATUS: Partial<Record<DeviceAuthRefusalCode, number>> = 
 /**
  * How the approval notice names the device that asked to sign in. A
  * requesting client name is chosen by the requesting device itself, before
- * anyone signs in, so the notice shows it only quoted and attributed to that
- * device ("named itself …") and cut short. Without one, the notice shows a
- * recognised client kind or a parsed browser label from the stored user
- * agent, never the raw header.
+ * anyone signs in, so the email and the push show it only quoted and
+ * attributed to that device ("named itself …"), cut short and with any quote
+ * mark inside it replaced. Without one, the notice shows a recognised client
+ * kind or a parsed browser label from the stored user agent, never the raw
+ * header.
  */
 function requesterFor(request: ApprovedDeviceAuthRequest): DeviceSignInRequester {
   if (request.requestingClientName) {

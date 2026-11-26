@@ -120,6 +120,10 @@ way, including Apple from connected accounts.
 4. A notice send failure MUST NOT fail the link.
 5. The notice MUST name the provider and the linked identity, and MUST
    tell the reader to remove the method if they did not add it.
+6. When an enterprise SSO link removed the account's other sign-in methods,
+   the notice MUST name them and say every browser was signed out, and
+   MUST tell the reader to contact support instead, since they cannot
+   remove the SSO method themselves.
 
 ### Mobile contract
 

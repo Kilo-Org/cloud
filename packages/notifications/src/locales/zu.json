@@ -80,6 +80,7 @@
         "device": "Kusuka ku-{{device}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
         "location": "Eduze kwe-{{location}}. Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
         "unknown": "Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
+        "selfNamedDevice": "Kusuka kudivayisi eziqambe ngokuthi \"{{name}}\". Akusiwe wena? Buyekeza ukuphepha kwe-akhawunti yakho manje.",
         "support": "Kwenziwe wusizo lwe-Kilo. Uma ungakucelanga lokhu, xhumana nosizo."
       }
     }

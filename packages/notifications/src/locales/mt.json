@@ -80,6 +80,7 @@
         "device": "Minn {{device}}. Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
         "location": "Qrib {{location}}. Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
         "unknown": "Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
+        "selfNamedDevice": "Minn apparat li sejjaħ lilu nnifsu \"{{name}}\". Ma kontx int? Iċċekkja s-sigurtà tal-kont tiegħek issa.",
         "support": "Sar mis-servizz ta’ appoġġ ta’ Kilo. Jekk ma tlabtx dan, ikkuntattja s-servizz ta’ appoġġ."
       }
     }

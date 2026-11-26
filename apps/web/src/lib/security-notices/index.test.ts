@@ -25,6 +25,7 @@ import { transactional_email_log, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import * as email from '@kilocode/web-shared/lib/email';
 import type { SecurityNoticeRequest } from '@kilocode/web-shared/lib/email';
+import { internalDispatchRequestSchema } from '@kilocode/notifications/schemas';
 import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
@@ -109,7 +110,7 @@ const EVENTS: Array<[SecurityNoticeEvent, unknown, unknown[]]> = [
       linkedAt: new Date('2026-03-04T05:06:07.000Z'),
     },
     jest.mocked(email.sendNewSignInMethodEmail),
-    ['GitHub', { email: 'octo@example.net', displayName: null }, REQUEST],
+    ['GitHub', { email: 'octo@example.net', displayName: null }, null, REQUEST],
   ],
   [
     { type: 'sign_in_method_unlinked', provider: 'github', actingSessionId: 'web-session-1' },
@@ -182,7 +183,31 @@ describe('scheduleSecurityNotice', () => {
     );
   });
 
-  it('quotes a name the requesting device chose in the approval push, cut short', async () => {
+  it('names the sign-in methods an SSO link replaced in its email', async () => {
+    await scheduleSecurityNotice(
+      user,
+      {
+        type: 'sign_in_method_linked',
+        provider: 'workos',
+        linkedIdentity: { email: 'owner@example.com', displayName: null },
+        linkedAt: new Date('2026-03-04T05:06:07.000Z'),
+        replacedProviders: ['github', 'google'],
+      },
+      REQUEST
+    );
+
+    expect(jest.mocked(email.sendNewSignInMethodEmail)).toHaveBeenCalledWith(
+      user.google_user_email,
+      'Enterprise SSO',
+      { email: 'owner@example.com', displayName: null },
+      ['GitHub', 'Google'],
+      REQUEST
+    );
+    expect(mockDispatchPush).toHaveBeenCalledTimes(1);
+    expect(await noticeRows(user.id)).toHaveLength(1);
+  });
+
+  it('attributes a name the requesting device chose in the approval push, cut short', async () => {
     await scheduleSecurityNotice(
       user,
       {
@@ -196,10 +221,32 @@ describe('scheduleSecurityNotice', () => {
 
     const [[push]] = mockDispatchPush.mock.calls;
     expect(push?.origin).toEqual({
-      actor: 'owner',
-      device: `"Kilo security check ${'x'.repeat(20)}…"`,
-      location: null,
+      actor: 'self_named_device',
+      name: `Kilo security check ${'x'.repeat(20)}…`,
     });
+  });
+
+  it('replaces a quote mark in a name the requesting device chose', async () => {
+    await scheduleSecurityNotice(
+      user,
+      {
+        type: 'device_sign_in_approved',
+        deviceAuthRequestId: 'request-3',
+        requester: { kind: 'self_named', name: 'Kilo CLI" verified by “Kilo”' },
+        requestIp: null,
+      },
+      REQUEST
+    );
+
+    const [[push]] = mockDispatchPush.mock.calls;
+    expect(push?.origin).toEqual({
+      actor: 'self_named_device',
+      name: "Kilo CLI' verified by 'Kilo'",
+    });
+    // The worker's schema accepts the request as sent.
+    expect(
+      internalDispatchRequestSchema.safeParse({ kind: 'account_security', ...push }).success
+    ).toBe(true);
   });
 
   it('names Kilo support and nothing about the staff member for a support action', async () => {

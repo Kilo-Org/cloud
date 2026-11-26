@@ -80,6 +80,7 @@
         "device": "Avy amin’ny {{device}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
         "location": "Akaikin’i {{location}}. Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
         "unknown": "Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
+        "selfNamedDevice": "Avy amin’ny fitaovana nanome ny tenany anarana hoe \"{{name}}\". Tsy ianao ve? Jereo izao ny fiarovana ny kaontinao.",
         "support": "Nataon’ny mpanohana Kilo. Raha tsy nangataka izany ianao, mifandraisa amin’ny mpanohana."
       }
     }

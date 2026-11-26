@@ -80,6 +80,7 @@
         "device": "Iš {{device}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
         "location": "Netoli {{location}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
         "unknown": "Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
+        "selfNamedDevice": "Iš įrenginio, kuris save pavadino „{{name}}“. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
         "support": "Atliko Kilo pagalba. Jei to neprašėte, susisiekite su pagalba."
       }
     }

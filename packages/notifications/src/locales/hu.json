@@ -80,6 +80,7 @@
         "device": "Innen: {{device}}. Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
         "location": "{{location}} közelében. Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
         "unknown": "Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
+        "selfNamedDevice": "Egy eszközről, amely „{{name}}” néven nevezte meg magát. Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
         "support": "A Kilo ügyfélszolgálata végezte el. Ha nem te kérted, lépj kapcsolatba az ügyfélszolgálattal."
       }
     }

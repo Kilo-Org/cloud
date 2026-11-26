@@ -83,25 +83,38 @@ export function genericPushContentForPushData(
 }
 
 function accountSecurityPushContext(origin: AccountSecurityOrigin): AccountSecurityPushContext {
-  if (origin.actor === 'support') return 'support';
-  if (origin.device !== null && origin.location !== null) return 'deviceAndLocation';
-  if (origin.device !== null) return 'device';
-  if (origin.location !== null) return 'location';
-  return 'unknown';
+  switch (origin.actor) {
+    case 'support':
+      return 'support';
+    case 'self_named_device':
+      return 'selfNamedDevice';
+    case 'owner':
+      if (origin.device !== null && origin.location !== null) return 'deviceAndLocation';
+      if (origin.device !== null) return 'device';
+      if (origin.location !== null) return 'location';
+      return 'unknown';
+  }
 }
 
 function accountSecurityPushParams(origin: AccountSecurityOrigin): Record<string, string> {
-  if (origin.actor === 'support') return {};
-  return {
-    ...(origin.device !== null ? { device: origin.device } : {}),
-    ...(origin.location !== null ? { location: origin.location } : {}),
-  };
+  switch (origin.actor) {
+    case 'support':
+      return {};
+    case 'self_named_device':
+      return { name: origin.name };
+    case 'owner':
+      return {
+        ...(origin.device !== null ? { device: origin.device } : {}),
+        ...(origin.location !== null ? { location: origin.location } : {}),
+      };
+  }
 }
 
 /**
  * The full-preview copy of an account-security notice: a title naming the
  * event and a body naming who acted: the owner's device and approximate
- * location when the request carried them, or Kilo support. `title` and `body`
+ * location when the request carried them, the quoted name a requesting device
+ * gave itself, or Kilo support. `title` and `body`
  * are the English rendering, which the channel shows when a token's catalog
  * cannot resolve `i18nKey`; the generic product copy stands in if even
  * English lost an entry, so the push is never blank.

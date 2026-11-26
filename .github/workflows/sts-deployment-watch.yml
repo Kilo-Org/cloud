@@ -1,0 +1,43 @@
+name: STS deployment watch
+
+# The monitor of the STS Worker outside STS (services/sts README, Cloudflare deploy tokens, setup
+# step 7): every Cloudflare deployment of `sts` or `sts-staging` that no STS deploy job of this
+# repository made is posted to Slack. STS cannot report a replacement of itself.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: sts-deployment-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    # Guard: reads a repository secret; only the canonical repository runs it.
+    if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Compare STS deployments with deploy jobs
+        id: watch
+        env:
+          CLOUDFLARE_TOKEN: ${{ secrets.STS_WATCH_CLOUDFLARE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/sts-deployment-watch.mjs
+
+      - name: Notify Slack
+        if: steps.watch.outputs.found != '0'
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          errors: true
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: ${{ steps.watch.outputs.payload }}

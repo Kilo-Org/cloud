@@ -151,7 +151,9 @@ async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
     return { status: 'misconfigured', reason: 'shard_refused' };
   }
   const { answer } = parsed.data;
-  const failed = [...answer.signers, ...answer.feeds].filter(entry => entry.status !== 'ok');
+  const failed = [...answer.signers, ...(answer.feeds ?? [])].filter(
+    entry => entry.status !== 'ok'
+  );
   if (failed.length > 0) {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.signers_failed', failed }));
   }
@@ -165,25 +167,29 @@ type HeldObjects = Pick<FeedIsolate, 'signers' | 'feeds'>;
  * object, read under 24 hours ago, in object order. A `kid` names its object, and each object's
  * keys come from one validated answer, so no `kid` repeats. An object past the hold drops out: a
  * signer's tokens, or a feed object's heads, then fail verification.
+ *
+ * A set with no live signer is no set: a verifier must keep its own last good set rather than take
+ * one that verifies no token, so the request answers 503 (or 500). `Age` counts from the newest
+ * signer read only (design 5.7); feed keys count toward the oldest age, which bounds every key.
  */
 function servedSet(held: HeldObjects, now: number): ServedSet | null {
-  const live: HeldSigner[] = [];
-  const missing: { signers: number[]; feeds: number[] } = { signers: [], feeds: [] };
-  for (const kind of ['signers', 'feeds'] as const) {
-    for (const [index, entry] of held[kind].entries()) {
-      if (entry !== null && now - entry.readAt < UTS_SIGNER_KEYS_HOLD_MS) live.push(entry);
-      else missing[kind].push(index);
-    }
-  }
+  const isLive = (entry: HeldSigner | null): entry is HeldSigner =>
+    entry !== null && now - entry.readAt < UTS_SIGNER_KEYS_HOLD_MS;
+  const signers = held.signers.filter(isLive);
+  const feeds = held.feeds.filter(isLive);
+  const missing = {
+    signers: held.signers.flatMap((entry, index) => (isLive(entry) ? [] : [index])),
+    feeds: held.feeds.flatMap((entry, index) => (isLive(entry) ? [] : [index])),
+  };
   if (missing.signers.length > 0 || missing.feeds.length > 0) {
     console.error(JSON.stringify({ event: 'uts_feed.key_set.signers_missing', ...missing }));
   }
-  if (live.length === 0) return null;
-  const readTimes = live.map(entry => entry.readAt);
+  if (signers.length === 0) return null;
+  const live = [...signers, ...feeds];
   return {
     body: JSON.stringify({ keys: live.flatMap(entry => entry.keys) } satisfies UtsJwks),
-    oldestReadAt: Math.min(...readTimes),
-    newestReadAt: Math.max(...readTimes),
+    oldestReadAt: Math.min(...live.map(entry => entry.readAt)),
+    newestReadAt: Math.max(...signers.map(entry => entry.readAt)),
   };
 }
 
@@ -222,7 +228,7 @@ async function runRead(
   let outcome: ReadState;
   if (result.status === 'answered') {
     state.signers = merge(state.signers, result.answer.signers, e => e.signer, result.receivedAt);
-    state.feeds = merge(state.feeds, result.answer.feeds, e => e.feed, result.receivedAt);
+    state.feeds = merge(state.feeds, result.answer.feeds ?? [], e => e.feed, result.receivedAt);
     state.served = servedSet(state, Date.now());
     if (state.served !== null) {
       outcome = { status: 'succeeded', startedAt };

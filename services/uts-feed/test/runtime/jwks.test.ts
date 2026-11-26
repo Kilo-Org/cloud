@@ -88,12 +88,12 @@ const answered = (
 
 const okAnswer = (generation = 0, readAt = Date.now()) => answered(allSigners(generation, readAt));
 
-/** Every signer and feed object failed with `status`, as the mint answers when it holds no keys. */
+/**
+ * Every signer failed with `status`, as the mint answers when it holds no signer keys. The feed
+ * objects answer their keys, so the test shows feed keys alone never make a key set.
+ */
 const failedAnswer = (status: 'misconfigured' | 'unavailable') =>
-  answered(
-    Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })),
-    [0, 1].map(feed => ({ feed, status }))
-  );
+  answered(Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })));
 
 /** A mint Worker binding whose `signerKeys()` answers `answer`, counting its calls. */
 function mintBinding(answer: () => Promise<MintResult>): SignerKeysBinding & { calls: number } {
@@ -109,7 +109,12 @@ function mintBinding(answer: () => Promise<MintResult>): SignerKeysBinding & { c
 
 /** The development feed Worker, with the mint binding the test supplies. */
 function envWith(mint: SignerKeysBinding, environment = 'development'): Env {
-  return { UTS_ENVIRONMENT: environment, UTS_MINT: mint, UTS_FEED_READS: unusedFeedReads };
+  return {
+    UTS_ENVIRONMENT: environment,
+    UTS_MINT: mint,
+    UTS_FEED_READS: unusedFeedReads,
+    CF_VERSION_METADATA: { id: 'test-version-0001', tag: '', timestamp: '' },
+  };
 }
 
 /** The key-set tests read no feed object; any call fails the test. */
@@ -516,8 +521,25 @@ describe('failures', () => {
     expect(await response.json()).toEqual({ error: 'server_error' });
   });
 
-  it('answers 503 when the mint Worker has keys for no signer', async () => {
+  it('answers 503 when the mint Worker has keys for no signer, even with both feed objects keyed', async () => {
     expect((await get(mintBinding(async () => failedAnswer('unavailable')))).status).toBe(503);
+  });
+
+  it('answers 503, not a feed-keys-only set, to an isolate that holds no signer keys', async () => {
+    let failing = false;
+    const mint = mintBinding(async () => (failing ? failedAnswer('unavailable') : okAnswer(0, T0)));
+    await get(mint, T0);
+    failing = true;
+    const response = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS);
+    expect(response.status).toBe(503);
+  });
+
+  it('takes an answer without the feed objects, from a mint Worker of the previous release', async () => {
+    const response = await get(
+      mintBinding(async () => ({ status: 'answered', answer: { signers: allSigners() } }))
+    );
+    expect(response.status).toBe(200);
+    expect(await keysOf(response)).toHaveLength(32);
   });
 
   it('answers 500 when the mint Worker refuses this caller or a signer object is misconfigured', async () => {

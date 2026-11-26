@@ -1,13 +1,15 @@
 import {
+  FeedHeadPayloadSchema,
   FeedListHashSchema,
   FeedReadsHeadSchema,
   FeedReadsListSchema,
+  decodeBase64Url,
   feedListHash,
   UTS_FEED_COUNT,
   type FeedReadsBinding,
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { FeedConfig } from './env';
 
 /**
@@ -26,11 +28,13 @@ export const FEED_FAILED_OBJECT_MS = 30 * 1000;
 export const FEED_HEAD_CACHE_SECONDS = 5;
 
 /**
- * The oldest head this Worker serves: an object signs a new head once its held one is 5 seconds
- * old, and the cache adds at most 5 seconds. A head an object answers older than this counts as
- * that object failing, so a stalled object hands over to the other one.
+ * The oldest head this Worker serves. A head's `iat` is the start of its object's last good
+ * backfill, which runs every 5 seconds and is given up after 10; the cache adds 5 seconds. A head
+ * an object answers older than this counts as that object failing, so a stalled object hands over
+ * to the other one, and a verifier (which refuses heads over 30 seconds old) keeps 10 seconds of
+ * margin.
  */
-export const FEED_HEAD_MAX_SERVED_AGE_MS = 10 * 1000;
+export const FEED_HEAD_MAX_SERVED_AGE_MS = 20 * 1000;
 
 /** A head more than this far ahead of this Worker's clock counts as a failed read (design 5.6). */
 const FEED_HEAD_MAX_FUTURE_MS = 5 * 1000;
@@ -65,16 +69,16 @@ function failuresFor(environment: UtsEnvironment): FeedFailures {
 }
 
 /**
- * The objects to read in order: those that have not failed in the last 30 seconds, feed 0 first;
- * every object when all of them failed, so one bad moment never stops the feed for 30 seconds.
+ * The objects to read, in order: those that have not failed in the last 30 seconds, feed 0 first,
+ * then the skipped ones, which are read only when every other one fails or holds no such list.
  */
 function readOrder(state: FeedFailures, now: number): number[] {
   const all = Array.from({ length: UTS_FEED_COUNT }, (_, feed) => feed);
-  const healthy = all.filter(feed => {
+  const healthy = (feed: number) => {
     const failedAt = state.failedAt[feed] ?? null;
     return failedAt === null || now - failedAt >= FEED_FAILED_OBJECT_MS;
-  });
-  return healthy.length > 0 ? healthy : all;
+  };
+  return [...all.filter(healthy), ...all.filter(feed => !healthy(feed))];
 }
 
 function disposeResult(result: unknown): void {
@@ -120,21 +124,40 @@ async function objectCall<Schema extends z.ZodType>(
   return parsed.data;
 }
 
-const CachedHeadSchema = z.strictObject({
-  head: z.string().min(1),
-  listHash: FeedListHashSchema,
-  issuedAt: z.number().int().nonnegative(),
-});
-
 /** Whether a head signed at `issuedAt` (seconds) may be served at `now`. */
 function servable(issuedAt: number, now: number): boolean {
   const signedAt = issuedAt * 1000;
   return now - signedAt <= FEED_HEAD_MAX_SERVED_AGE_MS && signedAt - now <= FEED_HEAD_MAX_FUTURE_MS;
 }
 
-/** The data-center cache key of one feed path in one environment; tests clear it through this. */
+/**
+ * The `iat` and `list_hash` a head's own payload states, or null for anything that is not a
+ * compact JWS with that payload. A cached head is read this way, never through fields stored
+ * beside it, so an entry in the cache cannot claim a fresher time than its head carries; the
+ * signature is the verifier's check.
+ */
+function headClaims(head: string): { issuedAt: number; listHash: string } | null {
+  const parts = head.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const payload: unknown = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1] ?? '')));
+    const parsed = FeedHeadPayloadSchema.safeParse(payload);
+    return parsed.success ? { issuedAt: parsed.data.iat, listHash: parsed.data.list_hash } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The data-center cache key of one feed path. The Cache API is one cache per zone, shared by every
+ * Worker on `kiloapps.io`, so the key carries this deployment's version id, which no other Worker
+ * holds: another Worker can neither read the list nor plant a head under it (design 7, as for the
+ * PAT cache). A new deployment starts with an empty cache.
+ */
 export function feedCacheKey(config: FeedConfig, path: string): Request {
-  return new Request(`${config.endpoints.feedOrigin}/__feed-cache/${config.environment}/${path}`);
+  return new Request(
+    `${config.endpoints.feedOrigin}/__feed-cache/${config.environment}/${config.cacheSegment}/${path}`
+  );
 }
 
 async function headFromObjects(reads: FeedReadsBinding, config: FeedConfig): Promise<HeadRead> {
@@ -166,8 +189,8 @@ async function headFromObjects(reads: FeedReadsBinding, config: FeedConfig): Pro
 
 /**
  * The current head: the data center's cached copy while it is servable, otherwise a read of the
- * feed objects, cached for 5 seconds. The cache is one per zone, so a cached head is checked for
- * shape and age before it serves; its signature is the verifier's check.
+ * feed objects, cached for 5 seconds. The cached entry is the head alone; its time and list hash
+ * are read from its payload.
  */
 export async function serveHead(
   reads: FeedReadsBinding,
@@ -177,21 +200,20 @@ export async function serveHead(
   const key = feedCacheKey(config, 'head');
   const cached = await caches.default.match(key);
   if (cached !== undefined) {
-    const head = CachedHeadSchema.safeParse(await cached.json().catch(() => null));
-    if (head.success && servable(head.data.issuedAt, Date.now())) {
-      return { status: 'ok', ...head.data };
+    const head = await cached.text();
+    const claims = headClaims(head);
+    if (claims !== null && servable(claims.issuedAt, Date.now())) {
+      return { status: 'ok', head, ...claims };
     }
   }
   const read = await headFromObjects(reads, config);
   if (read.status === 'ok') {
-    const { head, listHash, issuedAt } = read;
     ctx.waitUntil(
       caches.default.put(
         key,
-        Response.json(
-          { head, listHash, issuedAt },
-          { headers: { 'Cache-Control': `max-age=${FEED_HEAD_CACHE_SECONDS}` } }
-        )
+        new Response(read.head, {
+          headers: { 'Cache-Control': `max-age=${FEED_HEAD_CACHE_SECONDS}` },
+        })
       )
     );
   }
@@ -202,8 +224,9 @@ const encoder = new TextEncoder();
 
 /**
  * The list with hash `listHash`: the data center's cached bytes when they still match the hash,
- * otherwise a read of the feed objects. An object's list is served and cached only when its bytes
- * hash to `listHash`. `not_found` only when every object answered that it holds no such list.
+ * otherwise a read of the feed objects, skipped ones last. An object's list is served and cached
+ * only when its bytes hash to `listHash`. `not_found` only when every object answered that it holds
+ * no such list.
  */
 export async function serveList(
   reads: FeedReadsBinding,
@@ -241,6 +264,7 @@ export async function serveList(
             })
           )
         );
+        state.failedAt[feed] = null;
         return { status: 'ok', bytes };
       }
       console.error(JSON.stringify({ event: 'uts_feed.list.hash_mismatch', feed }));

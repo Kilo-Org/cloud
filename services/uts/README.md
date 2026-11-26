@@ -325,8 +325,10 @@ change, as on the first deploy of an environment, detection takes them out of th
 the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` deploys
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
 order). A change to only one of them deploys in the matrix. The signer-keys answer carries the feed
-objects' keys, which an older feed Worker refuses as an invalid answer and so keeps serving its held
-keys until it is deployed too.
+objects' keys in an optional `feeds` field for one release, so either Worker can deploy or roll back
+alone. Every grant statement calls `uts.feed_entries_of_statement()`, so apply migration 0006 to an
+environment's identity store before that environment binds `IDENTITY_STORE`; the code exchange,
+third-party refresh and `/revoke` fail until it is applied.
 
 ## Identity store
 

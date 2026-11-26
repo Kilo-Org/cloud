@@ -109,10 +109,18 @@ async function revocationFeed(
       if (read.status !== 'ok') return feedFailure(read.status);
       const body: UtsBootstrapWire = {
         jwks: read.jwks,
+        key_ages: read.keyAges,
         head: read.head,
         list: encodeBase64Url(read.list),
       };
-      return Response.json(body, { headers: NO_STORE });
+      // The same ages as the key-set response's headers, so either reader counts them.
+      return Response.json(body, {
+        headers: {
+          ...NO_STORE,
+          Age: String(read.keyAges.newest),
+          [UTS_JWKS_OLDEST_AGE_HEADER]: String(read.keyAges.oldest),
+        },
+      });
     }
   }
 }

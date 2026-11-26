@@ -172,7 +172,7 @@ describe('SignerKeysAnswerSchema', () => {
     feedEntries[1] = { feed: 1, status: 'unavailable' };
     const parsed = SignerKeysAnswerSchema.parse({ signers: answer, feeds: feedEntries });
     expect(parsed.signers[7]).toEqual({ signer: 7, status: 'unavailable' });
-    expect(parsed.feeds[1]).toEqual({ feed: 1, status: 'unavailable' });
+    expect(parsed.feeds?.[1]).toEqual({ feed: 1, status: 'unavailable' });
     const failing = Array.from({ length: 16 }, (_, signer) => ({ signer, status: 'unavailable' }));
     expect(SignerKeysAnswerSchema.safeParse({ signers: failing, feeds: feeds() }).success).toBe(
       true
@@ -185,7 +185,9 @@ describe('SignerKeysAnswerSchema', () => {
     expect(
       SignerKeysAnswerSchema.safeParse({ signers: withoutReadTime, feeds: feeds() }).success
     ).toBe(false);
-    expect(SignerKeysAnswerSchema.safeParse({ signers: signers() }).success).toBe(false);
+    // An answer from a mint Worker of the previous release has no `feeds`; it is accepted for one
+    // release.
+    expect(SignerKeysAnswerSchema.safeParse({ signers: signers() }).success).toBe(true);
   });
 
   it('names the signer-keys entrypoint, holds keys 24 hours, and reads an answer, a refusal or a misconfigured shard', () => {
@@ -284,7 +286,16 @@ describe('revocation feed shapes', () => {
           'list'
         ),
       bootstrap: async () =>
-        withDisposer({ status: 'ok', jwks: { keys: [] }, head: 'a.b.c', list: bytes }, 'boot'),
+        withDisposer(
+          {
+            status: 'ok',
+            jwks: { keys: [] },
+            keyAges: { newest: 3, oldest: 7200 },
+            head: 'a.b.c',
+            list: bytes,
+          },
+          'boot'
+        ),
     };
     const sources = feedReaderSources(binding);
     const signal = new AbortController().signal;
@@ -293,6 +304,7 @@ describe('revocation feed shapes', () => {
     await expect(sources.feed.list('other', signal)).rejects.toThrow('not_found');
     expect(await sources.bootstrap(signal)).toEqual({
       jwks: { keys: [] },
+      keyAges: { newest: 3, oldest: 7200 },
       head: 'a.b.c',
       list: bytes,
     });
@@ -301,7 +313,14 @@ describe('revocation feed shapes', () => {
     const refusing: FeedReaderBinding = {
       head: async () => ({ status: 'refused' }),
       list: async () => ({ status: 'unavailable', retryAfterSeconds: 5 }),
-      bootstrap: async () => ({ status: 'ok', head: 'a.b.c' }),
+      // A bootstrap without key ages, or with the newest older than the oldest, is refused.
+      bootstrap: async () => ({
+        status: 'ok',
+        jwks: { keys: [] },
+        keyAges: { newest: 9, oldest: 3 },
+        head: 'a.b.c',
+        list: new Uint8Array(),
+      }),
     };
     const refused = feedReaderSources(refusing);
     await expect(refused.feed.head(signal)).rejects.toThrow('refused');
@@ -332,7 +351,12 @@ describe('revocation feed shapes', () => {
       if (url.endsWith('/revocation/head')) return new Response('a.b.c');
       if (url.endsWith(`/revocation/list/${THUMBPRINT}`)) return new Response(bytes);
       if (url.endsWith('/revocation/bootstrap')) {
-        return Response.json({ jwks: { keys: [] }, head: 'a.b.c', list: encodeBase64Url(bytes) });
+        return Response.json({
+          jwks: { keys: [] },
+          key_ages: { newest: 0, oldest: 42 },
+          head: 'a.b.c',
+          list: encodeBase64Url(bytes),
+        });
       }
       return new Response('no', { status: 503 });
     };
@@ -342,6 +366,7 @@ describe('revocation feed shapes', () => {
     expect(await sources.feed.list(THUMBPRINT, signal)).toEqual(bytes);
     expect(await sources.bootstrap(signal)).toEqual({
       jwks: { keys: [] },
+      keyAges: { newest: 0, oldest: 42 },
       head: 'a.b.c',
       list: bytes,
     });

@@ -49,12 +49,29 @@ export const UTS_FEED_LIST_PATH_PREFIX = '/revocation/list/';
 export const UTS_BOOTSTRAP_PATH = '/revocation/bootstrap';
 
 /**
- * The HTTPS bootstrap body: the UTS key set as served at `jwks_uri`, the current head, and the
- * list bytes that head covers as base64url (JSON cannot carry raw bytes, and the hash covers the
- * exact bytes).
+ * The two ages of a UTS key set in whole seconds, measured at the feed Worker when it answers:
+ * `newest` is its `Age` (since the newest signer keys were read), `oldest` its
+ * `Kilo-Key-Set-Oldest-Age` (since the oldest held keys were read). A verifier counts the
+ * 5-minute lifetime from `newest` and the 24-hour last-good limit from `oldest`, so a bootstrap
+ * never restarts a held key's age (coordination with phases 2 and 4).
+ */
+export const KeySetAgesSchema = z
+  .strictObject({
+    newest: z.number().int().nonnegative(),
+    oldest: z.number().int().nonnegative(),
+  })
+  .refine(ages => ages.newest <= ages.oldest, 'newest age above oldest age');
+export type KeySetAges = z.infer<typeof KeySetAgesSchema>;
+
+/**
+ * The HTTPS bootstrap body: the UTS key set as served at `jwks_uri`, its ages, the current head,
+ * and the list bytes that head covers as base64url (JSON cannot carry raw bytes, and the hash
+ * covers the exact bytes). The response carries the same ages as `Age` and
+ * `Kilo-Key-Set-Oldest-Age`.
  */
 export const UtsBootstrapWireSchema = z.strictObject({
   jwks: z.record(z.string(), z.unknown()),
+  key_ages: KeySetAgesSchema,
   head: z.string().min(1),
   list: z.string().regex(/^[A-Za-z0-9_-]*$/),
 });
@@ -132,6 +149,7 @@ export const FeedReaderBootstrapSchema = z.discriminatedUnion('status', [
   z.strictObject({
     status: z.literal('ok'),
     jwks: z.record(z.string(), z.unknown()),
+    keyAges: KeySetAgesSchema,
     head: z.string().min(1),
     list: Bytes,
   }),
@@ -158,9 +176,13 @@ export type RevocationFeedSourcePort = {
   list(listHash: string, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>>;
 };
 
-/** `@kilocode/verify`'s `UtsBootstrapAnswer` and `UtsBootstrapSource`, with the same shapes. */
+/**
+ * `@kilocode/verify`'s `UtsBootstrapAnswer` and `UtsBootstrapSource`, with the same shapes. A
+ * bootstrap without valid `keyAges` is refused (fail closed).
+ */
 export type UtsBootstrapAnswerPort = {
   jwks: unknown;
+  keyAges: KeySetAges;
   head: string;
   list: Uint8Array<ArrayBuffer>;
 };
@@ -232,7 +254,12 @@ export function feedReaderSources(binding: FeedReaderBinding): UtsFeedSources {
     async bootstrap(signal) {
       const read = await rpcCall(() => binding.bootstrap(), FeedReaderBootstrapSchema, signal);
       if (read.status !== 'ok') throw new Error(`bootstrap ${read.status}`);
-      return { jwks: read.jwks, head: read.head, list: copyBytes(read.list) };
+      return {
+        jwks: read.jwks,
+        keyAges: read.keyAges,
+        head: read.head,
+        list: copyBytes(read.list),
+      };
     },
   };
 }
@@ -299,7 +326,12 @@ export function httpsFeedSources(
         signal
       );
       const body = UtsBootstrapWireSchema.parse(await response.json());
-      return { jwks: body.jwks, head: body.head, list: decodeBase64Url(body.list) };
+      return {
+        jwks: body.jwks,
+        keyAges: body.key_ages,
+        head: body.head,
+        list: decodeBase64Url(body.list),
+      };
     },
   };
 }

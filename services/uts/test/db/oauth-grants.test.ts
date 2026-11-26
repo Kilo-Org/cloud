@@ -1308,11 +1308,15 @@ describe('OAuth row maintenance', () => {
       })
     ).toMatchObject({ outcome: 'revoked' });
     const staleFeed = randomUUID();
+    // A row written an hour ago: the stamp trigger dates every write now, so the owner turns it
+    // off for this one insert.
+    await owner.query('ALTER TABLE uts.revocations DISABLE TRIGGER revocations_stamp');
     await owner.query(
       `INSERT INTO uts.revocations (kind, subject_id, revoked_at, feed_expires_at)
        VALUES ('grant', $1, now() - interval '1 hour', now() - interval '40 minutes')`,
       [staleFeed]
     );
+    await owner.query('ALTER TABLE uts.revocations ENABLE TRIGGER revocations_stamp');
     const staleJti = randomUUID();
     await owner.query(
       `INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at) VALUES ($1, $2, now() - interval '1 second')`,

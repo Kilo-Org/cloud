@@ -52,7 +52,7 @@ export class FeedReader extends WorkerEntrypoint<Env> implements FeedReaderBindi
     if (!this.#admitted('bootstrap')) return { status: 'refused' };
     const read = await serveBootstrap(this.env, readConfig(this.env), this.ctx);
     return read.status === 'ok'
-      ? { status: 'ok', jwks: read.jwks, head: read.head, list: read.list }
+      ? { status: 'ok', jwks: read.jwks, keyAges: read.keyAges, head: read.head, list: read.list }
       : UNAVAILABLE;
   }
 }

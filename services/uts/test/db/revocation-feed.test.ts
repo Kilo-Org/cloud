@@ -24,6 +24,7 @@ afterAll(() => db.drop());
 
 const MINUTE = 60_000;
 
+/** Writes an entry dated in the past; the stamp trigger is off for that one insert. */
 async function insertEntry(
   kind: string,
   id: string,
@@ -31,12 +32,47 @@ async function insertEntry(
   keptFor: string,
   revokedBeforeAgo: string | null = null
 ): Promise<void> {
-  await owner.query(
-    `INSERT INTO uts.revocations (kind, subject_id, revoked_before, revoked_at, feed_expires_at)
-     VALUES ($1, $2, now() - $5::interval, now() - $3::interval, now() - $3::interval + $4::interval)`,
-    [kind, id, revokedAgo, keptFor, revokedBeforeAgo]
-  );
+  await owner.query('ALTER TABLE uts.revocations DISABLE TRIGGER revocations_stamp');
+  try {
+    await owner.query(
+      `INSERT INTO uts.revocations (kind, subject_id, revoked_before, revoked_at, feed_expires_at)
+       VALUES ($1, $2, now() - $5::interval, now() - $3::interval, now() - $3::interval + $4::interval)`,
+      [kind, id, revokedAgo, keptFor, revokedBeforeAgo]
+    );
+  } finally {
+    await owner.query('ALTER TABLE uts.revocations ENABLE TRIGGER revocations_stamp');
+  }
 }
+
+describe('the stamp trigger', () => {
+  it('dates every insert and update now, keeping the feed time, so a running feed object finds it', async () => {
+    const id = `user-${randomUUID()}`;
+    await owner.query(
+      `INSERT INTO uts.revocations (kind, subject_id, revoked_before, revoked_at, feed_expires_at)
+       VALUES ('subject', $1, now() - interval '2 hours', now() - interval '1 hour', now() - interval '1 hour' + interval '70 minutes')`,
+      [id]
+    );
+    const read = async () =>
+      (
+        await owner.query<{ fresh: boolean; kept: unknown }>(
+          `SELECT revoked_at > now() - interval '1 minute' AS fresh, feed_expires_at - revoked_at AS kept
+           FROM uts.revocations WHERE subject_id = $1`,
+          [id]
+        )
+      ).rows[0];
+    expect(await read()).toEqual({ fresh: true, kept: { hours: 1, minutes: 10 } });
+    const recent = await readFeedEntries(store, {
+      kind: 'recent',
+      since: new Date(Date.now() - 20 * MINUTE),
+    });
+    expect(recent.status === 'read' && recent.entries.some(entry => entry.id === id)).toBe(true);
+    // A later sign-out everywhere updates the subject row and leaves `revoked_at` alone.
+    await owner.query(`UPDATE uts.revocations SET revoked_before = now() WHERE subject_id = $1`, [
+      id,
+    ]);
+    expect(await read()).toEqual({ fresh: true, kept: { hours: 1, minutes: 10 } });
+  });
+});
 
 describe('backfill reads', () => {
   const ids = {
@@ -64,7 +100,10 @@ describe('backfill reads', () => {
     });
     if (result.status !== 'read') throw new Error(result.status);
     const byId = new Map(result.entries.map(entry => [entry.id, entry]));
-    expect([...byId.keys()].sort()).toEqual([ids.blocked, ids.pat, ids.subject].sort());
+    const known = new Set<string>(Object.values(ids));
+    expect([...byId.keys()].filter(id => known.has(id)).sort()).toEqual(
+      [ids.blocked, ids.pat, ids.subject].sort()
+    );
     const subject = byId.get(ids.subject);
     expect(subject?.kind).toBe('subject');
     expect(subject?.revokedBefore).toBeGreaterThan(before - 3 * MINUTE);

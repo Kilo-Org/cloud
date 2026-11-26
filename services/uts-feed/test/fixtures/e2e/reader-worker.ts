@@ -24,7 +24,12 @@ export default {
       }
       if (pathname === '/bootstrap') {
         const answer = await sources.bootstrap(signal);
-        return Response.json({ ...answer, list: encodeBase64Url(answer.list) });
+        return Response.json({
+          jwks: answer.jwks,
+          key_ages: answer.keyAges,
+          head: answer.head,
+          list: encodeBase64Url(answer.list),
+        });
       }
       return new Response('not found', { status: 404 });
     } catch (error) {

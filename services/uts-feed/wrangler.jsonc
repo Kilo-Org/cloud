@@ -28,6 +28,9 @@
       "custom_domain": true,
     },
   ],
+  // This deployment's version id keys the feed's data-center cache, so no other Worker on the zone
+  // can read or plant an entry (src/revocation.ts). Every env block binds it too.
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "vars": {
     "UTS_ENVIRONMENT": "production",
   },
@@ -60,6 +63,7 @@
           "custom_domain": true,
         },
       ],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "vars": {
         "UTS_ENVIRONMENT": "staging",
       },
@@ -83,6 +87,7 @@
       "name": "uts-feed-local",
       "workers_dev": false,
       "routes": [],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "vars": {
         "UTS_ENVIRONMENT": "development",
       },

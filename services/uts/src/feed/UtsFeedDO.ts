@@ -14,7 +14,7 @@ import {
   type SignerState,
 } from '../keys/lifecycle';
 import { FeedEntriesSchema, type FeedEntry } from '../revocation/entries';
-import { readFeedEntries } from '../revocation/store';
+import { readFeedEntries, type FeedEntriesRead } from '../revocation/store';
 import { FeedLedger } from './ledger';
 
 /**
@@ -26,6 +26,10 @@ const KEY_STATE = 'feed-key-state';
 
 /** The alarm period: backfill, expiry and key rotation run every 5 seconds (design 5.6). */
 export const FEED_ALARM_INTERVAL_MS = 5 * 1000;
+
+/** A backfill gives up after this long, connecting included (design 3, "Revocation feed"). */
+export const FEED_BACKFILL_DEADLINE_MS = 10 * 1000;
+const FEED_BACKFILL_CONNECT_TIMEOUT_MS = 5 * 1000;
 
 export type FeedPublicKeysResult =
   | ({ status: 'ok' } & FeedPublicKeys)
@@ -93,18 +97,18 @@ export class UtsFeedDO extends DurableObject<Env> {
   async head(): Promise<FeedReadsHead> {
     const phase = this.#settled();
     if (phase.status === 'refused') return { status: 'misconfigured' };
-    const now = Date.now();
-    if (!this.#ledger.vouches(now)) return { status: 'unavailable' };
-    const head = await this.#ledger.head(
+    const answer = await this.#ledger.head(
       { kid: phase.state.current.kid, signingKey: phase.signingKey },
-      now
+      Date.now()
     );
+    if (answer.status === 'refused') return { status: 'unavailable' };
+    const { head } = answer;
     return { status: 'ok', head: head.compact, listHash: head.listHash, issuedAt: head.issuedAt };
   }
 
   async list(listHash: unknown): Promise<FeedReadsList> {
     if (this.#settled().status === 'refused') return { status: 'misconfigured' };
-    const list = this.#ledger.list(listHash);
+    const list = this.#ledger.list(listHash, Date.now());
     return list === null ? { status: 'not_found' } : { status: 'ok', list: list.text };
   }
 
@@ -134,6 +138,10 @@ export class UtsFeedDO extends DurableObject<Env> {
     return this.#phase;
   }
 
+  /**
+   * One backfill, given up after `FEED_BACKFILL_DEADLINE_MS`: the alarm returns then, so the next
+   * alarm runs and the ledger's stall rule applies; a read that lands later still merges.
+   */
   async #backfill(now: number): Promise<void> {
     const binding = identityStoreBinding(this.env);
     if (binding.kind === 'unprovisioned') {
@@ -145,24 +153,34 @@ export class UtsFeedDO extends DurableObject<Env> {
     }
     const read = this.#ledger.startBackfill(now);
     if (read === null) return;
-    let entries: FeedEntry[] | null = null;
+    const run = this.#readEntries(binding.connectionString, read).then(entries =>
+      this.#ledger.endBackfill(now, entries, Date.now())
+    );
+    this.ctx.waitUntil(run);
+    const deadline = scheduler.wait(FEED_BACKFILL_DEADLINE_MS).then(() => 'timed_out' as const);
+    if ((await Promise.race([run, deadline])) === 'timed_out') {
+      console.error(JSON.stringify({ event: 'uts.feed.backfill_timed_out', read: read.kind }));
+    }
+  }
+
+  /** The entries of one backfill read, or null when it failed or found more than the cap. */
+  async #readEntries(connectionString: string, read: FeedEntriesRead): Promise<FeedEntry[] | null> {
     try {
-      const result = await withIdentityStore(binding.connectionString, this.ctx, store =>
-        readFeedEntries(store, read)
+      const result = await withIdentityStore(
+        connectionString,
+        this.ctx,
+        store => readFeedEntries(store, read),
+        { connectionTimeoutMillis: FEED_BACKFILL_CONNECT_TIMEOUT_MS }
       );
-      if (result.status === 'too_many') {
-        console.error(JSON.stringify({ event: 'uts.feed.too_many_entries', limit: result.limit }));
-      } else {
-        entries = result.entries;
-      }
+      if (result.status === 'read') return result.entries;
+      console.error(JSON.stringify({ event: 'uts.feed.too_many_entries', limit: result.limit }));
     } catch (error) {
       // An `IdentityStoreError` names the SQLSTATE or system code only, never a row value.
       console.error(
         JSON.stringify({ event: 'uts.feed.backfill_failed', read: read.kind, error: String(error) })
       );
-    } finally {
-      this.#ledger.endBackfill(now, entries, Date.now());
     }
+    return null;
   }
 
   async #rotateKeys(loaded: Loaded, now: number): Promise<void> {

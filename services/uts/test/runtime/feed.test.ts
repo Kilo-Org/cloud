@@ -80,8 +80,8 @@ describe('feed objects', () => {
   it('reach the UTS key set through the key-set shards', async () => {
     await resetKeySetShards();
     const answer = await feedAnswer();
-    expect(answer.feeds.map(entry => entry.feed)).toEqual([0, 1]);
-    for (const entry of answer.feeds) {
+    expect(answer.feeds?.map(entry => entry.feed)).toEqual([0, 1]);
+    for (const entry of answer.feeds ?? []) {
       if (entry.status !== 'ok') throw new Error(`feed ${entry.feed} answered ${entry.status}`);
       expect(entry.keys.every(key => feedOfFeedKid(key.kid) === entry.feed)).toBe(true);
     }

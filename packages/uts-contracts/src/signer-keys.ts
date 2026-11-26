@@ -95,16 +95,20 @@ export const SignerKeysAnswerSchema = z
         signers => new Set(signers.map(entry => entry.signer)).size === UTS_SIGNER_COUNT,
         'every signer exactly once'
       ),
+    // Optional for one release, so a mint Worker without feed objects and a feed Worker that
+    // expects them keep serving signer keys during a rolling deploy or a rollback of either one.
+    // An answer without it holds no feed keys; the feed Worker keeps any it holds.
     feeds: z
       .array(FeedKeysEntrySchema)
       .length(UTS_FEED_COUNT)
       .refine(
         feeds => new Set(feeds.map(entry => entry.feed)).size === UTS_FEED_COUNT,
         'every feed object exactly once'
-      ),
+      )
+      .optional(),
   })
   .refine(answer => {
-    const kids = [...kidsOf(answer.signers), ...kidsOf(answer.feeds)];
+    const kids = [...kidsOf(answer.signers), ...kidsOf(answer.feeds ?? [])];
     return new Set(kids).size === kids.length;
   }, 'duplicate kid');
 export type SignerKeysAnswer = z.infer<typeof SignerKeysAnswerSchema>;

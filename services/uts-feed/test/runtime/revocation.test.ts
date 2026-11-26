@@ -1,6 +1,7 @@
 import { createExecutionContext, env as poolEnv, waitOnExecutionContext } from 'cloudflare:test';
 import {
   decodeBase64Url,
+  encodeBase64Url,
   feedListHash,
   FeedReaderBootstrapSchema,
   FeedReaderHeadSchema,
@@ -55,11 +56,22 @@ function feedReads(heads: Answer[], lists: Array<(hash: string) => Promise<unkno
 }
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
+/** A compact JWS shape whose payload states `iat` and the list hash; `name` is its last part. */
+const jws = (name: string, issuedAt: number) =>
+  [
+    encodeBase64Url(new TextEncoder().encode('{"alg":"EdDSA"}')),
+    encodeBase64Url(
+      new TextEncoder().encode(JSON.stringify({ iat: issuedAt, list_hash: listHash }))
+    ),
+    name,
+  ].join('.');
+/** Matches a head built by `jws` with this last part. */
+const named = (name: string) => expect.stringMatching(new RegExp(`\\.${name}$`));
 const okHead =
-  (head = 'head.of.feed', issuedAt = nowSeconds()): Answer =>
+  (name = 'headoffeed', issuedAt = nowSeconds()): Answer =>
   async () => ({
     status: 'ok',
-    head,
+    head: jws(name, issuedAt),
     listHash,
     issuedAt,
   });
@@ -71,10 +83,12 @@ const misconfigured: Answer = async () => ({ status: 'misconfigured' });
 const okList = async (hash: string) =>
   hash === listHash ? { status: 'ok', list: LIST } : { status: 'not_found' };
 
+const VERSION = { id: 'test-version-0001', tag: '', timestamp: '' };
 const config = readConfig({
   UTS_ENVIRONMENT: 'development',
   UTS_MINT: { signerKeys: async () => null },
   UTS_FEED_READS: feedReads([]).binding,
+  CF_VERSION_METADATA: VERSION,
 });
 
 async function head(reads: FeedReadsBinding) {
@@ -107,8 +121,12 @@ afterEach(() => {
 describe('head', () => {
   it('reads feed 0 and serves the cached head without another read', async () => {
     const reads = feedReads([okHead('head-0'), okHead('head-1')]);
-    expect(await head(reads.binding)).toMatchObject({ status: 'ok', head: 'head-0', listHash });
-    expect(await head(reads.binding)).toMatchObject({ status: 'ok', head: 'head-0' });
+    expect(await head(reads.binding)).toMatchObject({
+      status: 'ok',
+      head: named('head-0'),
+      listHash,
+    });
+    expect(await head(reads.binding)).toMatchObject({ status: 'ok', head: named('head-0') });
     expect(reads.calls).toEqual(['head 0']);
   });
 
@@ -118,7 +136,7 @@ describe('head', () => {
       resetFeedFailures();
       await caches.default.delete(feedCacheKey(config, 'head'));
       const reads = feedReads([first, okHead('head-1')]);
-      expect(await head(reads.binding)).toMatchObject({ status: 'ok', head: 'head-1' });
+      expect(await head(reads.binding)).toMatchObject({ status: 'ok', head: named('head-1') });
       expect(reads.calls).toEqual(['head 0', 'head 1']);
     }
   });
@@ -126,7 +144,7 @@ describe('head', () => {
   it('gives feed 0 one second, then reads feed 1', async () => {
     const reads = feedReads([() => new Promise(() => undefined), okHead('head-1')]);
     const started = Date.now();
-    expect(await head(reads.binding)).toMatchObject({ status: 'ok', head: 'head-1' });
+    expect(await head(reads.binding)).toMatchObject({ status: 'ok', head: named('head-1') });
     expect(Date.now() - started).toBeGreaterThanOrEqual(900);
     expect(Date.now() - started).toBeLessThan(3000);
   });
@@ -138,12 +156,17 @@ describe('head', () => {
     await head(reads.binding);
     await caches.default.delete(feedCacheKey(config, 'head'));
     clock.mockReturnValue(t0 + FEED_FAILED_OBJECT_MS - 1);
-    await head(reads.binding);
-    expect(reads.calls).toEqual(['head 0', 'head 1', 'head 1']);
+    const again = feedReads([
+      failing,
+      okHead('head-1', Math.floor((t0 + FEED_FAILED_OBJECT_MS - 1) / 1000)),
+    ]);
+    await head(again.binding);
+    expect(reads.calls).toEqual(['head 0', 'head 1']);
+    expect(again.calls).toEqual(['head 1']);
     await caches.default.delete(feedCacheKey(config, 'head'));
     clock.mockReturnValue(t0 + FEED_FAILED_OBJECT_MS);
     const retried = feedReads([okHead('head-0', Math.floor((t0 + FEED_FAILED_OBJECT_MS) / 1000))]);
-    expect(await head(retried.binding)).toMatchObject({ head: 'head-0' });
+    expect(await head(retried.binding)).toMatchObject({ head: named('head-0') });
     expect(retried.calls).toEqual(['head 0']);
   });
 
@@ -160,13 +183,10 @@ describe('head', () => {
   it('reads the objects again when the cached head is past its age', async () => {
     await caches.default.put(
       feedCacheKey(config, 'head'),
-      Response.json(
-        { head: 'old', listHash, issuedAt: nowSeconds() - 60 },
-        { headers: { 'Cache-Control': 'max-age=5' } }
-      )
+      new Response(jws('old', nowSeconds() - 60), { headers: { 'Cache-Control': 'max-age=5' } })
     );
     const reads = feedReads([okHead('fresh')]);
-    expect(await head(reads.binding)).toMatchObject({ head: 'fresh' });
+    expect(await head(reads.binding)).toMatchObject({ head: named('fresh') });
   });
 });
 
@@ -194,13 +214,30 @@ describe('list', () => {
     const broken = feedReads([], [failing, okList]);
     expect(await list(broken.binding, 'B'.repeat(43))).toEqual({ status: 'unavailable' });
   });
+
+  it('reads a skipped object before it answers not_found, since the list it holds can differ', async () => {
+    const t0 = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    // Feed 0 failed a head read, so this isolate skips it for 30 seconds.
+    await head(feedReads([failing, okHead('head-1', Math.floor(t0 / 1000))]).binding);
+    clock.mockReturnValue(t0 + 1000);
+    const notOnFeed1 = async () => ({ status: 'not_found' });
+    const reads = feedReads([], [okList, notOnFeed1]);
+    expect(await list(reads.binding, listHash)).toMatchObject({ status: 'ok' });
+    expect(reads.calls).toEqual(['list 1', 'list 0']);
+  });
 });
 
 describe('routes', () => {
   const signerKeys: SignerKeysBinding = { signerKeys: async () => null };
 
   async function get(path: string, reads: FeedReadsBinding, environment = 'development') {
-    const env: Env = { UTS_ENVIRONMENT: environment, UTS_MINT: signerKeys, UTS_FEED_READS: reads };
+    const env: Env = {
+      UTS_ENVIRONMENT: environment,
+      UTS_MINT: signerKeys,
+      UTS_FEED_READS: reads,
+      CF_VERSION_METADATA: VERSION,
+    };
     const ctx = createExecutionContext();
     const response = await handleRequest(new Request(`http://localhost:8801${path}`), env, ctx);
     await waitOnExecutionContext(ctx);
@@ -208,11 +245,11 @@ describe('routes', () => {
   }
 
   it('serve the head and the list over HTTPS in development', async () => {
-    const reads = feedReads([okHead('a.b.c')], [okList]).binding;
+    const reads = feedReads([okHead('abc')], [okList]).binding;
     const headResponse = await get('/revocation/head', reads);
     expect(headResponse.status).toBe(200);
     expect(headResponse.headers.get('Content-Type')).toBe('application/jwt');
-    expect(await headResponse.text()).toBe('a.b.c');
+    expect(await headResponse.text()).toEqual(named('abc'));
     const listResponse = await get(`/revocation/list/${listHash}`, reads);
     expect(listResponse.status).toBe(200);
     expect(await listResponse.text()).toBe(LIST);
@@ -254,7 +291,8 @@ describe('routes', () => {
     const env: Env = {
       UTS_ENVIRONMENT: 'development',
       UTS_MINT: { signerKeys: async () => answer },
-      UTS_FEED_READS: feedReads([okHead('a.b.c')], [okList]).binding,
+      UTS_FEED_READS: feedReads([okHead('abc')], [okList]).binding,
+      CF_VERSION_METADATA: VERSION,
     };
     const ctx = createExecutionContext();
     const response = await handleRequest(
@@ -265,9 +303,52 @@ describe('routes', () => {
     await waitOnExecutionContext(ctx);
     expect(response.status).toBe(200);
     const body = UtsBootstrapWireSchema.parse(await response.json());
-    expect(body.head).toBe('a.b.c');
+    expect(body.head).toEqual(named('abc'));
     expect(body.jwks).toEqual({ keys });
+    // Signer 0 was read now and no other signer has keys: both ages are 0, and the headers agree.
+    expect(body.key_ages).toEqual({ newest: 0, oldest: 0 });
+    expect(response.headers.get('Age')).toBe('0');
+    expect(response.headers.get('Kilo-Key-Set-Oldest-Age')).toBe('0');
     expect(await feedListHash(decodeBase64Url(body.list))).toBe(listHash);
+  });
+
+  it("keeps a held signer's oldest age in a bootstrap during that signer's outage", async () => {
+    const now = Date.now();
+    const keysOf = (signer: number) => {
+      const x = `${String(signer).padStart(2, '0')}${'C'.repeat(41)}`;
+      const kid = `uts-token-${String(signer).padStart(2, '0')}-${x}`;
+      return [{ kty: 'OKP', crv: 'Ed25519', x, kid, alg: 'EdDSA', use: 'sig' }];
+    };
+    // Signer 3's object stopped answering an hour ago; its last good keys stand in.
+    const answer = {
+      status: 'answered',
+      answer: {
+        signers: Array.from({ length: 16 }, (_, signer) => ({
+          signer,
+          status: 'ok',
+          keys: keysOf(signer),
+          readAt: signer === 3 ? now - 3_600_000 : now,
+        })),
+      },
+    };
+    const env: Env = {
+      UTS_ENVIRONMENT: 'development',
+      UTS_MINT: { signerKeys: async () => answer },
+      UTS_FEED_READS: feedReads([okHead('abc')], [okList]).binding,
+      CF_VERSION_METADATA: VERSION,
+    };
+    const ctx = createExecutionContext();
+    const response = await handleRequest(
+      new Request('http://localhost:8801/revocation/bootstrap'),
+      env,
+      ctx
+    );
+    await waitOnExecutionContext(ctx);
+    const body = UtsBootstrapWireSchema.parse(await response.json());
+    expect(body.key_ages.newest).toBeLessThanOrEqual(1);
+    expect(body.key_ages.oldest).toBeGreaterThanOrEqual(3600);
+    expect(body.key_ages.oldest).toBeLessThanOrEqual(3601);
+    expect(response.headers.get('Kilo-Key-Set-Oldest-Age')).toBe(String(body.key_ages.oldest));
   });
 });
 

@@ -1,16 +1,20 @@
+import type { KeySetAges } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { Env, FeedConfig } from './env';
 import { serveKeySet } from './jwks';
 import { serveHead, serveList } from './revocation';
 
 /**
- * One cold-start answer (design 7): the UTS key set, the current head and the list it covers. It
- * is whole or absent, so a verifier never takes a head without the key set that verifies it.
+ * One cold-start answer (design 7): the UTS key set with its two ages, the current head and the
+ * list it covers. It is whole or absent, so a verifier never takes a head without the key set
+ * that verifies it, and never takes a key set without its ages, so a bootstrap does not restart a
+ * held key's age (`keyAges`, the key set's `Age` and `Kilo-Key-Set-Oldest-Age`).
  */
 export type BootstrapRead =
   | {
       status: 'ok';
       jwks: Record<string, unknown>;
+      keyAges: KeySetAges;
       head: string;
       list: Uint8Array<ArrayBuffer>;
     }
@@ -39,6 +43,10 @@ export async function serveBootstrap(
   return {
     status: 'ok',
     jwks: KeySetBodySchema.parse(JSON.parse(keySet.body)),
+    keyAges: {
+      newest: Math.floor(keySet.ageMs / 1000),
+      oldest: Math.floor(keySet.oldestAgeMs / 1000),
+    },
     head: head.head,
     list: list.bytes,
   };

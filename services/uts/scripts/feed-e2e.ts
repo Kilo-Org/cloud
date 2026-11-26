@@ -48,8 +48,11 @@ if (!isLoopbackHost(new URL(adminUrl))) throw new Error('the end-to-end run uses
 const issuer = UTS_ENDPOINTS.development.issuer;
 const ACCOUNT = 'dev:uts-local';
 const CALLBACK = 'http://127.0.0.1:4100/callback';
-/** A served head is under 10 s old (feed Worker cache 5 s plus an object's 5 s re-sign). */
-const HEAD_AGE_BOUND_S = 11;
+/**
+ * The feed Worker serves no head over 20 s old: its `iat` is the object's last good backfill (every
+ * 5 s, given up after 10 s) and the data center's cache adds 5 s.
+ */
+const HEAD_AGE_BOUND_S = 20;
 const sources = httpsFeedSources(feedUrl);
 let failed = 0;
 

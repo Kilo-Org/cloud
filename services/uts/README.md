@@ -154,7 +154,7 @@ reached an audit row, and times the mint path.
 | Endpoint | Behaviour | SQL |
 |---|---|---|
 | `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
-| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A first-party retry of the same request while the code's 60-second lifetime lasts gets the same grant and a new refresh token (below); any other second use of a code, a third-party one included, revokes the grant | `uts.exchange_authorization_code` |
+| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A first-party retry of the same request while the code's 60-second lifetime lasts gets the same grant and the same refresh token (below); any other second use of a code, a third-party one included, revokes the grant | `uts.exchange_authorization_code` |
 | `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation, 60-second grace, reuse after the grace revokes the family and writes a feed entry; a token rotated more than 30 days ago is deleted and then unknown | `uts.refresh_first_party`, `uts.refresh_third_party` |
 | `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; a token issued to another client answers 200 like an unknown token and writes a denied row (at most one per grant per minute); an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
 | `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
@@ -167,8 +167,8 @@ is scoped to the key: a proof accepted for one grant of a device key is refused 
 grant of that key, and the `htu` check keeps it to one endpoint. A row stays 121 seconds: a
 proof's `iat` is at most 60 seconds ahead and it is accepted until 60 seconds after its `iat`. The
 statement records a `jti` only once the grant and the key match, so a caller without the device
-key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant id><32 random
-bytes>`), so the endpoint knows the grant and its signer before the statement. One call mints one
+key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant id><32-byte
+secret>`), so the endpoint knows the grant and its signer before the statement. One call mints one
 access token per scope, up to 8, each with one audience; one `signMany` call to the signer the
 grant id picks signs all of them, and `issued_tokens` lists them. The claims are exactly
 `iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
@@ -178,10 +178,14 @@ failure no retry fixes gives 500.
 The tokens are signed after the statement commits. When signing fails (or the response is lost),
 a first-party client sends the same code exchange again with a new DPoP proof. While the code's
 60-second lifetime lasts, the same client, redirect URI, PKCE verifier and DPoP key get the grant
-the first attempt created, new access tokens and a new refresh token, and the code does not count
-as reused: the device key and a fresh proof show the same client instance. Only hashes are
-stored, so the newest refresh token wins: the grant's token hash is replaced, and the earlier
-token is unknown from then on. A third-party client has only its PKCE verifier, so any second use
+the first attempt created, the same refresh token and new access tokens, and the code does not
+count as reused: the device key and a fresh proof show the same client instance. The refresh
+token's secret is the SHA-256 of a fixed label, the code and the verifier
+(`firstPartyRefreshTokenOfExchange`), so every attempt presents the hash the grant holds and no
+attempt replaces it: when the first answer also reaches the client, after the retry's or before
+it, both carry the one valid refresh token. A retry with another hash is refused and changes
+nothing. The store holds only the SHA-256 of the code and of the verifier, so stored data does not
+give the secret. A third-party client has only its PKCE verifier, so any second use
 of its code revokes the family (OAuth 2.1 section 4.1.2); a third-party client that lost its
 response authorizes again, and its consent stands, so it sees no consent screen. A consumed code
 with another client, redirect URI, verifier or key, or after its lifetime, still revokes the

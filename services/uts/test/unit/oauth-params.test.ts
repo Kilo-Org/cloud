@@ -9,7 +9,8 @@ import {
 } from '../../src/oauth/params';
 import { s256Challenge } from '../../src/oauth/pkce';
 import {
-  createFirstPartyRefreshToken,
+  firstPartyRefreshToken,
+  firstPartyRefreshTokenOfExchange,
   grantIdOfCode,
   grantIdOfFirstPartyRefreshToken,
   isRandomCredential,
@@ -147,7 +148,7 @@ describe('clients', () => {
 describe('credentials', () => {
   it('name the grant in a first-party refresh token and nowhere else', () => {
     const grantId = crypto.randomUUID();
-    const token = createFirstPartyRefreshToken(grantId);
+    const token = firstPartyRefreshToken(grantId, randomCredential());
     expect(token).toMatch(/^kilo_rt_[A-Za-z0-9_-]{65}$/);
     expect(grantIdOfFirstPartyRefreshToken(token)).toBe(grantId);
     expect(grantIdOfFirstPartyRefreshToken(randomCredential())).toBeNull();
@@ -172,7 +173,26 @@ describe('credentials', () => {
     );
     expect(await grantIdOfCode(code)).toBe(grantId);
     expect(await grantIdOfCode(randomCredential())).not.toBe(grantId);
-    expect(grantIdOfFirstPartyRefreshToken(createFirstPartyRefreshToken(grantId))).toBe(grantId);
+    expect(grantIdOfFirstPartyRefreshToken(firstPartyRefreshToken(grantId, randomCredential()))).toBe(
+      grantId
+    );
+  });
+
+  it('derive one first-party refresh token per code and verifier, naming the code grant', async () => {
+    const code = randomCredential();
+    const verifier = randomCredential();
+    const grantId = await grantIdOfCode(code);
+    const token = await firstPartyRefreshTokenOfExchange(grantId, code, verifier);
+    expect(token).toMatch(/^kilo_rt_[A-Za-z0-9_-]{65}$/);
+    expect(grantIdOfFirstPartyRefreshToken(token)).toBe(grantId);
+    expect(await firstPartyRefreshTokenOfExchange(grantId, code, verifier)).toBe(token);
+    expect(await firstPartyRefreshTokenOfExchange(grantId, code, randomCredential())).not.toBe(
+      token
+    );
+    const otherCode = randomCredential();
+    expect(
+      (await firstPartyRefreshTokenOfExchange(grantId, otherCode, verifier)).slice(-43)
+    ).not.toBe(token.slice(-43));
   });
 
   it('compute the RFC 7636 S256 challenge (appendix B)', async () => {

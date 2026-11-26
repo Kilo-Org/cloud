@@ -4,7 +4,7 @@ import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
 import {
-  createFirstPartyRefreshToken,
+  firstPartyRefreshTokenOfExchange,
   grantIdOfCode,
   grantIdOfFirstPartyRefreshToken,
   isRandomCredential,
@@ -26,11 +26,11 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * Each call verifies at most one DPoP proof, before the grant read, runs one SQL statement, which
  * also records the proof's `jti` under the proof's key, and signs one token per scope (up to 8)
  * in one call to the grant's signer object. A failure after the statement committed leaves the
- * grant as the statement left it and answers an error, and the client retries: a first-party code exchange
- * while the code's 60-second lifetime lasts gets the same grant with a new refresh token (a
- * third-party client authorizes again, because a second use of its code revokes the family), and
- * a third-party refresh within the 60-second grace of its rotated token gets the family's next
- * token.
+ * grant as the statement left it and answers an error, and the client retries: a first-party
+ * code exchange while the code's 60-second lifetime lasts gets the same grant and the same refresh
+ * token, which derives from the code and the PKCE verifier (a third-party client authorizes
+ * again, because a second use of its code revokes the family), and a third-party refresh within
+ * the 60-second grace of its rotated token gets the family's next token.
  */
 
 /** The RFC 8628 device grant, which the device sign-in slice provides. */
@@ -188,7 +188,7 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
       clientClass: identity.client.clientClass,
       device,
     };
-    refreshToken = createFirstPartyRefreshToken(grantId);
+    refreshToken = await firstPartyRefreshTokenOfExchange(grantId, code, verifier);
   } else {
     const refused = refuseThirdPartyProof(request);
     if (refused !== null) return refused;

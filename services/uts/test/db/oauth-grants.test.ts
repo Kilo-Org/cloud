@@ -503,16 +503,15 @@ describe('code exchange', () => {
     });
   });
 
-  it('answers a retry of the same exchange with the same grant and a new refresh token', async () => {
+  it('answers a retry of the same exchange with the same grant and the same refresh token', async () => {
     const accountId = await insertAccount(owner);
     const first = await firstPartyGrant(accountId);
-    // The signing failed after the first exchange committed; the client sends the request again
-    // with a new DPoP proof.
-    const retryToken = `kilo_rt_${token()}`;
+    // The client did not get the first answer (a failed signing, or a timeout while it was on its
+    // way) and sends the same request again with a new DPoP proof. The Worker derives the refresh
+    // token from the code and the verifier, so the retry carries the same hash.
     const retried = await grants.exchangeCode({
       ...first,
       binding: { kind: 'first_party', proof: proofOf(first.jkt), clientClass: 'desktop', device },
-      refreshTokenHash: sha256(retryToken),
     });
     if (retried.outcome !== 'issued') throw new Error(retried.outcome);
     expect(retried.subjectId).toBe(accountId);
@@ -524,20 +523,22 @@ describe('code exchange', () => {
       [accountId]
     );
     expect(stored.rows).toEqual([
-      { id: first.grantId, status: 'active', token_hash: sha256(retryToken) },
+      { id: first.grantId, status: 'active', token_hash: first.refreshTokenHash },
     ]);
-    const refresh = (refreshToken: string) =>
-      grants.refreshFirstParty({
-        environment,
-        tokenHash: sha256(refreshToken),
-        grantId: first.grantId,
-        clientId: 'kilo-cli',
-        proof: proofOf(first.jkt),
-        scopes: null,
-        resources: null,
-      });
-    expect(await refresh(first.refreshToken)).toEqual({ outcome: 'invalid_grant' });
-    expect((await refresh(retryToken)).outcome).toBe('issued');
+    // Whichever answer reaches the client last, its refresh token is the grant's.
+    expect(
+      (
+        await grants.refreshFirstParty({
+          environment,
+          tokenHash: sha256(first.refreshToken),
+          grantId: first.grantId,
+          clientId: 'kilo-cli',
+          proof: proofOf(first.jkt),
+          scopes: null,
+          resources: null,
+        })
+      ).outcome
+    ).toBe('issued');
 
     const rows = await auditRows(accountId);
     expect(rows.map(row => row.type)).not.toContain('ai.kilo.uts.authorization_code.reused');
@@ -549,13 +550,32 @@ describe('code exchange', () => {
           attributes: {
             grantType: 'authorization_code',
             grantId: first.grantId,
-            previousRefreshRef: reference(first.refreshToken),
-            refreshRef: reference(retryToken),
+            refreshRef: reference(first.refreshToken),
             tokenRefs: retried.tokenIds,
           },
         },
       },
     });
+    expect(retryRow?.event.data.attributes).not.toHaveProperty('previousRefreshRef');
+  });
+
+  it('refuses a retry with another refresh token hash and changes nothing', async () => {
+    const accountId = await insertAccount(owner);
+    const first = await firstPartyGrant(accountId);
+    const rowsBefore = (await auditRows(accountId)).length;
+    expect(
+      await grants.exchangeCode({
+        ...first,
+        binding: { kind: 'first_party', proof: proofOf(first.jkt), clientClass: 'desktop', device },
+        refreshTokenHash: sha256(`kilo_rt_${token()}`),
+      })
+    ).toEqual({ outcome: 'invalid_grant' });
+    const stored = await owner.query(
+      'SELECT status, token_hash FROM uts.refresh_grants WHERE id = $1',
+      [first.grantId]
+    );
+    expect(stored.rows).toEqual([{ status: 'active', token_hash: first.refreshTokenHash }]);
+    expect(await auditRows(accountId)).toHaveLength(rowsBefore);
   });
 
   it('refuses a retry that replays the first proof, and leaves the grant active', async () => {

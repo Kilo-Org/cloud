@@ -456,10 +456,13 @@ $$;
 -- A retry (design 5.4), first party only: when signing, or anything else after this statement
 -- committed, failed, the client sends the same request again. The same first-party client,
 -- redirect URI, PKCE challenge and DPoP key presenting the consumed code while the code's
--- 60-second lifetime lasts get the same grant and new tokens, and the code is not counted as
--- reused; the DPoP key and a fresh proof `jti` show it is the same client instance. Only hashes
--- are stored, so the retry replaces the grant's token hash and the earlier refresh token is
--- unknown from then on. The retry writes a `token.issued` row (`rotation` `code_retry`) instead of
+-- 60-second lifetime lasts get the same grant, the same refresh token and new access tokens, and
+-- the code is not counted as reused; the DPoP key and a fresh proof `jti` show it is the same
+-- client instance. The Worker derives the refresh token from the code and the PKCE verifier
+-- (`firstPartyRefreshTokenOfExchange`), so a retry presents the hash the grant already holds and
+-- the statement changes no hash: when the first attempt also answered, both answers carry the one
+-- valid refresh token, whichever arrives last. A retry with another hash is refused and changes
+-- nothing. The retry writes a `token.issued` row (`rotation` `code_retry`) instead of
 -- a second `grant.created`. Any other use of a consumed code (another client, redirect URI,
 -- verifier or key, after the code's lifetime, or any second use by a third-party client, whose
 -- only proof is the PKCE verifier) revokes the grant it created and fails (OAuth 2.1 section
@@ -514,7 +517,7 @@ DECLARE
   new_session_id uuid;
   idle_window interval;
   grant_state uts.grant_status;
-  previous_hash bytea;
+  stored_hash bytea;
 BEGIN
   PERFORM uts.require_inputs('uts.exchange_authorization_code',
     p_environment IS NOT NULL AND p_code_hash IS NOT NULL AND p_client_id IS NOT NULL
@@ -638,16 +641,13 @@ BEGIN
   ELSE
     SELECT grant_row.status, grant_row.token_hash,
       least(grant_row.idle_expires_at, grant_row.expires_at)
-    INTO grant_state, previous_hash, refresh_expires_at
-    FROM uts.refresh_grants AS grant_row WHERE grant_row.id = p_grant_id
-    FOR UPDATE;
-    IF grant_state IS DISTINCT FROM 'active' THEN
+    INTO grant_state, stored_hash, refresh_expires_at
+    FROM uts.refresh_grants AS grant_row WHERE grant_row.id = p_grant_id;
+    IF grant_state IS DISTINCT FROM 'active' OR stored_hash IS DISTINCT FROM p_refresh_token_hash THEN
       outcome := 'invalid_grant';
       RETURN NEXT;
       RETURN;
     END IF;
-    UPDATE uts.refresh_grants AS grant_row SET token_hash = p_refresh_token_hash
-    WHERE grant_row.id = p_grant_id;
   END IF;
 
   token_ids := ARRAY(SELECT gen_random_uuid() FROM generate_series(1, cardinality(chosen.scopes)));
@@ -661,7 +661,6 @@ BEGIN
         'grantId', p_grant_id,
         'rotation', 'code_retry',
         'codeRef', uts.credential_reference(p_code_hash),
-        'previousRefreshRef', uts.credential_reference(previous_hash),
         'refreshRef', uts.credential_reference(p_refresh_token_hash),
         'tokenRefs', to_jsonb(token_ids::text[]),
         'scopes', to_jsonb(chosen.scopes),

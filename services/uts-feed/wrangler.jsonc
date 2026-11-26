@@ -28,17 +28,27 @@
       "custom_domain": true,
     },
   ],
+  // This deployment's version id keys the feed's data-center cache, so no other Worker on the zone
+  // can read or plant an entry (src/revocation.ts). Every env block binds it too.
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "vars": {
     "UTS_ENVIRONMENT": "production",
   },
-  // The mint Worker's SignerKeys entrypoint. It answers only the caller named here, which must be
-  // this block's deployed name (services/uts/test/repo checks both). Placement does not apply to a
-  // named entrypoint, so the key read runs where this Worker runs.
+  // The mint Worker's SignerKeys and FeedReads entrypoints. Each answers only the caller named
+  // here, which must be this block's deployed name (services/uts/test/repo checks both). Placement
+  // does not apply to a named entrypoint, so the reads run where this Worker runs. FeedReads reads
+  // the two feed objects, which only the mint Worker binds.
   "services": [
     {
       "binding": "UTS_MINT",
       "service": "uts",
       "entrypoint": "SignerKeys",
+      "props": { "caller": "uts-feed" },
+    },
+    {
+      "binding": "UTS_FEED_READS",
+      "service": "uts",
+      "entrypoint": "FeedReads",
       "props": { "caller": "uts-feed" },
     },
   ],
@@ -53,6 +63,7 @@
           "custom_domain": true,
         },
       ],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "vars": {
         "UTS_ENVIRONMENT": "staging",
       },
@@ -63,6 +74,12 @@
           "entrypoint": "SignerKeys",
           "props": { "caller": "uts-feed-staging" },
         },
+        {
+          "binding": "UTS_FEED_READS",
+          "service": "uts-staging",
+          "entrypoint": "FeedReads",
+          "props": { "caller": "uts-feed-staging" },
+        },
       ],
     },
     // Local development only; no deploy workflow targets this name.
@@ -70,6 +87,7 @@
       "name": "uts-feed-local",
       "workers_dev": false,
       "routes": [],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "vars": {
         "UTS_ENVIRONMENT": "development",
       },
@@ -78,6 +96,12 @@
           "binding": "UTS_MINT",
           "service": "uts-local",
           "entrypoint": "SignerKeys",
+          "props": { "caller": "uts-feed-local" },
+        },
+        {
+          "binding": "UTS_FEED_READS",
+          "service": "uts-local",
+          "entrypoint": "FeedReads",
           "props": { "caller": "uts-feed-local" },
         },
       ],

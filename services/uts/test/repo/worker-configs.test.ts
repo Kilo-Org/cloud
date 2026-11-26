@@ -60,8 +60,8 @@ describe('repository Worker configs', () => {
 });
 
 describe('UTS Durable Object classes', () => {
-  it('fail a config outside the mint Worker that names the signer or the key-set shard class', () => {
-    for (const className of ['UtsSignerDO', 'UtsKeySetDO']) {
+  it('fail a config outside the mint Worker that names the signer, key-set shard or feed class', () => {
+    for (const className of ['UtsSignerDO', 'UtsKeySetDO', 'UtsFeedDO']) {
       const problems = workerConfigProblems([
         consumer({ durable_objects: { bindings: [{ name: 'OBJECTS', class_name: className }] } }),
       ]);
@@ -115,12 +115,13 @@ describe('UTS Durable Object classes', () => {
   });
 });
 
-describe('the SignerKeys entrypoint', () => {
+describe('the SignerKeys and FeedReads entrypoints', () => {
   it('fails any other config that binds the mint Worker, at any entrypoint', () => {
     for (const binding of [
       mintBinding('uts', 'consumer'),
       { binding: 'UTS', service: 'uts-staging' },
       mintBinding('uts-local', 'uts-feed-local'),
+      { ...mintBinding('uts', 'consumer'), entrypoint: 'FeedReads' },
     ]) {
       expect(workerConfigProblems([consumer({ services: [binding] })])).toEqual([
         expect.stringContaining('only the feed Worker may'),
@@ -128,12 +129,80 @@ describe('the SignerKeys entrypoint', () => {
     }
   });
 
-  it('lets another config bind the feed Worker', () => {
+  it('fails a feed config that does not bind SignerKeys and FeedReads once each', () => {
+    const configs = repoConfigs().filter(worker => worker.path !== FEED_CONFIG);
+    const feed = configAt(FEED_CONFIG);
+    const signerKeysOnly = parseWorkerConfig(FEED_CONFIG, {
+      ...feed.config,
+      services: [mintBinding('uts', 'uts-feed')],
+    });
+    expect(utsConfigProblems([...configs, signerKeysOnly])).toEqual([
+      expect.stringContaining('(top level): binds the mint Worker at SignerKeys; expected'),
+    ]);
+  });
+});
+
+describe('the FeedReader entrypoint', () => {
+  const readerBinding = (service: string, caller: unknown) => ({
+    binding: 'UTS_FEED',
+    service,
+    entrypoint: 'FeedReader',
+    props: { caller },
+  });
+
+  it('lets another config bind the feed Worker at FeedReader under its own name', () => {
     expect(
-      workerConfigProblems([consumer({ services: [{ binding: 'FEED', service: 'uts-feed' }] })])
+      workerConfigProblems([consumer({ services: [readerBinding('uts-feed', 'consumer')] })])
+    ).toEqual([]);
+    expect(
+      workerConfigProblems([
+        consumer({
+          env: {
+            staging: {
+              name: 'consumer-staging',
+              services: [readerBinding('uts-feed-staging', 'consumer-staging')],
+            },
+          },
+        }),
+      ])
     ).toEqual([]);
   });
 
+  it('fails a reader that poses as another caller, carries no props, or binds the default entrypoint', () => {
+    const problemsOf = (binding: Record<string, unknown>) =>
+      workerConfigProblems([consumer({ services: [binding] })]);
+    expect(problemsOf(readerBinding('uts-feed', 'o11y'))).toEqual([
+      expect.stringContaining('sets props.caller "o11y"'),
+    ]);
+    const { props: _props, ...propless } = readerBinding('uts-feed', 'consumer');
+    expect(problemsOf(propless)).toEqual([expect.stringContaining('sets props.caller undefined')]);
+    const { entrypoint: _entrypoint, ...atDefault } = readerBinding('uts-feed', 'consumer');
+    expect(problemsOf(atDefault)).toEqual([
+      expect.stringContaining('binds entrypoint (default); bind FeedReader'),
+    ]);
+    expect(problemsOf(readerBinding('uts-feed-canary', 'consumer'))).toEqual([
+      expect.stringContaining('not a feed Worker deployment'),
+    ]);
+  });
+
+  it('fails a reader in a preview and the mint Worker reading the feed this way', () => {
+    expect(
+      workerConfigProblems([
+        consumer({ previews: { services: [readerBinding('uts-feed', 'consumer')] } }),
+      ])
+    ).toEqual([expect.stringContaining('a preview runs unreviewed code')]);
+    const mint = configAt(MINT_CONFIG);
+    const reading = parseWorkerConfig(MINT_CONFIG, {
+      ...mint.config,
+      services: [readerBinding('uts-feed', 'uts')],
+    });
+    expect(workerConfigProblems([reading])).toEqual([
+      expect.stringContaining('binds the feed Worker; a UTS Worker does not'),
+    ]);
+  });
+});
+
+describe('feed Worker bindings of the mint Worker', () => {
   it('fails a feed block whose caller is not its own deployed name, or that carries no props', () => {
     const problems = workerConfigProblems(
       withFeed(raw => ({ ...raw, services: [mintBinding('uts', 'uts-feed-staging')] }))

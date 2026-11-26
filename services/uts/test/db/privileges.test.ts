@@ -637,6 +637,7 @@ describe('functions', () => {
       { routine: 'create_pat', grantee: 'uts_app' },
       { routine: 'end_long_transactions', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },

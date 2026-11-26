@@ -1,5 +1,7 @@
 export { UtsKeySetDO } from './dos/UtsKeySetDO';
 export { UtsSignerDO } from './dos/UtsSignerDO';
+export { FeedReads } from './feed/reads';
+export { UtsFeedDO } from './feed/UtsFeedDO';
 export { PatLookup } from './pat/entrypoint';
 export { SignerKeys } from './signer-keys';
 

@@ -1,7 +1,7 @@
 import type { UtsEnvironment, UtsPatLookupResult } from '@kilocode/uts-contracts';
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { callerOf } from '../callers';
 import { patLookupsInFlight, readConfig, type Env } from '../env';
-import { callerOf } from '../signer-keys';
 import {
   UNSERVED_RETRY_SECONDS,
   identityStorePatLookup,

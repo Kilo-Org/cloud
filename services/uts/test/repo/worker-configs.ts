@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   UTS_ENDPOINTS,
+  UTS_FEED_READER_ENTRYPOINT,
+  UTS_FEED_READS_ENTRYPOINT,
   UTS_SIGNER_KEYS_ENTRYPOINT,
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
@@ -29,11 +31,24 @@ const UTS_CONFIGS = new Set([
   FEED_TEST_CONFIG,
 ]);
 
-/** Every UTS Durable Object class and the configs that alone may bind it. */
+/**
+ * Every UTS Durable Object class and the configs that alone may bind it. Only the mint Worker
+ * binds the feed objects, so only it writes feed entries; the feed Worker reads them through the
+ * mint Worker's `FeedReads` entrypoint (design 5.7).
+ */
 export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['UtsSignerDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
   ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsFeedDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
 ]);
+
+/** The mint Worker entrypoints the feed Worker binds, each once per block. */
+export const MINT_ENTRYPOINTS: readonly string[] = [
+  UTS_SIGNER_KEYS_ENTRYPOINT,
+  UTS_FEED_READS_ENTRYPOINT,
+];
+
+const FEED_DEPLOYMENT_NAMES = new Set(Object.values(FEED_DEPLOYMENTS));
 
 /** The placement region of the identity store's primary (Frankfurt). */
 export const MINT_PLACEMENT_REGION = 'aws:eu-central-1';
@@ -79,6 +94,7 @@ const ServiceBindingSchema = z.looseObject({
   environment: z.string().optional(),
   props: z.record(z.string(), z.unknown()).optional(),
 });
+type ServiceBinding = z.infer<typeof ServiceBindingSchema>;
 
 const ScriptReferenceSchema = z.looseObject({ script_name: z.string().optional() });
 const ServiceReferenceSchema = z.looseObject({ service: z.string() });
@@ -287,55 +303,85 @@ function durableObjectProblems(path: string, block: Block): string[] {
 }
 
 /**
- * The `SignerKeys` entrypoint answers one caller per environment: the feed Worker, whose binding
- * names the mint deployment of its own environment at that named entrypoint and carries its own
- * deployed name as `props.caller`. The mint Worker's test config binds itself. Nothing else binds
- * the mint Worker, at any entrypoint.
+ * The `SignerKeys` and `FeedReads` entrypoints answer one caller per environment: the feed
+ * Worker, whose bindings name the mint deployment of its own environment at those named
+ * entrypoints and carry its own deployed name as `props.caller`. The mint Worker's test config
+ * binds itself. Nothing else binds the mint Worker, at any entrypoint.
  */
-function serviceBindingProblems(path: string, block: Block): string[] {
+function mintBindingProblems(path: string, block: Block, binding: ServiceBinding): string[] {
+  const where = `${block.where}: ${binding.binding}`;
+  if (path === MINT_TEST_CONFIG && binding.service === block.deployedName) return [];
+  if (path !== FEED_CONFIG) {
+    return [`${where} binds the UTS mint Worker ${binding.service}; only the feed Worker may`];
+  }
+  if (block.preview) return [`${where} binds ${binding.service}; a preview runs unreviewed code`];
+  const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+  if (environment === undefined) return [`${where}: env.${block.env} is not a UTS environment`];
   const problems: string[] = [];
-  for (const binding of block.bindings.services ?? []) {
-    const where = `${block.where}: ${binding.binding}`;
-    if (!isMintName(binding.service)) continue;
-    if (path === MINT_TEST_CONFIG && binding.service === block.deployedName) continue;
-    if (path !== FEED_CONFIG) {
-      problems.push(
-        `${where} binds the UTS mint Worker ${binding.service}; only the feed Worker may`
-      );
-      continue;
-    }
-    if (block.preview) {
-      problems.push(`${where} binds ${binding.service}; a preview runs unreviewed code`);
-      continue;
-    }
-    const environment = WRANGLER_ENVIRONMENTS.get(block.env);
-    if (environment === undefined) {
-      problems.push(`${where}: env.${block.env} is not a UTS environment`);
-      continue;
-    }
-    if (binding.service !== MINT_DEPLOYMENTS[environment]) {
-      problems.push(
-        `${where} binds ${binding.service}; this block must bind ${MINT_DEPLOYMENTS[environment]}`
-      );
-    }
-    if (binding.entrypoint !== UTS_SIGNER_KEYS_ENTRYPOINT) {
-      problems.push(
-        `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; bind ${UTS_SIGNER_KEYS_ENTRYPOINT}`
-      );
-    }
-    if (binding.environment !== undefined) {
-      problems.push(
-        `${where} names service environment ${binding.environment}; bind the deployed name`
-      );
-    }
-    const caller = binding.props?.caller;
-    if (caller !== block.deployedName || caller !== FEED_DEPLOYMENTS[environment]) {
-      problems.push(
-        `${where} sets props.caller ${JSON.stringify(caller)}; expected ${FEED_DEPLOYMENTS[environment]}, the block's own deployed name`
-      );
-    }
+  if (binding.service !== MINT_DEPLOYMENTS[environment]) {
+    problems.push(
+      `${where} binds ${binding.service}; this block must bind ${MINT_DEPLOYMENTS[environment]}`
+    );
+  }
+  if (binding.entrypoint === undefined || !MINT_ENTRYPOINTS.includes(binding.entrypoint)) {
+    problems.push(
+      `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; bind ${MINT_ENTRYPOINTS.join(' or ')}`
+    );
+  }
+  if (binding.environment !== undefined) {
+    problems.push(
+      `${where} names service environment ${binding.environment}; bind the deployed name`
+    );
+  }
+  const caller = binding.props?.caller;
+  if (caller !== block.deployedName || caller !== FEED_DEPLOYMENTS[environment]) {
+    problems.push(
+      `${where} sets props.caller ${JSON.stringify(caller)}; expected ${FEED_DEPLOYMENTS[environment]}, the block's own deployed name`
+    );
   }
   return problems;
+}
+
+/**
+ * A Worker verifier reads the revocation feed through the feed Worker's `FeedReader` entrypoint,
+ * bound by a feed deployment's name with its own deployed name as `props.caller`, so no reader
+ * poses as another (design 5.6). The feed Worker's test config binds itself; the UTS Workers do
+ * not read the feed this way, and no preview does.
+ */
+function feedReaderProblems(path: string, block: Block, binding: ServiceBinding): string[] {
+  const where = `${block.where}: ${binding.binding}`;
+  if (path === FEED_TEST_CONFIG && binding.service === block.deployedName) return [];
+  if (UTS_CONFIGS.has(path)) return [`${where} binds the feed Worker; a UTS Worker does not`];
+  if (block.preview) return [`${where} binds ${binding.service}; a preview runs unreviewed code`];
+  const problems: string[] = [];
+  if (!FEED_DEPLOYMENT_NAMES.has(binding.service)) {
+    problems.push(`${where} binds ${binding.service}, which is not a feed Worker deployment`);
+  }
+  if (binding.entrypoint !== UTS_FEED_READER_ENTRYPOINT) {
+    problems.push(
+      `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; bind ${UTS_FEED_READER_ENTRYPOINT}`
+    );
+  }
+  if (binding.environment !== undefined) {
+    problems.push(
+      `${where} names service environment ${binding.environment}; bind the deployed name`
+    );
+  }
+  const caller = binding.props?.caller;
+  if (block.deployedName === undefined || caller !== block.deployedName) {
+    problems.push(
+      `${where} sets props.caller ${JSON.stringify(caller)}; expected the block's own deployed name`
+    );
+  }
+  return problems;
+}
+
+function serviceBindingProblems(path: string, block: Block): string[] {
+  return (block.bindings.services ?? []).flatMap(binding => {
+    if (isFeedName(binding.service)) return feedReaderProblems(path, block, binding);
+    if (isMintName(binding.service)) return mintBindingProblems(path, block, binding);
+    return [];
+  });
 }
 
 function routeProblems(path: string, block: Block): string[] {
@@ -436,12 +482,12 @@ function devConfigProblems(dev: WorkerConfig): string[] {
 
 /**
  * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
- * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer objects hold
- * private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps the signer and
- * key-set shard objects in the `eu` jurisdiction, and places its fetch handler next to the
- * identity store; the development config is one block that runs the development entry under the
- * development name, unrouted, behind the build command that fails every command but `dev`; the
- * feed Worker runs without placement and binds no Durable Object.
+ * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
+ * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
+ * its objects in the `eu` jurisdiction, and places its fetch handler next to the identity store;
+ * the development config is one block that runs the development entry under the development name,
+ * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
+ * without placement, binds no Durable Object, and binds each mint entrypoint once.
  */
 export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];
@@ -499,14 +545,15 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
         problems.push(`${block.where}: the feed Worker runs without placement`);
       }
       if ((block.bindings.durable_objects?.bindings ?? []).length > 0) {
-        problems.push(`${block.where}: the feed Worker binds no Durable Object yet`);
+        problems.push(`${block.where}: the feed Worker binds no Durable Object`);
       }
-      const signerKeys = (block.bindings.services ?? []).filter(binding =>
-        isMintName(binding.service)
-      );
-      if (signerKeys.length !== 1) {
+      const mintEntrypoints = (block.bindings.services ?? [])
+        .filter(binding => isMintName(binding.service))
+        .map(binding => binding.entrypoint ?? '(default)')
+        .sort();
+      if (mintEntrypoints.join(',') !== [...MINT_ENTRYPOINTS].sort().join(',')) {
         problems.push(
-          `${block.where}: binds the mint Worker ${signerKeys.length} times; expected once`
+          `${block.where}: binds the mint Worker at ${mintEntrypoints.join(', ') || 'no entrypoint'}; expected ${MINT_ENTRYPOINTS.join(' and ')} once each`
         );
       }
     }

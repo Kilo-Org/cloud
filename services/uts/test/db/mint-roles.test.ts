@@ -210,7 +210,7 @@ describe('the membership role at mint', () => {
     expect(issued).toEqual({ outcome: 'issued', orgRole: 'member' });
     await setRole(orgId, accountId, 'admin');
     const { exchanged } = await exchange();
-    expect(exchanged).toEqual({ outcome: 'invalid_scope' });
+    expect(exchanged).toEqual({ outcome: 'invalid_scope', feedEntries: [] });
     expect(await stored(accountId)).toEqual({
       codes: 1,
       sessions: 0,

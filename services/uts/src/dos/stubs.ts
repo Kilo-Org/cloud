@@ -1,6 +1,11 @@
-import { UtsSignerIndexSchema, type UtsEnvironment } from '@kilocode/uts-contracts';
+import {
+  UtsFeedIndexSchema,
+  UtsSignerIndexSchema,
+  type UtsEnvironment,
+} from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { Env, UtsConfig } from '../env';
+import type { UtsFeedDO } from '../feed/UtsFeedDO';
 import type { UtsKeySetDO } from './UtsKeySetDO';
 import type { UtsSignerDO } from './UtsSignerDO';
 
@@ -10,6 +15,12 @@ import type { UtsSignerDO } from './UtsSignerDO';
  * primary in Frankfurt (design 5.7). The hint is best effort; the jurisdiction is enforced.
  */
 export const UTS_OBJECT_LOCATION_HINT: DurableObjectLocationHint = 'weur';
+
+/**
+ * The two feed objects sit in the `eu` jurisdiction with different EU hints, western and eastern
+ * Europe, so one regional failure does not stop both (design 5.6).
+ */
+export const FEED_OBJECT_LOCATION_HINTS: readonly DurableObjectLocationHint[] = ['weur', 'eeur'];
 
 /** The fixed number of key-set shards (design 5.7); it bounds the signer reads (design 3). */
 export const KEY_SET_SHARD_COUNT = 8;
@@ -22,6 +33,7 @@ const KeySetShardSchema = z
 
 const SIGNER_NAME_PATTERN = /^(production|staging|development):signer:(\d{2})$/;
 const KEY_SET_SHARD_NAME_PATTERN = /^(production|staging|development):keyset:(\d)$/;
+const FEED_NAME_PATTERN = /^(production|staging|development):feed:(\d)$/;
 
 /** Object names carry the environment, so a staging object can never serve production. */
 export function signerObjectName(environment: UtsEnvironment, signer: number): string {
@@ -30,6 +42,18 @@ export function signerObjectName(environment: UtsEnvironment, signer: number): s
 
 export function keySetShardObjectName(environment: UtsEnvironment, shard: number): string {
   return `${environment}:keyset:${KeySetShardSchema.parse(shard)}`;
+}
+
+export function feedObjectName(environment: UtsEnvironment, feed: number): string {
+  return `${environment}:feed:${UtsFeedIndexSchema.parse(feed)}`;
+}
+
+/** The feed index an object name names in this environment, or null for any other name. */
+export function feedOfObjectName(environment: UtsEnvironment, name: string): number | null {
+  const match = FEED_NAME_PATTERN.exec(name);
+  if (match === null || match[1] !== environment) return null;
+  const feed = UtsFeedIndexSchema.safeParse(Number(match[2]));
+  return feed.success ? feed.data : null;
 }
 
 /** The signer index an object name names in this environment, or null for any other name. */
@@ -60,7 +84,7 @@ export type ObjectIdCheck =
 function indexOfObjectId(
   config: UtsConfig,
   id: Pick<DurableObjectId, 'name' | 'jurisdiction'>,
-  kind: 'signer' | 'key-set shard',
+  kind: 'signer' | 'key-set shard' | 'feed',
   indexOfName: (environment: UtsEnvironment, name: string) => number | null
 ): ObjectIdCheck {
   const index = id.name === undefined ? null : indexOfName(config.environment, id.name);
@@ -132,6 +156,14 @@ export function storedSignerCheck(
   return { status: 'accepted', index: signer };
 }
 
+/** The feed index a feed object takes from its id. */
+export function feedOfObjectId(
+  config: UtsConfig,
+  id: Pick<DurableObjectId, 'name' | 'jurisdiction'>
+): ObjectIdCheck {
+  return indexOfObjectId(config, id, 'feed', feedOfObjectName);
+}
+
 export function getSignerStub(
   env: Env,
   config: UtsConfig,
@@ -151,5 +183,18 @@ export function getKeySetShardStub(
     config.jurisdiction === 'eu' ? env.UTS_KEY_SET_DO.jurisdiction('eu') : env.UTS_KEY_SET_DO;
   return namespace.get(namespace.idFromName(keySetShardObjectName(config.environment, shard)), {
     locationHint: UTS_OBJECT_LOCATION_HINT,
+  });
+}
+
+export function getFeedStub(
+  env: Env,
+  config: UtsConfig,
+  feed: number
+): DurableObjectStub<UtsFeedDO> {
+  const namespace =
+    config.jurisdiction === 'eu' ? env.UTS_FEED_DO.jurisdiction('eu') : env.UTS_FEED_DO;
+  const index = UtsFeedIndexSchema.parse(feed);
+  return namespace.get(namespace.idFromName(feedObjectName(config.environment, index)), {
+    locationHint: FEED_OBJECT_LOCATION_HINTS[index],
   });
 }

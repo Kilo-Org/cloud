@@ -1,8 +1,10 @@
+import { UtsFeedIndexSchema } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
-import { getSignerStub } from './dos/stubs';
+import type { DevUtsFeedDO } from './dev-feed';
+import { getFeedStub, getSignerStub } from './dos/stubs';
 import type { SignResult } from './dos/UtsSignerDO';
-import { readConfig, type Env } from './env';
+import { readConfig, type Env, type UtsConfig } from './env';
 import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
 import type { AuthorizationHandoff } from './oauth/authorize';
@@ -19,6 +21,8 @@ import type { SignerAccess } from './token/mint';
  * development issuer, which no staging or production verifier accepts.
  *
  * * `POST /__dev/sign` signs a caller-supplied claim set through the signer the grant picks.
+ * * `POST /__dev/feed/stop` makes one feed object fail every call for a number of seconds
+ *   (`src/dev-feed.ts`), for the fail-over check of the local end-to-end run.
  * * The development sign-in hand-off approves every authorization request for one synthetic
  *   account, `DEV_ACCOUNT_ID`, signed in by passkey now, bound to the organization the request
  *   names in `org` (the identity store checks the membership). `dev_decision=deny` on the
@@ -29,6 +33,7 @@ import type { SignerAccess } from './token/mint';
  *   scope.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
+export const DEV_FEED_STOP_PATH = '/__dev/feed/stop';
 
 /** The synthetic account the development hand-off signs in. */
 export const DEV_ACCOUNT_ID = 'dev:uts-local';
@@ -37,6 +42,26 @@ const DevSignRequestSchema = z.strictObject({
   grantId: z.string().min(1),
   claims: z.unknown(),
 });
+
+const DevFeedStopSchema = z.strictObject({
+  feed: UtsFeedIndexSchema,
+  seconds: z.number().int().min(1).max(300),
+});
+
+async function stopFeedObject(request: Request, env: Env, config: UtsConfig): Promise<Response> {
+  const body = DevFeedStopSchema.safeParse(await request.json().catch(() => undefined));
+  if (!body.success) return jsonResponse({ error: 'invalid_request' }, 400);
+  const until = Date.now() + body.data.seconds * 1000;
+  // The local entry exports `DevUtsFeedDO` as `UtsFeedDO` (src/dev-index.ts), so the objects of
+  // this namespace have `devStop`; the binding's type names the deployed class.
+  const stub = getFeedStub(
+    env,
+    config,
+    body.data.feed
+  ) as unknown as DurableObjectStub<DevUtsFeedDO>;
+  const result = await stub.devStop(until);
+  return jsonResponse({ feed: body.data.feed, result, until }, result === 'stopped' ? 200 : 400);
+}
 
 export const developmentHandoff: AuthorizationHandoff = async (request, pending) => {
   const params = new URL(request.url).searchParams;
@@ -66,7 +91,11 @@ export async function handleDevRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   if (config.environment !== 'development') return await handleRequest(request, env, ctx);
-  if (new URL(request.url).pathname !== DEV_SIGN_PATH) {
+  const { pathname } = new URL(request.url);
+  if (pathname === DEV_FEED_STOP_PATH && request.method === 'POST') {
+    return await stopFeedObject(request, env, config);
+  }
+  if (pathname !== DEV_SIGN_PATH) {
     // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant
     // statement, as a signer object that does not answer would, for the retry check of the local
     // end-to-end run.

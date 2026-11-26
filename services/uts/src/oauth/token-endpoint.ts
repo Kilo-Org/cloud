@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
+import type { FeedPublish } from '../revocation/publish';
 import {
   type MintClient,
   type ScopeRegistry,
@@ -37,6 +38,10 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * token, which derives from the code and the PKCE verifier. A third-party client that lost an
  * answer authorizes again: a second use of its code, like a second use of a replaced refresh
  * token, revokes the family.
+ *
+ * A refused exchange or third-party refresh whose statement revoked a grant (a second use of a
+ * code, a reused rotated token) publishes the statement's feed entries before it answers; a failed
+ * publish changes nothing in the answer, and the backfill adds the entries (design 5.6).
  */
 
 /** The RFC 8628 device grant, which the device sign-in slice provides. */
@@ -47,6 +52,7 @@ export type TokenDeps = {
   grants: GrantsAccess;
   sign: SignerAccess;
   scopes: ScopeRegistry;
+  publish: FeedPublish;
   deviceCodeGrant: DeviceCodeGrant | null;
 };
 
@@ -259,7 +265,10 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
       ...selection,
     })
   );
-  if (result.outcome !== 'issued') return grantError(result.outcome);
+  if (result.outcome !== 'issued') {
+    await deps.publish(result.feedEntries);
+    return grantError(result.outcome);
+  }
   return await completeMint(deps, client, grantId, result, {
     token: refreshToken,
     expiresAt: result.refreshExpiresAt,
@@ -307,7 +316,10 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
       ...selection,
     })
   );
-  if (result.outcome !== 'issued') return grantError(result.outcome);
+  if (result.outcome !== 'issued') {
+    await deps.publish(result.feedEntries);
+    return grantError(result.outcome);
+  }
   return await completeMint(deps, client, result.familyId, result, {
     token: rotated,
     expiresAt: result.refreshExpiresAt,

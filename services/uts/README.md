@@ -211,10 +211,12 @@ upload` with `WRANGLER_COMMAND` set to the command, fails for every command but 
 production and staging blocks. The same entry wires the development sign-in hand-off
 (`src/dev.ts`): it approves every authorization request for the synthetic account `dev:uts-local`.
 
-The local config binds the local identity store as `IDENTITY_STORE` (login `uts_app_a`) and
-`IDENTITY_STORE_PAT` (login `uts_pat_a`). The UTS logins have no password in the repository, so
-give both logins one and pass the URLs to wrangler
-(`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_PAT` for the second):
+The local config binds the local identity store as `IDENTITY_STORE` (login `uts_app_a`),
+`IDENTITY_STORE_PAT` (login `uts_pat_a`) and `IDENTITY_STORE_REPLICA` (login `uts_reader_a`). The
+UTS logins have no password in the repository, and wrangler refuses a local connection string
+without one, so give the three logins one and pass the URLs to wrangler
+(`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_PAT` and
+`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_REPLICA` for the others):
 
 ```sh
 CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE=postgres://uts_app_a:<password>@127.0.0.1:55432/uts \

@@ -24,6 +24,9 @@
  *   UTS_E2E_APP_URL     app login to the same database, for the Worker's Hyperdrive binding
  *   UTS_E2E_PORT        first of the run's ports (default 9000): Worker, inspector, then the
  *                       three stand-in providers at +3, +4 and +5
+ *
+ * The Worker's PAT and replica bindings take their local URLs from the environment, as for any
+ * `wrangler dev -c wrangler.dev.jsonc` (README, "Local development").
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';

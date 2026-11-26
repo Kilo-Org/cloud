@@ -12,6 +12,7 @@ import { recordDenial, type BundleDenial } from './audit/denials';
 import { BUNDLE_OBJECT_DEADLINE_MS, BUNDLE_OBJECT_RETRY_AFTER_SECONDS } from './constants';
 import { getBundleStub } from './dos/stubs';
 import { readConfig, type Env, type StsConfig } from './env';
+import type { GithubRun } from './identity/verify';
 import { policyExists, policyFor } from './policy';
 import { callWithDeadline } from './rpc';
 import { defaultMintAuthority, serveMint, type MintAuthority } from './tokens/mint';
@@ -155,12 +156,12 @@ export async function serveBundle(
   config: StsConfig,
   workload: string,
   request: BundleRequest,
-  options: { deadlineMs?: number } = {}
+  options: { deadlineMs?: number; run?: GithubRun | null } = {}
 ): Promise<BundleResult> {
   const parsed = BundleRequestSchema.parse(request);
   const outcome = await callWithDeadline(
     async () =>
-      await getBundleStub(env, config, workload).getBundle(workload, config.environment, parsed),
+      await getBundleStub(env, config, workload).getBundle(workload, config.environment, parsed, options.run ?? null),
     options.deadlineMs ?? BUNDLE_OBJECT_DEADLINE_MS
   );
   if (outcome.status === 'answered') return outcome.value;

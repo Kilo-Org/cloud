@@ -9,6 +9,7 @@ import {
 } from '@kilocode/sts-contracts';
 import type { PolicySnapshotEntry } from '../policy/load';
 import type { KeyRevocation, KeyRingChange } from '../tokens/key-ring';
+import type { GithubRun } from '../identity/verify';
 import type { BundleDenial, TokenDenial } from './denials';
 
 /** Attributes hold at most 256 values; longer lists are cut and flagged. */
@@ -27,6 +28,8 @@ export function bundleDeliveredEvent(input: {
   stale: boolean;
   secrets: { name: SecretName; version: number }[];
   missing: SecretName[];
+  /** The GitHub run a CI caller's verified token names; per-run claims appear on no refusal row. */
+  run: GithubRun | null;
 }): AuditEvent {
   return AuditEventSchema.parse({
     specversion: '1.0',
@@ -48,6 +51,13 @@ export function bundleDeliveredEvent(input: {
         secretCount: input.secrets.length,
         secrets: input.secrets.map(secret => `${secret.name}:${secret.version}`),
         missing: [...input.missing],
+        ...(input.run === null
+          ? {}
+          : {
+              jobWorkflowRef: input.run.jobWorkflowRef,
+              runId: input.run.runId,
+              ...(input.run.runAttempt === undefined ? {} : { runAttempt: input.run.runAttempt }),
+            }),
       },
     },
   });

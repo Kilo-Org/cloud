@@ -72,6 +72,19 @@ async function read(stub: DurableObjectStub<BundleDO>, ifNoneMatch?: string) {
 }
 
 describe('bundle delivery', () => {
+  it("records a GitHub caller's workflow file, run id and attempt as flat attributes", async () => {
+    const stub = getBundleStub(env, config, 'o11y');
+    await stub.putBundle(await workloadBundle({ O11Y_CF_AE_API_TOKEN: { version: 1 } }));
+    const run = {
+      jobWorkflowRef: 'acme/repo/.github/workflows/release.yml@refs/heads/main',
+      runId: '9001',
+      runAttempt: '2',
+    };
+    expect(await stub.getBundle('o11y', 'development', {}, run)).toMatchObject({ status: 'ok' });
+    const attributes = JSON.parse((await auditRows(stub)).latest ?? '{}').data.attributes;
+    expect(attributes).toMatchObject(run);
+  });
+
   it('serves the sealed bundle and appends one delivery row in the same call', async () => {
     const stub = getBundleStub(env, config, 'o11y');
     await stub.putBundle(
@@ -94,6 +107,7 @@ describe('bundle delivery', () => {
     expect(rows.count).toBe(1);
     expect(rows.latest).toContain('ai.kilo.sts.bundle.delivered');
     expect(rows.latest).not.toContain('value-for-');
+    expect(rows.latest).not.toContain('runId');
 
     const stored = await runInDurableObject(stub, (_instance, state) =>
       state.storage.sql

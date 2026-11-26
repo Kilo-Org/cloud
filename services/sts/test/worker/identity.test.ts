@@ -156,6 +156,7 @@ describe('Fly machine identity', () => {
       provider: 'fly',
       attestationExp: issuedAt + 900,
       attestationIat: issuedAt,
+      run: null,
     });
   });
 
@@ -204,7 +205,28 @@ describe('GitHub Actions identity', () => {
       provider: 'github',
       attestationExp: issuedAt + 300,
       attestationIat: issuedAt,
+      run: { jobWorkflowRef: RELEASE_WORKFLOW, runId: '9001' },
     });
+  });
+
+  it('carries run_attempt for the delivery row and keeps per-run claims off a refusal', async () => {
+    const { verify, provider } = await fixture('production');
+    const accepted = await signToken(provider(GITHUB_ISSUER), {
+      ...GITHUB_CLAIMS,
+      run_attempt: '2',
+    });
+    expect(await verify(accepted)).toMatchObject({
+      run: { jobWorkflowRef: RELEASE_WORKFLOW, runId: '9001', runAttempt: '2' },
+    });
+    const refused = await verify(
+      await signToken(provider(GITHUB_ISSUER), {
+        ...GITHUB_CLAIMS,
+        run_attempt: '2',
+        event_name: 'push',
+      })
+    );
+    expect(refused).toMatchObject({ status: 'denied' });
+    expect(JSON.stringify(refused)).not.toMatch(/run_id|run_attempt|9001/);
   });
 
   it('accepts a job of a called reusable workflow by its own entry', async () => {

@@ -39,6 +39,9 @@ export type VerifiedSubject = {
   claims: Record<string, string>;
 };
 
+/** The run a verified GitHub token came from; bounded flat strings for the delivery row. */
+export type GithubRun = { jobWorkflowRef: string; runId: string; runAttempt?: string };
+
 export type VerifyOutcome =
   | {
       status: 'verified';
@@ -47,6 +50,8 @@ export type VerifyOutcome =
       /** The provider token's own `exp` and `iat`, in seconds; a minted token never outlives it. */
       attestationExp: number;
       attestationIat: number;
+      /** A GitHub token's `job_workflow_ref`, `run_id` and `run_attempt`, for the delivery row only; refusals omit them. */
+      run: GithubRun | null;
     }
   | { status: 'denied'; reason: DeniedReason; subject?: VerifiedSubject }
   /** A provider's discovery document or key set could not be fetched; the caller retries. */
@@ -84,6 +89,18 @@ function issuerFor(identity: PolicyIdentity): string | null {
 function claim(payload: JWTPayload, name: string): string | null {
   const value = payload[name];
   return typeof value === 'string' ? value : null;
+}
+
+/** GitHub's run ids are decimal; anything else (or longer than 20 digits) is left out. */
+const RUN_NUMBER = /^[0-9]{1,20}$/;
+
+function githubRun(payload: JWTPayload): GithubRun | null {
+  const jobWorkflowRef = claim(payload, 'job_workflow_ref');
+  const runId = claim(payload, 'run_id');
+  if (jobWorkflowRef === null || runId === null || !RUN_NUMBER.test(runId)) return null;
+  const run = { jobWorkflowRef: jobWorkflowRef.slice(0, 200), runId };
+  const runAttempt = claim(payload, 'run_attempt');
+  return runAttempt !== null && RUN_NUMBER.test(runAttempt) ? { ...run, runAttempt } : run;
 }
 
 function isKnownProviderIssuer(issuer: string): boolean {
@@ -329,6 +346,7 @@ export class IdentityVerifier {
       provider,
       attestationExp: exp,
       attestationIat: iat,
+      run: provider === 'github' ? githubRun(payload) : null,
     });
     const rejected = (workload: string | null, reason: DeniedReason): VerifyOutcome => ({
       status: 'denied',

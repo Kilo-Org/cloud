@@ -558,7 +558,10 @@ Preconditions on the GitHub side, which STS cannot check:
 Denial rows carry `repository_id`, `repository_owner_id`, `repository`, `environment`, `ref`,
 `event_name`, `job_workflow_ref` and `sub`, never the token and never per-run claims such as
 `run_id` (they would make every refusal its own row). A delivery writes the usual
-`ai.kilo.sts.bundle.delivered` row for the policy's workload.
+`ai.kilo.sts.bundle.delivered` row for the policy's workload, plus the verified token's
+`jobWorkflowRef`, `runId` and, when present, `runAttempt` as flat string attributes (a run id or
+attempt that is not 1-20 decimal digits is left out). GitHub tokens carry no job claim, so the row
+names the workflow file and run, not the job.
 
 **Cost per CI job.** One `POST /v1/bundle`: the token check runs in the Worker, with GitHub's
 discovery document and key set cached per isolate (a cold isolate fetches both once), then one
@@ -704,6 +707,18 @@ After the merge, in this order:
 Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, identity
 `5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4`) follows the same list for its own environment.
 
+**Before an environment's first GitHub policy deploys** (a `policy/ci-*.yaml` naming that
+environment), in this order:
+
+1. **`/ci` read grant.** Grant the environment's Infisical STS role `readValue` on `/ci/**` there.
+   Without it every refresh in that environment fails and every bundle there goes stale. Verify:
+   Infisical → Access Control → the identity's role lists `/ci/**` for that environment.
+2. **Deploy the policy.** The refresher's stored copy has no `/ci` folder yet, so the first refresh
+   after this deploy needs a fresh manager read for every workload in that environment, not only
+   the CI ones. If the manager is down at that moment, an empty bundle object has no stale copy to
+   fill from until a read succeeds; objects that already hold a bundle keep serving it. Deploy
+   while the manager is up and check the Infisical audit log for the read within 5 minutes.
+
 ## Tests
 
 `pnpm --filter cloudflare-sts test` runs the Workers-pool suites in `test/worker/` (identity
@@ -759,5 +774,6 @@ The script signs a job token the way GitHub does and checks that the listed work
 bundle (its `/ci/ci-e2e-release` value and its `/shared` value, not the `/workloads` or `/ci/minting`
 decoys), that the refresher read `/ci`, and that a job of another workflow file, a `pull_request`
 job and a name-only subject each get 401 `identity_rejected`. It then waits for the
-`bundle.delivered` row and for the `bundle.denied` rows that name the refused `job_workflow_ref`,
-`event_name` and `sub`, and checks that no audit row carries a value.
+`bundle.delivered` row, which must carry the job's workflow file, run id and attempt, and for the
+`bundle.denied` rows that name the refused `job_workflow_ref`, `event_name` and `sub` and no run id,
+and checks that no audit row carries a value.

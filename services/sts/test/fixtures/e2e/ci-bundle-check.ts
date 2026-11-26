@@ -100,6 +100,7 @@ const JOB_CLAIMS: JWTPayload = {
   workflow_ref: WORKFLOW,
   job_workflow_ref: WORKFLOW,
   run_id: '424242',
+  run_attempt: '1',
   runner_environment: 'github-hosted',
 };
 
@@ -202,6 +203,19 @@ const deliveries = events.filter(
     event.type === 'ai.kilo.sts.bundle.delivered' && event.attributes.workload === 'ci-e2e-release'
 );
 check(deliveries.length === 1, 'one bundle.delivered row for ci-e2e-release', deliveries);
+check(
+  deliveries[0]?.attributes.runId === '424242' &&
+    deliveries[0]?.attributes.runAttempt === '1' &&
+    deliveries[0]?.attributes.jobWorkflowRef === WORKFLOW,
+  'the delivery row names the workflow file, run id and attempt',
+  deliveries[0]?.attributes
+);
+check(
+  !JSON.stringify(events.filter(event => event.type === 'ai.kilo.sts.bundle.denied')).includes(
+    '424242'
+  ),
+  'no denial row carries the run id'
+);
 check(
   sawDenial('job_workflow_ref=kilo-e2e/ci-fixture/.github/workflows/other.yml'),
   'the other workflow file is audited with its job_workflow_ref'

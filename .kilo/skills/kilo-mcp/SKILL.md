@@ -126,7 +126,6 @@ exist as an org-scoped mirror under `organizations`, for example
 - `customRouterBenchmarks`
 - `debug`
 - `discord`
-- `dolthub`
 - `feedback`
 - `githubApps`
 - `githubPrReview`

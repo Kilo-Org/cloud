@@ -8,7 +8,6 @@ export const SETUP_STATUS_PLATFORMS = [
   PLATFORM.GITLAB,
   PLATFORM.BITBUCKET,
   PLATFORM.LINEAR,
-  PLATFORM.DOLTHUB,
 ] as const;
 
 export type SetupStatusPlatform = (typeof SETUP_STATUS_PLATFORMS)[number];
@@ -43,8 +42,7 @@ function buildInstallationSummary(
   if (
     integration.platform === PLATFORM.GITHUB ||
     integration.platform === PLATFORM.GITLAB ||
-    integration.platform === PLATFORM.BITBUCKET ||
-    integration.platform === PLATFORM.DOLTHUB
+    integration.platform === PLATFORM.BITBUCKET
   ) {
     return { accountLogin: integration.platform_account_login };
   }

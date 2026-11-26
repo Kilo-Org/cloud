@@ -19,8 +19,7 @@ type SecretTokenInputProps = Omit<
  * Why not `<input type="password">`? Chrome and other browsers treat
  * `type="password"` as a strong signal that the surrounding form is a
  * sign-in form, which triggers the password-save prompt — a poor UX
- * for things that aren't passwords (DoltHub API tokens, OAuth tokens,
- * webhook secrets, etc).
+ * for API tokens and webhook secrets.
  *
  * Instead, we render `type="text"` with `-webkit-text-security: disc`
  * to mask the contents visually, plus an eye toggle to reveal. The

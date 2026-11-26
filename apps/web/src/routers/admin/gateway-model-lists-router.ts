@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
@@ -20,6 +21,13 @@ export const adminGatewayModelListsRouter = createTRPCRouter({
   }),
 
   set: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'gateway_model_lists.set',
+        target: inputFieldTarget('other', 'list'),
+      },
+    })
     .input(
       z.object({
         list: GatewayModelListSchema,

@@ -11,7 +11,7 @@ jest.mock('@/lib/auth/passkey', () => ({
 }));
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
-jest.mock('@/lib/admin/admin-action-audit');
+jest.mock('@kilocode/web-shared/lib/admin/admin-action-audit');
 jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store'),
   evaluateStepUp: jest.fn(),
@@ -31,7 +31,7 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   createRegistrationOptions,
   verifyRegistration,

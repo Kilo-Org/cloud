@@ -23,6 +23,7 @@ import {
   type ContainerUsageSegment,
 } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 
@@ -940,6 +941,13 @@ export const cloudBillingSkusRouter = createTRPCRouter({
   }),
 
   reconcileUsageWithCloudflare: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason:
+          'mutation-typed read: compares metered usage with Cloudflare analytics and writes nothing',
+      },
+    })
     .input(usageReconciliationSchema)
     .mutation(async ({ input }) => reconcileUsageWithCloudflare(input)),
 
@@ -1024,6 +1032,13 @@ export const cloudBillingSkusRouter = createTRPCRouter({
   }),
 
   create: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'cloud_billing_sku.create',
+        target: inputFieldTarget('other', 'id'),
+      },
+    })
     .input(createCloudBillingSkuInputSchema)
     .mutation(async ({ input, ctx }): Promise<SerializedCloudBillingSku> => {
       try {
@@ -1048,6 +1063,13 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     }),
 
   disable: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'cloud_billing_sku.disable',
+        target: inputFieldTarget('other', 'id'),
+      },
+    })
     .input(z.object({ id: cloudBillingSkuIdSchema }))
     .mutation(async ({ input }): Promise<SerializedCloudBillingSku> => {
       const [updated] = await db

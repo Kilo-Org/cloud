@@ -8,17 +8,22 @@ import {
   createOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
+  addAdminAuditMetadata,
   adminActionContextFromHeaders,
+  auditedAdminRoute,
+  inputFieldTarget,
+  isAuditedAdminRoute,
   organizationActionTarget,
   recordAdminAction,
   recordElevatedOrganizationAdminAction,
   recordAdminActions,
   redactEmailAddressesInAuditText,
   setAdminActionSinkForTest,
+  setAdminAuditActor,
   userActionTarget,
   type AdminActionContext,
   type AdminActionEvent,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 function ctxFor(overrides: Partial<AdminActionContext> = {}): AdminActionContext {
   return {
@@ -74,6 +79,7 @@ describe('recordAdminAction', () => {
       {
         event: 'admin_action',
         action: 'user.api_key.reset',
+        outcome: 'success',
         auditLogId: rows[0]?.id,
         persisted: true,
         kiloUserId: ctx.user.id,
@@ -131,7 +137,7 @@ describe('recordAdminAction', () => {
     });
   });
 
-  test('records one row and one event per entry across insert chunks', async () => {
+  test('records one row per entry and one log line per insert chunk', async () => {
     const userIds = Array.from({ length: 1_001 }, (_, index) => `bulk-user-${index}`);
 
     await recordAdminActions(
@@ -140,15 +146,140 @@ describe('recordAdminAction', () => {
         action: 'user.unblock' as const,
         target: userActionTarget(userId),
         message: 'Unblocked user via bulk unblock',
+        metadata: { bulk: true, userId },
       }))
     );
 
     const rows = await db
-      .select({ target_id: admin_action_audit_logs.target_id })
+      .select({ id: admin_action_audit_logs.id, target_id: admin_action_audit_logs.target_id })
       .from(admin_action_audit_logs);
     expect(rows.map(row => row.target_id).sort()).toEqual([...userIds].sort());
-    expect(events).toHaveLength(userIds.length);
-    expect(events.every(event => event.persisted && event.auditLogId !== null)).toBe(true);
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      event: 'admin_action',
+      action: 'user.unblock',
+      outcome: 'success',
+      entryCount: 1_000,
+      persisted: true,
+      route: 'admin.users.resetAPIKey',
+      targetType: 'user',
+      targetIds: userIds.slice(0, 1_000),
+      message: 'Unblocked user via bulk unblock',
+      // Each entry carries its own metadata, so the line names none.
+      metadata: null,
+    });
+    expect(events[1]).toMatchObject({ entryCount: 1, targetIds: [userIds[1_000]] });
+    // The rows hold each entry's id, message and metadata; the lines stay small.
+    for (const event of events) {
+      expect(event).toMatchObject({ errorCodes: null, messages: null, metadatas: null });
+      expect(event).not.toHaveProperty('auditLogIds');
+    }
+    expect(Math.max(...events.map(event => JSON.stringify(event).length))).toBeLessThan(64_000);
+  });
+
+  test('splits a bulk log line by action and outcome', async () => {
+    await recordAdminActions(ctxFor(), [
+      { action: 'user.unblock', target: userActionTarget('user-1'), message: 'Unblocked' },
+      {
+        action: 'user.unblock',
+        outcome: 'failure',
+        errorCode: 'Error',
+        target: userActionTarget('user-2'),
+        message: 'Unblock failed',
+      },
+      { action: 'user.unblock', target: organizationActionTarget('org-3'), message: 'Unblocked' },
+      {
+        action: 'user.unblock',
+        outcome: 'failure',
+        errorCode: 'NOT_FOUND',
+        target: userActionTarget('user-4'),
+        message: 'Unblock failed',
+      },
+    ]);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        outcome: 'success',
+        entryCount: 2,
+        targetType: null,
+        targetIds: ['user-1', 'org-3'],
+        errorCodes: null,
+        message: 'Unblocked',
+      }),
+      expect.objectContaining({
+        outcome: 'failure',
+        entryCount: 2,
+        targetType: 'user',
+        targetIds: ['user-2', 'user-4'],
+        errorCodes: ['Error', 'NOT_FOUND'],
+        // The entries' codes differ, so no metadata is shared.
+        metadata: null,
+      }),
+    ]);
+  });
+
+  test('logs a chunk that was not stored in lines of at most 100 entries', async () => {
+    const userIds = Array.from({ length: 2_000 }, (_, index) => `bulk-user-${index}`);
+    const insertRows = db.insert.bind(db);
+    let inserts = 0;
+    const insert = jest.spyOn(db, 'insert').mockImplementation(((table: never) => {
+      inserts += 1;
+      if (inserts === 2) throw new Error('database unavailable');
+      return insertRows(table);
+    }) as never);
+
+    try {
+      await recordAdminActions(
+        ctxFor(),
+        userIds.map(userId => ({
+          action: 'user.unblock' as const,
+          outcome: 'failure' as const,
+          errorCode: 'Error',
+          target: userActionTarget(userId),
+          message: `Unblock of ${userId} failed`,
+          metadata: { userId },
+        }))
+      );
+    } finally {
+      insert.mockRestore();
+    }
+
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(1_000);
+    // One line for the stored chunk, ten for the 1,000 entries that were not.
+    expect(events).toHaveLength(11);
+    expect(events[0]).toMatchObject({
+      entryCount: 1_000,
+      persisted: true,
+      targetIds: userIds.slice(0, 1_000),
+      errorCodes: Array.from({ length: 1_000 }, () => 'Error'),
+      messages: null,
+      metadatas: null,
+    });
+
+    const unstored = events.slice(1).map(event => {
+      if (!('targetIds' in event)) throw new Error('expected a bulk line');
+      expect(event).toMatchObject({ action: 'user.unblock', outcome: 'failure', persisted: false });
+      expect(event.entryCount).toBeLessThanOrEqual(100);
+      expect(event).not.toHaveProperty('auditLogIds');
+      return event;
+    });
+    const logged = unstored.flatMap(event =>
+      event.targetIds.map((targetId, index) => ({
+        targetId,
+        errorCode: event.errorCodes?.[index],
+        message: event.messages?.[index] ?? event.message,
+        metadata: event.metadatas?.[index] ?? event.metadata,
+      }))
+    );
+    expect(logged).toEqual(
+      userIds.slice(1_000).map(userId => ({
+        targetId: userId,
+        errorCode: 'Error',
+        message: `Unblock of ${userId} failed`,
+        metadata: { userId, errorCode: 'Error' },
+      }))
+    );
   });
 
   test('does nothing for an empty batch', async () => {
@@ -343,5 +474,127 @@ describe('recordElevatedOrganizationAdminAction', () => {
     const rows = await db.select().from(admin_action_audit_logs);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.metadata).toEqual({ heldRoles: null });
+  });
+});
+
+describe('auditedAdminRoute', () => {
+  const admin = defineTestUser({ is_admin: true, is_super_admin: false });
+  const path = '/admin/api/users/user-1/kill-balance-cache';
+  const routeContext = { params: Promise.resolve({ id: 'user-1' }) };
+  type RouteContext = typeof routeContext;
+  let events: AdminActionEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminActionSinkForTest(event => events.push(event));
+  });
+
+  afterEach(async () => {
+    setAdminActionSinkForTest(null);
+    await cleanupDbForTest();
+  });
+
+  function request() {
+    return new Request(`http://localhost:3000${path}`, {
+      method: 'POST',
+      headers: { 'x-vercel-forwarded-for': '198.51.100.4' },
+    });
+  }
+
+  const unblockUser = {
+    kind: 'declarative',
+    action: 'user.unblock',
+    target: inputFieldTarget('user', 'id'),
+  } as const;
+
+  test('records one success row with the target from the route params', async () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) => {
+      setAdminAuditActor(admin);
+      return Response.json({ ok: true });
+    });
+
+    expect((await POST(request(), routeContext)).status).toBe(200);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'success',
+        actor_id: admin.id,
+        target_type: 'user',
+        target_id: 'user-1',
+        message: path,
+        metadata: null,
+      }),
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({ outcome: 'success', route: path, ip: '198.51.100.4' }),
+    ]);
+  });
+
+  test('records a status of 400 or above as a failure and returns the response unchanged', async () => {
+    const refusal = Response.json({ error: 'Credit management access required' }, { status: 403 });
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) => {
+      setAdminAuditActor(admin);
+      return refusal;
+    });
+
+    await expect(POST(request(), routeContext)).resolves.toBe(refusal);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'failure',
+        target_id: 'user-1',
+        metadata: { errorCode: '403' },
+      }),
+    ]);
+    expect(events[0]).toMatchObject({ outcome: 'failure', metadata: { errorCode: '403' } });
+  });
+
+  test('records a throw as a failure without its message and rethrows the same error', async () => {
+    const failure = new Error('balance cache for someone@customer.test is unreachable');
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) => {
+      setAdminAuditActor(admin);
+      addAdminAuditMetadata({ attempt: 2 });
+      throw failure;
+    });
+
+    await expect(POST(request(), routeContext)).rejects.toBe(failure);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      outcome: 'failure',
+      metadata: { attempt: 2, errorCode: 'Error' },
+    });
+    expect(JSON.stringify(rows)).not.toContain('customer.test');
+    expect(JSON.stringify(events)).not.toContain('customer.test');
+  });
+
+  test('records nothing for a failure before the handler named its admin', async () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) =>
+      Response.json({ error: 'Unauthorized' }, { status: 401 })
+    );
+
+    expect((await POST(request(), routeContext)).status).toBe(401);
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  test('reports a success that never named its admin', async () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request, _ctx: RouteContext) =>
+      Response.json({ ok: true })
+    );
+
+    await expect(POST(request(), routeContext)).rejects.toThrow('Admin audit gap');
+  });
+
+  test('brands the wrapped handler without an enumerable key', () => {
+    const POST = auditedAdminRoute(unblockUser, async (_request: Request) => new Response());
+
+    expect(isAuditedAdminRoute(POST)).toBe(true);
+    expect(Object.keys(POST)).toEqual([]);
+    expect(isAuditedAdminRoute(async (_request: Request) => new Response())).toBe(false);
   });
 });

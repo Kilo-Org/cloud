@@ -92,6 +92,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  auth_audit_logs,
   blacklisted_domains_settings,
   kiloclaw_cli_runs,
   user_push_tokens,
@@ -156,6 +157,7 @@ import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 import { currentSignInMethodChangeAuditRequest } from '@/lib/auth/sign-in-method-change-request';
 import { currentSecurityNoticeRequest, scheduleSecurityNotice } from '@/lib/security-notices';
 import { strict as assert } from 'node:assert';
@@ -1228,6 +1230,9 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
+ * - auth_audit_logs (retained until pruned; user_id anonymized and the
+ *   subject email hash nulled on the user's rows, and on rows owned by no
+ *   account that hash the user's email or a linked provider's email)
  * - blacklisted_domains_settings (editor PII nulled; settings retained)
  * - model_eval_ingestions (promoter email anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
@@ -1410,7 +1415,12 @@ export async function anonymizeCloudUserData(
     .where(eq(blacklisted_domains_settings.updated_by, userId));
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
-  await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
+  // Auth audit rows hash whichever address a sign-in named, including a linked
+  // provider's, so keep those addresses for the audit scrub below.
+  const providerEmails = await tx
+    .delete(user_auth_provider)
+    .where(eq(user_auth_provider.kilo_user_id, userId))
+    .returning({ email: user_auth_provider.email });
   await tx.delete(pending_auth_links).where(eq(pending_auth_links.kilo_user_id, userId));
   await tx.execute(sql`
     INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
@@ -2127,6 +2137,34 @@ export async function anonymizeCloudUserData(
         eq(admin_action_audit_logs.target_id, userId)
       )
     );
+
+  await tx
+    .update(auth_audit_logs)
+    .set({ user_id: 'deleted-user', subject_email_hash: null })
+    .where(eq(auth_audit_logs.user_id, userId));
+
+  // Attempts on the user's addresses that never resolved to an account, such as
+  // a failed sign-in, carry only the hash. A row another account owns keeps its
+  // hash: that account may hold the same address today. With an empty hash key
+  // there is no hash to match.
+  const emailHashes = [
+    ...new Set(
+      [originalEmail, ...providerEmails.map(row => row.email)].flatMap(
+        email => authAuditEmailHash(email) ?? []
+      )
+    ),
+  ];
+  if (emailHashes.length > 0) {
+    await tx
+      .update(auth_audit_logs)
+      .set({ subject_email_hash: null })
+      .where(
+        and(
+          isNull(auth_audit_logs.user_id),
+          inArray(auth_audit_logs.subject_email_hash, emailHashes)
+        )
+      );
+  }
 
   await tx
     .update(model_eval_ingestions)

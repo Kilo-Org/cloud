@@ -70,7 +70,10 @@ import { linkAccountToExistingUser } from '@/lib/user';
 import { SIGN_IN_METHOD_CHANGE_REFUSAL_CODES } from '@/lib/auth/sign-in-method-change-codes';
 import { SIGN_IN_METHOD_REFUSAL_CODES } from '@kilocode/app-shared/auth';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import { setAdminActionSinkForTest, type AdminActionEvent } from '@/lib/admin/admin-action-audit';
+import {
+  setAdminActionSinkForTest,
+  type AdminActionEvent,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
 const mockSendCode = jest.mocked(sendSignInMethodChangeCodeEmail);

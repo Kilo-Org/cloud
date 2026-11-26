@@ -33,7 +33,7 @@ import {
 import { platform_integrations } from '@kilocode/db/schema';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
-import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordElevatedOrganizationAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 // Bitbucket credential changes by a Kilo admin without an owner or billing
 // role in the organization are recorded durably. Tokens are never logged.

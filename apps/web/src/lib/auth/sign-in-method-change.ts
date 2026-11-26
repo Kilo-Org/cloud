@@ -13,7 +13,10 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-audit';
+import {
+  recordAdminAction,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import type { SignInMethodChangeRefusal } from '@/lib/auth/sign-in-method-change-codes';
 
 export type SignInMethodChange = 'link' | 'unlink';

@@ -16,7 +16,7 @@ import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.
 import {
   adminActionContextFromHeaders,
   recordElevatedOrganizationAdminAction,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 // Roles that may mint each token kind without the admin bypass, mirroring the
 // role checks below (which never fire for admins, who are forced to owner).

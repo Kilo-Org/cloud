@@ -16,6 +16,7 @@ import {
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { adminMutationsMissingAuditSpec } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   ADMIN_ONLY_TRPC_NAMESPACES,
   ADMIN_ONLY_TRPC_PROCEDURES,
@@ -797,5 +798,11 @@ describe('admin target id fields name mounted mutations', () => {
     }
 
     expect(problems).toEqual([]);
+  });
+});
+
+describe('admin mutations declare how they are audited', () => {
+  test('every admin-guarded mutation carries valid adminAudit meta', () => {
+    expect(adminMutationsMissingAuditSpec(procedures)).toEqual([]);
   });
 });

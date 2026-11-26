@@ -803,7 +803,8 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
    client could skip STS, and no denial or backoff state outlives the run.
    usage-ingest waits 80 s for the answer: the route's slowest run is a 5 s key-set fetch, a
    30 s mint attempt (both tries after an identity refusal end within it), then four 10 s calls
-   here with the 30 s denied mint running alongside them, 75 s, and its `maxDuration` is 90 s.
+   here with the 30 s denied mint running alongside them, then a 2 s write of the held tokens
+   (their read runs alongside the mint), 77 s, and its `maxDuration` is 90 s.
 4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
    `succeeded` only when every check passed, with `mint_result`, `web_status`, and
    `<check>_result`/`_status` for `outbound`, `negative_wrong_audience`, `negative_forged`,
@@ -860,22 +861,34 @@ or failed, a network failure, a redirect) writes no web line, and a run the rout
 only `sts_canary_refused`; both show as a missing success.
 
 The expired-token check reads the deployment's held tokens from the Vercel Runtime Cache
-(namespace `sts-canary`, key `held:<VERCEL_DEPLOYMENT_ID>`): at most the two latest `usage-ingest`
-tokens that usage-ingest accepted with 204, oldest first, written with a 15-minute TTL (a little
-over two runs). A token that failed any check is never kept. Each run presents the oldest one
-past `exp` plus 60 s (expect 401) and drops it, then adds its own. Because every instance of the
-deployment shares the entry, the check runs on every run from a deployment's third on, whichever
-instance serves it; it reports `skipped` only while no held token is that old (the first two
-runs of a deployment, or after runs stopped for longer than 15 minutes). A store that cannot be
-read or written fails the check. A third monitor per environment tracks that the check still
-runs, and alerts the same route without paging: no `sts_canary` line whose
+(namespace `sts-canary`, key `held:<VERCEL_TARGET_ENV or VERCEL_ENV>:<VERCEL_DEPLOYMENT_ID>`): at
+most the two latest `usage-ingest` tokens that usage-ingest accepted with 204, oldest first,
+written with a 15-minute TTL (a little over two runs). A token that failed any check is never
+kept. The read runs alongside the route's own mint. Each entry must be genuine: its own `exp`
+claim equals the `exp` it is held under, it names audience `usage-ingest` and scope
+`usage-ingest:sts.canary`, and the route's verifier finds a signature STS made for this
+environment (the verifier checks signature, issuer and environment before `exp` and audience, so
+a genuine held token ends in `expired` or `audience`). An entry that is not genuine is dropped,
+never presented, and fails the check (`held token not genuine`). Each run presents the oldest
+genuine token past `exp` plus 60 s (expect 401) and drops it, then adds its own. Because every
+instance of the deployment shares the entry, the check runs on every run from a deployment's third
+on, whichever instance serves it. It reports `skipped` only while no held token is that old: a
+deployment's first two runs, runs less than about 360 s apart (manual runs), or after runs
+stopped for longer than 15 minutes. A read or write that fails or takes more than 2 s fails the
+check, and so does a Vercel runtime without `VERCEL_DEPLOYMENT_ID`; a failed presentation is
+reported even when the write after it fails too. A third monitor per environment tracks that the
+check still runs, and alerts the same route without paging: no `sts_canary` line whose
 `negatives.expired.result` is `ok` in 24 hours.
+
+The shared entry assumes one region: the Runtime Cache is regional, and `kilocode-app` runs its
+functions in Frankfurt only (a Vercel project setting; the repository pins no region). A second
+region would keep its own entry, so each region's check would need two runs on that region first.
 
 The entry holds live tokens for up to their 300 s. Each is a `usage-ingest:sts.canary` token,
 which only the verify route above accepts, and only to answer 204. Staging is a custom
 environment, which may share the preview Runtime Cache partition, so code of a preview deployment
-could read staging's entry; the deployment id in the key keeps deployments from overwriting each
-other, not from reading.
+could read staging's entry, or plant one; a planted entry fails the genuineness check, and the
+key's environment and deployment id keep deployments from overwriting each other.
 
 The route sees STS's refusal, not the audit row STS writes after its answer. A fourth monitor per
 environment tracks that the row lands, and alerts the same route without paging when this query
@@ -910,7 +923,7 @@ reaches STS every run. Per run and environment:
 | Audit queue messages | at most 3; the signers relay up to 500 events per message, so usually they share one with other rows, and `DenialDO`'s alarm relays the minute's merged denials of its own stream together | at most 864 |
 | STS key-set fetches | one per verifier isolate per 5 minutes: each usage-ingest isolate that serves a verify-route call and each web instance that serves the route fetches once when its copy is older than 5 minutes. The 3 or 4 verify calls and the scheduled run can land on different isolates, so a run can cost several. The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | at most (usage-ingest isolates + web instances) x 288 |
 | Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt. When STS refuses that fresh token too, the client writes a refusal marker for the deployment and audience that lives 60 s (`DENIED_RECHECK_MS`): until it expires no instance of the deployment drops a cached token or exchanges, each answers from its denied state. A deployment STS keeps refusing (a `web.yaml` naming the wrong project or environment) so costs at most 1 exchange per 60 s per audience and region, however many instances it runs; 17 such deployments spend about 17 of the project's roughly 100 exchanges a minute, a limit previews share with production, where without the marker each could spend about 6 | at most 288; in practice one per base-token renewal or new deployment |
-| Vercel Runtime Cache | 1 read and 1 write for the held tokens of the expired-token check (the write is skipped when nothing changed). For the exchange: 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal. The denied mint shares the instance's identity source and starts after the run's own mint, so its identity token is normally an instance memory hit and adds no exchange or cache operation; only when the run's own exchange failed does the probe try one more exchange, so a run makes at most 2 | 576 for the held tokens, plus at most about 1,700 for the exchange |
+| Vercel Runtime Cache | at most 1 read and 1 write for the held tokens of the expired-token check (the write is skipped when nothing changed), each bounded by 2 s. For the exchange: 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal. The denied mint shares the instance's identity source and starts after the run's own mint, so its identity token is normally an instance memory hit and adds no exchange or cache operation; only when the run's own exchange failed does the probe try one more exchange, so a run makes at most 2 | at most 576 for the held tokens, plus at most about 1,700 for the exchange |
 | Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
 
 Both environments together double each daily figure, except the Vercel rows: the web app's

@@ -17,21 +17,34 @@ import { createStsCanaryHandler } from '@/lib/sts-canary';
  */
 
 // The slowest run is a 5 s key-set fetch, a 30 s mint attempt, then four 10 s calls to usage-ingest
-// with the 30 s denied mint alongside them, 75 s; usage-ingest waits 80 s.
-// `STS_CANARY_ROUTE_MAX_DURATION_SECONDS` in `@kilocode/sts-contracts` states the arithmetic;
-// Next.js needs the literal here.
+// with the 30 s denied mint alongside them, then a 2 s write of the held tokens, 77 s; usage-ingest
+// waits 80 s. `STS_CANARY_ROUTE_MAX_DURATION_SECONDS` in `@kilocode/sts-contracts` states the
+// arithmetic; Next.js needs the literal here.
 export const maxDuration = 90;
 
 let handler: ((request: Request) => Promise<Response>) | null = null;
 
 /**
+ * The Runtime Cache key of the deployment's held tokens: its environment (`VERCEL_TARGET_ENV`, a
+ * custom environment's name, else `VERCEL_ENV`) and its deployment id, Vercel system variables at
+ * runtime. On Vercel without a deployment id it is null and the expired-token check fails; off
+ * Vercel (`next dev`) one local entry serves.
+ */
+function heldTokensKey(): string | null {
+  if (!process.env.VERCEL) return 'held:local';
+  const deployment = process.env.VERCEL_DEPLOYMENT_ID;
+  if (!deployment) return null;
+  return `held:${process.env.VERCEL_TARGET_ENV ?? process.env.VERCEL_ENV ?? 'unknown'}:${deployment}`;
+}
+
+/**
  * Built on the first request, once per instance, so the verifier's key set, the token client's
  * tokens and the shared Vercel identity serve every later request; each run's denied mint gets a
  * new client over that same identity. The held tokens of the expired-token check live in the
- * Runtime Cache under the deployment's id, so every instance of a deployment shares them and no
- * other deployment reads them. A missing or invalid setting leaves it unbuilt and answers 503; so
- * does an `STS_URL` that is not one of `STS_ISSUERS`, since the environment the verifier accepts
- * is the one whose STS that is.
+ * Runtime Cache under the deployment's environment and id, so every instance of a deployment
+ * shares them and no other deployment overwrites them. A missing or invalid setting leaves it
+ * unbuilt and answers 503; so does an `STS_URL` that is not one of `STS_ISSUERS`, since the
+ * environment the verifier accepts is the one whose STS that is.
  */
 function canaryHandler(): ((request: Request) => Promise<Response>) | null {
   if (handler !== null) return handler;
@@ -57,11 +70,7 @@ function canaryHandler(): ((request: Request) => Promise<Response>) | null {
       tokens: createHttpServiceTokens({ stsUrl: STS_URL, getIdentityToken }),
       newTokens: () => createHttpServiceTokens({ stsUrl: STS_URL, getIdentityToken }),
       verifyUrl,
-      held: {
-        store: getCache({ namespace: 'sts-canary' }),
-        // A Vercel system variable at runtime; `next dev` has none and keeps one local entry.
-        key: `held:${process.env.VERCEL_DEPLOYMENT_ID ?? 'local'}`,
-      },
+      held: { store: getCache({ namespace: 'sts-canary' }), key: heldTokensKey() },
       waitUntil,
     });
   } catch (error) {

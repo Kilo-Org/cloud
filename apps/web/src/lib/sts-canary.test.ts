@@ -121,14 +121,15 @@ function handler(
   fetchFn: typeof fetch,
   now?: () => number,
   newTokens: () => ServiceTokens = deniedTokens,
-  store: HeldTokenStore = memoryStore()
+  store: HeldTokenStore = memoryStore(),
+  key: string | null = 'held:dpl_test'
 ) {
   return createStsCanaryHandler({
     verifier: verifierFor('web'),
     tokens,
     newTokens,
     verifyUrl: VERIFY_URL,
-    held: { store, key: 'held:dpl_test' },
+    held: { store, key },
     waitUntil,
     fetch: fetchFn,
     now,
@@ -240,22 +241,32 @@ describe('STS canary route handler', () => {
     async function runOnNewInstance(
       time: number,
       store: HeldTokenStore,
-      fetchFn: typeof fetch = usageIngest().fetchFn
+      options: { fetchFn?: typeof fetch; key?: string | null } = {}
     ): Promise<{ report: StsCanaryReport; own: string }> {
       jest.setSystemTime(time);
       const own = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
       const response = await call(
         handler(
           fakeTokens(async () => own),
-          fetchFn,
+          options.fetchFn ?? usageIngest().fetchFn,
           undefined,
           deniedTokens,
-          store
+          store,
+          options.key === undefined ? 'held:dpl_test' : options.key
         ),
         await stsToken('usage-ingest', 'web', 'web:sts.canary')
       );
       return { report: (await response.json()) as StsCanaryReport, own };
     }
+
+    /** A store that already holds `entries` under the test key. */
+    async function storeHolding(entries: unknown) {
+      const store = memoryStore();
+      await store.set('held:dpl_test', entries, { ttl: 900 });
+      return store;
+    }
+
+    const NOT_GENUINE = { result: 'failed', status: null, detail: 'held token not genuine' };
 
     it('presents a token past exp plus the skew on every run from the third, whatever instance serves it', async () => {
       const store = memoryStore();
@@ -283,11 +294,11 @@ describe('STS canary route handler', () => {
       const store = memoryStore();
       const { fetchFn } = usageIngest();
       const down: typeof fetch = async () => new Response(null, { status: 503 });
-      await runOnNewInstance(at(0), store, down);
-      await runOnNewInstance(at(5), store, fetchFn);
-      const third = await runOnNewInstance(at(10), store, fetchFn);
+      await runOnNewInstance(at(0), store, { fetchFn: down });
+      await runOnNewInstance(at(5), store, { fetchFn });
+      const third = await runOnNewInstance(at(10), store, { fetchFn });
       expect(third.report.negatives.expired).toBe('skipped');
-      const fourth = await runOnNewInstance(at(15), store, fetchFn);
+      const fourth = await runOnNewInstance(at(15), store, { fetchFn });
       expect(fourth.report.negatives.expired).toEqual({ result: 'ok', status: 401 });
     });
 
@@ -322,6 +333,102 @@ describe('STS canary route handler', () => {
         status: null,
         detail: 'could not keep the token for a later run',
       });
+    });
+
+    it('fails on a planted entry and drops it', async () => {
+      const store = await storeHolding([{ token: 'x', exp: 0 }]);
+      const planted = await runOnNewInstance(at(10), store);
+      expect(planted.report.negatives.expired).toEqual(NOT_GENUINE);
+      expect(store.entries.get('held:dpl_test')?.value).toEqual([
+        { token: planted.own, exp: Math.floor(at(10) / 1000) + 300 },
+      ]);
+      // Not an entry the store could hold at all.
+      const garbage = await runOnNewInstance(at(15), await storeHolding({ token: 'x' }));
+      expect(garbage.report.negatives.expired).toEqual(NOT_GENUINE);
+    });
+
+    it('fails on an entry whose claims STS never signed or that names another exp', async () => {
+      jest.setSystemTime(at(0));
+      const genuine = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
+      const exp = Math.floor(at(0) / 1000) + 300;
+      const { privateKey: otherKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519' });
+      const [header = '', payload = ''] = genuine.split('.');
+      const forged = await new SignJWT(
+        JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>
+      )
+        .setProtectedHeader(JSON.parse(Buffer.from(header, 'base64url').toString('utf8')))
+        .sign(otherKey);
+
+      const presented: string[] = [];
+      const { fetchFn } = usageIngest();
+      const recording: typeof fetch = async (url, init) => {
+        presented.push(new Headers(init?.headers).get('authorization') ?? '');
+        return await fetchFn(url, init);
+      };
+      const signature = await runOnNewInstance(
+        at(10),
+        await storeHolding([{ token: forged, exp }]),
+        { fetchFn: recording }
+      );
+      expect(signature.report.negatives.expired).toEqual(NOT_GENUINE);
+      // A token that is not genuine is never presented.
+      expect(presented).not.toContain(`Bearer ${forged}`);
+
+      const restamped = await runOnNewInstance(
+        at(10),
+        await storeHolding([{ token: genuine, exp: exp - 600 }])
+      );
+      expect(restamped.report.negatives.expired).toEqual(NOT_GENUINE);
+    });
+
+    it('fails when the store does not answer within 2 s', async () => {
+      const hung: HeldTokenStore = {
+        get: async () => await Promise.withResolvers<never>().promise,
+        set: async () => {},
+      };
+      const started = Date.now();
+      const slow = await runOnNewInstance(at(10), hung);
+      expect(slow.report.negatives.expired).toEqual({
+        result: 'failed',
+        status: null,
+        detail: 'could not read the held tokens',
+      });
+      expect(Date.now() - started).toBeLessThan(5_000);
+    });
+
+    it('reports a failed presentation over a failed write', async () => {
+      jest.setSystemTime(at(0));
+      const held = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
+      const stored = await storeHolding([{ token: held, exp: Math.floor(at(0) / 1000) + 300 }]);
+      const { fetchFn } = usageIngest();
+      // usage-ingest wrongly accepts the expired token, and the write after it fails.
+      const accepting: typeof fetch = async (url, init) =>
+        new Headers(init?.headers).get('authorization') === `Bearer ${held}`
+          ? new Response(null, { status: 200 })
+          : await fetchFn(url, init);
+      const unwritable: HeldTokenStore = {
+        get: async key => await stored.get(key),
+        set: async () => {
+          throw new Error('runtime cache unavailable');
+        },
+      };
+      const run = await runOnNewInstance(at(10), unwritable, { fetchFn: accepting });
+      expect(run.report.negatives.expired).toEqual({
+        result: 'failed',
+        status: 200,
+        detail: 'expected 401',
+      });
+    });
+
+    it('fails without a deployment id to keep the held tokens under', async () => {
+      const store = memoryStore();
+      const run = await runOnNewInstance(at(10), store, { key: null });
+      expect(run.report.negatives.expired).toEqual({
+        result: 'failed',
+        status: null,
+        detail: 'no deployment id to keep the held tokens under',
+      });
+      expect(store.writes).toEqual([]);
     });
   });
 

@@ -1,5 +1,6 @@
 import {
   AccessTokenClaimsSchema,
+  STS_CANARY_HELD_STORE_TIMEOUT_MS,
   STS_CANARY_RUN_HEADER,
   STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
   STS_DENIED_PROBE,
@@ -40,9 +41,10 @@ export type StsCanaryDeps = {
   /**
    * Where the route keeps its earlier `usage-ingest` tokens between runs: the Vercel Runtime
    * Cache, shared by every instance of the deployment, so the expired-token check does not depend
-   * on two runs reaching one instance.
+   * on two runs reaching one instance. `key` is null on Vercel without a deployment id; the check
+   * then fails rather than share one entry across deployments.
    */
-  held: { store: HeldTokenStore; key: string };
+  held: { store: HeldTokenStore; key: string | null };
   waitUntil: (promise: Promise<unknown>) => void;
   fetch?: typeof fetch;
   now?: () => number;
@@ -71,18 +73,50 @@ const HeldTokensSchema = z
 type HeldToken = z.infer<typeof HeldTokensSchema>[number];
 
 const ExpClaimSchema = AccessTokenClaimsSchema.pick({ exp: true });
+const HeldClaimsSchema = AccessTokenClaimsSchema.pick({ exp: true, aud: true, scope: true });
 
-/** The `exp` of a token STS issued to this instance, read without verifying it. */
-function expOf(token: string): number | null {
-  let claims: unknown;
+/** The claims of a token, read without verifying it. */
+function payloadOf(token: string): unknown {
   try {
-    claims = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
+    return JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
   } catch {
     return null;
   }
-  const parsed = ExpClaimSchema.safeParse(claims);
+}
+
+/** The `exp` of a token STS issued to this instance, read without verifying it. */
+function expOf(token: string): number | null {
+  const parsed = ExpClaimSchema.safeParse(payloadOf(token));
   return parsed.success ? parsed.data.exp : null;
 }
+
+/**
+ * One Runtime Cache call, bounded by `STS_CANARY_HELD_STORE_TIMEOUT_MS`: `late` when it has not
+ * settled in time. A rejection still rejects.
+ */
+async function withinStoreTimeout<T>(operation: () => Promise<T>): Promise<{ value: T } | 'late'> {
+  const late = Promise.withResolvers<'late'>();
+  const handle = setTimeout(() => late.resolve('late'), STS_CANARY_HELD_STORE_TIMEOUT_MS);
+  try {
+    return await Promise.race([operation().then(value => ({ value })), late.promise]);
+  } finally {
+    clearTimeout(handle);
+  }
+}
+
+function heldFailure(detail: string): StsCanaryCheck {
+  return { result: 'failed', status: null, detail };
+}
+const HELD_UNREADABLE = heldFailure('could not read the held tokens');
+const HELD_UNVERIFIABLE = heldFailure('could not verify the held tokens');
+const HELD_NOT_GENUINE = heldFailure('held token not genuine');
+const HELD_UNKEPT = heldFailure('could not keep the token for a later run');
+const HELD_NO_DEPLOYMENT = heldFailure('no deployment id to keep the held tokens under');
+
+/** The deployment's held tokens, read and checked; or why the expired-token check failed. */
+type HeldLoad =
+  | { key: string; held: HeldToken[]; dropped: boolean; failure: null }
+  | { failure: StsCanaryCheck };
 
 /** A mint failure as a check's `detail`, without a token. */
 function mintFailure(error: unknown): string {
@@ -114,27 +148,84 @@ export function createStsCanaryHandler(
   /** A throwaway key STS never held, made once per instance; it signs the forged token. */
   let forgeryKey: CryptoKey | null = null;
   /**
-   * The expired-token check over the deployment's held tokens (`deps.held`). The oldest token past
-   * `exp` plus the verifier's skew is presented, expecting 401; every such token then leaves the
-   * store, and `verified`, this run's own token once usage-ingest accepted it, joins it. `skipped`
-   * only while the store holds no token that old (the first two runs of a deployment, or after
-   * runs stopped for longer than the store keeps them). A store that cannot be read or written
-   * fails the check: the next runs would otherwise skip it unnoticed.
+   * Whether a held token is one STS signed for this environment's usage-ingest canary scope, with
+   * the `exp` it was held under. The route's verifier accepts audience `web` only, and checks the
+   * signature, issuer and environment before the token's time and audience, so a held token STS
+   * signed ends in `expired` (past `exp` plus the skew) or `audience` (not yet), never `ok`; any
+   * other failure is a planted, forged or foreign entry. A key set it cannot reach is
+   * `unavailable`.
+   */
+  async function genuineness(entry: HeldToken): Promise<'genuine' | 'not_genuine' | 'unavailable'> {
+    const claims = HeldClaimsSchema.safeParse(payloadOf(entry.token));
+    if (
+      !claims.success ||
+      claims.data.exp !== entry.exp ||
+      claims.data.aud !== USAGE_INGEST_CANARY_TOKEN.audience ||
+      claims.data.scope !== USAGE_INGEST_CANARY_TOKEN.scope
+    ) {
+      return 'not_genuine';
+    }
+    const verified = await deps.verifier.verify(
+      `Bearer ${entry.token}`,
+      { issuer: 'sts', scope: WEB_CANARY_TOKEN.scope },
+      { waitUntil: deps.waitUntil }
+    );
+    if (verified.ok) return 'not_genuine';
+    if (verified.reason === 'expired' || verified.reason === 'audience') return 'genuine';
+    return verified.status === 503 ? 'unavailable' : 'not_genuine';
+  }
+
+  /**
+   * Reads the deployment's held tokens and drops every entry that is not genuine. Runs alongside
+   * the route's own mint: its 2 s read and any key-set fetch end within that 30 s attempt.
+   */
+  async function loadHeld(): Promise<HeldLoad> {
+    const key = deps.held.key;
+    if (key === null) return { failure: HELD_NO_DEPLOYMENT };
+    let stored: unknown;
+    try {
+      const read = await withinStoreTimeout(async () => await deps.held.store.get(key));
+      if (read === 'late') return { failure: HELD_UNREADABLE };
+      stored = read.value;
+    } catch {
+      return { failure: HELD_UNREADABLE };
+    }
+    if (stored === undefined || stored === null) {
+      return { key, held: [], dropped: false, failure: null };
+    }
+    const parsed = HeldTokensSchema.safeParse(stored);
+    if (!parsed.success) return { key, held: [], dropped: true, failure: null };
+    const held: HeldToken[] = [];
+    for (const entry of parsed.data) {
+      const verdict = await genuineness(entry);
+      if (verdict === 'unavailable') return { failure: HELD_UNVERIFIABLE };
+      if (verdict === 'genuine') held.push(entry);
+    }
+    return { key, held, dropped: held.length !== parsed.data.length, failure: null };
+  }
+
+  /**
+   * The expired-token check over the deployment's held tokens (`deps.held`). The oldest genuine
+   * token past `exp` plus the verifier's skew is presented, expecting 401; every such token then
+   * leaves the store, and `verified`, this run's own token once usage-ingest accepted it, joins
+   * it. `skipped` only while the store holds no token that old (a deployment's first two runs,
+   * runs less than about 360 s apart, or after runs stopped for longer than the store keeps
+   * them). An entry that is not genuine is dropped and fails the check (`held token not
+   * genuine`), and so does a store that cannot be read or written in 2 s: the next runs would
+   * otherwise skip the check unnoticed. A failed presentation is reported even when the write
+   * fails too.
    */
   async function checkExpired(
+    load: HeldLoad,
     verified: string | null,
     run: string
   ): Promise<StsCanaryCheck | 'skipped'> {
-    let held: HeldToken[];
-    try {
-      const stored = HeldTokensSchema.safeParse(await deps.held.store.get(deps.held.key));
-      held = stored.success ? stored.data : [];
-    } catch {
-      return { result: 'failed', status: null, detail: 'could not read the held tokens' };
-    }
+    if (load.failure !== null) return load.failure;
+    const { key, held, dropped } = load;
     const cutoff = now() / 1000 - TOKEN_CLOCK_SKEW_SECONDS;
     const [due] = held.filter(entry => entry.exp < cutoff);
-    const expired = due === undefined ? 'skipped' : check(await present(due.token, run), 401);
+    const presented = due === undefined ? 'skipped' : check(await present(due.token, run), 401);
+    const expired = dropped ? HELD_NOT_GENUINE : presented;
 
     const kept = held.filter(entry => entry.exp >= cutoff);
     const exp = verified === null ? null : expOf(verified);
@@ -143,14 +234,21 @@ export function createStsCanaryHandler(
     }
     const next = kept.slice(-HELD_TOKENS_MAX);
     const unchanged =
-      next.length === held.length && next.every((entry, index) => entry === held[index]);
+      !dropped &&
+      next.length === held.length &&
+      next.every((entry, index) => entry === held[index]);
     if (unchanged) return expired;
+    let written = false;
     try {
-      await deps.held.store.set(deps.held.key, next, { ttl: STS_CANARY_HELD_TTL_SECONDS });
+      const write = await withinStoreTimeout(
+        async () => await deps.held.store.set(key, next, { ttl: STS_CANARY_HELD_TTL_SECONDS })
+      );
+      written = write !== 'late';
     } catch {
-      return { result: 'failed', status: null, detail: 'could not keep the token for a later run' };
+      written = false;
     }
-    return expired;
+    if (written || (expired !== 'skipped' && expired.result === 'failed')) return expired;
+    return HELD_UNKEPT;
   }
 
   /**
@@ -240,6 +338,8 @@ export function createStsCanaryHandler(
       return failureResponse(inbound);
     }
 
+    // Alongside the route's own mint, so its read and any key-set fetch add no time to the run.
+    const heldLoad = loadHeld();
     let minted: { token: string } | { failure: StsCanaryCheck };
     try {
       minted = {
@@ -263,7 +363,7 @@ export function createStsCanaryHandler(
         : check(await present(await forge(own), run), 401);
 
     // Only a token usage-ingest just accepted is kept for a later run.
-    const expired = await checkExpired(outbound.result === 'ok' ? own : null, run);
+    const expired = await checkExpired(await heldLoad, outbound.result === 'ok' ? own : null, run);
 
     const report: StsCanaryReport = {
       inbound: 'ok',

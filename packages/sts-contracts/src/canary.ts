@@ -63,12 +63,16 @@ export const StsCanaryRunIdSchema = z.uuid();
  * `@kilocode/service-token-client`, which ends both of its tries, the retry with a fresh Vercel
  * identity token after a refusal included, within that time), then makes at most four calls to
  * usage-ingest of `STS_CANARY_VERIFY_CALL_TIMEOUT_MS` each, while the denied mint, one more 30 s
- * attempt, runs alongside them: 5 + 30 + max(4 x 10, 30) = 75 s. usage-ingest waits 80 s
- * (`WEB_CALL_TIMEOUT_MS` there), so it reads the route's report even in the slowest run, and the
- * route's 90 s `maxDuration`, after which Vercel ends the function, stays above both.
+ * attempt, runs alongside them, and finally writes its held tokens to the Runtime Cache within
+ * `STS_CANARY_HELD_STORE_TIMEOUT_MS` (their read runs alongside the mint): 5 + 30 + max(4 x 10,
+ * 30) + 2 = 77 s. usage-ingest waits 80 s (`WEB_CALL_TIMEOUT_MS` there), so it reads the route's
+ * report even in the slowest run, and the route's 90 s `maxDuration`, after which Vercel ends the
+ * function, stays above both.
  */
 export const STS_CANARY_VERIFY_CALL_TIMEOUT_MS = 10_000;
 export const STS_CANARY_VERIFY_CALLS_MAX = 4;
+/** The longest the web route waits for one read or write of its held tokens. */
+export const STS_CANARY_HELD_STORE_TIMEOUT_MS = 2_000;
 /** `maxDuration` of the web route; Next.js needs the literal there, a test keeps the two equal. */
 export const STS_CANARY_ROUTE_MAX_DURATION_SECONDS = 90;
 

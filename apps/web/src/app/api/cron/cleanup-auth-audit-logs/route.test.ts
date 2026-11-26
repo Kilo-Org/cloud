@@ -12,6 +12,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
+import { eq } from 'drizzle-orm';
 import { admin_action_audit_logs, auth_audit_logs } from '@kilocode/db/schema';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
@@ -82,5 +83,48 @@ describe('GET /api/cron/cleanup-auth-audit-logs', () => {
     expect(remaining.map(row => row.metadata?.marker)).toEqual(['auth-1']);
     // The admin table has its own cron.
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(1);
+  });
+
+  it('stops at the batch lock timeout and reports the rows left', async () => {
+    const [held] = await db
+      .insert(auth_audit_logs)
+      .values({ action: 'auth.sign_in', outcome: 'success', created_at: daysAgo(400) })
+      .returning({ id: auth_audit_logs.id });
+
+    // Another transaction, such as an account anonymization, holds the row.
+    const lock = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      await tx.select().from(auth_audit_logs).where(eq(auth_audit_logs.id, held.id)).for('update');
+      lock.resolve();
+      await release.promise;
+    });
+    await lock.promise;
+
+    // Half a second of budget left once the run starts: the batch gets the
+    // one-second floor, not the whole budget.
+    const realNow = Date.now.bind(Date);
+    let calls = 0;
+    const now = jest
+      .spyOn(Date, 'now')
+      .mockImplementation(() => (calls++ === 0 ? realNow() : realNow() + 119_500));
+    const startedAt = realNow();
+    let response: Response;
+    try {
+      response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+    } finally {
+      now.mockRestore();
+      release.resolve();
+      await holder;
+    }
+    const body = await response.json();
+
+    expect(realNow() - startedAt).toBeLessThan(10_000);
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ deletedCount: 0, hasMore: true, timedOut: true });
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'succeeded', has_more: true, timed_out: true })
+    );
+    expect(await db.select().from(auth_audit_logs)).toHaveLength(1);
   });
 });

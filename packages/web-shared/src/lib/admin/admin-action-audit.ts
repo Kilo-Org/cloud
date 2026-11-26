@@ -533,8 +533,10 @@ export function adminActionContextFromHeaders(
  * Either recording kind gets one failure row, with a stable `errorCode`, when
  * the call throws or fails. Its action is the declarative action, else the one
  * the handler named with {@link setAdminAuditFailureAction}, else the first
- * handler action. A call whose input never parsed records that row with no
- * target, since its input names nothing that was validated.
+ * handler action. That row keeps a target only when it was validated: the one
+ * the handler set, or the spec target once the call's input parsed. A refusal
+ * before parsing (the step-up check, a narrower guard, the input schema
+ * itself) records no target, since its raw input names nothing validated.
  */
 export type AdminAuditSpec =
   | {
@@ -569,6 +571,8 @@ type AdminAuditScopeState = {
   recordCalls: number;
   actor: AdminAuditActor | null;
   failureAction: AdminActionAuditAction | null;
+  /** Whether the call's input parser has read its input (see {@link AdminAuditRun}). */
+  inputParsingStarted: boolean;
 };
 
 const adminAuditScope = new AsyncLocalStorage<AdminAuditScopeState>();
@@ -617,6 +621,17 @@ function noteAdminAuditRecordCall(): void {
   if (state) state.recordCalls += 1;
 }
 
+/**
+ * Reports that the enclosing tRPC call's input parser reads the raw input. The
+ * tRPC admin procedure installs this on the raw-input reader it hands on, after
+ * its step-up check: nothing between that point and the parser reads the raw
+ * input, so the first read is the parser's.
+ */
+export function noteAdminAuditInputParsing(): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.inputParsingStarted = true;
+}
+
 export type AdminAuditOutcome =
   | { outcome: 'success' }
   | { outcome: 'failure'; errorCode: string; inputRejected?: boolean };
@@ -656,6 +671,14 @@ export type AdminAuditRun<TResult> = {
    */
   context: (actor: AdminAuditActor | null) => AdminActionContext | null;
   input: () => Promise<unknown>;
+  /**
+   * Whether the call's input parser reports reading the input through
+   * {@link noteAdminAuditInputParsing}, as a tRPC procedure's does. A failure
+   * then keeps the spec target only when the parser read the input and did not
+   * reject it. False for a REST handler, whose input is the route params of the
+   * path it matched.
+   */
+  reportsInputParsing: boolean;
   run: () => Promise<TResult>;
   outcomeOf: (result: TResult) => AdminAuditOutcome;
 };
@@ -677,6 +700,7 @@ export async function runAdminAuditScope<TResult>(
     recordCalls: 0,
     actor: null,
     failureAction: null,
+    inputParsingStarted: false,
   };
   let result: TResult;
   try {
@@ -720,12 +744,14 @@ async function recordScopeFailure<TResult>(
 ): Promise<void> {
   const ctx = params.context(state.actor);
   if (ctx === null) return;
+  const inputParsed =
+    !failure.inputRejected && (!params.reportsInputParsing || state.inputParsingStarted);
   await writeAdminActions(ctx, [
     {
       action: state.failureAction ?? state.actions[0],
       outcome: 'failure',
       errorCode: failure.errorCode,
-      target: failure.inputRejected ? null : await scopeTarget(params, state),
+      target: state.target.kind === 'set' || inputParsed ? await scopeTarget(params, state) : null,
       message: `${params.route} failed`,
       metadata: scopeMetadata(state),
     },
@@ -807,6 +833,7 @@ export function auditedAdminRoute<TArgs extends [Request, ...unknown[]]>(
           ? null
           : { ...adminActionContextFromHeaders(actor, request.headers), auditRoute: route },
       input: () => routeParams(routeContext),
+      reportsInputParsing: false,
       run: () => handler(...args),
       outcomeOf: response => responseAuditOutcome(response),
     });

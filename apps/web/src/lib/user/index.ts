@@ -2141,20 +2141,26 @@ export async function anonymizeCloudUserData(
 
   // Attempts on the user's addresses that never resolved to an account, such as
   // a failed sign-in, carry only the hash. A row another account owns keeps its
-  // hash: that account may hold the same address today.
+  // hash: that account may hold the same address today. With an empty hash key
+  // there is no hash to match.
   const emailHashes = [
     ...new Set(
-      [originalEmail, ...providerEmails.map(row => row.email)].map(email =>
-        authAuditEmailHash(email)
+      [originalEmail, ...providerEmails.map(row => row.email)].flatMap(
+        email => authAuditEmailHash(email) ?? []
       )
     ),
   ];
-  await tx
-    .update(auth_audit_logs)
-    .set({ subject_email_hash: null })
-    .where(
-      and(isNull(auth_audit_logs.user_id), inArray(auth_audit_logs.subject_email_hash, emailHashes))
-    );
+  if (emailHashes.length > 0) {
+    await tx
+      .update(auth_audit_logs)
+      .set({ subject_email_hash: null })
+      .where(
+        and(
+          isNull(auth_audit_logs.user_id),
+          inArray(auth_audit_logs.subject_email_hash, emailHashes)
+        )
+      );
+  }
 
   await tx
     .update(model_eval_ingestions)

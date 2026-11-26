@@ -126,12 +126,27 @@ export async function authAuditRequestFromCurrentRequest(): Promise<AuthAuditReq
 
 const EMAIL_HASH_DOMAIN = 'auth-audit-email:v1:';
 
+let reportedMissingHashKey = false;
+
 /**
  * Keyed hash of the normalized address (HMAC-SHA256 under NEXTAUTH_SECRET,
  * base64url). The key defeats dictionary reversal of the stored hash; the
  * domain prefix keeps it distinct from other hashes under the same key.
+ *
+ * Null when NEXTAUTH_SECRET is empty: an unkeyed hash of an address can be
+ * reversed by hashing candidate addresses, so none is made. The
+ * misconfiguration is reported once per process.
  */
-export function authAuditEmailHash(email: string): string {
+export function authAuditEmailHash(email: string): string | null {
+  if (!NEXTAUTH_SECRET) {
+    if (!reportedMissingHashKey) {
+      reportedMissingHashKey = true;
+      captureException(new Error('auth audit email hash key NEXTAUTH_SECRET is empty'), {
+        tags: { operation: 'auth_audit_email_hash_key' },
+      });
+    }
+    return null;
+  }
   return createHmac('sha256', NEXTAUTH_SECRET)
     .update(`${EMAIL_HASH_DOMAIN}${normalizeEmail(email)}`)
     .digest('base64url');

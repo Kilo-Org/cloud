@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { createHmac } from 'node:crypto';
 import { auth_audit_logs } from '@kilocode/db/schema';
-import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import * as drizzle from '@kilocode/web-shared/lib/drizzle';
 import {
   auditAuthRoute,
   authAuditEmailHash,
@@ -9,6 +9,8 @@ import {
   setAuthActionSinkForTest,
   type AuthActionEvent,
 } from '@/lib/auth/auth-audit';
+
+const { cleanupDbForTest, db } = drizzle;
 
 const request = { ip: '203.0.113.9', route: '/api/auth/callback/google' };
 
@@ -31,6 +33,42 @@ describe('authAuditEmailHash', () => {
       .digest('base64url');
 
     expect(authAuditEmailHash('  Someone+tag@Example.com ')).toBe(expected);
+  });
+
+  test('makes no hash, and stores none, when the key is empty, reporting that once', async () => {
+    const captureException = jest.fn();
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
+        ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
+        NEXTAUTH_SECRET: '',
+      }));
+      jest.doMock('@sentry/nextjs', () => ({
+        ...jest.requireActual<object>('@sentry/nextjs'),
+        captureException,
+      }));
+      // The same database client as the rest of the file, not a second pool.
+      jest.doMock('@kilocode/web-shared/lib/drizzle', () => drizzle);
+      // Loaded again inside the isolated registry so it reads the empty key.
+      const unkeyed = await import('@/lib/auth/auth-audit');
+
+      expect(unkeyed.authAuditEmailHash('someone@example.com')).toBeNull();
+      await unkeyed.recordAuthEvent(request, {
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        method: 'google',
+        failureReason: 'account_blocked',
+        email: 'someone@example.com',
+      });
+    });
+
+    const rows = await db.select().from(auth_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({ failure_reason: 'account_blocked', subject_email_hash: null }),
+    ]);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { operation: 'auth_audit_email_hash_key' },
+    });
   });
 });
 

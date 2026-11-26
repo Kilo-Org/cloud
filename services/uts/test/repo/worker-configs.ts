@@ -91,6 +91,26 @@ const UTS_AUDIT_QUEUES: Readonly<Record<UtsEnvironment, string>> = {
   development: 'kilo-audit-uts-local',
 };
 
+/**
+ * The identity store's three Hyperdrive configs in each deployed environment (README "Deploys"):
+ * the primary, the PAT lookup config and the read replica. A deployed block binds exactly these,
+ * never a local connection string.
+ */
+export const IDENTITY_STORE_HYPERDRIVE: Readonly<
+  Record<'production' | 'staging', Readonly<Record<string, string>>>
+> = {
+  production: {
+    IDENTITY_STORE: '314ea5eee7314e09b59728ff5453e9d9',
+    IDENTITY_STORE_PAT: 'f041609cd77043d7b81bdd9265f46cec',
+    IDENTITY_STORE_REPLICA: '4194e3ece2b442e381ec6d82f9bc0dcf',
+  },
+  staging: {
+    IDENTITY_STORE: '5dd523ea0fa447ebaf442a0300d8f848',
+    IDENTITY_STORE_PAT: '48227f1c669742618bb7bc6adf9a416c',
+    IDENTITY_STORE_REPLICA: '5fa4d303a52e4274a9750b20e2f507f0',
+  },
+};
+
 // Prefix match, wider than the deployment lists on purpose: a name that only looks like UTS
 // fails here instead of slipping past an exact-name list.
 const isUtsName = (name: string) => name === 'uts' || name.startsWith('uts-');
@@ -128,6 +148,15 @@ const RouteSchema = z.union([
 const BindingsShape = {
   vars: z.record(z.string(), z.unknown()).optional(),
   services: z.array(ServiceBindingSchema).optional(),
+  hyperdrive: z
+    .array(
+      z.looseObject({
+        binding: z.string(),
+        id: z.string(),
+        localConnectionString: z.string().optional(),
+      })
+    )
+    .optional(),
   queues: z
     .looseObject({
       producers: z.array(z.looseObject({ binding: z.string(), queue: z.string() })).optional(),
@@ -495,6 +524,28 @@ function auditQueueProblems(
     : [`${where}: produces to ${produced || 'nothing'}; expected ${expected}`];
 }
 
+function hyperdriveProblems(
+  where: string,
+  bindings: Bindings,
+  environment: 'production' | 'staging'
+): string[] {
+  const bound = (bindings.hyperdrive ?? [])
+    .map(config =>
+      config.localConnectionString === undefined
+        ? `${config.binding}=${config.id}`
+        : `${config.binding}=${config.id} with a local connection string`
+    )
+    .sort()
+    .join(', ');
+  const expected = Object.entries(IDENTITY_STORE_HYPERDRIVE[environment])
+    .map(([binding, id]) => `${binding}=${id}`)
+    .sort()
+    .join(', ');
+  return bound === expected
+    ? []
+    : [`${where}: binds Hyperdrive ${bound || 'nothing'}; expected ${expected}`];
+}
+
 /** Problems with the development config; `utsConfigProblems` lists its rules. */
 function devConfigProblems(dev: WorkerConfig): string[] {
   const { config } = dev;
@@ -647,6 +698,9 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       // batches the audit relay reads as UTS streams (services/audit-relay/src/relay).
       if (environment !== undefined && !block.preview) {
         problems.push(...auditQueueProblems(block.where, block.bindings, environment));
+        if (environment === 'production' || environment === 'staging') {
+          problems.push(...hyperdriveProblems(block.where, block.bindings, environment));
+        }
       }
       const main = block.block?.main ?? mint.config.main;
       if (main !== MINT_DEPLOYED_ENTRY) {

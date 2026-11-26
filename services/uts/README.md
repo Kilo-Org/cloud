@@ -1003,11 +1003,18 @@ production sets 32 (cap 96), the PAT config's 20 percent of `max_connections` 16
 config's connection limit changes the var in the same deploy. Staging and production refuse to
 start without a valid var; development may leave it out (cap 100).
 
+Staging and production bind all three configs in `wrangler.jsonc`; both identity stores hold
+migrations 0000 to 0014. `test/repo` fails a deployed block whose Hyperdrive bindings differ from
+`IDENTITY_STORE_HYPERDRIVE` in `test/repo/worker-configs.ts`, or that names a local connection
+string. Apply a new migration to both stores before the deploy that needs it.
+
 ### Provisioning per environment
 
 | Setting | Kind | Value |
 |---|---|---|
 | `IDENTITY_STORE` | Hyperdrive binding | The identity store's primary config (design 5.2); unset, no OAuth or sign-in endpoint is served |
+| `IDENTITY_STORE_PAT` | Hyperdrive binding | The PAT lookup config (logins `uts_pat_a`, `uts_pat_b`); unset, no PAT lookup is served |
+| `IDENTITY_STORE_REPLICA` | Hyperdrive binding | The read-replica config (logins `uts_reader_a`, `uts_reader_b`) for the account views |
 | `WEBAUTHN_RP_ID` | var | The app host whose passkeys users hold: `app.kilo.ai`, `staging-app.kilo.ai` |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
 | `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset, the device grant is not served. Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |

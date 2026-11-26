@@ -155,6 +155,9 @@ async function waitForHttp(url: string): Promise<void> {
       )
     )
       return;
+    if (worker?.exitCode !== null && worker?.exitCode !== undefined) {
+      throw new Error(`the mint Worker exited with ${worker.exitCode}; see ${WORK}/mint.log`);
+    }
     await sleep(1000);
   }
   throw new Error(`no answer at ${url}`);

@@ -63,12 +63,16 @@
   // streams from it (design 8.1).
   "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts" }] },
   // Every minute: keep the 8 audit shard relays running, maintain audit partitions, OAuth rows and
-  // sign-in rows, end long transactions, sweep notices, and check relay lag (src/scheduled.ts). It
-  // does nothing while IDENTITY_STORE is unbound.
+  // sign-in rows, end long transactions, sweep notices, and check relay lag (src/scheduled.ts).
   "triggers": { "crons": ["* * * * *"] },
-  // No identity-store Hyperdrive binding yet: the OAuth endpoints, the account API, the PAT probe
-  // route and the PAT lookup stay off until the environment's identity store is provisioned
-  // (src/grants/binding.ts, src/pat/lookup.ts).
+  // The identity store's three Hyperdrive configs (README "Deploys"): the primary (logins
+  // uts_app_a/b), the PAT lookup config (uts_pat_a/b) and the read replica (uts_reader_a/b).
+  // Bindings are not inherited, so the staging block lists its own.
+  "hyperdrive": [
+    { "binding": "IDENTITY_STORE", "id": "314ea5eee7314e09b59728ff5453e9d9" },
+    { "binding": "IDENTITY_STORE_PAT", "id": "f041609cd77043d7b81bdd9265f46cec" },
+    { "binding": "IDENTITY_STORE_REPLICA", "id": "4194e3ece2b442e381ec6d82f9bc0dcf" },
+  ],
   "env": {
     "staging": {
       "name": "uts-staging",
@@ -100,6 +104,11 @@
       },
       "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },
       "triggers": { "crons": ["* * * * *"] },
+      "hyperdrive": [
+        { "binding": "IDENTITY_STORE", "id": "5dd523ea0fa447ebaf442a0300d8f848" },
+        { "binding": "IDENTITY_STORE_PAT", "id": "48227f1c669742618bb7bc6adf9a416c" },
+        { "binding": "IDENTITY_STORE_REPLICA", "id": "5fa4d303a52e4274a9750b20e2f507f0" },
+      ],
     },
   },
 }

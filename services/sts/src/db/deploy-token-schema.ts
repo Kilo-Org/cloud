@@ -42,6 +42,13 @@ export const deployToken = sqliteTable(
     expiresAt: integer('expires_at').notNull(),
     /** When Cloudflare deleted the token, or when a creation that made none failed. */
     endedAt: integer('ended_at'),
+    /**
+     * A failed creation whose outcome is unknown (the answer was lost, or an instance stopped
+     * during the call): Cloudflare may hold a token STS never saw, so it counts against the
+     * account share until such a token has expired and been swept. A creation Cloudflare refused,
+     * or one never sent, made no token and does not count.
+     */
+    outcomeUnknown: integer('outcome_unknown', { mode: 'boolean' }).notNull().default(false),
     /** Set while a deletion is owed: the alarm retries it until Cloudflare takes it. */
     deleteCause: text('delete_cause').$type<DeployTokenDeleteCause>(),
     /** An owed deletion: the earliest time the alarm may try it again. */
@@ -54,6 +61,8 @@ export const deployToken = sqliteTable(
       .default(false),
     /** The policy's `intendedScripts` when the token was made (JSON array), for the window check. */
     intendedScripts: text('intended_scripts').notNull(),
+    /** The policy's `intendedRoutes` when the token was made (JSON array), for the window check. */
+    intendedRoutes: text('intended_routes').notNull(),
     /** The policy's zones when the token was made (JSON array): the routes the token could write. */
     zones: text('zones').notNull(),
     windowCheck: text('window_check').$type<DeployTokenWindowCheck>(),
@@ -73,6 +82,21 @@ export const deployTokenSweep = sqliteTable('deploy_token_sweep', {
   id: integer('id').primaryKey(),
   nextSweepAt: integer('next_sweep_at').notNull(),
   page: integer('page'),
+});
+
+/**
+ * A token the sweep found and could not delete, tried again by id from `retry_at` on, outside the
+ * sweep: `attempts` failures of its own double the wait up to the sweep's daily interval (a 401 or
+ * a 429 adds none, its hold or wait applies instead). Its `delete_failed` row is written once
+ * (`failure_audited`). The row goes once Cloudflare deleted the token or no longer has it.
+ */
+export const deployTokenSweepRetry = sqliteTable('deploy_token_sweep_retry', {
+  tokenId: text('token_id').primaryKey(),
+  tokenName: text('token_name').notNull(),
+  expiresAt: integer('expires_at'),
+  retryAt: integer('retry_at').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  failureAudited: integer('failure_audited', { mode: 'boolean' }).notNull().default(false),
 });
 
 /**

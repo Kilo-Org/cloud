@@ -1,0 +1,71 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The UTS mint Worker. Top level is production. Local development runs wrangler.dev.jsonc.
+  "name": "uts",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  // The fetch handler runs next to the identity store's primary in Frankfurt (AWS eu-central-1).
+  // Placement covers fetch handlers only; the SignerKeys entrypoint (src/signer-keys.ts), which the
+  // feed Worker calls for signer keys, runs where the feed Worker runs.
+  "placement": { "region": "aws:eu-central-1" },
+  // Traces stay off: a trace records Durable Object storage calls and outbound requests, and the
+  // signer objects hold private keys. Every env block inherits this.
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
+  },
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "uts.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "UTS_ENVIRONMENT": "production",
+    // Signer objects hold private keys, so production and staging pin them to the EU.
+    "DO_JURISDICTION": "eu",
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+  ],
+  // No identity-store Hyperdrive binding yet: the OAuth endpoints and their metadata stay off
+  // until the environment's identity store is provisioned (src/grants/binding.ts).
+  "env": {
+    "staging": {
+      "name": "uts-staging",
+      "workers_dev": false,
+      "placement": { "region": "aws:eu-central-1" },
+      "routes": [
+        {
+          "pattern": "uts-staging.kiloapps.io",
+          "zone_name": "kiloapps.io",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "UTS_ENVIRONMENT": "staging",
+        "DO_JURISDICTION": "eu",
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+          { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+        ],
+      },
+    },
+  },
+}

@@ -21,7 +21,10 @@ import {
 } from '@/lib/user';
 import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
-import type { User } from '@kilocode/db/schema';
+import { auth_audit_logs, type User } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { eq } from 'drizzle-orm';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 
 // Keep the real NativeIdTokenError class (route.ts uses `instanceof` on it) and only mock
 // the verifier functions.
@@ -59,9 +62,13 @@ jest.mock('@/lib/auth/native-token-rate-limit', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
+  NEXTAUTH_SECRET: 'native-token-test-secret',
+  // The audit write runs inline, as it does under the real test config.
+  IS_IN_AUTOMATED_TEST: true,
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
+  captureException: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),
@@ -3052,6 +3059,74 @@ describe('POST /api/auth/native/token', () => {
       }
       // The marketing version identifies a cohort, not a build or install.
       expect(serialized).toContain('"headerVersion":"1.0.16"');
+    });
+  });
+
+  describe('audit row email', () => {
+    const rowsFor = (column: 'user_id' | 'subject_email_hash', value: string | null) => {
+      if (value === null) throw new Error('the test environment has no email hash key');
+      return db.select().from(auth_audit_logs).where(eq(auth_audit_logs[column], value));
+    };
+    const appleBody = { provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' };
+
+    it("hashes the resolved account's email, not the ID token's", async () => {
+      const account = {
+        ...fakeUser,
+        id: `native-${crypto.randomUUID()}`,
+        google_user_email: `primary-${crypto.randomUUID()}@example.com`,
+      } as User;
+      const tokenEmail = `apple-relay-${crypto.randomUUID()}@example.com`;
+      mockVerifyNativeAppleIdToken.mockResolvedValue({ sub: 'apple-sub-1', email: tokenEmail });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: account,
+        isNew: false,
+      } as never);
+
+      expect((await POST(createRequest(appleBody))).status).toBe(200);
+
+      expect(await rowsFor('subject_email_hash', authAuditEmailHash(tokenEmail))).toEqual([]);
+      expect(await rowsFor('user_id', account.id)).toEqual([
+        expect.objectContaining({
+          outcome: 'success',
+          subject_email_hash: authAuditEmailHash(account.google_user_email),
+        }),
+      ]);
+    });
+
+    it('hashes the email of the blocked account a provider identity names', async () => {
+      const account = {
+        ...fakeUser,
+        id: `native-${crypto.randomUUID()}`,
+        google_user_email: `primary-${crypto.randomUUID()}@example.com`,
+        blocked_reason: 'abuse',
+      } as User;
+      const tokenEmail = `apple-relay-${crypto.randomUUID()}@example.com`;
+      mockVerifyNativeAppleIdToken.mockResolvedValue({ sub: 'apple-sub-1', email: tokenEmail });
+      mockFindUserIdByAuthProvider.mockResolvedValue(account.id);
+      mockFindUserById.mockResolvedValue(account);
+
+      expect((await POST(createRequest(appleBody))).status).toBe(403);
+
+      expect(await rowsFor('user_id', account.id)).toEqual([
+        expect.objectContaining({
+          outcome: 'failure',
+          failure_reason: 'blocked',
+          subject_email_hash: authAuditEmailHash(account.google_user_email),
+        }),
+      ]);
+    });
+
+    it('hashes the presented address when a refusal resolved no account', async () => {
+      const email = `unknown-${crypto.randomUUID()}@example.com`;
+      mockReserveSignInCode.mockResolvedValue('invalid');
+
+      const response = await POST(createRequest({ provider: 'email', email, code: '000000' }));
+
+      expect(response.status).toBe(401);
+      expect(await rowsFor('subject_email_hash', authAuditEmailHash(email))).toEqual([
+        expect.objectContaining({ user_id: null, failure_reason: 'invalid_code' }),
+      ]);
     });
   });
 

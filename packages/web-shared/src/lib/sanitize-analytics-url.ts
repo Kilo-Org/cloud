@@ -9,6 +9,11 @@ const NESTED_PATH_QUERY_PARAMS = new Set(['callbackpath']);
 const SESSION_SHARE_SEGMENT = 's/:share_token';
 const LEGACY_SHARE_SEGMENT = 'share/:share_id';
 const SHARE_PATH_SEGMENT = /(^|\/)(s|share)\/[^/?#\s"']+/g;
+// The legacy device-auth poll path carries the user code, which returns the
+// device token once a person approves it.
+const DEVICE_AUTH_CODE_SEGMENT = /(\/device-auth\/codes\/)[^/?#\s"']+/g;
+// The invitation link carries the token that joins its holder to an organization.
+const INVITE_TOKEN_SEGMENT = /(\/users\/accept-invite\/)[^/?#\s"']+/g;
 const ABSOLUTE_URL = /^[a-z][a-z0-9+.-]*:/i;
 const HTTP_URL = /^https?:\/\//i;
 
@@ -21,20 +26,23 @@ export function isSharedSessionPath(pathname: string): boolean {
   );
 }
 
-function redactSharePaths(value: string): string {
-  return value.replace(
-    SHARE_PATH_SEGMENT,
-    (_match, prefix: string, route: string) =>
-      `${prefix}${route === 's' ? SESSION_SHARE_SEGMENT : LEGACY_SHARE_SEGMENT}`
-  );
+function redactCapabilityPaths(value: string): string {
+  return value
+    .replace(
+      SHARE_PATH_SEGMENT,
+      (_match, prefix: string, route: string) =>
+        `${prefix}${route === 's' ? SESSION_SHARE_SEGMENT : LEGACY_SHARE_SEGMENT}`
+    )
+    .replace(DEVICE_AUTH_CODE_SEGMENT, '$1:code')
+    .replace(INVITE_TOKEN_SEGMENT, '$1:token');
 }
 
 export function sanitizeAnalyticsPathname(pathname: string): string {
-  return redactSharePaths(pathname);
+  return redactCapabilityPaths(pathname);
 }
 
 export function sanitizeAnalyticsText(value: string): string {
-  return redactSharePaths(value);
+  return redactCapabilityPaths(value);
 }
 
 /** A path with its own query sanitized; the path and fragment are kept. */
@@ -61,7 +69,7 @@ function sanitizeSearchParams(searchParams: string, sanitizeNested = true): stri
 }
 
 function sanitizeUrlParts(origin: string, pathname: string, searchParams: string): string {
-  const sanitizedPathname = redactSharePaths(pathname);
+  const sanitizedPathname = redactCapabilityPaths(pathname);
   const baseUrl = `${origin}${sanitizedPathname}`;
   if (SENSITIVE_PATHS.has(sanitizedPathname) || !searchParams) {
     return baseUrl;
@@ -96,7 +104,7 @@ export function sanitizeAnalyticsUrlValue(value: unknown): unknown {
       return sanitizeUrlParts(url.origin, url.pathname, url.searchParams.toString());
     }
 
-    const sanitizedPathname = redactSharePaths(url.pathname);
+    const sanitizedPathname = redactCapabilityPaths(url.pathname);
     const sanitizedSearch = sanitizeSearchParams(url.searchParams.toString());
     if (sanitizedPathname === url.pathname && sanitizedSearch === url.searchParams.toString()) {
       return value;

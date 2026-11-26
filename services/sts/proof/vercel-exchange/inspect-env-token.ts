@@ -3,7 +3,7 @@
 // THROWAWAY proof project only, never a real project: the pull writes that environment's values
 // to a 0700 temp directory, removed at once. For the pulled and the exchanged token it prints
 // `environment`, `custom_environment_id`, whether `user_id` is present, the `act` shape and the
-// `scope` value; never a token. Node 24, no imports from this directory, so `node` runs it as is;
+// `scope` value; never a token. Node 24; it imports only `lib/pass-rule.ts`, so `node` runs it as is;
 // `--cwd` is a directory linked (`vercel link`) to the proof project:
 //   node inspect-env-token.ts --cwd <dir linked to the proof project> preview production staging
 import { execFileSync } from 'node:child_process';
@@ -12,20 +12,21 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { personTokenGate } from './lib/pass-rule.ts';
 
 const EXCHANGE_URL = 'https://oidc.vercel.com/~token';
 /** Not an STS issuer, so the exchanged token can never be presented to STS. */
 const AUDIENCE = 'https://sts-proof.invalid';
 
-/** The token's claims, unverified; `{}` when it is missing or not a JWT. */
-function claimsOf(token: string): Record<string, unknown> {
+/** The token's claims, unverified; `null` when it is not a JWT. */
+function claimsOf(token: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(
       Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')
     );
-    return typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+    return typeof parsed === 'object' && parsed !== null ? { ...parsed } : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -60,7 +61,7 @@ function facts(claims: Record<string, unknown>): TokenFacts {
 
 async function exchange(
   token: string
-): Promise<{ status: number | 'network_error'; claims: TokenFacts | null }> {
+): Promise<{ status: number | 'network_error' | 'invalid_body'; claims: TokenFacts | null }> {
   let response: Response;
   try {
     response = await fetch(EXCHANGE_URL, {
@@ -82,10 +83,11 @@ async function exchange(
   } catch {
     exchanged = null;
   }
-  return {
-    status: response.status,
-    claims: typeof exchanged === 'string' ? facts(claimsOf(exchanged)) : null,
-  };
+  // A 2xx without a decodable token shows nothing; the gate treats it like a 5xx.
+  const claims = typeof exchanged === 'string' ? claimsOf(exchanged) : null;
+  return claims === null
+    ? { status: 'invalid_body', claims: null }
+    : { status: response.status, claims: facts(claims) };
 }
 
 const { values, positionals } = parseArgs({
@@ -120,17 +122,16 @@ for (const environment of positionals) {
     console.log(JSON.stringify({ pulled: environment, tokenIssued: false }));
     continue;
   }
-  const pulled = facts(claimsOf(token));
+  const pulled = facts(claimsOf(token) ?? {});
   const exchanged = await exchange(token);
-  // Merge gate: either no token, or both the pulled and the exchanged token carry user_id. A
-  // refused exchange (not 429) issues no exchanged token, so only the pulled one counts; a 429 or
-  // a network failure proves nothing and the step is rerun after 70 s.
-  const gate =
-    exchanged.status === 429 || exchanged.status === 'network_error'
-      ? 'inconclusive'
-      : pulled.userIdPresent && (exchanged.claims === null || exchanged.claims.userIdPresent)
-        ? 'holds'
-        : 'stops';
+  // Merge gate: either no token, or both the pulled and the exchanged token carry user_id. Only a
+  // definitive refusal (a 4xx other than 408 and 429) counts as no exchanged token; a 429, a 5xx,
+  // a network failure or an unreadable answer proves nothing, and the step is rerun after 70 s.
+  const gate = personTokenGate(
+    pulled.userIdPresent,
+    exchanged.status,
+    exchanged.claims?.userIdPresent ?? null
+  );
   console.log(
     JSON.stringify({ pulled: environment, tokenIssued: true, pulledToken: pulled, exchanged, gate })
   );

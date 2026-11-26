@@ -36,6 +36,12 @@ const CreatedTokenSchema = z.object({
   }),
 });
 
+/** A create answer that names the token it made, whatever else it holds or leaves out. */
+const CreatedTokenIdSchema = z.object({
+  success: z.literal(true),
+  result: z.object({ id: z.string().regex(/^[0-9a-f]{32}$/) }),
+});
+
 const ListedTokensSchema = z.object({
   success: z.literal(true),
   result: z.array(
@@ -89,7 +95,7 @@ export type TokenCreation =
   | { status: 'created'; token: CreatedToken }
   /**
    * Cloudflare answered 4xx: it made no token. Only a 401 refuses the credential: a 403 can refuse
-   * just this request (a group outside the member's role), so it starts no credential hold.
+   * just this request (a group outside the minting token's own policy), so it starts no hold.
    */
   | {
       status: 'refused';
@@ -97,7 +103,9 @@ export type TokenCreation =
       credentialRefused: boolean;
       retryAfterMs: number | null;
     }
-  /** A timeout, a transport error, a 5xx or an unreadable 200: a token may exist. */
+  /** Cloudflare made the token `tokenId` but its answer cannot be read otherwise: delete it. */
+  | { status: 'unverified'; tokenId: string }
+  /** A timeout, a transport error, a 5xx or a 200 that names no token: a token may exist. */
   | { status: 'unknown'; detail: string; retryAfterMs: number | null };
 
 /** A call that could not reach Cloudflare, or that Cloudflare refused. */
@@ -128,10 +136,13 @@ export type ListedRoute = { id: string; pattern: string; script: string | null }
 
 export type RouteList = { status: 'ok'; routes: ListedRoute[] } | CloudflareUnreachable;
 
+/** A 429 without a readable `Retry-After` still asks STS to wait this long. */
+const RATE_LIMITED_DEFAULT_WAIT_MS = 60_000;
+
 function retryAfterMs(response: Response): number | null {
   if (response.status !== 429) return null;
   const seconds = Number(response.headers.get('retry-after'));
-  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : RATE_LIMITED_DEFAULT_WAIT_MS;
 }
 
 function isCredentialRefused(status: number): boolean {
@@ -227,8 +238,11 @@ export class CloudflareTokens {
         retryAfterMs: null,
       };
     }
-    const parsed = CreatedTokenSchema.safeParse(await response.json().catch(() => null));
+    const body: unknown = await response.json().catch(() => null);
+    const parsed = CreatedTokenSchema.safeParse(body);
     if (!parsed.success) {
+      const named = CreatedTokenIdSchema.safeParse(body);
+      if (named.success) return { status: 'unverified', tokenId: named.data.result.id };
       return {
         status: 'unknown',
         detail: 'cloudflare token create response did not match',
@@ -255,7 +269,13 @@ export class CloudflareTokens {
     };
   }
 
-  /** `DELETE /accounts/{account_id}/tokens/{token_id}`. */
+  /**
+   * `DELETE /accounts/{account_id}/tokens/{token_id}`. Only a 401 refuses the credential: a 403
+   * can refuse just this token, such as one an earlier minting token created, which Cloudflare's
+   * docs do not say another account token may delete
+   * (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/delete/),
+   * so it fails this deletion alone.
+   */
   async delete(credential: string, tokenId: string): Promise<TokenDeletion> {
     let response: Response;
     try {
@@ -281,18 +301,22 @@ export class CloudflareTokens {
     return {
       status: 'unreachable',
       detail: `cloudflare token delete failed with status ${response.status}`,
-      credentialRefused: isCredentialRefused(response.status),
+      credentialRefused: response.status === 401,
       retryAfterMs: retryAfterMs(response),
     };
   }
 
-  /** `GET /accounts/{account_id}/tokens`, one page. */
+  /**
+   * `GET /accounts/{account_id}/tokens`, one page, expired tokens included: without
+   * `include_expired` Cloudflare leaves them out, and a recently expired one is what the sweep looks
+   * for (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/list/).
+   */
   async list(credential: string, page: number, perPage: number): Promise<TokenPage> {
     let response: Response;
     try {
       response = await cloudflareFetch(
         credential,
-        `/accounts/${this.accountId}/tokens?page=${page}&per_page=${perPage}`,
+        `/accounts/${this.accountId}/tokens?page=${page}&per_page=${perPage}&include_expired=true`,
         { method: 'GET' }
       );
     } catch (error) {

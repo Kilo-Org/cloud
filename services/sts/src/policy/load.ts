@@ -1,5 +1,6 @@
 import type { StsEnvironment, StsScopeRegistry } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
+import type { CloudflareDeployPins } from '../constants';
 import { sha256Base64Url } from '../crypto/hash';
 import {
   PolicySchema,
@@ -10,19 +11,26 @@ import {
   type Policy,
 } from './schema';
 
+/**
+ * One policy as `RefresherDO` stores it to diff the next policy change against. A policy without
+ * token grants leaves out `audiences` and `scopes`, so its entry keeps the format of the version
+ * before token grants, whose strict parser a rollback would run on it.
+ */
 export type PolicySnapshotEntry = {
   workload: string;
   environments: string[];
   identity: string;
   secrets: string[];
-  audiences: string[];
-  scopes: string[];
+  audiences?: string[];
+  scopes?: string[];
   /**
    * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant, and one
    * `cloudflare-deploy:<permissionSet>:<ttlSeconds>:<maxActive>:<maxPerHour>:<groups>:<zones>` with
-   * the first 8 characters of each sorted id, so a changed group or zone shows.
+   * the first 8 characters of each sorted id, so a changed group or zone shows. Absent when the
+   * policy has none, so the snapshot and its hash stay what a reader without leases expects (a
+   * rollback to it then parses the stored snapshot).
    */
-  dynamic: string[];
+  dynamic?: string[];
 };
 
 function dynamicKey(entry: DynamicGrant): string {
@@ -90,15 +98,15 @@ function bindingKeys(policy: Policy): string[] {
 }
 
 /**
- * `scopeRegistry` is the registry token grants are checked against, and
- * `forbiddenPermissionGroupIds` the Cloudflare permission groups no deploy grant may list
- * (default `CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS`); tests pass their own.
+ * `scopeRegistry` is the registry token grants are checked against, and `cloudflareDeployPins` the
+ * Cloudflare permission groups and zones deploy grants are checked against (default
+ * `CLOUDFLARE_DEPLOY_PINS`); tests pass their own.
  */
 export function loadPolicies(
   sources: Record<string, string>,
   options: {
     scopeRegistry?: StsScopeRegistry;
-    forbiddenPermissionGroupIds?: readonly string[];
+    cloudflareDeployPins?: CloudflareDeployPins;
   } = {}
 ): PolicyIndex {
   const policies: Policy[] = [];
@@ -118,7 +126,7 @@ export function loadPolicies(
     const problems = policyFileProblems(
       policy,
       options.scopeRegistry,
-      options.forbiddenPermissionGroupIds
+      options.cloudflareDeployPins
     );
     if (problems.length > 0) {
       throw new Error(`${file} is invalid: ${problems.join('; ')}`);
@@ -151,9 +159,9 @@ export function loadPolicies(
     environments: [...policy.environments].sort(),
     identity: canonicalIdentity(policy),
     secrets: [...policy.secrets].sort(),
-    audiences: [...policy.audiences].sort(),
-    scopes: [...policy.scopes].sort(),
-    dynamic: policy.dynamic.map(dynamicKey).sort(),
+    ...(policy.audiences.length > 0 ? { audiences: [...policy.audiences].sort() } : {}),
+    ...(policy.scopes.length > 0 ? { scopes: [...policy.scopes].sort() } : {}),
+    ...(policy.dynamic.length > 0 ? { dynamic: policy.dynamic.map(dynamicKey).sort() } : {}),
   }));
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 

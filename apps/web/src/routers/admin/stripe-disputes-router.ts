@@ -17,6 +17,10 @@ import {
   stripeDisputeDashboardUrl,
 } from '@/lib/stripe/disputes';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const DisputeQueueStatusSchema = z.enum([
   'all',
@@ -240,10 +244,19 @@ export const adminStripeDisputesRouter = createTRPCRouter({
   }),
 
   accept: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'stripe_dispute.accept',
+        target: inputFieldTarget('stripe_dispute', 'caseId'),
+      },
+    })
     .input(z.object({ caseId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       try {
-        return await acceptStripeDisputeCase({ caseId: input.caseId, actor: ctx.user });
+        const result = await acceptStripeDisputeCase({ caseId: input.caseId, actor: ctx.user });
+        addAdminAuditMetadata({ status: result.status, failureCount: result.failures.length });
+        return result;
       } catch (error) {
         throw disputeAcceptTRPCError(error);
       }

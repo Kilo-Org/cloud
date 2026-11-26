@@ -102,10 +102,12 @@ report() { owner -f "$HERE/report.sql"; }
 echo "PostgreSQL $(super -c 'show server_version')"
 
 # Supabase's shape: `postgres` owns the database, the schema and the application tables, and an
-# application pool logs in as its own role.
+# application pool logs in as its own role. supautils lets `postgres` set the log settings per role;
+# `GRANT SET ON PARAMETER` stands in for it.
 super -c "create role postgres login createrole password '$OWNER_PW'" \
   -c "alter database $DB owner to postgres" -c 'alter schema public owner to postgres' \
   -c 'grant pg_signal_backend, pg_monitor, pg_read_all_data to postgres' \
+  -c 'grant set on parameter log_statement, log_min_duration_statement, log_min_error_statement to postgres' \
   -c "create role app_pool login password '$APP_PW'" >/dev/null
 owner -c 'create table public.accounts (id int primary key, email text)' \
   -c "insert into public.accounts values (1, 'a@example.invalid')" \
@@ -165,6 +167,40 @@ for admin in kilo_lease_replica_admin kilo_lease_migration_admin; do
 done
 pass 'after setup-ci-migration.sql, postgres (and so a ci-migration lease) cannot reset either admin password'
 
+# setup-ci-migration.sql gave the kilo_lease schema, table and functions to kilo_lease_owner, so a
+# ci-migration lease acting as `postgres` cannot replace create_lease to record later passwords.
+[ "$(super -c "select count(*) from pg_proc where pronamespace = 'kilo_lease'::regnamespace and proowner <> 'kilo_lease_owner'::regrole")" = 0 ] ||
+  fail 'kilo_lease_owner owns every kilo_lease function'
+[ "$(super -c "select pg_has_role('postgres', 'kilo_lease_owner', 'member')")" = f ] || fail 'postgres is not a member of kilo_lease_owner'
+if owner -c 'create or replace function kilo_lease.create_lease(username text, password text, valid_until timestamptz) returns void language sql as $$ select $$' >/dev/null 2>"$TMP/err"; then
+  fail 'postgres cannot replace kilo_lease.create_lease'
+fi
+grep -qE 'must be owner|permission denied for schema kilo_lease' "$TMP/err" || fail "replace refused for ownership: $(cat "$TMP/err")"
+if owner -c 'create function kilo_lease.planted() returns int language sql as $$ select 1 $$' >/dev/null 2>&1; then
+  fail 'postgres cannot add a function to kilo_lease'
+fi
+if owner -c 'alter function kilo_lease.end_sessions(text) owner to postgres' >/dev/null 2>&1; then
+  fail 'postgres cannot take over a kilo_lease function'
+fi
+pass 'after setup-ci-migration.sql, postgres (and so a ci-migration lease) cannot replace, add or take over a kilo_lease function'
+
+# A ci-migration lease runs as `postgres`, which reads other sessions' query text. Neither admin
+# login's statements show there; another login's do.
+MARK=$(secret)
+PGPASSWORD=$APP_PW psql -h 127.0.0.1 -p "$PORT" -U app_pool -d "$DB" -qtAc "select pg_sleep(2), 'app-$MARK'" >/dev/null 2>&1 &
+APP_MARK=$!
+PGPASSWORD=$REPLICA_ADMIN_PW psql -h 127.0.0.1 -p "$PORT" -U kilo_lease_replica_admin -d "$DB" -qtAc "select pg_sleep(2), 'replica-$MARK'" >/dev/null 2>&1 &
+REPLICA_MARK=$!
+PGPASSWORD=$MIGRATION_ADMIN_PW psql -h 127.0.0.1 -p "$PORT" -U kilo_lease_migration_admin -d "$DB" -qtAc "select pg_sleep(2), 'migration-$MARK'" >/dev/null 2>&1 &
+MIGRATION_MARK=$!
+sleep 1
+seen() { owner -c "select count(*) from pg_stat_activity where position('$1-' || '$MARK' in query) > 0"; }
+[ "$(seen app)" = 1 ] || fail 'postgres sees the query text of an application session (the check sees tracked text)'
+[ "$(seen replica)" = 0 ] || fail 'postgres does not see the query text of a replica admin session'
+[ "$(seen migration)" = 0 ] || fail 'postgres does not see the query text of a migration admin session'
+wait "$APP_MARK" "$REPLICA_MARK" "$MIGRATION_MARK"
+pass 'after setup-ci-migration.sql, postgres (and so a ci-migration lease) cannot read either admin login query text in pg_stat_activity'
+
 # The report: what the replica template reaches through PUBLIC.
 expect_row() { grep -qxF "$1" "$TMP/setup.out" || fail "the setup report lists '$1': $(cat "$TMP/setup.out")"; }
 expect_row 'summary|replica-read|create=0 writable=1 definer=0 volatile=1 outbound=0 member_of=0 leftover=0'
@@ -218,26 +254,30 @@ if replica_admin -c 'select 1 from public.accounts' >/dev/null 2>&1; then
 fi
 pass 'the replica admin holds none of the lease role rights while the lease lives'
 
-# The password stays out of the server log under log_statement = ddl: Infisical sends a SELECT, and
-# the CREATE ROLE inside it is not a top-level statement. The old top-level CREATE ROLE shows that
-# the check sees a logged password.
-super -c "alter system set log_statement = 'ddl'" -c 'select pg_reload_conf()' >/dev/null
+# The lease password stays out of the server log with the server logging every statement, every
+# duration and the statement of every error: the admin logins' role settings turn all three off for
+# their own sessions. A failed creation's error carries no password either. Another login's
+# statement in the same log shows that the check sees logged statements.
+super -c "alter system set log_statement = 'all'" -c 'alter system set log_min_duration_statement = 0' \
+  -c 'select pg_reload_conf()' >/dev/null
 sleep 1
 RR8=$(role_name rr)
 RR8_PW=$(secret)
 create_replica "$RR8" "$RR8_PW" "$(expires_in 300)"
-[ "$(sql "$RR8" "$RR8_PW" -c 'select 1')" = 1 ] || fail 'the lease made under log_statement = ddl logs in'
-echo "CREATE ROLE \"{{username}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' IN ROLE kilo_lease_replica_read" >"$TMP/old.create.sql"
-RR9=$(role_name rr)
-RR9_PW=$(secret)
-infisical kilo_lease_replica_admin "$REPLICA_ADMIN_PW" "$TMP/old.create.sql" "$RR9" "$RR9_PW" "$(expires_in 300)"
-super -c "alter system reset log_statement" -c 'select pg_reload_conf()' >/dev/null
+[ "$(sql "$RR8" "$RR8_PW" -c 'select 1')" = 1 ] || fail 'the lease made with every statement logged logs in'
+FAILED_PW=$(secret)
+if create_replica "$RR8" "$FAILED_PW" "$(expires_in 300)" 2>"$TMP/err"; then fail 'a second role of the same name is refused'; fi
+grep -q 'was not created' "$TMP/err" || fail "the creation error names the role only: $(cat "$TMP/err")"
+if grep -qF "$FAILED_PW" "$TMP/err"; then fail 'the creation error sent to Infisical carries no password'; fi
+owner -c "select 'logged-$MARK'" >/dev/null
+super -c "alter system reset log_statement" -c 'alter system reset log_min_duration_statement' \
+  -c 'select pg_reload_conf()' >/dev/null
 docker logs "$NAME" >"$TMP/server.log" 2>&1
-grep -qF "$RR9_PW" "$TMP/server.log" || fail 'the old top-level CREATE ROLE puts its password in the server log (the check sees a logged password)'
-if grep -qF "$RR8_PW" "$TMP/server.log"; then fail 'the lease password is not in the server log under log_statement = ddl'; fi
-pass 'under log_statement = ddl the lease password stays out of the server log (a top-level CREATE ROLE puts it there)'
+grep -qF "logged-$MARK" "$TMP/server.log" || fail 'the server logs another login statement (the check sees logged statements)'
+if grep -qF "$RR8_PW" "$TMP/server.log"; then fail 'the lease password is not in the server log'; fi
+if grep -qF "$FAILED_PW" "$TMP/server.log"; then fail 'the failed creation password is not in the server log'; fi
+pass 'with log_statement = all, log_min_duration_statement = 0 and the default log_min_error_statement, no lease password reaches the server log, nor the error of a failed creation'
 revoke_replica "$RR8"
-revoke_replica "$RR9"
 if sql "$RR1" "$RR1_PW" -c 'set default_transaction_read_only = off' \
   -c "insert into public.accounts values (2, 'b@example.invalid')" >/dev/null 2>"$TMP/err"; then
   fail 'replica lease cannot insert with read-only mode off'
@@ -316,36 +356,52 @@ pass 'revocation is idempotent'
 kill "$APP_SESSION" 2>/dev/null || true
 wait "$APP_SESSION" 2>/dev/null || true
 
-# Revoke while a client keeps reconnecting: no session of the lease survives it. A login that lands
-# between the last termination and the commit keeps a session of a dropped role, which has no
-# rights left; the next revocation ends it.
-for round in 1 2 3; do
-  RR3=$(role_name rr)
-  RR3_PW=$(secret)
-  create_replica "$RR3" "$RR3_PW" "$(expires_in 300)"
+# Revoke while a client keeps reconnecting: no session of the lease survives it, and none of a
+# dropped role is left. The block commits before the drop, so every login that got in shows up
+# before the drop and is ended. In the ci-migration round such a session would keep acting as
+# `postgres`.
+reconnect_through_revoke() { # kind role password
   (
     for _ in $(seq 1 40); do
-      PGPASSWORD=$RR3_PW psql -h 127.0.0.1 -p "$PORT" -U "$RR3" -d "$DB" -qtAc 'select pg_sleep(30)' >/dev/null 2>&1 &
+      PGPASSWORD=$3 psql -h 127.0.0.1 -p "$PORT" -U "$2" -d "$DB" -qtAc 'select pg_sleep(30)' >/dev/null 2>&1 &
       sleep 0.05
     done
     wait
   ) &
   LOOP=$!
   sleep 1
-  revoke_replica "$RR3"
+  "revoke_$1" "$2"
   sleep 2.5
-  [ "$(role_count "$RR3")" = 0 ] || fail 'the reconnecting lease role is dropped'
-  left=$(orphans)
-  if [ "$left" != 0 ]; then
-    echo "INFO round $round: $left login(s) landed during the revocation's commit; the next revocation ends them"
-    revoke_replica "$(role_name rr)"
-    sleep 0.5
-    [ "$(orphans)" = 0 ] || fail 'the next revocation ends a session of a dropped lease role'
-  fi
+  [ "$(role_count "$2")" = 0 ] || fail 'the reconnecting lease role is dropped'
+  [ "$(orphans)" = 0 ] || fail "no session of a dropped role is left: $(orphans)"
   kill "$LOOP" 2>/dev/null || true
   wait "$LOOP" 2>/dev/null || true
+}
+for _ in 1 2 3; do
+  RR3=$(role_name rr)
+  RR3_PW=$(secret)
+  create_replica "$RR3" "$RR3_PW" "$(expires_in 300)"
+  reconnect_through_revoke replica "$RR3" "$RR3_PW"
 done
-pass 'a client reconnecting through a revocation keeps no session (3 rounds of 40 logins)'
+CM3=$(role_name cm)
+CM3_PW=$(secret)
+create_migration "$CM3" "$CM3_PW" "$(expires_in 300)"
+reconnect_through_revoke migration "$CM3" "$CM3_PW"
+pass 'a client reconnecting through a revocation keeps no session and leaves none of a dropped role (3 replica rounds and 1 ci-migration round of 40 logins)'
+
+# A revocation statement that skips the committed block (one transaction, the commit gap) is refused
+# and changes nothing.
+RR10=$(role_name rr)
+RR10_PW=$(secret)
+create_replica "$RR10" "$RR10_PW" "$(expires_in 300)"
+echo "SELECT kilo_lease.revoke_lease('{{username}}')" >"$TMP/one-transaction.revoke.sql"
+if infisical kilo_lease_replica_admin "$REPLICA_ADMIN_PW" "$TMP/one-transaction.revoke.sql" "$RR10" unused unused 2>"$TMP/err"; then
+  fail 'a revocation without the committed block is refused'
+fi
+grep -q 'still has its login' "$TMP/err" || fail "refused for its login: $(cat "$TMP/err")"
+can_login "$RR10" "$RR10_PW" || fail 'the refused revocation changed nothing'
+revoke_replica "$RR10"
+pass 'a revocation statement without the committed block is refused'
 
 # A large object and a temporary table of an open session: revocation drops both with the role.
 RR7=$(role_name rr)
@@ -384,6 +440,11 @@ CM1_PW=$(secret)
 create_migration "$CM1" "$CM1_PW" "$(expires_in 300)"
 [ "$(sql "$CM1" "$CM1_PW" -c "select current_user || '/' || session_user")" = "postgres/$CM1" ] || fail 'migration lease runs as postgres'
 pass 'a ci-migration session runs as postgres and is logged in as its lease role'
+if sql "$CM1" "$CM1_PW" -c 'create or replace function kilo_lease.create_lease(username text, password text, valid_until timestamptz) returns void language sql as $$ select $$' >/dev/null 2>"$TMP/err"; then
+  fail 'a ci-migration lease cannot replace kilo_lease.create_lease'
+fi
+grep -qE 'must be owner|permission denied for schema kilo_lease' "$TMP/err" || fail "replace refused for ownership: $(cat "$TMP/err")"
+pass 'a ci-migration lease cannot replace kilo_lease.create_lease'
 sql "$CM1" "$CM1_PW" -c 'create extension if not exists pgcrypto' -c 'create table public.migrated (id int)' \
   -c 'alter table public.accounts add column note text' -c 'create index on public.accounts (email)' >/dev/null
 [ "$(super -c "select tableowner from pg_tables where tablename = 'migrated'")" = postgres ] || fail 'the new table belongs to postgres'
@@ -445,6 +506,22 @@ pass 'DROP ROLE alone leaves the session open and unnamed'
 revoke_replica "$(role_name rr)"
 if wait "$RR4_SESSION"; then fail 'the unnamed session is ended'; fi
 [ "$(orphans)" = 0 ] || fail 'no unnamed session remains'
-pass 'the next revocation ends a session whose role was dropped'
+pass 'the next revocation ends a session of a lease role that was dropped'
+
+# A session of a role that was never a lease is never ended, also after its role is dropped.
+super -c "create role app_dropped login password '$APP_PW'" >/dev/null
+open_session app_dropped "$APP_PW" "$TMP/dropped.log"
+DROPPED_SESSION=$SESSION
+wait_for_session app_dropped
+super -c 'drop role app_dropped' >/dev/null
+[ "$(orphans)" = 1 ] || fail 'the dropped application role keeps its session'
+revoke_replica "$(role_name rr)"
+revoke_migration "$(role_name cm)"
+sleep 0.5
+[ "$(orphans)" = 1 ] || fail 'no revocation ends the session of a dropped role that was never a lease'
+kill "$DROPPED_SESSION" 2>/dev/null || true
+wait "$DROPPED_SESSION" 2>/dev/null || true
+super -c "select pg_terminate_backend(pid) from pg_stat_activity where backend_type = 'client backend' and usename is null" >/dev/null
+pass 'a revocation leaves the session of a dropped role that was never a lease alone'
 
 echo 'ALL PASS'

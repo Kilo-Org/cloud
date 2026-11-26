@@ -82,7 +82,8 @@ const server = createServer((request, response) => {
       });
     }
     if (request.method === 'DELETE' && path.startsWith('/api/v1/dynamic-secrets/leases/')) {
-      return json({ lease: { id: path.split('/').pop() } });
+      // Infisical answers with the lease row it deleted; `status` is set only when it kept the row.
+      return json({ lease: { id: path.split('/').pop(), status: null } });
     }
     json({ error: 'not found' }, 404);
   })();

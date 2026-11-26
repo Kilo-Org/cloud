@@ -57,7 +57,7 @@ secrets: [APP_SECRET]
 `,
   'ci-commit.yaml': `
 workload: ci-commit
-environments: [production]
+environments: [staging]
 identity:
   kind: github-oidc
   repository: acme/repo
@@ -68,6 +68,7 @@ identity:
   events: [workflow_run]
 secrets: [APP_SECRET]
 `,
+  // Two refs, each with its own workflow file: an entry admits a run on its own ref only.
   'ci-review.yaml': `
 workload: ci-review
 environments: [staging]
@@ -76,7 +77,10 @@ identity:
   repository: acme/other
   repositoryId: '789'
   repositoryOwnerId: '456'
-  jobWorkflowRefs: [acme/other/.github/workflows/review.yml@refs/heads/main]
+  refs: [refs/heads/main, refs/heads/release]
+  jobWorkflowRefs:
+    - acme/other/.github/workflows/review.yml@refs/heads/main
+    - acme/other/.github/workflows/smoke.yml@refs/heads/release
   events: [push]
 secrets: [APP_SECRET]
 `,
@@ -239,19 +243,26 @@ describe('GitHub Actions identity', () => {
   });
 
   it('routes two policies on one repository by environment and workflow file', async () => {
-    const { verify, provider } = await fixture('production');
-    const beta = await signToken(provider(GITHUB_ISSUER), {
+    const production = await fixture('production');
+    const beta = await signToken(production.provider(GITHUB_ISSUER), {
       ...AUTOMATION_CLAIMS,
       event_name: 'schedule',
       job_workflow_ref: 'acme/repo/.github/workflows/beta.yml@refs/heads/main',
     });
-    expect(await verify(beta)).toMatchObject({ status: 'verified', workload: 'ci-automation' });
-    const commit = await signToken(provider(GITHUB_ISSUER), {
+    expect(await production.verify(beta)).toMatchObject({
+      status: 'verified',
+      workload: 'ci-automation',
+    });
+    const staging = await fixture('staging');
+    const commit = await signToken(staging.provider(GITHUB_ISSUER), {
       ...AUTOMATION_CLAIMS,
       event_name: 'workflow_run',
       job_workflow_ref: 'acme/repo/.github/workflows/baselines.yml@refs/heads/main',
     });
-    expect(await verify(commit)).toMatchObject({ status: 'verified', workload: 'ci-commit' });
+    expect(await staging.verify(commit)).toMatchObject({
+      status: 'verified',
+      workload: 'ci-commit',
+    });
   });
 
   it.each([
@@ -286,19 +297,29 @@ describe('GitHub Actions identity', () => {
     [
       'the name-only subject of a repository without immutable subjects',
       'repo:acme/repo:environment:release',
+      'name-only:environment',
     ],
-    ['the ref form', 'repo:acme@456/repo@123:ref:refs/heads/main'],
-    ['another owner id', 'repo:acme@999/repo@123:environment:release'],
-    ['another environment', 'repo:acme@456/repo@123:environment:automation'],
-    ['a wildcard', 'repo:acme@456/repo@123:environment:*'],
-  ])('refuses a subject that is not the exact one: %s', async (_case, sub) => {
+    ['the ref form', 'repo:acme@456/repo@123:ref:refs/heads/main', 'immutable:ref'],
+    ['another owner id', 'repo:acme@999/repo@123:environment:release', 'immutable:environment'],
+    [
+      'another environment',
+      'repo:acme@456/repo@123:environment:automation',
+      'immutable:environment',
+    ],
+    ['a wildcard', 'repo:acme@456/repo@123:environment:*', 'immutable:environment'],
+    ['a customized template', 'repo:acme/repo:run_id:9001:actor:someone', 'custom'],
+  ])('refuses a subject that is not the exact one: %s', async (_case, sub, format) => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(GITHUB_ISSUER), { ...GITHUB_CLAIMS, sub });
-    expect(await verify(token)).toMatchObject({
+    const outcome = await verify(token);
+    expect(outcome).toMatchObject({
       status: 'denied',
       reason: 'identity_rejected',
-      subject: { actor: 'ci-release', claims: { sub } },
+      subject: { actor: 'ci-release', claims: { sub_format: format } },
     });
+    // Only the format: a customized subject can carry per-run claims.
+    expect(JSON.stringify(outcome)).not.toContain(sub);
+    expect(JSON.stringify(outcome)).not.toContain('9001');
   });
 
   it('refuses a ref the policy does not list', async () => {
@@ -379,6 +400,36 @@ describe('GitHub Actions identity', () => {
     });
   });
 
+  it('admits a workflow entry only on its own ref, even when a reusable workflow is called', async () => {
+    const { verify, provider } = await fixture('staging');
+    const run = (ref: string, jobWorkflowRef: string) =>
+      signToken(provider(GITHUB_ISSUER), {
+        sub: `repo:acme@456/other@789:ref:${ref}`,
+        repository_id: '789',
+        repository_owner_id: '456',
+        ref,
+        event_name: 'push',
+        job_workflow_ref: jobWorkflowRef,
+      });
+    const review = 'acme/other/.github/workflows/review.yml@refs/heads/main';
+    const smoke = 'acme/other/.github/workflows/smoke.yml@refs/heads/release';
+    expect(await verify(await run('refs/heads/release', smoke))).toMatchObject({
+      status: 'verified',
+      workload: 'ci-review',
+    });
+    // A run on one listed ref that calls the workflow pinned to the other listed ref.
+    for (const [ref, workflow] of [
+      ['refs/heads/release', review],
+      ['refs/heads/main', smoke],
+    ]) {
+      expect(await verify(await run(ref, workflow))).toMatchObject({
+        status: 'denied',
+        reason: 'identity_rejected',
+        subject: { actor: 'ci-review', claims: { ref, job_workflow_ref: workflow } },
+      });
+    }
+  });
+
   it('refuses a token from another repository', async () => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(GITHUB_ISSUER), {
@@ -419,7 +470,7 @@ describe('denial subjects', () => {
           ref: 'refs/heads/main',
           event_name: 'workflow_dispatch',
           job_workflow_ref: RELEASE_WORKFLOW,
-          sub: 'repo:acme@456/repo@123:environment:release',
+          sub_format: 'immutable:environment',
         },
       },
     });

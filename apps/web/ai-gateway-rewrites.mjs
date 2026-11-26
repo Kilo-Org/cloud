@@ -13,7 +13,6 @@ export const AI_GATEWAY_PATH_REWRITES = [
   { source: '/api/openrouter/v1/:path*', destination: '/api/v1/:path*' },
   { source: '/api/openrouter/:path*', destination: '/api/v1/:path*' },
   { source: '/api/fim/completions', destination: '/api/v1/fim/completions' },
-  { source: '/api/edit/completions', destination: '/api/v1/edit/completions' },
   { source: '/api/organizations/:id/models', destination: '/api/v1/organizations/:id/models' },
   {
     source: '/api/organizations/:id/models/validate',

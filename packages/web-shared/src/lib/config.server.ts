@@ -62,7 +62,6 @@ export const PAGES_AUTH_SECRET = getEnvVariable('PAGES_AUTH_SECRET');
 export const PAGES_DEV_AUTH_SECRET = getEnvVariable('PAGES_DEV_AUTH_SECRET');
 export const OPENROUTER_API_KEY = getEnvVariable('OPENROUTER_API_KEY');
 export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
-export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
 export const CODE_REVIEW_HEALTH_SECRET = getEnvVariable('CODE_REVIEW_HEALTH_SECRET');
@@ -74,8 +73,9 @@ export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 // The STS issuer of this deployment's environment (https://sts.kiloapps.io, staging
-// https://sts-staging.kiloapps.io): the STS canary route verifies tokens it issued and mints from
-// it with the function's Vercel identity. Empty: the route answers 503.
+// https://sts-staging.kiloapps.io): the STS canary route verifies tokens it issued, for the
+// environment `STS_ISSUERS` names it under, and mints from it with the function's Vercel identity.
+// Empty or not one of `STS_ISSUERS`: the route answers 503.
 export const STS_URL = getEnvVariable('STS_URL') || '';
 
 // Shared secret with the internal token-mint callers: the MCP catalog CI job

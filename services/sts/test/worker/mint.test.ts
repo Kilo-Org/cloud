@@ -2,7 +2,7 @@ import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import type { MintRequest, MintResult } from '@kilocode/sts-contracts';
 import { decodeJwt, decodeProtectedHeader } from 'jose';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearDenialBuffers } from '../../src/audit/denials';
+import { clearDenialBuffers, recordDenial } from '../../src/audit/denials';
 import { SecretsBroker, serveWorkerMint } from '../../src/broker';
 import { TOKEN_SIGNER_RETRY_AFTER_SECONDS, TOKEN_SIGNER_SHARDS } from '../../src/constants';
 import { getDenialStub, getTokenSignerStub } from '../../src/dos/stubs';
@@ -224,6 +224,45 @@ describe('worker-binding mint', () => {
     ).toEqual({ status: 'invalid_request' });
     expect(await mint('probe', { tokens: [] })).toEqual({ status: 'invalid_request' });
     expect(await issuedRows()).toEqual([]);
+  });
+
+  it('refuses an audience or scope over 256 characters as an invalid request and records no denial', async () => {
+    const longAudience = 'a'.repeat(257);
+    for (const entry of [
+      { audience: 'aud-1', scope: `aud-1:${'r'.repeat(251)}` },
+      { audience: longAudience, scope: `${longAudience}:read` },
+    ]) {
+      expect(await mint('probe', { tokens: [entry] })).toEqual({ status: 'invalid_request' });
+    }
+    expect(pending).toEqual([]);
+    expect(await issuedRows()).toEqual([]);
+  });
+
+  it('records the valid denials of a hop that also holds one no denial row can hold', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const hop = recordDenial(
+      env,
+      config,
+      {
+        kind: 'token',
+        channel: 'worker-binding',
+        reason: 'unknown_scope',
+        actor: 'probe',
+        audience: 'aud-1',
+        scope: 'aud-1:write',
+        claims: {},
+      },
+      {
+        kind: 'token',
+        channel: 'worker-binding',
+        reason: 'unknown_scope',
+        actor: 'x'.repeat(257),
+        claims: {},
+      }
+    );
+    if (hop !== null) pending.push(hop);
+    const denials = await flushedDenials();
+    expect(denials.map(event => event.data.attributes.workload)).toEqual(['probe']);
   });
 
   it('denies an audience the policy does not grant, audits the denial, and issues the rest', async () => {

@@ -8,7 +8,6 @@ import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { requireAdmin } from '../src/admin-middleware';
 import { queryContainerAllocations } from '../src/alerting/container-allocations';
-import { queryContainerApplications } from '../src/alerting/container-capacity-query';
 import { sendAlertNotification, type SloAlertPayload } from '../src/alerting/notify';
 import { queryErrorRates } from '../src/alerting/query';
 import { queryQueueBacklog } from '../src/alerting/queue-backlog-query';
@@ -310,10 +309,6 @@ describe('every o11y secret read site over the STS source', () => {
 
   it.each([
     [
-      'container capacity',
-      (env: Env, fetchFn: typeof fetch) => queryContainerApplications(env, fetchFn),
-    ],
-    [
       'container allocations',
       (env: Env, fetchFn: typeof fetch) => queryContainerAllocations(env, fetchFn),
     ],
@@ -332,11 +327,6 @@ describe('every o11y secret read site over the STS source', () => {
   });
 
   it.each([
-    [
-      'container capacity',
-      (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>
-        queryContainerApplications(env, fetchFn, ctx),
-    ],
     [
       'container allocations',
       (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>

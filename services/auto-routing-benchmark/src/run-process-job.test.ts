@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TAXONOMY_ROUTE_KEYS, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
+import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import type * as CliRunnerModule from './cli-runner';
 import type * as DbModule from './db';
 import type * as PaidStoreModule from './paid-case-store';
@@ -676,6 +680,34 @@ function releasedUnbilledGeneration(): boolean {
     );
 }
 
+/** Answers each mint with a token named for the audience its body requests. */
+function stubAudienceMints() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/models')) {
+        return Response.json({
+          data: [{ id: model, opencode: { variants: { max: { reasoning: { effort: 'max' } } } } }],
+        });
+      }
+      const body = init?.body;
+      if (typeof body !== 'string') throw new Error('Expected a JSON mint request.');
+      const { audience } = JSON.parse(body) as { audience?: string };
+      return Response.json({
+        token: `token-for-${audience ?? 'unsplit'}`,
+        expiresAt: '2026-06-16T01:00:00.000Z',
+      });
+    })
+  );
+}
+
+function mintRequestBodies(): unknown[] {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => (url as URL).href.includes('/api/internal/bot-token'))
+    .map(([, init]) => JSON.parse(init?.body as string));
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -696,7 +728,39 @@ describe('processJob — scheduler-owned execution', () => {
     expect(JSON.parse(init?.body as string)).toEqual({
       userId: 'benchmark-user',
       organizationId: 'benchmark-org',
+      audience: KILO_GATEWAY_AUDIENCE,
     });
+  });
+
+  it('gives the CLI container only the kilo-gateway token', async () => {
+    mockClaim();
+    stubAudienceMints();
+
+    await processJob(env, deciderMessage());
+
+    expect(mintRequestBodies()).toEqual([
+      {
+        userId: 'benchmark-user',
+        organizationId: 'benchmark-org',
+        audience: KILO_GATEWAY_AUDIENCE,
+      },
+    ]);
+    expect(warmUpCliContainer).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ kiloToken: 'token-for-kilo-gateway' })
+    );
+    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        kiloToken: 'token-for-kilo-gateway',
+        inferenceProxy: expect.objectContaining({
+          catalog: {
+            url: env.KILO_CLI_API_URL,
+            authorization: `Bearer ${'token-for-kilo-gateway'}`,
+          },
+        }),
+      })
+    );
   });
 
   it('does not mint a token for a run without an org snapshot', async () => {
@@ -913,6 +977,75 @@ describe('processJob — scheduler-owned execution', () => {
           prompt_revision: MEASUREMENT_REVISION,
         }),
         expect.anything()
+      );
+    });
+
+    it('mints only the kilo-api token for a probe and gives the probe no Kilo token', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id]) });
+      stubAudienceMints();
+      vi.mocked(runCancellableProbeCase).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        costUsd: 0.0011,
+        tools: { calls: 1, names: ['bash'], steps: 1, finalFinishReason: 'tool-calls' },
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(mintRequestBodies()).toEqual([
+        { userId: 'benchmark-user', organizationId: 'benchmark-org', audience: KILO_API_AUDIENCE },
+      ]);
+      const catalogCalls = vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) => (url as URL).href.endsWith('/models'));
+      expect(catalogCalls).toHaveLength(1);
+      expect(new Headers(catalogCalls[0]![1]?.headers).get('authorization')).toBe(
+        `Bearer ${'token-for-kilo-api'}`
+      );
+      const probe = vi.mocked(runCancellableProbeCase).mock.calls[0]![1];
+      expect(probe).not.toHaveProperty('kiloToken');
+      expect(probe.inference).not.toHaveProperty('catalog');
+      expect(JSON.stringify(probe)).not.toContain('token-for-');
+      expect(warmUpCliContainer).not.toHaveBeenCalled();
+    });
+
+    it('mints one token per audience for a chunk that mixes a probe and a CLI case', async () => {
+      mockClaim({ case_ids: JSON.stringify([probeCase.id, benchCase.id]) });
+      stubAudienceMints();
+      vi.mocked(runCancellableProbeCase).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: '',
+        costUsd: 0.0011,
+        tools: { calls: 1, names: ['bash'], steps: 1, finalFinishReason: 'tool-calls' },
+      });
+
+      await processJob(env, deciderMessage());
+
+      const identity = { userId: 'benchmark-user', organizationId: 'benchmark-org' };
+      const mints = mintRequestBodies();
+      expect(mints).toHaveLength(2);
+      expect(mints).toEqual(
+        expect.arrayContaining([
+          { ...identity, audience: KILO_API_AUDIENCE },
+          { ...identity, audience: KILO_GATEWAY_AUDIENCE },
+        ])
+      );
+      const probe = vi.mocked(runCancellableProbeCase).mock.calls[0]![1];
+      expect(JSON.stringify(probe)).not.toContain('token-for-');
+      expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
+        env,
+        expect.objectContaining({
+          kiloToken: 'token-for-kilo-gateway',
+          inferenceProxy: expect.objectContaining({
+            catalog: {
+              url: env.KILO_CLI_API_URL,
+              authorization: `Bearer ${'token-for-kilo-gateway'}`,
+            },
+          }),
+        })
+      );
+      expect(JSON.stringify(vi.mocked(runDeciderCaseViaCli).mock.calls)).not.toContain(
+        'token-for-kilo-api'
       );
     });
 

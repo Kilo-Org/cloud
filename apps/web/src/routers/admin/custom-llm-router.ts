@@ -5,18 +5,21 @@ import {
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
   CustomLlmPublicIdSchema,
+  type CustomLlmCredentialsEnvelope,
   type CustomLlmDefinition,
-  type EncryptedData,
 } from '@kilocode/db/schema-types';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { encryptCustomLlmCredentials } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/credentials-encryption';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isUpstreamUrlPolicyEnforced } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
@@ -127,46 +130,147 @@ export const adminCustomLlmRouter = createTRPCRouter({
     return { items: rows };
   }),
 
-  upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {
-    assertPricingMatchesPublicId(input.public_id, input.definition);
-    assertBaseUrlUsesHttps(input.definition);
-    const existing = await db.query.custom_llm2.findFirst({
-      where: eq(custom_llm2.public_id, input.public_id),
-    });
+  upsert: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'custom_llm.model.upsert',
+        target: inputFieldTarget('other', 'public_id'),
+      },
+    })
+    .input(UpsertCustomLlmSchema)
+    .mutation(async ({ ctx, input }) => {
+      assertPricingMatchesPublicId(input.public_id, input.definition);
+      assertBaseUrlUsesHttps(input.definition);
+      const existing = await db.query.custom_llm2.findFirst({
+        where: eq(custom_llm2.public_id, input.public_id),
+      });
 
-    if (input.definition.partner) {
-      // An existing partner stays editable after its model leaves the catalog.
-      if (!existing?.definition.partner) await assertPartnerPublicIdIsCatalogModel(input.public_id);
-    } else if (!existing || existing.definition.partner) {
-      // A former partner's id names a catalog model, which a custom LLM must not hide.
-      await assertPublicIdIsClaimable(input.public_id);
-    }
+      if (input.definition.partner) {
+        // An existing partner stays editable after its model leaves the catalog.
+        if (!existing?.definition.partner)
+          await assertPartnerPublicIdIsCatalogModel(input.public_id);
+      } else if (!existing || existing.definition.partner) {
+        // A former partner's id names a catalog model, which a custom LLM must not hide.
+        await assertPublicIdIsClaimable(input.public_id);
+      }
 
-    let encrypted_api_key: EncryptedData | undefined = undefined;
+      let encrypted_api_key: CustomLlmCredentialsEnvelope;
 
-    if (input.credentials) {
-      if (!BYOK_ENCRYPTION_KEY) {
+      if (input.credentials) {
+        encrypted_api_key = await encryptCustomLlmCredentials({
+          credentials: input.credentials,
+          actorUserId: ctx.user.id,
+        });
+      } else if (existing?.encrypted_api_key) {
+        encrypted_api_key = existing.encrypted_api_key;
+      } else {
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'BYOK_ENCRYPTION_KEY is not configured',
+          code: 'BAD_REQUEST',
+          message: 'Credentials are required when creating a custom LLM',
         });
       }
-      encrypted_api_key = encryptApiKey(JSON.stringify(input.credentials), BYOK_ENCRYPTION_KEY);
-    } else if (existing?.encrypted_api_key) {
-      encrypted_api_key = existing.encrypted_api_key;
-    } else {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Credentials are required when creating a custom LLM',
-      });
-    }
 
-    if (existing) {
+      if (existing) {
+        const [updated] = await db
+          .update(custom_llm2)
+          .set({
+            definition: input.definition,
+            encrypted_api_key,
+          })
+          .where(eq(custom_llm2.public_id, input.public_id))
+          .returning({
+            public_id: custom_llm2.public_id,
+            definition: custom_llm2.definition,
+          });
+
+        return updated;
+      }
+
+      const [inserted] = await db
+        .insert(custom_llm2)
+        .values({
+          public_id: input.public_id,
+          definition: input.definition,
+          encrypted_api_key,
+        })
+        .returning({
+          public_id: custom_llm2.public_id,
+          definition: custom_llm2.definition,
+        });
+
+      return inserted;
+    }),
+
+  copy: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'custom_llm.model.copy',
+        target: inputFieldTarget('other', 'public_id'),
+      },
+    })
+    .input(CopyCustomLlmSchema)
+    .mutation(async ({ input }) => {
+      addAdminAuditMetadata({ sourcePublicId: input.source_public_id });
+      const source = await db.query.custom_llm2.findFirst({
+        where: eq(custom_llm2.public_id, input.source_public_id),
+      });
+
+      if (!source) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Custom LLM with public_id "${input.source_public_id}" not found`,
+        });
+      }
+      if (source.definition.partner) {
+        badRequest('A partner custom LLM cannot be copied');
+      }
+      assertPricingMatchesPublicId(input.public_id, source.definition);
+      await assertPublicIdIsClaimable(input.public_id);
+
+      const [inserted] = await db
+        .insert(custom_llm2)
+        .values({
+          public_id: input.public_id,
+          definition: {
+            ...source.definition,
+            display_name: input.display_name,
+            internal_id: input.internal_id,
+          },
+          encrypted_api_key: source.encrypted_api_key,
+        })
+        .onConflictDoNothing()
+        .returning({
+          public_id: custom_llm2.public_id,
+          definition: custom_llm2.definition,
+        });
+
+      if (!inserted) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `Custom LLM with public_id "${input.public_id}" already exists`,
+        });
+      }
+
+      return inserted;
+    }),
+
+  setEnabled: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'custom_llm.model.set_enabled',
+        target: inputFieldTarget('other', 'public_id'),
+      },
+    })
+    .input(SetCustomLlmEnabledSchema)
+    .mutation(async ({ input }) => {
+      addAdminAuditMetadata({ isEnabled: input.is_enabled });
       const [updated] = await db
         .update(custom_llm2)
         .set({
-          definition: input.definition,
-          encrypted_api_key,
+          definition: sql`${custom_llm2.definition} || jsonb_build_object('is_enabled', ${input.is_enabled}::boolean)`,
         })
         .where(eq(custom_llm2.public_id, input.public_id))
         .returning({
@@ -174,100 +278,35 @@ export const adminCustomLlmRouter = createTRPCRouter({
           definition: custom_llm2.definition,
         });
 
+      if (!updated) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Custom LLM with public_id "${input.public_id}" not found`,
+        });
+      }
+
       return updated;
-    }
+    }),
 
-    const [inserted] = await db
-      .insert(custom_llm2)
-      .values({
-        public_id: input.public_id,
-        definition: input.definition,
-        encrypted_api_key,
-      })
-      .returning({
-        public_id: custom_llm2.public_id,
-        definition: custom_llm2.definition,
-      });
+  delete: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'custom_llm.model.delete',
+        target: inputFieldTarget('other', 'public_id'),
+      },
+    })
+    .input(DeleteCustomLlmSchema)
+    .mutation(async ({ input }) => {
+      const result = await db.delete(custom_llm2).where(eq(custom_llm2.public_id, input.public_id));
 
-    return inserted;
-  }),
+      if ((result.rowCount ?? 0) === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Custom LLM with public_id "${input.public_id}" not found`,
+        });
+      }
 
-  copy: adminProcedure.input(CopyCustomLlmSchema).mutation(async ({ input }) => {
-    const source = await db.query.custom_llm2.findFirst({
-      where: eq(custom_llm2.public_id, input.source_public_id),
-    });
-
-    if (!source) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: `Custom LLM with public_id "${input.source_public_id}" not found`,
-      });
-    }
-    if (source.definition.partner) {
-      badRequest('A partner custom LLM cannot be copied');
-    }
-    assertPricingMatchesPublicId(input.public_id, source.definition);
-    await assertPublicIdIsClaimable(input.public_id);
-
-    const [inserted] = await db
-      .insert(custom_llm2)
-      .values({
-        public_id: input.public_id,
-        definition: {
-          ...source.definition,
-          display_name: input.display_name,
-          internal_id: input.internal_id,
-        },
-        encrypted_api_key: source.encrypted_api_key,
-      })
-      .onConflictDoNothing()
-      .returning({
-        public_id: custom_llm2.public_id,
-        definition: custom_llm2.definition,
-      });
-
-    if (!inserted) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: `Custom LLM with public_id "${input.public_id}" already exists`,
-      });
-    }
-
-    return inserted;
-  }),
-
-  setEnabled: adminProcedure.input(SetCustomLlmEnabledSchema).mutation(async ({ input }) => {
-    const [updated] = await db
-      .update(custom_llm2)
-      .set({
-        definition: sql`${custom_llm2.definition} || jsonb_build_object('is_enabled', ${input.is_enabled}::boolean)`,
-      })
-      .where(eq(custom_llm2.public_id, input.public_id))
-      .returning({
-        public_id: custom_llm2.public_id,
-        definition: custom_llm2.definition,
-      });
-
-    if (!updated) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: `Custom LLM with public_id "${input.public_id}" not found`,
-      });
-    }
-
-    return updated;
-  }),
-
-  delete: adminProcedure.input(DeleteCustomLlmSchema).mutation(async ({ input }) => {
-    const result = await db.delete(custom_llm2).where(eq(custom_llm2.public_id, input.public_id));
-
-    if ((result.rowCount ?? 0) === 0) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: `Custom LLM with public_id "${input.public_id}" not found`,
-      });
-    }
-
-    return { success: true };
-  }),
+      return { success: true };
+    }),
 });

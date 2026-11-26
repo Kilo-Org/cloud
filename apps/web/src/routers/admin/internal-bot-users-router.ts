@@ -10,7 +10,11 @@ import {
   listInternalBotUsers,
 } from '@/lib/bot-users/bot-user-service';
 import { INTERNAL_BOT_SLUG_PATTERN } from '@/lib/bot-users/types';
-import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-audit';
+import {
+  addAdminAuditMetadata,
+  setAdminAuditTarget,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export const CreateInternalBotUserInputSchema = z.object({
   slug: z
@@ -27,8 +31,10 @@ export const adminInternalBotUsersRouter = createTRPCRouter({
   list: adminProcedure.query(() => listInternalBotUsers()),
 
   create: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'internal_bot_user.create' } })
     .input(CreateInternalBotUserInputSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
+      addAdminAuditMetadata({ slug: input.slug, organizationId: input.organizationId });
       const [organization] = await db
         .select({ id: organizations.id })
         .from(organizations)
@@ -39,14 +45,8 @@ export const adminInternalBotUsersRouter = createTRPCRouter({
       }
       try {
         const { user, created } = await ensureInternalBotUser(input);
-        if (created) {
-          await recordAdminAction(ctx, {
-            action: 'internal_bot_user.create',
-            target: userActionTarget(user.id),
-            message: 'Created internal bot user',
-            metadata: { slug: input.slug, organizationId: input.organizationId },
-          });
-        }
+        setAdminAuditTarget(userActionTarget(user.id));
+        addAdminAuditMetadata({ created });
         return { id: user.id, created };
       } catch (error) {
         if (error instanceof InternalBotUnusableError) {

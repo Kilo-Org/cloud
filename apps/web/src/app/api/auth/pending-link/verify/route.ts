@@ -23,6 +23,11 @@ import {
 } from '@/lib/auth/pending-link';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 import { isSameOrigin } from '@/lib/auth/same-origin';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 const bodySchema = z.object({
   code: z.string().regex(/^\d{6}$/),
@@ -40,6 +45,20 @@ async function attemptsLeft(challengeId: string | null): Promise<number | undefi
 }
 
 export const POST = withRestTiming('/api/auth/pending-link/verify', async (request: Request) => {
+  // A refusal is recorded here; the link itself is recorded by
+  // recordSignInMethodChange when completePendingLink attaches it.
+  const attempt: AuthAuditAttempt = { action: 'auth.sign_in_method.link', skipSuccessRow: true };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/auth/pending-link/verify'),
+    attempt,
+    () => verifyPendingLinkCode(request, attempt)
+  );
+});
+
+async function verifyPendingLinkCode(
+  request: Request,
+  attempt: AuthAuditAttempt
+): Promise<Response> {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: 'INVALID_ORIGIN' }, { status: 403 });
   }
@@ -54,6 +73,8 @@ export const POST = withRestTiming('/api/auth/pending-link/verify', async (reque
   if (!secret || !row) {
     return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
   }
+  attempt.userId = row.kilo_user_id;
+  attempt.method = row.provider;
   if (!row.email_code_allowed) {
     return NextResponse.json({ error: 'EMAIL_CODE_NOT_ALLOWED' }, { status: 403 });
   }
@@ -62,6 +83,7 @@ export const POST = withRestTiming('/api/auth/pending-link/verify', async (reque
   if (!user) {
     return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
   }
+  attempt.email = user.google_user_email;
   if (isBlockedAccount(user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
@@ -113,4 +135,4 @@ export const POST = withRestTiming('/api/auth/pending-link/verify', async (reque
     callbackUrl,
     provider: completed.provider,
   });
-});
+}

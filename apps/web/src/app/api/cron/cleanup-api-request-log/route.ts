@@ -31,6 +31,7 @@ export async function GET(request: Request) {
   });
 
   try {
+    // The R2 bucket lifecycle rule expires the underlying log objects independently of this job.
     const cutoffDate = getDaysAgo(RETENTION_DAYS).toISOString();
     const expiredRows = await db
       .select({ id: api_request_log_2.id })

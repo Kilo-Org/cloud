@@ -9,7 +9,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   apiRequestLogBlobKey,
   apiRequestLogBlobSchema,
@@ -27,10 +27,13 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
-jest.mock('@/lib/admin/admin-action-audit', () => ({
-  ...jest.requireActual('@/lib/admin/admin-action-audit'),
-  recordAdminAction: jest.fn().mockResolvedValue(undefined),
-}));
+// The spy keeps the real recorder, so the route's audit scope sees the row it writes.
+jest.mock('@kilocode/web-shared/lib/admin/admin-action-audit', () => {
+  const actual = jest.requireActual<
+    Record<string, unknown> & { recordAdminAction: typeof recordAdminAction }
+  >('@kilocode/web-shared/lib/admin/admin-action-audit');
+  return { ...actual, recordAdminAction: jest.fn(actual.recordAdminAction) };
+});
 
 jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest

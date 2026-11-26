@@ -1,9 +1,12 @@
 import {
   SignerKeysReadSchema,
+  UTS_FEED_COUNT,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
+  type FeedKeysEntry,
   type SignerKeysAnswer,
   type SignerKeysBinding,
+  type SignerKeysEntry,
   type UtsEnvironment,
   type UtsJwks,
   type UtsPublicJwk,
@@ -73,13 +76,15 @@ type ReadState =
 /**
  * Isolate state, plain data only: a pending promise is never shared between requests, because
  * awaiting another request's I/O can hang once that request ends (design 7). A request that needs
- * a read another request started polls `read` instead. Each signer's keys are held separately,
- * with the time they were read from their signer object, so one failing signer leaves the others
- * current. One state per environment, so no environment is served another's keys.
+ * a read another request started polls `read` instead. Each signer's and each feed object's keys
+ * are held separately, with the time they were read from their object, so one failing object
+ * leaves the others current. One state per environment, so no environment is served another's
+ * keys.
  */
 type FeedIsolate = {
   environment: UtsEnvironment;
   signers: ReadonlyArray<HeldSigner | null>;
+  feeds: ReadonlyArray<HeldSigner | null>;
   served: ServedSet | null;
   read: ReadState;
 };
@@ -103,10 +108,10 @@ function disposeResult(result: unknown): void {
 }
 
 /**
- * Reads every signer's keys from the mint Worker's `SignerKeys` entrypoint over the service
- * binding. A call that has not answered after the read guard is a failed read; its result, if it
- * still lands while this context lives, is disposed. The revocation-feed slice adds its two feed
- * keys to the same `keys` array under their own prefix.
+ * Reads every signer's and both feed objects' keys from the mint Worker's `SignerKeys`
+ * entrypoint over the service binding. A call that has not answered after the read guard is a
+ * failed read; its result, if it still lands while this context lives, is disposed. Feed keys
+ * carry `uts-feed-` kids and token keys `uts-token-` kids in the same `keys` array.
  */
 async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
   // Created in an async callback, so a binding that throws as it is called becomes a rejection
@@ -146,27 +151,32 @@ async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
     return { status: 'misconfigured', reason: 'shard_refused' };
   }
   const { answer } = parsed.data;
-  const failed = answer.signers.filter(entry => entry.status !== 'ok');
+  const failed = [...answer.signers, ...answer.feeds].filter(entry => entry.status !== 'ok');
   if (failed.length > 0) {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.signers_failed', failed }));
   }
   return { status: 'answered', answer, receivedAt: Date.now() };
 }
 
+type HeldObjects = Pick<FeedIsolate, 'signers' | 'feeds'>;
+
 /**
- * The set to serve from `signers` at `now`: the keys of every signer read under 24 hours ago, in
- * signer order. A `kid` names its signer, and each signer's keys come from one validated answer,
- * so no `kid` repeats. A signer past the hold drops out and its tokens fail verification.
+ * The set to serve from the held keys at `now`: the keys of every signer, then of every feed
+ * object, read under 24 hours ago, in object order. A `kid` names its object, and each object's
+ * keys come from one validated answer, so no `kid` repeats. An object past the hold drops out: a
+ * signer's tokens, or a feed object's heads, then fail verification.
  */
-function servedSet(signers: ReadonlyArray<HeldSigner | null>, now: number): ServedSet | null {
+function servedSet(held: HeldObjects, now: number): ServedSet | null {
   const live: HeldSigner[] = [];
-  const missing: number[] = [];
-  for (const [signer, entry] of signers.entries()) {
-    if (entry !== null && now - entry.readAt < UTS_SIGNER_KEYS_HOLD_MS) live.push(entry);
-    else missing.push(signer);
+  const missing: { signers: number[]; feeds: number[] } = { signers: [], feeds: [] };
+  for (const kind of ['signers', 'feeds'] as const) {
+    for (const [index, entry] of held[kind].entries()) {
+      if (entry !== null && now - entry.readAt < UTS_SIGNER_KEYS_HOLD_MS) live.push(entry);
+      else missing[kind].push(index);
+    }
   }
-  if (missing.length > 0) {
-    console.error(JSON.stringify({ event: 'uts_feed.key_set.signers_missing', missing }));
+  if (missing.signers.length > 0 || missing.feeds.length > 0) {
+    console.error(JSON.stringify({ event: 'uts_feed.key_set.signers_missing', ...missing }));
   }
   if (live.length === 0) return null;
   const readTimes = live.map(entry => entry.readAt);
@@ -178,25 +188,25 @@ function servedSet(signers: ReadonlyArray<HeldSigner | null>, now: number): Serv
 }
 
 /**
- * Takes each signer's keys from the answer when they were read later than the keys held for it.
+ * Takes each object's keys from the answer when they were read later than the keys held for it.
  * A read time later than the answer's arrival, from a clock ahead of this one, counts as the
  * arrival, so no keys can outlive their hold.
  */
-function merge(
+function merge<Entry extends SignerKeysEntry | FeedKeysEntry>(
   current: ReadonlyArray<HeldSigner | null>,
-  answer: SignerKeysAnswer,
+  entries: readonly Entry[],
+  indexOf: (entry: Entry) => number,
   receivedAt: number
 ): Array<HeldSigner | null> {
-  const signers = [...current];
-  for (const entry of answer.signers) {
+  const held = [...current];
+  for (const entry of entries) {
     if (entry.status !== 'ok') continue;
     const readAt = Math.min(entry.readAt, receivedAt);
-    const previous = signers[entry.signer] ?? null;
-    if (previous === null || previous.readAt < readAt) {
-      signers[entry.signer] = { keys: entry.keys, readAt };
-    }
+    const index = indexOf(entry);
+    const previous = held[index] ?? null;
+    if (previous === null || previous.readAt < readAt) held[index] = { keys: entry.keys, readAt };
   }
-  return signers;
+  return held;
 }
 
 /**
@@ -211,8 +221,9 @@ async function runRead(
   const result = await readFromMint(mint);
   let outcome: ReadState;
   if (result.status === 'answered') {
-    state.signers = merge(state.signers, result.answer, result.receivedAt);
-    state.served = servedSet(state.signers, Date.now());
+    state.signers = merge(state.signers, result.answer.signers, e => e.signer, result.receivedAt);
+    state.feeds = merge(state.feeds, result.answer.feeds, e => e.feed, result.receivedAt);
+    state.served = servedSet(state, Date.now());
     if (state.served !== null) {
       outcome = { status: 'succeeded', startedAt };
     } else {
@@ -239,15 +250,18 @@ async function waitForReads(state: FeedIsolate, deadline: number): Promise<void>
   }
 }
 
-/** The set held at `now`, rebuilt without any signer whose hold has ended. */
+/** The set held at `now`, rebuilt without any object whose hold has ended. */
 function servedFor(state: FeedIsolate, now: number): ServedSet | null {
   if (state.served === null || now - state.served.oldestReadAt < UTS_SIGNER_KEYS_HOLD_MS) {
     return state.served;
   }
-  state.signers = state.signers.map(entry =>
-    entry !== null && now - entry.readAt < UTS_SIGNER_KEYS_HOLD_MS ? entry : null
-  );
-  state.served = servedSet(state.signers, now);
+  const live = (held: ReadonlyArray<HeldSigner | null>) =>
+    held.map(entry =>
+      entry !== null && now - entry.readAt < UTS_SIGNER_KEYS_HOLD_MS ? entry : null
+    );
+  state.signers = live(state.signers);
+  state.feeds = live(state.feeds);
+  state.served = servedSet(state, now);
   return state.served;
 }
 
@@ -256,6 +270,7 @@ function isolateFor(environment: UtsEnvironment): FeedIsolate {
     isolate = {
       environment,
       signers: Array.from({ length: UTS_SIGNER_COUNT }, () => null),
+      feeds: Array.from({ length: UTS_FEED_COUNT }, () => null),
       served: null,
       read: { status: 'idle' },
     };

@@ -1,9 +1,11 @@
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import {
+  feedKid,
   tokenKid,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
   UtsJwksSchema,
+  type FeedKeysEntry,
   type SignerKeysBinding,
   type SignerKeysEntry,
 } from '@kilocode/uts-contracts';
@@ -42,20 +44,56 @@ function signerEntry(signer: number, generation = 0, readAt = Date.now()): OkEnt
 const allSigners = (generation = 0, readAt = Date.now()): SignerKeysEntry[] =>
   Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => signerEntry(signer, generation, readAt));
 
+/** Feed object `feed`'s two keys of `generation`, as its object answered at `readAt`. */
+function feedEntry(
+  feed: number,
+  generation = 0,
+  readAt = Date.now()
+): Extract<FeedKeysEntry, { status: 'ok' }> {
+  return {
+    feed,
+    status: 'ok',
+    keys: [0, 1].map(slot => {
+      const x = base64Url32(5000 + generation * 1000 + feed * 10 + slot);
+      return { kty: 'OKP', crv: 'Ed25519', x, kid: feedKid(feed, x), alg: 'EdDSA', use: 'sig' };
+    }),
+    readAt,
+  };
+}
+
 /** Whatever a `signerKeys()` call resolves to; the feed Worker validates it. */
 type MintResult = unknown;
 
-/** A `signerKeys()` result that carries `signers` as the mint Worker's answer. */
-const answered = (signers: unknown[]): Record<string, unknown> => ({
+/** The read time of the first signer answered with keys, so default feed keys age alongside. */
+function readAtOf(signers: unknown[]): number {
+  for (const signer of signers) {
+    if (typeof signer === 'object' && signer !== null && 'readAt' in signer) {
+      if (typeof signer.readAt === 'number') return signer.readAt;
+    }
+  }
+  return Date.now();
+}
+
+/**
+ * A `signerKeys()` result that carries `signers` as the mint's answer, with both feed objects
+ * answering keys read when the first signer's were, unless the test names the feed entries.
+ */
+const answered = (
+  signers: unknown[],
+  feeds: unknown[] = [0, 1].map(feed => feedEntry(feed, 0, readAtOf(signers)))
+): Record<string, unknown> => ({
   status: 'answered',
-  answer: { signers },
+  answer: { signers, feeds },
 });
 
 const okAnswer = (generation = 0, readAt = Date.now()) => answered(allSigners(generation, readAt));
 
-/** Every signer failed with `status`, as the mint Worker answers when it holds no keys. */
+/** Every signer and feed object failed with `status`, as the mint answers when it holds no keys. */
 const failedAnswer = (status: 'misconfigured' | 'unavailable') =>
-  answered(Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })));
+  answered(
+    Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })),
+    [0, 1].map(feed => ({ feed, status }))
+  );
 
 /** A mint Worker binding whose `signerKeys()` answers `answer`, counting its calls. */
 function mintBinding(answer: () => Promise<MintResult>): SignerKeysBinding & { calls: number } {
@@ -71,8 +109,18 @@ function mintBinding(answer: () => Promise<MintResult>): SignerKeysBinding & { c
 
 /** The development feed Worker, with the mint binding the test supplies. */
 function envWith(mint: SignerKeysBinding, environment = 'development'): Env {
-  return { UTS_ENVIRONMENT: environment, UTS_MINT: mint };
+  return { UTS_ENVIRONMENT: environment, UTS_MINT: mint, UTS_FEED_READS: unusedFeedReads };
 }
+
+/** The key-set tests read no feed object; any call fails the test. */
+const unusedFeedReads = {
+  head: async () => {
+    throw new Error('unexpected feed head read');
+  },
+  list: async () => {
+    throw new Error('unexpected feed list read');
+  },
+};
 
 const jwksRequest = (init?: RequestInit) =>
   new Request('http://localhost:8801/.well-known/jwks.json', init);
@@ -117,12 +165,18 @@ afterEach(() => {
 });
 
 describe('key set endpoint', () => {
-  it('serves the 32 keys of the 16 signers with the key-set cache header and both ages at 0', async () => {
+  it('serves the 32 token keys of the 16 signers and the 4 keys of the 2 feed objects, with the key-set cache header and both ages at 0', async () => {
     const response = await get(mintBinding(async () => okAnswer()));
     expect(response.status).toBe(200);
     expectKeySetHeaders(response, '0', '0');
     expect(response.headers.get('Content-Type')).toBe('application/json');
-    expect(await keysOf(response)).toHaveLength(32);
+    const keys = await keysOf(response);
+    expect(keys).toHaveLength(36);
+    expect(keys.filter(key => key.kid.startsWith('uts-token-'))).toHaveLength(32);
+    expect(keys.filter(key => key.kid.startsWith('uts-feed-')).map(key => key.kid)).toEqual([
+      ...feedEntry(0).keys.map(key => key.kid),
+      ...feedEntry(1).keys.map(key => key.kid),
+    ]);
   });
 
   it('answers 404 to other paths and 405 to other methods without a read', async () => {
@@ -176,7 +230,7 @@ describe('reads', () => {
     const mint = mintBinding(async () => ({ ...okAnswer(), [Symbol.dispose]: dispose }));
     const response = await get(mint, T0);
     expect(dispose).toHaveBeenCalledOnce();
-    expect(await keysOf(response)).toHaveLength(32);
+    expect(await keysOf(response)).toHaveLength(36);
   });
 
   it('shares no copy between isolates: a new isolate makes its own read', async () => {
@@ -304,7 +358,7 @@ describe('signers', () => {
     expect(response.status).toBe(200);
     expect(await xsOf(response.clone(), 3)).toEqual(xs(3, 1));
     expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
-    expect(await keysOf(response.clone())).toHaveLength(32);
+    expect(await keysOf(response.clone())).toHaveLength(36);
     expectKeySetHeaders(response, '0', '20');
   });
 
@@ -365,7 +419,31 @@ describe('signers', () => {
     const response = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS);
     expect(response.status).toBe(200);
     expect(await xsOf(response.clone(), 7)).toEqual([]);
-    expect(await keysOf(response)).toHaveLength(30);
+    expect(await keysOf(response)).toHaveLength(34);
+  });
+
+  it("keeps a failing feed object's keys and drops them 24 hours after its last good read", async () => {
+    let failing = false;
+    const mint = mintBinding(async () => {
+      if (!failing) return okAnswer(0, T0);
+      const later = Date.now();
+      return answered(allSigners(0, later), [
+        { feed: 0, status: 'unavailable' },
+        feedEntry(1, 0, later),
+      ]);
+    });
+    await get(mint, T0);
+    failing = true;
+    const held = await get(mint, T0 + KEY_SET_MAX_SERVED_AGE_MS);
+    const heldKids = (await keysOf(held.clone())).map(key => key.kid);
+    expect(heldKids).toEqual(expect.arrayContaining(feedEntry(0).keys.map(key => key.kid)));
+    expect(held.headers.get('Kilo-Key-Set-Oldest-Age')).toBe(
+      String(KEY_SET_MAX_SERVED_AGE_MS / 1000)
+    );
+    const dropped = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS);
+    const kids = (await keysOf(dropped)).map(key => key.kid);
+    expect(kids.filter(kid => kid.startsWith('uts-feed-0-'))).toEqual([]);
+    expect(kids.filter(kid => kid.startsWith('uts-feed-1-'))).toHaveLength(2);
   });
 });
 

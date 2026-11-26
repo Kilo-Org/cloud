@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import {
   internalDispatchResponseSchema,
   type GlanceableScopeRefreshRequest,
+  type InternalDispatchAccountSecurityRequest,
   type InternalDispatchAgentBriefingRequest,
   type InternalDispatchLowBalanceRequest,
   type InternalDispatchRequest,
@@ -305,6 +306,17 @@ export async function dispatchSecurityLifecyclePush(
   input: Omit<InternalDispatchSecurityLifecycleRequest, 'kind'>
 ): Promise<void> {
   await dispatchInternal({ kind: 'security_lifecycle', ...input });
+}
+
+/**
+ * Dispatches an account-security notice push. Never rejects; returns whether
+ * the worker accepted it, so the caller can report a refused push alongside
+ * the email it sends for the same event.
+ */
+export async function dispatchAccountSecurityPush(
+  input: Omit<InternalDispatchAccountSecurityRequest, 'kind'>
+): Promise<boolean> {
+  return dispatchInternal({ kind: 'account_security', ...input });
 }
 
 /**

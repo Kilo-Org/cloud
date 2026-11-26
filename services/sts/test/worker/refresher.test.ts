@@ -483,6 +483,9 @@ describe('policy audit stream', () => {
     expect([...event.data.attributes.addedWorkloads].sort()).toEqual([
       'audit-relay',
       'bouncer-watch',
+      'ci-deploy-bouncer',
+      'ci-sts-deploy-proof-production',
+      'ci-sts-deploy-proof-staging',
       'notifications',
       'o11y',
       'usage-ingest',

@@ -15,6 +15,7 @@ import {
   buildCreditsTopUpReceiptSection,
   buildCreditsTopUpServiceFeeSection,
   RawHtml,
+  renderNonAutolinkedText,
   renderTemplate,
   type TemplateName,
 } from '@kilocode/web-shared/lib/email';
@@ -96,9 +97,38 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         email: 'user@example.com',
         provider_name: 'GitHub',
         linked_identity: 'octocat (user@example.com)',
+        change_details: new RawHtml(
+          'Time: 2026-01-01 12:00 UTC<br />IP address: 203.0.113.7<br />Approximate location: San Francisco, US<br />Browser: Chrome on macOS'
+        ),
         connected_accounts_link: new RawHtml(
           `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
         ),
+      };
+    case 'signInMethodRemoved':
+      return {
+        email: 'user@example.com',
+        provider_name: 'GitHub',
+        change_details: new RawHtml(
+          'Time: 2026-01-01 12:00 UTC<br />IP address: 203.0.113.7<br />Approximate location: San Francisco, US<br />Browser: Chrome on macOS'
+        ),
+        connected_accounts_link: new RawHtml(
+          `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
+        ),
+      };
+    case 'signInMethodChangeCode':
+      return {
+        code: '482913',
+        email: 'user@example.com',
+        change_action: 'add',
+        provider_name: 'GitHub',
+        expires_in: '10 minutes',
+      };
+    case 'passkeyEnrollmentCode':
+      return {
+        code: '482913',
+        email: 'user@example.com',
+        expires_in: '10 minutes',
+        connected_accounts_url: renderNonAutolinkedText(`${NEXTAUTH_URL}/connected-accounts`),
       };
     case 'balanceAlert':
       return { minimum_balance: '10', organization_url };

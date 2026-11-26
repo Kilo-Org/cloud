@@ -93,10 +93,10 @@ export type SignKiloTokenExtra = Pick<
 export async function signKiloToken(params: {
   userId: string;
   /**
-   * Omit (or pass `undefined`) to mint an internal-service token with no
-   * `apiTokenPepper` claim at all — verifiers treat an absent claim as
-   * "skip pepper comparison", unlike an explicit `null`, which is compared
-   * against the account's current pepper.
+   * Omit (or pass `undefined`) to mint an internal assertion with no
+   * `apiTokenPepper` claim. Only receivers of internal assertions accept such a
+   * token, and only while it lives at most one hour (`isKiloTokenPepperCurrent`);
+   * an explicit `null` is compared against the account's current pepper.
    */
   pepper?: string | null;
   secret: string;

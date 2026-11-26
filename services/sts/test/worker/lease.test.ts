@@ -105,6 +105,8 @@ type LeaseManager = {
   setRevokeStatus: (status: number) => void;
   /** Infisical refuses the revocation of this lease only (503), whatever the revoke status. */
   refuseRevokeOf: (leaseId: string) => void;
+  /** The lease id a 404 names instead of the one asked for; null names the one asked for. */
+  setNotFoundId: (leaseId: string | null) => void;
   /**
    * Infisical's revocation statement fails at the database: a 200 whose lease row stays, with
    * status "Failed to delete" (and the database error, which STS must not keep).
@@ -132,6 +134,7 @@ function installLeaseManager(
   let onCreate = (): void => {};
   let serial = 0;
   const revokeRefused = new Set<string>();
+  let notFoundId: string | null = null;
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(
       typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -172,7 +175,7 @@ function installLeaseManager(
           {
             reqId: 'req-1',
             statusCode: 404,
-            message: `Dynamic secret lease with ID '${leaseId}' not found`,
+            message: `Dynamic secret lease with ID '${notFoundId ?? leaseId}' not found`,
             error: 'NotFound',
           },
           { status: 404 }
@@ -212,6 +215,9 @@ function installLeaseManager(
     },
     refuseRevokeOf: leaseId => {
       revokeRefused.add(leaseId);
+    },
+    setNotFoundId: leaseId => {
+      notFoundId = leaseId;
     },
     setRevokeKept: kept => {
       revokeKept = kept;
@@ -692,11 +698,38 @@ describe('revoke', () => {
       'revoked',
       'gone',
     ]);
+    // A clean 404 (no recorded failure) carries no detail.
+    expect(revoked[2]?.data.attributes).not.toHaveProperty('detail');
+  });
+
+  it('keeps a revocation owed when Infisical answers 404 naming another lease id', async () => {
+    const manager = installLeaseManager();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    manager.setRevokeStatus(404);
+    manager.setNotFoundId('00000000-0000-4000-8000-000000000000');
+    expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toMatchObject({
+      status: 'unavailable',
+    });
+    expect(errors).toHaveBeenCalledWith(
+      'sts: lease revocation failed; the lease object retries it',
+      expect.anything()
+    );
+    // Still owed: the alarm asks again, and the right id's 404 then confirms it.
+    manager.setNotFoundId(null);
+    await revocationsDue();
+    await runDurableObjectAlarm(getLeaseStub(env, config));
+    expect(manager.revokes()).toHaveLength(2);
+    const revoked = (await leaseEvents()).filter(
+      event => event.type === 'ai.kilo.sts.lease.revoked'
+    );
+    expect(revoked.map(event => event.data.attributes.result)).toEqual(['revoke_failed', 'gone']);
   });
 
   it('confirms a revocation as gone when Infisical answers 404 after a recorded failure', async () => {
     const manager = installLeaseManager();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
     manager.setRevokeStatus(503);
     await broker('bouncer-watch').revokeLease(created.leaseId);
@@ -708,6 +741,10 @@ describe('revoke', () => {
       status: 'revoked',
     });
     expect(errors).not.toHaveBeenCalled();
+    expect(warnings).toHaveBeenCalledWith(
+      expect.stringContaining('read as revoked'),
+      expect.objectContaining({ leaseId: created.leaseId })
+    );
     // Ended: neither a later revoke nor the alarm asks Infisical again or writes another row.
     expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toMatchObject({
       status: 'revoked',
@@ -722,6 +759,7 @@ describe('revoke', () => {
       ['failure', 'revoke_failed'],
       ['success', 'gone'],
     ]);
+    expect(revoked[1]?.data.attributes).toMatchObject({ detail: 'gone_after_failure' });
   });
 
   it('audits a revocation Infisical could not take once, and retries it from the alarm', async () => {
@@ -891,6 +929,7 @@ describe('revoke', () => {
   it('keeps a revocation owed when Infisical answers 200 but its revocation statement failed, and keeps the database error out of logs and audit', async () => {
     const manager = installLeaseManager();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
     manager.setRevokeKept(true);
     expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toMatchObject({

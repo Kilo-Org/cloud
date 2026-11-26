@@ -453,6 +453,8 @@ export class LeaseDO extends DurableObject<Env> {
    * revocation statement failed (a 200 with the row and its "Failed to delete" status, never a 404)
    * and deletes it only once a revocation succeeds; the success's own 200 still carries that stale
    * status, so the 404 that follows is the confirmation (README trial check 3, run on 2026-11-26).
+   * Its row says `detail: gone_after_failure` and it logs a warning, not an error: a forced delete
+   * at Infisical would look the same (README Risks), so it stays visible without paging.
    */
   async #attemptRevocation(leaseId: string): Promise<LeaseRevocationResult> {
     const row = this.#db.select().from(schema.lease).where(eq(schema.lease.leaseId, leaseId)).get();
@@ -463,6 +465,13 @@ export class LeaseDO extends DurableObject<Env> {
     const revocation = await this.#client.revokeLease(LEASE_DYNAMIC_SECRETS[row.grant], leaseId);
     const result: LeaseRevocationResult =
       revocation.status === 'unreachable' ? 'revoke_failed' : revocation.status;
+    const goneAfterFailure = result === 'gone' && row.revokeFailureAudited;
+    if (goneAfterFailure) {
+      console.warn(
+        'sts: Infisical no longer has a lease whose revocation failed before; read as revoked',
+        { workload: row.workload, grant: row.grant, cause, leaseId }
+      );
+    }
     if (revocation.status === 'unreachable') {
       const expired = row.expiresAt <= Date.now();
       console.error(
@@ -486,6 +495,7 @@ export class LeaseDO extends DurableObject<Env> {
           leaseId,
           cause,
           result,
+          ...(goneAfterFailure ? { detail: 'gone_after_failure' as const } : {}),
         })
       );
     } catch (error) {

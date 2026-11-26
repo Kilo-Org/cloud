@@ -62,7 +62,7 @@ choose; pass `null` when the header is absent, and the library refuses any PAT w
 
 ## API
 
-`createVerifier(config) -> { verify(input, route, ctx), warm(ctx) }`
+`createVerifier(config) -> { verify(input, route, ctx), warm(ctx), checkBrowserSession(record, ctx), checkUtsTokenRecord(record, ctx) }`
 
 | Input | Meaning |
 |---|---|
@@ -97,6 +97,38 @@ UTS key set when no bootstrap is configured) and the STS key set, in parallel, u
 `ctx.waitUntil`. A later `verify` joins the fetches in flight. It does nothing once the caches hold
 data.
 
+### Record checks
+
+Two narrow checks of a record the caller already authenticated against the verifier's held
+revocation feed. They read the same copy as `verify`, with its refresh and the 60 s head-age limit
+of a long-lived credential (as for a PAT), so they apply to the environment the verifier's UTS
+issuer and feed serve. Neither grants anything: `{ ok: true }` only says the feed revokes nothing
+about the record. Both take `ctx = { waitUntil }`, under which a background feed refresh runs.
+
+| Method | Record | Refusals |
+|---|---|---|
+| `checkBrowserSession(record, ctx)` | `{ sub, sid, issuedAt }` from the UTS `kilo-web` reply (`read` or the code exchange): `sid` = `session_id`, `issuedAt` = `issued_at`. No `kid`, so `revoked_kids` does not apply | 401 `invalid_session_record`, `revoked_session`, `account_blocked` |
+| `checkUtsTokenRecord(record, ctx)` | `{ sub, sid, issuedAt, kid }` of a UTS access token the caller verified and kept in a capability it authenticates itself: `issuedAt` = the token's `iat`, `kid` = its header `kid`. Never a value read from a URL | 401 `invalid_record`, `revoked_key`, `revoked_session`, `account_blocked` |
+
+Both answer `RecordCheckResult`: `{ ok: true }`, `{ ok: false, status: 401, reason }`, or
+`{ ok: false, status: 503, reason: 'revocation_unavailable', retryAfterSeconds? }`, where
+`retryAfterSeconds` is the retry time the key set, bootstrap or feed reported (the caller's
+`Retry-After`). The checks run in this order:
+
+1. Validation, before any fetch: `sub` 1 to 255 characters; `sid` a lowercase UUID; `issuedAt`
+   integer Unix seconds, positive and at most `RECORD_FUTURE_SKEW_SECONDS` (60) in the future; for
+   a token record, `kid` under `uts-token-` and at most 255 characters. Anything else is 401
+   `invalid_session_record` (session) or `invalid_record` (token).
+2. The feed: unavailable (cold and unreachable, or the held head over 60 s old) is 503
+   `revocation_unavailable`.
+3. Token record only: `kid` in `revoked_kids` is 401 `revoked_key`.
+4. `sid` in `revoked_sids`, or `revoked_before[sub] >= issuedAt`, is 401 `revoked_session`, even
+   for a blocked account.
+5. `sub` in `blocked_accounts` is 401 `account_blocked`.
+
+They reject only when the config has no `uts` (a programming error). Step-up strength
+(`auth_time`) and a capability's own expiry, audience and scope are the caller's checks.
+
 ## Ports
 
 | Port | Who implements it | Contract |
@@ -109,6 +141,8 @@ data.
 | `PatLookup` `(hash, signal)` | Phase 3 | `hash` is the lowercase-hex SHA-256 of the PAT. Answers `found` (a `PatRecordSchema` record), `not_found` (unknown, revoked or expired), `rate_limited` or `unavailable` with `retryAfterSeconds` |
 | `SharedPatCache` `{ get, put }` | The service: Workers Cache API or Vercel Runtime Cache | Opaque strings; errors count as a miss, and so does a read (with its key provider) that has not answered within `PAT_SHARED_CACHE_TIMEOUT_MS` (1 s) |
 | `PatConfig.cacheKeys` `(ctx) => Promise<{ current, previous? }>` | The service: two `Secrets.get` calls on its own bundle | Read on each shared-cache read and write, so a rotation reaches a running instance; `current` signs, `current` and `previous` verify; a rejection is a miss or a skipped write |
+| `BrowserSessionRecord` `{ sub, sid, issuedAt }` | The web app (BFF), from the UTS `kilo-web` reply that phase 3 authenticates (slice 3.12) | Passed to `checkBrowserSession` only after the `kilo-web` transport authenticated the reply; `issued_at` moves only at sign-in, a legacy-bridge exchange or a step-up rotation |
+| `UtsTokenRecord` `{ sub, sid, issuedAt, kid }` | The Pages capability verifier, from the UTS token it verified at issue time | Passed to `checkUtsTokenRecord` only from a capability the caller authenticated; the raw token is never kept |
 
 ### Revocation feed format
 
@@ -192,6 +226,7 @@ Fail-closed and caching rules:
 | PAT: lookup failure is 503; an expired entry serves stale up to 10 min, refreshed by at most one background lookup at a time, only with a head under 60 s | `pat.ts`, `verifyPat` | fail-closed lookups |
 | PAT: one lookup per hash; 429 above 20 uncached lookups/s per address, before the lookup; 503 above 1,000 pending lookups per instance, before the lookup; a 429 or 503 never evicts | `pat.ts` | merging and the per-address limit; fail-closed lookups; bounded bookkeeping |
 | PAT: bounded bookkeeping (10,000 instance entries and failure records, oldest first; 1,000 pending lookups; 10,000 tracked addresses, oldest first) | `pat.ts` | bounded bookkeeping |
+| Record checks: validation before any fetch; the held feed with its refresh and the 60 s head-age limit (503 when unavailable); token record `kid` first, then `revoked_sids`, `revoked_before >= issuedAt`, `blocked_accounts`; no grant | `checkBrowserSession`, `checkUtsTokenRecord`, `checkRecord` | `records.test.ts` |
 | No promise shared across requests: owner + pollers, `waitUntil` hand-off | `flight.ts` | `runtime.test.ts` (real workerd: concurrent cold requests, one call each; `warm`) |
 | A request cancelled mid-call does not stall others: after 1 s without its heartbeat, a key-set, feed or bootstrap call counts as failed (with its retry wait); a PAT lookup lets the next request make its own | `flight.ts` `abandoned` | `runtime.test.ts` races; the cancellation tests in each test file |
 

@@ -155,27 +155,29 @@ function unconfirmedEnd(row: LeaseRow, now: number): Partial<LeaseRow> {
  * by the alarm until Infisical confirms it, also after the lease expired (expiry stops new logins,
  * not open sessions), for at most a day past the expiry; then it is audited as `unconfirmed` and
  * logged as an error. Leases are few (a few hundred a day), so one object serves the environment.
+ * A stub can call every prototype method, so everything but `create`, `revoke` and `alarm` is
+ * ECMAScript-private: no caller revokes a lease past `revoke`'s owner check.
  */
 export class LeaseDO extends DurableObject<Env> {
-  private readonly config: StsConfig;
-  private readonly db: LeaseDatabase;
-  private readonly audit: AuditLog;
-  private readonly stream: string;
-  private readonly client: InfisicalClient;
+  readonly #config: StsConfig;
+  readonly #db: LeaseDatabase;
+  readonly #audit: AuditLog;
+  readonly #stream: string;
+  readonly #client: InfisicalClient;
   /**
    * Revocations in flight, by lease id: concurrent revokes of one lease (callers and the alarm)
    * share one manager call.
    */
-  private readonly revoking = new Map<string, Promise<LeaseRevocationResult>>();
+  readonly #revoking = new Map<string, Promise<LeaseRevocationResult>>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const config = readConfig(env);
-    this.config = config;
-    this.db = drizzle(ctx.storage, { schema });
-    this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
-    this.stream = `sts:${config.environment}:leases`;
-    this.client = new InfisicalClient(config.manager, () =>
+    this.#config = config;
+    this.#db = drizzle(ctx.storage, { schema });
+    this.#audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
+    this.#stream = `sts:${config.environment}:leases`;
+    this.#client = new InfisicalClient(config.manager, () =>
       withDORetry(
         () => getSignerStub(env, config),
         stub => stub.signManagerToken(),
@@ -183,7 +185,7 @@ export class LeaseDO extends DurableObject<Env> {
       )
     );
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
+      await migrate(this.#db, migrations);
     });
   }
 
@@ -195,10 +197,10 @@ export class LeaseDO extends DurableObject<Env> {
    */
   async create(raw: LeaseCreateRequest): Promise<LeaseCreateResult> {
     const input = LeaseCreateRequestSchema.parse(raw);
-    if (input.environment !== this.config.environment) {
+    if (input.environment !== this.#config.environment) {
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };
     }
-    if (this.config.manager.projectSlug === null) {
+    if (this.#config.manager.projectSlug === null) {
       console.warn('sts: lease refused: MANAGER_PROJECT_SLUG is empty in this environment');
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };
     }
@@ -213,10 +215,10 @@ export class LeaseDO extends DurableObject<Env> {
       });
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };
     }
-    const limited = this.limitFor(caller.workload, grant, input.maxActive, callStartedAt);
+    const limited = this.#limitFor(caller.workload, grant, input.maxActive, callStartedAt);
     if (limited !== null) return limited;
 
-    const { slot } = this.db
+    const { slot } = this.#db
       .insert(schema.lease)
       .values({
         workload: caller.workload,
@@ -230,7 +232,7 @@ export class LeaseDO extends DurableObject<Env> {
       .returning({ slot: schema.lease.slot })
       .get();
 
-    const created = await this.client.createLease(LEASE_DYNAMIC_SECRETS[grant], input.ttlSeconds);
+    const created = await this.#client.createLease(LEASE_DYNAMIC_SECRETS[grant], input.ttlSeconds);
     const finishedAt = Date.now();
     if (created.status === 'unreachable') {
       console.error('sts: lease creation failed', {
@@ -238,8 +240,8 @@ export class LeaseDO extends DurableObject<Env> {
         grant,
         detail: created.detail,
       });
-      this.end(slot, 'failed', finishedAt);
-      await this.scheduleAlarm(finishedAt, false);
+      this.#end(slot, 'failed', finishedAt);
+      await this.#scheduleAlarm(finishedAt, false);
       return { status: 'unavailable', retryAfterSeconds: retryAfterSeconds(created.retryAfterMs) };
     }
 
@@ -255,10 +257,10 @@ export class LeaseDO extends DurableObject<Env> {
       cause = 'expiry_mismatch';
     } else {
       try {
-        await this.audit.append(
-          this.stream,
+        await this.#audit.append(
+          this.#stream,
           leaseCreatedEvent({
-            environment: this.config.environment,
+            environment: this.#config.environment,
             caller,
             grant,
             leaseId: created.leaseId,
@@ -280,7 +282,7 @@ export class LeaseDO extends DurableObject<Env> {
     }
     if (cause !== null) {
       // Owed until Infisical takes it: the alarm retries this row if the first attempt fails.
-      this.db
+      this.#db
         .update(schema.lease)
         .set({
           leaseId: created.leaseId,
@@ -290,17 +292,17 @@ export class LeaseDO extends DurableObject<Env> {
         })
         .where(eq(schema.lease.slot, slot))
         .run();
-      await this.revokeOnce(created.leaseId);
-      await this.scheduleAlarm(Date.now(), false);
+      await this.#revokeOnce(created.leaseId);
+      await this.#scheduleAlarm(Date.now(), false);
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };
     }
     // In the same output gate as the audit row.
-    this.db
+    this.#db
       .update(schema.lease)
       .set({ leaseId: created.leaseId, state: 'active', expiresAt: created.expiresAt })
       .where(eq(schema.lease.slot, slot))
       .run();
-    await this.scheduleAlarm(Date.now(), false);
+    await this.#scheduleAlarm(Date.now(), false);
     return {
       status: 'created',
       leaseId: created.leaseId,
@@ -320,10 +322,10 @@ export class LeaseDO extends DurableObject<Env> {
    */
   async revoke(raw: LeaseRevokeRequest): Promise<LeaseRevokeOutcome> {
     const input = LeaseRevokeRequestSchema.parse(raw);
-    if (input.environment !== this.config.environment) {
+    if (input.environment !== this.#config.environment) {
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };
     }
-    const row = this.db
+    const row = this.#db
       .select()
       .from(schema.lease)
       .where(eq(schema.lease.leaseId, input.leaseId))
@@ -342,14 +344,14 @@ export class LeaseDO extends DurableObject<Env> {
 
     if (row.revokeCause === null) {
       // Owed from now on: the alarm retries it if Infisical cannot take it.
-      this.db
+      this.#db
         .update(schema.lease)
         .set({ revokeCause: 'caller' })
         .where(eq(schema.lease.slot, row.slot))
         .run();
     }
-    const result = await this.revokeOnce(input.leaseId);
-    await this.scheduleAlarm(Date.now(), false);
+    const result = await this.#revokeOnce(input.leaseId);
+    await this.#scheduleAlarm(Date.now(), false);
     return result === 'revoke_failed' || result === 'unconfirmed'
       ? { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS }
       : { status: 'revoked' };
@@ -358,18 +360,18 @@ export class LeaseDO extends DurableObject<Env> {
   async alarm(): Promise<void> {
     let failed = false;
     try {
-      await this.audit.relay(this.stream);
+      await this.#audit.relay(this.#stream);
     } catch (error) {
       failed = true;
       console.warn('sts: lease audit relay failed; rows stay for the next alarm', {
         reason: errorName(error),
       });
     }
-    await this.retryOwedRevocations();
+    await this.#retryOwedRevocations();
     const now = Date.now();
-    await this.stopUnconfirmedRevocations(now);
-    this.audit.pruneIfDue(now);
-    this.db
+    await this.#stopUnconfirmedRevocations(now);
+    this.#audit.pruneIfDue(now);
+    this.#db
       .delete(schema.lease)
       .where(
         and(
@@ -381,20 +383,20 @@ export class LeaseDO extends DurableObject<Env> {
         )
       )
       .run();
-    await this.scheduleAlarm(Date.now(), failed);
+    await this.#scheduleAlarm(Date.now(), failed);
   }
 
   /**
    * The refusal for a workload at its limits: its active leases of this grant (a pending creation
    * counts), then its creations of any grant in the last minute, whatever their outcome.
    */
-  private limitFor(
+  #limitFor(
     workload: string,
     grant: LeaseGrant,
     maxActive: number,
     now: number
   ): LeaseCreateResult | null {
-    const active = this.db
+    const active = this.#db
       .select({ expiresAt: schema.lease.expiresAt })
       .from(schema.lease)
       .where(
@@ -414,7 +416,7 @@ export class LeaseDO extends DurableObject<Env> {
         retryAfterSeconds: retryAfterSeconds(soonest - now),
       };
     }
-    const recent = this.db
+    const recent = this.#db
       .select({ createdAt: schema.lease.createdAt })
       .from(schema.lease)
       .where(and(eq(schema.lease.workload, workload), gt(schema.lease.createdAt, now - MINUTE_MS)))
@@ -431,13 +433,13 @@ export class LeaseDO extends DurableObject<Env> {
   }
 
   /** One revocation attempt of an owed lease, shared with any attempt already in flight. */
-  private async revokeOnce(leaseId: string): Promise<LeaseRevocationResult> {
-    const inFlight = this.revoking.get(leaseId);
+  async #revokeOnce(leaseId: string): Promise<LeaseRevocationResult> {
+    const inFlight = this.#revoking.get(leaseId);
     if (inFlight !== undefined) return await inFlight;
-    const pending = this.attemptRevocation(leaseId).finally(() => {
-      this.revoking.delete(leaseId);
+    const pending = this.#attemptRevocation(leaseId).finally(() => {
+      this.#revoking.delete(leaseId);
     });
-    this.revoking.set(leaseId, pending);
+    this.#revoking.set(leaseId, pending);
     return await pending;
   }
 
@@ -451,13 +453,13 @@ export class LeaseDO extends DurableObject<Env> {
    * shows that Infisical keeps a lease whose revocation failed until one succeeds, a missing lease
    * may be one deleted without its role being revoked, so the row ends and a person checks it.
    */
-  private async attemptRevocation(leaseId: string): Promise<LeaseRevocationResult> {
-    const row = this.db.select().from(schema.lease).where(eq(schema.lease.leaseId, leaseId)).get();
+  async #attemptRevocation(leaseId: string): Promise<LeaseRevocationResult> {
+    const row = this.#db.select().from(schema.lease).where(eq(schema.lease.leaseId, leaseId)).get();
     if (row === undefined || row.revokeCause === null) return 'gone';
     const cause = row.revokeCause;
     const caller: LeaseAuditCaller = CallerSchema.parse(JSON.parse(row.caller));
-    this.setRevokeRetryAt(row.slot, Date.now() + LEASE_REVOKE_RETRY_MS);
-    const revocation = await this.client.revokeLease(LEASE_DYNAMIC_SECRETS[row.grant], leaseId);
+    this.#setRevokeRetryAt(row.slot, Date.now() + LEASE_REVOKE_RETRY_MS);
+    const revocation = await this.#client.revokeLease(LEASE_DYNAMIC_SECRETS[row.grant], leaseId);
     let result: LeaseRevocationResult =
       revocation.status === 'unreachable' ? 'revoke_failed' : revocation.status;
     if (result === 'gone' && row.revokeFailureAudited) {
@@ -476,15 +478,15 @@ export class LeaseDO extends DurableObject<Env> {
         { workload: row.workload, grant: row.grant, cause, detail: revocation.detail }
       );
       if (revocation.retryAfterMs !== null && revocation.retryAfterMs > LEASE_REVOKE_RETRY_MS) {
-        this.setRevokeRetryAt(row.slot, Date.now() + revocation.retryAfterMs);
+        this.#setRevokeRetryAt(row.slot, Date.now() + revocation.retryAfterMs);
       }
       if (row.revokeFailureAudited) return result;
     }
     try {
-      await this.audit.append(
-        this.stream,
+      await this.#audit.append(
+        this.#stream,
         leaseRevokedEvent({
-          environment: this.config.environment,
+          environment: this.#config.environment,
           caller,
           grant: row.grant,
           leaseId,
@@ -500,7 +502,7 @@ export class LeaseDO extends DurableObject<Env> {
       return 'revoke_failed';
     }
     const now = Date.now();
-    this.db
+    this.#db
       .update(schema.lease)
       .set(
         result === 'revoke_failed'
@@ -519,8 +521,8 @@ export class LeaseDO extends DurableObject<Env> {
     return result;
   }
 
-  private setRevokeRetryAt(slot: number, at: number): void {
-    this.db
+  #setRevokeRetryAt(slot: number, at: number): void {
+    this.#db
       .update(schema.lease)
       .set({ revokeRetryAt: at })
       .where(eq(schema.lease.slot, slot))
@@ -532,8 +534,8 @@ export class LeaseDO extends DurableObject<Env> {
    * leases and of leases that expired less than `LEASE_REVOKE_CLEANUP_MS` ago, since expiry ends no
    * open session.
    */
-  private owedRevocations(now: number, dueBy: number, limit: number): LeaseRow[] {
-    return this.db
+  #owedRevocations(now: number, dueBy: number, limit: number): LeaseRow[] {
+    return this.#db
       .select()
       .from(schema.lease)
       .where(
@@ -550,11 +552,11 @@ export class LeaseDO extends DurableObject<Env> {
       .all();
   }
 
-  private async retryOwedRevocations(): Promise<void> {
+  async #retryOwedRevocations(): Promise<void> {
     const now = Date.now();
-    for (const row of this.owedRevocations(now, now, LEASE_REVOKE_RETRIES_PER_ALARM)) {
+    for (const row of this.#owedRevocations(now, now, LEASE_REVOKE_RETRIES_PER_ALARM)) {
       if (row.leaseId === null) continue;
-      await this.revokeOnce(row.leaseId);
+      await this.#revokeOnce(row.leaseId);
     }
   }
 
@@ -565,8 +567,8 @@ export class LeaseDO extends DurableObject<Env> {
    * a later revoke makes it owed no more. One whose row cannot be written stays owed and is tried
    * again `LEASE_REVOKE_RETRY_MS` later.
    */
-  private async stopUnconfirmedRevocations(now: number): Promise<void> {
-    const rows = this.db
+  async #stopUnconfirmedRevocations(now: number): Promise<void> {
+    const rows = this.#db
       .select()
       .from(schema.lease)
       .where(
@@ -585,10 +587,10 @@ export class LeaseDO extends DurableObject<Env> {
         { workload: row.workload, grant: row.grant, cause: row.revokeCause, leaseId: row.leaseId }
       );
       try {
-        await this.audit.append(
-          this.stream,
+        await this.#audit.append(
+          this.#stream,
           leaseRevokedEvent({
-            environment: this.config.environment,
+            environment: this.#config.environment,
             caller: CallerSchema.parse(JSON.parse(row.caller)),
             grant: row.grant,
             leaseId: row.leaseId,
@@ -601,10 +603,10 @@ export class LeaseDO extends DurableObject<Env> {
           workload: row.workload,
           reason: errorName(error),
         });
-        this.setRevokeRetryAt(row.slot, now + LEASE_REVOKE_RETRY_MS);
+        this.#setRevokeRetryAt(row.slot, now + LEASE_REVOKE_RETRY_MS);
         continue;
       }
-      this.db
+      this.#db
         .update(schema.lease)
         .set(unconfirmedEnd(row, now))
         .where(eq(schema.lease.slot, row.slot))
@@ -612,8 +614,8 @@ export class LeaseDO extends DurableObject<Env> {
     }
   }
 
-  private end(slot: number, state: 'failed' | 'revoked', at: number): void {
-    this.db
+  #end(slot: number, state: 'failed' | 'revoked', at: number): void {
+    this.#db
       .update(schema.lease)
       .set({ state, endedAt: at })
       .where(eq(schema.lease.slot, slot))
@@ -624,8 +626,8 @@ export class LeaseDO extends DurableObject<Env> {
    * The earliest time a lease row is due for deletion, or for an owed revocation to stop (a day
    * after its lease expired, or its next try when writing its row failed), or null for none.
    */
-  private nextRowDueAt(): number | null {
-    const row = this.db
+  #nextRowDueAt(): number | null {
+    const row = this.#db
       .select({
         due: sql<
           number | null
@@ -636,19 +638,19 @@ export class LeaseDO extends DurableObject<Env> {
     return row === undefined || row.due === null ? null : row.due;
   }
 
-  private async scheduleAlarm(now: number, failed: boolean): Promise<void> {
+  async #scheduleAlarm(now: number, failed: boolean): Promise<void> {
     let target = Number.POSITIVE_INFINITY;
-    if (this.audit.hasUnrelayed()) {
+    if (this.#audit.hasUnrelayed()) {
       target = now + (failed ? RELAY_RETRY_MS : RELAY_DELAY_MS);
-    } else if (this.audit.hasRows()) {
-      target = Math.max(now + 1_000, this.audit.nextPruneAt());
+    } else if (this.#audit.hasRows()) {
+      target = Math.max(now + 1_000, this.#audit.nextPruneAt());
     }
-    const [nextRevocation] = this.owedRevocations(now, Number.MAX_SAFE_INTEGER, 1);
+    const [nextRevocation] = this.#owedRevocations(now, Number.MAX_SAFE_INTEGER, 1);
     if (nextRevocation !== undefined) {
       const due = nextRevocation.revokeRetryAt ?? now;
       target = Math.min(target, Math.max(now + 1_000, due));
     }
-    const rowDue = this.nextRowDueAt();
+    const rowDue = this.#nextRowDueAt();
     if (rowDue !== null) target = Math.min(target, Math.max(now + 1_000, rowDue));
     if (target === Number.POSITIVE_INFINITY) return;
     const current = await this.ctx.storage.getAlarm();

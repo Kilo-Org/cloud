@@ -1709,7 +1709,10 @@ bounds, retries and give-up, interrupted creations, the credential hold after a 
 credential, the returned-token checks, the pinned forbidden and allowed groups and zones and the
 refusal while they are empty, the account limit, the policy rules (`main` only while the account
 is shared), the `/ci/minting` filter, and
-no token value or credential in storage, logs or audit rows)
+no token value or credential in storage, logs or audit rows; and the RPC surface of every
+Durable Object and the `SecretsBroker` entrypoint: each class's prototype chain up to the runtime
+base class holds exactly its RPC methods, and a stub call to an internal method, such as one that
+once returned a key, is refused)
 and then the Node suites: `test/repo/` (policy files, the Worker config checks, and a check that
 every `wrangler.jsonc` under `services/` other than a service's own, a symlink included, sits under
 `test/fixtures/`, which the production deploy job skips, that no `wrangler.json` and no tracked

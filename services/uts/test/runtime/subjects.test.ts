@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import { UTS_SUBJECT_REVOCATION_ENTRYPOINT } from '@kilocode/uts-contracts';
+import { JWKS_JITTER, JWKS_RETRY_MS } from '@kilocode/verify';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { generateKeyPair, SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
@@ -67,7 +68,7 @@ describe('deployed /internal/ routes', () => {
     expect(await response.json()).toEqual({ error: 'invalid_token' });
   });
 
-  it('answer 503 temporarily_unavailable, and write nothing, while the STS key set cannot be read', async () => {
+  it('answer 503 temporarily_unavailable with the wait verify names, and write nothing, while the STS key set cannot be read', async () => {
     // The development STS issuer has no key set in the test pool, so the fetch fails.
     const { privateKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519' });
     const now = Math.floor(Date.now() / 1000);
@@ -87,7 +88,11 @@ describe('deployed /internal/ routes', () => {
       .sign(privateKey);
     const response = await revoke(`Bearer ${token}`);
     expect(response.status).toBe(503);
-    expect(response.headers.get('Retry-After')).toBe('30');
+    // verify names what is left of its wait (at most JWKS_RETRY_MS plus JWKS_JITTER), never the
+    // route's own default.
+    const retryAfter = Number(response.headers.get('Retry-After'));
+    expect(retryAfter).toBeGreaterThanOrEqual(1);
+    expect(retryAfter).toBeLessThanOrEqual(Math.ceil((JWKS_RETRY_MS * (1 + JWKS_JITTER)) / 1000));
     expect(await response.json()).toEqual({ error: 'temporarily_unavailable' });
   });
 });

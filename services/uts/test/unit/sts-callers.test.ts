@@ -8,7 +8,7 @@ import {
   UTS_TOKEN_EXCHANGE_STS_SCOPE,
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
-import type { JwksSource } from '@kilocode/verify';
+import { JWKS_JITTER, JWKS_RETRY_MS, type JwksSource } from '@kilocode/verify';
 import { SignJWT, exportJWK, generateKeyPair, type JWK } from 'jose';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { UtsConfig } from '../../src/env';
@@ -136,14 +136,18 @@ describe('deployed STS callers', () => {
     expect(await stsCallers(web)).toEqual({ status: 'invalid' });
   });
 
-  it('fails closed with unavailable while the STS key set cannot be read', async () => {
+  it('fails closed with unavailable and the wait verify names while the STS key set cannot be read', async () => {
     const { serviceTokens } = callers('staging', unreachable);
     const stsCallers = exchangeOf(callers('staging', unreachable));
     const web = await stsToken('web', UTS_AUTHORITY_SCOPE);
-    expect(await serviceTokens(`Bearer ${web}`, UTS_AUTHORITY_SCOPE)).toEqual({
-      status: 'unavailable',
-      retryAfterSeconds: 30,
-    });
+    const check = await serviceTokens(`Bearer ${web}`, UTS_AUTHORITY_SCOPE);
+    if (check.status !== 'unavailable') throw new Error(`expected unavailable, got ${check.status}`);
+    // verify names what is left of its wait (at most JWKS_RETRY_MS plus JWKS_JITTER), never the
+    // fixed default.
+    expect(check.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+    expect(check.retryAfterSeconds).toBeLessThanOrEqual(
+      Math.ceil((JWKS_RETRY_MS * (1 + JWKS_JITTER)) / 1000)
+    );
     const broker = await stsToken(UTS_TOKEN_EXCHANGE_ACTOR, UTS_TOKEN_EXCHANGE_STS_SCOPE);
     expect(await stsCallers(broker)).toEqual({ status: 'unavailable' });
   });

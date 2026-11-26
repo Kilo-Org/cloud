@@ -17,6 +17,7 @@ import {
   type VerifyFailure,
   type Verifier,
 } from '@kilocode/verify';
+import { z } from 'zod';
 import type { UtsConfig } from './env';
 import type { StsCallerVerifier } from './exchange/endpoint';
 import type { ServiceTokenVerifier } from './subjects/service-tokens';
@@ -44,8 +45,11 @@ const UTS_STS_SCOPES = [
   ]),
 ];
 
-/** How long a caller waits while the STS key set cannot be read. */
+/** How long a caller waits while the STS key set cannot be read and verify names no wait. */
 const KEY_SET_RETRY_SECONDS = 30;
+
+/** verify's `Retry-After`: whole seconds, at least 1. */
+const RetryAfterSchema = z.coerce.number().int().positive();
 
 /** One verifier per isolate and environment, so its key-set cache serves every request. */
 let held: { key: string; verifier: Verifier<false> } | null = null;
@@ -91,9 +95,18 @@ async function verifyBearer(
   );
 }
 
-/** A failure the caller cannot fix: the STS key set (or another dependency) did not answer. */
+/**
+ * A failure the caller cannot fix: the STS key set (or another dependency) did not answer (503), or
+ * verify refused to call it again yet (429).
+ */
 function isUnavailable(failure: VerifyFailure): boolean {
-  return failure.status === 503;
+  return failure.status === 503 || failure.status === 429;
+}
+
+/** The wait verify set on the failure, or the default when it names none. */
+function retryAfterOf(failure: VerifyFailure): number {
+  const parsed = RetryAfterSchema.safeParse(failure.headers['retry-after']);
+  return parsed.success ? parsed.data : KEY_SET_RETRY_SECONDS;
 }
 
 /**
@@ -114,7 +127,7 @@ export function deployedStsCallers(
       const result = await verifyBearer(config, ctx, jwks, authorization, scope);
       if (!result.ok) {
         if (isUnavailable(result)) {
-          return { status: 'unavailable', retryAfterSeconds: KEY_SET_RETRY_SECONDS };
+          return { status: 'unavailable', retryAfterSeconds: retryAfterOf(result) };
         }
         if (result.reason === 'missing_credential') return { status: 'missing' };
         return { status: result.status === 403 ? 'insufficient_scope' : 'invalid' };

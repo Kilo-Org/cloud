@@ -445,6 +445,47 @@ describe('replacing an inventory credential', () => {
     ]);
   });
 
+  it.each(['replaceInventoryCredential', 'replaceManualCredentialRevocation'] as const)(
+    '%s binds an uppercase inventory id to the lowercase id a later read uses',
+    async replacement => {
+      const row = await insertInventoryRow(
+        replacement === 'replaceInventoryCredential'
+          ? {
+              plan_id: MINIMAX_PLAN_ID,
+              provider_id: 'minimax',
+              upstream_usage_id: null,
+              ...dualWrittenInventoryColumns('old-secret'),
+            }
+          : { status: 'revocation_pending' }
+      );
+      const uppercaseId = row.id.toUpperCase();
+
+      if (replacement === 'replaceInventoryCredential') {
+        await replaceInventoryCredential(uppercaseId, 'uppercase-replacement', ADMIN_USER_ID, {
+          validateCredential: async () => ({ valid: true }),
+        });
+      } else {
+        await replaceManualCredentialRevocation(
+          uppercaseId,
+          'uppercase-replacement',
+          ADMIN_USER_ID,
+          { validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-uppercase' }) }
+        );
+      }
+
+      const stored = await selectInventory(row.id);
+      await expect(openCodingPlanInventoryCredential(stored)).resolves.toBe(
+        'uppercase-replacement'
+      );
+      const [dataKeyRequest] = kms.requests.filter(request => request.path === '/data-key');
+      const decryptRequests = kms.requests.filter(request => request.path === '/decrypt');
+      // The fake KMS service does not check bindings; the real one refuses a context that
+      // differs from the one the data key was created for, so the request bodies must agree.
+      expect(dataKeyRequest.body.key_id).toBe(row.id);
+      expect(decryptRequests.at(-1)?.body).toMatchObject(inventoryContext(row.id));
+    }
+  );
+
   it('replaceInventoryCredential replaces a stale envelope', async () => {
     const row = await insertInventoryRow({
       plan_id: MINIMAX_PLAN_ID,

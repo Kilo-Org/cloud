@@ -25,7 +25,9 @@ export const CODING_PLAN_INVENTORY_KMS_PROVIDER_ID = 'coding-plan-inventory';
  */
 export function codingPlanInventoryKmsContext(inventoryId: string): ByokKmsContext {
   return {
-    key_id: inventoryId,
+    // Admin input may spell the UUID in uppercase while PostgreSQL returns it lowercase; the
+    // binding uses the form a later read derives from the row.
+    key_id: inventoryId.toLowerCase(),
     owner_type: 'organization',
     owner_id: KILO_ORGANIZATION_ID,
     provider_id: CODING_PLAN_INVENTORY_KMS_PROVIDER_ID,

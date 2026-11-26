@@ -123,6 +123,40 @@ describe('signer keys', () => {
     expect(result).toMatchObject({ status: 'ok', signer: 2 });
   });
 
+  it("refuses stored keys in any object but that signer's object of this environment", async () => {
+    const state = await storedState();
+    const reason = `stored state names signer ${SIGNER}, but this is not that signer's development object`;
+    // Another signer's object, and this signer's object of another environment.
+    try {
+      for (const name of ['development:signer:06', 'staging:signer:05']) {
+        const stub = () => env.UTS_SIGNER_DO.getByName(name);
+        await runInDurableObject(stub(), async (_instance, object) => {
+          await object.storage.deleteAlarm();
+          await object.storage.deleteAll();
+          await object.storage.put('signer-state', state);
+        });
+        await runInDurableObject(stub(), (_instance, object) => object.abort('test restart')).catch(
+          () => undefined
+        );
+        expect(await stub().publicKeys()).toEqual({ status: 'misconfigured', reason });
+        expect(await stub().sign(claims())).toEqual({ status: 'misconfigured', reason });
+        expect(await stub().removeKid(state.current.kid)).toEqual({
+          status: 'misconfigured',
+          reason,
+        });
+      }
+    } finally {
+      await resetSigner(6);
+    }
+  });
+
+  it('loads its stored keys when opened by its raw id, which carries no name, as an alarm does', async () => {
+    const before = await published();
+    const id = env.UTS_SIGNER_DO.idFromString(signer().id.toString());
+    await restartSigner(SIGNER);
+    expect(await env.UTS_SIGNER_DO.get(id).publicKeys()).toEqual(before);
+  });
+
   it('schedules its alarm for the next rotation', async () => {
     const state = await storedState();
     expect(await storedAlarm()).toBe(state.current.activatedAt + 30 * DAY);

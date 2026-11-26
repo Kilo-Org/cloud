@@ -23,7 +23,7 @@ import {
   type SignerState,
 } from '../keys/lifecycle';
 import { dataCenter } from './data-center';
-import { signerOfObjectId } from './stubs';
+import { signerOfObjectId, storedSignerCheck } from './stubs';
 
 /**
  * KV storage key of the whole signer state. Key material lives in KV storage, not in SQL rows: a
@@ -210,16 +210,26 @@ export class UtsSignerDO extends DurableObject<Env> {
     const now = Date.now();
     const stored: unknown = await this.ctx.storage.get(STATE_KEY);
     if (stored !== undefined) {
-      await this.#scheduleAlarm(await this.#advanceStored(SignerStateSchema.parse(stored), now));
+      const state = SignerStateSchema.parse(stored);
+      const owner = storedSignerCheck(this.env, this.#config, this.ctx.id, state.signer);
+      if (owner.status === 'refused') {
+        this.#refuse(owner.reason);
+        return;
+      }
+      await this.#scheduleAlarm(await this.#advanceStored(state, now));
       return;
     }
     const id = signerOfObjectId(this.#config, this.ctx.id);
     if (id.status === 'refused') {
-      console.error(JSON.stringify({ event: 'uts.signer.refused', reason: id.reason }));
-      this.#phase = id;
+      this.#refuse(id.reason);
       return;
     }
     await this.#scheduleAlarm(await this.#bootstrap(id.index, now));
+  }
+
+  #refuse(reason: string): void {
+    console.error(JSON.stringify({ event: 'uts.signer.refused', reason }));
+    this.#phase = { status: 'refused', reason };
   }
 
   async #advanceStored(stored: SignerState, now: number): Promise<SignerState> {

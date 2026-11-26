@@ -24,8 +24,8 @@ export type BlockUserParams = {
  *
  * Also in the same transaction, through `revokeUserSessions`: revokes step-up
  * proofs, denies pending or approved device auth requests, revokes device
- * sessions with their unconsumed refresh tokens, and deletes native attested
- * keys.
+ * sessions with their unconsumed refresh tokens, deletes native attested keys,
+ * and deletes unconsumed app-shell hand-off tokens.
  *
  * @returns `true` if this call transitioned the user from unblocked to blocked,
  * `false` if the user was already blocked (or does not exist).

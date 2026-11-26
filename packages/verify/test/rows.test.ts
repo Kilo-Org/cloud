@@ -115,6 +115,33 @@ describe('row 1: algorithm is EdDSA only, and the header names a kid', () => {
       token: async () => 'abc.def',
       expected: invalid('malformed_token'),
     },
+    {
+      name: 'a crit header is refused',
+      token: h =>
+        signWithHeader(h.sts, stsClaims(), {
+          alg: 'EdDSA',
+          typ: 'at+jwt',
+          kid: h.sts.kid,
+          crit: ['exp'],
+        }),
+      expected: invalid('header_extension'),
+    },
+    {
+      name: 'a b64 header is refused, even set to true',
+      token: h =>
+        signWithHeader(h.sts, stsClaims(), {
+          alg: 'EdDSA',
+          typ: 'at+jwt',
+          kid: h.sts.kid,
+          b64: true,
+        }),
+      expected: invalid('header_extension'),
+    },
+    {
+      name: 'a header that is not a JSON object is refused',
+      token: async () => `${btoa('"x"')}.${btoa('{}')}.AA`,
+      expected: invalid('malformed_token'),
+    },
   ]);
 });
 
@@ -181,7 +208,7 @@ describe('row 3: issuer is an exact match and the key comes from that issuer set
       name: 'a UTS token signed under a revocation-feed key of the UTS set is refused',
       token: async h => {
         const feedKey = await createIssuer(UTS_ISSUER, 'uts-feed-0-');
-        h.utsJwks.keys = [h.uts.jwk, feedKey.jwk];
+        h.utsJwks.keys = [...h.utsJwks.keys, feedKey.jwk];
         return await sign(feedKey, utsClaims());
       },
       route: uts,
@@ -731,5 +758,25 @@ describe('error responses', () => {
     expect(() =>
       createVerifier({ audience: AUDIENCE, resourceMetadataUrl: 'https://x.test/"a' })
     ).toThrow();
+  });
+
+  it.each([
+    ['an http issuer on a public host', 'http://sts.test', true],
+    ['an issuer that is not a URL', 'sts.test', true],
+    ['an https issuer', 'https://sts.test', false],
+    ['an http issuer on localhost', 'http://localhost:8825', false],
+    ['an http issuer on 127.0.0.1', 'http://127.0.0.1:8825', false],
+  ])('validates the issuer: %s', (_name, issuer, refused) => {
+    let threw = false;
+    try {
+      createVerifier({
+        audience: AUDIENCE,
+        resourceMetadataUrl: RESOURCE_METADATA,
+        sts: { issuer, jwks: h.stsJwks.source },
+      });
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(refused);
   });
 });

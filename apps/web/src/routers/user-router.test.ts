@@ -9,6 +9,7 @@ import { SELF_CLEANUP_PROCEDURES } from '@kilocode/app-shared/auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
+  app_shell_handoff_tokens,
   cli_sessions_v2,
   credit_transactions,
   device_refresh_tokens,
@@ -36,10 +37,9 @@ import {
   sendAccountDeletionSupportNotification,
 } from '@kilocode/web-shared/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
-import { createAccountLinkingSession } from '@/lib/account-linking-session';
-import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
+import { consumeAppShellHandoff, createAppShellHandoff } from '@/lib/app-shell/handoff-token';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
@@ -54,13 +54,6 @@ jest.mock('@kilocode/web-shared/lib/email', () => {
 
 jest.mock('@/lib/user/gdpr-removal', () => ({
   performGdprRemoval: jest.fn(),
-}));
-
-// Starting a link writes the linking cookie through `next/headers`, which has no
-// request scope here; the offer list is what this suite checks against.
-jest.mock('@/lib/account-linking-session', () => ({
-  ...jest.requireActual('@/lib/account-linking-session'),
-  createAccountLinkingSession: jest.fn(),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -139,29 +132,6 @@ describe('user router - getMe', () => {
       email: user.google_user_email,
       isAdmin: false,
     });
-  });
-});
-
-describe('user router - linkAuthProvider', () => {
-  it('starts a link for every provider the connected-accounts card offers', async () => {
-    const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
-    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
-
-    for (const { id } of AccountLinkingProviders) {
-      mockCreateLinkingSession.mockClear();
-      await expect(caller.user.linkAuthProvider({ provider: id })).resolves.toEqual({
-        success: true,
-      });
-      expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
-    }
-
-    // A method the card does not offer must not open a linking session.
-    mockCreateLinkingSession.mockClear();
-    await expect(caller.user.linkAuthProvider({ provider: 'workos' })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
   });
 });
 
@@ -524,6 +494,10 @@ describe('session and API token reset mutations', () => {
       device_session_id: deviceSession.id,
       expires_at: '2099-01-01 00:00:00+00',
     });
+    await createAppShellHandoff({
+      userId: user.id,
+      targetPath: '/app-shell/github-app',
+    });
     const caller = await createCallerForUser(user.id);
 
     await caller.user.resetAPIKey();
@@ -545,12 +519,22 @@ describe('session and API token reset mutations', () => {
       .from(device_refresh_tokens)
       .where(eq(device_refresh_tokens.device_session_id, deviceSession.id));
     expect(refreshTokens).toEqual([]);
+
+    const handoffTokens = await db
+      .select({ id: app_shell_handoff_tokens.id })
+      .from(app_shell_handoff_tokens)
+      .where(eq(app_shell_handoff_tokens.kilo_user_id, user.id));
+    expect(handoffTokens).toEqual([]);
   });
 
   it('signs out current user browser sessions without resetting the API key', async () => {
     const user = await insertTestUser({
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
+    });
+    const handoff = await createAppShellHandoff({
+      userId: user.id,
+      targetPath: '/app-shell/github-app',
     });
     const caller = await createCallerForUser(user.id);
 
@@ -560,6 +544,8 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
+    // A hand-off minted before the sign-out cannot open a shell after it.
+    await expect(consumeAppShellHandoff(handoff)).resolves.toBeNull();
   });
 
   it('lets admins reset a user API key without signing out browser sessions', async () => {
@@ -584,6 +570,10 @@ describe('session and API token reset mutations', () => {
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
+    const handoff = await createAppShellHandoff({
+      userId: target.id,
+      targetPath: '/app-shell/connected-accounts',
+    });
     const caller = await createCallerForUser(admin.id);
 
     await caller.admin.users.signOutBrowserSessions({ userId: target.id });
@@ -592,6 +582,7 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
+    await expect(consumeAppShellHandoff(handoff)).resolves.toBeNull();
   });
 });
 

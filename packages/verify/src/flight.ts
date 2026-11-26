@@ -11,8 +11,10 @@
  *
  * A request can also be cancelled outright (its client went away), and then its call never
  * answers. While a call is pending its owner marks it alive on its own timer, which workerd
- * stops with the request; a poller that sees no mark for `ABANDONED_AFTER_MS` drops the call and
- * starts its own, instead of waiting out the call's timeout and failing.
+ * stops with the request; a poller that sees no mark for `ABANDONED_AFTER_MS` drops the call
+ * instead of waiting out its timeout. The key-set cache, the feed and the bootstrap count a
+ * dropped call as a failed one, with its retry wait, so cancelling requests cannot make them fetch
+ * more often; the PAT resolver lets the poller start its own lookup, within the per-address limit.
  */
 
 export type WaitUntil = (promise: Promise<unknown>) => void;
@@ -111,4 +113,12 @@ export function handOff(scope: CallScope, waitUntil: WaitUntil): void {
 /** Seconds until `at`, at least 1: the `Retry-After` of a dependency failure. */
 export function retryAfterSeconds(at: number, now: number): number {
   return Math.max(1, Math.ceil((at - now) / 1000));
+}
+
+/**
+ * The wait before the next call after `consecutive` failed ones: `baseMs`, doubled per further
+ * failure, at most `capMs`.
+ */
+export function backoffMs(baseMs: number, capMs: number, consecutive: number): number {
+  return Math.min(capMs, baseMs * 2 ** Math.max(0, consecutive - 1));
 }

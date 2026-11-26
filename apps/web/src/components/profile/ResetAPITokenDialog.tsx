@@ -28,6 +28,13 @@ export function ResetAPITokenDialog() {
         );
         await signOut({ callbackUrl: '/users/sign_in' });
       },
+      onError: async error => {
+        // The session is already gone, typically because an earlier reset
+        // committed but its response never arrived.
+        if (error.data?.code === 'UNAUTHORIZED') {
+          await signOut({ callbackUrl: '/users/sign_in' });
+        }
+      },
     })
   );
 
@@ -53,11 +60,12 @@ export function ResetAPITokenDialog() {
             API tokens. It also signs you out of every browser and the mobile app, including this
             one, so you will need to sign in again.
           </DialogDescription>
-          {resetAPIKeyMutation.isError && (
-            <p className="text-destructive text-sm">
-              The reset did not complete. Nothing was changed; try again.
-            </p>
-          )}
+          {resetAPIKeyMutation.isError &&
+            resetAPIKeyMutation.error.data?.code !== 'UNAUTHORIZED' && (
+              <p className="text-destructive text-sm">
+                The reset may not have completed. Reload the page and try again.
+              </p>
+            )}
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <DialogClose asChild>

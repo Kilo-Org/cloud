@@ -12,6 +12,26 @@ The fake-llm Worker is a new, separate Worker with no container and no
 rendered into a private file. The checked-in `wrangler.jsonc` is never
 modified, so the production/default deploy is unaffected.
 
+## Why the deployed profile is paused
+
+Both e2e Workers verify tokens with the development signing key
+(`NEXTAUTH_SECRET_DEV`). The Worker never receives the user token: the driver
+sends it only to the backend, which returns short-lived control tokens and
+stream tickets for the driver to present to the Worker. The production backend
+at `https://api.kilo.ai` signs those with the production key, so the Worker
+refuses them and a deployed run against it fails.
+
+The `Cloud Agent E2E nightly` workflow's daily schedule is therefore off. Its
+manual dispatch remains, but it still targets `https://api.kilo.ai` and fails the
+same way. Running the deployed profile again needs:
+
+- a Kilo backend that signs control tokens and stream tickets with
+  `NEXTAUTH_SECRET_DEV`;
+- a personal API token issued by that backend;
+- `E2E_BACKEND_URL` (the tests workflow's `backend_url` input) set to that
+  backend, and the renderer's `KILOCODE_BACKEND_BASE_URL`, now
+  `https://api.kilo.ai`, changed to match.
+
 ## Prerequisites
 
 - `pnpm install` at the repo root.
@@ -24,8 +44,10 @@ modified, so the production/default deploy is unaffected.
   `Cloud Agent E2E deploy` workflow runs this preparation for its own SHA, so it only deploys a SHA
   whose exact-SHA runtime publication has completed.
 - A fake-llm admin token, exported as `FAKE_LLM_ADMIN_TOKEN` or provided by
-  `E2E_AUTH_FILE`, and a user token supplied by `E2E_USER_TOKEN` or
-  `E2E_AUTH_FILE` (see [Environment variables](#environment-variables)).
+  `E2E_AUTH_FILE`, and a user token issued by a backend that signs with
+  `NEXTAUTH_SECRET_DEV`, supplied by `E2E_USER_TOKEN` or `E2E_AUTH_FILE` (see
+  [Environment variables](#environment-variables) and
+  [Why the deployed profile is paused](#why-the-deployed-profile-is-paused)).
 - Docker scope: deploying the fake Worker needs no Docker, because it is a Worker
   and a Durable Object, not a container image. Deploying the Cloud Agent e2e
   Worker uses the prepared immutable runtime-free image. Runtime preparation needs Docker to verify it. Running the
@@ -173,7 +195,7 @@ script never falls back to another token and never prints the token value.
 | Name | Required | Meaning |
 |---|---|---|
 | `E2E_AUTH_FILE` | no | Optional mode-600 JSON file for a deployed run: `{ token, userId?, email?, fakeLlmAdminToken?, e2eInternalApiSecret? }`. Supplies the user token when `E2E_USER_TOKEN` is unset or empty, and the identity (`userId` derived from the token when omitted; `email` optional). `deploy-fake-llm.sh` reads its `fakeLlmAdminToken` field when `FAKE_LLM_ADMIN_TOKEN` is unset or empty; `deploy-e2e-worker.sh` and the deployed driver read its `e2eInternalApiSecret` field when `E2E_INTERNAL_API_SECRET` is unset or empty. |
-| `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token. The driver exchanges it for short-lived control tokens and uses it directly for backend requests, including stream tickets. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
+| `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token issued by the backend at `E2E_BACKEND_URL`. The driver sends it only to that backend: it exchanges it for short-lived control tokens and uses it for backend requests, including stream tickets. The Worker never receives it; it verifies the backend-issued control tokens and stream tickets with `NEXTAUTH_SECRET_DEV`, so a token for `https://api.kilo.ai` cannot drive a passing run. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
 | `E2E_INTERNAL_API_SECRET` | required for the deployed driver; optional for deploy | Value uploaded as the `cloud-agent-e2e-test` Worker's `INTERNAL_API_SECRET` secret when a source supplies it, and always presented by the driver as both the surface key and the internal tRPC key. Needed for the first deploy or a rotation; a redeploy without it keeps the deployed value. When unset or empty, both `deploy-e2e-worker.sh` and the deployed driver resolve it from the `E2E_AUTH_FILE`'s `e2eInternalApiSecret` field. The shared `requireE2eInternalSecret` rules require at least 16 characters, no whitespace, and not the development default; the dotenv alphabet `[A-Za-z0-9._~-]` is a local-renderer concern only, so a base64 value is accepted here. Must differ from production's `INTERNAL_API_SECRET` (an operator requirement the scripts cannot prove). |
 | `FAKE_LLM_BASE_URL` | yes | Must be `https://<fake-host>/api/openrouter`. |
 | `FAKE_LLM_ADMIN_TOKEN` | yes | Bearer for the fake's `/test/*` routes. Uploaded as the Worker secret by `deploy-fake-llm.sh` and exported for the driver. When unset or empty, the script resolves it from `E2E_AUTH_FILE`. Never the development default. |
@@ -204,10 +226,13 @@ account's stored pepper; a null claim is valid for an account whose
 current pepper without a database, so it is a shape check, not full gateway
 semantics.
 
-Both e2e Workers bind the development signing key, so a deployed run must present
-a user token signed with that key. A production-issued token, and a stream ticket
-issued by the production backend, are signed with the production key and are
-refused by these Workers.
+Both e2e Workers bind the development signing key. The Worker never receives the
+user token; it receives the control tokens and stream tickets the backend issues
+in exchange for it, and refuses any not signed with `NEXTAUTH_SECRET_DEV`. The
+production backend at `https://api.kilo.ai` signs them with the production key,
+so the deployed profile cannot run against it while the Workers use the
+development key (see
+[Why the deployed profile is paused](#why-the-deployed-profile-is-paused)).
 
 ## What the render changes, and why
 
@@ -221,6 +246,7 @@ refused by these Workers.
 | Only the native `SandboxContainers` container kept | Native Cloudflare Containers is the only runtime; the E2E Worker exercises the same provider as production. |
 | Runtime migrations preserve E2E history | `v15` removes the old runtime; `v15-e2e` creates the retained runtime namespaces. |
 | `NEXTAUTH_SECRET` Secrets Store binding added, pointing at `NEXTAUTH_SECRET_DEV` | Verifies the ticket and API token, and seals runtime authorization, with the non-production signing key. |
+| Not changed: `INTERNAL_API_SECRET_PROD` Secrets Store binding | The e2e Worker still binds the production internal API key, inherited from `wrangler.jsonc`. |
 
 ### Container classes and migrations
 
@@ -244,15 +270,21 @@ image paths are rebased for the generated configuration directory.
 
 The driver requires an ordinary personal Kilo API token from the
 `generateApiToken` family, supplied as `E2E_USER_TOKEN` or as the `token` field of
-the auth file named by `E2E_AUTH_FILE`. Obtain one from the user's personal API
-key in the Kilo web app or the CLI token flow. Never print the token.
+the auth file named by `E2E_AUTH_FILE`. Obtain one from the personal API key or
+CLI token flow of the backend named by `E2E_BACKEND_URL`. Never print the token.
 
 The driver exchanges this source token for short-lived Cloud Agent control
-tokens through the backend's `/api/cloud-agent-next/token` route.
+tokens through that backend's `/api/cloud-agent-next/token` route.
 It presents the control token to the Worker and refreshes it before expiry.
-Backend requests, including stream tickets, still use the source token.
+Backend requests, including stream tickets, still use the source token; the
+Worker never receives it.
 The driver rejects session/control, organization and delegated/runtime tokens
 as source credentials before it sends a request.
+
+The Worker verifies control tokens and stream tickets with `NEXTAUTH_SECRET_DEV`,
+so the backend must sign them with that key. `https://api.kilo.ai` signs with
+the production key, so a token for it cannot drive a passing run (see
+[Why the deployed profile is paused](#why-the-deployed-profile-is-paused)).
 
 The renderer sets `E2E_MODEL_VALIDATION_BASE_URL` to the fake Worker origin.
 Model validation accepts this base only when its origin matches
@@ -316,8 +348,10 @@ spawn and reported as a skip, not a failure.
 
 The `Cloud Agent E2E tests` workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
-and `workflow_call`. The `Cloud Agent E2E nightly` workflow calls it after
-deploying the e2e stack at 03:37 UTC each day. The tests workflow runs the
+and `workflow_call`. The `Cloud Agent E2E nightly` workflow deploys the e2e stack
+and then calls it. Its daily 03:37 UTC schedule is paused (see
+[Why the deployed profile is paused](#why-the-deployed-profile-is-paused)), so it
+runs only on manual dispatch. The tests workflow runs the
 parallel runner (`e2e:parallel`) as one job. Its `parallel` input defaults to
 `4` and sets `E2E_PARALLEL`; `only` selects scenarios. See
 [`../README.md`](../README.md#the-matrix-runner) for the scenario matrix

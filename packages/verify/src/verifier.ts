@@ -13,19 +13,26 @@ import {
   type Actor,
   type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
-import {
-  compactVerify,
-  decodeJwt,
-  decodeProtectedHeader,
-  type JWTPayload,
-  type ProtectedHeaderParameters,
-} from 'jose';
 import { z } from 'zod';
+import { createBootstrap, type Bootstrap, type UtsBootstrapSource } from './bootstrap';
 import { createFailures, type FailureReason, type VerifyFailure } from './failure';
 import { handOff, newCallScope, type CallScope, type WaitUntil } from './flight';
-import { createKeySetCache, type JwksSource, type KeySetCache } from './jwks';
+import {
+  UTS_FEED_KID_PREFIX,
+  UTS_TOKEN_KID_PREFIX,
+  createKeySetCache,
+  type JwksSource,
+  type KeySetCache,
+} from './jwks';
+import { decodeJws, hasJwsExtension, verifyEd25519 } from './jws';
 import { hashPat, hasPatPrefix, parsePat } from './pat-format';
-import { createPatResolver, type PatConfig, type PatRecord, type PatResolver } from './pat';
+import {
+  createPatResolver,
+  type PatConfig,
+  type PatRecord,
+  type PatRequest,
+  type PatResolver,
+} from './pat';
 import {
   FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS,
   createRevocationFeed,
@@ -52,26 +59,43 @@ export type VerifierConfig = {
   /** RFC 9728 protected-resource metadata URL, sent in every 401 challenge. */
   resourceMetadataUrl: string;
   sts?: {
-    /** Exact `iss` of STS tokens, such as `STS_ISSUERS.production`. */
+    /** Exact `iss` of STS tokens, such as `STS_ISSUERS.production`; `https:`, or `http:` on localhost. */
     issuer: string;
     jwks: JwksSource;
     /** Defaults to `STS_SCOPE_REGISTRY`. */
     scopeRegistry?: StsScopeRegistry;
   };
   uts?: {
+    /** Exact `iss` of UTS tokens; `https:`, or `http:` on localhost. */
     issuer: string;
-    jwks: JwksSource;
     /**
-     * Whether a `kid` names a token-signing key. The UTS key set also publishes the revocation-feed
-     * keys (design 5.6); a token signed under any other `kid` is refused before any key-set fetch.
+     * The UTS key set, for warm refreshes. It holds token keys under `UTS_TOKEN_KID_PREFIX` and
+     * revocation-feed keys under `UTS_FEED_KID_PREFIX`.
      */
-    isTokenKid: (kid: string) => boolean;
+    jwks: JwksSource;
     scopeRegistry: UtsScopeRegistry;
+    /** The revocation feed, for warm refreshes; the library verifies every head and list. */
     revocation: RevocationFeedSource;
+    /**
+     * The UTS bootstrap endpoint. While neither the UTS key set nor the feed holds data, one call
+     * loads both; without it, a cold instance fetches the key set and then the feed.
+     */
+    bootstrap?: UtsBootstrapSource;
     /** Without it, a PAT is refused with 401. */
     pat?: PatConfig;
   };
 };
+
+/** Whether a verifier for config `C` may receive PATs, so each call must pass a client address. */
+export type AcceptsPats<C> = 'uts' extends keyof C
+  ? NonNullable<C['uts' & keyof C]> extends infer U
+    ? 'pat' extends keyof U
+      ? U['pat' & keyof U] extends undefined
+        ? false
+        : true
+      : false
+    : false
+  : false;
 
 /** What one route accepts: exactly one issuer and exactly one scope. */
 export type Route = {
@@ -83,12 +107,16 @@ export type Route = {
   requiresSession?: boolean;
 };
 
-export type VerifyContext = {
+/**
+ * Per-request input. A verifier that accepts PATs requires `clientAddress`: the platform's client
+ * address header (README), or null when the request has none, which refuses any PAT.
+ */
+export type VerifyContext<RequireAddress extends boolean = true> = {
   /** The request's own `waitUntil`; background refreshes this request starts run under it. */
   waitUntil: WaitUntil;
-  /** The client's address, for the per-address PAT lookup limit. */
-  clientAddress?: string;
-};
+} & (RequireAddress extends true
+  ? { clientAddress: string | null }
+  : { clientAddress?: string | null });
 
 export type Caller =
   | { kind: 'service'; workload: string }
@@ -114,24 +142,42 @@ export type VerifySuccess =
 
 export type VerifyResult = VerifySuccess | VerifyFailure;
 
-export type Verifier = {
+export type Verifier<RequireAddress extends boolean = true> = {
   /**
    * Checks the bearer credential of `input` (a request or its `Authorization` header value)
    * against `route`. Never throws for a bad credential or an unavailable dependency; it rejects
    * only for a route this verifier cannot serve (a programming error).
    */
-  verify(input: Request | string | null, route: Route, ctx: VerifyContext): Promise<VerifyResult>;
+  verify(
+    input: Request | string | null,
+    route: Route,
+    ctx: VerifyContext<RequireAddress>
+  ): Promise<VerifyResult>;
+  /**
+   * Starts the cold-start fetches (the UTS bootstrap, or the UTS key set without one, and the STS
+   * key set) in parallel under `ctx.waitUntil`, without waiting for them. Call it at the start of a
+   * request, beside the secrets bundle call; a later `verify` joins the fetches in flight.
+   */
+  warm(ctx: { waitUntil: WaitUntil }): void;
 };
+
+/** An issuer URL: `https:`, or `http:` on a loopback host for local development. */
+const IssuerUrlSchema = z.url().refine(value => {
+  const url = new URL(value);
+  return (
+    url.protocol === 'https:' ||
+    (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
+  );
+}, 'must be https, or http on localhost');
 
 const ConfigSchema = z.object({
   audience: AudienceSchema,
   resourceMetadataUrl: z.url().refine(url => !/["\\]/.test(url), 'must not contain quotes'),
+  sts: z.object({ issuer: IssuerUrlSchema }).optional(),
+  uts: z.object({ issuer: IssuerUrlSchema }).optional(),
 });
 
 const BEARER = /^Bearer +([^\s]+) *$/i;
-
-/** The address bucket for requests whose caller passed none. */
-const UNKNOWN_ADDRESS = 'unknown';
 
 /** Maps the first schema issue to the §7 row it breaks. */
 function claimsReason(error: z.ZodError): FailureReason {
@@ -154,34 +200,28 @@ function claimsReason(error: z.ZodError): FailureReason {
   }
 }
 
-function parseJson(bytes: Uint8Array): unknown {
-  try {
-    return JSON.parse(new TextDecoder().decode(bytes));
-  } catch {
-    return undefined;
-  }
-}
-
 type StsIssuer = {
+  kind: 'sts';
   issuer: string;
   keySet: KeySetCache;
   scopeRegistry: StsScopeRegistry;
 };
 
 type UtsIssuer = {
+  kind: 'uts';
   issuer: string;
   keySet: KeySetCache;
-  isTokenKid: (kid: string) => boolean;
   scopeRegistry: UtsScopeRegistry;
   feed: RevocationFeed;
+  bootstrap: Bootstrap | null;
   pats: PatResolver | null;
 };
 
 /**
  * One verifier per isolate: create it at module scope so its caches are shared by every request.
- * It does no I/O until the first `verify`.
+ * It does no I/O until the first `warm` or `verify`.
  */
-export function createVerifier(config: VerifierConfig): Verifier {
+export function createVerifier<C extends VerifierConfig>(config: C): Verifier<AcceptsPats<C>> {
   ConfigSchema.parse(config);
   const audience = config.audience;
   const failures = createFailures(config.resourceMetadataUrl);
@@ -189,21 +229,30 @@ export function createVerifier(config: VerifierConfig): Verifier {
     config.sts === undefined
       ? null
       : {
+          kind: 'sts',
           issuer: config.sts.issuer,
-          keySet: createKeySetCache(config.sts.jwks),
+          keySet: createKeySetCache(config.sts.jwks, 'sts'),
           scopeRegistry: config.sts.scopeRegistry ?? STS_SCOPE_REGISTRY,
         };
-  const uts: UtsIssuer | null =
-    config.uts === undefined
-      ? null
-      : {
-          issuer: config.uts.issuer,
-          keySet: createKeySetCache(config.uts.jwks),
-          isTokenKid: config.uts.isTokenKid,
-          scopeRegistry: config.uts.scopeRegistry,
-          feed: createRevocationFeed(config.uts.revocation),
-          pats: config.uts.pat === undefined ? null : createPatResolver(config.uts.pat),
-        };
+  const uts: UtsIssuer | null = (() => {
+    if (config.uts === undefined) return null;
+    const keySet = createKeySetCache(config.uts.jwks, 'uts');
+    const feed = createRevocationFeed(config.uts.revocation, (kid, now) =>
+      keySet.feedKey(kid, now)
+    );
+    return {
+      kind: 'uts',
+      issuer: config.uts.issuer,
+      keySet,
+      scopeRegistry: config.uts.scopeRegistry,
+      feed,
+      bootstrap:
+        config.uts.bootstrap === undefined
+          ? null
+          : createBootstrap(config.uts.bootstrap, keySet, feed),
+      pats: config.uts.pat === undefined ? null : createPatResolver(config.uts.pat),
+    };
+  })();
 
   function assertRoute(route: Route): void {
     if (!ScopeSchema.safeParse(route.scope).success || scopeAudience(route.scope) !== audience) {
@@ -219,52 +268,58 @@ export function createVerifier(config: VerifierConfig): Verifier {
     }
   }
 
-  /** Rows 1-7 for either issuer: header, issuer, key, signature, claim types and time. */
+  /** Cold UTS state with a bootstrap port: one bootstrap call fills the key set and the feed. */
+  async function utsLoaded(issuer: UtsIssuer, scope: CallScope): Promise<VerifyFailure | null> {
+    if (issuer.bootstrap === null) return null;
+    const loaded = await issuer.bootstrap.load(scope);
+    return loaded.status === 'ready'
+      ? null
+      : failures.unavailable('bootstrap_unavailable', loaded.retryAfterSeconds);
+  }
+
+  /**
+   * Rows 1, 2, 3, 5 and 14 for either issuer: header, issuer, key and signature. The token is
+   * decoded once; the payload returned is the one the signature covers, not yet validated.
+   */
   async function verifySignedToken(
     token: string,
-    issuer: { issuer: string; keySet: KeySetCache; isTokenKid?: (kid: string) => boolean },
+    issuer: StsIssuer | UtsIssuer,
     other: string | null,
     scope: CallScope
   ): Promise<{ ok: true; kid: string; payload: unknown } | VerifyFailure> {
-    if (token.split('.').length !== 3) return failures.invalidToken('malformed_token');
-    let header: ProtectedHeaderParameters;
-    let peeked: JWTPayload;
-    try {
-      header = decodeProtectedHeader(token);
-      peeked = decodeJwt(token);
-    } catch {
-      return failures.invalidToken('malformed_token');
-    }
+    const jws = decodeJws(token);
+    if (jws === null) return failures.invalidToken('malformed_token');
+    const header = jws.header;
+    if (hasJwsExtension(header)) return failures.invalidToken('header_extension');
     // Rows 1 and 5: EdDSA with a kid, typ at+jwt.
     if (header.alg !== ACCESS_TOKEN_ALGORITHM) return failures.invalidToken('algorithm');
-    if (typeof header.kid !== 'string' || header.kid === '')
-      return failures.invalidToken('kid_missing');
+    const kid = header.kid;
+    if (typeof kid !== 'string' || kid === '') return failures.invalidToken('kid_missing');
     if (header.typ !== ACCESS_TOKEN_TYPE) return failures.invalidToken('type');
 
     // Rows 3 and 14: the route's one issuer; the key comes only from that issuer's set.
-    if (peeked.iss !== issuer.issuer) {
-      return failures.invalidToken(
-        other !== null && peeked.iss === other ? 'issuer_per_route' : 'issuer'
-      );
+    const payload = jws.payload;
+    const iss =
+      typeof payload === 'object' && payload !== null && 'iss' in payload ? payload.iss : undefined;
+    if (iss !== issuer.issuer) {
+      return failures.invalidToken(other !== null && iss === other ? 'issuer_per_route' : 'issuer');
     }
-    if (issuer.isTokenKid !== undefined && !issuer.isTokenKid(header.kid)) {
+    // A feed key never verifies a token, and a UTS token key carries the token prefix.
+    if (
+      kid.startsWith(UTS_FEED_KID_PREFIX) ||
+      (issuer.kind === 'uts' && !kid.startsWith(UTS_TOKEN_KID_PREFIX))
+    ) {
       return failures.invalidToken('not_token_key');
     }
-    const found = await issuer.keySet.key(header.kid, scope);
+    const found = await issuer.keySet.key(kid, scope);
     if (found.status === 'unknown_kid') return failures.invalidToken('unknown_kid');
     if (found.status === 'unavailable') {
       return failures.unavailable('jwks_unavailable', found.retryAfterSeconds);
     }
 
     // Row 2: the signature, Ed25519 only.
-    try {
-      const verified = await compactVerify(token, found.key, {
-        algorithms: [ACCESS_TOKEN_ALGORITHM],
-      });
-      return { ok: true, kid: header.kid, payload: parseJson(verified.payload) };
-    } catch {
-      return failures.invalidToken('signature');
-    }
+    if (!(await verifyEd25519(found.key, jws))) return failures.invalidToken('signature');
+    return { ok: true, kid, payload };
   }
 
   /** Row 6: `exp` in the future, `iat` and `nbf` not in the future, with 60 s of skew. */
@@ -296,6 +351,8 @@ export function createVerifier(config: VerifierConfig): Verifier {
     const parsed = ServiceTokenClaimsSchema.safeParse(signed.payload);
     if (!parsed.success) return failures.invalidToken(claimsReason(parsed.error));
     const claims = parsed.data;
+    // Row 3 on the verified claims.
+    if (claims.iss !== issuer.issuer) return failures.invalidToken('issuer');
     const late = timeFailure(claims);
     if (late !== null) return late;
 
@@ -324,11 +381,15 @@ export function createVerifier(config: VerifierConfig): Verifier {
     issuer: UtsIssuer,
     scope: CallScope
   ): Promise<VerifyResult> {
+    const cold = await utsLoaded(issuer, scope);
+    if (cold !== null) return cold;
     const signed = await verifySignedToken(token, issuer, sts?.issuer ?? null, scope);
     if (!signed.ok) return signed;
     const parsed = AccessTokenClaimsSchema.safeParse(signed.payload);
     if (!parsed.success) return failures.invalidToken(claimsReason(parsed.error));
     const claims = parsed.data;
+    // Row 3 on the verified claims.
+    if (claims.iss !== issuer.issuer) return failures.invalidToken('issuer');
     const late = timeFailure(claims);
     if (late !== null) return late;
 
@@ -381,20 +442,40 @@ export function createVerifier(config: VerifierConfig): Verifier {
     token: string,
     route: Route,
     issuer: UtsIssuer,
-    ctx: VerifyContext,
+    ctx: VerifyContext<boolean>,
     scope: CallScope
   ): Promise<VerifyResult> {
-    if (issuer.pats === null) return failures.invalidToken('pat_not_accepted');
+    const pats = issuer.pats;
+    if (pats === null) return failures.invalidToken('pat_not_accepted');
     // Row 12: offline prefix and checksum first; a malformed PAT touches no cache and no feed.
     const parsed = parsePat(token);
     if (!parsed.ok) return failures.invalidToken('pat_malformed');
+    // The per-address lookup limit needs an address; there is no shared fallback bucket.
+    const clientAddress = ctx.clientAddress;
+    if (typeof clientAddress !== 'string' || clientAddress === '') {
+      return failures.invalidRequest('pat_client_address_missing');
+    }
+    const request: PatRequest = { clientAddress, waitUntil: ctx.waitUntil, scope };
+    // The hash and the shared-cache read run alongside the key-set and feed reads.
+    const prepared = hashPat(parsed.pat).then(hash => ({
+      hash,
+      shared: pats.prefetch(hash, request),
+    }));
+
+    const cold = await utsLoaded(issuer, scope);
+    if (cold !== null) return cold;
+    // The feed head verifies under a feed key of the UTS key set.
+    const keys = await issuer.keySet.ready(scope);
+    if (keys.status === 'unavailable') {
+      return failures.unavailable('jwks_unavailable', keys.retryAfterSeconds);
+    }
     // A PAT is a long-lived credential: the feed head must be at most 60 s old, even on a cache hit.
     const read = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
     if (read.status === 'unavailable') {
       return failures.unavailable('feed_unavailable', read.retryAfterSeconds);
     }
-    const hash = await hashPat(parsed.pat);
-    const resolved = await issuer.pats.resolve(hash, ctx.clientAddress ?? UNKNOWN_ADDRESS, scope);
+    const { hash, shared } = await prepared;
+    const resolved = await pats.resolve(hash, request, shared);
     switch (resolved.status) {
       case 'rate_limited':
         return failures.rateLimited(resolved.retryAfterSeconds);
@@ -408,7 +489,7 @@ export function createVerifier(config: VerifierConfig): Verifier {
     const record = resolved.record;
     // The feed entry for this PAT id overrides every cache layer; rows 13 and the PAT's own expiry.
     if (read.list.revokedPatIds.has(record.patId)) {
-      issuer.pats.forget(hash);
+      pats.forget(hash);
       return failures.invalidToken('pat_revoked');
     }
     if (read.list.blockedAccounts.has(record.subject))
@@ -439,7 +520,7 @@ export function createVerifier(config: VerifierConfig): Verifier {
   function dispatch(
     token: string,
     route: Route,
-    ctx: VerifyContext,
+    ctx: VerifyContext<boolean>,
     scope: CallScope
   ): Promise<VerifyResult> {
     if (route.issuer === 'sts') {
@@ -475,6 +556,15 @@ export function createVerifier(config: VerifierConfig): Verifier {
       } finally {
         handOff(scope, ctx.waitUntil);
       }
+    },
+    warm(ctx) {
+      const scope = newCallScope();
+      sts?.keySet.prefetch(scope);
+      if (uts !== null) {
+        if (uts.bootstrap !== null) uts.bootstrap.prefetch(scope);
+        else uts.keySet.prefetch(scope);
+      }
+      handOff(scope, ctx.waitUntil);
     },
   };
 }

@@ -429,6 +429,7 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "organizations.admin.searchParentMembers query [admin] -> trpc.organizations.admin",
   "organizations.admin.setParent mutation [admin] -> trpc.organizations.admin",
   "organizations.admin.setServiceFeeExemption mutation [admin] -> trpc.organizations.admin",
+  "organizations.admin.updateAllowNonSsoSignInMethods mutation [admin] -> trpc.organizations.admin",
   "organizations.admin.updateCreatedBy mutation [admin] -> trpc.organizations.admin",
   "organizations.admin.updateFreeTrialEndAt mutation [admin] -> trpc.organizations.admin",
   "organizations.admin.updateKiloEncrypt mutation [admin] -> trpc.organizations.admin",

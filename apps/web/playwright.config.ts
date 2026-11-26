@@ -90,6 +90,9 @@ export default defineConfig({
       PORT: String(port),
       VERCEL_ENV: '',
       VERCEL_TARGET_ENV: '',
+      // Specs read emailed codes from dev/logs/emails.
+      LOCAL_EMAIL_OUTBOX_IN_AUTOMATED_TEST: '1',
+      LOCAL_EMAIL_OPEN_BROWSER: 'false',
     },
   },
 });

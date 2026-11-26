@@ -1,7 +1,17 @@
 import type { StsScopeRegistry } from '@kilocode/sts-contracts';
 import { SignJWT, base64url, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
-import { createVerifier, type PatConfig, type Verifier, type VerifyContext } from '../src/index';
-import type { FeedFetch, FeedHead, RevocationList } from '../src/revocation';
+import { vi } from 'vitest';
+import {
+  FEED_HEAD_TYPE,
+  createVerifier,
+  type PatConfig,
+  type RevocationFeedSource,
+  type RevocationList,
+  type RevocationListWire,
+  type UtsBootstrapSource,
+  type Verifier,
+  type VerifyContext,
+} from '../src/index';
 import type { UtsScopeRegistry } from '../src/verifier';
 
 export const AUDIENCE = 'session-ingest';
@@ -25,9 +35,9 @@ const UTS_SCOPES: Record<string, { requiresSession: boolean; patEligible: boolea
 export const UTS_REGISTRY: UtsScopeRegistry = (audience, scope) =>
   audience === AUDIENCE && Object.hasOwn(UTS_SCOPES, scope) ? (UTS_SCOPES[scope] ?? null) : null;
 
-/** UTS token keys carry this `kid` prefix; its feed keys carry another (uts-contracts jwks.ts). */
-export const UTS_TOKEN_KID_PREFIX = 'uts-token-00-';
-export const isUtsTokenKid = (kid: string): boolean => kid.startsWith(UTS_TOKEN_KID_PREFIX);
+/** `kid` prefixes of one UTS signer object's token key and of one feed object's key. */
+export const UTS_TOKEN_KID = 'uts-token-00-';
+export const UTS_FEED_KID = 'uts-feed-0-';
 
 export const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
@@ -55,6 +65,20 @@ export async function sign(
     .sign(issuer.privateKey);
 }
 
+/** A compact JWS with exactly this header and payload, signed with Ed25519 whatever `alg` says. */
+export async function signCompact(
+  privateKey: CryptoKey,
+  header: Record<string, unknown>,
+  payload: unknown
+): Promise<string> {
+  const encode = (value: unknown) => base64url.encode(JSON.stringify(value));
+  const encoded = `${encode(header)}.${encode(payload)}`;
+  const signature = new Uint8Array(
+    await crypto.subtle.sign('Ed25519', privateKey, new TextEncoder().encode(encoded))
+  );
+  return `${encoded}.${base64url.encode(signature)}`;
+}
+
 /** A token whose header is exactly `header`, signed with whatever `alg` it names. */
 export async function signWithHeader(
   issuer: Issuer,
@@ -76,13 +100,8 @@ export async function signWithHeader(
         .setProtectedHeader({ ...header, alg: header.alg })
         .sign(privateKey);
     }
-    default: {
-      const encoded = `${encode(header)}.${encode(claims)}`;
-      const signature = new Uint8Array(
-        await crypto.subtle.sign('Ed25519', issuer.privateKey, new TextEncoder().encode(encoded))
-      );
-      return `${encoded}.${base64url.encode(signature)}`;
-    }
+    default:
+      return await signCompact(issuer.privateKey, header, claims);
   }
 }
 
@@ -169,47 +188,111 @@ export function emptyList(): RevocationList {
   };
 }
 
+/** The list as UTS serves it: UTF-8 JSON of the wire schema. */
+export function encodeList(list: RevocationList): Uint8Array<ArrayBuffer> {
+  const wire: RevocationListWire = {
+    revoked_before: Object.fromEntries(list.revokedBefore),
+    revoked_sids: [...list.revokedSids],
+    revoked_kids: [...list.revokedKids],
+    revoked_pat_ids: [...list.revokedPatIds],
+    blocked_accounts: [...list.blockedAccounts],
+  };
+  return new TextEncoder().encode(JSON.stringify(wire));
+}
+
+export async function listHash(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  return base64url.encode(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
+}
+
 /**
- * A scripted revocation feed: each fetch answers a head signed `headAgeMs` ago (or exactly at
- * `headIssuedAt` when set); `gate` holds the answer.
+ * A scripted revocation feed that signs real heads with `signer`: each head is signed `headAgeMs`
+ * ago (or exactly at `headIssuedAt`, in ms, when set) over the current `list`. `gate` holds the
+ * head answer; `header` adds header parameters; `tamperList` serves list bytes off the hash.
  */
 export type FakeFeed = {
   list: RevocationList;
-  listHash: string;
+  signer: Issuer;
   headAgeMs: number;
   headIssuedAt: number | null;
+  header: Record<string, unknown>;
+  tamperList: boolean;
   mode: SourceMode;
   gate: Gate | null;
+  /** Head fetches. */
   calls: number;
+  /** List fetches. */
   listsSent: number;
-  heldOnLastCall: FeedHead | null;
-  source: { fetch(held: FeedHead | null, signal: AbortSignal): Promise<FeedFetch> };
+  /** A signed head and its list bytes now, without counting a fetch (the bootstrap uses it). */
+  current(): Promise<{ head: string; list: Uint8Array<ArrayBuffer> }>;
+  source: RevocationFeedSource;
 };
 
-export function fakeFeed(): FakeFeed {
+export function fakeFeed(signer: Issuer): FakeFeed {
+  const served = new Map<string, Uint8Array<ArrayBuffer>>();
   const fake: FakeFeed = {
     list: emptyList(),
-    listHash: 'hash-1',
+    signer,
     headAgeMs: 0,
     headIssuedAt: null,
+    header: {},
+    tamperList: false,
     mode: 'ok',
     gate: null,
     calls: 0,
     listsSent: 0,
-    heldOnLastCall: null,
+    async current() {
+      const bytes = encodeList(fake.list);
+      const hash = await listHash(bytes);
+      served.set(hash, bytes);
+      const issuedAtMs = fake.headIssuedAt ?? Date.now() - fake.headAgeMs;
+      const head = await signCompact(
+        fake.signer.privateKey,
+        { alg: 'EdDSA', typ: FEED_HEAD_TYPE, kid: fake.signer.kid, ...fake.header },
+        { iat: Math.floor(issuedAtMs / 1000), list_hash: hash }
+      );
+      return { head, list: bytes };
+    },
     source: {
-      async fetch(held) {
+      async head() {
         fake.calls++;
-        fake.heldOnLastCall = held;
         if (fake.gate !== null) await fake.gate.promise;
         if (fake.mode === 'fail') throw new Error('feed unreachable');
         if (fake.mode === 'hang') return await never();
-        const issuedAt = fake.headIssuedAt ?? Date.now() - fake.headAgeMs;
-        const head = { issuedAt, listHash: fake.listHash };
-        if (held !== null && held.listHash === fake.listHash) return { head, list: null };
-        fake.listsSent++;
-        return { head, list: fake.list };
+        return (await fake.current()).head;
       },
+      async list(hash) {
+        fake.listsSent++;
+        const bytes = served.get(hash);
+        if (bytes === undefined) throw new Error('unknown list hash');
+        return fake.tamperList
+          ? encodeList({ ...emptyList(), revokedSids: new Set(['x']) })
+          : bytes;
+      },
+    },
+  };
+  return fake;
+}
+
+/** A scripted bootstrap endpoint answering the fake UTS key set, head and list in one call. */
+export type FakeBootstrap = {
+  mode: SourceMode;
+  gate: Gate | null;
+  calls: number;
+  source: UtsBootstrapSource;
+};
+
+export function fakeBootstrap(jwks: FakeJwks, feed: FakeFeed): FakeBootstrap {
+  const fake: FakeBootstrap = {
+    mode: 'ok',
+    gate: null,
+    calls: 0,
+    source: async () => {
+      fake.calls++;
+      if (fake.gate !== null) await fake.gate.promise;
+      if (fake.mode === 'fail') throw new Error('bootstrap unreachable');
+      if (fake.mode === 'hang') return await never();
+      const { head, list } = await feed.current();
+      return { jwks: { keys: jwks.keys }, head, list };
     },
   };
   return fake;
@@ -219,19 +302,25 @@ export type Harness = {
   verifier: Verifier;
   sts: Issuer;
   uts: Issuer;
+  feedSigner: Issuer;
   stsJwks: FakeJwks;
   utsJwks: FakeJwks;
   feed: FakeFeed;
+  bootstrap: FakeBootstrap;
   background: Promise<unknown>[];
   ctx: VerifyContext;
 };
 
-export async function harness(options: { pat?: PatConfig } = {}): Promise<Harness> {
+export async function harness(
+  options: { pat?: PatConfig; bootstrap?: boolean } = {}
+): Promise<Harness> {
   const sts = await createIssuer(STS_ISSUER);
-  const uts = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID_PREFIX);
+  const uts = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID);
+  const feedSigner = await createIssuer(UTS_ISSUER, UTS_FEED_KID);
   const stsJwks = fakeJwks([sts.jwk]);
-  const utsJwks = fakeJwks([uts.jwk]);
-  const feed = fakeFeed();
+  const utsJwks = fakeJwks([uts.jwk, feedSigner.jwk]);
+  const feed = fakeFeed(feedSigner);
+  const bootstrap = fakeBootstrap(utsJwks, feed);
   const background: Promise<unknown>[] = [];
   const verifier = createVerifier({
     audience: AUDIENCE,
@@ -240,9 +329,9 @@ export async function harness(options: { pat?: PatConfig } = {}): Promise<Harnes
     uts: {
       issuer: UTS_ISSUER,
       jwks: utsJwks.source,
-      isTokenKid: isUtsTokenKid,
       scopeRegistry: UTS_REGISTRY,
       revocation: feed.source,
+      bootstrap: options.bootstrap === true ? bootstrap.source : undefined,
       pat: options.pat,
     },
   });
@@ -250,9 +339,11 @@ export async function harness(options: { pat?: PatConfig } = {}): Promise<Harnes
     verifier,
     sts,
     uts,
+    feedSigner,
     stsJwks,
     utsJwks,
     feed,
+    bootstrap,
     background,
     ctx: { waitUntil: promise => background.push(promise), clientAddress: '203.0.113.7' },
   };
@@ -263,4 +354,20 @@ export const bearer = (token: string): string => `Bearer ${token}`;
 /** Lets the background calls handed to `waitUntil` so far settle. */
 export async function drain(background: Promise<unknown>[]): Promise<void> {
   await Promise.all(background.splice(0));
+}
+
+/**
+ * Also fakes the timers each call's owner uses to mark it alive, so no mark ever lands: every
+ * pending call then looks like one whose request was cancelled, once 1 s passes on the clock.
+ */
+export function freezeHeartbeats(): void {
+  vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'], now: Date.now() });
+}
+
+/** Fakes every timer the library uses, so `vi.advanceTimersByTimeAsync` drives its polling too. */
+export function fakeAllTimers(): void {
+  vi.useFakeTimers({
+    toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    now: Date.now(),
+  });
 }

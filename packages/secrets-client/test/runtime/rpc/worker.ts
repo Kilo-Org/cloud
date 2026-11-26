@@ -5,7 +5,7 @@ import {
   type BundleBinding,
   type Secrets,
   type SecretsExecutionContext,
-} from '../../src/index';
+} from '../../../src/index';
 
 /**
  * Test-only Worker for rpc-runtime.test.ts. Its service bindings point at its own entrypoints,
@@ -25,7 +25,15 @@ const OK: BundleResult = {
   missing: [],
 };
 
-/** Broker calls whose context was still open 1 s after they returned. */
+/**
+ * How long after returning the broker checks whether its call is still open. A caller that
+ * disposes the result ends the call within milliseconds; 2.5 s leaves room for a stalled machine.
+ */
+const BROKER_PROBE_MS = 2_500;
+/** How long the caller keeps working after its read: past the probe, so a held call is caught. */
+const CALLER_WORK_MS = 5_000;
+
+/** Broker calls whose context was still open `BROKER_PROBE_MS` after they returned. */
 let brokerOpenAfterReturn = 0;
 
 export class BundleStore extends WorkerEntrypoint<Env> {
@@ -39,7 +47,7 @@ export class SecretsBroker extends WorkerEntrypoint<Env> {
     const result = await this.env.STORE.read();
     // workerd cancels this timer when the call's context ends, so it fires only while a caller
     // still holds the call open.
-    setTimeout(() => brokerOpenAfterReturn++, 1_000);
+    setTimeout(() => brokerOpenAfterReturn++, BROKER_PROBE_MS);
     return result;
   }
 }
@@ -50,9 +58,9 @@ export default {
   async fetch(_request: Request, env: Env, ctx: SecretsExecutionContext): Promise<Response> {
     secrets ??= createWorkerSecrets(env.STS);
     const value = await secrets.get('O11Y_CF_AE_API_TOKEN', ctx);
-    // The request keeps working past the broker's 1 s timer, as a relay batch does after its read.
+    // The request keeps working past the broker's probe, as a relay batch does after its read.
     const work = Promise.withResolvers<void>();
-    setTimeout(work.resolve, 1_500);
+    setTimeout(work.resolve, CALLER_WORK_MS);
     await work.promise;
     return Response.json({ value, brokerOpenAfterReturn });
   },

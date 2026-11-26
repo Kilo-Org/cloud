@@ -3,13 +3,17 @@ import { NextRequest } from 'next/server';
 import { TRPCError } from '@trpc/server';
 import type * as SessionModule from '@/lib/app-shell/session';
 import type * as InstallStartModule from '@/lib/integrations/github/install-start';
+import type * as AppShellFlowModule from '@/lib/integrations/oauth/app-shell-flow';
 import type * as StartRouteModule from './route';
 import { shellUser } from '@/tests/helpers/shell-user.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'synthetic-install-start-signing-secret',
 }));
-jest.mock('@/lib/app-shell/session', () => ({ requireAppShellUser: jest.fn() }));
+jest.mock('@/lib/app-shell/session', () => ({
+  ...jest.requireActual<typeof SessionModule>('@/lib/app-shell/session'),
+  requireAppShellUser: jest.fn(),
+}));
 jest.mock('@/lib/integrations/github/install-start', () => ({
   beginGitHubAppInstall: jest.fn(),
   buildGitHubAppInstallUrl: jest.fn(),
@@ -18,7 +22,11 @@ jest.mock('@/lib/integrations/github/install-start', () => ({
 // This repo's transform does not hoist `jest.mock` above the static imports, so
 // the mocked modules and the module under test are required here, after the
 // mocks are registered.
-const { requireAppShellUser } = jest.requireMock<typeof SessionModule>('@/lib/app-shell/session');
+const { bindAppShellSession, requireAppShellUser } =
+  jest.requireMock<typeof SessionModule>('@/lib/app-shell/session');
+const { APP_SHELL_FLOW_COOKIE, verifyAppShellFlowToken } = jest.requireActual<
+  typeof AppShellFlowModule
+>('@/lib/integrations/oauth/app-shell-flow');
 const { beginGitHubAppInstall, buildGitHubAppInstallUrl } = jest.requireMock<
   typeof InstallStartModule
 >('@/lib/integrations/github/install-start');
@@ -65,6 +73,21 @@ describe('GET /app-shell/github-app/start', () => {
       }
     );
     expect(response.headers.get('location')).toContain('github.com/apps');
+  });
+
+  test("binds the flow cookie to the shell user's web-session pepper", async () => {
+    mockRequireUser.mockResolvedValue({ ...shellUser('user-1'), web_session_pepper: 'pepper-1' });
+
+    const response = await GET(startRequest());
+
+    const flowCookie = response.cookies.get(APP_SHELL_FLOW_COOKIE)?.value;
+    expect(flowCookie).toEqual(expect.any(String));
+    const callback = new NextRequest('http://localhost:3000/api/integrations/github/callback', {
+      headers: { cookie: `${APP_SHELL_FLOW_COOKIE}=${flowCookie}` },
+    });
+    expect(verifyAppShellFlowToken(callback, 'install-state')).toEqual(
+      bindAppShellSession('user-1', 'pepper-1')
+    );
   });
 
   test('keeps the organization context when the caller may not start the install', async () => {

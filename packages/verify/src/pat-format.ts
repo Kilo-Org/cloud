@@ -63,10 +63,25 @@ export function parsePat(value: string): { ok: true; pat: string } | { ok: false
   return { ok: true, pat: value };
 }
 
-/** SHA-256 of the whole PAT, lowercase hex: the key of every cache layer and of the UTS lookup. */
+/**
+ * SHA-256 of the whole PAT, lowercase hex: the key of every cache layer and of the UTS lookup, and
+ * what UTS stores (design 5.3).
+ */
 export async function hashPat(pat: string): Promise<string> {
   const digest = new Uint8Array(
     await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pat))
   );
   return Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The PAT's token reference for logs and audit rows (design 8.2): the first 8 characters of the
+ * base64url SHA-256 of the whole PAT. Same digest as `hashPat`, another encoding and length; it
+ * names a PAT in a log line and never serves as a lookup key.
+ */
+export async function patReference(pat: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pat))
+  );
+  return base64url.encode(digest).slice(0, 8);
 }

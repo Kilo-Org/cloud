@@ -7,7 +7,8 @@ import { createPatString, hashPat } from '../src/index';
 // Runs the verifier in local workerd, where each fetch is its own request with its own context.
 // A promise created for one request and settled or awaited in another stalls there and makes
 // workerd log "different request context"; plain Node cannot show that, so only this test proves
-// that the key-set, feed and PAT caches share plain data across requests, never a promise.
+// that the key-set, feed, bootstrap and PAT caches share plain data across requests, never a
+// promise, and that `warm` keeps its fetches alive under the request's waitUntil.
 
 /** The part of wrangler's local Worker handle this test uses. */
 type LocalWorker = {
@@ -27,8 +28,11 @@ const CallsSchema = z.strictObject({
   stsJwks: z.number(),
   utsJwks: z.number(),
   feed: z.number(),
+  bootstrap: z.number(),
   pat: z.number(),
 });
+type Calls = z.infer<typeof CallsSchema>;
+const NO_CALLS: Calls = { stsJwks: 0, utsJwks: 0, feed: 0, bootstrap: 0, pat: 0 };
 
 /** workerd's warning when a promise is settled after the request that created it ended. */
 const CROSS_REQUEST_WARNING = /different request context/;
@@ -127,17 +131,20 @@ async function knownPat(pat: string): Promise<Record<string, unknown>> {
   };
 }
 
+type Cold = 'bootstrap' | 'separate';
+
 async function verify(
   issuer: 'sts' | 'uts',
-  credential: string
+  credential: string,
+  cold: Cold = 'bootstrap'
 ): Promise<z.infer<typeof ReplySchema>> {
-  const reply = await worker.fetch(`http://runtime.test/verify?issuer=${issuer}`, {
+  const reply = await worker.fetch(`http://runtime.test/verify?issuer=${issuer}&cold=${cold}`, {
     headers: { authorization: `Bearer ${credential}` },
   });
   return ReplySchema.parse(await reply.json());
 }
 
-async function calls(): Promise<z.infer<typeof CallsSchema>> {
+async function calls(): Promise<Calls> {
   return CallsSchema.parse(await (await worker.fetch('http://runtime.test/calls')).json());
 }
 
@@ -161,7 +168,7 @@ it('serves two concurrent STS requests on a cold key-set cache from one fetch', 
     { ok: true, caller: 'service' },
     { ok: true, caller: 'service' },
   ]);
-  expect(await calls()).toEqual({ stsJwks: 1, utsJwks: 0, feed: 0, pat: 0 });
+  expect(await calls()).toEqual({ ...NO_CALLS, stsJwks: 1 });
   expect(crossRequestWarnings()).toEqual([]);
 }, 30_000);
 
@@ -170,23 +177,30 @@ it('answers a later STS request from the cache the first request filled', async 
   await setup({ stsJwks: { keys: [jwk] } });
   expect(await verify('sts', token)).toEqual({ ok: true, caller: 'service' });
   expect(await verify('sts', token)).toEqual({ ok: true, caller: 'service' });
-  expect(await calls()).toEqual({ stsJwks: 1, utsJwks: 0, feed: 0, pat: 0 });
+  expect(await calls()).toEqual({ ...NO_CALLS, stsJwks: 1 });
   expect(crossRequestWarnings()).toEqual([]);
 }, 30_000);
 
-it('serves two concurrent UTS requests on a cold key set and a cold feed from one fetch each', async () => {
-  const { token, jwk } = await utsToken();
-  await setup({ utsJwks: { keys: [jwk] } });
+it.each<[Cold, Partial<Calls>]>([
+  ['bootstrap', { bootstrap: 1 }],
+  ['separate', { utsJwks: 1, feed: 1 }],
+])(
+  'serves two concurrent UTS requests on a cold UTS state (%s) from one call per source',
+  async (cold, expected) => {
+    const { token, jwk } = await utsToken();
+    await setup({ utsJwks: { keys: [jwk] } });
 
-  const replies = await Promise.all([verify('uts', token), verify('uts', token)]);
+    const replies = await Promise.all([verify('uts', token, cold), verify('uts', token, cold)]);
 
-  expect(replies).toEqual([
-    { ok: true, caller: 'user' },
-    { ok: true, caller: 'user' },
-  ]);
-  expect(await calls()).toEqual({ stsJwks: 0, utsJwks: 1, feed: 1, pat: 0 });
-  expect(crossRequestWarnings()).toEqual([]);
-}, 30_000);
+    expect(replies).toEqual([
+      { ok: true, caller: 'user' },
+      { ok: true, caller: 'user' },
+    ]);
+    expect(await calls()).toEqual({ ...NO_CALLS, ...expected });
+    expect(crossRequestWarnings()).toEqual([]);
+  },
+  30_000
+);
 
 it('merges two concurrent lookups of one cold PAT into one lookup', async () => {
   const pat = createPatString();
@@ -198,13 +212,31 @@ it('merges two concurrent lookups of one cold PAT into one lookup', async () => 
     { ok: true, caller: 'pat' },
     { ok: true, caller: 'pat' },
   ]);
-  expect(await calls()).toEqual({ stsJwks: 0, utsJwks: 0, feed: 1, pat: 1 });
+  expect(await calls()).toEqual({ ...NO_CALLS, bootstrap: 1, pat: 1 });
+  expect(crossRequestWarnings()).toEqual([]);
+}, 30_000);
+
+it('keeps the fetches warm starts alive under its waitUntil for later requests', async () => {
+  const sts = await stsToken();
+  const uts = await utsToken();
+  await setup({ stsJwks: { keys: [sts.jwk] }, utsJwks: { keys: [uts.jwk] } });
+
+  expect(await (await worker.fetch('http://runtime.test/warm')).text()).toBe('warming');
+  const replies = await Promise.all([verify('uts', uts.token), verify('sts', sts.token)]);
+
+  expect(replies).toEqual([
+    { ok: true, caller: 'user' },
+    { ok: true, caller: 'service' },
+  ]);
+  expect(await calls()).toEqual({ ...NO_CALLS, stsJwks: 1, bootstrap: 1 });
   expect(crossRequestWarnings()).toEqual([]);
 }, 30_000);
 
 // In each race the first request is cancelled while the hung call is in flight: that call never
-// answers. The second request must notice the call was abandoned and make its own, well before
-// the 5 s call timeout, instead of waiting on (or failing with) the cancelled request's call.
+// answers. The second request must notice the call was abandoned well before the call timeout,
+// instead of waiting on it. A key-set, feed or bootstrap call that was abandoned counts as a failed
+// one (so cancelling requests cannot make the isolate fetch more often): the second request gets
+// a prompt 503. An abandoned PAT lookup lets the second request make its own.
 
 const RaceSchema = z.strictObject({
   first: z.union([z.literal('cancelled'), z.number()]),
@@ -217,22 +249,68 @@ const PROMPT_MS = 2_500;
 
 async function race(
   issuer: 'sts' | 'uts',
-  credential: string
+  credential: string,
+  cold: Cold
 ): Promise<z.infer<typeof RaceSchema>> {
-  const reply = await worker.fetch(`http://runtime.test/race?issuer=${issuer}`, {
+  const reply = await worker.fetch(`http://runtime.test/race?issuer=${issuer}&cold=${cold}`, {
     headers: { authorization: `Bearer ${credential}` },
   });
   return RaceSchema.parse(await reply.json());
 }
 
-it.each<[string, 'sts' | 'uts', 'stsJwks' | 'utsJwks' | 'feed' | 'pat', Record<string, number>]>([
-  ['the STS key set', 'sts', 'stsJwks', { stsJwks: 2, utsJwks: 0, feed: 0, pat: 0 }],
-  ['the UTS key set', 'uts', 'utsJwks', { stsJwks: 0, utsJwks: 2, feed: 1, pat: 0 }],
-  ['the revocation feed', 'uts', 'feed', { stsJwks: 0, utsJwks: 1, feed: 2, pat: 0 }],
-  ['a PAT lookup', 'uts', 'pat', { stsJwks: 0, utsJwks: 0, feed: 1, pat: 2 }],
+type RaceCase = [
+  name: string,
+  issuer: 'sts' | 'uts',
+  cold: Cold,
+  hang: keyof Calls,
+  second: z.infer<typeof ReplySchema>,
+  calls: Partial<Calls>,
+];
+
+it.each<RaceCase>([
+  [
+    'the STS key set',
+    'sts',
+    'bootstrap',
+    'stsJwks',
+    { ok: false, status: 503, reason: 'jwks_unavailable' },
+    { stsJwks: 1 },
+  ],
+  [
+    'the UTS key set',
+    'uts',
+    'separate',
+    'utsJwks',
+    { ok: false, status: 503, reason: 'jwks_unavailable' },
+    { utsJwks: 1 },
+  ],
+  [
+    'the revocation feed',
+    'uts',
+    'separate',
+    'feed',
+    { ok: false, status: 503, reason: 'feed_unavailable' },
+    { utsJwks: 1, feed: 1 },
+  ],
+  [
+    'the UTS bootstrap',
+    'uts',
+    'bootstrap',
+    'bootstrap',
+    { ok: false, status: 503, reason: 'bootstrap_unavailable' },
+    { bootstrap: 1 },
+  ],
+  [
+    'a PAT lookup',
+    'uts',
+    'bootstrap',
+    'pat',
+    { ok: true, caller: 'pat' },
+    { bootstrap: 1, pat: 2 },
+  ],
 ])(
-  'serves a request that arrives while a cancelled request was loading %s',
-  async (_name, issuer, dependency, expectedCalls) => {
+  'answers promptly a request that arrives while a cancelled request was loading %s',
+  async (_name, issuer, cold, dependency, second, expectedCalls) => {
     const sts = await stsToken();
     const uts = await utsToken();
     const pat = createPatString();
@@ -246,15 +324,12 @@ it.each<[string, 'sts' | 'uts', 'stsJwks' | 'utsJwks' | 'feed' | 'pat', Record<s
     });
     const credential = issuer === 'sts' ? sts.token : dependency === 'pat' ? pat : uts.token;
 
-    const result = await race(issuer, credential);
+    const result = await race(issuer, credential, cold);
 
     expect(result.first).toBe('cancelled');
-    expect(result.second).toEqual({
-      ok: true,
-      caller: issuer === 'sts' ? 'service' : dependency === 'pat' ? 'pat' : 'user',
-    });
+    expect(result.second).toEqual(second);
     expect(result.secondMs).toBeLessThan(PROMPT_MS);
-    expect(await calls()).toEqual(expectedCalls);
+    expect(await calls()).toEqual({ ...NO_CALLS, ...expectedCalls });
     expect(crossRequestWarnings()).toEqual([]);
   },
   30_000

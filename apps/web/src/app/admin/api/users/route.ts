@@ -4,7 +4,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { emailDomainSuffixes, findBlacklistedDomains } from '@kilocode/worker-utils/account-access';
 import type { UsersApiResponse, SortableField, UserTableProps } from '@/types/admin';
 import { sortableFields } from '@/types/admin';
-import { toClientUser } from '@/lib/admin/client-user';
+import { toClientUser } from '@/lib/user/client-user';
 import {
   describePaymentMethods,
   getPaymentStatusByUserIds,

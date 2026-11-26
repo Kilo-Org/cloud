@@ -8,13 +8,18 @@ import {
   startOwned,
   type CallScope,
   type Liveness,
+  type WaitUntil,
 } from './flight';
 
 /** In-instance and shared positive lifetime of a PAT lookup answer. */
 export const PAT_POSITIVE_TTL_MS = 60_000;
 /** In-instance and shared lifetime of a "no such PAT" answer. */
 export const PAT_NEGATIVE_TTL_MS = 30_000;
-/** An expired positive entry serves stale this long past its expiry while one refresh runs. */
+/**
+ * An expired positive entry serves stale this long past its expiry. One background lookup at a
+ * time refreshes it; while none can run (the retry wait after a failed lookup, or the address is
+ * over its limit), the entry still serves.
+ */
 export const PAT_MAX_STALE_MS = 10 * 60_000;
 /** At most this many uncached lookups per second per client address per instance. */
 export const PAT_LOOKUPS_PER_SECOND_PER_ADDRESS = 20;
@@ -24,10 +29,13 @@ export const PAT_LOOKUP_TIMEOUT_MS = 5_000;
 export const PAT_RETRY_MS = 2_000;
 /** The longest retry time a UTS answer can set for one hash. */
 const PAT_MAX_RETRY_MS = 60_000;
-/** Instance cache size bound; the oldest entries go first. */
-const MAX_INSTANCE_ENTRIES = 10_000;
-/** Rate-limit window bookkeeping size bound. */
-const MAX_TRACKED_ADDRESSES = 10_000;
+/**
+ * Size bound of the instance cache (oldest entry goes first; a "no such PAT" entry can push out a
+ * positive one) and of the failure and pending-lookup bookkeeping.
+ */
+export const MAX_INSTANCE_ENTRIES = 10_000;
+/** Hard size bound of the per-address window bookkeeping; the oldest window goes first. */
+export const MAX_TRACKED_ADDRESSES = 10_000;
 
 /** What UTS holds for an active PAT: one audience and one scope. `expiresAt` is in seconds. */
 export const PatRecordSchema = z.strictObject({
@@ -47,10 +55,11 @@ export type PatLookupResult =
   | { status: 'unavailable'; retryAfterSeconds: number };
 
 /**
- * The UTS PAT lookup by full SHA-256 hash (phase 3 implements the call). `not_found` covers
- * unknown, revoked and expired PATs alike. A rejection, a `rate_limited` or `unavailable` answer,
- * or no answer within `PAT_LOOKUP_TIMEOUT_MS` is a lookup failure: the request gets 503, and the
- * hash is not looked up again before the later of `PAT_RETRY_MS` and the answer's retry time.
+ * The UTS PAT lookup by full SHA-256 hash, lowercase hex (phase 3 implements the call).
+ * `not_found` covers unknown, revoked and expired PATs alike. A rejection, a `rate_limited` or
+ * `unavailable` answer, or no answer within `PAT_LOOKUP_TIMEOUT_MS` is a lookup failure: the
+ * request gets 503, and the hash is not looked up again before the later of `PAT_RETRY_MS` and the
+ * answer's retry time.
  */
 export type PatLookup = (hash: string, signal: AbortSignal) => Promise<PatLookupResult>;
 
@@ -67,13 +76,20 @@ export type SharedPatCache = {
 /** A key from the workload's own secrets bundle; `version` names it in each entry. */
 export type PatCacheKey = { version: string; secret: string };
 
+/** The current key signs; the current and the previous key verify, so rotation keeps the cache. */
+export type PatCacheKeys = { current: PatCacheKey; previous?: PatCacheKey };
+
 export type PatConfig = {
   lookup: PatLookup;
   /** The workload name; part of every shared-cache key and of the authenticated text. */
   workload: string;
   sharedCache?: SharedPatCache;
-  /** The current key signs; the current and the previous key verify, so rotation keeps the cache. */
-  cacheKeys: { current: PatCacheKey; previous?: PatCacheKey };
+  /**
+   * Reads the shared-cache HMAC keys from the workload's bundle on each shared-cache read and
+   * write (such as two `Secrets.get` calls), so a rotation reaches a running instance. A rejection
+   * counts as a cache miss or a skipped write.
+   */
+  cacheKeys: (ctx: { waitUntil: WaitUntil }) => Promise<PatCacheKeys>;
 };
 
 export type PatResolution =
@@ -98,7 +114,7 @@ const SharedEntrySchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({ kind: z.literal('not_found'), expiresAt: z.number().int() }),
 ]);
-type SharedEntry = z.infer<typeof SharedEntrySchema>;
+export type SharedEntry = z.infer<typeof SharedEntrySchema>;
 
 const EnvelopeSchema = z.strictObject({
   v: z.literal(1),
@@ -110,10 +126,25 @@ const EnvelopeSchema = z.strictObject({
   m: z.string(),
 });
 
+/** One request's side of a lookup: its client address, its `waitUntil` and its calls. */
+export type PatRequest = { clientAddress: string; waitUntil: WaitUntil; scope: CallScope };
+
 export type PatResolver = {
-  resolve(hash: string, clientAddress: string, scope: CallScope): Promise<PatResolution>;
+  /**
+   * Starts the shared-cache read for `hash` when the instance holds no live entry for it, so the
+   * caller can run it alongside the feed read; null when there is nothing to read. Never rejects.
+   */
+  prefetch(hash: string, request: PatRequest): Promise<SharedEntry | null> | null;
+  /** `shared`: the read `prefetch` started for this hash, used instead of a new one. */
+  resolve(
+    hash: string,
+    request: PatRequest,
+    shared: Promise<SharedEntry | null> | null
+  ): Promise<PatResolution>;
   /** Drops the instance entry, for a PAT the feed revoked. */
   forget(hash: string): void;
+  /** Pending lookups and tracked addresses; for tests of the size bounds. */
+  sizes(): { pending: number; addresses: number };
 };
 
 export function createPatResolver(config: PatConfig): PatResolver {
@@ -121,7 +152,8 @@ export function createPatResolver(config: PatConfig): PatResolver {
   const running = new Map<string, Attempt>();
   const failures = new Map<string, Failure>();
   const windows = new Map<string, { startedAt: number; count: number }>();
-  const hmacKeys = new Map<string, CryptoKey>();
+  /** Imported HMAC keys by version; a version whose secret changed is imported again. */
+  const hmacKeys = new Map<string, { secret: string; key: CryptoKey }>();
   let nextAttemptId = 1;
 
   function sharedKey(hash: string): string {
@@ -130,7 +162,7 @@ export function createPatResolver(config: PatConfig): PatResolver {
 
   async function hmacKey(key: PatCacheKey): Promise<CryptoKey> {
     const held = hmacKeys.get(key.version);
-    if (held !== undefined) return held;
+    if (held !== undefined && held.secret === key.secret) return held.key;
     const imported = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(key.secret),
@@ -138,25 +170,39 @@ export function createPatResolver(config: PatConfig): PatResolver {
       false,
       ['sign', 'verify']
     );
-    hmacKeys.set(key.version, imported);
+    hmacKeys.set(key.version, { secret: key.secret, key: imported });
     return imported;
   }
 
-  function verifyingKey(version: string): PatCacheKey | null {
-    const { current, previous } = config.cacheKeys;
-    if (current.version === version) return current;
-    if (previous !== undefined && previous.version === version) return previous;
-    return null;
+  /** The bundle's keys now; imported keys of versions it no longer lists are dropped. */
+  async function currentKeys(waitUntil: WaitUntil): Promise<PatCacheKeys> {
+    const keys = await config.cacheKeys({ waitUntil });
+    for (const version of hmacKeys.keys()) {
+      if (version !== keys.current.version && version !== keys.previous?.version) {
+        hmacKeys.delete(version);
+      }
+    }
+    return keys;
   }
 
-  async function readShared(hash: string, now: number): Promise<SharedEntry | null> {
+  async function readShared(
+    hash: string,
+    now: number,
+    waitUntil: WaitUntil
+  ): Promise<SharedEntry | null> {
     if (config.sharedCache === undefined) return null;
     try {
       const key = sharedKey(hash);
       const text = await config.sharedCache.get(key);
       if (text === null) return null;
       const envelope = EnvelopeSchema.parse(JSON.parse(text));
-      const signing = verifyingKey(envelope.k);
+      const { current, previous } = await currentKeys(waitUntil);
+      const signing =
+        current.version === envelope.k
+          ? current
+          : previous !== undefined && previous.version === envelope.k
+            ? previous
+            : null;
       if (signing === null) return null;
       const valid = await crypto.subtle.verify(
         'HMAC',
@@ -174,12 +220,17 @@ export function createPatResolver(config: PatConfig): PatResolver {
     }
   }
 
-  async function writeShared(hash: string, entry: SharedEntry, ttlMs: number): Promise<void> {
+  async function writeShared(
+    hash: string,
+    entry: SharedEntry,
+    ttlMs: number,
+    waitUntil: WaitUntil
+  ): Promise<void> {
     if (config.sharedCache === undefined) return;
     try {
       const key = sharedKey(hash);
       const e = JSON.stringify(entry);
-      const signing = config.cacheKeys.current;
+      const signing = (await currentKeys(waitUntil)).current;
       const mac = new Uint8Array(
         await crypto.subtle.sign(
           'HMAC',
@@ -206,18 +257,24 @@ export function createPatResolver(config: PatConfig): PatResolver {
     }
   }
 
-  /** Counts one uncached lookup for `address`; false once it is over the per-second limit. */
+  /**
+   * Counts one uncached lookup for `address`; false once it is over the per-second limit. Windows
+   * are kept in start order, so expired ones are dropped from the front, and past the bound the
+   * oldest live window goes too (that address then starts a new window).
+   */
   function admit(address: string, now: number): boolean {
     const window = windows.get(address);
-    if (window === undefined || now - window.startedAt >= 1000) {
-      if (windows.size >= MAX_TRACKED_ADDRESSES) {
-        for (const [tracked, w] of windows) if (now - w.startedAt >= 1000) windows.delete(tracked);
-      }
-      windows.set(address, { startedAt: now, count: 1 });
+    if (window !== undefined && now - window.startedAt < 1000) {
+      if (window.count >= PAT_LOOKUPS_PER_SECOND_PER_ADDRESS) return false;
+      window.count++;
       return true;
     }
-    if (window.count >= PAT_LOOKUPS_PER_SECOND_PER_ADDRESS) return false;
-    window.count++;
+    windows.delete(address);
+    for (const [tracked, w] of windows) {
+      if (now - w.startedAt < 1000 && windows.size < MAX_TRACKED_ADDRESSES) break;
+      windows.delete(tracked);
+    }
+    windows.set(address, { startedAt: now, count: 1 });
     return true;
   }
 
@@ -233,10 +290,25 @@ export function createPatResolver(config: PatConfig): PatResolver {
     }
   }
 
-  function start(hash: string, scope: CallScope, at: number): Attempt {
-    const started: Attempt = { ...liveness(scope, at), id: nextAttemptId++ };
+  /**
+   * Over the bound, fails the pending lookups past their timeout. A request cancelled during its
+   * lookup never settles it, and nobody may ask for that hash again; pending lookups are kept in
+   * start order, so this walks only the timed-out front of the map.
+   */
+  function pruneRunning(at: number): void {
+    if (running.size <= MAX_INSTANCE_ENTRIES) return;
+    for (const [hash, pending] of running) {
+      if (at < pending.startedAt + PAT_LOOKUP_TIMEOUT_MS) break;
+      fail(hash, pending, pending.startedAt + PAT_LOOKUP_TIMEOUT_MS, 0);
+    }
+  }
+
+  function start(hash: string, request: PatRequest, at: number): Attempt {
+    const started: Attempt = { ...liveness(request.scope, at), id: nextAttemptId++ };
+    running.delete(hash);
     running.set(hash, started);
-    startOwned(scope, started, PAT_LOOKUP_TIMEOUT_MS, async answered => {
+    pruneRunning(at);
+    startOwned(request.scope, started, PAT_LOOKUP_TIMEOUT_MS, async answered => {
       let result: PatLookupResult;
       try {
         result = await config.lookup(hash, AbortSignal.timeout(PAT_LOOKUP_TIMEOUT_MS));
@@ -266,13 +338,19 @@ export function createPatResolver(config: PatConfig): PatResolver {
         await writeShared(
           hash,
           { kind: 'found', record: result.record, expiresAt },
-          PAT_POSITIVE_TTL_MS
+          PAT_POSITIVE_TTL_MS,
+          request.waitUntil
         );
       } else {
         const expiresAt = now + PAT_NEGATIVE_TTL_MS;
         store(hash, { kind: 'not_found', expiresAt, attemptStartedAt: started.startedAt });
         answered();
-        await writeShared(hash, { kind: 'not_found', expiresAt }, PAT_NEGATIVE_TTL_MS);
+        await writeShared(
+          hash,
+          { kind: 'not_found', expiresAt },
+          PAT_NEGATIVE_TTL_MS,
+          request.waitUntil
+        );
       }
     });
     return started;
@@ -286,9 +364,10 @@ export function createPatResolver(config: PatConfig): PatResolver {
 
   async function resolve(
     hash: string,
-    clientAddress: string,
-    scope: CallScope
+    request: PatRequest,
+    prefetched: Promise<SharedEntry | null> | null
   ): Promise<PatResolution> {
+    let sharedRead = prefetched;
     let sharedChecked = false;
     let awaited: number | null = null;
     for (;;) {
@@ -301,8 +380,9 @@ export function createPatResolver(config: PatConfig): PatResolver {
         fail(hash, attempt, attempt.startedAt + PAT_LOOKUP_TIMEOUT_MS, 0);
         continue;
       }
-      if (attempt !== undefined && abandoned(attempt, scope, now)) {
-        // Its request was cancelled, so it will never answer; this request may start its own.
+      if (attempt !== undefined && abandoned(attempt, request.scope, now)) {
+        // Its request was cancelled, so it will never answer; this request may start its own,
+        // within its address's limit.
         running.delete(hash);
         awaited = null;
         continue;
@@ -310,7 +390,8 @@ export function createPatResolver(config: PatConfig): PatResolver {
 
       if (!sharedChecked && attempt === undefined) {
         sharedChecked = true;
-        const shared = await readShared(hash, now);
+        const shared = await (sharedRead ?? readShared(hash, now, request.waitUntil));
+        sharedRead = null;
         if (shared !== null) store(hash, { ...shared, attemptStartedAt: now });
         // Another request may have answered or started a lookup meanwhile: look again.
         continue;
@@ -319,17 +400,18 @@ export function createPatResolver(config: PatConfig): PatResolver {
       const failure = failures.get(hash);
       const backingOff = failure !== undefined && now < failure.retryAt;
 
-      // Stale-while-revalidate: an expired positive entry serves up to 10 minutes past its expiry
-      // while one background lookup runs. The caller has already required a feed head under 60 s.
+      // Stale-while-revalidate: an expired positive entry serves up to 10 minutes past its expiry,
+      // refreshed by at most one background lookup at a time. The caller has already required a
+      // feed head under 60 s.
       if (entry?.kind === 'found' && now < entry.expiresAt + PAT_MAX_STALE_MS) {
-        if (attempt === undefined && !backingOff && admit(clientAddress, now))
-          start(hash, scope, now);
+        if (attempt === undefined && !backingOff && admit(request.clientAddress, now))
+          start(hash, request, now);
         return answer(entry);
       }
 
       if (attempt !== undefined) {
         awaited ??= attempt.id;
-        await sleep(scope, attempt.startedAt + PAT_LOOKUP_TIMEOUT_MS);
+        await sleep(request.scope, attempt.startedAt + PAT_LOOKUP_TIMEOUT_MS);
         continue;
       }
       if (failure !== undefined && (failure.attemptId === awaited || backingOff)) {
@@ -338,15 +420,25 @@ export function createPatResolver(config: PatConfig): PatResolver {
           retryAfterSeconds: retryAfterSeconds(failure.retryAt, now),
         };
       }
-      if (!admit(clientAddress, now)) return { status: 'rate_limited', retryAfterSeconds: 1 };
-      awaited = start(hash, scope, now).id;
+      if (!admit(request.clientAddress, now))
+        return { status: 'rate_limited', retryAfterSeconds: 1 };
+      awaited = start(hash, request, now).id;
     }
   }
 
   return {
+    prefetch(hash, request) {
+      const now = Date.now();
+      const entry = entries.get(hash);
+      if (config.sharedCache === undefined || (entry !== undefined && now < entry.expiresAt)) {
+        return null;
+      }
+      return readShared(hash, now, request.waitUntil);
+    },
     resolve,
     forget(hash) {
       entries.delete(hash);
     },
+    sizes: () => ({ pending: running.size, addresses: windows.size }),
   };
 }

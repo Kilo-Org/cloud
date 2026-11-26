@@ -2,14 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   PAT_LENGTH,
   PAT_LOOKUPS_PER_SECOND_PER_ADDRESS,
+  PAT_LOOKUP_TIMEOUT_MS,
   PAT_MAX_STALE_MS,
   PAT_NEGATIVE_TTL_MS,
   PAT_POSITIVE_TTL_MS,
   PAT_PREFIX,
   createPatString,
+  createVerifier,
   hashPat,
   parsePat,
+  patReference,
   type PatCacheKey,
+  type PatCacheKeys,
   type PatConfig,
   type PatLookupResult,
   type PatRecord,
@@ -17,15 +21,26 @@ import {
   type SharedPatCache,
   type VerifyResult,
 } from '../src/index';
+import { newCallScope } from '../src/flight';
+import {
+  MAX_INSTANCE_ENTRIES,
+  MAX_TRACKED_ADDRESSES,
+  createPatResolver,
+  type PatRequest,
+} from '../src/pat';
 import {
   AUDIENCE,
   NO_PAT_SCOPE,
   OTHER_SCOPE,
+  RESOURCE_METADATA,
   SCOPE,
   SESSION_SCOPE,
+  UTS_ISSUER,
+  UTS_REGISTRY,
   bearer,
   drain,
   emptyList,
+  fakeAllTimers,
   gate,
   harness,
   nowSeconds,
@@ -72,6 +87,10 @@ describe('PAT format', () => {
     expect(await hashPat('abc')).toBe(
       'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
     );
+  });
+
+  it('names a PAT in logs by the first 8 characters of its base64url SHA-256', async () => {
+    expect(await patReference('abc')).toBe('ungWv48B');
   });
 });
 
@@ -172,14 +191,21 @@ let h: Harness;
 let pat: string;
 
 async function instance(
-  options: { workload?: string; current?: PatCacheKey; previous?: PatCacheKey } = {}
+  options: {
+    workload?: string;
+    current?: PatCacheKey;
+    previous?: PatCacheKey;
+    cacheKeys?: PatConfig['cacheKeys'];
+  } = {}
 ): Promise<Harness> {
   return await harness({
     pat: {
       lookup: lookup.lookup,
       workload: options.workload ?? 'session-ingest',
       sharedCache: shared,
-      cacheKeys: { current: options.current ?? KEY_V1, previous: options.previous },
+      cacheKeys:
+        options.cacheKeys ??
+        (async () => ({ current: options.current ?? KEY_V1, previous: options.previous })),
     },
   });
 }
@@ -206,7 +232,7 @@ async function verify(
   value = pat,
   route: Partial<Route> = {},
   on: Harness = h,
-  clientAddress = '203.0.113.7'
+  clientAddress: string | null = '203.0.113.7'
 ): Promise<VerifyResult> {
   return await on.verifier.verify(
     bearer(value),
@@ -356,7 +382,6 @@ describe('the feed entry for a PAT id overrides both layers', () => {
     await verify();
     await drain(h.background);
     h.feed.list = { ...emptyList(), revokedPatIds: new Set(['pat-1']) };
-    h.feed.listHash = 'hash-2';
     advance(10_000);
     await verify();
     await drain(h.background);
@@ -364,7 +389,6 @@ describe('the feed entry for a PAT id overrides both layers', () => {
     // A second instance reading the still-cached shared entry refuses it as well.
     const other = await instance();
     other.feed.list = h.feed.list;
-    other.feed.listHash = 'hash-2';
     expect(await verify(pat, {}, other)).toMatchObject({ ok: false, reason: 'pat_revoked' });
   });
 
@@ -601,5 +625,171 @@ describe('PAT record checks', () => {
   it('refuses a PAT of a blocked account', async () => {
     h.feed.list = { ...emptyList(), blockedAccounts: new Set(['user-1']) };
     expect(await verify()).toMatchObject({ ok: false, status: 401, reason: 'blocked_account' });
+  });
+});
+
+describe('the client address', () => {
+  it.each([
+    ['no address', null],
+    ['an empty address', ''],
+  ])('refuses a PAT with %s: 400, no lookup, no feed fetch', async (_name, address) => {
+    expect(await verify(pat, {}, h, address)).toMatchObject({
+      ok: false,
+      status: 400,
+      error: 'invalid_request',
+      reason: 'pat_client_address_missing',
+    });
+    expect(lookup.hashes).toEqual([]);
+    expect(h.feed.calls).toBe(0);
+  });
+
+  it('needs no address for an access token', async () => {
+    expect(
+      await h.verifier.verify(
+        bearer('not.a.token'),
+        { issuer: 'uts', scope: SCOPE },
+        { waitUntil: h.ctx.waitUntil, clientAddress: null }
+      )
+    ).toMatchObject({ status: 401, reason: 'malformed_token' });
+  });
+
+  it('is required by the type of a verifier that accepts PATs', () => {
+    const uts = {
+      issuer: UTS_ISSUER,
+      jwks: h.utsJwks.source,
+      scopeRegistry: UTS_REGISTRY,
+      revocation: h.feed.source,
+    };
+    const withPats = createVerifier({
+      audience: AUDIENCE,
+      resourceMetadataUrl: RESOURCE_METADATA,
+      uts: {
+        ...uts,
+        pat: { lookup: lookup.lookup, workload: 'w', cacheKeys: async () => ({ current: KEY_V1 }) },
+      },
+    });
+    const tokensOnly = createVerifier({
+      audience: AUDIENCE,
+      resourceMetadataUrl: RESOURCE_METADATA,
+      uts,
+    });
+    const route: Route = { issuer: 'uts', scope: SCOPE };
+    const waitUntil = () => {};
+    // Never called: tsgo checks these lines.
+    const calls = () => [
+      // @ts-expect-error a verifier that accepts PATs needs the client address
+      withPats.verify(null, route, { waitUntil }),
+      withPats.verify(null, route, { waitUntil, clientAddress: null }),
+      tokensOnly.verify(null, route, { waitUntil }),
+    ];
+    expect(calls).toBeTypeOf('function');
+  });
+});
+
+describe('shared-cache keys from the bundle on each access', () => {
+  it('follows a rotation on a running instance', async () => {
+    let keys: PatCacheKeys = { current: KEY_V1 };
+    const provider = async () => keys;
+    h = await instance({ cacheKeys: provider });
+    const reader = await instance({ cacheKeys: provider });
+    const [later, newer] = [createPatString(), createPatString()];
+    lookup.records.set(await hashPat(later), record({ patId: 'pat-later' }));
+    lookup.records.set(await hashPat(newer), record({ patId: 'pat-newer' }));
+    await verify(pat);
+    await verify(later);
+    await drain(h.background);
+    expect(lookup.hashes).toHaveLength(2);
+
+    // Rotation: v2 signs, v1 still verifies. The reader serves the v1 entry from the shared cache.
+    keys = { current: KEY_V2, previous: KEY_V1 };
+    expect(await verify(pat, {}, reader)).toMatchObject({ ok: true });
+    expect(lookup.hashes).toHaveLength(2);
+    // A new entry is signed with v2.
+    await verify(newer);
+    await drain(h.background);
+    const written = shared.entries.get(`pat:session-ingest:${await hashPat(newer)}`) ?? '{}';
+    expect(JSON.parse(written)).toMatchObject({ k: 'v2' });
+
+    // v1 leaves the bundle: its entries no longer count; v2 entries still do.
+    keys = { current: KEY_V3, previous: KEY_V2 };
+    expect(await verify(later, {}, reader)).toMatchObject({ ok: true });
+    expect(lookup.hashes).toHaveLength(4);
+    expect(await verify(newer, {}, reader)).toMatchObject({ ok: true });
+    expect(lookup.hashes).toHaveLength(4);
+  });
+
+  it('counts a key provider failure as a cache miss and skips the write', async () => {
+    await verify();
+    await drain(h.background);
+    const puts = shared.puts;
+    const failing = await instance({
+      cacheKeys: async () => {
+        throw new Error('bundle unavailable');
+      },
+    });
+    expect(await verify(pat, {}, failing)).toMatchObject({ ok: true });
+    await drain(failing.background);
+    expect(lookup.hashes).toHaveLength(2);
+    expect(shared.puts).toBe(puts);
+  });
+});
+
+describe('the shared-cache read on a cold instance', () => {
+  it('starts alongside the feed read, and an instance hit reads nothing', async () => {
+    let reads = 0;
+    const get = shared.get;
+    shared.get = async key => {
+      reads++;
+      return await get(key);
+    };
+    h.feed.gate = gate();
+    const pending = verify();
+    await vi.waitFor(() => expect(h.feed.calls).toBe(1));
+    expect(reads).toBe(1);
+    h.feed.gate.release();
+    expect(await pending).toMatchObject({ ok: true });
+    expect(await verify()).toMatchObject({ ok: true });
+    expect(reads).toBe(1);
+  });
+});
+
+describe('bounded bookkeeping', () => {
+  const request = (address: string): PatRequest => ({
+    clientAddress: address,
+    waitUntil: () => {},
+    scope: newCallScope(),
+  });
+
+  it('fails pending lookups past their timeout once over the bound', async () => {
+    // Every timer is fake and never advanced: each owner looks like a cancelled request whose
+    // lookup never settles.
+    fakeAllTimers();
+    const resolver = createPatResolver({
+      lookup: () => Promise.withResolvers<PatLookupResult>().promise,
+      workload: 'w',
+      cacheKeys: async () => ({ current: KEY_V1 }),
+    });
+    for (let i = 0; i <= MAX_INSTANCE_ENTRIES; i++) {
+      void resolver.resolve(`old-${i}`, request(`a-${i}`), null);
+    }
+    await vi.advanceTimersByTimeAsync(1);
+    expect(resolver.sizes().pending).toBe(MAX_INSTANCE_ENTRIES + 1);
+    vi.setSystemTime(Date.now() + PAT_LOOKUP_TIMEOUT_MS);
+    for (let i = 0; i < 100; i++) void resolver.resolve(`new-${i}`, request(`b-${i}`), null);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(resolver.sizes().pending).toBe(100);
+  });
+
+  it('never tracks more addresses than its bound', async () => {
+    const resolver = createPatResolver({
+      lookup: async () => ({ status: 'not_found' }),
+      workload: 'w',
+      cacheKeys: async () => ({ current: KEY_V1 }),
+    });
+    // All inside one second, so no window has expired.
+    for (let i = 0; i < MAX_TRACKED_ADDRESSES + 500; i++) {
+      await resolver.resolve(`hash-${i}`, request(`a-${i}`), null);
+    }
+    expect(resolver.sizes().addresses).toBe(MAX_TRACKED_ADDRESSES);
   });
 });

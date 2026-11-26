@@ -548,18 +548,6 @@ export async function accountHasVerifiedPrimaryAddress(userId: string): Promise<
   return providers.length === 0 || hasVerifiedPrimaryAddress(user.google_user_email, providers);
 }
 
-/**
- * The sign-in methods an enterprise SSO link removed, each named once in a
- * stable order, or undefined when it removed none. A stale WorkOS row the
- * link replaces is the same method, so it is not one of them.
- */
-function replacedSignInMethods(
-  removed: readonly AuthProviderId[]
-): readonly [AuthProviderId, ...AuthProviderId[]] | undefined {
-  const [first, ...rest] = [...new Set(removed.filter(provider => provider !== 'workos'))].sort();
-  return first === undefined ? undefined : [first, ...rest];
-}
-
 export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
@@ -687,7 +675,13 @@ export async function createOrUpdateUser(
           return {
             user: updatedUser,
             linkedAt: linked.created_at,
-            replacedProviders: replacedSignInMethods(removed.map(row => row.provider)),
+            // The other sign-in methods the link removed, each named once in a
+            // stable order. A stale WorkOS row it replaces is the same method.
+            replacedProviders: [
+              ...new Set(
+                removed.map(row => row.provider).filter(provider => provider !== 'workos')
+              ),
+            ].sort(),
           };
         });
         linkedUser = settled.user;
@@ -702,9 +696,7 @@ export async function createOrUpdateUser(
                 displayName: args.display_name ?? null,
               },
               linkedAt: new Date(settled.linkedAt),
-              ...(settled.replacedProviders
-                ? { replacedProviders: settled.replacedProviders }
-                : {}),
+              change: { kind: 'sso_settled', replacedProviders: settled.replacedProviders },
             },
             await currentSecurityNoticeRequest()
           );
@@ -1103,6 +1095,7 @@ export async function linkAccountToExistingUser(
             displayName: authProviderData.display_name ?? null,
           },
           linkedAt: new Date(linkResult.linkedAt),
+          change: { kind: 'added' },
         },
         noticeRequest
       );
@@ -2732,21 +2725,26 @@ export async function checkAuthProviderUnlink(
   return successResult();
 }
 
+/**
+ * Removes the provider's link rows. `removedLinkCreatedAt` holds when each
+ * removed row was written, empty when a concurrent unlink removed them first.
+ */
 export async function unlinkAuthProviderFromUser(
   kiloUserId: string,
   provider: AuthProviderId
-): Promise<OptionalError<TRPCError>> {
+): Promise<Result<{ removedLinkCreatedAt: string[] }, TRPCError>> {
   const unlinkable = await checkAuthProviderUnlink(kiloUserId, provider);
   if (!unlinkable.success) return unlinkable;
 
-  await db
+  const removed = await db
     .delete(user_auth_provider)
     .where(
       and(
         eq(user_auth_provider.kilo_user_id, kiloUserId),
         eq(user_auth_provider.provider, provider)
       )
-    );
+    )
+    .returning({ created_at: user_auth_provider.created_at });
 
   // Clear Discord guild membership verification when unlinking Discord
   if (provider === 'discord') {
@@ -2764,5 +2762,5 @@ export async function unlinkAuthProviderFromUser(
     await clearOpenAiChatGptConnection({ kiloUserId, organizationId: null });
   }
 
-  return successResult();
+  return successResult({ removedLinkCreatedAt: removed.map(row => row.created_at) });
 }

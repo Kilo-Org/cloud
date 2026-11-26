@@ -10,7 +10,7 @@
  */
 import 'server-only';
 
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { headers } from 'next/headers';
 import { captureException } from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
@@ -42,13 +42,6 @@ import { runAfterResponse } from '@/lib/after-response';
 import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
 import { approximateLocation, describeUserAgent } from '@/lib/auth/sign-in-method-change-request';
 
-/**
- * The server-held identifier of the session that took an action: the browser
- * session or the device session that authenticated the request. Null when the
- * request carried neither, as with a plain API token.
- */
-type ActingSessionId = string | null;
-
 export type SecurityNoticeEvent =
   | { type: 'passkey_added'; passkeyId: string; passkeyName: string | null }
   | { type: 'passkey_removed'; passkeyId: string; passkeyName: string | null }
@@ -59,12 +52,21 @@ export type SecurityNoticeEvent =
       /** When the link row was written; a later re-link after an unlink is a new event. */
       linkedAt: Date;
       /**
-       * The other sign-in methods the link removed, as an SSO link does;
-       * absent when it removed none.
+       * `added`: the owner linked a method they can remove themselves.
+       * `sso_settled`: an enterprise SSO sign-in settled onto the account. It
+       * replaced the account's other sign-in methods (none or more), signed
+       * out every browser, and only Kilo support can remove it.
        */
-      replacedProviders?: readonly [AuthProviderId, ...AuthProviderId[]];
+      change:
+        | { kind: 'added' }
+        | { kind: 'sso_settled'; replacedProviders: readonly AuthProviderId[] };
     }
-  | { type: 'sign_in_method_unlinked'; provider: AuthProviderId; actingSessionId: ActingSessionId }
+  | {
+      type: 'sign_in_method_unlinked';
+      provider: AuthProviderId;
+      /** When each removed link row was written: the identity of what this unlink removed. */
+      removedLinkCreatedAt: readonly [string, ...string[]];
+    }
   | {
       type: 'device_sign_in_approved';
       deviceAuthRequestId: string;
@@ -72,15 +74,20 @@ export type SecurityNoticeEvent =
       requester: DeviceSignInRequester;
       requestIp: string | null;
     }
-  | { type: 'api_key_reset'; actingSessionId: ActingSessionId }
-  | { type: 'browser_sessions_revoked'; actingSessionId: ActingSessionId }
+  /**
+   * `rotationId` identifies the committed change by the pepper it installed
+   * (`newPepperRotation`), so two changes are two notices and a repeated
+   * schedule of one is one.
+   */
+  | { type: 'api_key_reset'; rotationId: string }
+  | { type: 'browser_sessions_revoked'; rotationId: string }
   | {
       type: 'device_session_revoked';
       deviceSessionId: string;
       /** Kilo's description of the signed-out device, or null when it has none. */
       revokedDevice: string | null;
     }
-  | { type: 'sign_in_reset_by_support'; actingSessionId: ActingSessionId }
+  | { type: 'sign_in_reset_by_support'; rotationId: string }
   | {
       type: 'new_sign_in';
       /** The sign-in provider id; an id this build does not name renders generically. */
@@ -91,12 +98,6 @@ type SecurityNoticeType = SecurityNoticeEvent['type'];
 
 /** The one `transactional_email_log` type every notice claims its key under. */
 const SECURITY_NOTICE_EMAIL_TYPE = 'security_notice';
-
-/** Repeats of a reset, a sign-out or a support reset by one session inside this window are one notice. */
-const REVOCATION_BUCKET_MS = 10 * 60 * 1000;
-
-/** An unlink is guarded by its single-use code; the bucket only absorbs a replayed schedule. */
-const UNLINK_BUCKET_MS = 60 * 1000;
 
 /**
  * At most one new-sign-in notice per user per hour: the sign-in check's own
@@ -140,14 +141,6 @@ export function supportSecurityNoticeRequest(occurredAt: Date = new Date()): Sec
   return { actor: 'support', occurredAt };
 }
 
-/** The session that authenticated a tRPC request, for the key of a notice it causes. */
-export function actingSessionIdFromContext(ctx: {
-  webSessionId?: string;
-  deviceSessionId?: string;
-}): ActingSessionId {
-  return ctx.webSessionId ?? ctx.deviceSessionId ?? null;
-}
-
 /**
  * Kilo's own description of a client from its recorded user agent: a
  * recognised client kind or a parsed browser label, never the raw header.
@@ -171,20 +164,11 @@ function timeBucket(occurredAt: Date, bucketMs: number): string {
 }
 
 /**
- * The acting session in a key. An action whose request carried no session is
- * keyed on a fresh random value, so it is its own notice: a lost security
- * notice is worse than a duplicate one.
- */
-function actingSessionKeyPart(actingSessionId: ActingSessionId): string {
-  return actingSessionId ?? `unidentified:${randomUUID()}`;
-}
-
-/**
  * The event's identity: two schedules of one event share it, two events never
- * do. Every part is a server-issued random id, a provider id from a fixed list,
- * or a time; no email address, IP address, network or provider account id
- * goes in, because a plain SHA-256 of a guessable value can be reversed by
- * anyone who can read the outbox row.
+ * do. Every part is a server-issued random id, a digest of a fresh random
+ * pepper, a provider id from a fixed list, or a time; no email address, IP
+ * address, network or provider account id goes in, because a plain SHA-256 of
+ * a guessable value can be reversed by anyone who can read the outbox row.
  */
 function securityNoticeIdempotencyKey(
   userId: string,
@@ -199,11 +183,7 @@ function securityNoticeIdempotencyKey(
       case 'sign_in_method_linked':
         return [event.provider, event.linkedAt.toISOString()];
       case 'sign_in_method_unlinked':
-        return [
-          event.provider,
-          actingSessionKeyPart(event.actingSessionId),
-          timeBucket(request.occurredAt, UNLINK_BUCKET_MS),
-        ];
+        return [event.provider, ...[...event.removedLinkCreatedAt].sort()];
       case 'device_sign_in_approved':
         return [event.deviceAuthRequestId];
       case 'device_session_revoked':
@@ -211,10 +191,7 @@ function securityNoticeIdempotencyKey(
       case 'api_key_reset':
       case 'browser_sessions_revoked':
       case 'sign_in_reset_by_support':
-        return [
-          actingSessionKeyPart(event.actingSessionId),
-          timeBucket(request.occurredAt, REVOCATION_BUCKET_MS),
-        ];
+        return [event.rotationId];
       case 'new_sign_in':
         return [timeBucket(request.occurredAt, NEW_SIGN_IN_BUCKET_MS)];
     }
@@ -248,7 +225,14 @@ function sendSecurityNoticeEmail(
         email,
         AUTH_PROVIDER_DISPLAY_NAMES[event.provider],
         event.linkedIdentity,
-        replacedMethodNames(event.replacedProviders),
+        event.change.kind === 'added'
+          ? { kind: 'added' }
+          : {
+              kind: 'sso_settled',
+              replacedMethodNames: event.change.replacedProviders.map(
+                provider => AUTH_PROVIDER_DISPLAY_NAMES[provider]
+              ),
+            },
         request
       );
     case 'sign_in_method_unlinked':
@@ -278,17 +262,6 @@ function sendSecurityNoticeEmail(
         request
       );
   }
-}
-
-function replacedMethodNames(
-  providers: readonly [AuthProviderId, ...AuthProviderId[]] | undefined
-): readonly [string, ...string[]] | null {
-  if (providers === undefined) return null;
-  const [first, ...rest] = providers;
-  return [
-    AUTH_PROVIDER_DISPLAY_NAMES[first],
-    ...rest.map(provider => AUTH_PROVIDER_DISPLAY_NAMES[provider]),
-  ];
 }
 
 function pushLabel(value: string | null): string | null {

@@ -4,6 +4,7 @@ import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
+import { newPepperRotation } from '@kilocode/web-shared/lib/auth/pepper-rotation';
 import { getPostgresErrorCode } from '@/lib/db-errors';
 import { deleteUserPasskeys, revokeUserSessions } from '@/lib/user/session-revocation';
 
@@ -11,6 +12,8 @@ export type MagicLinkRecoveryResult = {
   removedProviders: AuthProviderId[];
   removedPasskeyCount: number;
   revokedDeviceSessionCount: number;
+  /** Identifies this reset by the browser-session pepper it installed, without revealing it. */
+  rotationId: string;
 };
 
 /**
@@ -28,10 +31,11 @@ export type MagicLinkRecoveryResult = {
 export async function resetAccountToMagicLink(
   kiloUserId: string
 ): Promise<MagicLinkRecoveryResult | null> {
+  const webSessionRotation = newPepperRotation();
   const outcome = await db.transaction(async tx => {
     const [user] = await tx
       .update(kilocode_users)
-      .set({ web_session_pepper: randomUUID(), api_token_pepper: randomUUID() })
+      .set({ web_session_pepper: webSessionRotation.pepper, api_token_pepper: randomUUID() })
       .where(eq(kilocode_users.id, kiloUserId))
       .returning({ id: kilocode_users.id });
     if (!user) return null;
@@ -64,6 +68,7 @@ export async function resetAccountToMagicLink(
     removedProviders: outcome.removedProviders,
     removedPasskeyCount: outcome.removedPasskeyCount,
     revokedDeviceSessionCount: outcome.revokedSessionIds.length,
+    rotationId: webSessionRotation.rotationId,
   };
 }
 

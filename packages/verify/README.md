@@ -107,7 +107,7 @@ data.
 | `RevocationFeedSource` `{ head(signal), list(listHash, signal) }` | Phase 3 (service binding on Workers, HTTPS on Vercel and Fly) | `head` returns the signed head as a compact JWS string; `list` returns the list bytes for that hash. The transport verifies nothing: the library verifies the head under a feed key and the list against the head hash (format below). Any rejection is a failed fetch |
 | `UtsBootstrapSource` `(signal) => Promise<{ jwks, head, list }>` | Phase 3 (the bootstrap endpoint) | One call: the UTS key-set body, a head and its list bytes, in the same formats. Used only while neither the UTS key set nor the feed holds data; it applies whole or not at all |
 | `PatLookup` `(hash, signal)` | Phase 3 | `hash` is the lowercase-hex SHA-256 of the PAT. Answers `found` (a `PatRecordSchema` record), `not_found` (unknown, revoked or expired), `rate_limited` or `unavailable` with `retryAfterSeconds` |
-| `SharedPatCache` `{ get, put }` | The service: Workers Cache API or Vercel Runtime Cache | Opaque strings; errors count as a miss |
+| `SharedPatCache` `{ get, put }` | The service: Workers Cache API or Vercel Runtime Cache | Opaque strings; errors count as a miss, and so does a read (with its key provider) that has not answered within `PAT_SHARED_CACHE_TIMEOUT_MS` (1 s) |
 | `PatConfig.cacheKeys` `(ctx) => Promise<{ current, previous? }>` | The service: two `Secrets.get` calls on its own bundle | Read on each shared-cache read and write, so a rotation reaches a running instance; `current` signs, `current` and `previous` verify; a rejection is a miss or a skipped write |
 
 ### Revocation feed format
@@ -183,22 +183,24 @@ Fail-closed and caching rules:
 | Cold start: one bootstrap call fills the UTS key set and the feed; `warm` starts it beside the STS key set | `bootstrap.ts`, `warm` | `bootstrap.test.ts` |
 | PAT: malformed is 401 with no cache write | `verifyPat` | `pat.test.ts` offline check |
 | PAT: no client address is 400 `invalid_request`, before any cache or feed read | `verifyPat` | the client address |
-| PAT: 60 s positive / 30 s negative in the instance and in the shared cache, by full hash; HMAC keys read per access (current and previous); workload in the key | `pat.ts` | two cache layers; shared-cache keys from the bundle |
+| PAT: 60 s positive / 30 s negative in the instance and in the shared cache, by full hash; HMAC keys read per access (current and previous); workload in the key; a shared read over 1 s is a miss | `pat.ts` | two cache layers; shared-cache keys from the bundle; a slow shared cache |
 | PAT: the hash and the shared-cache read run alongside the feed read | `verifyPat`, `pat.ts` `prefetch` | the shared-cache read on a cold instance |
-| PAT: feed entry overrides both layers | `verifyPat` | the feed entry for a PAT id overrides both layers |
+| PAT: feed entry overrides both layers; the decision reads the feed again after the lookup, so a revocation installed meanwhile counts and the head is still at most 60 s old | `verifyPat` | the feed entry for a PAT id overrides both layers |
 | PAT: lookup failure is 503; an expired entry serves stale up to 10 min, refreshed by at most one background lookup at a time, only with a head under 60 s | `pat.ts`, `verifyPat` | fail-closed lookups |
-| PAT: one lookup per hash; 429 above 20 uncached lookups/s per address, before the lookup; a 429 or 503 never evicts | `pat.ts` | merging and the per-address limit; fail-closed lookups |
-| PAT: bounded bookkeeping (10,000 instance entries, failures and pending lookups; 10,000 tracked addresses, oldest first) | `pat.ts` | bounded bookkeeping |
+| PAT: one lookup per hash; 429 above 20 uncached lookups/s per address, before the lookup; 503 above 1,000 pending lookups per instance, before the lookup; a 429 or 503 never evicts | `pat.ts` | merging and the per-address limit; fail-closed lookups; bounded bookkeeping |
+| PAT: bounded bookkeeping (10,000 instance entries and failure records, oldest first; 1,000 pending lookups; 10,000 tracked addresses, oldest first) | `pat.ts` | bounded bookkeeping |
 | No promise shared across requests: owner + pollers, `waitUntil` hand-off | `flight.ts` | `runtime.test.ts` (real workerd: concurrent cold requests, one call each; `warm`) |
 | A request cancelled mid-call does not stall others: after 1 s without its heartbeat, a key-set, feed or bootstrap call counts as failed (with its retry wait); a PAT lookup lets the next request make its own | `flight.ts` `abandoned` | `runtime.test.ts` races; the cancellation tests in each test file |
 
 Error responses: no credential is 401 with `WWW-Authenticate: Bearer resource_metadata="…"`;
-malformed, expired, revoked or wrong-issuer credentials, a missing `sid` on a session-bound route,
-and a PAT on a session-bound route are 401 `invalid_token`; wrong audience or unknown scope is 403
-`insufficient_scope` with the required scope in the body and the challenge; an org mismatch is 403
-`org_mismatch`; a PAT without a client address is 400 `invalid_request`; a failed dependency (key
-set, feed, bootstrap, PAT lookup, including a UTS 429 or 503) is 503 `temporarily_unavailable` with
-`Retry-After`; the per-address PAT lookup limit is 429 `too_many_requests` with `Retry-After`.
+malformed, over-long, expired, revoked, wrong-environment or wrong-issuer credentials, a missing
+`sid` on a session-bound route, and a PAT on a session-bound route are 401 `invalid_token`; wrong
+audience or unknown scope is 403 `insufficient_scope` with the required scope in the body and the
+challenge; an org mismatch, or no org on an org-scoped route, is 403 `org_mismatch`; a PAT without
+a client address is 400 `invalid_request`; a failed dependency (key set, feed, bootstrap, PAT
+lookup, including a UTS 429 or 503, or 1,000 PAT lookups already pending in the instance) is 503
+`temporarily_unavailable` with `Retry-After`; the per-address PAT lookup limit is 429
+`too_many_requests` with `Retry-After`.
 Every failure carries `Cache-Control: no-store`.
 
 ## Checks

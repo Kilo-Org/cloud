@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  MAX_PENDING_LOOKUPS,
   PAT_LENGTH,
   PAT_LOOKUPS_PER_SECOND_PER_ADDRESS,
   PAT_LOOKUP_TIMEOUT_MS,
@@ -7,6 +8,7 @@ import {
   PAT_NEGATIVE_TTL_MS,
   PAT_POSITIVE_TTL_MS,
   PAT_PREFIX,
+  PAT_SHARED_CACHE_TIMEOUT_MS,
   createPatString,
   createVerifier,
   hashPat,
@@ -407,6 +409,41 @@ describe('the feed entry for a PAT id overrides both layers', () => {
     expect(await verify()).toMatchObject({ ok: false, status: 503, reason: 'feed_unavailable' });
     expect(lookup.hashes).toHaveLength(1);
   });
+
+  it('decides on the feed as it is after the lookup, not as it was before', async () => {
+    await verify();
+    await drain(h.background);
+    const other = createPatString();
+    lookup.records.set(await hashPat(other), record({ patId: 'pat-other' }));
+    advance(9_000);
+    lookup.gate = gate();
+    const pending = verify(other);
+    await vi.waitFor(() => expect(lookup.hashes).toHaveLength(2));
+    // While the lookup waits, another request refreshes the feed, which now revokes the PAT.
+    h.feed.list = { ...emptyList(), revokedPatIds: new Set(['pat-other']) };
+    advance(2_000);
+    expect(await verify()).toMatchObject({ ok: true });
+    await drain(h.background);
+    lookup.gate.release();
+    expect(await pending).toMatchObject({ ok: false, status: 401, reason: 'pat_revoked' });
+  });
+
+  it('refuses a PAT whose feed head passes 60 s while its lookup runs', async () => {
+    h.feed.headAgeMs = 25_000;
+    await verify();
+    await drain(h.background);
+    const other = createPatString();
+    lookup.records.set(await hashPat(other), record({ patId: 'pat-other' }));
+    h.feed.mode = 'fail';
+    // The head is 59 s old when the request starts, 61 s old when the lookup answers.
+    advance(34_000);
+    lookup.gate = gate();
+    const pending = verify(other);
+    await vi.waitFor(() => expect(lookup.hashes).toHaveLength(2));
+    advance(2_000);
+    lookup.gate.release();
+    expect(await pending).toMatchObject({ ok: false, status: 503, reason: 'feed_unavailable' });
+  });
 });
 
 describe('fail-closed lookups', () => {
@@ -736,6 +773,24 @@ describe('shared-cache keys from the bundle on each access', () => {
   });
 });
 
+describe('a slow shared cache', () => {
+  it.each([
+    ['a cache read', 'get'],
+    ['the key provider', 'keys'],
+  ] as const)('counts %s that does not answer in time as a miss', async (_name, hung) => {
+    await verify();
+    await drain(h.background);
+    const never = <T>(): Promise<T> => Promise.withResolvers<T>().promise;
+    if (hung === 'get') shared.get = never;
+    const other = await instance(hung === 'keys' ? { cacheKeys: never } : {});
+    // Real timers: the read is given up after the timeout, and the lookup answers instead.
+    const started = performance.now();
+    expect(await verify(pat, {}, other)).toMatchObject({ ok: true });
+    expect(performance.now() - started).toBeGreaterThanOrEqual(PAT_SHARED_CACHE_TIMEOUT_MS - 50);
+    expect(lookup.hashes).toHaveLength(2);
+  });
+});
+
 describe('the shared-cache read on a cold instance', () => {
   it('starts alongside the feed read, and an instance hit reads nothing', async () => {
     let reads = 0;
@@ -762,7 +817,7 @@ describe('bounded bookkeeping', () => {
     scope: newCallScope(),
   });
 
-  it('fails pending lookups past their timeout once over the bound', async () => {
+  it(`keeps at most ${MAX_PENDING_LOOKUPS} lookups pending, whatever their addresses`, async () => {
     // Every timer is fake and never advanced: each owner looks like a cancelled request whose
     // lookup never settles.
     fakeAllTimers();
@@ -771,15 +826,39 @@ describe('bounded bookkeeping', () => {
       workload: 'w',
       cacheKeys: async () => ({ current: KEY_V1 }),
     });
-    for (let i = 0; i <= MAX_INSTANCE_ENTRIES; i++) {
-      void resolver.resolve(`old-${i}`, request(`a-${i}`), null);
-    }
+    const results = Array.from({ length: MAX_PENDING_LOOKUPS + 1 }, (_, i) =>
+      resolver.resolve(`old-${i}`, request(`a-${i}`), null)
+    );
     await vi.advanceTimersByTimeAsync(1);
-    expect(resolver.sizes().pending).toBe(MAX_INSTANCE_ENTRIES + 1);
+    expect(resolver.sizes().pending).toBe(MAX_PENDING_LOOKUPS);
+    expect(await results.at(-1)).toEqual({ status: 'unavailable', retryAfterSeconds: 1 });
+    // Past their timeout the pending lookups count as failed, and new ones start.
     vi.setSystemTime(Date.now() + PAT_LOOKUP_TIMEOUT_MS);
     for (let i = 0; i < 100; i++) void resolver.resolve(`new-${i}`, request(`b-${i}`), null);
     await vi.advanceTimersByTimeAsync(1);
     expect(resolver.sizes().pending).toBe(100);
+  });
+
+  it(`keeps at most ${MAX_INSTANCE_ENTRIES} failure records, dropping the oldest first`, async () => {
+    let calls = 0;
+    const resolver = createPatResolver({
+      lookup: async () => {
+        calls++;
+        return { status: 'rate_limited', retryAfterSeconds: 60 };
+      },
+      workload: 'w',
+      cacheKeys: async () => ({ current: KEY_V1 }),
+    });
+    const count = MAX_INSTANCE_ENTRIES + 10;
+    for (let i = 0; i < count; i++) {
+      await resolver.resolve(`hash-${i}`, request(`a-${i}`), null);
+    }
+    expect(resolver.sizes().failures).toBe(MAX_INSTANCE_ENTRIES);
+    // The newest record still holds its hash back; the oldest was dropped, so it is looked up.
+    await resolver.resolve(`hash-${count - 1}`, request('c-1'), null);
+    expect(calls).toBe(count);
+    await resolver.resolve('hash-0', request('c-2'), null);
+    expect(calls).toBe(count + 1);
   });
 
   it('never tracks more addresses than its bound', async () => {

@@ -496,9 +496,10 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
       return failures.unavailable('jwks_unavailable', keys.retryAfterSeconds);
     }
     // A PAT is a long-lived credential: the feed head must be at most 60 s old, even on a cache hit.
-    const read = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
-    if (read.status === 'unavailable') {
-      return failures.unavailable('feed_unavailable', read.retryAfterSeconds);
+    // This read fails fast before any lookup; the decision below reads the feed again.
+    const early = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
+    if (early.status === 'unavailable') {
+      return failures.unavailable('feed_unavailable', early.retryAfterSeconds);
     }
     const { hash, shared } = await prepared;
     const resolved = await pats.resolve(hash, request, shared);
@@ -513,6 +514,12 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
         break;
     }
     const record = resolved.record;
+    // The shared-cache read or the lookup may have waited: decide on the feed as it is now, so a
+    // revocation installed meanwhile counts and the head is still at most 60 s old.
+    const read = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
+    if (read.status === 'unavailable') {
+      return failures.unavailable('feed_unavailable', read.retryAfterSeconds);
+    }
     // The feed entry for this PAT id overrides every cache layer; rows 13 and the PAT's own expiry.
     if (read.list.revokedPatIds.has(record.patId)) {
       pats.forget(hash);

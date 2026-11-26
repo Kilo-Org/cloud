@@ -25,13 +25,20 @@ export const PAT_MAX_STALE_MS = 10 * 60_000;
 export const PAT_LOOKUPS_PER_SECOND_PER_ADDRESS = 20;
 /** A PAT lookup that has not answered by then counts as a failure. */
 export const PAT_LOOKUP_TIMEOUT_MS = 5_000;
+/**
+ * At most this many PAT lookups are pending at UTS per instance, whatever their addresses. A
+ * request that would start one more gets 503 without a lookup.
+ */
+export const MAX_PENDING_LOOKUPS = 1_000;
+/** A shared-cache read, its key provider included, that has not answered by then is a miss. */
+export const PAT_SHARED_CACHE_TIMEOUT_MS = 1_000;
 /** After a failed lookup, a new lookup for that hash waits this long, or longer when UTS says so. */
 export const PAT_RETRY_MS = 2_000;
 /** The longest retry time a UTS answer can set for one hash. */
 const PAT_MAX_RETRY_MS = 60_000;
 /**
  * Size bound of the instance cache (oldest entry goes first; a "no such PAT" entry can push out a
- * positive one) and of the failure and pending-lookup bookkeeping.
+ * positive one) and of the failure bookkeeping (the oldest failure record goes first).
  */
 export const MAX_INSTANCE_ENTRIES = 10_000;
 /** Hard size bound of the per-address window bookkeeping; the oldest window goes first. */
@@ -143,8 +150,8 @@ export type PatResolver = {
   ): Promise<PatResolution>;
   /** Drops the instance entry, for a PAT the feed revoked. */
   forget(hash: string): void;
-  /** Pending lookups and tracked addresses; for tests of the size bounds. */
-  sizes(): { pending: number; addresses: number };
+  /** Pending lookups, failure records and tracked addresses; for tests of the size bounds. */
+  sizes(): { pending: number; failures: number; addresses: number };
 };
 
 export function createPatResolver(config: PatConfig): PatResolver {
@@ -185,15 +192,37 @@ export function createPatResolver(config: PatConfig): PatResolver {
     return keys;
   }
 
+  /**
+   * The shared entry for `hash`, or null on a miss. A read that has not answered within
+   * `PAT_SHARED_CACHE_TIMEOUT_MS` (a slow cache or key provider) counts as a miss.
+   */
   async function readShared(
     hash: string,
     now: number,
     waitUntil: WaitUntil
   ): Promise<SharedEntry | null> {
     if (config.sharedCache === undefined) return null;
+    const timedOut = Promise.withResolvers<null>();
+    const timer = setTimeout(() => timedOut.resolve(null), PAT_SHARED_CACHE_TIMEOUT_MS);
+    try {
+      return await Promise.race([
+        readSharedEntry(config.sharedCache, hash, now, waitUntil),
+        timedOut.promise,
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function readSharedEntry(
+    sharedCache: SharedPatCache,
+    hash: string,
+    now: number,
+    waitUntil: WaitUntil
+  ): Promise<SharedEntry | null> {
     try {
       const key = sharedKey(hash);
-      const text = await config.sharedCache.get(key);
+      const text = await sharedCache.get(key);
       if (text === null) return null;
       const envelope = EnvelopeSchema.parse(JSON.parse(text));
       const { current, previous } = await currentKeys(waitUntil);
@@ -278,36 +307,42 @@ export function createPatResolver(config: PatConfig): PatResolver {
     return true;
   }
 
+  /**
+   * Records a failed lookup. Records are kept in the order they were written, so past the bound
+   * the oldest one goes: that hash may then be looked up before its retry time, within its
+   * address's limit and the pending bound.
+   */
   function fail(hash: string, done: Attempt, at: number, hintSeconds: number): void {
     if (running.get(hash)?.id !== done.id) return;
     running.delete(hash);
     const hintMs = Number.isFinite(hintSeconds)
       ? Math.min(hintSeconds * 1000, PAT_MAX_RETRY_MS)
       : 0;
+    failures.delete(hash);
     failures.set(hash, { attemptId: done.id, retryAt: at + Math.max(PAT_RETRY_MS, hintMs) });
     if (failures.size > MAX_INSTANCE_ENTRIES) {
-      for (const [key, f] of failures) if (f.retryAt <= at) failures.delete(key);
+      const oldest = failures.keys().next();
+      if (oldest.done !== true) failures.delete(oldest.value);
     }
   }
 
   /**
-   * Over the bound, fails the pending lookups past their timeout. A request cancelled during its
-   * lookup never settles it, and nobody may ask for that hash again; pending lookups are kept in
-   * start order, so this walks only the timed-out front of the map.
+   * Fails the pending lookups past their timeout, then says whether one more lookup fits under
+   * `MAX_PENDING_LOOKUPS`. A request cancelled during its lookup never settles it; pending lookups
+   * are kept in start order, so this walks only the timed-out front of the map.
    */
-  function pruneRunning(at: number): void {
-    if (running.size <= MAX_INSTANCE_ENTRIES) return;
+  function roomToStart(at: number): boolean {
     for (const [hash, pending] of running) {
       if (at < pending.startedAt + PAT_LOOKUP_TIMEOUT_MS) break;
       fail(hash, pending, pending.startedAt + PAT_LOOKUP_TIMEOUT_MS, 0);
     }
+    return running.size < MAX_PENDING_LOOKUPS;
   }
 
   function start(hash: string, request: PatRequest, at: number): Attempt {
     const started: Attempt = { ...liveness(request.scope, at), id: nextAttemptId++ };
     running.delete(hash);
     running.set(hash, started);
-    pruneRunning(at);
     startOwned(request.scope, started, PAT_LOOKUP_TIMEOUT_MS, async answered => {
       let result: PatLookupResult;
       try {
@@ -404,8 +439,14 @@ export function createPatResolver(config: PatConfig): PatResolver {
       // refreshed by at most one background lookup at a time. The caller has already required a
       // feed head under 60 s.
       if (entry?.kind === 'found' && now < entry.expiresAt + PAT_MAX_STALE_MS) {
-        if (attempt === undefined && !backingOff && admit(request.clientAddress, now))
+        if (
+          attempt === undefined &&
+          !backingOff &&
+          roomToStart(now) &&
+          admit(request.clientAddress, now)
+        ) {
           start(hash, request, now);
+        }
         return answer(entry);
       }
 
@@ -420,6 +461,8 @@ export function createPatResolver(config: PatConfig): PatResolver {
           retryAfterSeconds: retryAfterSeconds(failure.retryAt, now),
         };
       }
+      // The isolate-wide bound first, so an address is not charged for a lookup that never starts.
+      if (!roomToStart(now)) return { status: 'unavailable', retryAfterSeconds: 1 };
       if (!admit(request.clientAddress, now))
         return { status: 'rate_limited', retryAfterSeconds: 1 };
       awaited = start(hash, request, now).id;
@@ -439,6 +482,6 @@ export function createPatResolver(config: PatConfig): PatResolver {
     forget(hash) {
       entries.delete(hash);
     },
-    sizes: () => ({ pending: running.size, addresses: windows.size }),
+    sizes: () => ({ pending: running.size, failures: failures.size, addresses: windows.size }),
   };
 }

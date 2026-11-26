@@ -864,7 +864,7 @@ describe('round-1 review fixes', () => {
     const [first, second] = [randomUUID(), randomUUID()];
     expect((await syncSso(first, 'org_x', [connection], 1)).outcome).toBe('applied');
     expect(await syncSso(second, 'org_y', [connection], 1)).toEqual({
-      outcome: 'refused',
+      outcome: 'retry_later',
       error: 'connection_conflict',
     });
     expect((await syncSso(first, 'org_x', [], 2)).outcome).toBe('applied');
@@ -874,6 +874,42 @@ describe('round-1 review fixes', () => {
       [connection]
     );
     expect(row.rows).toEqual([{ org_id: second }]);
+  });
+
+  it('answers retry_later and writes nothing when another organization takes a connection during the sync', async () => {
+    const connection = `conn_${randomUUID()}`;
+    const [taker, syncing] = [randomUUID(), randomUUID()];
+    const appPid = (await app.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    // The other organization's write is not committed yet, so the sync's first check misses it
+    // and its upsert waits on the connection's unique key.
+    await owner.query('BEGIN');
+    await owner.query(
+      `INSERT INTO uts.sso_connections (org_id, workos_connection_id, workos_organization_id)
+       VALUES ($1, $2, 'org_taker')`,
+      [taker, connection]
+    );
+    const pending = syncSso(syncing, 'org_syncing', [connection], 1);
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      const waiting = await db.connect().then(async probe => {
+        const result = await probe.query<{ waiting: boolean }>(
+          'SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted) AS waiting',
+          [appPid]
+        );
+        await probe.end();
+        return result.rows[0].waiting;
+      });
+      if (waiting) break;
+      if (Date.now() > deadline) throw new Error('the sync never waited on the connection');
+    }
+    await owner.query('COMMIT');
+    expect(await pending).toEqual({ outcome: 'retry_later', error: 'connection_conflict' });
+    const left = await owner.query<{ policies: number; org_id: string }>(
+      `SELECT (SELECT count(*)::int FROM uts.org_sso_policies WHERE org_id = $1) AS policies,
+              (SELECT org_id FROM uts.sso_connections WHERE workos_connection_id = $2) AS org_id`,
+      [syncing, connection]
+    );
+    expect(left.rows).toEqual([{ policies: 0, org_id: taker }]);
   });
 
   it('keeps a revoked CI trust policy and an ended sandbox grant final', async () => {

@@ -45,7 +45,7 @@ export const SourceVersionSchema = z.number().int().min(0).max(Number.MAX_SAFE_I
  */
 export const OperationActorSchema = z
   .string()
-  .regex(/^(?:(?:user|admin):[A-Za-z0-9_:./-]{1,255}|system:[a-z0-9_.-]{1,64})$/);
+  .regex(/^(?:(?:user|admin):[^\s]{1,255}|system:[a-z0-9_.-]{1,64})$/);
 
 /** A UTS account id: an imported app user id, or `uts_` plus 26 base32 characters. */
 export const SubjectSchema = z.string().min(1).max(255);
@@ -315,9 +315,10 @@ export type AuthorityKind = z.infer<typeof AuthorityKindSchema>;
 
 /**
  * `applied`, `already_applied` (the same `operation_id`, an effect that already holds, or a
- * source version older than one UTS applied) and `no_subject` are 200. `refused` (409) is final
- * for this request: `email_taken` (another account holds the address) or `connection_conflict`
- * (a WorkOS connection is active in another organization; it never moves while it is).
+ * source version older than one UTS applied) and `no_subject` are 200. `retry_later` with
+ * `connection_conflict` (409, `Retry-After: 30`): a WorkOS connection is still active in another
+ * organization; nothing was written, and the outbox retries until that organization's sync
+ * releases it. `refused` with `email_taken` (409) is final for this request.
  */
 export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   z.strictObject({
@@ -325,10 +326,15 @@ export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
     operation_id: z.uuid(),
   }),
   z.strictObject({
-    outcome: z.literal('refused'),
-    error: z.enum(['email_taken', 'connection_conflict']),
+    outcome: z.literal('retry_later'),
+    error: z.literal('connection_conflict'),
+    operation_id: z.uuid(),
   }),
+  z.strictObject({ outcome: z.literal('refused'), error: z.literal('email_taken') }),
 ]);
+
+/** Seconds an SSO sync waits for another organization to release a connection. */
+export const UTS_CONNECTION_CONFLICT_RETRY_SECONDS = 30;
 export type AuthorityAnswer = z.infer<typeof AuthorityAnswerSchema>;
 
 /**

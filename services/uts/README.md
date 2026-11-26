@@ -693,7 +693,7 @@ the mint Worker carries `@kilocode/verify`, so every `/internal/` route answers
 
 **Operations** (`@kilocode/uts-contracts` `UTS_SUBJECT_OPERATIONS`). The body is
 `{ operation_id, subject, reason, actor, source_version }`; `actor` is `user:<id>` or `admin:<id>`
-(`[A-Za-z0-9_:./-]`, 1-255) or `system:<source>` (`[a-z0-9_.-]`, 1-64); `source_version` is
+(no whitespace, 1-255 characters) or `system:<source>` (`[a-z0-9_.-]`, 1-64); `source_version` is
 0 to 2^53 - 1. An `operation_id` is kept 7 days; a repeat answers `already_applied` and hands the
 entries of the first run to the feed again.
 
@@ -747,7 +747,8 @@ address); `membership` adds, changes or (with `role: null`) removes a membership
 `uts.remove_org_member`, ordered by the subject's version; `sso-organization` writes the SSO policy,
 the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
 by the organization's own version; a connection active in another organization never moves
-(`409 refused connection_conflict`). The authority check behind the legacy bridge and
+(`409 retry_later connection_conflict`, `Retry-After: 30`, nothing written, also when another
+organization's sync takes it during this one). The authority check behind the legacy bridge and
 `sso_app_organization` is `uts.sso_app_organization` through `src/subjects/authority.ts`: verified
 only when the connection is active, belongs to that WorkOS organization, maps to the app
 organization, and the active account holds an active membership there.

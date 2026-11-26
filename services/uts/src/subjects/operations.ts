@@ -230,6 +230,9 @@ export async function runAuthoritySync(
   if (synced === null) return { outcome: 'invalid_request' };
   const { operationId, row } = synced;
   if (row.outcome === 'refused') return row;
+  if (row.outcome === 'retry_later') {
+    return { outcome: 'retry_later', error: row.error, operation_id: operationId };
+  }
   if ((await deps.publish(row.feedEntries)) === 'unpublished') {
     return { outcome: 'unavailable', retryAfterSeconds: RETRY_AFTER_SECONDS };
   }

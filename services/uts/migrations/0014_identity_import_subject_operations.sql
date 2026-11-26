@@ -1084,8 +1084,9 @@ $$;
 -- organization's own source version (`uts.org_sso_policies.event_version`): the policy, the
 -- WorkOS organization whose `externalId` is this organization, and its connections; a connection
 -- of the organization left out becomes inactive. A connection never moves from another
--- organization while it is active there. Outcomes: `applied`, `already_applied`, `refused` with
--- `connection_conflict`.
+-- organization while it is active there: the sync answers `retry_later` with
+-- `connection_conflict` and writes nothing, and the outbox retries until the other organization's
+-- sync releases it. Outcomes: `applied`, `already_applied`, `retry_later`.
 CREATE FUNCTION uts.sync_sso_organization(
   p_environment text,
   p_operation_id uuid,
@@ -1104,6 +1105,7 @@ AS $$
 DECLARE
   stored_version bigint;
   touched integer;
+  held integer;
   changed integer := 0;
 BEGIN
   PERFORM uts.require_inputs(
@@ -1124,36 +1126,54 @@ BEGIN
     WHERE connection.workos_connection_id = ANY (p_workos_connection_ids)
       AND connection.org_id <> p_org_id AND connection.status = 'active'
   ) THEN
-    outcome := 'refused';
+    outcome := 'retry_later';
     error := 'connection_conflict';
     RETURN NEXT;
     RETURN;
   END IF;
   IF stored_version IS NULL OR stored_version <= p_source_version THEN
-    INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version)
-    VALUES (p_org_id, p_enforcement, p_source_version)
-    ON CONFLICT (org_id) DO UPDATE
-    SET enforcement = EXCLUDED.enforcement, event_version = EXCLUDED.event_version, updated_at = now()
-    WHERE uts.org_sso_policies.enforcement <> EXCLUDED.enforcement
-      OR uts.org_sso_policies.event_version <> EXCLUDED.event_version;
-    GET DIAGNOSTICS touched = ROW_COUNT;
-    changed := changed + touched;
-    INSERT INTO uts.sso_connections (org_id, workos_connection_id, workos_organization_id)
-    SELECT p_org_id, connection_id, p_workos_organization_id
-    FROM unnest(p_workos_connection_ids) AS connection_id
-    ON CONFLICT (workos_connection_id) DO UPDATE
-    SET org_id = EXCLUDED.org_id, workos_organization_id = EXCLUDED.workos_organization_id,
-      status = 'active', updated_at = now()
-    WHERE uts.sso_connections.org_id <> EXCLUDED.org_id
-      OR uts.sso_connections.workos_organization_id IS DISTINCT FROM EXCLUDED.workos_organization_id
-      OR uts.sso_connections.status <> 'active';
-    GET DIAGNOSTICS touched = ROW_COUNT;
-    changed := changed + touched;
-    UPDATE uts.sso_connections AS connection SET status = 'inactive', updated_at = now()
-    WHERE connection.org_id = p_org_id AND connection.status = 'active'
-      AND connection.workos_connection_id <> ALL (p_workos_connection_ids);
-    GET DIAGNOSTICS touched = ROW_COUNT;
-    changed := changed + touched;
+    -- The block is a savepoint: a connection another organization took meanwhile (its row is
+    -- skipped by the guard below) undoes every write of this sync.
+    BEGIN
+      INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version)
+      VALUES (p_org_id, p_enforcement, p_source_version)
+      ON CONFLICT (org_id) DO UPDATE
+      SET enforcement = EXCLUDED.enforcement, event_version = EXCLUDED.event_version, updated_at = now()
+      WHERE uts.org_sso_policies.enforcement <> EXCLUDED.enforcement
+        OR uts.org_sso_policies.event_version <> EXCLUDED.event_version;
+      GET DIAGNOSTICS touched = ROW_COUNT;
+      changed := changed + touched;
+      INSERT INTO uts.sso_connections (org_id, workos_connection_id, workos_organization_id)
+      SELECT p_org_id, connection_id, p_workos_organization_id
+      FROM unnest(p_workos_connection_ids) AS connection_id
+      ON CONFLICT (workos_connection_id) DO UPDATE
+      SET org_id = EXCLUDED.org_id, workos_organization_id = EXCLUDED.workos_organization_id,
+        status = 'active', updated_at = now()
+      WHERE (uts.sso_connections.org_id = EXCLUDED.org_id OR uts.sso_connections.status <> 'active')
+        AND (uts.sso_connections.org_id <> EXCLUDED.org_id
+          OR uts.sso_connections.workos_organization_id IS DISTINCT FROM EXCLUDED.workos_organization_id
+          OR uts.sso_connections.status <> 'active');
+      GET DIAGNOSTICS touched = ROW_COUNT;
+      changed := changed + touched;
+      -- Every connection sent must now be an active connection of this organization; a row the
+      -- guard skipped is not.
+      SELECT count(*)::integer INTO held FROM uts.sso_connections AS connection
+      WHERE connection.workos_connection_id = ANY (p_workos_connection_ids)
+        AND connection.org_id = p_org_id AND connection.status = 'active';
+      IF held <> (SELECT count(DISTINCT sent) FROM unnest(p_workos_connection_ids) AS sent) THEN
+        RAISE EXCEPTION 'a connection is active in another organization' USING ERRCODE = 'U3171';
+      END IF;
+      UPDATE uts.sso_connections AS connection SET status = 'inactive', updated_at = now()
+      WHERE connection.org_id = p_org_id AND connection.status = 'active'
+        AND connection.workos_connection_id <> ALL (p_workos_connection_ids);
+      GET DIAGNOSTICS touched = ROW_COUNT;
+      changed := changed + touched;
+    EXCEPTION WHEN SQLSTATE 'U3171' THEN
+      outcome := 'retry_later';
+      error := 'connection_conflict';
+      RETURN NEXT;
+      RETURN;
+    END;
   END IF;
   IF changed > 0 THEN
     PERFORM uts.write_workload_audit_event(

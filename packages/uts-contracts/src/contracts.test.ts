@@ -478,7 +478,12 @@ describe('subject operation contracts', () => {
   };
 
   it('accept the three actor forms and refuse every other', () => {
-    for (const actor of ['user:abc', 'admin:oauth/google:1', 'system:scim-sync.v2']) {
+    for (const actor of [
+      'user:abc',
+      'admin:oauth/google:1',
+      'user:oauth/github|owner',
+      'system:scim-sync.v2',
+    ]) {
       expect(SubjectOperationRequestSchema.safeParse({ ...request, actor }).success).toBe(true);
     }
     for (const actor of [
@@ -487,8 +492,6 @@ describe('subject operation contracts', () => {
       'system:Upper',
       `system:${'a'.repeat(65)}`,
       'staff:x',
-      'user:someone@example.com',
-      'admin:a+b',
     ]) {
       expect(SubjectOperationRequestSchema.safeParse({ ...request, actor }).success).toBe(false);
     }

@@ -908,8 +908,11 @@ design accepts (section 4): an account-wide deploy right, only for a job of one 
 protected GitHub environment on `main`, for 1 hour. While staging and production share one
 account (below), the loader holds every `cloudflare-deploy` grant, in every environment, to
 `refs/heads/main` alone (`CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS` in `src/constants.ts`), so
-the gate is `main` whichever environment's policy minted the token. A policy's `intendedScripts`
-lists the Workers the job deploys, for review and audit only; STS does not and cannot enforce it.
+the gate is `main` whichever environment's policy minted the token. `main` is not the whole gate:
+while the account is shared, a staging job on `main` gets production-Worker rights without the
+production GitHub environment's protection rules, so the staging deploy environment must carry
+the same rules (setup step 6 checks it). A policy's `intendedScripts` lists the Workers the job
+deploys, for review and audit only; STS does not and cannot enforce it.
 An account-wide deploy right also lets its holder deploy a Worker that binds STS with any
 `props.caller` and so read that workload's bundle (design 6.4, deploy-level trust): for its hour,
 a minted token is as strong as the stored deploy token it replaces (design decision Q65).
@@ -1056,13 +1059,15 @@ meanwhile. Once a day, and once more after a creation whose outcome STS does not
 also sweeps the account's token list (`GET /accounts/<account>/tokens`, 50 a page, 2 pages per
 alarm) and deletes every expired token whose name starts with `sts-<environment>-` and for which
 STS holds no row. It never touches another environment's tokens, an unexpired token, or a token
-named otherwise. When Cloudflare answers 401 or 403 to the minting credential, the object drops
-the credential and stores a hold: until it ends, the alarm makes no Cloudflare call and reads no
-credential (deletes, the window check and the sweep all wait for it, the sweep's next run
-included). The hold starts at 1 minute and doubles with each refusal up to 1 hour; a call
-Cloudflare accepts ends it. A mint or revoke a caller asks for still reads the credential again,
-so a replaced minting token works at once. Rows are deleted a day after their token was deleted,
-and a handed-over token's row only once its window check ended.
+named otherwise. When Cloudflare answers 401 or 403 to the minting credential on a delete or a
+list, or 401 on a token creation (a 403 there can refuse just that request, such as a group
+outside the member's role), the object drops the credential and stores a hold: until it ends,
+the alarm makes no Cloudflare call and reads no credential (deletes, the window check and the
+sweep all wait for it, the sweep's next run included). The hold starts at 1 minute and doubles
+with each refusal up to 1 hour; a call Cloudflare accepts ends it. A mint or revoke a caller asks
+for still reads the credential again, so a replaced minting token works at once. Rows are deleted
+a day after their token was deleted, and a handed-over token's row only once its window check
+ended.
 
 **Window check (detective control).** About 2 minutes after a handed-over token's live window
 closes (its deletion or expiry, plus the 2-minute clock tolerance), the alarm lists the account's
@@ -1189,7 +1194,10 @@ is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
    read the `Ratelimit` header (remaining quota) of a call made with the minting token, run a
    deploy with a minted token, then read it again. If the deploy's calls lowered it, the minting
    token and its minted tokens share one budget (the member's); if not, each token has its own.
-   Record the answer in the cost paragraph below.
+   Record the answer in the cost paragraph below. Finally, while the account is shared, confirm in
+   each deploying repository's settings that the GitHub environment a staging `cloudflare-deploy`
+   policy binds carries the same protection rules as production's (required reviewers, deployment
+   branch `main`, no self-review): a staging token reaches production Workers.
 
 **Rotation (every 90 days, or at once on a leak).** Create the new minting token as in step 2, put
 it into `/ci/minting`, wait 5 minutes (STS reads it within 4), then delete the old minting token in
@@ -1204,8 +1212,10 @@ not revoke costs the same delete at expiry), 2 audit rows, at most 2 Infisical r
 credential and access token have lapsed), and the alarms that relay the rows. The window check
 adds, per deploy: 1 script list call and 1 route list call per zone of the grant (1 for bouncer),
 usually with the credential the revoke read 2 minutes before (at most 1 more read, login and
-`SignerDO` call for a token that expired unrevoked), at most 20 rows of each kind, and a scan of
-the day's rows against the account's scripts (500 at most on a paid plan) and the zone's routes.
+`SignerDO` call for a token that expired unrevoked), at most 20 rows of each kind, a scan of the
+day's rows against the account's scripts (500 at most on a paid plan) and the zone's routes, and
+a rewrite of each listed zone's stored route list (1 row delete per stored route and 1 row write
+per listed route, plus 1 for the zone: about 2 writes per route of bouncer's zone per deploy).
 At 43 releases a day: 86 STS requests, 86 `DeployTokenDO` calls, 172 Cloudflare calls, 86 audit
 rows, at most 86 Infisical reads and 43 logins (against Infisical's 600 requests a minute). The
 daily sweep adds, once a day: 1 login, 1 `SignerDO` call and 1 Infisical read (the cached

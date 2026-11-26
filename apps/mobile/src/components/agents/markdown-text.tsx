@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { markdownMessageDirection } from '@/lib/rtl-text';
 
 import { MarkdownCodeFence } from './markdown-code-fence';
 import { MarkdownEnriched } from './markdown-enriched';
@@ -267,9 +268,11 @@ export type MarkdownTextProps = {
    * Base direction of the document body, when it has one of its own: a legal
    * document is English in every interface language, so its prose keeps a
    * left-to-right base direction and the left edge while the screen around it
-   * mirrors. Chat and every other content body omit this: each paragraph then
-   * resolves from its own first strong character, so English content keeps its
-   * left edge and Arabic content sits on the right in either interface.
+   * mirrors. Chat and every other content body omit this: each block then
+   * resolves from its own first strong character — its paragraphs, headings and
+   * list items, whose markers sit on that block's own leading edge — so English
+   * content keeps its left edge and Arabic content sits on the right in either
+   * interface.
    */
   documentDirection?: 'ltr';
   selectable?: boolean;
@@ -303,6 +306,18 @@ export function MarkdownText({
   const colors = useThemeColors();
 
   const palette = useMemo(() => getPalette(variant, colors), [variant, colors]);
+
+  // The direction the whole message names, from its first letter outside HTML
+  // tag syntax. Every segment of one message shares it, so a block that holds
+  // no letter of its own sits on the message's edge instead of the interface's:
+  // the design gate measured one row of the markdown fallback block on each
+  // edge, because `42 · 7` fell back to the interface while the Latin rows
+  // beside it named their own edge. A document body names one direction for
+  // everything instead.
+  const messageDirection = useMemo(
+    () => documentDirection ?? markdownMessageDirection(value),
+    [value, documentDirection]
+  );
 
   // Re-lex only past the previous snapshot's tail boundary (its last block run
   // and any list or blockquote that can still absorb it): a streaming append can
@@ -378,6 +393,7 @@ export function MarkdownText({
             html={segment.raw}
             palette={palette}
             documentDirection={documentDirection}
+            messageDirection={messageDirection}
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
@@ -387,7 +403,7 @@ export function MarkdownText({
             key={`md-content-${index}`}
             raw={segment.raw}
             palette={palette}
-            documentDirection={documentDirection}
+            messageDirection={messageDirection}
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
@@ -402,7 +418,7 @@ export function MarkdownText({
 type MarkdownRunProps = {
   raw: string;
   palette: MarkdownPalette;
-  documentDirection?: 'ltr';
+  messageDirection: 'ltr' | 'rtl' | undefined;
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -415,11 +431,17 @@ type MarkdownRunProps = {
  * the native renderer. A mermaid fence keeps the diagram renderer once it is
  * closed; while a streamed append is still open the source shows as code, as the
  * fence regex it replaces did.
+ *
+ * The message's direction is handed down: markdown is copy the app did not
+ * write, so the native renderer resolves each block from its own first letter
+ * and only a block with no letter takes the message's direction
+ * (`markdown-enriched`). A fence is code and keeps its own left-to-right
+ * layout.
  */
 function MarkdownRun({
   raw,
   palette,
-  documentDirection,
+  messageDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -435,7 +457,7 @@ function MarkdownRun({
               key={`md-text-${index}`}
               value={run.raw}
               palette={palette}
-              documentDirection={documentDirection}
+              messageDirection={messageDirection}
               selectable={selectable}
               onLongPressLink={onLongPressLink}
               onPressLink={onPressLink}

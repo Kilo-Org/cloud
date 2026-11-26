@@ -135,6 +135,7 @@ const lexer = vi.spyOn(marked, 'lexer');
 
 type RenderHtmlHostProps = {
   baseStyle: Record<string, unknown>;
+  classesStyles?: Record<string, Record<string, unknown>>;
   defaultTextProps: { selectable: boolean };
   domVisitors: DomVisitorCallbacks;
   enableCSSInlineProcessing: boolean;
@@ -165,6 +166,7 @@ function codeFences(renderer: TestRenderer.ReactTestRenderer): CodeFenceProps[] 
 
 type EnrichedHostProps = {
   markdown: string;
+  containerStyle?: { direction?: 'ltr' | 'rtl' };
   markdownStyle: {
     paragraph: { lineHeight: number; textAlign?: 'right' };
     h1: { textAlign?: 'right' };
@@ -1767,34 +1769,76 @@ describe('MarkdownText streaming conversion tail', () => {
 describe('MarkdownText document direction', () => {
   const value = '# Heading\n\nBody text\n\n- one\n- two';
 
-  it('leaves chat blocks their own direction and marks its list items', async () => {
+  // The design gate's markdown fallback block, exactly as the target renders it:
+  // a letterless row, an HTML paragraph of Latin text, and a bullet whose
+  // content wrote a right-to-left mark in front of its text.
+  const FALLBACK_VALUE =
+    '42 · 7\n\n<custom-note class="kilo-block-rtl">Latin text and more here.</custom-note>\n\n' +
+    '- \u200FLatin bullet';
+
+  it('leaves chat markdown byte-identical in a right-to-left interface', async () => {
     rnStub.I18nManager.isRTL = true;
-    // Only Android resolves a list item from its own first strong character.
     rnStub.Platform.OS = 'android';
     try {
       const renderer = await mount(<MarkdownText value={value} />);
       const props = enrichedProps(renderer);
 
-      // Chat is copy the app did not write, so each paragraph resolves from its
+      // Chat is copy the app did not write, so every block resolves from its
       // own first strong character: an English reply keeps its left edge and
-      // the punctuation that ends it inside an Arabic interface.
+      // the punctuation that ends it inside an Arabic interface, and the
+      // native renderer draws each list marker on its own item's leading edge.
+      // Nothing is rewritten to name an edge, and nothing marks a direction.
       expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
       expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
-      // `rtlListItems` names the start edge and isolates the item's own text.
-      expect(props.markdown).toContain('\u200F\u2068one\u2069');
+      expect(props.markdown).toBe(value);
     } finally {
       rnStub.I18nManager.isRTL = false;
       rnStub.Platform.OS = 'ios';
     }
   });
 
-  it('keeps a document body at the left edge without the list-item mark', async () => {
+  // The design gate's markdown fallback block, whose three rows sat on
+  // different edges: `42 · 7` has no letter, the HTML paragraph draws in the
+  // HTML renderer, and the bullet's content wrote a right-to-left mark in front
+  // of its Latin text.
+  it('puts every row of one message on the message’s own edge', async () => {
+    rnStub.I18nManager.isRTL = true;
+    rnStub.Platform.OS = 'android';
+    try {
+      const renderer = await mount(<MarkdownText value={FALLBACK_VALUE} />);
+
+      // The message's first letter is Latin, so the letterless row takes that
+      // direction from the container...
+      const containers = renderer.root
+        .findAllByType(EnrichedType)
+        .map(node => (node.props as EnrichedHostProps).containerStyle);
+      expect(containers).toEqual([{ direction: 'ltr' }, { direction: 'ltr' }]);
+
+      // ...and the mark the bullet wrote no longer decides its item.
+      const sources = markdownSources(renderer).map(source => source.trim());
+      expect(sources).toEqual(['42 · 7', '- Latin bullet']);
+      // Nothing invisible is added for the letterless row: the container
+      // carries its direction instead.
+      expect(markdownSources(renderer).join('')).not.toContain('\u200F');
+
+      const arabic = await mount(<MarkdownText value={'42 · 7\n\nمرحبا'} />);
+      expect(enrichedProps(arabic).containerStyle).toMatchObject({ direction: 'rtl' });
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+      rnStub.Platform.OS = 'ios';
+    }
+  });
+
+  it('leaves a document body markdown unchanged as well', async () => {
     rnStub.I18nManager.isRTL = true;
     rnStub.Platform.OS = 'android';
     try {
       const renderer = await mount(<MarkdownText value={value} documentDirection="ltr" />);
       const props = enrichedProps(renderer);
 
+      // A document body's own direction governs its HTML blocks; markdown keeps
+      // resolving each block from its own first letter, so the source needs no
+      // rewrite either way.
       expect(props.markdownStyle.paragraph).not.toHaveProperty('textAlign');
       expect(props.markdownStyle.h1).not.toHaveProperty('textAlign');
       expect(props.markdown).toBe(value);
@@ -1813,48 +1857,71 @@ describe('MarkdownText document direction', () => {
     expect(props.markdown).toBe(value);
   });
 
-  it('names the base direction of an HTML body only for a document', async () => {
+  it('names block directions for a content body and one direction for a document', async () => {
     rnStub.I18nManager.isRTL = true;
     try {
       const chat = await mount(<MarkdownText value="> <u>quoted</u>" />);
-      expect(htmlProps(chat).baseStyle).not.toHaveProperty('direction');
+      const chatHtml = htmlProps(chat);
+      // A content body names no whole-document direction: each block names its
+      // own through the class styles the DOM visitor installs.
+      expect(chatHtml.baseStyle).not.toHaveProperty('direction');
+      expect(chatHtml.classesStyles).toMatchObject({
+        'kilo-block-ltr': { direction: 'ltr', writingDirection: 'ltr' },
+        'kilo-block-rtl': { direction: 'rtl', writingDirection: 'rtl' },
+      });
 
       const document = await mount(
         <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
       );
-      expect(htmlProps(document).baseStyle).toMatchObject({ direction: 'ltr' });
+      const documentHtml = htmlProps(document);
+      expect(documentHtml.baseStyle).toMatchObject({ direction: 'ltr' });
+      // One direction for the whole document, so a per-block class must not be
+      // able to override it.
+      expect(documentHtml.classesStyles).toBeUndefined();
     } finally {
       rnStub.I18nManager.isRTL = false;
     }
   });
 
-  it('renders an image alt fallback in the body direction on both platforms', async () => {
+  it('gives an image alt fallback the direction of its own first letter', async () => {
     // A scheme the image view cannot draw leaves the alt text as plain text.
     rnStub.I18nManager.isRTL = true;
     try {
       const chatHost = await mount(<MarkdownText value="> <u>quoted</u>" />);
       const chatImage = requiredRenderer(htmlProps(chatHost).renderers, 'img');
-      const chatAlt = await renderCustom(chatImage, {
-        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
-        parent: null,
-      });
-      const chatProps = chatAlt.root.findByType(TextType).props as {
-        style?: { writingDirection?: string; direction?: string };
+      const altStyle = async (alt: string) => {
+        const rendered = await renderCustom(chatImage, {
+          attributes: { src: 'ftp://example.com/a.png', alt },
+          parent: null,
+        });
+        const props = rendered.root.findByType(TextType).props as {
+          style?: { writingDirection?: string; direction?: string };
+        };
+        return props.style;
       };
-      expect(chatProps.style).toMatchObject({ writingDirection: 'rtl' });
-      expect(chatProps.style).not.toHaveProperty('direction');
+
+      // Alt text is copy the app did not write: an English alt keeps its left
+      // edge in a right-to-left interface and an Arabic one sits on the right,
+      // instead of both following the interface.
+      expect(await altStyle('shot')).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
+      expect(await altStyle('صورة')).toMatchObject({ direction: 'rtl', writingDirection: 'rtl' });
+      // An alt with no letter of its own takes the message's direction — this
+      // message's first letter is the `q` of `quoted` — so it sits on the edge
+      // of the blocks beside it instead of the interface's.
+      expect(await altStyle('42')).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
 
       const documentHost = await mount(
         <MarkdownText value="> <u>quoted</u>" documentDirection="ltr" />
       );
       const documentImage = requiredRenderer(htmlProps(documentHost).renderers, 'img');
       const documentAlt = await renderCustom(documentImage, {
-        attributes: { src: 'ftp://example.com/a.png', alt: 'shot' },
+        attributes: { src: 'ftp://example.com/a.png', alt: 'صورة' },
         parent: null,
       });
       const documentProps = documentAlt.root.findByType(TextType).props as {
         style?: { writingDirection?: string; direction?: string };
       };
+      // A document body keeps its one direction whatever the alt says.
       expect(documentProps.style).toMatchObject({
         direction: 'ltr',
         writingDirection: 'ltr',

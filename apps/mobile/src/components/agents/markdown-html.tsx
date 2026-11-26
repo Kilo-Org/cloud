@@ -17,11 +17,19 @@ import RenderHTML, {
   defaultHTMLElementModels,
   type DomVisitorCallbacks,
   HTMLContentModel,
+  type HTMLModelRecord,
+  isDomElement,
+  isDomText,
+  type MixedStyleRecord,
   type RenderersProps,
   type TNode,
 } from '@native-html/render';
 
-import { withRtlWritingDirection } from '@/lib/rtl-text';
+import {
+  contentStringDirection,
+  DIRECTION_TEXT_STYLES,
+  markdownMessageDirection,
+} from '@/lib/rtl-text';
 
 import {
   type MarkdownLinkLongPressHandler,
@@ -40,31 +48,176 @@ import {
 } from './markdown-palette';
 import { lexMarkdown } from './markdown-parse-cache';
 
+// Ignore only void tags here: the engine drops an ignored tag's whole subtree.
+const IGNORED_HTML_TAGS = ['link', 'frame', 'embed', 'source', 'track', 'input', 'base', 'meta'];
+
 const REMOVED_HTML_TAG_SET = new Set<string>(REMOVED_HTML_TAGS);
 
-// Ignore only void tags here: the engine drops an ignored tag's whole subtree.
-// The visitor below handles containers — clearing the contents of removed ones,
-// hoisting the children of `picture` so its fallback `<img>` still renders, and
-// reading an unknown tag as a `span`, as a browser does: the engine renders a
-// tag it has no model for as nothing, dropping its text.
-const IGNORED_HTML_TAGS = ['link', 'frame', 'embed', 'source', 'track', 'input', 'base', 'meta'];
-const HTML_DOM_VISITORS: DomVisitorCallbacks = {
-  onElement(element) {
-    if (REMOVED_HTML_TAG_SET.has(element.name)) {
-      element.children.splice(0);
-    } else if (element.name === 'picture' && element.parent !== null) {
-      // Dropping the `<picture>` wrapper must not drop its fallback `<img>`:
-      // replace the wrapper with its children (`<source>` candidates never
-      // reach the tree; removed children are already cleared above).
-      const index = element.parent.children.indexOf(element);
-      if (index !== -1) {
-        element.parent.children.splice(index, 1, ...element.children);
-      }
-    } else if (!Object.hasOwn(defaultHTMLElementModels, element.name)) {
-      element.name = 'span';
-    }
+// The engine models `details` and `summary` as interactive tags with no
+// content, so it renders neither; give them block content for `HtmlDetails`.
+const HTML_ELEMENT_MODELS = {
+  details: defaultHTMLElementModels.details.extend({ contentModel: HTMLContentModel.block }),
+  summary: defaultHTMLElementModels.summary.extend({ contentModel: HTMLContentModel.block }),
+};
+
+// The models the visitor reads a tag's content model from, the app's own two
+// included: `summary` is only a block here.
+const BLOCK_MODELS: HTMLModelRecord<string> = {
+  ...defaultHTMLElementModels,
+  ...HTML_ELEMENT_MODELS,
+};
+
+// One class per base direction. A class is the engine's only channel that can
+// differ between two blocks of the same tag: it merges class styles into the
+// node's own processed props, where a tag style is one value for the whole tag.
+// `direction` there lands in the flowing block styles, so it reaches both the
+// block's view and the paragraph drawn inside it, and every inline run of that
+// paragraph (see `rtl-text.ts` for why both spellings are named). The styles go
+// on the block that draws the text, never on a container of blocks: a
+// direction on a view makes Yoga resolve its children in that direction, which
+// is what puts the block's own text on its own edge and what would otherwise
+// reorder a container's children. A list container stays unset for that reason:
+// the engine draws a list's markers in a physical column beside each item, so a
+// direction there would move the markers while the indentation stayed put.
+const DIRECTION_CLASSES = {
+  ltr: 'kilo-block-ltr',
+  rtl: 'kilo-block-rtl',
+} as const;
+
+// The engine's own declaration for each class: both spellings of the base
+// direction, taken from the shared constants so the two render paths cannot
+// disagree. (`rtl-text.ts` explains why `direction` alone is not enough.)
+const DIRECTION_CLASS_STYLES: MixedStyleRecord = {
+  [DIRECTION_CLASSES.ltr]: {
+    direction: DIRECTION_TEXT_STYLES.ltr.direction,
+    writingDirection: DIRECTION_TEXT_STYLES.ltr.writingDirection,
+  },
+  [DIRECTION_CLASSES.rtl]: {
+    direction: DIRECTION_TEXT_STYLES.rtl.direction,
+    writingDirection: DIRECTION_TEXT_STYLES.rtl.writingDirection,
   },
 };
+
+type HtmlDomElement = Parameters<NonNullable<DomVisitorCallbacks['onElement']>>[0];
+type HtmlDomNode = HtmlDomElement['children'][number];
+
+/** Whether the engine renders this element as a block container. */
+function isBlockContainer(node: HtmlDomNode): boolean {
+  return isDomElement(node) && BLOCK_MODELS[node.name]?.isTranslatableBlock() === true;
+}
+
+/** A DOM subtree's text, in document order. */
+function domText(nodes: readonly HtmlDomNode[]): string {
+  let text = '';
+  for (const node of nodes) {
+    if (isDomText(node)) {
+      text += node.data;
+    } else if (isDomElement(node)) {
+      text += domText(node.children);
+    }
+  }
+  return text;
+}
+
+/**
+ * The direction class a block element names, or `undefined` when it names none.
+ * Only a block that draws text of its own names one: a container of other
+ * blocks (`div`, a `blockquote` of paragraphs, `details`) draws nothing itself,
+ * so it stays unset and the blocks inside it name their own directions.
+ *
+ * A block takes the direction of its own first letter; a block that holds no
+ * letter at all takes `messageDirection`, the direction of the message's own
+ * first letter. Some blocks have no letter of their own — `42 · 7` — and
+ * leaving those to the interface's edge put one block of Latin fallback text on
+ * each edge of the same message (the design gate measured the middle row of the
+ * markdown fallback block starting left while the rows around it stayed right).
+ */
+function blockDirectionClass(
+  element: HtmlDomElement,
+  messageDirection: 'ltr' | 'rtl' | undefined
+): string | undefined {
+  if (!isBlockContainer(element)) {
+    return undefined;
+  }
+  // Its own text is what it draws directly: text nodes and inline elements,
+  // without the blocks nested in it.
+  const ownText = domText(element.children.filter(child => !isBlockContainer(child)));
+  // A container that draws nothing of its own names no direction at all — a
+  // direction on its view would reorder the blocks inside it instead — so the
+  // message's direction answers only for a block that does draw text and holds
+  // no letter in it.
+  const direction =
+    contentStringDirection(ownText) ?? (ownText.trim().length === 0 ? undefined : messageDirection);
+  if (direction === undefined) {
+    return undefined;
+  }
+  return direction === 'rtl' ? DIRECTION_CLASSES.rtl : DIRECTION_CLASSES.ltr;
+}
+
+// The visitor below handles containers — clearing the contents of removed tags,
+// hoisting the children of `picture` so its fallback `<img>` still renders,
+// reading an unknown tag as a `span`, as a browser does: the engine renders a
+// tag it has no model for as nothing, dropping its text — and naming each
+// block's own base direction, which `documentDirection="ltr"` supersedes with
+// one direction for the whole document.
+function htmlDomVisitors(
+  namesBlockDirection: boolean,
+  messageDirection: 'ltr' | 'rtl' | undefined
+): DomVisitorCallbacks {
+  return {
+    onElement(element) {
+      // A direction class the content wrote is never a direction: a block's own
+      // class is recomputed from its own text on every parse, so a stale mark
+      // from an earlier parse of the same element (a streaming publish
+      // re-parses the source) is dropped, and a container of blocks must never
+      // carry one at all. Strip first, before any branch below clears, hoists
+      // or renames the element, so the rule holds for every element the visitor
+      // sees: an unknown tag becomes a `span`, and that path returns early.
+      stripContentDirectionClass(element);
+      if (REMOVED_HTML_TAG_SET.has(element.name)) {
+        element.children.splice(0);
+      } else if (element.name === 'picture' && element.parent !== null) {
+        // Dropping the `<picture>` wrapper must not drop its fallback `<img>`:
+        // replace the wrapper with its children (`<source>` candidates never
+        // reach the tree; removed children are already cleared above).
+        const index = element.parent.children.indexOf(element);
+        if (index !== -1) {
+          element.parent.children.splice(index, 1, ...element.children);
+        }
+        return;
+      } else if (!Object.hasOwn(defaultHTMLElementModels, element.name)) {
+        element.name = 'span';
+        return;
+      }
+      const directionClass = namesBlockDirection
+        ? blockDirectionClass(element, messageDirection)
+        : undefined;
+      if (directionClass !== undefined) {
+        // The strip above already removed every content-written direction class,
+        // so the element's remaining classes plus the computed one is its class.
+        const kept = element.attribs.class?.split(/\s+/).filter(Boolean) ?? [];
+        kept.push(directionClass);
+        element.attribs.class = kept.join(' ');
+      }
+    },
+  };
+}
+
+/**
+ * Drop every content-written direction class from an element. A class the
+ * content itself wrote is not a direction: the block's own first strong
+ * character names it, so a stale mark from an earlier parse of the same element
+ * (a streaming publish re-parses the source) is dropped.
+ */
+function stripContentDirectionClass(element: HtmlDomElement): void {
+  const classes = element.attribs.class?.split(/\s+/).filter(Boolean) ?? [];
+  const kept = classes.filter(
+    name => name !== DIRECTION_CLASSES.ltr && name !== DIRECTION_CLASSES.rtl
+  );
+  if (kept.length !== classes.length) {
+    element.attribs.class = kept.join(' ');
+  }
+}
 
 export type MarkdownHtmlSegment = {
   type: 'html' | 'markdown';
@@ -598,18 +751,11 @@ function parentAnchor(tnode: TNode): TNode | null {
   return null;
 }
 
-// The engine models `details` and `summary` as interactive tags with no
-// content, so it renders neither; give them block content for `HtmlDetails`.
-const HTML_ELEMENT_MODELS = {
-  details: defaultHTMLElementModels.details.extend({ contentModel: HTMLContentModel.block }),
-  summary: defaultHTMLElementModels.summary.extend({ contentModel: HTMLContentModel.block }),
-};
-
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
-// The engine's base style is CSS-like: `direction` names a block's base
-// direction, and its `MixedStyleDeclaration` has no `writingDirection` (that is
-// the native `Text` spelling, `LTR_TEXT_DIRECTION`).
+// The engine's base style is CSS-like: `direction` names one base direction for
+// the whole document, which is what a document body wants. A content body names
+// each block's own direction instead (`DIRECTION_CLASSES`).
 const LTR_BASE_DIRECTION = { direction: 'ltr' } as const;
 
 type MarkdownHtmlProps = {
@@ -617,6 +763,12 @@ type MarkdownHtmlProps = {
   palette: MarkdownPalette;
   /** Base direction of the document body; see `MarkdownTextProps`. */
   documentDirection?: 'ltr';
+  /**
+   * The direction the whole message names (`markdownMessageDirection`), which a
+   * block holding no letter of its own takes. Omitted, this HTML is taken as
+   * the whole message.
+   */
+  messageDirection?: 'ltr' | 'rtl';
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
@@ -626,6 +778,7 @@ export function MarkdownHtml({
   html,
   palette,
   documentDirection,
+  messageDirection,
   selectable,
   onLongPressLink,
   onPressLink,
@@ -651,13 +804,28 @@ export function MarkdownHtml({
       color: palette.textColor,
       fontSize: 16,
       lineHeight: 24,
-      // Naming the body's own direction makes the engine resolve every block
-      // left to right and left aligned; a content body (chat, a PR description)
-      // omits it and the engine resolves each paragraph from its own first
-      // strong character.
+      // A document body names one base direction for the whole document; a
+      // content body (chat, a PR description) omits it, and each of its blocks
+      // names the direction of its own first letter — or, holding no letter, the
+      // message's (`DIRECTION_CLASSES`, installed by the DOM visitor).
       ...(documentDirection === 'ltr' ? LTR_BASE_DIRECTION : {}),
     }),
     [palette, documentDirection]
+  );
+  // A document body's one direction, or this HTML's own when the caller did not
+  // pass the message's. Both are read from the message's first prose letter,
+  // which is what a block that holds no letter of its own follows.
+  const resolvedMessageDirection = useMemo(
+    () => messageDirection ?? markdownMessageDirection(html),
+    [messageDirection, html]
+  );
+  // Only a content body names per-block directions: a document body's one
+  // direction must win, and a class style would override it.
+  const namesBlockDirection = documentDirection !== 'ltr';
+  const classesStyles = namesBlockDirection ? DIRECTION_CLASS_STYLES : undefined;
+  const domVisitors = useMemo(
+    () => htmlDomVisitors(namesBlockDirection, resolvedMessageDirection),
+    [namesBlockDirection, resolvedMessageDirection]
   );
   // Most keys, subscripts and superscripts become markdown before they reach
   // this renderer (`markdown-html-inline.ts`). What is left draws as smaller
@@ -722,16 +890,22 @@ export function MarkdownHtml({
     const HtmlImage: CustomBlockRenderer = ({ tnode }) => {
       const src = tnode.attributes.src ?? '';
       if (!isSupportedScheme(src)) {
-        // Alt text is document content: a body with its own direction names
-        // both halves of the direction — the interface mark would keep it
-        // mirrored on iOS, where `writingDirection` is the paragraph's base.
-        const altStyle =
+        // Alt text is copy the app did not write: like every other block it
+        // names its own base direction from its own first letter, and a
+        // letterless alt takes the message's direction. A document body keeps
+        // its one left-to-right direction.
+        const alt = tnode.attributes.alt ?? '';
+        const altDirection =
           documentDirection === 'ltr'
-            ? { ...baseStyle, writingDirection: 'ltr' as const }
-            : withRtlWritingDirection(baseStyle);
+            ? 'ltr'
+            : (contentStringDirection(alt) ?? resolvedMessageDirection);
+        const altStyle =
+          altDirection === undefined
+            ? baseStyle
+            : { ...baseStyle, ...DIRECTION_TEXT_STYLES[altDirection] };
         return (
           <Text selectable={selectable} style={altStyle}>
-            {tnode.attributes.alt ?? ''}
+            {alt}
           </Text>
         );
       }
@@ -770,16 +944,24 @@ export function MarkdownHtml({
       img: HtmlImage,
       details: HtmlDetails,
     };
-  }, [baseStyle, documentDirection, onLongPressLink, onPressLink, selectable]);
+  }, [
+    baseStyle,
+    documentDirection,
+    resolvedMessageDirection,
+    onLongPressLink,
+    onPressLink,
+    selectable,
+  ]);
 
   return (
     <View onLayout={handleLayout}>
       <RenderHTML
         baseStyle={baseStyle}
+        classesStyles={classesStyles}
         contentWidth={measuredWidth ?? windowWidth}
         customHTMLElementModels={HTML_ELEMENT_MODELS}
         defaultTextProps={{ selectable }}
-        domVisitors={HTML_DOM_VISITORS}
+        domVisitors={domVisitors}
         enableCSSInlineProcessing={false}
         ignoredDomTags={IGNORED_HTML_TAGS}
         renderers={renderers}

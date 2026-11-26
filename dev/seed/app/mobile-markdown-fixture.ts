@@ -28,10 +28,20 @@ const PART_RICH = 'prtMdLibsRich000001';
 const PART_BIG = 'prtMdLibsBig0000001';
 const PART_MERMAID = 'prtMdLibsMermaid001';
 const PART_HTML = 'prtMdLibsHtml000001';
+const PART_RTL = 'prtMdLibsRtl0000001';
 const PART_PROMPT = 'prtMdLibsPrompt00001';
 const PART_READ = 'prtMdLibsRead000001';
 const PART_FILE = 'prtMdLibsFile000001';
-const EXPECTED = [PART_PROMPT, PART_RICH, PART_BIG, PART_MERMAID, PART_HTML, PART_READ, PART_FILE];
+const EXPECTED = [
+  PART_PROMPT,
+  PART_RICH,
+  PART_BIG,
+  PART_MERMAID,
+  PART_HTML,
+  PART_READ,
+  PART_FILE,
+  PART_RTL,
+];
 const MD_DOC = [
   '# Notes file',
   '',
@@ -206,6 +216,51 @@ const HTML = [
   FENCE,
 ].join('\n');
 
+/**
+ * A mixed right-to-left and left-to-right message whose Latin blocks were
+ * written with a leading right-to-left mark: the app strips that mark at each
+ * block's first character, so every Latin block has to sit on the left edge
+ * while the Arabic prose keeps the message's right edge. The two images come
+ * from an untrusted host, so the image gate replaces each with its alt text.
+ */
+const RTL = [
+  '# جدول الحالة',
+  '',
+  'فقرة عربية تفتح الرسالة ثم تتابع.',
+  '',
+  'Latin paragraph that follows a blank line.',
+  '',
+  '## Heading two',
+  '\u200FLatin paragraph directly after the heading.',
+  '',
+  '- \u200FLatin bullet whose content wrote a mark',
+  '- [ ] \u200FLatin task item',
+  '- **\u200FLatin emphasised item**',
+  '',
+  '---',
+  '\u200FLatin paragraph after a thematic break',
+  '',
+  `${FENCE}js`,
+  'const a = 1;',
+  FENCE,
+  '\u200FLatin paragraph after a closing fence',
+  '',
+  '> اقتباس عربي',
+  '',
+  '1. عنصر عربي',
+  '2. \u200FLatin ordered item',
+  '',
+  '- عنصر أب',
+  '  - \u200FNested Latin child whose text opens with a mark',
+  '  - Nested Latin child with no mark',
+  '',
+  '![Latin photo caption](https://example.com/photo.png)',
+  '',
+  '![وصف عربي للصورة](https://example.com/photo2.png)',
+  '',
+  '42 · 7',
+].join('\n');
+
 function textPart(id: string, text: string, messageID = ASSISTANT_ID): SessionIngestItem {
   return {
     type: 'part',
@@ -338,6 +393,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     textPart(PART_BIG, BIG),
     textPart(PART_MERMAID, MERMAID),
     textPart(PART_HTML, HTML),
+    textPart(PART_RTL, RTL),
     textPart(PART_PROMPT, USER_PROMPT, USER_ID),
     buildToolPartItem({
       partId: PART_READ,

@@ -112,15 +112,29 @@ test('opens the window at the previous success less the overlap, and says when i
   });
 });
 
-test('skips runs last updated before the window', () => {
+test('checks only runs of this repository on main, from a deploy event, updated in the window', () => {
+  const base = {
+    head_branch: 'main',
+    head_repository: { full_name: 'Kilo-Org/cloud' },
+    event: 'push',
+  };
   const runs = [
-    { id: 1, updated_at: '2026-11-27T10:00:00Z' },
-    { id: 2, updated_at: '2026-11-27T10:59:00Z' },
-    { id: 3, updated_at: '2026-11-27T11:30:00Z' },
+    { ...base, id: 1, updated_at: '2026-11-27T10:00:00Z' },
+    { ...base, id: 2, updated_at: '2026-11-27T10:59:00Z' },
+    { ...base, id: 3, updated_at: '2026-11-27T11:30:00Z' },
+    { ...base, id: 4, updated_at: '2026-11-27T11:30:00Z', head_branch: 'feature' },
+    {
+      ...base,
+      id: 5,
+      updated_at: '2026-11-27T11:30:00Z',
+      head_repository: { full_name: 'fork/cloud' },
+    },
+    { ...base, id: 6, updated_at: '2026-11-27T11:30:00Z', event: 'pull_request' },
+    { ...base, id: 7, updated_at: '2026-11-27T11:30:00Z', event: 'workflow_dispatch' },
   ];
   assert.deepEqual(
-    runsToCheck(runs, SINCE).map(item => item.id),
-    [2, 3]
+    runsToCheck(runs, SINCE, 'Kilo-Org/cloud').map(item => item.id),
+    [2, 3, 7]
   );
 });
 

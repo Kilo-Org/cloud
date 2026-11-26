@@ -66,9 +66,28 @@ export function windowStart(now, previousSuccessStartedAt) {
   return since < floor ? { since: floor, clamped: true } : { since, clamped: false };
 }
 
-/** Runs that may hold a deploy job overlapping the window: a run last updated before it cannot. */
-export function runsToCheck(runs, since) {
-  return runs.filter(run => !(Date.parse(run.updated_at) + JOB_MARGIN_AFTER_MS < since));
+/** Events a deploy run on main starts from; a fork's pull request starts none of them. */
+export const DEPLOY_RUN_EVENTS = [
+  'push',
+  'schedule',
+  'workflow_dispatch',
+  'workflow_run',
+  'workflow_call',
+];
+
+/**
+ * Runs that may hold a deploy job overlapping the window: runs of this repository on main, from a
+ * deploy event, last updated after the window opened. A run on another branch, or from a fork,
+ * could otherwise make a span that hides an STS deployment.
+ */
+export function runsToCheck(runs, since, repository) {
+  return runs.filter(
+    run =>
+      run.head_branch === 'main' &&
+      run.head_repository?.full_name === repository &&
+      DEPLOY_RUN_EVENTS.includes(run.event) &&
+      !(Date.parse(run.updated_at) + JOB_MARGIN_AFTER_MS < since)
+  );
 }
 
 /**
@@ -208,7 +227,7 @@ export async function watch({ env, fetch: fetchImpl, now }) {
       `${gh.api}/actions/workflows/${file}/runs?created=%3E%3D${encodeURIComponent(created)}&per_page=100`,
       gh.headers
     );
-    for (const run of runsToCheck(list.workflow_runs ?? [], since)) {
+    for (const run of runsToCheck(list.workflow_runs ?? [], since, env.GITHUB_REPOSITORY)) {
       const jobs = await getJson(
         fetchImpl,
         `${gh.api}/actions/runs/${run.id}/jobs?filter=all&per_page=100`,

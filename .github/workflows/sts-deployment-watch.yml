@@ -8,7 +8,7 @@ name: STS deployment watch
 # scheduled run on main has succeeded for 45 minutes.
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '4,19,34,49 * * * *'
   workflow_dispatch:
 
 permissions:

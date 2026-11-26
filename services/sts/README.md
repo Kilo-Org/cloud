@@ -1456,8 +1456,8 @@ first; the production deploy policy (step 5) follows the staging proof.
    API tokens, members, roles or account settings (`Account API Tokens Read` and `Write`, `Account
    Settings Read` and `Write`, and from `GET /user/tokens/permission_groups` the user-level `API
    Tokens Read` and `Write` and `Memberships Read` and `Write`). Then deploy. Ids are resolved here,
-   once, never by name at runtime. Until this deploy, STS refuses every mint (`not_configured`) once
-   step 5 set the account.
+   once, never by name at runtime. While `CF_DEPLOY_ACCOUNT_ID` is set and the pins are empty, STS
+   refuses every mint (`not_configured`); here both land in one change.
 4. **Infisical.** Store the minting token as `CLOUDFLARE_MINTING_TOKEN` in `/ci/minting` of the
    environment. The STS identity's `readValue` on `/ci/**` (the grant every GitHub policy needs,
    [Infisical setup](#infisical-setup-per-environment)) covers it. No other identity, role or
@@ -1523,21 +1523,26 @@ first; the production deploy policy (step 5) follows the staging proof.
    `deploy-workers.yml` (either), and posts to Slack (`DEPLOY_NOTIFY_SLACK_WEBHOOK_URL`) each
    deployment made since the previous successful scheduled run on `main` started (less 5 minutes)
    that is not a `wrangler deploy` (source `wrangler`, `workers/triggered_by` `deployment`, as every
-   CI deploy of STS records) inside such a job of its environment (from 1 minute before the job
+   CI deploy of STS records) inside a span of a deploy job run on `main` of this repository, from a
+   push, schedule, dispatch or workflow event, for its environment (from 1 minute before the job
    started to 2 minutes after it ended). A rollback, a secret change or a dashboard edit is
-   reported even inside a job. A `wrangler deploy` with any other credential inside a legitimate
-   job's span is hidden: Cloudflare records no author for an API token, so nothing tells it apart.
-   Outside a job's span it is reported. A window clamped to 7 days (no successful run for a week)
-   is posted too. It reads Cloudflare with `STS_WATCH_CLOUDFLARE_TOKEN`, a repository secret holding
-   an account token (`sts-deployment-watch`, only `Workers Scripts Read`, expires 2027-11-27), and
-   GitHub with the job's own token (`actions: read`). A run that cannot check fails, posts that it
-   failed (plain text), and the next run covers its window.
+   reported even inside a job. A `wrangler deploy` with any other credential inside a span of a
+   deploy job run on `main` is hidden: Cloudflare records no author for an API token, so nothing
+   tells it apart. A run on another branch or from a fork makes no span. Outside a span it is
+   reported. A window clamped to 7 days (no successful run for a week) is posted too. It reads
+   Cloudflare with `STS_WATCH_CLOUDFLARE_TOKEN`, a repository secret holding an account token
+   (`sts-deployment-watch`, only `Workers Scripts Read`, expires 2027-11-27), and GitHub with the
+   job's own token (`actions: read`). A run that cannot check fails, posts that it failed (plain
+   text), and the next run covers its window. A flood of watch-failure alerts means the watch
+   cannot read Cloudflare or GitHub: fix `STS_WATCH_CLOUDFLARE_TOKEN` (a rolled, deleted or expired
+   token) before anything else, since STS deployments go unchecked meanwhile.
    `.github/workflows/sts-deployment-watch-health.yml` runs twice an hour with only the GitHub
    token and posts when the watch has had no successful scheduled run on `main` for 45 minutes, so
    a revoked or rolled Cloudflare token, a stopped schedule or a broken workflow cannot silence the
    watch. Budget: per watch run 2 Cloudflare calls, 4 Actions list calls and 1 jobs call per deploy
    run updated inside the window (about 1 to 3), so about 700 GitHub API calls and 200 Cloudflare
-   calls a day; the health job adds 2 GitHub calls per run, 96 a day.
+   calls a day; the health job adds 2 GitHub calls per run, 96 a day. Together they use about 4,300
+   GitHub Actions minutes a month (96 and 48 one-minute runs a day).
 
 **Rotation (every 90 days, or at once on a leak).** A Super Administrator creates the new minting
 token as in step 2, puts it into `/ci/minting`, and waits 5 minutes (STS reads it within 4). Then

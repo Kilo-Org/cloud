@@ -237,6 +237,11 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   if (identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }
+  // A workflow_run job follows a run a pull request may have started; only an environment's
+  // protection rules stand between it and the policy's values, in any STS environment.
+  if (identity.events.includes('workflow_run') && identity.environment === undefined) {
+    problems.push('a github-oidc policy that accepts workflow_run must bind identity.environment');
+  }
   const workflowPrefix = `${identity.repository}/.github/workflows/`;
   for (const entry of identity.jobWorkflowRefs) {
     if (!entry.startsWith(workflowPrefix)) {

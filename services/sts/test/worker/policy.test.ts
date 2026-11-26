@@ -323,6 +323,22 @@ ${options.extra ?? ''}`;
       );
     });
 
+    it.each(['production', 'staging'])(
+      'requires identity.environment for a workflow_run policy in %s',
+      environment => {
+        expectThrow(
+          {
+            'ci-release.yaml': github({
+              environments: `[${environment}]`,
+              environment: null,
+              events: '[workflow_run]',
+            }),
+          },
+          'a github-oidc policy that accepts workflow_run must bind identity.environment'
+        );
+      }
+    );
+
     it('rejects the removed allowedEvents and environments fields', () => {
       expectThrow(
         { 'ci-release.yaml': github({ identity: '\n  allowedEvents: [workflow_run]' }) },

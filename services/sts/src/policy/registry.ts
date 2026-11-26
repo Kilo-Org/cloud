@@ -10,7 +10,6 @@ export const POLICY_FILES = [
   'notifications.yaml',
   'usage-ingest.yaml',
   'web.yaml',
-  'ci-deploy-bouncer.yaml',
   'ci-sts-deploy-proof-staging.yaml',
   'ci-sts-deploy-proof-production.yaml',
 ] as const;

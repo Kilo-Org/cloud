@@ -1,0 +1,38 @@
+name: STS deployment watch health
+
+# Posts to Slack when the STS deployment watch (sts-deployment-watch.yml) has had no successful
+# scheduled run on main for 45 minutes. It uses only the job's GitHub token, so it keeps working
+# when the watch's Cloudflare token is revoked or rolled, its schedule stops, or its workflow breaks.
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  health:
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Check the last successful watch run
+        id: health
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/sts-deployment-watch.mjs health
+
+      - name: Notify Slack
+        if: steps.health.outputs.stale == 'true' || failure()
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          errors: true
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {"text": "STS deployment watch has had no successful scheduled run on main for 45 minutes (or its health check failed); STS deployments are unchecked: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/sts-deployment-watch.yml"}

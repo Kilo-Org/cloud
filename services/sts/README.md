@@ -1163,7 +1163,10 @@ whoever reads `/ci/minting`, or replaces the STS Worker (which any minted deploy
 controls every account token, not only one hour of deploy rights. Igor declined the alternatives
 (STS in its own Cloudflare account; a dedicated member with a restricted role) on 2026-11-26
 (design Q65). The detective controls are the window check's `unexpected_script` and
-`unexpected_route` rows and the monitor of the STS Worker outside STS (setup step 7).
+`unexpected_route` rows and the monitor of the STS Worker outside STS (setup step 7). The minting
+credential can also roll or delete the monitor's own Cloudflare token; that is why the monitor
+posts every run that fails and, through a second workflow that needs no Cloudflare token, every
+45 minutes without a successful run.
 
 **Policy.** A `github-oidc` policy bound to a GitHub environment lists one `cloudflare-deploy`
 entry in `dynamic`:
@@ -1417,10 +1420,11 @@ channel, `provider: cloudflare`, `permissionSet`, `tokenId`, `tokenName`, `ttlSe
 last `reason`). Refusals go through the denial object as `ai.kilo.sts.deploy_token.denied` with
 their reason, the token id for a revoke, and the caller's stable claims.
 
-**Setup, per environment (staging first). Igor approved it on 2026-11-26.** Steps 3, 5 and 7 are
-in the repository: `CLOUDFLARE_DEPLOY_PINS` holds the ids below, `CF_DEPLOY_ACCOUNT_ID` is set in
-the staging and production blocks of `wrangler.jsonc` (development stays empty), and the monitor
-of step 7 is a scheduled workflow. Steps 2 and 4 follow the deploy of that change, staging first.
+**Setup, per environment (staging first). Igor approved it on 2026-11-26.** Steps 3 and 7 are in
+the repository: `CLOUDFLARE_DEPLOY_PINS` holds the ids below, `CF_DEPLOY_ACCOUNT_ID` is set in the
+staging and production blocks of `wrangler.jsonc` (development stays empty), and the monitor of
+step 7 runs as two scheduled workflows. Steps 2 and 4 follow the deploy of that change, staging
+first; the production deploy policy (step 5) follows the staging proof.
 
 1. **Creator.** The minting credential is an account-owned API token, not a person or a dedicated
    member: account tokens "act as service principals with their own specific set of permissions"
@@ -1445,22 +1449,24 @@ of step 7 is a scheduled workflow. Steps 2 and 4 follow the deploy of that chang
    /accounts/<account>/tokens/permission_groups`, which lists every group with its id and name
    (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/permission_groups/methods/list/);
    copy the ids and Cloudflare's exact names of the deploy groups of step 2 (`Workers Scripts
-   Write`, `Workers Containers Write` (the dashboard's "Containers"), `Workers Routes Write`)
-   into the policy. Fill
-   `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`): `allowedGroups` with those three ids and their
-   scopes (account, account, zone); `allowedZones` with the `kiloapps.io` zone id for staging and
-   production; and `forbiddenGroupIds` with the ids of every group that reads or writes API tokens,
-   members, roles or account settings (for example `Account API Tokens Write`, `API Tokens Write`,
-   `Account Settings Write`, `Memberships Write`). Then deploy. Ids are resolved here, once, never
-   by name at runtime. Until this deploy, STS refuses every mint (`not_configured`) once step 5
-   set the account.
+   Write`, `Workers Containers Write` (the dashboard's "Containers"), `Workers Routes Write`) into
+   the policy. Fill `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`): `allowedGroups` with those three
+   ids and their scopes (account, account, zone); `allowedZones` with the `kiloapps.io` zone id for
+   staging and production; and `forbiddenGroupIds` with the ids of every group that reads or writes
+   API tokens, members, roles or account settings (`Account API Tokens Read` and `Write`, `Account
+   Settings Read` and `Write`, and from `GET /user/tokens/permission_groups` the user-level `API
+   Tokens Read` and `Write` and `Memberships Read` and `Write`). Then deploy. Ids are resolved here,
+   once, never by name at runtime. Until this deploy, STS refuses every mint (`not_configured`) once
+   step 5 set the account.
 4. **Infisical.** Store the minting token as `CLOUDFLARE_MINTING_TOKEN` in `/ci/minting` of the
    environment. The STS identity's `readValue` on `/ci/**` (the grant every GitHub policy needs,
    [Infisical setup](#infisical-setup-per-environment)) covers it. No other identity, role or
    person except the break-glass owner may read `/ci/minting`; the STS deploy job's identity reads
    `/sts-deploy` only.
-5. **STS.** Set `CF_DEPLOY_ACCOUNT_ID` in that environment's block of `wrangler.jsonc` and deploy;
-   then add the policy (`ci-deploy-bouncer`) with its grant and deploy again.
+5. **STS.** `CF_DEPLOY_ACCOUNT_ID` and the pins went in with step 3, in one change with the two
+   throwaway proof policies (`ci-sts-deploy-proof-staging` and `-production`). After the staging
+   proof passes, the production deploy policy (`ci-deploy-bouncer`) lands in its own change and
+   deploys; the proof policies are removed right after the production proof.
 6. **Checks in staging.** A staging deploy job gets a token and deploys with it. Try to create a
    token scoped to one Worker ("Specified Workers", `Individual Workers Editor`), once in the
    dashboard and once through `POST /accounts/<account>/tokens` with the minting token; record
@@ -1489,48 +1495,61 @@ of step 7 is a scheduled workflow. Steps 2 and 4 follow the deploy of that chang
    `main`, no self-review): a staging token reaches production Workers.
    **Answers, 2026-11-26 (staging minting token `sts-minting-staging`, by API at 23:07Z, since
    deleted): Q65 was reopened, and Igor accepted the residual risk the same day (above).** A token
-   with `DNS Read` on `kiloapps.io`, a
-   group outside the minting token's policy, was created (200): its policy is not a ceiling. A
-   Super Administrator's canary token was read, rolled (a new value returned) and deleted (200
-   each): the minting token reaches every account token, including the value of each by rolling
-   it. So whoever reads `/ci/minting`, or replaces the STS Worker (which a minted deploy token
-   can, see above), controls every account token, not one hour of deploy rights. A token scoped
-   to one Worker (`Individual Workers Editor`, resource `com.cloudflare.edge.worker.script.<account>.<script>`)
-   was refused (400, code 1001). The minting token lists the tokens it did not create too (all
-   24), and created, listed and deleted its own child (200 each). The script list (200) and the
-   zone's route list (200) work. Its calls carry `Ratelimit: "default";r=1199;t=1` and
-   `Ratelimit-Policy: "default";q=1200;w=300`. GitHub environments: the only staging
-   `cloudflare-deploy` policy is the throwaway proof policy (`ci-sts-deploy-proof-staging`); its
-   environment `sts-proof-staging` in `iscekic/sts-deploy-token-proof` carries the same rules as
+   with `DNS Read` on `kiloapps.io`, a group outside the minting token's policy, was created (200):
+   its policy is not a ceiling. A Super Administrator's canary token was read, rolled (a new value
+   returned) and deleted (200 each): the minting token reaches every account token, including the
+   value of each by rolling it. So whoever reads `/ci/minting`, or replaces the STS Worker (which a
+   minted deploy token can, see above), controls every account token, not one hour of deploy
+   rights. A token scoped to one Worker (`Individual Workers Editor`, resource
+   `com.cloudflare.edge.worker.script.<account>.<script>`) was refused (400, code 1001) through the
+   API; the dashboard attempt is pending the staging proof. The minting token lists the tokens it
+   did not create too (all 24 account tokens), and created, listed and deleted its own child (200
+   each). The script list (200) and the zone's route list (200) work. Its calls carry `Ratelimit:
+   "default";r=1199;t=1` and `Ratelimit-Policy: "default";q=1200;w=300`; whether a deploy's calls
+   lower it is pending the staging proof. Also pending the staging proof: a minted token's own
+   token creation answering 403, an unrevoked minted token gone about an hour later, and the
+   sweep's `include_expired=true` list. GitHub environments: the only staging `cloudflare-deploy`
+   policy is the throwaway proof policy (`ci-sts-deploy-proof-staging`); its environment
+   `sts-proof-staging` in `iscekic/sts-deploy-token-proof` carries the same rules as
    `sts-proof-production` (deployment branch `main` only, no required reviewers, in a repository
    whose only writer is Igor), and both policies are removed right after the production proof.
-   `ci-deploy-bouncer` binds production only.
+   `ci-deploy-bouncer` will bind production only.
 7. **Monitor of the STS Worker, outside STS.** The window check runs inside STS, so it cannot
-   report a change to the STS Worker of its own environment. The workflow
-   `.github/workflows/sts-deployment-watch.yml` runs every 15 minutes
-   (`scripts/sts-deployment-watch.mjs`): it lists the Cloudflare deployments of `sts` and
-   `sts-staging` (`GET /accounts/<account>/workers/scripts/<script>/deployments`) and the jobs
-   named `Deploy services/sts` of `deploy-production.yml` (production), `deploy-staging.yml`
-   (staging) and `deploy-workers.yml` (either), and posts to Slack (`DEPLOY_NOTIFY_SLACK_WEBHOOK_URL`)
-   each deployment made since the previous successful run started (less 5 minutes) that no such job
-   of its environment covers (from 1 minute before the job started to 2 minutes after it ended). A
-   rollback, a secret change, a dashboard edit or a `wrangler deploy` with any other credential is
-   reported. It reads Cloudflare with `STS_WATCH_CLOUDFLARE_TOKEN`, a repository secret holding an
-   account token (`sts-deployment-watch`) with only `Workers Scripts Read`, and GitHub with the
-   job's own token (`actions: read`). A run that cannot read either fails, and the next one covers
-   its window. It cannot tell a legitimate deploy job from one a misused deploy token's holder
-   runs in this repository on `main` at the same moment; that job is in the repository's history.
+   report a change to the STS Worker of its own environment.
+   `.github/workflows/sts-deployment-watch.yml` runs every 15 minutes on `main`
+   (`scripts/sts-deployment-watch.mjs watch`): it lists the Cloudflare deployments of `sts` and
+   `sts-staging` (`GET /accounts/<account>/workers/scripts/<script>/deployments`) and the jobs named
+   `Deploy services/sts` of `deploy-production.yml` (production), `deploy-staging.yml` (staging) and
+   `deploy-workers.yml` (either), and posts to Slack (`DEPLOY_NOTIFY_SLACK_WEBHOOK_URL`) each
+   deployment made since the previous successful scheduled run on `main` started (less 5 minutes)
+   that is not a `wrangler deploy` (source `wrangler`, `workers/triggered_by` `deployment`, as every
+   CI deploy of STS records) inside such a job of its environment (from 1 minute before the job
+   started to 2 minutes after it ended). A rollback, a secret change or a dashboard edit is
+   reported even inside a job. A `wrangler deploy` with any other credential inside a legitimate
+   job's span is hidden: Cloudflare records no author for an API token, so nothing tells it apart.
+   Outside a job's span it is reported. A window clamped to 7 days (no successful run for a week)
+   is posted too. It reads Cloudflare with `STS_WATCH_CLOUDFLARE_TOKEN`, a repository secret holding
+   an account token (`sts-deployment-watch`, only `Workers Scripts Read`, expires 2027-11-27), and
+   GitHub with the job's own token (`actions: read`). A run that cannot check fails, posts that it
+   failed (plain text), and the next run covers its window.
+   `.github/workflows/sts-deployment-watch-health.yml` runs twice an hour with only the GitHub
+   token and posts when the watch has had no successful scheduled run on `main` for 45 minutes, so
+   a revoked or rolled Cloudflare token, a stopped schedule or a broken workflow cannot silence the
+   watch. Budget: per watch run 2 Cloudflare calls, 4 Actions list calls and 1 jobs call per deploy
+   run updated inside the window (about 1 to 3), so about 700 GitHub API calls and 200 Cloudflare
+   calls a day; the health job adds 2 GitHub calls per run, 96 a day.
 
 **Rotation (every 90 days, or at once on a leak).** A Super Administrator creates the new minting
 token as in step 2, puts it into `/ci/minting`, and waits 5 minutes (STS reads it within 4). Then
 they wait 1 hour and 5 minutes more, so every token the old credential minted has expired and its
 deletion or sweep has run, and look in **Account API tokens** (a Super Administrator sees every
-account token) for any `sts-<env>-` token still there: STS's deletes with the new credential may be
-refused for tokens the old one created (Cloudflare documents no rule either way; such a 403 fails
-that deletion alone, which STS retries up to hourly). Delete each by hand (STS's next retry then
-finds it gone), then delete the old minting token. On a leak of the minting token, delete it at
-once instead and clear its `sts-<env>-` children by hand the same way; on a leak of a minted token,
-delete it in the dashboard; it expires within the hour anyway.
+account token) for any `sts-<env>-` token still there. The staging check found that a minting
+token lists every account token, not only those it created, so its successor very likely deletes
+its predecessor's tokens; if a delete is refused anyway (a 403 fails that deletion alone, which STS
+retries up to hourly), delete each by hand (STS's next retry then finds it gone), then delete the
+old minting token. On a leak of the minting token, delete it at once instead and clear its
+`sts-<env>-` children by hand the same way; on a leak of a minted token, delete it in the
+dashboard; it expires within the hour anyway.
 
 **Cost.** Per deploy (one token for both of bouncer's deploy steps, revoked by the job): 2 STS
 requests, 2 `DeployTokenDO` calls, 2 Cloudflare API calls (create and delete; a token the job does

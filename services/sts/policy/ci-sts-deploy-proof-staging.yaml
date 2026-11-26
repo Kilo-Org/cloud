@@ -1,5 +1,5 @@
-# Throwaway proof of Cloudflare deploy tokens in staging (setup steps 6 and the staging proof, README
-# "Cloudflare deploy tokens"). Remove this file right after the production proof passes.
+# Throwaway proof of Cloudflare deploy tokens in staging (README "Cloudflare deploy
+# tokens", setup step 6). Remove this file right after the production proof passes.
 workload: ci-sts-deploy-proof-staging
 environments: [staging]
 identity:

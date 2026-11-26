@@ -1,6 +1,5 @@
 import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
-import ciDeployBouncerPolicy from '../../policy/ci-deploy-bouncer.yaml';
 import ciStsDeployProofProductionPolicy from '../../policy/ci-sts-deploy-proof-production.yaml';
 import ciStsDeployProofStagingPolicy from '../../policy/ci-sts-deploy-proof-staging.yaml';
 import notificationsPolicy from '../../policy/notifications.yaml';
@@ -19,7 +18,6 @@ const sources: Record<PolicyFile, string> = {
   'o11y.yaml': o11yPolicy,
   'usage-ingest.yaml': usageIngestPolicy,
   'web.yaml': webPolicy,
-  'ci-deploy-bouncer.yaml': ciDeployBouncerPolicy,
   'ci-sts-deploy-proof-staging.yaml': ciStsDeployProofStagingPolicy,
   'ci-sts-deploy-proof-production.yaml': ciStsDeployProofProductionPolicy,
 };

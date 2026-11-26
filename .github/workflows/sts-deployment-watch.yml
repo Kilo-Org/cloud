@@ -2,7 +2,10 @@ name: STS deployment watch
 
 # The monitor of the STS Worker outside STS (services/sts README, Cloudflare deploy tokens, setup
 # step 7): every Cloudflare deployment of `sts` or `sts-staging` that no STS deploy job of this
-# repository made is posted to Slack. STS cannot report a replacement of itself.
+# repository made is posted to Slack. STS cannot report a replacement of itself. The minting
+# credential STS holds can delete or roll this job's Cloudflare token, so the job fails loud: a run
+# that cannot check posts that it failed, and sts-deployment-watch-health.yml posts when no
+# scheduled run on main has succeeded for 45 minutes.
 on:
   schedule:
     - cron: '*/15 * * * *'
@@ -18,8 +21,9 @@ concurrency:
 
 jobs:
   watch:
-    # Guard: reads a repository secret; only the canonical repository runs it.
-    if: github.repository == 'Kilo-Org/cloud'
+    # Guard: reads a repository secret, and a run elsewhere than main must not move the window
+    # (the next run starts from the previous successful scheduled run on main).
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
@@ -31,13 +35,24 @@ jobs:
         env:
           CLOUDFLARE_TOKEN: ${{ secrets.STS_WATCH_CLOUDFLARE_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/sts-deployment-watch.mjs
+        run: node scripts/sts-deployment-watch.mjs watch
 
       - name: Notify Slack
-        if: steps.watch.outputs.found != '0'
+        if: steps.watch.outputs.payload != ''
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           errors: true
           webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: ${{ steps.watch.outputs.payload }}
+
+      # Plain text only: nothing from the failure itself reaches Slack.
+      - name: Notify Slack of a failed check
+        if: failure()
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          errors: true
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {"text": "STS deployment watch failed and did not check STS deployments: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}

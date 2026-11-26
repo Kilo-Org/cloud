@@ -692,8 +692,8 @@ the mint Worker carries `@kilocode/verify`, so every `/internal/` route answers
 `uts-dev-sts:<workload>:<scope>`, for the local run only.
 
 **Operations** (`@kilocode/uts-contracts` `UTS_SUBJECT_OPERATIONS`). The body is
-`{ operation_id, subject, reason, actor, source_version }`; `actor` is `user:<id>`, `admin:<id>`
-(no whitespace, 1-255 characters) or `system:<source>` (`[a-z0-9_.-]`, 1-64); `source_version` is
+`{ operation_id, subject, reason, actor, source_version }`; `actor` is `user:<id>` or `admin:<id>`
+(`[A-Za-z0-9_:./-]`, 1-255) or `system:<source>` (`[a-z0-9_.-]`, 1-64); `source_version` is
 0 to 2^53 - 1. An `operation_id` is kept 7 days; a repeat answers `already_applied` and hands the
 entries of the first run to the feed again.
 
@@ -708,7 +708,8 @@ entries of the first run to the feed again.
 - `unblock` with `access_unblock`: `409 retry_later unblock_too_soon` with `Retry-After` (1-60)
   while the block is under 60 seconds old; then the account is active again, and an
   `unblocked_account` entry takes it out of `blocked_accounts`. Nothing revoked comes back: a
-  revoked session, grant, family or PAT keeps its status (triggers, migrations 0001 and 0014).
+  revoked session, grant, family, PAT or CI trust policy, or an ended sandbox grant, keeps its
+  status (triggers, migrations 0001 and 0014).
 - `end-browser-sessions` (`staff_signout`, `workos_relink`, `scim_mailbox_move`,
   `apple_consent_revoked`): browser sessions only. `end-device-sessions`
   (`apple_consent_revoked`): CLI, IDE, extension and mobile grants only.
@@ -720,12 +721,16 @@ Outcomes: `200 applied | already_applied | no_subject`; `409 retry_later` (with 
 `401`/`403` for the token; `503 temporarily_unavailable` with `Retry-After`. The outbox retries
 only `503`, `retry_later` and network errors.
 
-**Source versions and tombstones.** `uts.accounts.event_version` holds the newest source version
-applied. A block or unblock older than it is superseded (`already_applied`, nothing changes); a
-revocation applies whatever its version. An operation for a subject UTS does not hold answers
-`no_subject` and writes a tombstone. `uts.import_account` reads them first: a deletion refuses the
-import for good, a block imports the account blocked (unless a later unblock), a revoke sets
-`revoked_before`, and an import older than any tombstone is `stale`.
+**Source versions and tombstones.** Each kind of authority has its own high-water mark:
+`uts.accounts.status_version` for block and unblock, `email_version` for the primary email, and
+each membership row's `event_version`. A block, unblock, email sync or membership change older
+than its own mark is superseded (`already_applied`, nothing changes); revocations and session ends
+neither read nor raise a mark. An operation for a subject UTS does not hold answers `no_subject`
+and writes a tombstone. `uts.import_account` reads them first: a deletion refuses the import for
+good, a block imports the account blocked (unless a later unblock), a revoke sets
+`revoked_before`, and an import older than any tombstone is `stale`. `uts.subject_revoked_since`
+reads the account's `revoked_before` too, so a legacy session issued before a revocation stays
+refused after the 70-minute feed row expired.
 
 **Import** (`AccountImportRequestSchema`): the app user id (never `uts_`), the primary email, the
 status, the verified provider identities with their link times, the SSO tie
@@ -734,13 +739,15 @@ with the WebAuthn user handle it was created under; the relying-party id is the 
 source version. Every check runs before the first write: `imported` or `already_imported`;
 `409 retry_later sso_connection_unknown` until the organization's SSO sync arrives; `409 refused`
 with `deleted`, `stale`, `identity_taken`, `email_taken`, `passkey_taken` or
-`sso_authority_mismatch`.
+`sso_authority_mismatch` (also for a WorkOS identity without an SSO tie, on a connection of
+another organization, or on an inactive connection).
 
 **Authority sync.** `email` moves the primary email forward by version (the audit row names no
 address); `membership` adds, changes or (with `role: null`) removes a membership through
 `uts.remove_org_member`, ordered by the subject's version; `sso-organization` writes the SSO policy,
 the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
-by the organization's own version. The authority check behind the legacy bridge and
+by the organization's own version; a connection active in another organization never moves
+(`409 refused connection_conflict`). The authority check behind the legacy bridge and
 `sso_app_organization` is `uts.sso_app_organization` through `src/subjects/authority.ts`: verified
 only when the connection is active, belongs to that WorkOS organization, maps to the app
 organization, and the active account holds an active membership there.

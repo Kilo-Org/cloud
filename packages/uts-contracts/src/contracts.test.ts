@@ -487,6 +487,8 @@ describe('subject operation contracts', () => {
       'system:Upper',
       `system:${'a'.repeat(65)}`,
       'staff:x',
+      'user:someone@example.com',
+      'admin:a+b',
     ]) {
       expect(SubjectOperationRequestSchema.safeParse({ ...request, actor }).success).toBe(false);
     }

@@ -74,7 +74,7 @@ export type SsoOrganizationSyncInput = SyncCommon & {
 
 export type SyncRow =
   | { outcome: 'applied' | 'already_applied' | 'no_subject'; feedEntries: FeedEntry[] }
-  | { outcome: 'refused'; error: 'email_taken' };
+  | { outcome: 'refused'; error: 'email_taken' | 'connection_conflict' };
 
 export type SubjectStore = {
   applyOperation(input: OperationInput): Promise<OperationRow>;
@@ -129,7 +129,10 @@ const MembershipRowSchema = z.object({
   feed_entries: StatementFeedEntriesSchema,
 });
 
-const SsoRowSchema = z.object({ outcome: z.enum(['applied', 'already_applied']) });
+const SsoRowSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.enum(['applied', 'already_applied']) }),
+  z.object({ outcome: z.literal('refused'), error: z.literal('connection_conflict') }),
+]);
 
 const AppEventRowSchema = z.object({
   event_id: z.uuid(),
@@ -235,7 +238,7 @@ export function identityStoreSubjects(store: IdentityStore): SubjectStore {
 
     async syncSsoOrganization(input) {
       const row = await one(
-        'SELECT result.outcome FROM uts.sync_sso_organization($1, $2, $3, $4, $5, $6, $7, $8, $9) AS result',
+        'SELECT result.outcome, result.error FROM uts.sync_sso_organization($1, $2, $3, $4, $5, $6, $7, $8, $9) AS result',
         [
           input.environment,
           input.operationId,
@@ -249,7 +252,7 @@ export function identityStoreSubjects(store: IdentityStore): SubjectStore {
         ],
         SsoRowSchema
       );
-      return { outcome: row.outcome, feedEntries: [] };
+      return row.outcome === 'refused' ? row : { outcome: row.outcome, feedEntries: [] };
     },
 
     async readAppEvents(limit) {

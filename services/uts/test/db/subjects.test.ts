@@ -129,12 +129,15 @@ async function statuses(accountId: string) {
 async function accountRow(accountId: string) {
   const result = await owner.query<{
     status: string;
-    event_version: bigint;
+    status_version: bigint;
+    email_version: bigint;
     revoked_before: Date | null;
     blocked_at: Date | null;
-  }>('SELECT status, event_version, revoked_before, blocked_at FROM uts.accounts WHERE id = $1', [
-    accountId,
-  ]);
+  }>(
+    `SELECT status, status_version, email_version, revoked_before, blocked_at
+     FROM uts.accounts WHERE id = $1`,
+    [accountId]
+  );
   return result.rows[0] ?? null;
 }
 
@@ -235,7 +238,12 @@ describe('uts.import_account', () => {
     expect(await importAccount(request)).toEqual({ outcome: 'already_imported' });
 
     const account = await accountRow(request.app_user_id);
-    expect(account).toMatchObject({ status: 'active', event_version: 12n, revoked_before: null });
+    expect(account).toMatchObject({
+      status: 'active',
+      status_version: 12n,
+      email_version: 12n,
+      revoked_before: null,
+    });
     const methods = await owner.query<{ provider: string; added_at: Date; sso: boolean }>(
       `SELECT provider::text, added_at, sso_connection_id IS NOT NULL AS sso FROM uts.sign_in_methods
        WHERE account_id = $1 ORDER BY provider`,
@@ -351,7 +359,7 @@ describe('tombstones and source versions', () => {
       status: 'blocked',
       blocked_at: tombstone.rows[0].created_at,
       revoked_before: tombstone.rows[0].created_at,
-      event_version: 3n,
+      status_version: 3n,
     });
     const left = await owner.query('SELECT 1 FROM uts.subject_tombstones WHERE subject = $1', [
       request.app_user_id,
@@ -435,7 +443,7 @@ describe('uts.apply_subject_operation', () => {
       pat: 'revoked',
       family: 'revoked',
     });
-    expect(await accountRow(accountId)).toMatchObject({ status: 'blocked', event_version: 1n });
+    expect(await accountRow(accountId)).toMatchObject({ status: 'blocked', status_version: 1n });
     expect((await auditTypes(accountId)).at(-1)).toEqual({
       event_type: 'ai.kilo.uts.subject.revoked',
       actor: { kind: 'workload', id: 'web' },
@@ -509,7 +517,7 @@ describe('uts.apply_subject_operation', () => {
     expect((await operation('unblock', accountId, 'access_unblock', 9)).outcome).toBe(
       'already_applied'
     );
-    expect(await accountRow(accountId)).toMatchObject({ status: 'blocked', event_version: 10n });
+    expect(await accountRow(accountId)).toMatchObject({ status: 'blocked', status_version: 10n });
     await owner.query(
       "UPDATE uts.accounts SET blocked_at = now() - interval '61 seconds' WHERE id = $1",
       [accountId]
@@ -518,7 +526,7 @@ describe('uts.apply_subject_operation', () => {
     expect((await operation('revoke', accountId, 'access_block', 11)).outcome).toBe(
       'already_applied'
     );
-    expect(await accountRow(accountId)).toMatchObject({ status: 'active', event_version: 12n });
+    expect(await accountRow(accountId)).toMatchObject({ status: 'active', status_version: 12n });
     // A revocation applies whatever its version: it only takes access away.
     const recovery = await operation('revoke', accountId, 'account_recovery', 1);
     expect(recovery.outcome).toBe('applied');
@@ -747,6 +755,149 @@ describe('authority sync', () => {
     expect(policy.rows).toEqual([{ enforcement: 'required', event_version: 6n }]);
     await operation('revoke', accountId, 'access_block', 2);
     expect(await verify(second)).toEqual({ status: 'unverified' });
+  });
+});
+
+describe('round-1 review fixes', () => {
+  const email = (subject: string, address: string, version: number) =>
+    subjects.syncPrimaryEmail({
+      environment,
+      workload,
+      operationId: randomUUID(),
+      actor: 'system:scim',
+      sourceVersion: version,
+      subject,
+      primaryEmail: address,
+    });
+
+  it('orders status and email by their own versions; revocations raise neither', async () => {
+    const ended = await insertAccount(owner);
+    expect((await operation('end-browser-sessions', ended, 'staff_signout', 6)).outcome).toBe(
+      'already_applied'
+    );
+    expect((await operation('revoke', ended, 'access_block', 5)).outcome).toBe('applied');
+    expect(await accountRow(ended)).toMatchObject({ status: 'blocked', status_version: 5n });
+
+    const recovered = await insertAccount(owner);
+    expect((await operation('revoke', recovered, 'account_recovery', 6)).outcome).toBe('applied');
+    const address = `${randomBytes(5).toString('hex')}@example.com`;
+    expect((await email(recovered, address, 5)).outcome).toBe('applied');
+    expect(await accountRow(recovered)).toMatchObject({ status_version: 0n, email_version: 5n });
+
+    const emailed = await insertAccount(owner);
+    expect((await email(emailed, `${randomBytes(5).toString('hex')}@example.com`, 6)).outcome).toBe(
+      'applied'
+    );
+    expect((await operation('revoke', emailed, 'access_block', 5)).outcome).toBe('applied');
+    expect(await accountRow(emailed)).toMatchObject({
+      status: 'blocked',
+      status_version: 5n,
+      email_version: 6n,
+    });
+  });
+
+  it("refuses a session issued before the account's revoked_before after the feed row expired", async () => {
+    const accountId = await insertAccount(owner);
+    const issuedBefore = new Date(Date.now() - 60_000);
+    await operation('revoke', accountId, 'account_reset', 1);
+    await owner.query("DELETE FROM uts.revocations WHERE kind = 'subject' AND subject_id = $1", [
+      accountId,
+    ]);
+    const check = async (issuedAt: Date) =>
+      (
+        await owner.query<{ revoked: boolean }>(
+          'SELECT uts.subject_revoked_since($1, $2) AS revoked',
+          [accountId, issuedAt]
+        )
+      ).rows[0].revoked;
+    expect(await check(issuedBefore)).toBe(true);
+    expect(await check(new Date(Date.now() + 60_000))).toBe(false);
+  });
+
+  it('refuses a WorkOS identity outside the SSO tie, without one, or on an inactive connection', async () => {
+    const orgId = randomUUID();
+    const otherOrg = randomUUID();
+    const workosOrg = `org_${randomUUID()}`;
+    const [own, foreign, retired] = [randomUUID(), randomUUID(), randomUUID()].map(
+      id => `conn_${id}`
+    );
+    await syncSso(orgId, workosOrg, [own, retired], 1);
+    await syncSso(orgId, workosOrg, [own], 2);
+    await syncSso(otherOrg, `org_${randomUUID()}`, [foreign], 1);
+    const workos = (connection: string) => ({
+      provider: 'workos' as const,
+      provider_subject: `prof_${randomUUID()}`,
+      verified_email: null,
+      workos_connection_id: connection,
+      linked_at: '2025-01-01T00:00:00Z',
+    });
+    const tie = (connection: string) => ({
+      app_organization_id: orgId,
+      workos_organization_id: workosOrg,
+      workos_connection_id: connection,
+      role: 'member' as const,
+    });
+    const refused = { outcome: 'refused', error: 'sso_authority_mismatch' };
+    expect(await importAccount(importRequest({ verified_identities: [workos(own)] }))).toEqual(
+      refused
+    );
+    expect(
+      await importAccount(
+        importRequest({ verified_identities: [workos(foreign)], sso_authority: tie(own) })
+      )
+    ).toEqual(refused);
+    expect(
+      await importAccount(
+        importRequest({ verified_identities: [workos(retired)], sso_authority: tie(own) })
+      )
+    ).toEqual(refused);
+    expect(await importAccount(importRequest({ sso_authority: tie(retired) }))).toEqual(refused);
+    expect(
+      await importAccount(
+        importRequest({ verified_identities: [workos(own)], sso_authority: tie(own) })
+      )
+    ).toEqual({ outcome: 'imported' });
+  });
+
+  it('never moves a connection that is active in another organization', async () => {
+    const connection = `conn_${randomUUID()}`;
+    const [first, second] = [randomUUID(), randomUUID()];
+    expect((await syncSso(first, 'org_x', [connection], 1)).outcome).toBe('applied');
+    expect(await syncSso(second, 'org_y', [connection], 1)).toEqual({
+      outcome: 'refused',
+      error: 'connection_conflict',
+    });
+    expect((await syncSso(first, 'org_x', [], 2)).outcome).toBe('applied');
+    expect((await syncSso(second, 'org_y', [connection], 2)).outcome).toBe('applied');
+    const row = await owner.query(
+      'SELECT org_id FROM uts.sso_connections WHERE workos_connection_id = $1',
+      [connection]
+    );
+    expect(row.rows).toEqual([{ org_id: second }]);
+  });
+
+  it('keeps a revoked CI trust policy and an ended sandbox grant final', async () => {
+    const accountId = await insertAccount(owner);
+    await owner.query(
+      `INSERT INTO uts.sandbox_grants (account_id, sandbox_session_id, allowed_scopes, expires_at, status, ended_at)
+       VALUES ($1, $2, '{uts:probe.read}', now() + interval '1 hour', 'ended', now())`,
+      [accountId, randomUUID()]
+    );
+    await owner.query(
+      `INSERT INTO uts.ci_trust_policies (account_id, gate_pass_id, repository, repository_id,
+         audience, scopes, status, revoked_at)
+       VALUES ($1, $2, 'kilo/e2e', 1, 'uts', '{uts:probe.read}', 'revoked', now())`,
+      [accountId, await insertGatePass(owner, accountId, 'ci_policy_create')]
+    );
+    for (const table of ['sandbox_grants', 'ci_trust_policies']) {
+      expect(
+        await sqlStateOf(() =>
+          owner.query(`UPDATE uts.${table} SET status = 'active' WHERE account_id = $1`, [
+            accountId,
+          ])
+        )
+      ).toBe('23514');
+    }
   });
 });
 

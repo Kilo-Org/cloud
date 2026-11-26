@@ -13,9 +13,11 @@
 --   them first: a deletion refuses the import for good; a block imports the account blocked; a
 --   revoke sets the account's `revoked_before`; and an import older than any of them is stale.
 -- * Source versions: every import and operation carries the app's per-subject authority version
---   (an organization's own version for its SSO setup). `uts.accounts.event_version` holds the
---   newest one applied. A block or an unblock older than it is superseded and changes nothing; a
---   revocation applies whatever its version, because it only takes access away.
+--   (an organization's own version for its SSO setup). Each kind of authority keeps its own
+--   high-water mark: `uts.accounts.status_version` for block and unblock, `email_version` for the
+--   primary email, and each membership row's `event_version`. A block, unblock, email sync or
+--   membership change older than its own mark is superseded and changes nothing; revocations and
+--   session ends neither read nor raise a mark, because they only take access away.
 -- * Feed: a block lists the account in `blocked_accounts` for 70 minutes (a deletion for 24
 --   hours), beside the subject's `revoked_before`; an unblock writes an `unblocked_account` entry
 --   that removes the block from every feed object's list (src/revocation/entries.ts).
@@ -43,11 +45,17 @@ CREATE TYPE uts.subject_operation AS ENUM (
 );
 
 -- `imported_at`: when `uts.import_account` wrote the account. `revoked_before`: the latest
--- subject-wide revocation, so a legacy session that signed in at or before it never bridges into a
--- UTS session.
+-- subject-wide revocation, which `uts.subject_revoked_since` reads after the feed row expired, so
+-- a legacy session that signed in at or before it never bridges into a UTS session.
+-- `status_version` and `email_version`: the newest app version applied to the status and to the
+-- primary email. `event_version` of 0001 stays unused by these statements.
 ALTER TABLE uts.accounts
   ADD COLUMN imported_at timestamptz,
-  ADD COLUMN revoked_before timestamptz;
+  ADD COLUMN revoked_before timestamptz,
+  ADD COLUMN status_version bigint NOT NULL DEFAULT 0
+    CHECK (status_version BETWEEN 0 AND 9007199254740991),
+  ADD COLUMN email_version bigint NOT NULL DEFAULT 0
+    CHECK (email_version BETWEEN 0 AND 9007199254740991);
 
 -- An imported passkey keeps no gate pass: the app registered it before UTS existed.
 ALTER TABLE uts.passkey_credentials
@@ -62,24 +70,47 @@ ALTER TABLE uts.sso_connections
     CHECK (length(workos_organization_id) BETWEEN 1 AND 255);
 
 -- An unblock never restores what a block took (design 5.6): a revoked browser session, device
--- session, first-party grant or third-party family stays revoked, as a revoked PAT already does
--- (`uts.refuse_reopening`, 0001). The user signs in again and gets new ones.
-CREATE TRIGGER browser_sessions_stay_revoked
+-- session, first-party grant or third-party family stays revoked, and an ended sandbox grant
+-- stays ended, as a revoked PAT or CI trust policy already does (`uts.refuse_reopening`, 0001).
+-- The user signs in again and gets new ones. CREATE OR REPLACE: migration 0013 creates the same
+-- browser-session trigger, so this one applies whether or not 0013 ran first.
+CREATE OR REPLACE TRIGGER browser_sessions_stay_revoked
   BEFORE UPDATE ON uts.browser_sessions
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
   EXECUTE FUNCTION uts.refuse_reopening('status');
-CREATE TRIGGER device_sessions_stay_revoked
+CREATE OR REPLACE TRIGGER device_sessions_stay_revoked
   BEFORE UPDATE ON uts.device_sessions
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
   EXECUTE FUNCTION uts.refuse_reopening('status');
-CREATE TRIGGER refresh_grants_stay_revoked
+CREATE OR REPLACE TRIGGER refresh_grants_stay_revoked
   BEFORE UPDATE ON uts.refresh_grants
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
   EXECUTE FUNCTION uts.refuse_reopening('status');
-CREATE TRIGGER third_party_grant_families_stay_revoked
+CREATE OR REPLACE TRIGGER third_party_grant_families_stay_revoked
   BEFORE UPDATE ON uts.third_party_grant_families
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
   EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE OR REPLACE TRIGGER sandbox_grants_stay_ended
+  BEFORE UPDATE ON uts.sandbox_grants
+  FOR EACH ROW WHEN (OLD.status = 'ended' AND NEW.status <> 'ended')
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+
+-- Whether a subject-wide revocation covers a session issued at `p_issued_at`: the feed row while
+-- it lives, and the account's `revoked_before` after it expired. Migration 0013 defines it with
+-- the feed row only; this keeps its signature and kind, so 0013's callers read both.
+CREATE OR REPLACE FUNCTION uts.subject_revoked_since(p_account_id text, p_issued_at timestamptz)
+RETURNS boolean
+LANGUAGE sql STABLE
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM uts.revocations AS entry
+    WHERE entry.kind = 'subject' AND entry.subject_id = $1 AND entry.revoked_before >= $2
+  ) OR EXISTS (
+    SELECT 1 FROM uts.accounts AS account
+    WHERE account.id = $1 AND account.revoked_before >= $2
+  )
+$$;
 
 -- The operations UTS applied, by `operation_id`, for 7 days, with the feed entries each wrote.
 -- `target` is the subject, or the organization id of an SSO sync.
@@ -550,7 +581,7 @@ BEGIN
     RETURN;
   END IF;
 
-  SELECT account.status, account.blocked_at, account.event_version INTO holder
+  SELECT account.status, account.blocked_at, account.status_version INTO holder
   FROM uts.accounts AS account WHERE account.id = p_subject FOR UPDATE;
   IF NOT FOUND THEN
     SELECT * INTO absent FROM uts.operation_without_account(
@@ -565,7 +596,7 @@ BEGIN
   END IF;
 
   IF p_operation = 'unblock' THEN
-    IF p_source_version < holder.event_version OR holder.status <> 'blocked' THEN
+    IF p_source_version < holder.status_version OR holder.status <> 'blocked' THEN
       changed := false;
     ELSIF holder.blocked_at > now() - interval '60 seconds' THEN
       outcome := 'retry_later';
@@ -576,7 +607,8 @@ BEGIN
       RETURN NEXT;
       RETURN;
     ELSE
-      UPDATE uts.accounts AS account SET status = 'active', blocked_at = NULL, updated_at = now()
+      UPDATE uts.accounts AS account
+      SET status = 'active', blocked_at = NULL, status_version = p_source_version, updated_at = now()
       WHERE account.id = p_subject;
       INSERT INTO uts.revocations (kind, subject_id, feed_expires_at)
       VALUES ('unblocked_account', p_subject, now() + interval '20 minutes')
@@ -593,7 +625,7 @@ BEGIN
     event_activity := 99;
   ELSIF p_operation = 'revoke' THEN
     IF p_reason = 'access_block'
-      AND (p_source_version < holder.event_version OR holder.status = 'blocked')
+      AND (p_source_version < holder.status_version OR holder.status = 'blocked')
     THEN
       changed := false;
     ELSIF p_reason = 'account_deleted' THEN
@@ -637,9 +669,10 @@ BEGIN
     event_activity := 4;
   END IF;
 
-  UPDATE uts.accounts AS account
-  SET event_version = greatest(account.event_version, p_source_version)
-  WHERE account.id = p_subject AND account.event_version < p_source_version;
+  IF p_reason IN ('access_block', 'access_unblock') THEN
+    UPDATE uts.accounts AS account SET status_version = p_source_version
+    WHERE account.id = p_subject AND account.status_version < p_source_version;
+  END IF;
   feed_entries := uts.feed_entries_of_statement();
   IF p_reason = 'account_deleted' THEN
     counts := counts || jsonb_build_object(
@@ -765,6 +798,8 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
+  -- A WorkOS identity needs a synced connection (else retry), an active one in the organization
+  -- of the SSO tie, which the import must name.
   IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements(p_identities) AS identity
@@ -773,6 +808,11 @@ BEGIN
         SELECT 1 FROM uts.sso_connections AS connection
         WHERE connection.workos_connection_id = identity ->> 'workos_connection_id'
       )
+  ) OR (
+    p_sso_authority IS NOT NULL AND jsonb_typeof(p_sso_authority) = 'object' AND NOT EXISTS (
+      SELECT 1 FROM uts.sso_connections AS connection
+      WHERE connection.workos_connection_id = p_sso_authority ->> 'workos_connection_id'
+    )
   ) THEN
     outcome := 'retry_later';
     error := 'sso_connection_unknown';
@@ -780,16 +820,12 @@ BEGIN
     RETURN;
   END IF;
   IF p_sso_authority IS NOT NULL AND jsonb_typeof(p_sso_authority) = 'object' THEN
-    SELECT connection.org_id, connection.workos_organization_id INTO sso_connection
+    SELECT connection.org_id, connection.workos_organization_id, connection.status
+    INTO sso_connection
     FROM uts.sso_connections AS connection
     WHERE connection.workos_connection_id = p_sso_authority ->> 'workos_connection_id';
-    IF NOT FOUND THEN
-      outcome := 'retry_later';
-      error := 'sso_connection_unknown';
-      RETURN NEXT;
-      RETURN;
-    END IF;
-    IF sso_connection.org_id <> (p_sso_authority ->> 'app_organization_id')::uuid
+    IF sso_connection.status <> 'active'
+      OR sso_connection.org_id <> (p_sso_authority ->> 'app_organization_id')::uuid
       OR sso_connection.workos_organization_id IS DISTINCT FROM
         p_sso_authority ->> 'workos_organization_id'
     THEN
@@ -798,6 +834,23 @@ BEGIN
       RETURN NEXT;
       RETURN;
     END IF;
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(p_identities) AS identity
+    JOIN uts.sso_connections AS connection
+      ON connection.workos_connection_id = identity ->> 'workos_connection_id'
+    WHERE identity ->> 'provider' = 'workos'
+      AND (
+        p_sso_authority IS NULL OR jsonb_typeof(p_sso_authority) <> 'object'
+        OR connection.status <> 'active'
+        OR connection.org_id <> (p_sso_authority ->> 'app_organization_id')::uuid
+      )
+  ) THEN
+    outcome := 'refused';
+    error := 'sso_authority_mismatch';
+    RETURN NEXT;
+    RETURN;
   END IF;
 
   -- The tombstones: a revoke dates `revoked_before`; the newest block or unblock decides the
@@ -814,14 +867,15 @@ BEGIN
   blocked := p_status = 'blocked' OR coalesce(last_status.reason = 'access_block', false);
 
   INSERT INTO uts.accounts (
-    id, primary_email, status, blocked_at, event_version, imported_at, revoked_before
+    id, primary_email, status, blocked_at, status_version, email_version, imported_at,
+    revoked_before
   ) VALUES (
     p_app_user_id, p_primary_email,
     CASE WHEN blocked THEN 'blocked' ELSE 'active' END::uts.account_status,
     CASE WHEN blocked THEN coalesce(
       CASE WHEN last_status.reason = 'access_block' THEN last_status.created_at END, now()
     ) END,
-    p_source_version, now(), revoked_at_time
+    p_source_version, p_source_version, now(), revoked_at_time
   );
   INSERT INTO uts.sign_in_methods (
     account_id, provider, provider_subject, verified_email, sso_connection_id, added_at
@@ -901,7 +955,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  SELECT account.primary_email, account.event_version INTO holder
+  SELECT account.primary_email, account.email_version INTO holder
   FROM uts.accounts AS account WHERE account.id = p_subject FOR UPDATE;
   IF NOT FOUND THEN
     SELECT * INTO absent FROM uts.operation_without_account(
@@ -912,7 +966,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF p_source_version < holder.event_version OR holder.primary_email = p_primary_email THEN
+  IF p_source_version < holder.email_version OR holder.primary_email = p_primary_email THEN
     outcome := 'already_applied';
   ELSE
     PERFORM pg_advisory_xact_lock(hashtextextended('uts.primary_email:' || p_primary_email, 0));
@@ -926,7 +980,7 @@ BEGIN
       RETURN;
     END IF;
     UPDATE uts.accounts AS account
-    SET primary_email = p_primary_email, event_version = p_source_version, updated_at = now()
+    SET primary_email = p_primary_email, email_version = p_source_version, updated_at = now()
     WHERE account.id = p_subject;
     PERFORM uts.write_workload_audit_event(
       p_environment, 'ai.kilo.uts.primary_email.synced', 3001, 99, p_subject, p_workload,
@@ -938,8 +992,8 @@ BEGIN
     );
     outcome := 'applied';
   END IF;
-  UPDATE uts.accounts AS account SET event_version = p_source_version
-  WHERE account.id = p_subject AND account.event_version < p_source_version;
+  UPDATE uts.accounts AS account SET email_version = p_source_version
+  WHERE account.id = p_subject AND account.email_version < p_source_version;
   PERFORM uts.record_operation(p_operation_id, 'email_sync', p_subject, p_source_version, '[]');
   RETURN NEXT;
 END
@@ -1018,8 +1072,6 @@ BEGIN
       )
     );
   END IF;
-  UPDATE uts.accounts AS account SET event_version = p_source_version
-  WHERE account.id = p_subject AND account.event_version < p_source_version;
   feed_entries := uts.feed_entries_of_statement();
   PERFORM uts.record_operation(
     p_operation_id, 'membership_sync', p_subject, p_source_version, feed_entries
@@ -1031,7 +1083,9 @@ $$;
 -- POST /internal/authority/sso-organization: an organization's SSO setup, ordered by the
 -- organization's own source version (`uts.org_sso_policies.event_version`): the policy, the
 -- WorkOS organization whose `externalId` is this organization, and its connections; a connection
--- of the organization left out becomes inactive. Outcomes: `applied`, `already_applied`.
+-- of the organization left out becomes inactive. A connection never moves from another
+-- organization while it is active there. Outcomes: `applied`, `already_applied`, `refused` with
+-- `connection_conflict`.
 CREATE FUNCTION uts.sync_sso_organization(
   p_environment text,
   p_operation_id uuid,
@@ -1042,7 +1096,7 @@ CREATE FUNCTION uts.sync_sso_organization(
   p_actor text,
   p_workload text,
   p_source_version bigint
-) RETURNS TABLE (outcome text)
+) RETURNS TABLE (outcome text, error text)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
@@ -1065,7 +1119,17 @@ BEGIN
   END IF;
   SELECT policy.event_version INTO stored_version
   FROM uts.org_sso_policies AS policy WHERE policy.org_id = p_org_id;
-  IF NOT FOUND OR stored_version <= p_source_version THEN
+  IF EXISTS (
+    SELECT 1 FROM uts.sso_connections AS connection
+    WHERE connection.workos_connection_id = ANY (p_workos_connection_ids)
+      AND connection.org_id <> p_org_id AND connection.status = 'active'
+  ) THEN
+    outcome := 'refused';
+    error := 'connection_conflict';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  IF stored_version IS NULL OR stored_version <= p_source_version THEN
     INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version)
     VALUES (p_org_id, p_enforcement, p_source_version)
     ON CONFLICT (org_id) DO UPDATE

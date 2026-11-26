@@ -47,6 +47,8 @@ export const AccountRowSchema = z.strictObject({
   sign_in_denied_audited_at: timestamp.nullable(),
   imported_at: timestamp.nullable(),
   revoked_before: timestamp.nullable(),
+  status_version: z.bigint(),
+  email_version: z.bigint(),
 });
 
 export const SsoConnectionRowSchema = z.strictObject({

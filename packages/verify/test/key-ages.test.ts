@@ -234,7 +234,8 @@ describe('a late answer does not replace newer keys', () => {
     c.jwks.keys = [other.jwk];
     advance(JWKS_RETRY_MS);
     expect(await lookup(c.keySet, other.kid)).toBe('key');
-    // The first fetch now answers with the old key set, read before the second fetch.
+    // A second later the first fetch answers with the old key set, read before the second fetch.
+    advance(1_000);
     c.jwks.keys = [key.jwk];
     held.release();
     await late;

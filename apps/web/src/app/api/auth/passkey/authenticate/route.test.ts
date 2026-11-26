@@ -17,6 +17,11 @@ import {
 } from '@/lib/auth/passkey';
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
+import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
+import { auth_audit_logs } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { setAuthActionSinkForTest, type AuthActionEvent } from '@/lib/auth/auth-audit';
 import { POST } from './route';
 import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
@@ -176,7 +181,11 @@ describe('POST /api/auth/passkey/authenticate', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ticket: 'one-time-ticket' });
-    expect(mockVerifyAuthentication).toHaveBeenCalledWith(challengeId, assertion);
+    expect(mockVerifyAuthentication).toHaveBeenCalledWith(
+      challengeId,
+      assertion,
+      expect.any(Function)
+    );
   });
 
   it('returns 400 for an invalid request', async () => {
@@ -226,7 +235,11 @@ describe('POST /api/auth/passkey/authenticate', () => {
     expect(response.status).toBe(200);
     // The verifier never reads extension outputs, so absence is normalized to
     // the empty set rather than handed on as undefined.
-    expect(mockVerifyAuthentication).toHaveBeenCalledWith(challengeId, assertion);
+    expect(mockVerifyAuthentication).toHaveBeenCalledWith(
+      challengeId,
+      assertion,
+      expect.any(Function)
+    );
   });
 
   it('returns 401 with the stable code when the assertion is refused', async () => {
@@ -238,5 +251,88 @@ describe('POST /api/auth/passkey/authenticate', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'UNKNOWN_CREDENTIAL' });
+  });
+});
+
+describe('POST /api/auth/passkey/authenticate audit', () => {
+  let events: AuthActionEvent[];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    events = [];
+    setAuthActionSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAuthActionSinkForTest(null);
+  });
+
+  function verify() {
+    return POST(createRequest({ action: 'verify', challengeId, response: assertion }));
+  }
+
+  it('stores a refused assertion of a known credential under its account', async () => {
+    const userId = randomUUID();
+    mockVerifyAuthentication.mockImplementation(async (_challengeId, _response, onOwner) => {
+      onOwner?.(userId);
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    });
+
+    expect((await verify()).status).toBe(401);
+
+    const rows = await db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        method: 'passkey',
+        failure_reason: 'verification_failed',
+        subject_email_hash: null,
+        metadata: { step: 'verify' },
+      }),
+    ]);
+    const recorded = JSON.stringify({ rows, events });
+    expect(recorded).not.toContain(assertion.id);
+    expect(recorded).not.toContain(challengeId);
+  });
+
+  it('logs an unknown credential without a row', async () => {
+    mockVerifyAuthentication.mockRejectedValue(new PasskeyVerificationError('UNKNOWN_CREDENTIAL'));
+
+    expect((await verify()).status).toBe(401);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        userId: null,
+        failureReason: 'unknown_credential',
+        stored: false,
+        route: '/api/auth/passkey/authenticate',
+      }),
+    ]);
+  });
+
+  it('logs a rate-limited verify without a row', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    expect((await verify()).status).toBe(429);
+
+    expect(events).toEqual([
+      expect.objectContaining({ failureReason: 'rate_limited', stored: false }),
+    ]);
+  });
+
+  it('records nothing for a verified assertion, whose ticket redemption records the sign-in', async () => {
+    mockVerifyAuthentication.mockImplementation(async (_challengeId, _response, onOwner) => {
+      onOwner?.(randomUUID());
+      return { ticket: 'one-time-ticket' };
+    });
+
+    expect((await verify()).status).toBe(200);
+
+    expect(events).toEqual([]);
   });
 });

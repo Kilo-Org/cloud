@@ -544,10 +544,14 @@ export async function advancePasskeyCounter(
  * credential, refuses an assertion that does not verify against the stored
  * public key with this configuration's origin/rpId, and refuses a signature
  * counter that did not advance once the authenticator started counting.
+ *
+ * `onCredentialOwner` learns the account of a stored credential as soon as the
+ * assertion names one, so a refusal after that point can be attributed to it.
  */
 export async function verifyAuthentication(
   challengeId: string,
-  response: AuthenticationResponseJSON
+  response: AuthenticationResponseJSON,
+  onCredentialOwner?: (kiloUserId: string) => void
 ): Promise<{ ticket: string }> {
   // The route hands the assertion over straight from an untrusted body, and the
   // credential id below is used as a query parameter before the WebAuthn
@@ -572,6 +576,7 @@ export async function verifyAuthentication(
   if (!credential) {
     throw new PasskeyVerificationError('UNKNOWN_CREDENTIAL');
   }
+  onCredentialOwner?.(credential.kilo_user_id);
 
   const { authenticationInfo } = await verifyOrRefuse(() =>
     verifyAuthenticationResponse({

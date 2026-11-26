@@ -19,13 +19,18 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 /**
  * Durable record of a self-service authentication action, success or failure.
  *
- * Every event is written to `auth_audit_logs` and emitted as an
- * `event:"auth_action"` structured log line (Axiom `vercel` dataset). The log
- * line carries the request IP, which the table deliberately does not store.
+ * Every event is emitted as an `event:"auth_action"` structured log line
+ * (Axiom `vercel` dataset), which carries the request IP the table
+ * deliberately does not store. Every success is also written to
+ * `auth_audit_logs`; a failure is written there only when it names a subject
+ * (a user id or an email) and was not refused by a rate limit or cap
+ * (design section 10 item 6, Q56). Any other failure is the log line alone,
+ * flagged `stored:false`, so an unauthenticated flood cannot grow the table.
  *
  * Neither ever holds a token, a secret, or an email address in clear. An email
  * is stored only as {@link authAuditEmailHash}, so attempts on one address
- * correlate without revealing it. `method` and `failureReason` must be stable
+ * correlate without revealing it; it is always the account's email, never a
+ * provider identity's. `method` and `failureReason` must be stable
  * codes (`google`, `magic_link`, `invalid_code`), never an error message; a
  * value that is not a code is replaced with `invalid_code_value` and reported.
  * `metadata` is stored verbatim: safe ids and counts only.
@@ -40,7 +45,10 @@ type AuthAuditEntryFields = {
   userId?: string | null;
   /** Sign-in method, provider, or channel, e.g. `google`, `passkey`, `device_auth`. */
   method?: string | null;
-  /** The subject's email; hashed here, never stored or logged in clear. */
+  /**
+   * The subject account's email, never a provider identity's; hashed here,
+   * never stored or logged in clear.
+   */
   email?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -62,6 +70,9 @@ export type AuthActionEvent = {
   method: string | null;
   failureReason: string | null;
   auditLogId: string | null;
+  /** Whether the event belongs in the table; false for a failure the line alone records. */
+  stored: boolean;
+  /** Whether the row was written; false when it is not stored or the insert failed. */
   persisted: boolean;
   ip: string | null;
   route: string | null;
@@ -280,6 +291,31 @@ export async function auditAuthProcedure<T>(
   return result;
 }
 
+/**
+ * Refusals by a rate limit or cap, in audit form. Each is one more request
+ * than a limit allows, so a row per refusal would let a flood fill the table.
+ * `rate_limited` covers the firewall rules and the device-auth pending cap;
+ * `http_429` is a 429 that names no code.
+ */
+const RATE_LIMIT_FAILURE_CODES: Record<string, true> = {
+  rate_limited: true,
+  signup_rate_limited: true,
+  too_many_attempts: true,
+  too_many_challenges: true,
+  too_many_codes: true,
+  too_many_requests: true,
+  email_code_cooldown: true,
+  email_code_hourly_limit: true,
+  http_429: true,
+};
+
+/** Whether an entry belongs in the table: every success; a failure with a subject that no limit refused. */
+function isStoredEntry(entry: AuthAuditEntry, failureReason: string | null): boolean {
+  if (entry.outcome === 'success') return true;
+  if (!entry.userId && !entry.email) return false;
+  return failureReason === null || RATE_LIMIT_FAILURE_CODES[failureReason] !== true;
+}
+
 export async function recordAuthEvent(
   request: AuthAuditRequest,
   entry: AuthAuditEntry
@@ -288,27 +324,30 @@ export async function recordAuthEvent(
   const method = auditCode(entry.method, 'method');
   const failureReason =
     entry.outcome === 'failure' ? auditCode(entry.failureReason, 'failureReason') : null;
+  const stored = isStoredEntry(entry, failureReason);
 
   let auditLogId: string | null = null;
-  try {
-    const [row] = await db
-      .insert(auth_audit_logs)
-      .values({
-        action: entry.action,
-        outcome: entry.outcome,
-        user_id: userId,
-        method,
-        failure_reason: failureReason,
-        subject_email_hash: subjectEmailHash(entry.email),
-        metadata: entry.metadata ?? null,
-      })
-      .returning({ id: auth_audit_logs.id });
-    auditLogId = row?.id ?? null;
-  } catch (error) {
-    captureException(error, {
-      tags: { operation: 'auth_audit_insert' },
-      extra: { action: entry.action },
-    });
+  if (stored) {
+    try {
+      const [row] = await db
+        .insert(auth_audit_logs)
+        .values({
+          action: entry.action,
+          outcome: entry.outcome,
+          user_id: userId,
+          method,
+          failure_reason: failureReason,
+          subject_email_hash: subjectEmailHash(entry.email),
+          metadata: entry.metadata ?? null,
+        })
+        .returning({ id: auth_audit_logs.id });
+      auditLogId = row?.id ?? null;
+    } catch (error) {
+      captureException(error, {
+        tags: { operation: 'auth_audit_insert' },
+        extra: { action: entry.action },
+      });
+    }
   }
 
   try {
@@ -320,6 +359,7 @@ export async function recordAuthEvent(
       method,
       failureReason,
       auditLogId,
+      stored,
       persisted: auditLogId !== null,
       ip: request.ip,
       route: request.route,

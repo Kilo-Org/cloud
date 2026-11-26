@@ -1007,8 +1007,39 @@ const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
 
 const serverSessionCallback = sessionAuthOptions.callbacks?.session;
 
+/**
+ * Records an OAuth callback that NextAuth refused before the signIn callback
+ * ran: the provider answered with an error (`error=access_denied`), logged as
+ * `OAUTH_CALLBACK_HANDLER_ERROR` with the provider's error fields, or a state,
+ * PKCE, nonce or token check failed, logged as `OAUTH_CALLBACK_ERROR` with the
+ * provider id. No account is known yet, so the `auth_action` line is the only
+ * record (design Q56). It carries the code alone: never the error message,
+ * the description, or the callback query.
+ */
+function recordOAuthCallbackRefusal(code: string, metadata: unknown): void {
+  if (typeof metadata !== 'object' || metadata === null || !('providerId' in metadata)) return;
+  const failureReason =
+    code === 'OAUTH_CALLBACK_HANDLER_ERROR' && 'error_description' in metadata
+      ? 'provider_error'
+      : code === 'OAUTH_CALLBACK_ERROR'
+        ? 'oauth_callback_error'
+        : null;
+  if (failureReason === null) return;
+  const method = typeof metadata.providerId === 'string' ? metadata.providerId : null;
+  void authAuditRequestFromCurrentRequest().then(request =>
+    recordAuthEvent(request, { action: 'auth.sign_in', outcome: 'failure', method, failureReason })
+  );
+}
+
 export const authOptions: NextAuthOptions = {
   ...sessionAuthOptions,
+  logger: {
+    ...sessionAuthOptions.logger,
+    error(code, metadata) {
+      sessionAuthOptions.logger.error(code, metadata);
+      recordOAuthCallbackRefusal(code, metadata);
+    },
+  },
   cookies: {
     // Apple Sign In uses response_mode=form_post, which is a cross-site POST
     // from appleid.apple.com. SameSite=Lax (the default) cookies are not sent
@@ -1233,6 +1264,8 @@ export const authOptions: NextAuthOptions = {
       // Every return below sets the decision that the `finally` records.
       let decision: SignInDecision | null = null;
       let auditUserId: string | null = null;
+      // A link row hashes the linked account's email, never the provider identity's.
+      let auditLinkEmail: string | null = null;
       const refuse = (failureReason: string) => {
         decision = { outcome: 'failure', failureReason };
       };
@@ -1306,6 +1339,7 @@ export const authOptions: NextAuthOptions = {
           // it again so a policy change in between, or a link started before
           // the policy applied, can not add a method SSO forbids.
           const linkTarget = await findUserById(linkingSession.existingUserId);
+          auditLinkEmail = linkTarget?.google_user_email ?? null;
           const linkRefusal: AuthErrorType | null = !linkTarget
             ? 'LINKING-FAILED'
             : (await isSignInMethodLinkAllowed(linkTarget))
@@ -1521,6 +1555,9 @@ export const authOptions: NextAuthOptions = {
             refuse(new URL(result, 'http://localhost').searchParams.get('error') ?? 'sso_refused');
             return preserveSignInRedirectContext(result, redirectContext);
           }
+          // The first SSO sign-in creates the account, which existed for no
+          // lookup above; its new provider row names it.
+          auditUserId ??= await findUserIdByAuthProvider('workos', accountInfo.provider_account_id);
           decision = { outcome: 'success' };
           return result;
         }
@@ -1733,7 +1770,7 @@ export const authOptions: NextAuthOptions = {
         await recordSignInDecision(decision, {
           linking: Boolean(isAccountLinking),
           method: account?.provider ?? null,
-          email: user.email ?? null,
+          email: isAccountLinking ? auditLinkEmail : (user.email ?? null),
           userId: auditUserId,
         });
       }

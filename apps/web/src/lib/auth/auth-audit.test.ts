@@ -64,6 +64,7 @@ describe('recordAuthEvent', () => {
         method: 'google',
         failureReason: 'account_blocked',
         auditLogId: rows[0]?.id,
+        stored: true,
         persisted: true,
         ip: '203.0.113.9',
         route: '/api/auth/callback/google',
@@ -87,6 +88,71 @@ describe('recordAuthEvent', () => {
     expect(events[0]?.failureReason).toBe('invalid_code_value');
   });
 
+  test('keeps a refusal that names no subject out of the table, with one log line', async () => {
+    await recordAuthEvent(request, {
+      action: 'auth.device_auth.redeem',
+      outcome: 'failure',
+      method: 'device_code',
+      failureReason: 'invalid_request',
+    });
+
+    expect(await db.select().from(auth_audit_logs)).toEqual([]);
+    expect(events).toEqual([
+      {
+        event: 'auth_action',
+        action: 'auth.device_auth.redeem',
+        outcome: 'failure',
+        userId: null,
+        method: 'device_code',
+        failureReason: 'invalid_request',
+        auditLogId: null,
+        stored: false,
+        persisted: false,
+        ip: '203.0.113.9',
+        route: '/api/auth/callback/google',
+      },
+    ]);
+  });
+
+  test.each(['rate_limited', 'too_many_attempts', 'http_429'])(
+    'keeps a %s refusal of a known account out of the table',
+    async failureReason => {
+      await recordAuthEvent(request, {
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        userId: 'user-1',
+        email: 'someone@example.com',
+        failureReason,
+      });
+
+      expect(await db.select().from(auth_audit_logs)).toEqual([]);
+      expect(events).toEqual([
+        expect.objectContaining({ userId: 'user-1', failureReason, stored: false }),
+      ]);
+    }
+  );
+
+  test('stores a refusal of a known account', async () => {
+    await recordAuthEvent(request, {
+      action: 'auth.passkey.add',
+      outcome: 'failure',
+      userId: 'user-1',
+      failureReason: 'verification_failed',
+    });
+
+    expect(await db.select().from(auth_audit_logs)).toEqual([
+      expect.objectContaining({ user_id: 'user-1', failure_reason: 'verification_failed' }),
+    ]);
+    expect(events).toEqual([expect.objectContaining({ stored: true, persisted: true })]);
+  });
+
+  test('stores a success that names no subject', async () => {
+    await recordAuthEvent(request, { action: 'auth.sign_out', outcome: 'success' });
+
+    expect(await db.select().from(auth_audit_logs)).toHaveLength(1);
+    expect(events).toEqual([expect.objectContaining({ stored: true, persisted: true })]);
+  });
+
   test('still emits the log line, flagged unpersisted, when the insert fails', async () => {
     const insert = jest.spyOn(db, 'insert').mockImplementationOnce(() => {
       throw new Error('database unavailable');
@@ -105,6 +171,7 @@ describe('recordAuthEvent', () => {
         outcome: 'success',
         userId: 'user-1',
         auditLogId: null,
+        stored: true,
         persisted: false,
       }),
     ]);

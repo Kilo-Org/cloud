@@ -1099,6 +1099,7 @@ export const userRouter = createTRPCRouter({
           action: 'auth.sign_in_method.link',
           userId: ctx.user.id,
           method: input.provider,
+          email: ctx.user.google_user_email,
           skipSuccessRow: true,
         },
         async () => {
@@ -1177,6 +1178,7 @@ export const userRouter = createTRPCRouter({
           action: 'auth.sign_in_method.unlink',
           userId: ctx.user.id,
           method: input.provider,
+          email: ctx.user.google_user_email,
           skipSuccessRow: true,
         },
         async () => {

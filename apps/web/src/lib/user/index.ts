@@ -159,7 +159,11 @@ import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
-import { authAuditEmailHash } from '@/lib/auth/auth-audit';
+import {
+  authAuditEmailHash,
+  authAuditRequestFromCurrentRequest,
+  recordAuthEvent,
+} from '@/lib/auth/auth-audit';
 import {
   currentSignInMethodChangeAuditRequest,
   currentSignInMethodChangeRequestDetails,
@@ -1083,6 +1087,18 @@ export async function linkAccountToExistingUser(
         }
       });
     }
+  } else {
+    // A relink of the identity already attached changes nothing, so it sends
+    // no notice and writes no admin or organization record; the attempt still
+    // gets its one auth row.
+    await recordAuthEvent(await authAuditRequestFromCurrentRequest(), {
+      action: 'auth.sign_in_method.link',
+      outcome: 'success',
+      userId: existingKiloUserId,
+      method: authProviderData.provider,
+      email: existingUser.google_user_email,
+      metadata: { noop: true },
+    });
   }
 
   // Log the account linking event

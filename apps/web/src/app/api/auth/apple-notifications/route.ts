@@ -1,7 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { device_refresh_tokens, device_sessions, user_auth_provider } from '@kilocode/db/schema';
+import {
+  device_refresh_tokens,
+  device_sessions,
+  kilocode_users,
+  user_auth_provider,
+} from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -32,8 +37,11 @@ function extractAppleEvent(payload: Record<string, unknown>): AppleEvent {
   return events as AppleEvent;
 }
 
+/** An account whose Apple sign-in a notification removed, with its email for the audit row. */
+type UnlinkedAccount = { userId: string; email: string };
+
 /** Applies one Apple event and returns the accounts whose Apple sign-in it removed. */
-async function handleAppleEvent(event: AppleEvent): Promise<string[]> {
+async function handleAppleEvent(event: AppleEvent): Promise<UnlinkedAccount[]> {
   const { type, sub } = event;
 
   logExceptInTest(`Apple auth event: ${type} for sub=${sub}`);
@@ -41,7 +49,7 @@ async function handleAppleEvent(event: AppleEvent): Promise<string[]> {
   if (type === 'consent-revoked' || type === 'account-delete') {
     // Compatibility: the old handler deleted the provider row only. Keep the
     // extra web/device revocation until Apple stops sending these events.
-    const unlinkedUserIds = await db.transaction(async tx => {
+    const unlinkedAccounts = await db.transaction(async tx => {
       const deletedProviders = await tx
         .delete(user_auth_provider)
         .where(
@@ -79,10 +87,18 @@ async function handleAppleEvent(event: AppleEvent): Promise<string[]> {
             )
           );
       }
-      return deletedProviders.map(provider => provider.kilo_user_id);
+      return tx
+        .select({ userId: kilocode_users.id, email: kilocode_users.google_user_email })
+        .from(kilocode_users)
+        .where(
+          inArray(
+            kilocode_users.id,
+            deletedProviders.map(provider => provider.kilo_user_id)
+          )
+        );
     });
     logExceptInTest(`Removed apple auth provider for sub=${sub} (${type})`);
-    return unlinkedUserIds;
+    return unlinkedAccounts;
   }
   // email-disabled and email-enabled are informational — no action needed
   return [];
@@ -195,12 +211,13 @@ export async function POST(request: NextRequest) {
     try {
       const jwtPayload = await verifyAppleJwtWithJwks(payload, APPLE_CLIENT_ID);
       const event = extractAppleEvent(jwtPayload);
-      const unlinkedUserIds = await handleAppleEvent(event);
-      for (const userId of unlinkedUserIds) {
+      const unlinkedAccounts = await handleAppleEvent(event);
+      for (const { userId, email } of unlinkedAccounts) {
         await recordAuthEvent(auditRequest, {
           action: 'auth.sign_in_method.unlink',
           outcome: 'success',
           userId,
+          email,
           method: 'apple',
           metadata: {
             reason: event.type === 'consent-revoked' ? 'consent_revoked' : 'account_delete',

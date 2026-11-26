@@ -10,6 +10,11 @@ import {
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
 import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 /**
  * Vercel Firewall rate-limit rules applied by this route.
@@ -45,12 +50,30 @@ const requestSchema = z.discriminatedUnion('action', [
 ]);
 
 export async function POST(request: NextRequest) {
+  // One attempt per call. A verified assertion only mints a ticket, and the
+  // sign-in that redeems it records the success, so a success writes no row
+  // here. A refusal records the response's stable code, attributed to the
+  // credential's account once the assertion names a stored credential.
+  const attempt: AuthAuditAttempt = {
+    action: 'auth.sign_in',
+    method: 'passkey',
+    skipSuccessRow: true,
+  };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/auth/passkey/authenticate'),
+    attempt,
+    () => authenticate(request, attempt)
+  );
+}
+
+async function authenticate(request: NextRequest, attempt: AuthAuditAttempt): Promise<Response> {
   const body = await request.json().catch(() => undefined);
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
 
+  attempt.metadata = { step: parsed.data.action };
   try {
     if (parsed.data.action === 'options') {
       const limit = await checkFirewallRateLimit(OPTIONS_RATE_LIMIT_ID, {
@@ -73,7 +96,13 @@ export async function POST(request: NextRequest) {
     const refusal = firewallRateLimitRefusal(limit);
     if (refusal) return refusal;
 
-    const { ticket } = await verifyAuthentication(parsed.data.challengeId, parsed.data.response);
+    const { ticket } = await verifyAuthentication(
+      parsed.data.challengeId,
+      parsed.data.response,
+      kiloUserId => {
+        attempt.userId = kiloUserId;
+      }
+    );
     return NextResponse.json({ ticket });
   } catch (error) {
     if (error instanceof PasskeyVerificationError) {

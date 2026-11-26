@@ -793,6 +793,7 @@ describe('sign-in method audit rows', () => {
         user_id: user.id,
         method: 'openai',
         failure_reason: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.browserSessionRequired,
+        subject_email_hash: authAuditEmailHash(user.google_user_email),
       }),
     ]);
   });
@@ -815,6 +816,7 @@ describe('sign-in method audit rows', () => {
         user_id: user.id,
         method: 'google',
         failure_reason: SIGN_IN_METHOD_REFUSAL_CODES.lastMethod,
+        subject_email_hash: authAuditEmailHash(user.google_user_email),
       }),
     ]);
   });
@@ -866,5 +868,38 @@ describe('sign-in method audit rows', () => {
     ]);
     expect(JSON.stringify(rows)).not.toContain('linked-identity');
     expect(JSON.stringify(rows)).not.toContain(user.google_user_email);
+  });
+
+  it('records a relink of the identity already attached as one no-op success row', async () => {
+    const user = await insertUser();
+    const relinked = {
+      google_user_email: 'relinked-identity@example.net',
+      google_user_name: 'Linked',
+      google_user_image_url: '',
+      hosted_domain: '@@github@@',
+      provider: 'github' as const,
+      provider_account_id: `github-${randomUUID()}`,
+      display_name: null,
+    };
+    await linkAccountToExistingUser(user.id, relinked);
+
+    const result = await linkAccountToExistingUser(user.id, relinked);
+
+    expect(result.success).toBe(true);
+    const rows = await authRowsFor(user.id);
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'auth.sign_in_method.link', metadata: null }),
+        expect.objectContaining({
+          action: 'auth.sign_in_method.link',
+          outcome: 'success',
+          method: 'github',
+          subject_email_hash: authAuditEmailHash(user.google_user_email),
+          metadata: { noop: true },
+        }),
+      ])
+    );
+    expect(mockSendAdded).toHaveBeenCalledTimes(1);
   });
 });

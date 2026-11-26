@@ -51,7 +51,10 @@ import {
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isNativeTokenAddressRateLimited } from '@/lib/auth/native-token-rate-limit';
 import { captureMessage } from '@sentry/nextjs';
-import type { User } from '@kilocode/db/schema';
+import { auth_audit_logs, type User } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { eq } from 'drizzle-orm';
+import { setAuthActionSinkForTest, type AuthActionEvent } from '@/lib/auth/auth-audit';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
 const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
@@ -379,5 +382,73 @@ describe('POST /api/auth/native/exchange', () => {
       user: fakeUser,
     });
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  describe('audit', () => {
+    let events: AuthActionEvent[];
+
+    beforeEach(() => {
+      events = [];
+      setAuthActionSinkForTest(event => events.push(event));
+    });
+
+    afterEach(() => {
+      setAuthActionSinkForTest(null);
+    });
+
+    it('records an exchange as a native sign-in of the bearer account', async () => {
+      const user = { ...fakeUser, id: `exchange-${crypto.randomUUID()}` } as User;
+      mockGetUserFromBearer.mockResolvedValue({ user, authFailedResponse: null });
+      mockCreateDeviceSessionWithCredentials.mockResolvedValue({
+        token: 'short-jwt',
+        refreshToken: 'refresh-abc',
+        expiresIn: 3600,
+        sessionId: 'session-1',
+      });
+
+      expect((await POST(createRequest(bearerHeaders))).status).toBe(200);
+
+      const rows = await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.user_id, user.id));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'auth.sign_in',
+          outcome: 'success',
+          method: 'human_bearer',
+          metadata: { client: 'native', exchange: true },
+        }),
+      ]);
+      const recorded = JSON.stringify({ rows, events });
+      expect(recorded).not.toContain('short-jwt');
+      expect(recorded).not.toContain('refresh-abc');
+      expect(recorded).not.toContain('old-token');
+    });
+
+    it('stores a refusal of a known account and logs a rate-limited exchange only', async () => {
+      const user = { ...fakeUser, id: `exchange-${crypto.randomUUID()}` } as User;
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'ios-key',
+        existingKeyUserId: 'another-account',
+      });
+      mockGetUserFromBearer.mockResolvedValue({ user, authFailedResponse: null });
+
+      expect((await POST(createRequest(bearerHeaders))).status).toBe(403);
+      mockAddressRateLimited.mockResolvedValue(true);
+      expect((await POST(createRequest(bearerHeaders))).status).toBe(429);
+
+      expect(
+        await db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, user.id))
+      ).toEqual([
+        expect.objectContaining({ outcome: 'failure', failure_reason: 'admission_required' }),
+      ]);
+      expect(events).toEqual([
+        expect.objectContaining({ failureReason: 'admission_required', stored: true }),
+        expect.objectContaining({ userId: null, failureReason: 'rate_limited', stored: false }),
+      ]);
+    });
   });
 });

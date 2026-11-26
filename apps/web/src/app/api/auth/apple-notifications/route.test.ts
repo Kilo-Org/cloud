@@ -12,12 +12,14 @@ import { NextRequest } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import type jwt from 'jsonwebtoken';
 import {
+  auth_audit_logs,
   device_refresh_tokens,
   device_sessions,
   kilocode_users,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
@@ -189,6 +191,30 @@ describe('POST /api/auth/apple-notifications', () => {
     expect(await providerRow('apple-sub-other')).toBeDefined();
     expect(mockRevokeWebSessions).not.toHaveBeenCalled();
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("records the unlink under the account's email, not the Apple identity's", async () => {
+    const user = await insertTestUser();
+    await insertAppleProvider(user.id, SUB);
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        events: JSON.stringify({ type: 'consent-revoked', sub: SUB, event_time: 1_700_000_000 }),
+      })
+    );
+
+    expect((await POST(applePost())).status).toBe(200);
+
+    expect(
+      await db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, user.id))
+    ).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.unlink',
+        outcome: 'success',
+        method: 'apple',
+        subject_email_hash: authAuditEmailHash(user.google_user_email),
+        metadata: { reason: 'consent_revoked' },
+      }),
+    ]);
   });
 
   it('rolls back the provider delete and session revocation when a later statement throws', async () => {

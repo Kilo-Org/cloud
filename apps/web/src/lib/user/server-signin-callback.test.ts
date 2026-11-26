@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { createHash, randomUUID } from 'crypto';
+import { setImmediate as nextMacrotask } from 'node:timers/promises';
 
 const cookieStore = new Map<string, { name: string; value: string }>();
 jest.mock('next/headers', () => ({
@@ -1188,7 +1189,7 @@ describe('sign-in audit rows', () => {
     expect(JSON.stringify({ rows, events })).not.toContain(email.split('@')[0]);
   });
 
-  it('records a magic link that authorize refuses', async () => {
+  it('records a magic link that authorize refuses as the log line only, since it names no account', async () => {
     // A Credentials provider keeps its configured id and authorize under
     // `options`; next-auth's provider type does not expose that authorize.
     const provider = authOptions.providers.find(
@@ -1212,8 +1213,97 @@ describe('sign-in audit rows', () => {
         outcome: 'failure',
         method: 'email',
         failureReason: 'invalid_token',
-        persisted: true,
+        stored: false,
+        persisted: false,
       }),
     ]);
+  });
+
+  it("records a refused link under the linked account's email, not the provider identity's", async () => {
+    const owner = await insertLinkOwner();
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+      createdAt: Date.now(),
+    });
+    await setOwnerSessionCookie(owner, { webSessionId: 'web-session-other-browser' });
+    const providerEmail = `provider-identity-${randomUUID()}@example.net`;
+
+    const result = await signIn(openAiLinkCallback(providerEmail, `openai-${randomUUID()}`));
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(await rowsForEmail(providerEmail)).toEqual([]);
+    expect(await rowsForEmail(owner.google_user_email)).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.link',
+        outcome: 'failure',
+        user_id: owner.id,
+        failure_reason: 'linking_failed',
+      }),
+    ]);
+  });
+});
+
+describe('OAuth callback refusals before the signIn callback', () => {
+  let events: AuthActionEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAuthActionSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAuthActionSinkForTest(null);
+  });
+
+  async function githubCallback(query: Record<string, string>): Promise<Response> {
+    const url = new URL('http://localhost:3000/api/auth/callback/github');
+    for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
+    const response = await nextAuthHttpHandler(new NextRequest(url), {
+      params: Promise.resolve({ nextauth: ['callback', 'github'] }),
+    });
+    // The logger records the line without blocking NextAuth; let it finish.
+    await nextMacrotask();
+    return response;
+  }
+
+  it('logs a provider error by its code alone, without the error text', async () => {
+    const response = await githubCallback({
+      error: 'access_denied',
+      error_description: 'The user denied the request',
+    });
+
+    expect(response.status).toBe(302);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        userId: null,
+        method: 'github',
+        failureReason: 'provider_error',
+        stored: false,
+        ip: '203.0.113.7',
+      }),
+    ]);
+    const logged = JSON.stringify(events);
+    expect(logged).not.toContain('access_denied');
+    expect(logged).not.toContain('denied the request');
+  });
+
+  it('logs a callback whose state check fails', async () => {
+    const response = await githubCallback({ code: 'provider-code', state: 'forged-state' });
+
+    expect(response.status).toBe(302);
+    expect(events).toEqual([
+      expect.objectContaining({
+        method: 'github',
+        failureReason: 'oauth_callback_error',
+        stored: false,
+      }),
+    ]);
+    const logged = JSON.stringify(events);
+    expect(logged).not.toContain('provider-code');
+    expect(logged).not.toContain('forged-state');
   });
 });

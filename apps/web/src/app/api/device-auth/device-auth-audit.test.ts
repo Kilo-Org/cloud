@@ -8,7 +8,8 @@ jest.mock('@vercel/firewall', () => ({
   checkRateLimit: jest.fn(async () => ({ rateLimited: false })),
 }));
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { checkRateLimit } from '@vercel/firewall';
 import { auth_audit_logs, device_auth_requests, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -22,6 +23,7 @@ import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewe
 import { setAuthActionSinkForTest, type AuthActionEvent } from '@/lib/auth/auth-audit';
 import { POST as approve } from './tokens/route';
 import { DELETE as denyOrCancel } from './codes/[code]/route';
+import { POST as redeem } from './token/route';
 
 const mockSession = jest.mocked(getUserFromSessionForCredentialIssuance);
 const mockAuth = jest.mocked(getUserFromAuth);
@@ -159,6 +161,70 @@ describe('device authorization audit rows', () => {
         outcome: 'failure',
         user_id: user.id,
         failure_reason: 'viewer_token_user_mismatch',
+      }),
+    ]);
+  });
+
+  it('keeps a redemption refused before it names an account out of the table', async () => {
+    const response = await redeem(
+      new Request(`${APP_URL}/api/device-auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supportsRefresh: true }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(
+      await db
+        .select()
+        .from(auth_audit_logs)
+        .where(
+          and(
+            eq(auth_audit_logs.action, 'auth.device_auth.redeem'),
+            eq(auth_audit_logs.failure_reason, 'invalid_request')
+          )
+        )
+    ).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.device_auth.redeem',
+        outcome: 'failure',
+        userId: null,
+        failureReason: 'invalid_request',
+        auditLogId: null,
+        stored: false,
+        persisted: false,
+        route: '/api/device-auth/token',
+      }),
+    ]);
+  });
+
+  it('keeps a rate-limited denial by a known account out of the table', async () => {
+    const user = await signedInUser();
+    const pairing = await createDeviceAuthRequest({ ipAddress: '198.51.100.23' });
+    jest.mocked(checkRateLimit).mockResolvedValueOnce({ rateLimited: true } as never);
+
+    const response = await denyOrCancel(
+      new Request(`${APP_URL}/api/device-auth/codes/${pairing.userCode}`, {
+        method: 'DELETE',
+        headers: {
+          'x-device-auth-viewer-token': createDeviceAuthViewerToken(pairing.userCode, user.id),
+        },
+      }),
+      { params: Promise.resolve({ code: pairing.userCode }) }
+    );
+
+    expect(response.status).toBe(429);
+    expect(await authRowsFor(user.id)).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.device_auth.deny',
+        outcome: 'failure',
+        userId: user.id,
+        failureReason: 'rate_limited',
+        stored: false,
+        persisted: false,
       }),
     ]);
   });

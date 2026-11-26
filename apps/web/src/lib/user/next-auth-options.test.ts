@@ -47,6 +47,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 import {
+  auth_audit_logs,
   openai_chatgpt_connections,
   organizations,
   passkey_sign_in_tickets,
@@ -276,7 +277,11 @@ describe('OpenAI (ChatGPT) OAuth provider', () => {
 describe('sessionAuthOptions', () => {
   test('reads a session with the same configuration as authOptions', async () => {
     expect(authOptions.secret).toBe(sessionAuthOptions.secret);
-    expect(authOptions.logger).toBe(sessionAuthOptions.logger);
+    // Sign-in adds one step to `error`: it records an OAuth callback refusal.
+    expect(authOptions.logger).toEqual({
+      ...sessionAuthOptions.logger,
+      error: expect.any(Function),
+    });
     expect(authOptions.pages).toBe(sessionAuthOptions.pages);
     expect(authOptions.debug).toBe(sessionAuthOptions.debug);
     // Server reads keep the per-session claim; the browser-facing session
@@ -758,6 +763,43 @@ describe('WorkOS sign-in callback', () => {
       '/connected-accounts?error=LINKING-FAILED'
     );
     expect(processSSOUserLogin).not.toHaveBeenCalled();
+  });
+
+  test('records the account that the first SSO sign-in creates', async () => {
+    const providerAccountId = `workos-${crypto.randomUUID()}`;
+    let createdUserId: string | undefined;
+    jest.mocked(processSSOUserLogin).mockImplementation(async () => {
+      const created = await insertTestUser({
+        google_user_email: `sso-first-${crypto.randomUUID()}@example.com`,
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: created.id,
+        provider: 'workos',
+        provider_account_id: providerAccountId,
+        email: created.google_user_email,
+        avatar_url: '',
+        hosted_domain: null,
+      });
+      createdUserId = created.id;
+      return true;
+    });
+
+    await expect(
+      authOptions.callbacks!.signIn!({
+        ...signInArgs,
+        account: { ...signInArgs.account, providerAccountId },
+      })
+    ).resolves.toBe(true);
+
+    expect(createdUserId).toBeDefined();
+    expect(
+      await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.user_id, createdUserId ?? ''))
+    ).toEqual([
+      expect.objectContaining({ action: 'auth.sign_in', outcome: 'success', method: 'workos' }),
+    ]);
   });
 });
 

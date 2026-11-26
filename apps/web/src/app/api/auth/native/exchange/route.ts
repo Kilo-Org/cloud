@@ -19,6 +19,11 @@ import {
 import { isNativeTokenAddressRateLimited } from '@/lib/auth/native-token-rate-limit';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 /**
  * Token exchange endpoint. Authenticates with the existing long-lived bearer
@@ -56,6 +61,23 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
  *         token stays valid and the client retries on its next launch
  */
 export const POST = withRestTiming('/api/auth/native/exchange', async (request: Request) => {
+  // One attempt per request: the success, or the refusal code the response carries.
+  const attempt: AuthAuditAttempt = {
+    action: 'auth.sign_in',
+    method: request.headers.has('authorization') ? 'human_bearer' : 'session',
+    metadata: { client: 'native', exchange: true },
+  };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/auth/native/exchange'),
+    attempt,
+    () => exchangeForDeviceSession(request, attempt)
+  );
+});
+
+async function exchangeForDeviceSession(
+  request: Request,
+  attempt: AuthAuditAttempt
+): Promise<Response> {
   // Counted first, so the admission gate and attestation verification run
   // inside the caller's address budget. Both native credential endpoints
   // count this rule at this point. Only a rule that answered `allowed`
@@ -97,6 +119,7 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
   if (!auth.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  attempt.userId = auth.user.id;
 
   const userAgent = request.headers.get('user-agent') ?? undefined;
 
@@ -152,7 +175,7 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
     },
     { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );
-});
+}
 
 async function getSessionAuth(request: Request) {
   const origin = request.headers.get('origin');

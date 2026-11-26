@@ -305,7 +305,10 @@ export const SsoOrganizationSyncRequestSchema = z.strictObject({
   source_version: SourceVersionSchema,
   app_organization_id: z.uuid(),
   workos_organization_id: WorkosIdSchema,
-  workos_connection_ids: z.array(WorkosIdSchema).max(16),
+  workos_connection_ids: z
+    .array(WorkosIdSchema)
+    .max(16)
+    .refine(ids => new Set(ids).size === ids.length, 'each connection once'),
   enforcement: z.enum(['off', 'optional', 'required']),
 });
 

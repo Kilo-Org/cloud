@@ -29,6 +29,7 @@ import {
   AccountImportRequestSchema,
   AppUserCreatedEventSchema,
   reasonAllowed,
+  SsoOrganizationSyncRequestSchema,
   SubjectOperationRequestSchema,
   UTS_CREATED_ACCOUNT_ID,
   UTS_SUBJECT_OPERATIONS,
@@ -555,6 +556,25 @@ describe('subject operation contracts', () => {
     ).toBe(false);
     expect(
       AccountImportRequestSchema.safeParse({ ...base, primary_email: 'User@example.com' }).success
+    ).toBe(false);
+  });
+
+  it('refuse an SSO organization sync that names a connection twice', () => {
+    const sync = {
+      operation_id: '00000000-0000-4000-8000-000000000003',
+      actor: 'system:scim',
+      source_version: 1,
+      app_organization_id: '00000000-0000-4000-8000-000000000004',
+      workos_organization_id: 'org_1',
+      workos_connection_ids: ['conn_1', 'conn_2'],
+      enforcement: 'required',
+    };
+    expect(SsoOrganizationSyncRequestSchema.safeParse(sync).success).toBe(true);
+    expect(
+      SsoOrganizationSyncRequestSchema.safeParse({
+        ...sync,
+        workos_connection_ids: ['conn_1', 'conn_1'],
+      }).success
     ).toBe(false);
   });
 

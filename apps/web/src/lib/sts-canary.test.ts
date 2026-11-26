@@ -98,7 +98,10 @@ describe('STS canary route handler', () => {
 
     const missing = await call(run, null);
     expect(missing.status).toBe(401);
-    const wrongScope = await call(run, await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary'));
+    const wrongScope = await call(
+      run,
+      await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary')
+    );
     expect(wrongScope.status).toBe(403);
     expect(tokens.get).not.toHaveBeenCalled();
     expect(presented).toEqual([]);
@@ -107,7 +110,10 @@ describe('STS canary route handler', () => {
   it('verifies the caller, gets 204 for its own token and the refusals usage-ingest must answer', async () => {
     const { fetchFn, presented } = usageIngest();
     const own = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
-    const run = handler(fakeTokens(async () => own), fetchFn);
+    const run = handler(
+      fakeTokens(async () => own),
+      fetchFn
+    );
 
     const response = await call(run, await stsToken('usage-ingest', 'web', 'web:sts.canary'));
     expect(response.status).toBe(200);
@@ -127,11 +133,16 @@ describe('STS canary route handler', () => {
   });
 
   it('presents its earlier token once it is past exp plus the skew, and expects 401', async () => {
-    jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'setImmediate', 'nextTick', 'queueMicrotask'] });
+    jest.useFakeTimers({
+      doNotFake: ['setTimeout', 'clearTimeout', 'setImmediate', 'nextTick', 'queueMicrotask'],
+    });
     jest.setSystemTime(Date.UTC(2026, 10, 26, 12, 0, 0));
     const { fetchFn } = usageIngest();
     let current = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
-    const run = handler(fakeTokens(async () => current), fetchFn);
+    const run = handler(
+      fakeTokens(async () => current),
+      fetchFn
+    );
 
     await call(run, await stsToken('usage-ingest', 'web', 'web:sts.canary'));
     jest.setSystemTime(Date.UTC(2026, 10, 26, 12, 6, 30));
@@ -150,7 +161,10 @@ describe('STS canary route handler', () => {
         { audience: 'usage-ingest', scope: 'usage-ingest:sts.canary' }
       );
     });
-    const response = await call(handler(tokens, fetchFn), await stsToken('usage-ingest', 'web', 'web:sts.canary'));
+    const response = await call(
+      handler(tokens, fetchFn),
+      await stsToken('usage-ingest', 'web', 'web:sts.canary')
+    );
     const report = (await response.json()) as StsCanaryReport;
     expect(report.outbound).toMatchObject({ result: 'failed', status: null });
     expect(report.negatives.wrongAudience).toEqual({ result: 'ok', status: 403 });

@@ -63,7 +63,8 @@ async function settleError(promise: Promise<unknown>, ms?: number): Promise<Serv
     ),
     ms
   );
-  if (!(error instanceof ServiceTokenError)) throw new Error(`expected a ServiceTokenError: ${String(error)}`);
+  if (!(error instanceof ServiceTokenError))
+    throw new Error(`expected a ServiceTokenError: ${String(error)}`);
   return error;
 }
 
@@ -86,7 +87,11 @@ describe('first use', () => {
     const tokens = client(transport);
 
     const reads = Promise.all([tokens.get(WEB), tokens.get(WEB), tokens.get(WEB)]);
-    expect(await settle(reads)).toEqual(['web:sts.canary#1', 'web:sts.canary#1', 'web:sts.canary#1']);
+    expect(await settle(reads)).toEqual([
+      'web:sts.canary#1',
+      'web:sts.canary#1',
+      'web:sts.canary#1',
+    ]);
     expect(transport).toHaveBeenCalledTimes(1);
 
     expect(await tokens.get(WEB)).toBe('web:sts.canary#1');
@@ -123,7 +128,9 @@ describe('first use', () => {
     targets.push({ audience: 'svc-0', scope: 'svc-0:write' });
 
     const values = await settle(Promise.all(targets.map(target => tokens.get(target))));
-    values.forEach((value, index) => expect(value).toMatch(new RegExp(`^${targets[index].scope}#[12]$`)));
+    values.forEach((value, index) =>
+      expect(value).toMatch(new RegExp(`^${targets[index].scope}#[12]$`))
+    );
     expect(requests.map(request => request.tokens.length)).toEqual([8, 3]);
     for (const request of requests) {
       const audiences = request.tokens.map(token => token.audience);
@@ -134,7 +141,9 @@ describe('first use', () => {
 
   it('refuses a scope of another audience without calling STS', async () => {
     const { transport } = scripted(issueAll());
-    const error = await settleError(client(transport).get({ audience: 'web', scope: 'usage-ingest:x' }));
+    const error = await settleError(
+      client(transport).get({ audience: 'web', scope: 'usage-ingest:x' })
+    );
     expect(error).toMatchObject({ reason: 'denied', deniedReason: 'invalid_request' });
     expect(transport).not.toHaveBeenCalled();
   });
@@ -226,7 +235,9 @@ describe('failures', () => {
     const { transport } = scripted(() => ({ status: 'identity_rejected' }));
     const tokens = client(transport);
     const [web, ingest] = await settle(
-      Promise.all([tokens.get(WEB), tokens.get(INGEST)].map(read => read.catch((error: unknown) => error)))
+      Promise.all(
+        [tokens.get(WEB), tokens.get(INGEST)].map(read => read.catch((error: unknown) => error))
+      )
     );
     expect(web).toMatchObject({ reason: 'denied', deniedReason: 'identity_rejected' });
     expect(ingest).toMatchObject({ reason: 'denied', deniedReason: 'identity_rejected' });

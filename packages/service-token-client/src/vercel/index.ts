@@ -6,12 +6,7 @@ import {
   type SharedTokenSettings,
 } from './shared-token';
 
-export {
-  DEFAULT_SETTINGS,
-  SharedExchangedToken,
-  cacheTtlSeconds,
-  expOf,
-} from './shared-token';
+export { DEFAULT_SETTINGS, SharedExchangedToken, cacheTtlSeconds, expOf } from './shared-token';
 export type {
   Clock,
   Exchange,

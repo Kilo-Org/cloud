@@ -1,4 +1,8 @@
-import { AuditBatchTooLargeError, encodeAuditBatch, type AuditEvent } from '@kilocode/sts-contracts';
+import {
+  AuditBatchTooLargeError,
+  encodeAuditBatch,
+  type AuditEvent,
+} from '@kilocode/sts-contracts';
 import { describe, expect, it } from 'vitest';
 import { tokenDeniedEvent, tokenIssuedEvent, tokenKeyRotatedEvent } from '../../src/audit/events';
 import { AuditEventInvalidError, assertRelayable } from '../../src/audit/relay';

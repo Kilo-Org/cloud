@@ -22,7 +22,12 @@ export class SecretsBroker extends WorkerEntrypoint<FixtureEnv> {
     const signer = { kid: this.env.TEST_SIGNING_KID, privateKey };
     const tokens = await Promise.all(
       request.tokens.map(async ({ audience, scope }) => {
-        const claims = serviceClaims({ issuer: this.env.STS_URL, workload: 'usage-ingest', audience, scope });
+        const claims = serviceClaims({
+          issuer: this.env.STS_URL,
+          workload: 'usage-ingest',
+          audience,
+          scope,
+        });
         return {
           status: 'issued' as const,
           audience,

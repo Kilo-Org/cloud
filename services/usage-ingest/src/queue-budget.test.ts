@@ -8,7 +8,12 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 475 wi
   const production = unstable_readConfig({ config });
   // The only service binding is the STS canary's, which makes no writer call.
   expect(production.services).toEqual([
-    { binding: 'STS', service: 'sts', entrypoint: 'SecretsBroker', props: { caller: 'usage-ingest' } },
+    {
+      binding: 'STS',
+      service: 'sts',
+      entrypoint: 'SecretsBroker',
+      props: { caller: 'usage-ingest' },
+    },
   ]);
   expect(production.queues.producers).toEqual([
     { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-eu' },

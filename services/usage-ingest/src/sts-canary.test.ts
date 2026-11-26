@@ -32,7 +32,10 @@ function ingestClaims(overrides: Record<string, unknown> = {}) {
 }
 
 /** Serves the stand-in key set at STS_URL; any other URL is answered by `other`. */
-function stubFetch(other: (url: string, init?: RequestInit) => Response | Promise<Response> = () => new Response('unexpected', { status: 599 })) {
+function stubFetch(
+  other: (url: string, init?: RequestInit) => Response | Promise<Response> = () =>
+    new Response('unexpected', { status: 599 })
+) {
   const calls: { url: string; init?: RequestInit }[] = [];
   vi.stubGlobal(
     'fetch',
@@ -47,7 +50,8 @@ function stubFetch(other: (url: string, init?: RequestInit) => Response | Promis
 }
 
 async function verifyWith(token: string | null, method = 'POST') {
-  const headers: Record<string, string> = token === null ? {} : { authorization: `Bearer ${token}` };
+  const headers: Record<string, string> =
+    token === null ? {} : { authorization: `Bearer ${token}` };
   return await handleStsCanaryVerify(new Request(VERIFY_URL, { method, headers }), { STS_URL });
 }
 
@@ -63,7 +67,12 @@ describe('POST /sts-canary/verify', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const webToken = await signToken(
       signer,
-      serviceClaims({ issuer: STS_URL, workload: 'usage-ingest', audience: 'web', scope: 'web:sts.canary' })
+      serviceClaims({
+        issuer: STS_URL,
+        workload: 'usage-ingest',
+        audience: 'web',
+        scope: 'web:sts.canary',
+      })
     );
     const wrongAudience = await verifyWith(webToken);
     expect(wrongAudience.status).toBe(403);
@@ -74,7 +83,9 @@ describe('POST /sts-canary/verify', () => {
     expect(forged.status).toBe(401);
 
     const past = Math.floor(Date.now() / 1000) - 3_600;
-    const expired = await verifyWith(await signToken(signer, ingestClaims({ iat: past, exp: past + 300 })));
+    const expired = await verifyWith(
+      await signToken(signer, ingestClaims({ iat: past, exp: past + 300 }))
+    );
     expect(expired.status).toBe(401);
 
     const missing = await verifyWith(null);
@@ -88,7 +99,10 @@ describe('POST /sts-canary/verify', () => {
 
   it('answers 405 for another method and 503 without STS_URL', async () => {
     expect((await verifyWith(null, 'GET')).status).toBe(405);
-    const unconfigured = await handleStsCanaryVerify(new Request(VERIFY_URL, { method: 'POST' }), {});
+    const unconfigured = await handleStsCanaryVerify(
+      new Request(VERIFY_URL, { method: 'POST' }),
+      {}
+    );
     expect(unconfigured.status).toBe(503);
   });
 });
@@ -125,7 +139,11 @@ function issue(request: MintRequest): MintResult {
 const CONTROLLER = { cron: '*/5 * * * *', scheduledTime: Date.UTC(2026, 10, 26, 12, 0, 0) };
 
 function context(): ExecutionContext {
-  return { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+  return {
+    waitUntil: () => {},
+    passThroughOnException: () => {},
+    props: {},
+  } as unknown as ExecutionContext;
 }
 
 /** The `scheduled_job.completed` events the run logged. */
@@ -139,7 +157,11 @@ describe('scheduled STS canary', () => {
   it('does nothing unless STS_CANARY_ENABLED is exactly true', async () => {
     const calls = stubFetch();
     const sts = binding(issue);
-    await runStsCanary(CONTROLLER, { STS: sts, STS_CANARY_ENABLED: 'false', WEB_STS_CANARY_URL: WEB_URL }, context());
+    await runStsCanary(
+      CONTROLLER,
+      { STS: sts, STS_CANARY_ENABLED: 'false', WEB_STS_CANARY_URL: WEB_URL },
+      context()
+    );
     expect(sts.mintTokens).not.toHaveBeenCalled();
     expect(calls).toEqual([]);
   });
@@ -158,7 +180,9 @@ describe('scheduled STS canary', () => {
     };
     await runStsCanary(CONTROLLER, env, context());
 
-    expect(sts.mintTokens).toHaveBeenCalledWith({ tokens: [{ audience: 'web', scope: 'web:sts.canary' }] });
+    expect(sts.mintTokens).toHaveBeenCalledWith({
+      tokens: [{ audience: 'web', scope: 'web:sts.canary' }],
+    });
     const [web] = calls;
     expect(web.url).toBe(WEB_URL);
     const headers = new Headers(web.init?.headers);
@@ -196,7 +220,10 @@ describe('scheduled STS canary', () => {
     });
 
     stubFetch(() =>
-      Response.json({ ...PASSING_REPORT, negatives: { ...PASSING_REPORT.negatives, forged: { result: 'failed', status: 204 } } })
+      Response.json({
+        ...PASSING_REPORT,
+        negatives: { ...PASSING_REPORT.negatives, forged: { result: 'failed', status: 204 } },
+      })
     );
     await runStsCanary(CONTROLLER, env(binding(issue)), context());
     stubFetch(() => Response.json({ error: 'invalid_token' }, { status: 401 }));
@@ -206,16 +233,34 @@ describe('scheduled STS canary', () => {
       env(
         binding(request => ({
           status: 'ok',
-          tokens: request.tokens.map(({ audience, scope }) => ({ status: 'denied', audience, scope, reason: 'scope_not_allowed' })),
+          tokens: request.tokens.map(({ audience, scope }) => ({
+            status: 'denied',
+            audience,
+            scope,
+            reason: 'scope_not_allowed',
+          })),
         }))
       ),
       context()
     );
 
     expect(events(info, error)).toEqual([
-      expect.objectContaining({ outcome: 'failed', exception_name: 'StsCanaryCheckFailed', negative_forged_result: 'failed' }),
-      expect.objectContaining({ outcome: 'failed', exception_name: 'StsCanaryWebRefused', web_status: 401 }),
-      expect.objectContaining({ outcome: 'failed', exception_name: 'ServiceTokenError', mint_result: 'denied', mint_detail: 'scope_not_allowed' }),
+      expect.objectContaining({
+        outcome: 'failed',
+        exception_name: 'StsCanaryCheckFailed',
+        negative_forged_result: 'failed',
+      }),
+      expect.objectContaining({
+        outcome: 'failed',
+        exception_name: 'StsCanaryWebRefused',
+        web_status: 401,
+      }),
+      expect.objectContaining({
+        outcome: 'failed',
+        exception_name: 'ServiceTokenError',
+        mint_result: 'denied',
+        mint_detail: 'scope_not_allowed',
+      }),
     ]);
   });
 });

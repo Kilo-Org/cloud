@@ -40,7 +40,10 @@ function base64urlJson(segment: string): unknown {
 function expOf(token: string): number | null {
   try {
     const claims = base64urlJson(token.split('.')[1] ?? '');
-    return typeof claims === 'object' && claims !== null && 'exp' in claims && typeof claims.exp === 'number'
+    return typeof claims === 'object' &&
+      claims !== null &&
+      'exp' in claims &&
+      typeof claims.exp === 'number'
       ? claims.exp
       : null;
   } catch {
@@ -52,7 +55,9 @@ function log(level: 'info' | 'warn', fields: Record<string, unknown>): void {
   console[level](JSON.stringify({ event: 'sts_canary', ...fields }));
 }
 
-export function createStsCanaryHandler(deps: StsCanaryDeps): (request: Request) => Promise<Response> {
+export function createStsCanaryHandler(
+  deps: StsCanaryDeps
+): (request: Request) => Promise<Response> {
   const fetchFn = deps.fetch ?? fetch;
   const now = deps.now ?? Date.now;
   /** A throwaway key STS never held, made once per instance; it signs the forged token. */
@@ -85,8 +90,12 @@ export function createStsCanaryHandler(deps: StsCanaryDeps): (request: Request) 
 
   /** The same header and claims, signed by a key STS never held. */
   async function forge(token: string): Promise<string> {
-    forgeryKey ??= ((await crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign', 'verify'])) as CryptoKeyPair)
-      .privateKey;
+    forgeryKey ??= (
+      (await crypto.subtle.generateKey({ name: 'Ed25519' }, false, [
+        'sign',
+        'verify',
+      ])) as CryptoKeyPair
+    ).privateKey;
     const [header = '', payload = ''] = token.split('.');
     const signature = await crypto.subtle.sign(
       'Ed25519',
@@ -105,7 +114,13 @@ export function createStsCanaryHandler(deps: StsCanaryDeps): (request: Request) 
     const presented = StsCanaryRunIdSchema.safeParse(request.headers.get(STS_CANARY_RUN_HEADER));
     const run = presented.success ? presented.data : crypto.randomUUID();
     if (!inbound.ok) {
-      log('warn', { run, step: 'inbound', status: inbound.status, error: inbound.error, reason: inbound.reason });
+      log('warn', {
+        run,
+        step: 'inbound',
+        status: inbound.status,
+        error: inbound.error,
+        reason: inbound.reason,
+      });
       return failureResponse(inbound);
     }
 

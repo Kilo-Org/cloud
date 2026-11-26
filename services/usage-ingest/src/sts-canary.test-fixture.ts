@@ -23,7 +23,11 @@ export async function testSigner(kid = 'test-kid'): Promise<TestSigner> {
   return {
     kid,
     privateKey: pair.privateKey,
-    jwks: { keys: [{ kty: 'OKP', crv: 'Ed25519', x: publicJwk.x, kid, alg: 'EdDSA', use: 'sig' } as JsonWebKey] },
+    jwks: {
+      keys: [
+        { kty: 'OKP', crv: 'Ed25519', x: publicJwk.x, kid, alg: 'EdDSA', use: 'sig' } as JsonWebKey,
+      ],
+    },
   };
 }
 
@@ -32,7 +36,11 @@ export async function signToken(
   claims: Record<string, unknown>
 ): Promise<string> {
   const input = `${encodeJson({ alg: 'EdDSA', typ: 'at+jwt', kid: signer.kid })}.${encodeJson(claims)}`;
-  const signature = await crypto.subtle.sign('Ed25519', signer.privateKey, new TextEncoder().encode(input));
+  const signature = await crypto.subtle.sign(
+    'Ed25519',
+    signer.privateKey,
+    new TextEncoder().encode(input)
+  );
   return `${input}.${base64url(new Uint8Array(signature))}`;
 }
 

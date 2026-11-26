@@ -279,8 +279,7 @@ export function createServiceTokens(
         // Sticky until a mint succeeds: only the read that asks STS again waits for the answer.
         const waiting = fetch.state === 'running' && fetch.attempt === mine;
         const retryDue =
-          fetch.state === 'idle' ||
-          (fetch.state === 'backing_off' && at >= fetch.failure.retryAt);
+          fetch.state === 'idle' || (fetch.state === 'backing_off' && at >= fetch.failure.retryAt);
         if (!waiting && (at < entry.denied.recheckAt || !retryDue)) {
           throw new ServiceTokenError(
             { reason: 'denied', deniedReason: entry.denied.reason },

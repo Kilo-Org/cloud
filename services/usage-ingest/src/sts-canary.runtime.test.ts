@@ -41,7 +41,12 @@ async function webRoute(request: IncomingMessage, response: ServerResponse): Pro
   const inbound = authorization?.replace(/^Bearer /, '') ?? '';
   const own = await signToken(
     signer,
-    serviceClaims({ issuer: base, workload: 'web', audience: 'usage-ingest', scope: 'usage-ingest:sts.canary' })
+    serviceClaims({
+      issuer: base,
+      workload: 'web',
+      audience: 'usage-ingest',
+      scope: 'usage-ingest:sts.canary',
+    })
   );
   const outbound = await verifyAtWorker(own);
   const wrongAudience = await verifyAtWorker(inbound);
@@ -61,7 +66,9 @@ beforeAll(async () => {
   signer = await testSigner('runtime-kid');
   server = createServer((request, response) => {
     if (request.url === '/.well-known/jwks.json') {
-      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(signer.jwks));
+      response
+        .writeHead(200, { 'content-type': 'application/json' })
+        .end(JSON.stringify(signer.jwks));
       return;
     }
     if (request.url === '/api/internal/sts-canary' && request.method === 'POST') {

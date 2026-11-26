@@ -2,17 +2,10 @@ import type { AuthorizationHandoff } from '../oauth/authorize';
 import { classifyFailure } from '../oauth/errors';
 import { sha256 } from '../token/credentials';
 import type { SignInDeps } from './deps';
-import { signInPage, unavailablePage } from './pages';
+import { confirmAppPage, signInPage, unavailablePage } from './pages';
+import { isSameOriginPost } from './requests';
 import { sessionCookieValue } from './session';
 import type { BrowserSession } from './store';
-
-/**
- * RFC 8252 section 8.6: a client that receives its code on a private-use URI scheme cannot be
- * identified, because another app can claim the same scheme, so its request is approved only for
- * a sign-in this recent. The sign-in page then makes the user sign in, so a request another app
- * started never completes without the user.
- */
-export const FRESH_SIGN_IN_SECONDS = 5 * 60;
 
 /** The browser session the request's cookie names, or null. */
 export async function requestSession(
@@ -31,6 +24,11 @@ export async function requestSession(
  * approved for the session's account, with the organization it asked for (the identity store
  * checks the membership). A third-party client is denied until the consent screen serves it
  * (design 5.9).
+ *
+ * RFC 8252 section 8.6: a client that receives its code on a private-use URI scheme cannot be
+ * identified, because another app can claim the same scheme. Its request is approved only from
+ * the confirm page's same-origin POST, so every such request shows the user a page (sign-in or
+ * confirm) and a request another app started never completes without the user.
  */
 export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
   return async (request, pending) => {
@@ -44,11 +42,13 @@ export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
         response: unavailablePage(classifyFailure(error, 'authorize') === 'retryable'),
       };
     }
-    const fresh =
-      session !== null &&
-      (pending.client.redirectKind === 'loopback' ||
-        Date.now() - session.authTime.getTime() < FRESH_SIGN_IN_SECONDS * 1000);
-    if (session === null || !fresh) return { status: 'interaction', response: signInPage() };
+    if (session === null) return { status: 'interaction', response: signInPage() };
+    if (pending.client.redirectKind === 'private_use_scheme' && !isSameOriginPost(request)) {
+      return {
+        status: 'interaction',
+        response: confirmAppPage(pending.client.name, pending.redirectUri),
+      };
+    }
     return {
       status: 'approved',
       approval: {

@@ -32,6 +32,8 @@ const FUNCTION_WRITTEN_TABLES = [
   'device_codes',
   'tickets',
   'webauthn_challenges',
+  'account_user_code_failures',
+  'network_user_code_failures',
 ];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
@@ -40,6 +42,8 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   dpop_proofs: 'jti',
   passkey_credentials: 'name',
   step_ups: 'purpose',
+  account_user_code_failures: 'failures',
+  network_user_code_failures: 'failures',
 };
 
 let db: TestDatabase;
@@ -156,6 +160,9 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
       'device_codes',
       'tickets',
       'step_ups',
+      'account_user_code_failures',
+      'network_user_code_failures',
+      'browser_sessions',
     ]);
   });
 

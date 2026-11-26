@@ -128,8 +128,6 @@ export const BrowserSessionRowSchema = z.strictObject({
   status: z.enum(enums.SESSION_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
-  user_code_failures: z.number().int(),
-  user_code_window_started_at: timestamp.nullable(),
   denied_audited_at: timestamp.nullable(),
 });
 
@@ -349,6 +347,18 @@ export const WebauthnChallengeRowSchema = z.strictObject({
   consumed_at: timestamp.nullable(),
 });
 
+export const AccountUserCodeFailureRowSchema = z.strictObject({
+  account_id: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
+});
+
+export const NetworkUserCodeFailureRowSchema = z.strictObject({
+  client_network: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
+});
+
 export const PersonalAccessTokenRowSchema = z.strictObject({
   id: uuid,
   account_id: z.string(),
@@ -496,6 +506,8 @@ export const IDENTITY_STORE_TABLES = {
   email_code_limits: EmailCodeLimitRowSchema,
   tickets: TicketRowSchema,
   webauthn_challenges: WebauthnChallengeRowSchema,
+  account_user_code_failures: AccountUserCodeFailureRowSchema,
+  network_user_code_failures: NetworkUserCodeFailureRowSchema,
   personal_access_tokens: PersonalAccessTokenRowSchema,
   org_bot_keys: OrgBotKeyRowSchema,
   ci_trust_policies: CiTrustPolicyRowSchema,

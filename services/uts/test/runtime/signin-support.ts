@@ -87,3 +87,22 @@ export function pageJson(
     headers,
   });
 }
+
+/** A form POST from a sign-in page: same origin unless given, the session cookie when given. */
+export function pageForm(
+  path: string,
+  fields: Record<string, string>,
+  options: { cookie?: string; origin?: string; clientIp?: string } = {}
+): Request {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    Origin: options.origin ?? ORIGIN,
+  };
+  if (options.cookie !== undefined) headers.Cookie = `__Host-uts_session=${options.cookie}`;
+  if (options.clientIp !== undefined) headers['CF-Connecting-IP'] = options.clientIp;
+  return new Request(`${config.endpoints.issuer}${path}`, {
+    method: 'POST',
+    body: new URLSearchParams(fields).toString(),
+    headers,
+  });
+}

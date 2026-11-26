@@ -25,7 +25,8 @@ import { CodeChallengeSchema } from './pkce';
  * redirect URI are checked first; an error there is shown to the user and never redirected
  * (RFC 6749 section 4.1.2.1). Every later error, and the code itself, goes back to the redirect
  * URI with `state` and `iss` (RFC 9207). The user's sign-in and consent come from the
- * authorization hand-off, which the sign-in and consent screens implement.
+ * authorization hand-off, which the sign-in and consent screens implement. A POST carries the same
+ * query; only the hand-off's confirm page sends one, and its parameters stay those of the URL.
  */
 
 /**
@@ -106,8 +107,8 @@ function redirect(location: URL): Response {
 }
 
 export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Promise<Response> {
-  if (request.method !== 'GET') {
-    return oauthError('invalid_request', 405, 'use GET', { Allow: 'GET' });
+  if (request.method !== 'GET' && request.method !== 'POST') {
+    return oauthError('invalid_request', 405, 'use GET', { Allow: 'GET, POST' });
   }
   const params = paramsOf(new URL(request.url).searchParams);
 

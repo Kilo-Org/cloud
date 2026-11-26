@@ -139,7 +139,8 @@ export type DeviceCodeInput = {
 
 export type DeviceCodeCreated =
   | { outcome: 'created'; expiresAt: Date; interval: number }
-  | { outcome: 'user_code_taken' };
+  | { outcome: 'user_code_taken' }
+  | { outcome: 'too_many_pending' };
 
 /** What the approval page shows of a pending device sign-in (design 5.4). */
 export type PendingDevice = {
@@ -156,10 +157,23 @@ export type DeviceCodeRead =
   | ({ outcome: 'pending' } & PendingDevice)
   | { outcome: 'no_session' | 'unknown_code' | 'too_many_attempts' };
 
-export type DeviceDecisionInput = {
-  environment: UtsEnvironment;
+/**
+ * Where the user code on the device page came from: typed by the user, or filled in from the
+ * verification URL (RFC 8628 `verification_uri_complete`), which someone else may have sent.
+ */
+export type UserCodeSource = 'typed' | 'link';
+
+/** A user code entered on the device page, and who entered it from where. */
+export type UserCodeEntry = {
   userCodeHash: Uint8Array;
   sessionTokenHash: Uint8Array;
+  /** The connecting address; its network shares one count of wrong codes. */
+  clientIp: string | null;
+};
+
+export type DeviceDecisionInput = UserCodeEntry & {
+  environment: UtsEnvironment;
+  source: UserCodeSource;
   approve: boolean;
 };
 
@@ -222,7 +236,7 @@ export type SignInStore = {
   ): Promise<void>;
   registerPasskey(input: RegistrationInput): Promise<RegistrationResult>;
   createDeviceCode(input: DeviceCodeInput): Promise<DeviceCodeCreated>;
-  readDeviceCode(userCodeHash: Uint8Array, sessionTokenHash: Uint8Array): Promise<DeviceCodeRead>;
+  readDeviceCode(entry: UserCodeEntry): Promise<DeviceCodeRead>;
   decideDeviceCode(input: DeviceDecisionInput): Promise<DeviceDecision>;
   exchangeDeviceCode(input: DeviceExchangeInput): Promise<DeviceExchangeResult>;
 };
@@ -307,6 +321,7 @@ const DeviceCodeCreatedRowSchema = z.discriminatedUnion('outcome', [
     interval_seconds: z.number().int().positive(),
   }),
   z.object({ outcome: z.literal('user_code_taken') }),
+  z.object({ outcome: z.literal('too_many_pending') }),
 ]);
 
 const DeviceCodeReadRowSchema = z.discriminatedUnion('outcome', [
@@ -541,10 +556,10 @@ export function identityStoreSignIn(store: IdentityStore): SignInStore {
       return { outcome: 'created', expiresAt: row.code_expires_at, interval: row.interval_seconds };
     },
 
-    async readDeviceCode(userCodeHash, sessionTokenHash) {
+    async readDeviceCode(entry) {
       const row = await one(
-        'SELECT * FROM uts.read_device_code($1, $2)',
-        [userCodeHash, sessionTokenHash],
+        'SELECT * FROM uts.read_device_code($1, $2, $3)',
+        [entry.userCodeHash, entry.sessionTokenHash, entry.clientIp],
         DeviceCodeReadRowSchema
       );
       if (row.outcome !== 'pending') return { outcome: row.outcome };
@@ -562,8 +577,15 @@ export function identityStoreSignIn(store: IdentityStore): SignInStore {
 
     async decideDeviceCode(input) {
       const row = await one(
-        'SELECT * FROM uts.decide_device_code($1, $2, $3, $4)',
-        [input.environment, input.userCodeHash, input.sessionTokenHash, input.approve],
+        'SELECT * FROM uts.decide_device_code($1, $2, $3, $4, $5, $6)',
+        [
+          input.environment,
+          input.userCodeHash,
+          input.sessionTokenHash,
+          input.clientIp,
+          input.source === 'typed',
+          input.approve,
+        ],
         DeviceDecisionRowSchema
       );
       return row.outcome;

@@ -21,7 +21,12 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { auth_audit_logs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { setAuthActionSinkForTest, type AuthActionEvent } from '@/lib/auth/auth-audit';
+import {
+  authAuditEmailHash,
+  setAuthActionSinkForTest,
+  type AuthActionEvent,
+} from '@/lib/auth/auth-audit';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { POST } from './route';
 import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
@@ -273,8 +278,9 @@ describe('POST /api/auth/passkey/authenticate audit', () => {
     return POST(createRequest({ action: 'verify', challengeId, response: assertion }));
   }
 
-  it('stores a refused assertion of a known credential under its account', async () => {
-    const userId = randomUUID();
+  it("stores a refused assertion of a known credential under its account and the account's email hash", async () => {
+    const owner = await insertTestUser({ google_user_email: `owner-${randomUUID()}@example.com` });
+    const userId = owner.id;
     mockVerifyAuthentication.mockImplementation(async (_challengeId, _response, onOwner) => {
       onOwner?.(userId);
       throw new PasskeyVerificationError('VERIFICATION_FAILED');
@@ -289,13 +295,14 @@ describe('POST /api/auth/passkey/authenticate audit', () => {
         outcome: 'failure',
         method: 'passkey',
         failure_reason: 'verification_failed',
-        subject_email_hash: null,
+        subject_email_hash: authAuditEmailHash(owner.google_user_email),
         metadata: { step: 'verify' },
       }),
     ]);
     const recorded = JSON.stringify({ rows, events });
     expect(recorded).not.toContain(assertion.id);
     expect(recorded).not.toContain(challengeId);
+    expect(recorded).not.toContain(owner.google_user_email);
   });
 
   it('logs an unknown credential without a row', async () => {

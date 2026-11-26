@@ -15,6 +15,7 @@ import {
   authAuditRequestFromHeaders,
   type AuthAuditAttempt,
 } from '@/lib/auth/auth-audit';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 /**
  * Vercel Firewall rate-limit rules applied by this route.
@@ -106,6 +107,11 @@ async function authenticate(request: NextRequest, attempt: AuthAuditAttempt): Pr
     return NextResponse.json({ ticket });
   } catch (error) {
     if (error instanceof PasskeyVerificationError) {
+      // A refusal stored under the credential's owner hashes the owner's
+      // email. Only a refusal pays for the read: a success writes no row here.
+      if (attempt.userId) {
+        attempt.email = (await findUserById(attempt.userId))?.google_user_email ?? null;
+      }
       return NextResponse.json({ error: error.code }, { status: 401 });
     }
     throw error;

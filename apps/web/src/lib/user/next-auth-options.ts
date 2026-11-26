@@ -65,6 +65,7 @@ import {
   authAuditRequestFromCurrentRequest,
   recordAuthEvent,
 } from '@/lib/auth/auth-audit';
+import { runAfterResponse } from '@/lib/after-response';
 import { whenOk } from '@kilocode/web-shared/lib/maybe-result';
 import type { AuthErrorType, SignupStepUpMethod } from '@kilocode/web-shared/lib/auth/constants';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
@@ -1026,9 +1027,18 @@ function recordOAuthCallbackRefusal(code: string, metadata: unknown): void {
         : null;
   if (failureReason === null) return;
   const method = typeof metadata.providerId === 'string' ? metadata.providerId : null;
-  void authAuditRequestFromCurrentRequest().then(request =>
-    recordAuthEvent(request, { action: 'auth.sign_in', outcome: 'failure', method, failureReason })
-  );
+  // NextAuth's logger is synchronous, so the line is scheduled to finish after
+  // the response instead of being left to an unawaited promise the runtime may
+  // drop. The attribution is read now, inside the request.
+  const request = authAuditRequestFromCurrentRequest();
+  void runAfterResponse(async () => {
+    await recordAuthEvent(await request, {
+      action: 'auth.sign_in',
+      outcome: 'failure',
+      method,
+      failureReason,
+    });
+  });
 }
 
 export const authOptions: NextAuthOptions = {
@@ -1266,6 +1276,9 @@ export const authOptions: NextAuthOptions = {
       let auditUserId: string | null = null;
       // A link row hashes the linked account's email, never the provider identity's.
       let auditLinkEmail: string | null = null;
+      // A sign-in row hashes the resolved account's email; until an account is
+      // resolved, the address the person presented.
+      let auditSignInEmail: string | null = null;
       const refuse = (failureReason: string) => {
         decision = { outcome: 'failure', failureReason };
       };
@@ -1458,7 +1471,10 @@ export const authOptions: NextAuthOptions = {
 
         // Check if this is an existing user with a different primary email
         const existingUser = await findAndSyncExistingUser(accountInfo);
-        if (!isAccountLinking) auditUserId = existingUser?.id ?? null;
+        if (!isAccountLinking) {
+          auditUserId = existingUser?.id ?? null;
+          auditSignInEmail = existingUser?.google_user_email ?? null;
+        }
 
         if (existingUser && isBlockedAccount(existingUser)) {
           return redirectUrlForCode('BLOCKED');
@@ -1557,7 +1573,12 @@ export const authOptions: NextAuthOptions = {
           }
           // The first SSO sign-in creates the account, which existed for no
           // lookup above; its new provider row names it.
-          auditUserId ??= await findUserIdByAuthProvider('workos', accountInfo.provider_account_id);
+          if (!auditUserId) {
+            auditUserId = await findUserIdByAuthProvider('workos', accountInfo.provider_account_id);
+            auditSignInEmail = auditUserId
+              ? ((await findUserById(auditUserId))?.google_user_email ?? null)
+              : null;
+          }
           decision = { outcome: 'success' };
           return result;
         }
@@ -1693,6 +1714,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         auditUserId = result.user.id;
+        auditSignInEmail = result.user.google_user_email;
         if (isBlockedAccount(result.user)) {
           return redirectUrlForCode(`BLOCKED`);
         }
@@ -1770,7 +1792,7 @@ export const authOptions: NextAuthOptions = {
         await recordSignInDecision(decision, {
           linking: Boolean(isAccountLinking),
           method: account?.provider ?? null,
-          email: isAccountLinking ? auditLinkEmail : (user.email ?? null),
+          email: isAccountLinking ? auditLinkEmail : (auditSignInEmail ?? user.email ?? null),
           userId: auditUserId,
         });
       }

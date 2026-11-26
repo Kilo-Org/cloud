@@ -120,6 +120,7 @@ async function exchangeForDeviceSession(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   attempt.userId = auth.user.id;
+  attempt.email = auth.user.google_user_email;
 
   const userAgent = request.headers.get('user-agent') ?? undefined;
 

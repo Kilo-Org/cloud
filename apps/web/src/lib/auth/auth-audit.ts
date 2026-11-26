@@ -29,9 +29,12 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  *
  * Neither ever holds a token, a secret, or an email address in clear. An email
  * is stored only as {@link authAuditEmailHash}, so attempts on one address
- * correlate without revealing it; it is always the account's email, never a
- * provider identity's. `method` and `failureReason` must be stable
- * codes (`google`, `magic_link`, `invalid_code`), never an error message; a
+ * correlate without revealing it. Once the attempt has resolved an account,
+ * the hash is of that account's `google_user_email`, never of a provider
+ * identity's address or the address the person presented; only a refusal that
+ * resolved no account hashes the presented address. `method` and
+ * `failureReason` must be stable codes (`google`, `magic_link`,
+ * `invalid_code`), never an error message; a
  * value that is not a code is replaced with `invalid_code_value` and reported.
  * `metadata` is stored verbatim: safe ids and counts only.
  *
@@ -46,8 +49,9 @@ type AuthAuditEntryFields = {
   /** Sign-in method, provider, or channel, e.g. `google`, `passkey`, `device_auth`. */
   method?: string | null;
   /**
-   * The subject account's email, never a provider identity's; hashed here,
-   * never stored or logged in clear.
+   * The resolved account's `google_user_email`; the presented address only for
+   * a refusal that resolved no account. Hashed here, never stored or logged in
+   * clear.
    */
   email?: string | null;
   metadata?: Record<string, unknown>;
@@ -230,23 +234,25 @@ function attemptFields(attempt: AuthAuditAttempt): AuthAuditEntryFields {
 async function recordAttemptOutcome(
   request: AuthAuditRequest,
   attempt: AuthAuditAttempt,
-  failureReason: string | null
+  failureReason: string | null,
+  rateLimited = false
 ): Promise<void> {
   if (failureReason !== null) {
-    await recordAuthEvent(request, {
-      ...attemptFields(attempt),
-      outcome: 'failure',
-      failureReason,
-    });
+    await writeAuthEvent(
+      request,
+      { ...attemptFields(attempt), outcome: 'failure', failureReason },
+      rateLimited
+    );
   } else if (!attempt.skipSuccessRow) {
-    await recordAuthEvent(request, { ...attemptFields(attempt), outcome: 'success' });
+    await writeAuthEvent(request, { ...attemptFields(attempt), outcome: 'success' }, false);
   }
 }
 
 /**
  * Runs a route handler as one auth attempt. A response below 400 is a success;
  * a refused response records the code in its `error` field, or `http_<status>`
- * when it carries none. A throw records `internal_error` and rethrows.
+ * when it carries none. A 429 is a rate-limit refusal whatever its code, so it
+ * is the log line only. A throw records `internal_error` and rethrows.
  */
 export async function auditAuthRoute(
   request: AuthAuditRequest,
@@ -262,7 +268,7 @@ export async function auditAuthRoute(
   }
   const failureReason =
     attempt.failureReason ?? (response.status >= 400 ? await responseFailureCode(response) : null);
-  await recordAttemptOutcome(request, attempt, failureReason);
+  await recordAttemptOutcome(request, attempt, failureReason, response.status === 429);
   return response;
 }
 
@@ -309,10 +315,18 @@ const RATE_LIMIT_FAILURE_CODES: Record<string, true> = {
   http_429: true,
 };
 
-/** Whether an entry belongs in the table: every success; a failure with a subject that no limit refused. */
-function isStoredEntry(entry: AuthAuditEntry, failureReason: string | null): boolean {
+/**
+ * Whether an entry belongs in the table: every success; a failure with a
+ * subject that no limit refused. `rateLimited` marks a refusal a limit
+ * answered whatever its code, such as a 429 response.
+ */
+function isStoredEntry(
+  entry: AuthAuditEntry,
+  failureReason: string | null,
+  rateLimited: boolean
+): boolean {
   if (entry.outcome === 'success') return true;
-  if (!entry.userId && !entry.email) return false;
+  if (rateLimited || (!entry.userId && !entry.email)) return false;
   return failureReason === null || RATE_LIMIT_FAILURE_CODES[failureReason] !== true;
 }
 
@@ -320,11 +334,19 @@ export async function recordAuthEvent(
   request: AuthAuditRequest,
   entry: AuthAuditEntry
 ): Promise<void> {
+  await writeAuthEvent(request, entry, false);
+}
+
+async function writeAuthEvent(
+  request: AuthAuditRequest,
+  entry: AuthAuditEntry,
+  rateLimited: boolean
+): Promise<void> {
   const userId = entry.userId ?? null;
   const method = auditCode(entry.method, 'method');
   const failureReason =
     entry.outcome === 'failure' ? auditCode(entry.failureReason, 'failureReason') : null;
-  const stored = isStoredEntry(entry, failureReason);
+  const stored = isStoredEntry(entry, failureReason, rateLimited);
 
   let auditLogId: string | null = null;
   if (stored) {

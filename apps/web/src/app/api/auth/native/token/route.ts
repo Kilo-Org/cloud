@@ -166,9 +166,15 @@ async function userRateLimitResponse(request: Request, kiloUserId: string) {
   return undefined;
 }
 
+/**
+ * Refuses a provider identity whose account is blocked or not eligible. The
+ * account it names becomes the attempt's subject, so a refusal row carries
+ * that account and its email.
+ */
 async function checkExistingProviderAccount(
   provider: 'apple' | 'google',
-  providerAccountId: string
+  providerAccountId: string,
+  attempt: AuthAuditAttempt
 ) {
   const userId = await findUserIdByAuthProvider(provider, providerAccountId);
   if (!userId) {
@@ -178,6 +184,8 @@ async function checkExistingProviderAccount(
   if (!user) {
     throw new Error(`Auth provider references missing user ${userId}`);
   }
+  attempt.userId = user.id;
+  attempt.email = user.google_user_email;
   if (isBlockedAccount(user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
@@ -501,12 +509,17 @@ async function runNativeTokenExchange(
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    // The presented address until an account is resolved.
     attempt.email = verified.email;
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
       return eligibilityResponse(eligibility);
     }
-    const existingAccountResponse = await checkExistingProviderAccount('apple', verified.sub);
+    const existingAccountResponse = await checkExistingProviderAccount(
+      'apple',
+      verified.sub,
+      attempt
+    );
     if (existingAccountResponse) {
       return existingAccountResponse;
     }
@@ -549,12 +562,17 @@ async function runNativeTokenExchange(
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    // The presented address until an account is resolved.
     attempt.email = verified.email;
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
       return eligibilityResponse(eligibility);
     }
-    const existingAccountResponse = await checkExistingProviderAccount('google', verified.sub);
+    const existingAccountResponse = await checkExistingProviderAccount(
+      'google',
+      verified.sub,
+      attempt
+    );
     if (existingAccountResponse) {
       return existingAccountResponse;
     }
@@ -576,9 +594,9 @@ async function runNativeTokenExchange(
     // resolved for that same address. An alias of another account's address is
     // a different address: it settles the alias, and the signup rules refuse it
     // when the normalized address is already taken.
-    attempt.email = data.email;
     const existingUser = await findUserBySignInCodeEmail(data.email);
     attempt.userId = existingUser?.id ?? null;
+    attempt.email = existingUser?.google_user_email ?? data.email;
     const email = existingUser?.google_user_email ?? getDeliveredEmailAddress(data.email);
 
     const reserveResult = await reserveSignInCode(data.email, data.code, data.challengeId);
@@ -629,7 +647,10 @@ async function runNativeTokenExchange(
         true,
         verifyNewAccountAdmission
       );
-      if (result.success) attempt.userId = result.user.id;
+      if (result.success) {
+        attempt.userId = result.user.id;
+        attempt.email = result.user.google_user_email;
+      }
       if (!result.success) {
         phase = 'release';
         return settlementFailureResponse(result, args);
@@ -787,7 +808,10 @@ async function runNativeTokenExchange(
     true,
     verifyNewAccountAdmission
   );
-  if (result.success) attempt.userId = result.user.id;
+  if (result.success) {
+    attempt.userId = result.user.id;
+    attempt.email = result.user.google_user_email;
+  }
   if (!result.success) {
     return settlementFailureResponse(result, args);
   }

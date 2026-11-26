@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto';
 import { auth_audit_logs } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  auditAuthRoute,
   authAuditEmailHash,
   recordAuthEvent,
   setAuthActionSinkForTest,
@@ -174,6 +175,38 @@ describe('recordAuthEvent', () => {
         stored: true,
         persisted: false,
       }),
+    ]);
+  });
+});
+
+describe('auditAuthRoute', () => {
+  test('keeps a 429 of a known account out of the table whatever code it carries', async () => {
+    const attempt = { action: 'auth.sign_in' as const, userId: 'user-1', method: 'email' };
+
+    const response = await auditAuthRoute(request, attempt, async () =>
+      Response.json({ error: 'CODE_SEND_REFUSED' }, { status: 429 })
+    );
+
+    expect(response.status).toBe(429);
+    expect(await db.select().from(auth_audit_logs)).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        userId: 'user-1',
+        failureReason: 'code_send_refused',
+        stored: false,
+      }),
+    ]);
+  });
+
+  test('stores the same refusal of a known account when it is not a 429', async () => {
+    const attempt = { action: 'auth.sign_in' as const, userId: 'user-1', method: 'email' };
+
+    await auditAuthRoute(request, attempt, async () =>
+      Response.json({ error: 'CODE_SEND_REFUSED' }, { status: 403 })
+    );
+
+    expect(await db.select().from(auth_audit_logs)).toEqual([
+      expect.objectContaining({ user_id: 'user-1', failure_reason: 'code_send_refused' }),
     ]);
   });
 });

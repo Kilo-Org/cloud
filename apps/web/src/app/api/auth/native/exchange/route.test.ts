@@ -54,7 +54,11 @@ import { captureMessage } from '@sentry/nextjs';
 import { auth_audit_logs, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { setAuthActionSinkForTest, type AuthActionEvent } from '@/lib/auth/auth-audit';
+import {
+  authAuditEmailHash,
+  setAuthActionSinkForTest,
+  type AuthActionEvent,
+} from '@/lib/auth/auth-audit';
 
 const mockGetUserFromBearer = jest.mocked(getUserFromBearerForCredentialExchange);
 const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
@@ -396,8 +400,13 @@ describe('POST /api/auth/native/exchange', () => {
       setAuthActionSinkForTest(null);
     });
 
-    it('records an exchange as a native sign-in of the bearer account', async () => {
-      const user = { ...fakeUser, id: `exchange-${crypto.randomUUID()}` } as User;
+    it('records an exchange as a native sign-in of the bearer account, with its email hash', async () => {
+      const email = `exchange-${crypto.randomUUID()}@example.com`;
+      const user = {
+        ...fakeUser,
+        id: `exchange-${crypto.randomUUID()}`,
+        google_user_email: email,
+      } as User;
       mockGetUserFromBearer.mockResolvedValue({ user, authFailedResponse: null });
       mockCreateDeviceSessionWithCredentials.mockResolvedValue({
         token: 'short-jwt',
@@ -418,12 +427,14 @@ describe('POST /api/auth/native/exchange', () => {
           outcome: 'success',
           method: 'human_bearer',
           metadata: { client: 'native', exchange: true },
+          subject_email_hash: authAuditEmailHash(email),
         }),
       ]);
       const recorded = JSON.stringify({ rows, events });
       expect(recorded).not.toContain('short-jwt');
       expect(recorded).not.toContain('refresh-abc');
       expect(recorded).not.toContain('old-token');
+      expect(recorded).not.toContain(email);
     });
 
     it('stores a refusal of a known account and logs a rate-limited exchange only', async () => {

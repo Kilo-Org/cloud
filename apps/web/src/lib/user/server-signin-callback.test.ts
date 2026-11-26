@@ -1166,7 +1166,7 @@ describe('sign-in audit rows', () => {
     expect(JSON.stringify({ rows, events })).not.toContain(email.split('@')[0]);
   });
 
-  it('records a refused sign-in with its refusal code and only a hash of the email', async () => {
+  it('records a refusal that resolved no account under a hash of the presented address', async () => {
     const email = `audit-refused-${randomUUID()}@example.com`;
 
     const result = await googleSignIn(email);
@@ -1240,6 +1240,62 @@ describe('sign-in audit rows', () => {
         outcome: 'failure',
         user_id: owner.id,
         failure_reason: 'linking_failed',
+      }),
+    ]);
+  });
+
+  /** An account whose Google identity carries an address other than its primary one. */
+  async function insertAccountWithGoogleIdentity() {
+    const account = await insertTestUser({
+      google_user_email: `primary-${randomUUID()}@example.com`,
+    });
+    const providerEmail = `google-identity-${randomUUID()}@example.com`;
+    const sub = `sub-${randomUUID()}`;
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: account.id,
+      provider: 'google',
+      provider_account_id: sub,
+      email: providerEmail,
+      avatar_url: '',
+      hosted_domain: account.hosted_domain,
+    });
+    const callback = {
+      user: { id: 'x', email: providerEmail, name: 'Audit Google', image: '' },
+      account: { provider: 'google', providerAccountId: sub, type: 'oauth' },
+      profile: { email_verified: true, email: providerEmail },
+    } as never;
+    return { account, providerEmail, callback };
+  }
+
+  it("hashes the account's primary email, not the provider's, once the sign-in resolves the account", async () => {
+    const { account, providerEmail, callback } = await insertAccountWithGoogleIdentity();
+    mockCreateOrUpdateUser.mockResolvedValueOnce({
+      success: true,
+      user: account,
+      isNew: false,
+    } as never);
+    setValidTurnstileCookie();
+
+    await expect(signIn(callback)).resolves.toBe(true);
+
+    expect(await rowsForEmail(providerEmail)).toEqual([]);
+    expect(await rowsForEmail(account.google_user_email)).toEqual([
+      expect.objectContaining({ action: 'auth.sign_in', outcome: 'success', user_id: account.id }),
+    ]);
+  });
+
+  it("hashes the account's primary email on a refusal after the account is resolved", async () => {
+    const { account, providerEmail, callback } = await insertAccountWithGoogleIdentity();
+
+    // No Turnstile cookie: refused after the provider identity named the account.
+    expect(await signIn(callback)).toEqual(expect.stringContaining('TURNSTILE_REQUIRED'));
+
+    expect(await rowsForEmail(providerEmail)).toEqual([]);
+    expect(await rowsForEmail(account.google_user_email)).toEqual([
+      expect.objectContaining({
+        outcome: 'failure',
+        user_id: account.id,
+        failure_reason: 'turnstile_required',
       }),
     ]);
   });

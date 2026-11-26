@@ -248,10 +248,18 @@ const denied = (reason: string) =>
   events.some(
     event => event.type === 'ai.kilo.sts.lease.denied' && event.attributes.reason === reason
   );
-// Denials are written once their minute closes, so this waits up to about two minutes.
+// Denials are written once their minute closes, so this waits up to about two minutes. Lease rows
+// are relayed on their own schedule, so it also waits for every one of them.
 for (let attempt = 0; attempt < 40; attempt += 1) {
   events = (await (await fetch(`${BASE}/probe/audit`)).json()) as SeenEvent[];
-  if (denied('too_many_active') && denied('not_owner')) break;
+  if (
+    denied('too_many_active') &&
+    denied('not_owner') &&
+    events.filter(event => event.type === 'ai.kilo.sts.lease.created').length >= 4 &&
+    events.filter(event => event.type === 'ai.kilo.sts.lease.revoked').length >= 4
+  ) {
+    break;
+  }
   await sleep(5_000);
 }
 const created = events.filter(event => event.type === 'ai.kilo.sts.lease.created');

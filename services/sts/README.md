@@ -979,7 +979,9 @@ decoys), that the refresher read `/ci`, and that a job of another workflow file,
 job and a name-only subject each get 401 `identity_rejected`. It then waits for the
 `bundle.delivered` row, which must carry the job's workflow file, run id and attempt, and for the
 `bundle.denied` rows that name the refused `job_workflow_ref`, `event_name` and `sub` and no run id,
-and checks that no audit row carries a value.
+and checks that no audit row carries a value. It needs empty local state: a bundle kept from an
+earlier run skips the refresher read, so run `rm -rf test/fixtures/e2e/.wrangler/state` before
+`wrangler dev`.
 
 **Local end-to-end check of database leases.** The probe policy also holds `replica-read`
 (maximum 9000 seconds, 2 active) and `ci-e2e-migrate` holds `ci-migration`. `lease-check.ts` serves

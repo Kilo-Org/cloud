@@ -186,10 +186,17 @@ const sawDenial = (fragment: string) =>
       event.type === 'ai.kilo.sts.bundle.denied' &&
       deniedClaims(event).some(claim => claim.includes(fragment))
   );
-// Denials are written once their minute closes, so this waits up to about two minutes.
+// Denials are written once their minute closes, so this waits up to about two minutes. The
+// delivery row is relayed 5 seconds after its append, and a minute can close before that, so it
+// also waits for the delivery row.
 for (let attempt = 0; attempt < 40; attempt += 1) {
   events = (await (await fetch(`${BASE}/probe/audit`)).json()) as SeenEvent[];
   if (
+    events.some(
+      event =>
+        event.type === 'ai.kilo.sts.bundle.delivered' &&
+        event.attributes.workload === 'ci-e2e-release'
+    ) &&
     sawDenial('other.yml') &&
     sawDenial('event_name=pull_request') &&
     sawDenial('sub=repo:kilo-e2e/')

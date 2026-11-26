@@ -63,9 +63,11 @@ Each object:
   created to sign 30 days later; a removed next key is replaced by a new one published at least 7
   days before it signs. When the signer's storage itself is exposed, remove the next key first and
   the current key second: the second removal signs with the key the first removal created.
-  Verifiers hold that key once it has been in the key set for 5 minutes and 15 seconds (the feed
-  Worker's 15 seconds plus the 5-minute `max-age`), so wait that long between the two removals;
-  removing at once leaves that signer's new tokens unverifiable for up to that time. The result is
+  Verifiers hold that key once it has been in the key set for 5 minutes and 17 seconds (the feed
+  Worker's 17 seconds plus the 5-minute `max-age`, while every signer read succeeds), so wait that
+  long between the two removals, and before the second one check that the public key set
+  (`/.well-known/jwks.json` on the feed Worker) lists the signer's new next `kid`; removing at once
+  leaves that signer's new tokens unverifiable for up to that time. The result is
   the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The revocation feed
   writes it once that feed exists. No route calls `removeKid` yet: it stays unreachable until the
   revocation-feed slice adds the operator route, which audits and alerts on each removal;
@@ -74,14 +76,28 @@ Each object:
 
 ### The internal signer-keys route
 
-`GET /internal/signer-keys` (`UTS_SIGNER_KEYS_PATH`) returns every signer's published keys:
-`200 { status: "ok", signers }`, `500 { status: "misconfigured" }` when a signer object refused to
-load, or `503 { status: "unavailable" }` when a signer call failed after its retries. It is a route
-of the mint Worker's fetch handler, so placement runs it next to the identity store's primary and
-its 16 signer calls start next to the signer objects; an RPC method or a named entrypoint would run
-in the caller's data center. It answers only a service binding to the default entrypoint whose
-`props.caller` is the feed Worker's deployed name for its own environment; every other request,
-from the internet or another binding, gets the same `404 not_found` as an unknown path.
+`GET /internal/signer-keys` (`UTS_SIGNER_KEYS_PATH`) answers `{ signers }`, every signer exactly
+once (`SignerKeysAnswerSchema`): its keys with `readAt`, the time they were read from the signer
+object, or its failure, `misconfigured` (the object refused to load) or `unavailable` (the call
+failed after its retries). The status is `200` when every signer has keys, else `500` when a signer
+is misconfigured, else `503`; the body is the whole answer either way, so the feed Worker still
+takes every signer that has keys.
+
+- Each isolate answers from a plain-data copy of its last answer for 2 seconds, with one read in
+  flight; a request that needs that read polls for it. The signer objects therefore see at most one
+  read per mint isolate per 2 seconds, however many feed isolates ask.
+- Every signer call of a read, retries included, ends within 5 seconds, so a hung object cannot
+  hold a read past the feed Worker's 10-second read guard.
+- Each isolate keeps every signer's last good keys. A signer whose call fails, or whose object
+  refuses to load, answers those keys with their own `readAt` while they are under 24 hours old,
+  and its failure after that; each failure is logged with the read time of the keys that stood in.
+
+It is a route of the mint Worker's fetch handler, so placement runs it next to the identity store's
+primary and its 16 signer calls start next to the signer objects; an RPC method or a named
+entrypoint would run in the caller's data center. It answers only a service binding to the default
+entrypoint whose `props.caller` is the feed Worker's deployed name for its own environment; every
+other request, from the internet or another binding, gets the same `404 not_found` as an unknown
+path.
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
 UTS Durable Object class or binds the mint Worker, any feed binding at a named entrypoint or whose
 caller is not the feed block's own name, and any drift in the UTS configs (names, `eu`
@@ -105,16 +121,18 @@ must name the development issuer.
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
   `wrangler.test.jsonc`): key lifecycle with time travel, signing and verification with `jose`, key
   persistence across restarts, rotation by alarm, an overdue rotation and a lost alarm, emergency
-  removal by direct call, the RPC surface, the signer-keys route and its caller check, metadata.
+  removal by direct call, the RPC surface, the signer-keys route (its caller check, its 2-second
+  copy, one read in flight, and the held keys of a failed signer), metadata.
 - `pnpm test:node`: the repository config check (`test/repo`) and the identity store tests
   (`test/db`, see "Local database and tests").
 
 ## Staging proof run (before merge)
 
 workerd implements neither jurisdictions nor placement, so these checks run on staging before the
-pull request merges (design 2.4, 5.7). Deploy both Workers from the branch, the mint Worker first,
-and start a tail of the mint Worker before the first key-set read, which creates all 16 signer
-objects:
+pull request merges (design 2.4, 5.7). The pull request stays held, out of the merge queue, until
+the results of all three checks are in its body. Deploy both Workers from the branch, the mint
+Worker first, and start a tail of the mint Worker before the first key-set read, which creates all
+16 signer objects:
 
 ```sh
 cd services/uts && pnpm exec wrangler deploy --env staging
@@ -141,7 +159,7 @@ Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and meta
    such as `FRA`, `AMS` or `CDG`.
 
 2. **Key persistence across real restarts (design 5.7).** A deploy restarts every object. Record
-   the kids, redeploy the mint Worker, wait past the feed Worker's 15-second window, and compare;
+   the kids, redeploy the mint Worker, wait past the feed Worker's 17-second window, and compare;
    the tail must show no new `uts.signer.bootstrapped` line:
 
    ```sh

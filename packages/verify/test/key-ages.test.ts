@@ -3,6 +3,7 @@ import { BOOTSTRAP_FETCH_TIMEOUT_MS, BOOTSTRAP_RETRY_MS } from '../src/bootstrap
 import { handOff, newCallScope } from '../src/flight';
 import {
   JWKS_FETCH_TIMEOUT_MS,
+  JWKS_MAX_RETRY_MS,
   JWKS_MAX_STALE_MS,
   JWKS_REFRESH_AFTER_MS,
   JWKS_RETRY_MS,
@@ -158,6 +159,57 @@ describe('the 24-hour limit is a refresh point', () => {
     advance(1_000);
     expect(await lookup(c.keySet)).toBe(status);
     expect(c.jwks.calls).toBe(4);
+  });
+
+  it('keeps doubling the retry wait past the limit, up to 60 s, until a success', async () => {
+    const c = cache('uts', [0, 24 * HOUR_S - 1]);
+    await lookup(c.keySet);
+    c.jwks.mode = 'fail';
+    advance(1_000);
+    const waits: number[] = [];
+    for (let failures = 1; failures <= 6; failures++) {
+      const calls = c.jwks.calls;
+      expect(await lookup(c.keySet)).toBe('unavailable');
+      expect(c.jwks.calls).toBe(calls + 1);
+      // The wait: no fetch one millisecond before it, the next fetch at it.
+      const wait = Math.min(JWKS_MAX_RETRY_MS, JWKS_RETRY_MS * 2 ** (failures - 1));
+      advance(wait - 1);
+      expect(await lookup(c.keySet)).toBe('unavailable');
+      expect(c.jwks.calls).toBe(calls + 1);
+      advance(1);
+      waits.push(wait);
+    }
+    expect(waits).toEqual([5_000, 10_000, 20_000, 40_000, 60_000, 60_000]);
+    // UTS answers again: the next fetch succeeds, and a later outage starts again at 5 s.
+    c.jwks.mode = 'ok';
+    [c.jwks.age, c.jwks.oldestAge] = [0, 0];
+    expect(await lookup(c.keySet)).toBe('key');
+    c.jwks.mode = 'fail';
+    advance(JWKS_TTL_MS);
+    const calls = c.jwks.calls;
+    expect(await lookup(c.keySet)).toBe('key');
+    advance(JWKS_RETRY_MS - 1);
+    await lookup(c.keySet);
+    expect(c.jwks.calls).toBe(calls + 1);
+    advance(1);
+    await lookup(c.keySet);
+    expect(c.jwks.calls).toBe(calls + 2);
+  });
+
+  it('refreshes every isolate at the limit in the same millisecond, whatever its jitter', async () => {
+    // Refresh points at 192 s and 288 s; the 24-hour limit of both comes first, at 100 s.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const early = cache('uts', [0, 24 * HOUR_S - 100]);
+    await lookup(early.keySet);
+    vi.spyOn(Math, 'random').mockReturnValue(1 - 2 ** -53);
+    const late = cache('uts', [0, 24 * HOUR_S - 100]);
+    await lookup(late.keySet);
+    advance(99_999);
+    await Promise.all([lookup(early.keySet), lookup(late.keySet)]);
+    expect([early.jwks.calls, late.jwks.calls]).toEqual([1, 1]);
+    advance(1);
+    await Promise.all([lookup(early.keySet), lookup(late.keySet)]);
+    expect([early.jwks.calls, late.jwks.calls]).toEqual([2, 2]);
   });
 });
 

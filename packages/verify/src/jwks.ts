@@ -296,14 +296,18 @@ export function createKeySetCache(source: JwksSource, kind: KeySetKind): KeySetC
 
   /**
    * Records `done` as failed: past its timeout, answered with an error or a stale set, or dropped
-   * because its request was cancelled. The retry wait doubles per consecutive failure while a
-   * last good set serves; without one it stays at `JWKS_RETRY_MS`. Both get the jitter.
+   * because its request was cancelled. The retry wait doubles per consecutive failure, up to
+   * `JWKS_MAX_RETRY_MS`, while a last good set serves and, for UTS, also once a held set passed its
+   * 24-hour limit, so an outage longer than 24 hours keeps the 60 s cadence; the count resets only
+   * after a success. A cold cache, and an expired STS set, keep `JWKS_RETRY_MS`. Both get jitter.
    */
   function fail(done: Attempt, at: number): void {
     if (refresh.state !== 'fetching' || refresh.attempt.id !== done.id) return;
     const consecutive = refresh.failuresBefore + 1;
-    const serving = set !== null && at < set.servesUntil;
-    const wait = serving ? backoffMs(JWKS_RETRY_MS, JWKS_MAX_RETRY_MS, consecutive) : JWKS_RETRY_MS;
+    const backsOff = set !== null && (kind === 'uts' || at < set.servesUntil);
+    const wait = backsOff
+      ? backoffMs(JWKS_RETRY_MS, JWKS_MAX_RETRY_MS, consecutive)
+      : JWKS_RETRY_MS;
     refresh = {
       state: 'failed',
       attempt: { id: done.id, startedAt: done.startedAt },

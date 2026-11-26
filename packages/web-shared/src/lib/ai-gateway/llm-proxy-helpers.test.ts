@@ -2122,7 +2122,7 @@ describe('captureProxyError', () => {
         model: 'vendor/model',
         responseBodyReadLength: JSON.stringify({ error: 'upstream unavailable' }).length,
       });
-      expect(data).not.toHaveProperty('first4kOfResponse');
+      expect(data.first4kOfResponse).toBe('{"error":"upstream unavailable"}');
       expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
         `openrouter returned error ${status}`,
         expect.anything()
@@ -2335,7 +2335,13 @@ describe('captureProxyError', () => {
       { type: 'error', error: { type: 'overloaded_error', message: 'm' } },
       { upstreamErrorType: 'overloaded_error' },
     ],
-    ['OpenRouter', { error: { code: 402, message: 'm' } }, { upstreamErrorCode: '402' }],
+    [
+      'OpenRouter',
+      {
+        error: { code: 402, message: 'm', metadata: { provider_name: 'Fake Provider', raw: 'x' } },
+      },
+      { upstreamErrorCode: '402', upstreamProviderName: 'Fake Provider' },
+    ],
     [
       'Google',
       { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'm' } },
@@ -2347,24 +2353,43 @@ describe('captureProxyError', () => {
     expect(data).toMatchObject(expected);
   });
 
-  it('sends no upstream response text, only its length and the allowlisted fields', async () => {
+  it('sends Sentry no upstream response text and logs only a redacted prefix', async () => {
     const fakeKey = ['sk', '-proj-', 'fake'.repeat(8)].join('');
     const body = {
       error: {
-        message: `invalid key ${fakeKey} for user person@example.com`,
+        message: `invalid key ${fakeKey} for user`,
         echo: `Bearer ${fakeKey}`,
         code: 'invalid_api_key',
       },
     };
-    const data = await captureResponsesError({}, Response.json(body, { status: 401 }));
+    await captureProxyError({
+      errorMessage: 'openai returned error 401',
+      user: { id: 'synthetic-user' },
+      request: {},
+      response: Response.json(body, { status: 401 }),
+      organizationId: undefined,
+      model: 'openai/gpt-6.1-sol',
+      trackInSentry: true,
+    });
 
-    expect(data).not.toHaveProperty('first4kOfResponse');
-    expect(data.upstreamErrorCode).toBe('invalid_api_key');
-    expect(data.responseBodyReadLength).toBe(JSON.stringify(body).length);
-    const serialized = JSON.stringify(data);
-    expect(serialized).not.toContain(fakeKey);
-    expect(serialized).not.toContain('invalid key');
-    expect(serialized).not.toContain('person@example.com');
+    const logged = await capturedErrorData();
+    expect(logged.first4kOfResponse).toBe(
+      '{"error":{"message":"invalid key [Filtered] for user","echo":"Bearer [Filtered]","code":"invalid_api_key"}}'
+    );
+    expect(JSON.stringify(logged)).not.toContain(fakeKey);
+
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+    const sentExtra = jest.mocked(captureMessage).mock.calls[0]?.[1];
+    expect(sentExtra).toMatchObject({
+      extra: {
+        upstreamErrorCode: 'invalid_api_key',
+        responseBodyReadLength: JSON.stringify(body).length,
+      },
+    });
+    const sent = JSON.stringify(sentExtra);
+    expect(sent).not.toContain('first4kOfResponse');
+    expect(sent).not.toContain(fakeKey);
+    expect(sent).not.toContain('invalid key');
   });
 
   it('reads only a bounded prefix of a large error body', async () => {
@@ -2386,7 +2411,7 @@ describe('captureProxyError', () => {
     const data = await captureResponsesError({}, response);
     await response.body?.cancel();
 
-    expect(data).not.toHaveProperty('first4kOfResponse');
+    expect(String(data.first4kOfResponse)).toBe(`${'x '.repeat(2048)}[Truncated]`);
     expect(pulledChunks).toBeLessThan(8);
     expect(cancelled).toBe(true);
   });

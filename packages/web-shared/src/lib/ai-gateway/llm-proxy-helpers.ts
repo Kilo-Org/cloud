@@ -13,6 +13,7 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { redactSecretValues } from '@kilocode/web-shared/lib/observability/sentry-secret-patterns';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
@@ -934,6 +935,11 @@ function describeUpstreamError(responseText: string): Record<string, string> {
       fields[name] = String(value).slice(0, UPSTREAM_ERROR_FIELD_LIMIT);
     }
   }
+  // OpenRouter names the provider that failed behind its router.
+  const providerName = isRecord(error.metadata) ? error.metadata.provider_name : undefined;
+  if (typeof providerName === 'string') {
+    fields.upstreamProviderName = providerName.slice(0, UPSTREAM_ERROR_FIELD_LIMIT);
+  }
   return fields;
 }
 
@@ -996,8 +1002,9 @@ export async function captureProxyError(params: {
         ...describeRequestFields(request),
       };
 
-      // Only the length of the body and allowlisted error fields leave this
-      // process; the body text itself is never sent.
+      // Only the length of the body and allowlisted error fields go to Sentry.
+      // The server log also gets a redacted prefix of the body.
+      let logOnlyFields: Record<string, string> = {};
       try {
         const responseText = await readTextPrefix(response.clone(), ERROR_BODY_DIAGNOSTIC_LIMIT);
         extraErrorData.responseBodyReadLength = responseText.length;
@@ -1005,11 +1012,12 @@ export async function captureProxyError(params: {
           extraErrorData,
           describeUpstreamError(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT))
         );
+        logOnlyFields = { first4kOfResponse: redactSecretValues(responseText, 4096) };
       } catch {
         // ignore errors when already handling errors...
       }
 
-      errorExceptInTest(errorMessage, extraErrorData);
+      errorExceptInTest(errorMessage, { ...extraErrorData, ...logOnlyFields });
       if (trackInSentry) {
         captureMessage(errorMessage, {
           level: 'error',

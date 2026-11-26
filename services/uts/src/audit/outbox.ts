@@ -33,7 +33,7 @@ export const RelayReadRowSchema = AuditEventRowSchema.extend({ watermark_seq: z.
 /**
  * Moves one shard's watermark only from the sequence number the relay read it at, so a second
  * runner of the same shard (an overlapping deploy) can never move it back or skip a range, and
- * only by the exact count of rows it passes (`uts.advance_audit_watermark`, migration 0007).
+ * only by the exact count of rows it passes (`uts.advance_audit_watermark`, migration 0002).
  */
 const ADVANCE_WATERMARK = `SELECT uts.advance_audit_watermark(
     $1::smallint, $2::bigint, $3::xid8, $4::bigint, $5::bigint

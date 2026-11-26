@@ -1,5 +1,12 @@
 import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
+import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
+import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
+import ciKilocodeNotifyPolicy from '../../policy/ci-kilocode-notify.yaml';
+import ciKilocodeOpencodeWatchPolicy from '../../policy/ci-kilocode-opencode-watch.yaml';
+import ciKilocodeReleaseJetbrainsPolicy from '../../policy/ci-kilocode-release-jetbrains.yaml';
+import ciKilocodeReleasePolicy from '../../policy/ci-kilocode-release.yaml';
+import ciKilocodeScanNotifyPolicy from '../../policy/ci-kilocode-scan-notify.yaml';
 import notificationsPolicy from '../../policy/notifications.yaml';
 import o11yPolicy from '../../policy/o11y.yaml';
 import usageIngestPolicy from '../../policy/usage-ingest.yaml';
@@ -12,6 +19,13 @@ import type { Policy } from './schema';
 const sources: Record<PolicyFile, string> = {
   'audit-relay.yaml': auditRelayPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
+  'ci-kilocode-app-key.yaml': ciKilocodeAppKeyPolicy,
+  'ci-kilocode-community.yaml': ciKilocodeCommunityPolicy,
+  'ci-kilocode-notify.yaml': ciKilocodeNotifyPolicy,
+  'ci-kilocode-opencode-watch.yaml': ciKilocodeOpencodeWatchPolicy,
+  'ci-kilocode-release-jetbrains.yaml': ciKilocodeReleaseJetbrainsPolicy,
+  'ci-kilocode-release.yaml': ciKilocodeReleasePolicy,
+  'ci-kilocode-scan-notify.yaml': ciKilocodeScanNotifyPolicy,
   'notifications.yaml': notificationsPolicy,
   'o11y.yaml': o11yPolicy,
   'usage-ingest.yaml': usageIngestPolicy,

@@ -483,6 +483,13 @@ describe('policy audit stream', () => {
     expect([...event.data.attributes.addedWorkloads].sort()).toEqual([
       'audit-relay',
       'bouncer-watch',
+      'ci-kilocode-app-key',
+      'ci-kilocode-community',
+      'ci-kilocode-notify',
+      'ci-kilocode-opencode-watch',
+      'ci-kilocode-release',
+      'ci-kilocode-release-jetbrains',
+      'ci-kilocode-scan-notify',
       'notifications',
       'o11y',
       'usage-ingest',

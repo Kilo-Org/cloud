@@ -75,15 +75,25 @@ ALTER TABLE uts.passkey_credentials
     FOREIGN KEY (gate_pass_id, account_id, gate_pass_action)
     REFERENCES uts.gate_passes (id, account_id, action);
 
--- The client network whose anonymous writes and wrong user codes share one count: the address's
--- IPv4 /24 or IPv6 /48, or NULL without an address. One IPv6 subscriber holds a /64 or more, so
--- an exact address bounds nothing. `clientNetwork` in src/signin/network.ts computes the same
--- network for the Worker's limiter.
+-- The client network whose wrong user codes share one count: the address's IPv4 /24 or IPv6
+-- /48, or NULL without an address. It is wider than the anonymous writer below because it
+-- bounds guessing: spending it takes signed-in accounts, and a network that spends it only waits
+-- an hour to approve devices, while a guesser that gets past it can approve someone else's device.
 CREATE FUNCTION uts.client_network(p_client_ip inet) RETURNS inet
 LANGUAGE sql
 IMMUTABLE
 SET search_path = pg_catalog, pg_temp
 RETURN network(set_masklen(p_client_ip, CASE family(p_client_ip) WHEN 4 THEN 24 ELSE 48 END))::inet;
+
+-- Who counts as one anonymous writer (design 3, "Anonymous sign-in writes"): the exact IPv4
+-- address, so one host cannot use up an office /24, or the IPv6 /48, since one IPv6 subscriber
+-- holds a /64 or more and an exact address would bound nothing. NULL without an address.
+-- `anonymousWriter` in src/signin/network.ts computes the same key for the Worker's limiter.
+CREATE FUNCTION uts.anonymous_writer(p_client_ip inet) RETURNS inet
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog, pg_temp
+RETURN network(set_masklen(p_client_ip, CASE family(p_client_ip) WHEN 4 THEN 32 ELSE 48 END))::inet;
 
 -- When the session's last denied audit row was written, and when the session cleanup last found
 -- the ended session still kept by a credential (`uts.maintain_sign_in_rows`).
@@ -113,15 +123,15 @@ CREATE INDEX network_user_code_failures_window_idx
 
 -- An approval records when and how the user authenticated, which become the device session's
 -- `auth_time` and `amr`; a consumed code names the grant it created and the DPoP key that grant
--- is bound to, so a retry of the same poll gets that grant again. `client_network` keys the cap
--- on pending codes per network (`uts.create_device_code`).
+-- is bound to, so a retry of the same poll gets that grant again. `anonymous_writer` keys the cap
+-- on pending codes per writer (`uts.create_device_code`).
 ALTER TABLE uts.device_codes
   ADD COLUMN auth_time timestamptz,
   ADD COLUMN amr uts.auth_method[]
     CHECK (cardinality(amr) BETWEEN 1 AND 8 AND array_position(amr, NULL) IS NULL),
   ADD COLUMN grant_id uuid,
   ADD COLUMN dpop_jkt uts.sha256,
-  ADD COLUMN client_network inet GENERATED ALWAYS AS (uts.client_network(client_ip)) STORED,
+  ADD COLUMN anonymous_writer inet GENERATED ALWAYS AS (uts.anonymous_writer(client_ip)) STORED,
   ADD CONSTRAINT device_codes_approval_shape CHECK (
     (status IN ('approved', 'consumed')) = (auth_time IS NOT NULL AND amr IS NOT NULL)
   ),
@@ -686,10 +696,10 @@ END
 $$;
 
 -- POST /device_authorization (RFC 8628 section 3.1): a pending 10-minute device code. It names
--- no account, so it writes no audit row. One client network (`uts.client_network`) holds at most
--- 5 pending codes, so an anonymous caller cannot fill the table (design 3, "Anonymous sign-in
--- writes"). Outcomes: `created`; `user_code_taken` (the caller draws another user code);
--- `too_many_pending`.
+-- no account, so it writes no audit row. One anonymous writer (`uts.anonymous_writer`: an IPv4
+-- address or an IPv6 /48) holds at most 5 pending codes, so an anonymous caller cannot fill the
+-- table (design 3, "Anonymous sign-in writes"). Outcomes: `created`; `user_code_taken` (the
+-- caller draws another user code); `too_many_pending`.
 CREATE FUNCTION uts.create_device_code(
   p_device_code_hash bytea,
   p_user_code_hash bytea,
@@ -708,7 +718,7 @@ AS $$
 BEGIN
   IF p_client_ip IS NOT NULL AND (
     SELECT count(*) FROM uts.device_codes AS pending
-    WHERE pending.client_network = uts.client_network(p_client_ip)
+    WHERE pending.anonymous_writer = uts.anonymous_writer(p_client_ip)
       AND pending.status = 'pending'
       AND pending.expires_at > now()
   ) >= 5 THEN
@@ -1533,7 +1543,7 @@ CREATE INDEX step_ups_browser_session_idx ON uts.step_ups (browser_session_id)
 CREATE INDEX authorization_codes_browser_session_idx ON uts.authorization_codes (browser_session_id)
   WHERE browser_session_id IS NOT NULL;
 -- The pending-code cap of `uts.create_device_code`.
-CREATE INDEX device_codes_pending_network_idx ON uts.device_codes (client_network)
+CREATE INDEX device_codes_pending_writer_idx ON uts.device_codes (anonymous_writer)
   WHERE status = 'pending';
 
 GRANT EXECUTE ON FUNCTION

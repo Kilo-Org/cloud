@@ -35,14 +35,14 @@ export function requestNetwork(request: Request): NetworkContext {
 }
 
 /**
- * The client network of an address `requestNetwork` accepted, as `uts.client_network` defines it
- * (migration 0008): its IPv4 /24 or IPv6 /48, written as those leading octets or hextets. Null
- * without an address. One IPv6 subscriber holds a /64 or more, so a limit on exact addresses
- * bounds nothing.
+ * Who counts as one anonymous writer, as `uts.anonymous_writer` defines it (migration 0008), for
+ * an address `requestNetwork` accepted: the exact IPv4 address, so one host cannot use up an
+ * office /24, or the IPv6 /48 written as its leading hextets, since one IPv6 subscriber holds a
+ * /64 or more and an exact address would bound nothing. Null without an address.
  */
-export function clientNetwork(clientIp: string | null): string | null {
+export function anonymousWriter(clientIp: string | null): string | null {
   if (clientIp === null) return null;
-  if (!clientIp.includes(':')) return `${clientIp.split('.').slice(0, 3).join('.')}.0/24`;
+  if (!clientIp.includes(':')) return clientIp;
   // Expand `::` to the hextets it stands for; an IPv4 tail (`::ffff:192.0.2.1`) holds two.
   const groups = (part: string) =>
     part === ''

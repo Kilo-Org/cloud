@@ -1285,14 +1285,20 @@ describe('anonymous write limits', () => {
       network: { ...network, clientIp },
     });
 
-  it('holds at most 5 pending device codes per IPv4 /24', async () => {
+  it('holds at most 5 pending device codes per IPv4 address, so one host cannot block its /24', async () => {
     const [first, second] = randomBytes(2);
-    const prefix = `172.${16 + (first % 16)}`;
-    for (let host = 1; host <= 5; host++) {
-      expect((await create(`${prefix}.${second}.${host}`)).outcome).toBe('created');
+    const host = `172.${16 + (first % 16)}.${second}`;
+    for (let code = 0; code < 5; code++) {
+      expect((await create(`${host}.1`)).outcome).toBe('created');
     }
-    expect(await create(`${prefix}.${second}.200`)).toEqual({ outcome: 'too_many_pending' });
-    expect((await create(`${prefix}.${(second + 1) % 256}.1`)).outcome).toBe('created');
+    expect(await create(`${host}.1`)).toEqual({ outcome: 'too_many_pending' });
+    expect((await create(`${host}.2`)).outcome).toBe('created');
+    const writers = await owner.query<{ v4: string; v6: string; none: string | null }>(
+      `SELECT uts.anonymous_writer('192.0.2.77')::text AS v4,
+              uts.anonymous_writer('2001:db8:1:2::5')::text AS v6,
+              uts.anonymous_writer(NULL)::text AS none`
+    );
+    expect(writers.rows).toEqual([{ v4: '192.0.2.77/32', v6: '2001:db8:1::/48', none: null }]);
   });
 
   it('holds at most 5 pending device codes per IPv6 /48, whatever /64 each came from', async () => {
@@ -1302,8 +1308,8 @@ describe('anonymous write limits', () => {
     }
     expect(await create(`${site}:ffff:1:2:3:4`)).toEqual({ outcome: 'too_many_pending' });
     const stored = await owner.query<{ network: string }>(
-      `SELECT DISTINCT client_network::text AS network FROM uts.device_codes
-       WHERE client_network = uts.client_network($1::inet)`,
+      `SELECT DISTINCT anonymous_writer::text AS network FROM uts.device_codes
+       WHERE anonymous_writer = uts.anonymous_writer($1::inet)`,
       [`${site}::1`]
     );
     expect(stored.rows).toHaveLength(1);

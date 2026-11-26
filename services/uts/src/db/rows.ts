@@ -293,7 +293,7 @@ export const DeviceCodeRowSchema = z.strictObject({
   amr: amr.nullable(),
   grant_id: uuid.nullable(),
   dpop_jkt: sha256.nullable(),
-  client_network: z.string().nullable(),
+  anonymous_writer: z.string().nullable(),
 });
 
 export const EmailCodeRowSchema = z.strictObject({

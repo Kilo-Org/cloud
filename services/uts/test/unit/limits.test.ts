@@ -1,41 +1,40 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { anonymousWriteRefusal } from '../../src/signin/limits';
-import { clientNetwork } from '../../src/signin/network';
+import { anonymousWriter } from '../../src/signin/network';
 
 /**
  * The isolate's anonymous sign-in write limit (design 3, "Anonymous sign-in writes"). The windows
- * live in module state, so each test uses its own networks and its own clock.
+ * live in module state, so each test uses its own writers and its own clock.
  */
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Spends the network's 10 writes of the window that starts at `start`. */
+/** Spends the writer's 10 writes of the window that starts at `start`. */
 function spend(address: string | null, start: number) {
   for (let write = 0; write < 10; write++) {
     expect(anonymousWriteRefusal(address, 'device_authorization', start + write)).toBeNull();
   }
 }
 
-describe('client network', () => {
-  it('is the IPv4 /24 or the IPv6 /48 of the address', () => {
-    expect(clientNetwork('192.0.2.77')).toBe('192.0.2.0/24');
-    expect(clientNetwork('2001:db8:1:2::5')).toBe('2001:db8:1::/48');
-    expect(clientNetwork('2001:0db8:0001:ffff:ffff:ffff:ffff:ffff')).toBe('2001:db8:1::/48');
-    expect(clientNetwork('2001:db8::1')).toBe('2001:db8:0::/48');
-    expect(clientNetwork('1::2:3:4:5:6:7')).toBe('1:0:2::/48');
-    expect(clientNetwork('::ffff:192.0.2.1')).toBe('0:0:0::/48');
-    expect(clientNetwork(null)).toBeNull();
+describe('anonymous writer', () => {
+  it('is the exact IPv4 address or the IPv6 /48', () => {
+    expect(anonymousWriter('192.0.2.77')).toBe('192.0.2.77');
+    expect(anonymousWriter('2001:db8:1:2::5')).toBe('2001:db8:1::/48');
+    expect(anonymousWriter('2001:0db8:0001:ffff:ffff:ffff:ffff:ffff')).toBe('2001:db8:1::/48');
+    expect(anonymousWriter('2001:db8::1')).toBe('2001:db8:0::/48');
+    expect(anonymousWriter('1::2:3:4:5:6:7')).toBe('1:0:2::/48');
+    expect(anonymousWriter('::ffff:192.0.2.1')).toBe('0:0:0::/48');
+    expect(anonymousWriter(null)).toBeNull();
   });
 });
 
 describe('anonymous sign-in write limit', () => {
-  it('allows 10 writes per network per minute, then answers 429 with the seconds left', async () => {
+  it('allows 10 writes per writer per minute, then answers 429 with the seconds left', async () => {
     const start = 1_000_000;
     spend('198.51.1.1', start);
-    // Another address of the same /24 shares the count.
-    const refused = anonymousWriteRefusal('198.51.1.200', 'device_authorization', start + 15_000);
+    const refused = anonymousWriteRefusal('198.51.1.1', 'device_authorization', start + 15_000);
     expect(refused?.status).toBe(429);
     expect(refused?.headers.get('Retry-After')).toBe('45');
     expect(await refused?.json()).toEqual({ error: 'rate_limited' });
@@ -44,7 +43,14 @@ describe('anonymous sign-in write limit', () => {
     expect(last?.headers.get('Retry-After')).toBe('1');
   });
 
-  it('counts every address of one IPv6 /64, and of its /48, as one network', () => {
+  it('counts each IPv4 host on its own, so one host cannot block its /24', () => {
+    const start = 1_250_000;
+    spend('198.51.7.1', start);
+    expect(anonymousWriteRefusal('198.51.7.1', 'device_authorization', start + 1)).not.toBeNull();
+    expect(anonymousWriteRefusal('198.51.7.2', 'device_authorization', start + 1)).toBeNull();
+  });
+
+  it('counts every address of one IPv6 /64, and of its /48, as one writer', () => {
     const start = 1_500_000;
     for (let host = 0; host < 10; host++) {
       const address = `2001:db8:5:${host % 2}:${host.toString(16)}::1`;

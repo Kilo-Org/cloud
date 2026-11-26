@@ -1,7 +1,10 @@
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, pending_auth_links, user_auth_provider } from '@kilocode/db/schema';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { sendNewSignInMethodEmail } from '@kilocode/web-shared/lib/email';
 import {
   accountHasVerifiedPrimaryAddress,
@@ -83,6 +86,8 @@ afterEach(async () => {
   await db
     .delete(user_auth_provider)
     .where(inArray(user_auth_provider.kilo_user_id, createdUserIds));
+  // A completed link sends a security notice, which claims its key under the user.
+  await deleteTransactionalEmailLogForUsers(createdUserIds);
   await db.delete(kilocode_users).where(inArray(kilocode_users.id, createdUserIds));
   createdUserIds.length = 0;
 });
@@ -178,7 +183,8 @@ describe('pending auth link attach rule', () => {
       user.google_user_email,
       'GitHub',
       { email: user.google_user_email, displayName: 'octo-pending' },
-      expect.objectContaining({ changedAt: expect.any(Date) })
+      { kind: 'added' },
+      expect.objectContaining({ actor: 'owner', occurredAt: expect.any(Date) })
     );
   });
 

@@ -16,7 +16,10 @@ import {
   hashWebSessionId,
   revokeStepUpProofs,
 } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { assertPrivilegedPermission, requirePrivilegedActor } from './require-privileged-actor';
 
@@ -155,6 +158,9 @@ describe('requirePrivilegedActor', () => {
         .delete(session_step_up_proofs)
         .where(eq(session_step_up_proofs.kilo_user_id, userId));
       await db.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
+      // An admin API key reset notifies the target user, whose outbox row
+      // references the user.
+      await deleteTransactionalEmailLogForUsers([userId]);
       await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
     }
   });

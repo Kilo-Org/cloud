@@ -66,6 +66,9 @@ const PUSH_HISTORY_DECISIONS = {
   security_lifecycle: () => 'securityFindings',
   // Briefings have no settings category; they appear under All only.
   agent_briefing: () => null,
+  // The notice email is the durable record of an account-security event, and
+  // the push has no settings category: it cannot be turned off.
+  account_security: NOT_RECORDED,
   active_agents_glanceable: NOT_RECORDED,
   session_live_update: NOT_RECORDED,
 } satisfies PushHistoryDecisions;

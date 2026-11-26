@@ -340,6 +340,7 @@ describe('policy audit stream', () => {
     expect(event.type).toBe('ai.kilo.sts.policy.changed');
     expect([...event.data.attributes.addedWorkloads].sort()).toEqual([
       'audit-relay',
+      'bouncer-watch',
       'o11y',
       'usage-ingest',
       'web',

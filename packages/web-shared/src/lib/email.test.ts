@@ -1,11 +1,21 @@
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureException: jest.fn(),
+  captureMessage: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/lib/email-mailgun', () => ({
   getEmailVerificationRecipient: jest.fn(() => null),
   sendViaMailgun: jest.fn().mockResolvedValue({}),
+}));
+
+// The address verifier is off unless a test sets a key.
+let mockNeverBounceApiKey: string | undefined;
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/config.server'),
+  get NEVERBOUNCE_API_KEY() {
+    return mockNeverBounceApiKey;
+  },
 }));
 
 import {
@@ -14,9 +24,16 @@ import {
   renderTemplate,
   sendAccountDeletionCompletedEmail,
   sendAccountDeletionSupportNotification,
+  sendApiKeyResetEmail,
+  sendDeviceSessionRevokedEmail,
+  sendDeviceSignInApprovedEmail,
+  sendNewSignInMethodEmail,
   sendKiloPassDuplicateCardCanceledEmail,
+  sendPasskeyAddedEmail,
+  sendSignInResetBySupportEmail,
   sendSpendAlertEmail,
   subjects,
+  type SecurityNoticeRequest,
   sendCreditsTopUpEmail,
   buildCreditsSection,
   buildCreditsTopUpCreditsRowSection,
@@ -27,8 +44,12 @@ import {
 } from '@kilocode/web-shared/lib/email';
 import fs from 'fs';
 import path from 'path';
-import { captureException } from '@sentry/nextjs';
-import { sendViaMailgun } from '@kilocode/web-shared/lib/email-mailgun';
+import { captureException, captureMessage } from '@sentry/nextjs';
+import {
+  getEmailVerificationRecipient,
+  sendViaMailgun,
+} from '@kilocode/web-shared/lib/email-mailgun';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
@@ -478,5 +499,261 @@ describe('spend alert email', () => {
       retryable: ['billing@example.com'],
       undeliverable: [],
     });
+  });
+});
+
+describe('security notice emails', () => {
+  const ownerRequest: SecurityNoticeRequest = {
+    actor: 'owner',
+    occurredAt: new Date('2026-03-04T05:06:07.000Z'),
+    ip: '203.0.113.7',
+    location: 'Berlin, DE',
+    device: 'Firefox on Linux',
+  };
+  const supportRequest: SecurityNoticeRequest = {
+    actor: 'support',
+    occurredAt: new Date('2026-03-04T05:06:07.000Z'),
+  };
+
+  /** The rendered email as a reader sees it: tags dropped, whitespace collapsed. */
+  function sentText(): string {
+    const { html } = jest.mocked(sendViaMailgun).mock.calls[0][0];
+    return html
+      .replace(/<style[\s\S]*?<\/style>/g, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ');
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('names Kilo support and the time for a support action, and nothing about the staff member', async () => {
+    await sendApiKeyResetEmail('owner@example.com', supportRequest);
+
+    const text = sentText();
+    expect(text).toContain('Time: 2026-03-04 05:06 UTC');
+    expect(text).toContain('Done by: Kilo support');
+    expect(text).toContain('Kilo support made this change.');
+    expect(text).toContain('If you did not ask for this:');
+    expect(text).not.toContain('IP address');
+    expect(text).not.toContain('Browser:');
+    expect(text).not.toContain('If this was you');
+  });
+
+  it('says a support token reset leaves browsers and devices signed in', async () => {
+    await sendApiKeyResetEmail('owner@example.com', supportRequest);
+
+    const text = sentText();
+    expect(text).toContain(
+      'Every earlier API token stopped working. Browsers and signed-in devices stay signed in.'
+    );
+    expect(text).not.toContain('were signed out');
+  });
+
+  it('describes the owner’s own reset by its address, location and browser', async () => {
+    await sendApiKeyResetEmail('owner@example.com', ownerRequest);
+
+    const text = sentText();
+    expect(text).toContain('IP address: 203.0.113.7');
+    expect(text).toContain('Approximate location: Berlin, DE');
+    expect(text).toContain('Browser: Firefox on Linux');
+    expect(text).toContain(
+      'Every earlier token stopped working, and every browser, the app, and the CLI were signed out.'
+    );
+    expect(text).toContain('If this was you, no action is needed.');
+    expect(text).not.toContain('stay signed in');
+    expect(text).not.toContain('Kilo support made this change');
+  });
+
+  it('tells the owner to remove a new sign-in method they added', async () => {
+    await sendNewSignInMethodEmail(
+      'owner@example.com',
+      'GitHub',
+      { email: 'owner@example.com', displayName: null },
+      { kind: 'added' },
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'GitHub was added as a sign-in method for your Kilo Code account. If this was you, no action is needed.'
+    );
+    expect(text).toContain(`If this was not you: remove this sign-in method at ${NEXTAUTH_URL}`);
+    expect(text).not.toContain('It replaced');
+    expect(text).not.toContain('was signed out');
+  });
+
+  it('names the sign-in methods an SSO settlement replaced, the browser sign-out, and points to support', async () => {
+    await sendNewSignInMethodEmail(
+      'owner@example.com',
+      'Enterprise SSO',
+      { email: 'owner@example.com', displayName: null },
+      { kind: 'sso_settled', replacedMethodNames: ['Google', 'GitHub'] },
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'Enterprise SSO was added as a sign-in method for your Kilo Code account. It replaced: Google, GitHub. Every browser was signed out. If this was you, no action is needed.'
+    );
+    expect(text).toContain(
+      `If this was not you: contact ${SUPPORT_EMAIL} to remove this sign-in method, which you cannot remove yourself`
+    );
+    expect(text).not.toContain('remove this sign-in method at');
+  });
+
+  it('reports the browser sign-out and points to support for an SSO settlement that replaced no other method', async () => {
+    await sendNewSignInMethodEmail(
+      'owner@example.com',
+      'Enterprise SSO',
+      { email: 'owner@example.com', displayName: null },
+      { kind: 'sso_settled', replacedMethodNames: [] },
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'Enterprise SSO was added as a sign-in method for your Kilo Code account. Every browser was signed out. If this was you, no action is needed.'
+    );
+    expect(text).toContain(
+      `If this was not you: contact ${SUPPORT_EMAIL} to remove this sign-in method, which you cannot remove yourself`
+    );
+    expect(text).not.toContain('It replaced');
+    expect(text).not.toContain('remove this sign-in method at');
+  });
+
+  it('names an unidentified signed-out device as the requester line does', async () => {
+    await sendDeviceSessionRevokedEmail('owner@example.com', null, ownerRequest);
+
+    const text = sentText();
+    expect(text).toContain('Signed-out device: Unidentified');
+    expect(text).not.toContain('Signed-out device: A device');
+  });
+
+  it('tells the owner how to get back in after a support reset', async () => {
+    await sendSignInResetBySupportEmail('owner@example.com', supportRequest);
+
+    expect(sendViaMailgun).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: subjects.signInResetBySupport })
+    );
+    const text = sentText();
+    expect(text).toContain('removed every sign-in method and passkey');
+    expect(text).toContain('use the sign-in link we email you');
+    expect(text).toContain('Done by: Kilo support');
+    expect(text).not.toContain('IP address');
+  });
+
+  it('quotes and attributes a name the requesting device chose, cut short', async () => {
+    await sendDeviceSignInApprovedEmail(
+      'owner@example.com',
+      {
+        client: {
+          kind: 'self_named',
+          name: 'Kilo security check no action needed everything is fine',
+        },
+        ip: '198.51.100.24',
+      },
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'A sign-in request from a device that named itself &quot;Kilo security check no action needed eve…&quot; was approved'
+    );
+    expect(text).toContain(
+      'Requesting device: named itself &quot;Kilo security check no action needed eve…&quot;'
+    );
+    expect(text).not.toContain('everything');
+  });
+
+  it('replaces a quote mark in a name the requesting device chose', async () => {
+    await sendDeviceSignInApprovedEmail(
+      'owner@example.com',
+      { client: { kind: 'self_named', name: 'Kilo CLI" verified by Kilo' }, ip: null },
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'Requesting device: named itself &quot;Kilo CLI&#039; verified by Kilo&quot;'
+    );
+    expect(text).not.toContain('CLI&quot;');
+  });
+
+  it('names a recognised requesting client plainly, with a space after the article', async () => {
+    await sendDeviceSignInApprovedEmail(
+      'owner@example.com',
+      { client: { kind: 'recognised', label: 'Kilo CLI' }, ip: null },
+      ownerRequest
+    );
+
+    expect(sentText()).toContain('A sign-in request from Kilo CLI was approved');
+  });
+
+  it.each([
+    [null, 'A passkey was added to your Kilo Code account'],
+    ['  ', 'A passkey was added to your Kilo Code account'],
+    ['Laptop', 'A passkey (Laptop) was added to your Kilo Code account'],
+  ])('names the passkey %p only when it has a name', async (name, sentence) => {
+    await sendPasskeyAddedEmail('owner@example.com', name, ownerRequest);
+
+    const text = sentText();
+    expect(text).toContain(sentence);
+    expect(text).not.toContain('unnamed');
+  });
+});
+
+describe('security notice address verification', () => {
+  const address = 'private-owner@example.test';
+  const request: SecurityNoticeRequest = { actor: 'support', occurredAt: new Date() };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockNeverBounceApiKey = 'test-neverbounce-key';
+    jest.mocked(getEmailVerificationRecipient).mockReturnValue(address);
+  });
+
+  afterEach(() => {
+    mockNeverBounceApiKey = undefined;
+    jest.mocked(getEmailVerificationRecipient).mockReturnValue(null);
+  });
+
+  function verifierAnswer(status: string, result: string): Response {
+    return Response.json({ status, result, flags: [], suggested_correction: '' });
+  }
+
+  it.each([
+    ['answers an HTTP error', async () => new Response('', { status: 500 }), true],
+    ['fails its own check', async () => verifierAnswer('auth_failure', 'valid'), true],
+    ['rejects the address', async () => verifierAnswer('success', 'invalid'), false],
+    [
+      'cannot be reached',
+      async (): Promise<Response> => {
+        throw new Error(`${address} request failed`);
+      },
+      true,
+    ],
+  ])('keeps the recipient out of logs and Sentry when the verifier %s', async (_, answer, sent) => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockImplementation(answer);
+    const consoleSpies = (['log', 'info', 'warn', 'error'] as const).map(method =>
+      jest.spyOn(console, method).mockImplementation(() => {})
+    );
+    try {
+      const result = await sendApiKeyResetEmail(address, request);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(
+        sent ? { sent: true } : { sent: false, reason: 'neverbounce_rejected' }
+      );
+      for (const spy of consoleSpies) {
+        expect(JSON.stringify(spy.mock.calls)).not.toContain(address);
+      }
+      expect(jest.mocked(captureMessage)).not.toHaveBeenCalled();
+      expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain(address);
+    } finally {
+      fetchMock.mockRestore();
+      for (const spy of consoleSpies) spy.mockRestore();
+    }
   });
 });

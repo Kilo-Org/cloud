@@ -8,7 +8,8 @@
       "securityFinding": "सुरक्षा निष्कर्षाकडे लक्ष आवश्यक आहे",
       "securityUpdate": "सुरक्षा तपासणीमध्ये अपडेट आहे",
       "agentBriefing": "तुमचा एजंट आढावा तयार आहे",
-      "activeAgentsGlanceable": "सक्रिय एजंट्सकडे अपडेट आहे"
+      "activeAgentsGlanceable": "सक्रिय एजंट्सकडे अपडेट आहे",
+      "accountSecurity": "तुमच्या खात्यावर सुरक्षा क्रियाकलाप झाला"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA उल्लंघन"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "तुमच्या खात्यात पासकी जोडली"
+      },
+      "passkeyRemoved": {
+        "title": "तुमच्या खात्यातून पासकी काढली"
+      },
+      "signInMethodLinked": {
+        "title": "तुमच्या खात्यात साइन-इन पद्धत जोडली"
+      },
+      "signInMethodUnlinked": {
+        "title": "तुमच्या खात्यातून साइन-इन पद्धत काढली"
+      },
+      "deviceSignInApproved": {
+        "title": "डिव्हाइस साइन-इन मंजूर झाले"
+      },
+      "apiKeyReset": {
+        "title": "API टोकन रीसेट केले"
+      },
+      "browserSessionsRevoked": {
+        "title": "सर्व ब्राउझरमधून साइन आउट केले"
+      },
+      "deviceSessionRevoked": {
+        "title": "तुमच्या खात्यातून एक डिव्हाइस साइन आउट केले"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo सपोर्टने साइन-इन रीसेट केले"
+      },
+      "newSignIn": {
+        "title": "तुमच्या खात्यात नवीन साइन-इन"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} जवळील {{device}} वरून. हे तुम्ही नव्हता? आत्ताच तुमच्या खात्याची सुरक्षा तपासा.",
+        "device": "{{device}} वरून. हे तुम्ही नव्हता? आत्ताच तुमच्या खात्याची सुरक्षा तपासा.",
+        "location": "{{location}} जवळून. हे तुम्ही नव्हता? आत्ताच तुमच्या खात्याची सुरक्षा तपासा.",
+        "unknown": "हे तुम्ही नव्हता? आत्ताच तुमच्या खात्याची सुरक्षा तपासा.",
+        "selfNamedDevice": "स्वतःला \"{{name}}\" असे नाव दिलेल्या डिव्हाइसवरून. हे तुम्ही नव्हता? आत्ताच तुमच्या खात्याची सुरक्षा तपासा.",
+        "support": "Kilo सपोर्टने हे केले. तुम्ही याची विनंती केली नसल्यास, सपोर्टशी संपर्क साधा."
+      }
     }
   },
   "sessionReady": {

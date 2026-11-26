@@ -9,10 +9,7 @@ import type { ensureOrganizationAccess } from '@kilocode/web-shared/routers/orga
 import type { adminWebhookTriggersRouter as AdminWebhookTriggersRouter } from './admin-webhook-triggers-router';
 import type { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import { webhookTriggerModeSchema } from '@/lib/webhook-trigger-validation';
-import type {
-  generateCloudAgentWorkflowToken,
-  TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+import type { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import type { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -50,7 +47,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   }),
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateCloudAgentWorkflowToken: jest.fn(() => 'test-cloud-agent-token'),
   TOKEN_EXPIRY: { oneHour: 3600 },
 }));
@@ -1029,7 +1026,7 @@ describe('webhook trigger variant inputs', () => {
 
   it('mints a bounded workflow credential for the Worker capability read', async () => {
     const { generateCloudAgentWorkflowToken } = jest.requireMock(
-      '@kilocode/web-shared/lib/tokens'
+      '@/lib/auth/kilo-token-signing'
     ) as { generateCloudAgentWorkflowToken: jest.Mock };
     const organizationId = '00000000-0000-4000-8000-000000000003';
     mockEnsureOrganizationAccess.mockResolvedValue('member');
@@ -1048,7 +1045,7 @@ describe('webhook trigger variant inputs', () => {
   it('issues a credential that verifies under the Worker audience policy', async () => {
     // requireActual bypasses the module mock so the real issuer mints the token
     // this case then pins against the Worker-side policy validator.
-    const tokens = jest.requireActual('@kilocode/web-shared/lib/tokens') as {
+    const tokens = jest.requireActual('@/lib/auth/kilo-token-signing') as {
       generateCloudAgentWorkflowToken: typeof generateCloudAgentWorkflowToken;
       TOKEN_EXPIRY: typeof TOKEN_EXPIRY;
     };

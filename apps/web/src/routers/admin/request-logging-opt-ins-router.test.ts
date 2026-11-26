@@ -16,6 +16,13 @@ import { createCallerForUser } from '@/routers/test-utils';
 let admin: User;
 let nonAdmin: User;
 
+function successAudits() {
+  return db
+    .select()
+    .from(admin_action_audit_logs)
+    .where(eq(admin_action_audit_logs.outcome, 'success'));
+}
+
 function makeOptIn(): RequestLoggingOptIn {
   return {
     id: crypto.randomUUID(),
@@ -59,14 +66,14 @@ describe('admin.requestLoggingOptIns', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
     expect(await getRequestLoggingOptIns()).toEqual([existing]);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it('lists no opt-ins when the singleton is absent without auditing a write', async () => {
     const caller = await createCallerForUser(admin.id);
 
     await expect(caller.admin.requestLoggingOptIns.list()).resolves.toEqual([]);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it.each(['account', 'organization'] as const)(
@@ -167,7 +174,7 @@ describe('admin.requestLoggingOptIns', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
       expect(await db.select().from(ai_gateway_request_logging_opt_ins)).toEqual([]);
-      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+      expect(await successAudits()).toEqual([]);
     }
   );
 
@@ -186,7 +193,7 @@ describe('admin.requestLoggingOptIns', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' });
 
     expect(await getRequestLoggingOptIns()).toEqual([existing]);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it('rejects a full active list with BAD_REQUEST without changing state or auditing success', async () => {
@@ -206,7 +213,7 @@ describe('admin.requestLoggingOptIns', () => {
     });
 
     expect(await getRequestLoggingOptIns()).toEqual(existing);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it.each([false, true])(
@@ -223,7 +230,7 @@ describe('admin.requestLoggingOptIns', () => {
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
       expect(await getRequestLoggingOptIns()).toEqual(existing);
-      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+      expect(await successAudits()).toEqual([]);
     }
   );
 });

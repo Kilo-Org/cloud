@@ -35,8 +35,14 @@ import {
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { STEP_UP_ENROLLMENT_FRESH_SIGNIN_MS } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { captureException } from '@sentry/nextjs';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
+import { scheduleSecurityNotice, securityNoticeRequestFromHeaders } from '@/lib/security-notices';
 
 /**
  * Vercel Firewall rate-limit rule applied to `{ action: 'send_code' }` and
@@ -216,7 +222,11 @@ function managementAuthorizationInvalid(): NextResponse {
  * this account. The bearer alone never adds a sign-in factor, including when
  * it belongs to a platform admin.
  */
-async function handleNativeRegistration(request: NextRequest): Promise<NextResponse> {
+async function handleNativeRegistration(
+  request: NextRequest,
+  attempt: AuthAuditAttempt
+): Promise<NextResponse> {
+  attempt.method = 'human_bearer';
   const auth = await getUserFromAuth({
     adminOnly: false,
     requestHeaders: request.headers,
@@ -225,6 +235,7 @@ async function handleNativeRegistration(request: NextRequest): Promise<NextRespo
   if (auth.authFailedResponse) {
     return auth.authFailedResponse;
   }
+  attempt.userId = auth.user?.id ?? null;
   if (!auth.user) {
     return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   }
@@ -240,6 +251,7 @@ async function handleNativeRegistration(request: NextRequest): Promise<NextRespo
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
   const input = parsed.data;
+  attempt.metadata = { step: input.action };
   const authorization = input.managementAuthorization?.trim();
   if (!authorization) {
     return NextResponse.json({ error: 'PASSKEY_MANAGEMENT_REQUIRED' }, { status: 403 });
@@ -278,6 +290,8 @@ async function handleNativeRegistration(request: NextRequest): Promise<NextRespo
         return managementAuthorizationInvalid();
       }
 
+      // Minting options is a step of the attempt, not an added passkey.
+      attempt.skipSuccessRow = true;
       return NextResponse.json({ challengeId, options });
     }
 
@@ -302,7 +316,13 @@ async function handleNativeRegistration(request: NextRequest): Promise<NextRespo
       authViaToken: true,
       headersList: request.headers,
     });
+    await scheduleSecurityNotice(
+      user,
+      { type: 'passkey_added', passkeyId: credential.id, passkeyName: credential.name },
+      securityNoticeRequestFromHeaders(request.headers)
+    );
 
+    attempt.metadata = { step: 'verify', passkeyId: credential.id };
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {
     if (error instanceof PasskeyVerificationError) {
@@ -312,22 +332,42 @@ async function handleNativeRegistration(request: NextRequest): Promise<NextRespo
   }
 }
 
+/**
+ * Every request is one audited attempt. A browser `send_code` request records
+ * `auth.passkey.enrollment_code.send`: the sent code, or the refusal. A
+ * missing, wrong, expired or locked emailed code records
+ * `auth.passkey.enrollment_code.verify` as a failure; the code is accepted as
+ * part of the `auth.passkey.add` row its verify step writes. Every other
+ * outcome is `auth.passkey.add`: a refusal at either step, or the verified
+ * enrollment. Minting options records only a refusal.
+ */
 export async function POST(request: NextRequest) {
+  const attempt: AuthAuditAttempt = { action: 'auth.passkey.add' };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/auth/passkey/register'),
+    attempt,
+    () => registerPasskey(request, attempt)
+  );
+}
+
+async function registerPasskey(request: NextRequest, attempt: AuthAuditAttempt): Promise<Response> {
   // A bearer token is the native app. Enrollment and management there are
   // bound to a management grant; this route never accepts a bearer on the
   // browser path.
   if (request.headers.has('authorization')) {
-    return handleNativeRegistration(request);
+    return handleNativeRegistration(request, attempt);
   }
 
   // Browser enrollment. A passkey is a sign-in factor, so the session must be
   // fresh, the person must prove control of the account's mailbox, and a
   // bearer token never takes this path: see the native handler.
+  attempt.method = 'session';
   const { user, authFailedResponse, webSessionId, webSessionPepper, authenticatedAt } =
     await getUserFromSessionForCredentialIssuance();
   if (authFailedResponse) {
     return authFailedResponse;
   }
+  attempt.userId = user.id;
 
   const body = await request.json().catch(() => undefined);
   const parsed = requestSchema.safeParse(body);
@@ -335,6 +375,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
   const input = parsed.data;
+  attempt.metadata = { step: input.action };
+  if (input.action === 'send_code') attempt.action = 'auth.passkey.enrollment_code.send';
+  const refuseEmailCode = (refusal: PasskeyEnrollmentCodeRefusal): NextResponse => {
+    attempt.action = 'auth.passkey.enrollment_code.verify';
+    if (refusal.status === 'locked' && refusal.lockedByThisAttempt) attempt.lockout = true;
+    return emailCodeRefused(refusal);
+  };
 
   if (input.action !== 'verify') {
     const limit = await checkFirewallRateLimit(REGISTRATION_OPTIONS_RATE_LIMIT_ID, {
@@ -361,6 +408,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!input.emailCode) {
+    attempt.action = 'auth.passkey.enrollment_code.verify';
     return NextResponse.json({ error: 'EMAIL_CODE_REQUIRED' }, { status: 401 });
   }
   const emailCode: PasskeyEnrollmentEmailCode = { binding, ...input.emailCode };
@@ -368,12 +416,13 @@ export async function POST(request: NextRequest) {
   try {
     if (input.action === 'options') {
       const checked = await checkPasskeyEnrollmentCode(emailCode);
-      if (checked.status !== 'ok') return emailCodeRefused(checked);
+      if (checked.status !== 'ok') return refuseEmailCode(checked);
 
       const { challengeId, options } = await createRegistrationOptions(
         user.id,
         user.google_user_email
       );
+      attempt.skipSuccessRow = true;
       return NextResponse.json({ challengeId, options });
     }
 
@@ -391,11 +440,17 @@ export async function POST(request: NextRequest) {
       authViaToken: false,
       headersList: request.headers,
     });
+    await scheduleSecurityNotice(
+      user,
+      { type: 'passkey_added', passkeyId: credential.id, passkeyName: credential.name },
+      securityNoticeRequestFromHeaders(request.headers)
+    );
 
+    attempt.metadata = { step: 'verify', passkeyId: credential.id };
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {
     if (error instanceof PasskeyEnrollmentCodeRefusedError) {
-      return emailCodeRefused(error.refusal);
+      return refuseEmailCode(error.refusal);
     }
     if (error instanceof PasskeyVerificationError) {
       return NextResponse.json({ error: error.code }, { status: 401 });

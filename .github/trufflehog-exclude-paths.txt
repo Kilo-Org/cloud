@@ -71,3 +71,11 @@ apps/web/src/db/reset-target\.test\.ts
 # assembles it from parts, but that commit stays in branch history. Exclude the
 # fixture path so the historical commit does not fail the scan.
 apps/mobile/src/components/chat/mcp-settings-state-remote-servers\.test\.ts
+
+# UTS connection-policy fixtures. operator-connection.test.ts asserts which
+# operator and test-admin URLs the identity-store scripts refuse, so it lists
+# synthetic credential URLs for a remote example host. Earlier commits on the
+# branch used literal URIs and a later commit assembles them from parts, but
+# those commits stay in branch history. Exclude the fixture path so the
+# historical commits do not fail the scan.
+services/uts/test/db/operator-connection\.test\.ts

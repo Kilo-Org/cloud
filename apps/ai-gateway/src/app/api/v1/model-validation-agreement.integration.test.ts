@@ -39,11 +39,8 @@ import { GET as catalog } from './models/route';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import {
-  generateApiToken,
-  generateOrganizationApiToken,
-  TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+import { signTestApiToken } from '@kilocode/web-shared/tests/helpers/api-token.helper';
+import { KILO_TOKEN_MAX_LIFETIME_SECONDS } from '@kilocode/worker-utils/kilo-token';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_routing_custom_routers } from '@kilocode/db/schema';
@@ -108,7 +105,11 @@ describe('model validation agrees with the catalog for one credential', () => {
       false
     );
     await addUserToOrganization(organization.id, member.id, 'member');
-    const { token } = generateOrganizationApiToken(member, organization.id, 'member');
+    const token = signTestApiToken(
+      member,
+      { organizationId: organization.id, organizationRole: 'member' },
+      { expiresIn: 15 * 60 }
+    );
     currentHeaders = new Headers({ authorization: `Bearer ${token}` });
 
     const availableIds = await catalogModelIds();
@@ -145,7 +146,11 @@ describe('model validation agrees with the catalog for one credential', () => {
       entries: [{ kind: 'gateway', model: allowedModel }],
       default_entry_key: `gateway:${allowedModel}`,
     });
-    const { token } = generateOrganizationApiToken(member, organization.id, 'member');
+    const token = signTestApiToken(
+      member,
+      { organizationId: organization.id, organizationRole: 'member' },
+      { expiresIn: 15 * 60 }
+    );
     currentHeaders = new Headers({ authorization: `Bearer ${token}` });
 
     const routerModelId = `kilo-auto/custom/org/${slug}`;
@@ -171,7 +176,7 @@ describe('model validation agrees with the catalog for one credential', () => {
     );
     await addUserToOrganization(organization.id, user.id, 'member');
     currentHeaders = new Headers({
-      authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+      authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
     });
 
     await expect(validate(deniedModel)).resolves.toEqual({

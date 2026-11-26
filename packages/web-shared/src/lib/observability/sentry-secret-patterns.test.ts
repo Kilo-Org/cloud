@@ -36,7 +36,7 @@ const FAKE_GOOGLE_API_KEY = ['AI', 'za', 'fake'.repeat(8), '1_-'].join('');
 const FAKE_GOOGLE_AUTH_KEY = ['A', 'Q.', 'fake0123'.repeat(5)].join('');
 const FAKE_NPM_TOKEN = ['np', 'm_', 'fake0123'.repeat(4), 'AbC4'].join('');
 const FAKE_SENTRY_USER_TOKEN = ['sntry', 'u_', 'abcd0123'.repeat(8)].join('');
-const FAKE_SENTRY_ORG_TOKEN = [
+const FAKE_SENTRY_ORG_TOKEN_PREFIX = [
   'sntry',
   's_',
   Buffer.from(
@@ -48,8 +48,10 @@ const FAKE_SENTRY_ORG_TOKEN = [
     })
   ).toString('base64'),
   '_',
-  Buffer.alloc(32, 0xfb).toString('base64').replace(/=+$/, ''),
 ].join('');
+const FAKE_SENTRY_ORG_TOKEN = `${FAKE_SENTRY_ORG_TOKEN_PREFIX}${Buffer.alloc(32, 0xfb)
+  .toString('base64')
+  .replace(/=+$/, '')}`;
 const SLACK_WEBHOOK_HOST = ['https://hooks', 'slack.com'].join('.');
 const DISCORD_WEBHOOK_PATH = ['/api', 'webhooks'].join('/');
 const PRIVATE_KEY_HEADER = ['-----BEGIN', 'PRIVATE KEY-----'].join(' ');
@@ -89,6 +91,11 @@ describe('redactSecretValues', () => {
     ['an npm access token', FAKE_NPM_TOKEN, '[Filtered]'],
     ['a Sentry user token', FAKE_SENTRY_USER_TOKEN, '[Filtered]'],
     ['a Sentry organization token', `(${FAKE_SENTRY_ORG_TOKEN})`, '([Filtered])'],
+    [
+      'a Sentry organization token with a slash segment',
+      `${FAKE_SENTRY_ORG_TOKEN_PREFIX}/s/${'A'.repeat(40)}`,
+      '[Filtered]',
+    ],
   ])('replaces %s', (_name, input, expected) => {
     expect(redactSecretValues(input)).toBe(expected);
   });

@@ -192,9 +192,10 @@ Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and meta
 
    Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt) on the metadata
    response and `"status":200` with the same placement on each read line. A `null` placement on a
-   read line means placement does not cover service-binding fetches: record that in the pull
-   request, because each key-set read then makes its 16 signer calls from the feed Worker's data
-   center.
+   read line leaves placement of the signer-keys route unproven, not disproven: Cloudflare is not
+   documented to add that header to a service-binding response. Record it as unproven in the pull
+   request; if placement did not apply, each key-set read would make its 16 signer calls from the
+   feed Worker's data center (latency only, the same call counts).
 
 ## Deploys
 

@@ -1,6 +1,6 @@
 import { runInDurableObject } from 'cloudflare:test';
 import {
-  SignerKeysResultSchema,
+  SignerKeysAnswerSchema,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_PATH,
   UtsJwksSchema,
@@ -8,6 +8,7 @@ import {
 } from '@kilocode/uts-contracts';
 import { getSignerStub } from '../../src/dos/stubs';
 import type { SignableClaims } from '../../src/keys/claims';
+import { resetSignerKeysIsolate } from '../../src/signer-keys';
 import { config, env } from './test-env';
 
 /** A claim set the development signer accepts. */
@@ -56,9 +57,17 @@ export async function fetchSignerKeys(binding: Fetcher = env.FEED_MINT): Promise
   return await binding.fetch(`${config.endpoints.issuer}${UTS_SIGNER_KEYS_PATH}`);
 }
 
-/** The key set as the feed Worker builds it: every signer's keys over the internal route. */
+/**
+ * The key set as the feed Worker builds it: every signer's keys over the internal route. It drops
+ * the route's isolate copy first, so the answer reflects the signer objects now.
+ */
 export async function keySet(): Promise<UtsJwks> {
-  const result = SignerKeysResultSchema.parse(await (await fetchSignerKeys()).json());
-  if (result.status !== 'ok') throw new Error(`the signer-keys read answered ${result.status}`);
-  return UtsJwksSchema.parse({ keys: result.signers.flatMap(entry => entry.keys) });
+  resetSignerKeysIsolate();
+  const answer = SignerKeysAnswerSchema.parse(await (await fetchSignerKeys()).json());
+  return UtsJwksSchema.parse({
+    keys: answer.signers.flatMap(entry => {
+      if (entry.status !== 'ok') throw new Error(`signer ${entry.signer} answered ${entry.status}`);
+      return entry.keys;
+    }),
+  });
 }

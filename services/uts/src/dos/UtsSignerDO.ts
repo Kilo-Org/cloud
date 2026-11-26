@@ -127,8 +127,9 @@ export class UtsSignerDO extends DurableObject<Env> {
   async publicKeys(): Promise<PublicKeysResult> {
     const phase = await this.#current();
     if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
-    // The feed Worker reads at most a few times per second, so this read also checks the stored
-    // alarm and sets it again when it is gone. `sign` runs far more often and skips that read.
+    // The signer-keys route reads each object at most once per 2 seconds per mint isolate (its
+    // copy), so this read can also check the stored alarm and set it again when it is gone. `sign`
+    // runs far more often and skips that read.
     await this.#scheduleAlarm(phase.state, 'confirm');
     return { status: 'ok', signer: phase.state.signer, keys: publishedKeys(phase.state) };
   }

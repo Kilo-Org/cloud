@@ -2,49 +2,65 @@ import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
 import {
   tokenKid,
   UTS_SIGNER_COUNT,
+  UTS_SIGNER_KEYS_HOLD_MS,
   UtsJwksSchema,
-  type SignerPublicKeys,
+  type SignerKeysEntry,
 } from '@kilocode/uts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/env';
 import { handleRequest } from '../../src/http';
 import {
   KEY_SET_FRESH_MS,
-  KEY_SET_HOLD_MS,
   KEY_SET_MAX_SERVED_AGE_MS,
   KEY_SET_READ_GUARD_MS,
   resetIsolate,
 } from '../../src/jwks';
 
-const T0 = 1_000_000_000;
+const T0 = 1_000_000_000_000;
 
 /** A synthetic base64url value of 32 bytes; the feed Worker checks shape, not curve points. */
 function base64Url32(seed: number): string {
   return `${String(seed).padStart(4, '0')}${'A'.repeat(39)}`;
 }
 
-function signerKeys(signer: number, generation = 0): SignerPublicKeys {
+type OkEntry = Extract<SignerKeysEntry, { status: 'ok' }>;
+
+/** Signer `signer`'s two keys of `generation`, as its object answered at `readAt`. */
+function signerEntry(signer: number, generation = 0, readAt = Date.now()): OkEntry {
   return {
     signer,
+    status: 'ok',
     keys: [0, 1].map(slot => {
       const x = base64Url32(generation * 1000 + signer * 10 + slot);
       return { kty: 'OKP', crv: 'Ed25519', x, kid: tokenKid(signer, x), alg: 'EdDSA', use: 'sig' };
     }),
+    readAt,
   };
 }
 
-const allSigners = (generation = 0) =>
-  Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => signerKeys(signer, generation));
+const allSigners = (generation = 0, readAt = Date.now()): SignerKeysEntry[] =>
+  Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => signerEntry(signer, generation, readAt));
 
-const okAnswer = (generation = 0) =>
-  Response.json({ status: 'ok', signers: allSigners(generation) });
+const okAnswer = (generation = 0, readAt = Date.now()) =>
+  Response.json({ signers: allSigners(generation, readAt) });
 
-/** A mint Worker binding that answers `answer` and counts reads. */
-function mintBinding(answer: () => Promise<Response>): Fetcher & { calls: number } {
+/** Every signer failed with `status`, as the mint Worker answers when it holds no keys. */
+const failedAnswer = (status: 'misconfigured' | 'unavailable') =>
+  Response.json(
+    { signers: Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })) },
+    { status: status === 'misconfigured' ? 500 : 503 }
+  );
+
+/** A mint Worker binding that answers `answer` and records each read's request options. */
+function mintBinding(
+  answer: () => Promise<Response>
+): Fetcher & { calls: number; inits: Array<RequestInit | undefined> } {
   const fake = {
     calls: 0,
-    fetch: async (): Promise<Response> => {
+    inits: new Array<RequestInit | undefined>(),
+    fetch: async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       fake.calls += 1;
+      fake.inits.push(init);
       return await answer();
     },
     connect: (): Socket => {
@@ -75,7 +91,16 @@ async function get(mint: Fetcher, at?: number, environment?: string): Promise<Re
   }
 }
 
-const firstX = async (response: Response) => UtsJwksSchema.parse(await response.json()).keys[0]?.x;
+const keysOf = async (response: Response) => UtsJwksSchema.parse(await response.json()).keys;
+
+/** The `x` of each key the response lists for `signer`. */
+async function xsOf(response: Response, signer: number): Promise<string[]> {
+  const prefix = `uts-token-${String(signer).padStart(2, '0')}-`;
+  return (await keysOf(response)).filter(key => key.kid.startsWith(prefix)).map(key => key.x);
+}
+
+const xs = (signer: number, generation: number) =>
+  signerEntry(signer, generation, T0).keys.map(key => key.x);
 
 beforeEach(() => {
   resetIsolate();
@@ -86,12 +111,13 @@ afterEach(() => {
 });
 
 describe('key set endpoint', () => {
-  it('serves the 32 keys of the 16 signers with the key-set cache header', async () => {
+  it('serves the 32 keys of the 16 signers with the key-set cache header and no Age', async () => {
     const response = await get(mintBinding(async () => okAnswer()));
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('max-age=300, stale-if-error=86400');
+    expect(response.headers.get('Age')).toBeNull();
     expect(response.headers.get('Content-Type')).toBe('application/json');
-    expect(UtsJwksSchema.parse(await response.json()).keys).toHaveLength(32);
+    expect(await keysOf(response)).toHaveLength(32);
   });
 
   it('answers 404 to other paths and 405 to other methods without a read', async () => {
@@ -124,6 +150,14 @@ describe('reads', () => {
     expect(mint.calls).toBe(1);
   });
 
+  it('aborts each mint read after the read guard', async () => {
+    const mint = mintBinding(async () => okAnswer());
+    await get(mint, T0);
+    const signal = mint.inits[0]?.signal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
+  });
+
   it('shares no copy between isolates: a new isolate makes its own read', async () => {
     const mint = mintBinding(async () => okAnswer());
     expect((await get(mint, T0)).status).toBe(200);
@@ -139,26 +173,46 @@ describe('reads', () => {
     expect(mint.calls).toBe(1);
   });
 
-  it('after the fresh window serves the held set and refreshes it once in the background', async () => {
+  it('after the fresh window serves the held set with its Age and refreshes it once in the background', async () => {
     let generation = 0;
     const mint = mintBinding(async () => okAnswer(generation));
     await get(mint, T0);
     generation = 1;
     const stale = await get(mint, T0 + KEY_SET_FRESH_MS);
-    expect(await firstX(stale)).toBe(signerKeys(0, 0).keys[0]?.x);
+    expect(await xsOf(stale, 0)).toEqual(xs(0, 0));
+    expect(stale.headers.get('Age')).toBe('10');
+    expect(stale.headers.get('Cache-Control')).toBe('max-age=290, stale-if-error=86390');
     expect(mint.calls).toBe(2);
     const refreshed = await get(mint, T0 + KEY_SET_FRESH_MS + 1);
-    expect(await firstX(refreshed)).toBe(signerKeys(0, 1).keys[0]?.x);
+    expect(await xsOf(refreshed, 0)).toEqual(xs(0, 1));
+    expect(refreshed.headers.get('Age')).toBeNull();
     expect(mint.calls).toBe(2);
   });
 
-  it('waits for the read once the held set is 15 seconds old, so it never serves an older set', async () => {
+  it('waits for the read once the newest keys are 17 seconds old, so it never serves older ones', async () => {
     let generation = 0;
     const mint = mintBinding(async () => okAnswer(generation));
     await get(mint, T0);
     generation = 1;
     const response = await get(mint, T0 + KEY_SET_MAX_SERVED_AGE_MS);
-    expect(await firstX(response)).toBe(signerKeys(0, 1).keys[0]?.x);
+    expect(await xsOf(response, 0)).toEqual(xs(0, 1));
+  });
+
+  it('counts the age from the signer read behind a mint Worker copy, and still reads once per guard window', async () => {
+    const mint = mintBinding(async () => okAnswer(0, Date.now() - 2000));
+    await get(mint, T0);
+    await get(mint, T0 + KEY_SET_FRESH_MS - 2000);
+    expect(mint.calls).toBe(1);
+    const response = await get(mint, T0 + KEY_SET_READ_GUARD_MS);
+    expect(response.headers.get('Age')).toBe('12');
+    expect(mint.calls).toBe(2);
+  });
+
+  it('counts a read time from a clock ahead of its own as the arrival time', async () => {
+    const mint = mintBinding(async () => okAnswer(0, Date.now() + 60_000));
+    await get(mint, T0);
+    await get(mint, T0 + KEY_SET_FRESH_MS);
+    expect(mint.calls).toBe(2);
   });
 
   it('never serves one environment the key set read for another', async () => {
@@ -168,14 +222,14 @@ describe('reads', () => {
     expect(mint.calls).toBe(2);
   });
 
-  it('keeps the newer key set when an older read finishes late', async () => {
+  it('keeps the newer keys when an older read finishes late', async () => {
     const { promise: oldAnswer, resolve: releaseOld } = Promise.withResolvers<void>();
     let call = 0;
     const mint = mintBinding(async () => {
       call += 1;
       if (call === 1) {
         await oldAnswer;
-        return okAnswer(0);
+        return okAnswer(0, T0);
       }
       return okAnswer(1);
     });
@@ -184,19 +238,101 @@ describe('reads', () => {
     const late = handleRequest(jwksRequest(), envWith(mint), lateCtx);
     clock.mockReturnValue(T0 + KEY_SET_READ_GUARD_MS);
     const newer = await handleRequest(jwksRequest(), envWith(mint), createExecutionContext());
-    expect(await firstX(newer)).toBe(signerKeys(0, 1).keys[0]?.x);
+    expect(await xsOf(newer, 0)).toEqual(xs(0, 1));
     releaseOld();
     await late;
     await waitOnExecutionContext(lateCtx);
     clock.mockReturnValue(T0 + KEY_SET_READ_GUARD_MS + 1);
     const held = await handleRequest(jwksRequest(), envWith(mint), createExecutionContext());
-    expect(await firstX(held)).toBe(signerKeys(0, 1).keys[0]?.x);
+    expect(await xsOf(held, 0)).toEqual(xs(0, 1));
+    expect(mint.calls).toBe(2);
+  });
+
+  it('lets a waiting request take the result of a read that replaced a hung one', async () => {
+    let call = 0;
+    const mint = mintBinding(async () => {
+      call += 1;
+      if (call === 1) return await new Promise<Response>(() => undefined);
+      return okAnswer();
+    });
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(T0);
+    void handleRequest(jwksRequest(), envWith(mint), createExecutionContext());
+    clock.mockReturnValue(T0 + 1);
+    const waiter = handleRequest(jwksRequest(), envWith(mint), createExecutionContext());
+    await scheduler.wait(50);
+    clock.mockReturnValue(T0 + KEY_SET_READ_GUARD_MS);
+    const starter = await handleRequest(jwksRequest(), envWith(mint), createExecutionContext());
+    expect(starter.status).toBe(200);
+    expect((await waiter).status).toBe(200);
     expect(mint.calls).toBe(2);
   });
 });
 
+describe('signers', () => {
+  it("takes a healthy signer's new keys while another signer fails, and keeps the failed signer's keys", async () => {
+    let failing = false;
+    const mint = mintBinding(async () => {
+      if (!failing) return okAnswer(0);
+      const signers = allSigners(0);
+      signers[3] = signerEntry(3, 1);
+      signers[7] = { signer: 7, status: 'unavailable' };
+      return Response.json({ signers }, { status: 503 });
+    });
+    await get(mint, T0);
+    failing = true;
+    const response = await get(mint, T0 + 20_000);
+    expect(response.status).toBe(200);
+    expect(await xsOf(response.clone(), 3)).toEqual(xs(3, 1));
+    expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
+    expect(await keysOf(response.clone())).toHaveLength(32);
+    expect(response.headers.get('Age')).toBe('20');
+    expect(response.headers.get('Cache-Control')).toBe('max-age=280, stale-if-error=86380');
+  });
+
+  it('takes keys the mint Worker held for a failed signer, with their own read time', async () => {
+    const mint = mintBinding(async () => {
+      const signers = allSigners(0);
+      signers[7] = signerEntry(7, 0, Date.now() - 3600 * 1000);
+      return Response.json({ signers });
+    });
+    const response = await get(mint, T0);
+    expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
+    expect(response.headers.get('Age')).toBe('3600');
+    expect(response.headers.get('Cache-Control')).toBe('max-age=0, stale-if-error=82800');
+  });
+
+  it("keeps its own newer keys for a signer over the mint Worker's older held ones", async () => {
+    let olderHeld = false;
+    const mint = mintBinding(async () => {
+      const signers = allSigners(0);
+      if (olderHeld) signers[7] = signerEntry(7, 2, T0 - 1000);
+      return Response.json({ signers });
+    });
+    await get(mint, T0);
+    olderHeld = true;
+    const response = await get(mint, T0 + KEY_SET_MAX_SERVED_AGE_MS);
+    expect(await xsOf(response, 7)).toEqual(xs(7, 0));
+  });
+
+  it('drops a signer whose keys are 24 hours old and serves the other signers', async () => {
+    let failing = false;
+    const mint = mintBinding(async () => {
+      if (!failing) return okAnswer(0);
+      const signers = allSigners(0);
+      signers[7] = { signer: 7, status: 'unavailable' };
+      return Response.json({ signers }, { status: 503 });
+    });
+    await get(mint, T0);
+    failing = true;
+    const response = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS);
+    expect(response.status).toBe(200);
+    expect(await xsOf(response.clone(), 7)).toEqual([]);
+    expect(await keysOf(response)).toHaveLength(30);
+  });
+});
+
 describe('failures', () => {
-  it('keeps serving the held set while reads fail, for up to 24 hours', async () => {
+  it('keeps serving the held set while reads fail, with its Age, for up to 24 hours', async () => {
     let fail = false;
     const mint = mintBinding(async () => {
       if (fail) throw new Error('network connection lost');
@@ -204,10 +340,30 @@ describe('failures', () => {
     });
     await get(mint, T0);
     fail = true;
-    expect((await get(mint, T0 + KEY_SET_MAX_SERVED_AGE_MS)).status).toBe(200);
-    expect((await get(mint, T0 + KEY_SET_HOLD_MS - 1)).status).toBe(200);
-    const expired = await get(mint, T0 + KEY_SET_HOLD_MS + KEY_SET_READ_GUARD_MS);
+    const held = await get(mint, T0 + 60_000);
+    expect(held.status).toBe(200);
+    expect(held.headers.get('Age')).toBe('60');
+    expect(held.headers.get('Cache-Control')).toBe('max-age=240, stale-if-error=86340');
+    const last = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS - 1000);
+    expect(last.status).toBe(200);
+    expect(last.headers.get('Cache-Control')).toBe('max-age=0, stale-if-error=1');
+    const expired = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS + KEY_SET_READ_GUARD_MS);
     expect(expired.status).toBe(503);
+  });
+
+  it('keeps serving the held set after any failed read: a refused caller or an invalid answer', async () => {
+    for (const failure of [
+      () => Response.json({ error: 'not_found' }, { status: 404 }),
+      () => Response.json({ signers: [] }),
+    ]) {
+      resetIsolate();
+      let fail = false;
+      const mint = mintBinding(async () => (fail ? failure() : okAnswer()));
+      await get(mint, T0);
+      fail = true;
+      expect((await get(mint, T0 + KEY_SET_MAX_SERVED_AGE_MS)).status).toBe(200);
+      expect(mint.calls).toBe(2);
+    }
   });
 
   it('answers 503 with Retry-After when it holds nothing, and reads at most once per guard window', async () => {
@@ -235,15 +391,14 @@ describe('failures', () => {
     expect((await get(mint)).status).toBe(503);
   });
 
-  it('answers 503 when the mint Worker reports a signer call that failed', async () => {
-    const mint = mintBinding(async () => Response.json({ status: 'unavailable' }, { status: 503 }));
-    expect((await get(mint)).status).toBe(503);
+  it('answers 503 when the mint Worker has keys for no signer', async () => {
+    expect((await get(mintBinding(async () => failedAnswer('unavailable')))).status).toBe(503);
   });
 
   it('answers 500 when the mint Worker refuses this caller or a signer object is misconfigured', async () => {
     for (const answer of [
       () => Response.json({ error: 'not_found' }, { status: 404 }),
-      () => Response.json({ status: 'misconfigured' }, { status: 500 }),
+      () => failedAnswer('misconfigured'),
     ]) {
       resetIsolate();
       const response = await get(mintBinding(async () => answer()));
@@ -253,20 +408,14 @@ describe('failures', () => {
   });
 
   it('answers 500 for an answer without every signer, with a private key part, or with a duplicate kid', async () => {
-    const missing = { status: 'ok', signers: allSigners().slice(1) };
+    const missing = { signers: allSigners().slice(1) };
     const withPrivate = allSigners();
-    withPrivate[0] = {
-      ...signerKeys(0),
-      keys: signerKeys(0).keys.map(key => ({ ...key, d: base64Url32(1) })),
-    };
+    const first = signerEntry(0);
+    withPrivate[0] = { ...first, keys: first.keys.map(key => ({ ...key, d: base64Url32(1) })) };
     const duplicated = allSigners();
-    const [first] = signerKeys(3).keys;
-    duplicated[3] = { signer: 3, keys: [first, first] };
-    for (const body of [
-      missing,
-      { status: 'ok', signers: withPrivate },
-      { status: 'ok', signers: duplicated },
-    ]) {
+    const third = signerEntry(3);
+    duplicated[3] = { ...third, keys: [...third.keys, ...third.keys] };
+    for (const body of [missing, { signers: withPrivate }, { signers: duplicated }]) {
       resetIsolate();
       expect((await get(mintBinding(async () => Response.json(body)))).status).toBe(500);
     }

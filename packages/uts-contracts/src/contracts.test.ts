@@ -7,7 +7,7 @@ import {
   SignJWT,
 } from 'jose';
 import { describe, expect, it } from 'vitest';
-import { UTS_ENDPOINTS } from './environment';
+import { UTS_ENDPOINTS, utsJwksCacheControl } from './environment';
 import {
   signerOfTokenKid,
   tokenKid,
@@ -17,10 +17,11 @@ import {
 } from './jwks';
 import { AuthorizationServerMetadataSchema } from './metadata';
 import {
-  SIGNER_KEYS_HTTP_STATUS,
-  SignerKeysResultSchema,
+  signerKeysHttpStatus,
+  SignerKeysAnswerSchema,
+  UTS_SIGNER_KEYS_HOLD_MS,
   UTS_SIGNER_KEYS_PATH,
-  type SignerPublicKeys,
+  type SignerKeysEntry,
 } from './signer-keys';
 
 const THUMBPRINT = 'A'.repeat(43);
@@ -48,6 +49,13 @@ describe('UTS endpoints', () => {
         jwksUri: 'http://localhost:8801/.well-known/jwks.json',
       },
     });
+  });
+
+  it('shrinks both key-set cache limits by the age of the oldest keys', () => {
+    expect(utsJwksCacheControl(0)).toBe('max-age=300, stale-if-error=86400');
+    expect(utsJwksCacheControl(42)).toBe('max-age=258, stale-if-error=86358');
+    expect(utsJwksCacheControl(3600)).toBe('max-age=0, stale-if-error=82800');
+    expect(utsJwksCacheControl(90_000)).toBe('max-age=0, stale-if-error=0');
   });
 });
 
@@ -103,37 +111,57 @@ describe('UtsJwksSchema', () => {
   });
 });
 
-describe('SignerKeysResultSchema', () => {
-  const signers = (): SignerPublicKeys[] =>
-    Array.from({ length: 16 }, (_, signer) => ({ signer, keys: [jwk(signer)] }));
+describe('SignerKeysAnswerSchema', () => {
+  const READ_AT = 1_800_000_000_000;
+  const signers = (): SignerKeysEntry[] =>
+    Array.from({ length: 16 }, (_, signer) => ({
+      signer,
+      status: 'ok',
+      keys: [jwk(signer)],
+      readAt: READ_AT,
+    }));
 
-  it('accepts every signer exactly once, and the two failure results', () => {
-    expect(SignerKeysResultSchema.parse({ status: 'ok', signers: signers() }).status).toBe('ok');
-    for (const status of ['misconfigured', 'unavailable'] as const) {
-      expect(SignerKeysResultSchema.parse({ status })).toEqual({ status });
-    }
-    expect(SignerKeysResultSchema.safeParse({ status: 'denied' }).success).toBe(false);
+  it('accepts every signer exactly once, each with its keys and read time or a failure', () => {
+    const answer = signers();
+    answer[3] = { signer: 3, status: 'misconfigured' };
+    answer[7] = { signer: 7, status: 'unavailable' };
+    expect(SignerKeysAnswerSchema.parse({ signers: answer }).signers[7]).toEqual({
+      signer: 7,
+      status: 'unavailable',
+    });
+    const failing = Array.from({ length: 16 }, (_, signer) => ({ signer, status: 'unavailable' }));
+    expect(SignerKeysAnswerSchema.safeParse({ signers: failing }).success).toBe(true);
+    const withoutReadTime = Array.from({ length: 16 }, (_, signer) => ({
+      signer,
+      status: 'ok',
+      keys: [jwk(signer)],
+    }));
+    expect(SignerKeysAnswerSchema.safeParse({ signers: withoutReadTime }).success).toBe(false);
   });
 
-  it('maps each result to its HTTP status on the internal path', () => {
+  it('maps an answer to its HTTP status on the internal path, and holds keys 24 hours', () => {
     expect(UTS_SIGNER_KEYS_PATH).toBe('/internal/signer-keys');
-    expect(SIGNER_KEYS_HTTP_STATUS).toEqual({ ok: 200, misconfigured: 500, unavailable: 503 });
+    expect(UTS_SIGNER_KEYS_HOLD_MS).toBe(24 * 60 * 60 * 1000);
+    expect(signerKeysHttpStatus({ signers: signers() })).toBe(200);
+    const unavailable = signers();
+    unavailable[4] = { signer: 4, status: 'unavailable' };
+    expect(signerKeysHttpStatus({ signers: unavailable })).toBe(503);
+    const misconfigured = [...unavailable];
+    misconfigured[9] = { signer: 9, status: 'misconfigured' };
+    expect(signerKeysHttpStatus({ signers: misconfigured })).toBe(500);
   });
 
-  it('rejects a missing or repeated signer and a kid of another signer', () => {
-    expect(
-      SignerKeysResultSchema.safeParse({ status: 'ok', signers: signers().slice(1) }).success
-    ).toBe(false);
+  it('rejects a missing or repeated signer, a kid of another signer, and a kid twice', () => {
+    expect(SignerKeysAnswerSchema.safeParse({ signers: signers().slice(1) }).success).toBe(false);
     const repeated = signers();
-    repeated[1] = { signer: 0, keys: [jwk(0)] };
-    expect(SignerKeysResultSchema.safeParse({ status: 'ok', signers: repeated }).success).toBe(
-      false
-    );
+    repeated[1] = { signer: 0, status: 'unavailable' };
+    expect(SignerKeysAnswerSchema.safeParse({ signers: repeated }).success).toBe(false);
     const foreignKid = signers();
-    foreignKid[2] = { signer: 2, keys: [jwk(3)] };
-    expect(SignerKeysResultSchema.safeParse({ status: 'ok', signers: foreignKid }).success).toBe(
-      false
-    );
+    foreignKid[2] = { signer: 2, status: 'ok', keys: [jwk(3)], readAt: READ_AT };
+    expect(SignerKeysAnswerSchema.safeParse({ signers: foreignKid }).success).toBe(false);
+    const twice = signers();
+    twice[5] = { signer: 5, status: 'ok', keys: [jwk(5), jwk(5)], readAt: READ_AT };
+    expect(SignerKeysAnswerSchema.safeParse({ signers: twice }).success).toBe(false);
   });
 });
 

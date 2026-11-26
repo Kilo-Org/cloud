@@ -10,7 +10,19 @@ export const UTS_JWKS_PATH = '/.well-known/jwks.json';
 export const UTS_AUTHORIZATION_SERVER_METADATA_PATH = '/.well-known/oauth-authorization-server';
 
 /** Design 5.7: a verifier keeps the key set 5 minutes and may serve it up to a day on error. */
-export const UTS_JWKS_CACHE_CONTROL = 'max-age=300, stale-if-error=86400';
+const UTS_JWKS_MAX_AGE_SECONDS = 300;
+const UTS_JWKS_STALE_IF_ERROR_SECONDS = 86_400;
+
+/**
+ * The key set's `Cache-Control` for a set whose oldest keys were read from their signer objects
+ * `ageSeconds` ago. The feed Worker sends that age as `Age` beside it, and both limits shrink by it,
+ * so a verifier keeps no key longer than 5 minutes, or 24 hours on error, after its signer read.
+ */
+export function utsJwksCacheControl(ageSeconds: number): string {
+  const maxAge = Math.max(0, UTS_JWKS_MAX_AGE_SECONDS - ageSeconds);
+  const staleIfError = Math.max(0, UTS_JWKS_STALE_IF_ERROR_SECONDS - ageSeconds);
+  return `max-age=${maxAge}, stale-if-error=${staleIfError}`;
+}
 
 export type UtsEndpoints = {
   /** The exact `iss` of every token this environment's UTS signs (design 7). */

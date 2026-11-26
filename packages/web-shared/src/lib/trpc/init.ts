@@ -38,6 +38,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   isAdminAuditInputRejection,
+  noteAdminAuditInputParsing,
   reportAdminAuditGap,
   runAdminAuditScope,
   type AdminAuditSpec,
@@ -574,8 +575,8 @@ const adminStepUpEnforcementMiddleware = t.middleware(
 // chained on `adminProcedure`, from its `adminAudit` meta. It runs after the
 // admin guard, so a refused non-admin records nothing, and before the step-up
 // guard and any specialized guard chained later, so their refusals are
-// recorded as failures. Input that never parsed records its failure with no
-// target.
+// recorded as failures. A failure keeps its spec target only when the input
+// parsed (see `adminAuditInputParsingMiddleware`).
 const adminAuditMiddleware = t.middleware(({ ctx, meta, path, type, getRawInput, next }) => {
   if (type !== 'mutation') return next();
   const spec = meta?.adminAudit;
@@ -588,6 +589,7 @@ const adminAuditMiddleware = t.middleware(({ ctx, meta, path, type, getRawInput,
     route: path,
     context: () => ctx,
     input: getRawInput,
+    reportsInputParsing: true,
     run: () => next(),
     outcomeOf: result =>
       result.ok
@@ -600,7 +602,23 @@ const adminAuditMiddleware = t.middleware(({ ctx, meta, path, type, getRawInput,
   });
 });
 
+// tRPC runs a procedure's `.input()` parser as a middleware after every `.use()`
+// chained before it, so the guards a refusal can come from (the step-up check
+// above, and the narrower guards chained on `adminProcedure`) run before it,
+// and none of them reads the raw input after this point. The first read of the
+// reader handed on here is therefore the parser's: it tells the audit scope
+// that a later failure came after parsing began.
+const adminAuditInputParsingMiddleware = t.middleware(({ getRawInput, next }) =>
+  next({
+    getRawInput: () => {
+      noteAdminAuditInputParsing();
+      return getRawInput();
+    },
+  })
+);
+
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)
   .use(adminAuditMiddleware)
-  .use(adminStepUpEnforcementMiddleware);
+  .use(adminStepUpEnforcementMiddleware)
+  .use(adminAuditInputParsingMiddleware);

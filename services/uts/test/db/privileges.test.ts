@@ -460,6 +460,7 @@ describe('functions', () => {
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
+      { routine: 'maintain_notice_rows', grantee: 'uts_app' },
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
       { routine: 'refresh_first_party', grantee: 'uts_app' },
       { routine: 'refresh_third_party', grantee: 'uts_app' },

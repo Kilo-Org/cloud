@@ -11,9 +11,10 @@ import type { ChannelOutcome } from './transports';
 
 /**
  * The notice delivery statements (migration `0010_notices.sql`), each one SQL statement through
- * the primary config: claim a notice (`pending` to `sending`, one claim per round), and finish the
- * claim with the round's attempts. The claim is the admission guard: only the statement that moves
- * a row to `sending` gets it, so two Workers never send one round twice.
+ * the primary config: claim a notice (`pending` to `sending`, one claim per round), finish the
+ * claim with the round's attempts, and one bounded retention step. The claim is the admission
+ * guard: only the statement that moves a row to `sending` gets it, so two Workers never send one
+ * round twice.
  */
 
 /** A notice claimed for one delivery round. */
@@ -25,7 +26,9 @@ export type ClaimedNotice = {
   details: Record<string, unknown>;
   createdAt: Date;
   round: number;
-  /** The account's primary email when the notice was claimed. */
+  /** The account's primary email when the notice was written. */
+  recipientEmail: string;
+  /** The account's primary email when the notice was claimed; also emailed when it differs. */
   primaryEmail: string;
   /** The address an email change replaced; set only for `primary_email_changed`. */
   oldEmail: string | null;
@@ -61,6 +64,8 @@ export type NoticeStore = {
   ): Promise<ClaimedNotice | null>;
   claimDueNotices(limit: number): Promise<ClaimedNotice[]>;
   finishNotice(input: FinishInput): Promise<FinishResult>;
+  /** One retention step; answers how many rows of each kind it deleted. */
+  maintainNoticeRows(batch: number): Promise<{ kind: string; deleted: number }[]>;
 };
 
 /** Runs `work` with the notice store of one identity-store connection. */
@@ -88,6 +93,7 @@ const ClaimedRowSchema = z
     details: z.record(z.string(), z.unknown()),
     created_at: z.date(),
     round: z.number().int().min(1).max(3),
+    recipient_email: z.string(),
     primary_email: z.string(),
     old_email: z.string().nullable(),
     settled_channels: ChannelListSchema,
@@ -100,6 +106,7 @@ const ClaimedRowSchema = z
     details: row.details,
     createdAt: row.created_at,
     round: row.round,
+    recipientEmail: row.recipient_email,
     primaryEmail: row.primary_email,
     oldEmail: row.old_email,
     settledChannels: row.settled_channels,
@@ -163,6 +170,13 @@ export function identityStoreNotices(store: IdentityStore): NoticeStore {
       return row.outcome === 'finished'
         ? { outcome: 'finished', delivery: row.delivery }
         : { outcome: 'stale_claim' };
+    },
+
+    async maintainNoticeRows(batch) {
+      return await store.rows(
+        { text: 'SELECT kind, deleted FROM uts.maintain_notice_rows($1)', values: [batch] },
+        z.object({ kind: z.string(), deleted: z.number().int().nonnegative() })
+      );
     },
   };
 }

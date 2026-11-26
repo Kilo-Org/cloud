@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { applyMigrations, loadMigrations } from '../../scripts/migrator';
 import { IdentityStore } from '../../src/db/client';
 import { NoticeAttemptRowSchema, SignInRowSchema } from '../../src/db/rows';
 import { credentialNotices } from '../../src/notices/credential';
@@ -172,21 +173,18 @@ describe('sign-in recording and new-device-and-network detection', () => {
     expect(await noticeRows(accountId)).toEqual([]);
   });
 
-  it('fires one notice for a new device on a new network, with the device and the region', async () => {
+  it('fires one notice for a new device on a new network, with the kind of device and the region', async () => {
     const { accountId } = await accountWithBaseline();
     await deviceSignIn(owner, accountId, randomBytes(32), PARIS);
     const [notice] = await noticeRows(accountId);
-    expect(notice).toMatchObject({
-      kind: 'new_device_network',
-      delivery: 'pending',
-      details: {
-        sessionKind: 'device',
-        deviceLabel: 'Kilo CLI 1.2.3',
-        platform: 'linux',
-        country: 'FR',
-        city: 'Paris',
-        methods: ['passkey'],
-      },
+    expect(notice).toMatchObject({ kind: 'new_device_network', delivery: 'pending' });
+    // The client's own label and platform stay in the sign-in row, never in the notice.
+    expect(notice.details).toEqual({
+      sessionKind: 'device',
+      deviceKind: 'desktop',
+      country: 'FR',
+      city: 'Paris',
+      methods: ['passkey'],
     });
     const rows = await signIns(accountId);
     expect(rows.at(-1)).toMatchObject({
@@ -285,10 +283,45 @@ describe('sign-in recording and new-device-and-network detection', () => {
       ['browser', true, false],
     ]);
     const [notice] = await noticeRows(accountId);
-    expect(notice.details).toMatchObject({
-      sessionKind: 'browser',
-      deviceLabel: 'Mozilla/5.0 (Macintosh) Firefox/140.0',
+    expect(notice.details).toMatchObject({ sessionKind: 'browser', deviceKind: 'browser' });
+    expect(JSON.stringify(notice.details)).not.toContain('Mozilla');
+  });
+
+  it('records a browser with an empty user agent, without a label', async () => {
+    const { accountId } = await accountWithBaseline();
+    await owner.query(
+      `INSERT INTO uts.browser_sessions
+         (account_id, token_hash, auth_time, amr, idle_expires_at, expires_at, user_agent)
+       VALUES ($1, $2, now(), '{oauth}', now() + interval '14 days', now() + interval '30 days', '')`,
+      [accountId, randomHash()]
+    );
+    expect((await signIns(accountId)).at(-1)).toMatchObject({
+      session_kind: 'browser',
+      device_label: null,
     });
+  });
+
+  it('counts an older live session as the baseline, even one without network data', async () => {
+    const accountId = await insertAccount(owner);
+    await owner.query(
+      `INSERT INTO uts.device_sessions (account_id, client_class, device_label, platform, auth_time, amr)
+       VALUES ($1, 'mobile', 'old phone', 'ios', now(), '{passkey}')`,
+      [accountId]
+    );
+    await deviceSignIn(owner, accountId, randomBytes(32), PARIS);
+    expect((await noticeRows(accountId)).map(row => row.kind)).toEqual(['new_device_network']);
+  });
+
+  it('counts an earlier sign-in without network data as the baseline', async () => {
+    const accountId = await insertAccount(owner);
+    await deviceSignIn(owner, accountId, randomBytes(32), { ip: null, asn: null });
+    await owner.query(
+      `UPDATE uts.device_sessions SET status = 'revoked', revoked_at = now(), revoke_reason = 'sign_out'
+       WHERE account_id = $1`,
+      [accountId]
+    );
+    await deviceSignIn(owner, accountId, randomBytes(32), PARIS);
+    expect((await noticeRows(accountId)).map(row => row.kind)).toEqual(['new_device_network']);
   });
 
   it('recognises a browser by its device key', async () => {
@@ -425,7 +458,7 @@ describe('notice delivery statements', () => {
     expect(await attempts(noticeId)).toEqual([]);
   });
 
-  it('sends an email change to the previous address too, then forgets that address', async () => {
+  it('sends an email change to the previous address too, then forgets both addresses', async () => {
     const accountId = await insertAccount(owner);
     const result = await owner.query<{ id: string }>(
       `INSERT INTO uts.notices (account_id, kind, old_email) VALUES ($1, 'primary_email_changed', 'old@example.com')
@@ -438,10 +471,11 @@ describe('notice delivery statements', () => {
     expect(email?.message).toMatchObject({
       to: [expect.stringMatching(/@example\.com$/), 'old@example.com'],
     });
-    const row = await owner.query('SELECT old_email FROM uts.notices WHERE id = $1', [
-      result.rows[0].id,
-    ]);
-    expect(row.rows).toEqual([{ old_email: null }]);
+    const row = await owner.query(
+      'SELECT recipient_email, old_email FROM uts.notices WHERE id = $1',
+      [result.rows[0].id]
+    );
+    expect(row.rows).toEqual([{ recipient_email: null, old_email: null }]);
     expect(
       await sqlStateOf(() =>
         owner.query(
@@ -450,6 +484,28 @@ describe('notice delivery statements', () => {
         )
       )
     ).toBe('23514');
+  });
+
+  it('emails the address of the event time even after the account changed it', async () => {
+    const accountId = await insertAccount(owner);
+    const before = await owner.query<{ primary_email: string }>(
+      'SELECT primary_email FROM uts.accounts WHERE id = $1',
+      [accountId]
+    );
+    const noticeId = await insertNotice(accountId, 'new_device_network', { deviceKind: 'browser' });
+    const stored = await owner.query('SELECT recipient_email FROM uts.notices WHERE id = $1', [
+      noticeId,
+    ]);
+    expect(stored.rows).toEqual([{ recipient_email: before.rows[0].primary_email }]);
+    await owner.query(`UPDATE uts.accounts SET primary_email = 'thief@example.com' WHERE id = $1`, [
+      accountId,
+    ]);
+    const outbox: RecordedMessage[] = [];
+    await dispatchNotice(noticeDeps(ALWAYS_SENT, outbox), noticeId);
+    const email = outbox.find(entry => entry.channel === 'email');
+    expect(email?.message).toMatchObject({
+      to: [before.rows[0].primary_email, 'thief@example.com'],
+    });
   });
 
   it('claims the credential notice a create statement wrote, by account and credential', async () => {
@@ -469,6 +525,20 @@ describe('notice delivery statements', () => {
     expect(outbox.map(entry => entry.channel)).toEqual(['push', 'email']);
     expect(outbox[0].message).toMatchObject({ title: 'New personal access token' });
     expect(await attempts(noticeId)).toHaveLength(2);
+  });
+
+  it('claims no credential notice older than an hour', async () => {
+    const accountId = await insertAccount(owner);
+    const patId = randomUUID();
+    const noticeId = await insertNotice(accountId, 'credential_created', {
+      credential: 'pat',
+      patId,
+    });
+    await owner.query(
+      `UPDATE uts.notices SET created_at = now() - interval '61 minutes' WHERE id = $1`,
+      [noticeId]
+    );
+    expect(await notices.claimCredentialNotice(accountId, 'pat', patId)).toBeNull();
   });
 
   it('sweeps due notices, reclaims a stopped claim, and gives up after 24 hours', async () => {
@@ -498,6 +568,77 @@ describe('notice delivery statements', () => {
     });
     expect(await attempts(due)).toEqual([{ round: 1, channel: 'push', outcome: 'sent' }]);
     expect(await attempts(old)).toEqual([]);
+  });
+
+  it('sends a fresh notice while more than 20 stale ones wait, and never sends a stale one', async () => {
+    const accountId = await insertAccount(owner);
+    const stale: string[] = [];
+    for (let index = 0; index < 25; index += 1) {
+      stale.push(await insertNotice(accountId, 'sessions_revoked'));
+    }
+    await owner.query(
+      `UPDATE uts.notices SET created_at = now() - interval '30 hours',
+         next_attempt_at = now() - interval '30 hours' WHERE id = ANY ($1)`,
+      [stale]
+    );
+    const fresh = await insertNotice(accountId, 'suspicious_sign_in');
+    // The direct claim refuses a stale notice; the pass settles stale ones and sends the fresh one.
+    expect(await notices.claimNotice(stale[24])).toBeNull();
+    const outbox: RecordedMessage[] = [];
+    // Notices of the other tests in this file may be due too; the passes take them as well.
+    for (let pass = 0; pass < 5; pass += 1) await sweepNotices(noticeDeps(ALWAYS_SENT, outbox));
+    expect(await attempts(fresh)).toEqual([
+      { round: 1, channel: 'push', outcome: 'sent' },
+      { round: 1, channel: 'email', outcome: 'sent' },
+    ]);
+    const sent = await owner.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM uts.notice_attempts WHERE notice_id = ANY ($1)',
+      [stale]
+    );
+    expect(sent.rows[0].count).toBe(0);
+    const states = await owner.query<{ delivery: string; count: number }>(
+      `SELECT delivery, count(*)::int AS count FROM uts.notices WHERE id = ANY ($1) GROUP BY 1`,
+      [stale]
+    );
+    expect(states.rows).toEqual([{ delivery: 'failed', count: 25 }]);
+  });
+
+  it('deletes devices and networks unseen for 90 days and finished notices after 400 days', async () => {
+    const { accountId } = await accountWithBaseline();
+    await deviceSignIn(owner, accountId, randomBytes(32), PARIS);
+    await owner.query(
+      `UPDATE uts.known_devices SET first_seen_at = now() - interval '100 days',
+         last_seen_at = now() - interval '91 days' WHERE account_id = $1`,
+      [accountId]
+    );
+    await owner.query(
+      `UPDATE uts.known_networks SET first_seen_at = now() - interval '100 days',
+         last_seen_at = now() - interval '91 days' WHERE account_id = $1 AND network_key = 'as3215'`,
+      [accountId]
+    );
+    const old = await insertNotice(accountId, 'sessions_revoked');
+    await dispatchNotice(noticeDeps(ALWAYS_SENT, []), old);
+    const kept = await insertNotice(accountId, 'sessions_revoked');
+    await owner.query(
+      `UPDATE uts.notices SET created_at = now() - interval '401 days' WHERE id = ANY ($1)`,
+      [[old, kept]]
+    );
+    const steps = await notices.maintainNoticeRows(500);
+    expect(steps.map(step => step.kind)).toEqual(['known_devices', 'known_networks', 'notices']);
+    const left = await owner.query<{ devices: number; networks: string[]; notices: string[] }>(
+      `SELECT
+         (SELECT count(*)::int FROM uts.known_devices WHERE account_id = $1) AS devices,
+         ARRAY(SELECT network_key FROM uts.known_networks WHERE account_id = $1) AS networks,
+         ARRAY(SELECT id::text FROM uts.notices WHERE id = ANY ($2)) AS notices`,
+      [accountId, [old, kept]]
+    );
+    // The pending notice stays (an unfinished notice is never deleted); the delivered one and its
+    // attempts go.
+    expect(left.rows).toEqual([{ devices: 0, networks: ['as3320'], notices: [kept] }]);
+    expect(await attempts(old)).toEqual([]);
+    expect(await sqlStateOf(() => app.query('SELECT * FROM uts.maintain_notice_rows(5001)'))).toBe(
+      '22023'
+    );
   });
 
   it('refuses a claim of more than 100 notices', async () => {
@@ -606,5 +747,53 @@ describe('security view', () => {
     expect(await sqlStateOf(() => reader.query('SELECT client_ip FROM uts_read.sign_ins'))).toBe(
       '42703'
     );
+  });
+});
+
+describe('migration 0010 baseline', () => {
+  it('records the devices and networks of sessions that predate it', async () => {
+    const empty = await TestDatabase.create('empty');
+    try {
+      const admin = await empty.connect();
+      const migrations = await loadMigrations();
+      await applyMigrations(
+        admin,
+        migrations.filter(migration => migration.name !== '0010_notices.sql')
+      );
+      await admin.query('SET ROLE uts_owner');
+      const accountId = await insertAccount(admin);
+      const laptop = randomBytes(32);
+      await deviceSignIn(admin, accountId, laptop, BERLIN);
+      await admin.query(
+        `INSERT INTO uts.browser_sessions
+           (account_id, token_hash, auth_time, amr, idle_expires_at, expires_at, client_ip)
+         VALUES ($1, $2, now(), '{oauth}', now() + interval '14 days', now() + interval '30 days',
+                 '192.0.2.77')`,
+        [accountId, randomHash()]
+      );
+      await admin.query('RESET ROLE');
+      await applyMigrations(admin, migrations);
+      await admin.query('SET ROLE uts_owner');
+
+      const known = await admin.query<{ devices: number; networks: string[] }>(
+        `SELECT (SELECT count(*)::int FROM uts.known_devices WHERE account_id = $1 AND device_key = $2)
+                  AS devices,
+                ARRAY(SELECT network_key FROM uts.known_networks WHERE account_id = $1
+                      ORDER BY network_key) AS networks`,
+        [accountId, laptop]
+      );
+      expect(known.rows).toEqual([{ devices: 1, networks: ['as3320', 'net:192.0.2.0/24'] }]);
+
+      // The first sign-in after the migration is compared with that baseline.
+      await deviceSignIn(admin, accountId, randomBytes(32), BERLIN);
+      await deviceSignIn(admin, accountId, randomBytes(32), PARIS);
+      const fired = await admin.query<{ kind: string }>(
+        'SELECT kind FROM uts.notices WHERE account_id = $1',
+        [accountId]
+      );
+      expect(fired.rows).toEqual([{ kind: 'new_device_network' }]);
+    } finally {
+      await empty.drop();
+    }
   });
 });

@@ -35,6 +35,9 @@ export type DeliveryResult = {
 /** Delivery rounds a background pass claims at most; each round makes at most 2 provider calls. */
 export const NOTICE_SWEEP_LIMIT = 20;
 
+/** Rows of each kind one background pass deletes at most (`uts.maintain_notice_rows`). */
+export const NOTICE_RETENTION_BATCH = 500;
+
 async function sendOn(
   channel: OutOfBandChannel,
   claimed: ClaimedNotice,
@@ -51,10 +54,11 @@ async function sendOn(
       });
     }
     if (transports.email === null) return 'not_configured';
-    const to = [claimed.primaryEmail];
-    if (claimed.oldEmail !== null && claimed.oldEmail !== claimed.primaryEmail) {
-      to.push(claimed.oldEmail);
-    }
+    // The address on file when the event happened, the address on file now, and the address an
+    // email change replaced, each once.
+    const to = [
+      ...new Set([claimed.recipientEmail, claimed.primaryEmail, claimed.oldEmail]),
+    ].filter((address): address is string => address !== null);
     return await transports.email({ to, ...noticeEmail(rendered) });
   } catch (error) {
     console.error(
@@ -133,11 +137,19 @@ export type SweepResult = {
   failed: number;
   /** Rounds whose finish statement failed; their notices come back after 5 minutes. */
   unfinished: number;
+  retention: { status: 'done'; deleted: number } | { status: 'failed' };
 };
+
+function errorFields(error: unknown) {
+  return error instanceof IdentityStoreError
+    ? { failure: error.failure, sqlState: error.sqlState }
+    : { error: error instanceof Error ? error.name : 'unknown' };
+}
 
 /**
  * The background pass: claims up to `NOTICE_SWEEP_LIMIT` due notices (new ones whose immediate
- * delivery never ran, retries, and claims left by a stopped Worker) and delivers them in parallel.
+ * delivery never ran, retries, and claims left by a stopped Worker), delivers them in parallel, and
+ * then runs one retention step. A failed retention step is logged and does not fail the pass.
  */
 export async function sweepNotices(deps: NoticeDeps): Promise<SweepResult> {
   const claimed = await deps.notices(store => store.claimDueNotices(NOTICE_SWEEP_LIMIT));
@@ -148,23 +160,27 @@ export async function sweepNotices(deps: NoticeDeps): Promise<SweepResult> {
     pending: 0,
     failed: 0,
     unfinished: 0,
+    retention: { status: 'failed' },
   };
   for (const settled of results) {
     if (settled.status === 'rejected') {
       result.unfinished += 1;
-      const error: unknown = settled.reason;
       console.error(
-        JSON.stringify({
-          event: 'uts.notice.finish_failed',
-          ...(error instanceof IdentityStoreError
-            ? { failure: error.failure, sqlState: error.sqlState }
-            : { error: error instanceof Error ? error.name : 'unknown' }),
-        })
+        JSON.stringify({ event: 'uts.notice.finish_failed', ...errorFields(settled.reason) })
       );
       continue;
     }
     const { finish } = settled.value;
     if (finish.outcome === 'finished') result[finish.delivery] += 1;
+  }
+  try {
+    const steps = await deps.notices(store => store.maintainNoticeRows(NOTICE_RETENTION_BATCH));
+    result.retention = {
+      status: 'done',
+      deleted: steps.reduce((total, step) => total + step.deleted, 0),
+    };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'uts.notice.retention_failed', ...errorFields(error) }));
   }
   return result;
 }

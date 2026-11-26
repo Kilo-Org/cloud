@@ -22,7 +22,7 @@ import {
   noticeEmail,
   noticePush,
   plainText,
-  producerValue,
+  placeName,
   renderNotice,
 } from '../../src/notices/kinds';
 import type {
@@ -36,19 +36,25 @@ import { mailgunEmail, notificationsServicePush } from '../../src/notices/transp
 const CREATED_AT = new Date('2026-11-26T14:05:09Z');
 const LINK_LIKE = /:\/\/|www\.|[\p{L}\p{N}-]\.\p{L}{2,}|@|https?:/iu;
 
-/** Every field a producer may set, each holding a link, to show none reaches the text. */
+/**
+ * Every field a producer may set, holding what an attacker would put there: links, a phone
+ * number, an instruction. None of it may reach a message.
+ */
 const HOSTILE_DETAILS = {
-  deviceLabel: 'Chrome 120.0 on https://evil.example/login',
-  platform: 'macOS 14.1 www.evil.example',
+  deviceLabel: 'Call Kilo support 1 888 555 0100 now',
+  platform: 'Reply with your code to 4242',
+  deviceKind: 'browser',
   country: 'DE',
-  city: 'Berlin evil.example',
+  city: 'Berlin 0800 123',
   credential: 'pat',
-  method: 'passkey',
+  method: 'toString',
   change: 'added',
   clientName: 'Visit evil.example/claim or mail me@evil.example',
   actor: 'support',
   flaggedKeys: 2,
 };
+/** Words and digits of the hostile values that no message may carry. */
+const HOSTILE_WORDS = /Call|888|0100|Reply|4242|evil|0800|Visit|claim|function/;
 
 function claimed(kind: NoticeKind, overrides: Partial<ClaimedNotice> = {}): ClaimedNotice {
   return {
@@ -56,9 +62,10 @@ function claimed(kind: NoticeKind, overrides: Partial<ClaimedNotice> = {}): Clai
     claimId: '00000000-0000-4000-8000-0000000000c1',
     accountId: 'oauth/user-1',
     kind,
-    details: { country: 'DE', city: 'Berlin', deviceLabel: 'Kilo CLI 1.2.3', platform: 'linux' },
+    details: { country: 'DE', city: 'Berlin', deviceKind: 'desktop' },
     createdAt: CREATED_AT,
     round: 1,
+    recipientEmail: 'user@example.com',
     primaryEmail: 'user@example.com',
     oldEmail: null,
     settledChannels: [],
@@ -80,6 +87,7 @@ function memoryStore(
       finished.push(input);
       return finish;
     },
+    maintainNoticeRows: async () => [{ kind: 'notices', deleted: 3 }],
   };
   return { store, finished };
 }
@@ -106,22 +114,39 @@ describe('notice kinds', () => {
     }
   });
 
-  it.each(NOTICE_KINDS)('render %s without a link, even from hostile details', kind => {
-    for (const details of [{}, HOSTILE_DETAILS, { deviceLabel: 42, country: 'not a code' }]) {
-      const rendered = renderNotice(kind, details, CREATED_AT);
-      const email = noticeEmail(rendered);
-      const push = noticePush(rendered);
-      for (const text of [rendered.title, rendered.text, email.subject, email.text, push.body]) {
-        expect(text).not.toMatch(LINK_LIKE);
+  it.each(NOTICE_KINDS)(
+    'render %s without a link or a producer word, even from hostile details',
+    kind => {
+      for (const details of [{}, HOSTILE_DETAILS, { deviceLabel: 42, country: 'not a code' }]) {
+        const rendered = renderNotice(kind, details, CREATED_AT);
+        const email = noticeEmail(rendered);
+        const push = noticePush(rendered);
+        for (const text of [
+          rendered.title,
+          rendered.text,
+          email.subject,
+          email.text,
+          push.title,
+          push.body,
+        ]) {
+          expect(text).not.toMatch(LINK_LIKE);
+          expect(text).not.toMatch(HOSTILE_WORDS);
+        }
+        expect(rendered.text).toContain('Time: 2026-11-26 14:05 UTC');
       }
-      expect(rendered.text).toContain('Time: 2026-11-26 14:05 UTC');
     }
-  });
+  );
 
-  it('names the event, the time, the approximate network and the device', () => {
+  it('names the event, the time, the approximate network and the kind of device only', () => {
     const rendered = renderNotice(
       'new_device_network',
-      { country: 'DE', city: 'Berlin', deviceLabel: 'Kilo CLI 1.2.3', platform: 'linux' },
+      {
+        country: 'DE',
+        city: 'Berlin',
+        deviceKind: 'desktop',
+        deviceLabel: 'Kilo CLI 1.2.3',
+        platform: 'linux',
+      },
       CREATED_AT
     );
     expect(rendered).toEqual({
@@ -130,10 +155,25 @@ describe('notice kinds', () => {
         'Your Kilo account was signed in to from a device and a network it has not used before.',
         'Time: 2026-11-26 14:05 UTC',
         'Approximate location, from the network: Berlin, DE',
-        'Device: Kilo CLI 1.2.3, linux',
+        'Device: a desktop client, such as the Kilo CLI',
       ].join('\n'),
     });
     expect(noticeEmail(rendered).text).toContain('This email holds no links.');
+    expect(
+      renderNotice('new_device_network', { deviceKind: 'browser' }, CREATED_AT).text
+    ).toContain('Device: a web browser');
+    expect(renderNotice('new_device_network', { deviceKind: 'mobile' }, CREATED_AT).text).toContain(
+      'Device: a mobile device'
+    );
+  });
+
+  it('names a sign-in method only from its closed list', () => {
+    const line = (method: string) =>
+      renderNotice('sign_in_method_changed', { method, change: 'removed' }, CREATED_AT).text.split(
+        '\n'
+      )[0];
+    expect(line('github')).toBe('GitHub sign-in was removed on your Kilo account.');
+    expect(line('toString')).toBe('A sign-in method was removed on your Kilo account.');
   });
 
   it('says a change came from Kilo support without naming anyone', () => {
@@ -158,10 +198,11 @@ describe('notice kinds', () => {
     );
   });
 
-  it('turns a producer value into plain words', () => {
-    expect(producerValue('evil.example/login?x=1')).toBe('evil example login x 1');
-    expect(producerValue('Kilo CLI 1.2.3')).toBe('Kilo CLI 1.2.3');
-    expect(producerValue('a'.repeat(100))).toHaveLength(64);
+  it('keeps only the letters of a place name', () => {
+    expect(placeName('evil.example/login?x=1')).toBe('evil example login x');
+    expect(placeName("Saint-Jean-d'Angély")).toBe("Saint-Jean-d'Angély");
+    expect(placeName('Call 1 888 555 0100')).toBe('Call');
+    expect(placeName('a'.repeat(100))).toHaveLength(40);
   });
 });
 
@@ -202,6 +243,16 @@ describe('notice delivery', () => {
     expect(outbox[1]).toMatchObject({
       channel: 'email',
       message: { to: ['user@example.com', 'old@example.com'] },
+    });
+  });
+
+  it('emails the address of the event time and the address on file now when they differ', async () => {
+    const outbox: RecordedMessage[] = [];
+    const notice = claimed('new_device_network', { primaryEmail: 'changed@example.com' });
+    await deliverClaimed(deps(memoryStore([notice]).store, ALWAYS_SENT, outbox), notice);
+    expect(outbox[1]).toMatchObject({
+      channel: 'email',
+      message: { to: ['user@example.com', 'changed@example.com'] },
     });
   });
 
@@ -303,7 +354,25 @@ describe('notice delivery', () => {
       },
     };
     const result = await sweepNotices(deps(store, ALWAYS_SENT, []));
-    expect(result).toEqual({ claimed: 2, delivered: 1, pending: 0, failed: 0, unfinished: 1 });
+    expect(result).toEqual({
+      claimed: 2,
+      delivered: 1,
+      pending: 0,
+      failed: 0,
+      unfinished: 1,
+      retention: { status: 'done', deleted: 3 },
+    });
+  });
+
+  it('logs a failed retention step without failing the pass', async () => {
+    const store: NoticeStore = {
+      ...memoryStore([]).store,
+      maintainNoticeRows: async () => {
+        throw new Error('down');
+      },
+    };
+    const result = await sweepNotices(deps(store, ALWAYS_SENT, []));
+    expect(result.retention).toEqual({ status: 'failed' });
   });
 
   it('delivers the credential notice the create statement wrote, once', async () => {

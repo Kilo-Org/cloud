@@ -81,7 +81,7 @@ SELECT caller.live, CASE WHEN caller.live THEN json_build_object(
     FROM (
       SELECT browser.last_seen_at, json_build_object(
         'id', browser.id, 'kind', 'browser', 'client_class', NULL,
-        'device_label', left(browser.user_agent, 128), 'platform', NULL,
+        'device_label', NULLIF(left(browser.user_agent, 128), ''), 'platform', NULL,
         'signed_in_at', browser.auth_time, 'last_seen_at', browser.last_seen_at,
         'methods', to_json(browser.amr::text[]),
         'network', json_build_object('asn', browser.asn, 'country', browser.country, 'city', browser.city)

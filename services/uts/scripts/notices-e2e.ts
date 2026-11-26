@@ -164,14 +164,11 @@ async function main() {
   const admin = new pg.Client({ connectionString: adminUrl });
   await admin.connect();
   await admin.query('SET ROLE uts_owner');
-  await admin.query(
-    `INSERT INTO uts.accounts (id, primary_email) VALUES ($1, 'e2e@example.com') ON CONFLICT DO NOTHING`,
-    [ACCOUNT]
-  );
-  // A clean history for the development account, so the run starts at its first sign-in.
-  for (const table of ['sign_ins', 'known_devices', 'known_networks', 'notices']) {
-    await admin.query(`DELETE FROM uts.${table} WHERE account_id = $1`, [ACCOUNT]);
-  }
+  // A fresh development account, so the run starts at its first sign-in with no older session.
+  await admin.query('DELETE FROM uts.accounts WHERE id = $1', [ACCOUNT]);
+  await admin.query(`INSERT INTO uts.accounts (id, primary_email) VALUES ($1, 'e2e@example.com')`, [
+    ACCOUNT,
+  ]);
   const attemptsOf = async (noticeId: string) =>
     (
       await admin.query<{ round: number; channel: string; outcome: string }>(
@@ -291,6 +288,10 @@ async function main() {
     {
       messages: sent.length,
     }
+  );
+  check(
+    'no message holds a device label, a platform or an app name the client chose',
+    texts.every(text => !/laptop|linux|Safari|evil|Visit|claim/i.test(text))
   );
   const emailChange = sent.find(
     entry => entry.channel === 'email' && entry.message.subject.includes('email changed')

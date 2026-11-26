@@ -202,16 +202,20 @@ counts as a new device every time). The trigger upserts `uts.known_devices` and
 network is `as<number>` when the autonomous system is known, else the /24 (IPv4) or /48 (IPv6)
 prefix; a row unseen for 90 days counts as new again. The `new_device_network` notice fires only
 when both the device and the network are new: a new address in a known autonomous system, or a
-known device on a new network, fires nothing. The account's first sign-in sets the baseline and
-fires nothing, and a sign-in without network data fires nothing. "New" is decided by the upsert
-itself, so two concurrent sign-ins from one new device and network fire one notice.
+known device on a new network, fires nothing. "New" is decided by the upsert itself, so two
+concurrent sign-ins from one new device and network fire one notice. A sign-in without network
+data fires nothing. The account's first sign-in sets the baseline and fires nothing; an account
+has a baseline once it has a known network, a recorded sign-in or another live session, and
+migration 0010 fills `known_devices` and `known_networks` from the live grants and sessions that
+exist when it runs, so an account that predates it is not treated as new.
 
 **Notices.** A `uts.notices` row is the in-app notice, which the security page always shows. Its
 producer writes it in the statement of the change (the PAT and bot key statements, the sign-in
-trigger, later the method, email, device, CI policy, consent and revoke statements); `details`
-holds the fields the text reads (`deviceLabel`, `platform`, `country`, `city`, `credential`,
-`method`, `change`, `clientName`, `actor`, `flaggedKeys`), never a link or an email address. An
-email change puts the replaced address in `old_email`, which is cleared when the notice finishes.
+trigger, later the method, email, device, CI policy, consent and revoke statements). `details`
+holds the fields the text reads (`deviceKind`, `country`, `city`, `credential`, `method`, `change`,
+`actor`, `flaggedKeys`), never a link or an email address. A trigger stores the account's primary
+email in `recipient_email` when the row is written; an email change puts the replaced address in
+`old_email`. Both are cleared when the notice finishes.
 
 | Kind | Channels, in order |
 |---|---|
@@ -219,18 +223,26 @@ email change puts the replaced address in `old_email`, which is cleared when the
 | `sign_in_code_stopped` | push (sign-in emails are what the stop is about) |
 
 Email always follows push: a device that receives push may be one a thief signed in, while the
-address on file is the user's. An email change also goes to the previous address, in its own
-message. No channel carries a link: the text names the event, the time, the approximate network
-and the device, and points to the security page; `plainText` refuses anything a mail client or
-a phone could open as a link, and `producerValue` turns a producer's value into plain words.
-Email is plain text with Mailgun tracking off.
+address on file is the user's. The email goes to the address of the event time, to the address
+on file at sending time when that differs (so an address changed after the event cannot take the
+notice away), and for an email change to the previous address, each in its own message.
+
+No channel carries a link, and none carries text that a client or a third party chose: a device
+label, a platform string or an app name is the attacker's own words when the event is an attack
+(a phone number, an instruction). The text names the event, the time, the approximate place from
+the network (`placeName`: letters only), and the kind of device from a closed list (a web browser,
+a desktop client such as the Kilo CLI, a mobile device), and points to the security page.
+`plainText` refuses anything a mail client or a phone could open as a link. Email is plain text
+with Mailgun tracking off.
 
 **Delivery.** One delivery round is three steps, each its own statement or call, and the
 identity-store connection is not held while a provider answers:
 
 1. Claim (`uts.claim_notice`, `uts.claim_credential_notice`, `uts.claim_due_notices`): `pending`
    to `sending` with a new claim id; rows another statement holds are skipped, so one round runs
-   once. A claim older than 5 minutes (its Worker stopped) can be claimed again.
+   once. A claim older than 5 minutes (its Worker stopped) can be claimed again before the third
+   round. A pending notice written more than 24 hours ago is never claimed. The credential claim
+   reads only the account's pending notices of the last hour.
 2. Send push, then email, skipping the channels an earlier round settled. Each answers `sent`,
    `no_target`, `not_configured`, `retryable_failure` or `permanent_failure`; a provider that throws
    or does not answer within 10 seconds is a retryable failure.
@@ -239,10 +251,19 @@ identity-store connection is not held while a provider answers:
    failed retryably, else `delivered` when a channel sent it, else `failed`. A finish under a claim
    that is no longer current changes nothing (`stale_claim`).
 
-A notice is tried in at most 3 rounds and for 24 hours; the in-app row stays whatever happens. The
-account API's `CredentialNotices` port (`src/notices/credential.ts`) claims the
-`credential_created` notice that the create statement wrote and delivers it at once;
-`sweepNotices` (at most 20 notices per pass) delivers every other due notice and the retries.
+A notice is tried in at most 3 rounds and for 24 hours; the in-app row stays whatever happens.
+Each background pass first settles up to 500 notices past those limits (delivered when an earlier
+attempt sent them, else failed), without sending them. The account API's `CredentialNotices` port
+(`src/notices/credential.ts`) claims the `credential_created` notice that the create statement
+wrote and delivers it at once; `sweepNotices` (at most 20 notices per pass) delivers every other
+due notice and the retries, then runs one retention step (`uts.maintain_notice_rows`, at most 500
+rows of each kind): known devices and networks unseen for 90 days, and finished notices with
+their attempts 400 days after they were written.
+
+The deployed Worker calls `sweepNotices` from the minute cron of the audit outbox relay, which
+joins this code when the branches are integrated. Until that wiring lands, the sign-in notice and
+every retry stay `pending` in a deployed environment (they show in-app only), and only the
+credential notice port sends at once, once it is wired with real transports.
 
 | Channel | Provider | Adapter |
 |---|---|---|
@@ -256,9 +277,11 @@ Locally both channels use `fakeTransports` (`src/notices/fake-transports.ts`), w
 grant and its device session and, only for a live session, lists the newest 50 sign-ins, the live
 sessions, the passkeys, sign-in methods, live PATs, third-party consents and CI trust policies, and
 the newest 50 notices with their attempts and their text. The `uts_read` views leave out client
-addresses, device keys and `old_email`. The route needs the account API's bearer check, so the
-deployed entry serves it once that check is wired; the development entry serves it with a caller
-check from the `Kilo-Dev-Account` and `Kilo-Dev-Grant` headers.
+addresses, device keys, `recipient_email` and `old_email`. The device labels, platforms, user
+agents and app names in the sign-in, session and credential lists are the client's own raw text:
+the page must render them as escaped text, never as markup or a link. The route needs the account
+API's bearer check, so the deployed entry serves it once that check is wired; the development
+entry serves it with a caller check from the `Kilo-Dev-Account` and `Kilo-Dev-Grant` headers.
 
 `scripts/notices-e2e.ts` runs the whole path against `wrangler dev --env local`: real code
 exchanges (baseline, new device on a new network, a second new device, the first one again),

@@ -11,8 +11,13 @@ import type { NOTICE_KINDS } from '../db/enums';
  * No notice carries a link, in any channel: a link that performs a state change invites phishing
  * and lets a mail scanner act by accident. A notice names the event, the time and the approximate
  * network, and it points the reader to the security page of their account. `plainText` refuses
- * any text that a mail client or a phone could turn into a link, so a producer's value (a device
- * label, a client name) cannot add one either.
+ * any text that a mail client or a phone could turn into a link.
+ *
+ * No notice carries text that the client, or a third party, chose either: a device label, a
+ * platform string or an app's name is the attacker's own words when the event is an attack (a
+ * phone number, an instruction). The text uses only fixed words: the kind of device from a closed
+ * list, the place from the network (letters only), and closed names for methods. Those raw values
+ * stay on the security page, in the sign-in and credential lists.
  */
 
 export type NoticeKind = (typeof NOTICE_KINDS)[number];
@@ -36,26 +41,30 @@ export const NOTICE_CHANNEL_PLAN: Readonly<Record<NoticeKind, readonly OutOfBand
   bot_key_flagged: ['push', 'email'],
 };
 
-const ProducerText = z.string().min(1).max(200);
+/** The kind of client that signed in, as the sign-in trigger records it; a closed list. */
+const DEVICE_WORDS = {
+  browser: 'a web browser',
+  desktop: 'a desktop client, such as the Kilo CLI',
+  mobile: 'a mobile device',
+} as const;
 
 /**
  * The `details` fields the notice text reads. A producer may store more; a field of the wrong
  * shape is left out of the text rather than failing the notice.
  */
 const NoticeDetailsSchema = z.object({
-  deviceLabel: ProducerText.optional().catch(undefined),
-  platform: ProducerText.optional().catch(undefined),
+  deviceKind: z.enum(['browser', 'desktop', 'mobile']).optional().catch(undefined),
   country: z
     .string()
     .regex(/^[A-Z]{2}$/)
     .optional()
     .catch(undefined),
-  city: ProducerText.optional().catch(undefined),
+  /** The city from the network's location (Cloudflare), not from the client. */
+  city: z.string().min(1).max(128).optional().catch(undefined),
   credential: z.enum(['pat', 'bot_key']).optional().catch(undefined),
   /** A sign-in method or passkey change: what changed and how. */
-  method: ProducerText.optional().catch(undefined),
+  method: z.string().max(32).optional().catch(undefined),
   change: z.enum(['added', 'removed']).optional().catch(undefined),
-  clientName: ProducerText.optional().catch(undefined),
   /** Set when Kilo support made the change; the notice never names the staff member. */
   actor: z.enum(['user', 'support']).optional().catch(undefined),
   flaggedKeys: z.number().int().positive().optional().catch(undefined),
@@ -79,21 +88,20 @@ export function plainText(text: string): string {
 }
 
 /**
- * A producer's value as notice text: letters, digits, spaces and `-_()+,'` only, and a dot only
- * before a digit (a version such as 14.1), at most 64 characters. Anything else becomes a space,
- * so `evil.example/x` reads as `evil example x` and no client can open it.
+ * A place name as notice text: letters, spaces, `-` and `'` only, at most 40 characters. A digit,
+ * a dot or any other sign becomes a space, so no number, host or address can ride on it.
  */
-export function producerValue(value: string): string {
+export function placeName(value: string): string {
   return value
-    .replace(/\.(?!\p{N})/gu, ' ')
-    .replace(/[^\p{L}\p{N} _()+,'.-]/gu, ' ')
+    .replace(/[^\p{L} '-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 64)
+    .slice(0, 40)
     .trim();
 }
 
-const METHOD_NAMES: Readonly<Record<string, string>> = {
+/** The closed names of sign-in methods a notice can mention; any other value reads generically. */
+const METHOD_NAMES: Readonly<Record<string, string>> = Object.freeze({
   passkey: 'A passkey',
   google: 'Google sign-in',
   openai: 'OpenAI sign-in',
@@ -106,7 +114,7 @@ const METHOD_NAMES: Readonly<Record<string, string>> = {
   linkedin: 'LinkedIn sign-in',
   workos: 'Single sign-on',
   email: 'Email sign-in',
-};
+});
 
 function what(kind: NoticeKind, details: NoticeDetails): { title: string; line: string } {
   const by = details.actor === 'support' ? ' by Kilo support' : '';
@@ -117,10 +125,12 @@ function what(kind: NoticeKind, details: NoticeDetails): { title: string; line: 
         line: 'Your Kilo account was signed in to from a device and a network it has not used before.',
       };
     case 'sign_in_method_changed': {
-      const method =
-        details.method === undefined
-          ? 'A passkey or sign-in method'
-          : (METHOD_NAMES[details.method] ?? 'A sign-in method');
+      let method = 'A passkey or sign-in method';
+      if (details.method !== undefined) {
+        method = Object.hasOwn(METHOD_NAMES, details.method)
+          ? METHOD_NAMES[details.method]
+          : 'A sign-in method';
+      }
       const change = details.change === undefined ? 'added or removed' : details.change;
       return {
         title: 'Sign-in method changed',
@@ -152,16 +162,11 @@ function what(kind: NoticeKind, details: NoticeDetails): { title: string; line: 
         title: 'CI access changed',
         line: 'A CI trust policy, which lets a CI workflow act for your Kilo account, was created or changed.',
       };
-    case 'third_party_client_approved': {
-      const client =
-        details.clientName === undefined
-          ? 'An app'
-          : `The app "${producerValue(details.clientName)}"`;
+    case 'third_party_client_approved':
       return {
         title: 'App access approved',
-        line: `${client} was given access to your Kilo account.`,
+        line: 'An app was given access to your Kilo account. The security page names it.',
       };
-    }
     case 'sessions_revoked':
       return {
         title: 'Sessions signed out',
@@ -209,16 +214,12 @@ export function renderNotice(
   const lines = [line, `Time: ${utcMinute(createdAt)}`];
   const place = [details.city, details.country]
     .filter(part => part !== undefined)
-    .map(producerValue)
+    .map(placeName)
     .filter(part => part !== '');
   if (place.length > 0) {
     lines.push(`Approximate location, from the network: ${place.join(', ')}`);
   }
-  const device = [details.deviceLabel, details.platform]
-    .filter(part => part !== undefined)
-    .map(producerValue)
-    .filter(part => part !== '');
-  if (device.length > 0) lines.push(`Device: ${device.join(', ')}`);
+  if (details.deviceKind !== undefined) lines.push(`Device: ${DEVICE_WORDS[details.deviceKind]}`);
   return { title: plainText(title), text: plainText(lines.join('\n')) };
 }
 

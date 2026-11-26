@@ -5,6 +5,10 @@ import { z } from 'zod';
  * security notices of the caller's account, from the identity store's read replica. The route is
  * on the issuer origin and takes a UTS access token for the `uts` audience with
  * `uts:security.read` that names its grant (`sid`).
+ *
+ * `device_label`, `platform`, `client_name` and `client_id` are the client's or app's own text,
+ * which an attacker chooses when the event is an attack: a page renders them as escaped text,
+ * never as markup or a link.
  */
 export const UTS_SECURITY_PATH = '/account/security';
 export const UTS_SECURITY_READ_SCOPE = 'uts:security.read';

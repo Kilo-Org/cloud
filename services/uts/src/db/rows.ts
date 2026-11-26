@@ -427,6 +427,7 @@ export const NoticeRowSchema = z.strictObject({
   rounds: z.number().int().min(0).max(3),
   claim_id: uuid.nullable(),
   claimed_at: timestamp.nullable(),
+  recipient_email: z.string().nullable(),
   old_email: z.string().nullable(),
 });
 

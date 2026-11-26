@@ -12,8 +12,11 @@
 --   push and then email, and finishes the claim with one attempt row per channel. A claim that
 --   is not finished within 5 minutes can be claimed again, and a late finish of an older claim
 --   changes nothing.
--- * Nothing here stores a link, a token or an email address in `details`. The previous address of
---   an email change sits in `old_email` only until its notice is finished.
+-- * Nothing here stores a link, a token or an email address in `details`. The address a notice
+--   goes to is fixed when the row is written (`recipient_email`), and the previous address of an
+--   email change sits in `old_email`; both are cleared when the notice is finished.
+-- * Retention (`uts.maintain_notice_rows`, run by each background pass): a known device or network
+--   unseen for 90 days, and a finished notice with its attempts after 400 days.
 
 SET LOCAL ROLE uts_owner;
 
@@ -45,24 +48,56 @@ ALTER TABLE uts.notices
   ADD COLUMN rounds smallint NOT NULL DEFAULT 0 CHECK (rounds BETWEEN 0 AND 3),
   ADD COLUMN claim_id uuid,
   ADD COLUMN claimed_at timestamptz,
+  -- The account's primary email when the notice was written (`uts.fill_notice_recipient`). The
+  -- email goes there, and also to the address on file at sending time when that differs, so an
+  -- address changed after the event cannot take the notice away from the user.
+  ADD COLUMN recipient_email uts.email,
   -- The address an email change replaced: the change notice also goes there, because the new
-  -- address may be the one a thief controls. Cleared when the notice is finished.
+  -- address may be the one a thief controls.
   ADD COLUMN old_email uts.email,
-  ADD CONSTRAINT notices_old_email_kind CHECK (old_email IS NULL OR kind = 'primary_email_changed'),
+  ADD CONSTRAINT notices_old_email_kind CHECK (old_email IS NULL OR kind = 'primary_email_changed');
+
+-- Rows written before this migration (none outside development) get their account's address.
+UPDATE uts.notices AS notice
+SET recipient_email = account.primary_email
+FROM uts.accounts AS account
+WHERE account.id = notice.account_id AND notice.delivery = 'pending';
+
+ALTER TABLE uts.notices
   ADD CONSTRAINT notices_delivery_shape CHECK (
     CASE delivery
       WHEN 'pending' THEN claim_id IS NULL AND claimed_at IS NULL AND delivered_at IS NULL
-        AND failed_at IS NULL AND rounds < 3
+        AND failed_at IS NULL AND rounds < 3 AND recipient_email IS NOT NULL
       WHEN 'sending' THEN claim_id IS NOT NULL AND claimed_at IS NOT NULL AND delivered_at IS NULL
-        AND failed_at IS NULL AND rounds >= 1
+        AND failed_at IS NULL AND rounds >= 1 AND recipient_email IS NOT NULL
       WHEN 'delivered' THEN claim_id IS NULL AND claimed_at IS NULL AND delivered_at IS NOT NULL
-        AND failed_at IS NULL AND old_email IS NULL
+        AND failed_at IS NULL AND recipient_email IS NULL AND old_email IS NULL
       ELSE claim_id IS NULL AND claimed_at IS NULL AND delivered_at IS NULL
-        AND failed_at IS NOT NULL AND old_email IS NULL
+        AND failed_at IS NOT NULL AND recipient_email IS NULL AND old_email IS NULL
     END
   );
 CREATE INDEX notices_due_idx ON uts.notices (next_attempt_at) WHERE delivery = 'pending';
 CREATE INDEX notices_sending_idx ON uts.notices (claimed_at) WHERE delivery = 'sending';
+CREATE INDEX notices_finished_idx ON uts.notices (created_at)
+  WHERE delivery IN ('delivered', 'failed');
+
+-- Every producer writes a notice with the account's current primary email as its recipient,
+-- whether its statement names one or not.
+CREATE FUNCTION uts.fill_notice_recipient() RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF NEW.delivery = 'pending' AND NEW.recipient_email IS NULL THEN
+    SELECT primary_email INTO STRICT NEW.recipient_email FROM uts.accounts WHERE id = NEW.account_id;
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER notices_fill_recipient
+  BEFORE INSERT ON uts.notices
+  FOR EACH ROW EXECUTE FUNCTION uts.fill_notice_recipient();
 
 -- One row per channel tried in a delivery round, in the order tried: push, then email. In-app
 -- has no row; the notice row itself is the in-app notice.
@@ -92,6 +127,7 @@ CREATE TABLE uts.known_devices (
   PRIMARY KEY (account_id, device_key),
   CONSTRAINT known_devices_seen_order CHECK (first_seen_at <= last_seen_at)
 );
+CREATE INDEX known_devices_last_seen_idx ON uts.known_devices (last_seen_at);
 
 CREATE TABLE uts.known_networks (
   account_id uts.account_id NOT NULL REFERENCES uts.accounts (id) ON DELETE CASCADE,
@@ -101,6 +137,7 @@ CREATE TABLE uts.known_networks (
   PRIMARY KEY (account_id, network_key),
   CONSTRAINT known_networks_seen_order CHECK (first_seen_at <= last_seen_at)
 );
+CREATE INDEX known_networks_last_seen_idx ON uts.known_networks (last_seen_at);
 
 -- Recent sign-ins for the security page: the newest 50 per account. The session reference
 -- becomes NULL when the session row is deleted; the kind stays.
@@ -152,13 +189,22 @@ END;
 -- that it renewed, has `first_seen_at = now()`. Two concurrent sign-ins from one new device and
 -- network serialize on the primary key, so the second sees the first's row and fires nothing.
 -- A NULL device key (no per-install key) is always new; a NULL network key never is, because
--- there is nothing to compare. The first sign-in of an account, which has no known network yet,
--- sets the baseline and fires nothing.
+-- there is nothing to compare.
+--
+-- The first sign-in of an account sets the baseline and fires nothing. An account has a baseline
+-- once it has a known network, a recorded sign-in, or another live session: an account whose
+-- sessions predate this migration, or carried no network, is not treated as new.
+--
+-- The notice carries only facts the sign-in cannot choose: the kind of client from a closed list
+-- (`browser`, `desktop`, `mobile`), the approximate place from the network, and the sign-in
+-- methods. The device label and platform the client sent stay in `uts.sign_ins` for the security
+-- page, never in a notice text (design section 5.13).
 CREATE FUNCTION uts.record_sign_in(
   p_account_id text,
   p_session_kind uts.sign_in_session_kind,
   p_session_id uuid,
   p_device_key bytea,
+  p_device_kind text,
   p_amr uts.auth_method[],
   p_device_label text,
   p_platform text,
@@ -177,7 +223,19 @@ DECLARE
   network_new boolean := false;
   new_notice_id uuid;
 BEGIN
-  has_baseline := EXISTS (SELECT 1 FROM uts.known_networks WHERE account_id = p_account_id);
+  IF p_device_kind NOT IN ('browser', 'desktop', 'mobile') THEN
+    RAISE EXCEPTION 'unknown device kind' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  has_baseline := EXISTS (SELECT 1 FROM uts.known_networks WHERE account_id = p_account_id)
+    OR EXISTS (SELECT 1 FROM uts.sign_ins WHERE account_id = p_account_id)
+    OR EXISTS (
+      SELECT 1 FROM uts.device_sessions
+      WHERE account_id = p_account_id AND status = 'active' AND id <> p_session_id
+    )
+    OR EXISTS (
+      SELECT 1 FROM uts.browser_sessions
+      WHERE account_id = p_account_id AND status = 'active' AND id <> p_session_id
+    );
 
   IF p_device_key IS NOT NULL THEN
     INSERT INTO uts.known_devices AS known (account_id, device_key, first_seen_at, last_seen_at)
@@ -209,8 +267,7 @@ BEGIN
       p_account_id, 'new_device_network',
       jsonb_strip_nulls(jsonb_build_object(
         'sessionKind', p_session_kind,
-        'deviceLabel', p_device_label,
-        'platform', p_platform,
+        'deviceKind', p_device_kind,
         'country', p_country,
         'city', p_city,
         'methods', to_jsonb(p_amr::text[])
@@ -255,9 +312,9 @@ DECLARE
 BEGIN
   SELECT * INTO STRICT device_session FROM uts.device_sessions WHERE id = NEW.device_session_id;
   PERFORM uts.record_sign_in(
-    NEW.account_id, 'device', device_session.id, NEW.dpop_jkt, device_session.amr,
-    device_session.device_label, device_session.platform, device_session.client_ip,
-    device_session.asn, device_session.country, device_session.city
+    NEW.account_id, 'device', device_session.id, NEW.dpop_jkt, device_session.client_class::text,
+    device_session.amr, device_session.device_label, device_session.platform,
+    device_session.client_ip, device_session.asn, device_session.country, device_session.city
   );
   RETURN NULL;
 END
@@ -273,8 +330,8 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   PERFORM uts.record_sign_in(
-    NEW.account_id, 'browser', NEW.id, NEW.device_key_hash, NEW.amr,
-    left(NEW.user_agent, 128), NULL, NEW.client_ip, NEW.asn, NEW.country, NEW.city
+    NEW.account_id, 'browser', NEW.id, NEW.device_key_hash, 'browser', NEW.amr,
+    NULLIF(left(NEW.user_agent, 128), ''), NULL, NEW.client_ip, NEW.asn, NEW.country, NEW.city
   );
   RETURN NULL;
 END
@@ -283,9 +340,32 @@ CREATE TRIGGER browser_sessions_record_sign_in
   AFTER INSERT ON uts.browser_sessions
   FOR EACH ROW EXECUTE FUNCTION uts.record_browser_sign_in();
 
--- What a Worker needs to deliver a claimed notice: the account's current primary email (read at
--- claim time, so a notice goes to the address on file), the previous one of an email change, and
--- the channels an earlier round already settled, which this round skips.
+-- The baseline of every account that already holds live sessions: their device keys and
+-- networks, so the first sign-in after this migration is compared with them (design 5.13).
+INSERT INTO uts.known_devices (account_id, device_key, first_seen_at, last_seen_at)
+SELECT grant_row.account_id, grant_row.dpop_jkt, min(grant_row.created_at),
+  max(greatest(grant_row.created_at, grant_row.last_used_at))
+FROM uts.refresh_grants AS grant_row
+WHERE grant_row.status = 'active'
+GROUP BY grant_row.account_id, grant_row.dpop_jkt;
+
+INSERT INTO uts.known_networks (account_id, network_key, first_seen_at, last_seen_at)
+SELECT live.account_id, live.network_key, min(live.created_at),
+  max(greatest(live.created_at, live.last_seen_at))
+FROM (
+  SELECT account_id, uts.network_key(client_ip, asn) AS network_key, created_at, last_seen_at
+  FROM uts.device_sessions WHERE status = 'active'
+  UNION ALL
+  SELECT account_id, uts.network_key(client_ip, asn), created_at, last_seen_at
+  FROM uts.browser_sessions WHERE status = 'active'
+) AS live
+WHERE live.network_key IS NOT NULL
+GROUP BY live.account_id, live.network_key;
+
+-- What a Worker needs to deliver a claimed notice: the address fixed when the notice was written,
+-- the account's primary email now (the email also goes there when it differs), the previous
+-- address of an email change, and the channels an earlier round already settled, which this
+-- round skips.
 CREATE TYPE uts.claimed_notice AS (
   notice_id uuid,
   claim_id uuid,
@@ -294,15 +374,16 @@ CREATE TYPE uts.claimed_notice AS (
   details jsonb,
   created_at timestamptz,
   round smallint,
+  recipient_email text,
   primary_email text,
   old_email text,
   settled_channels uts.notice_channel[]
 );
 
--- Claims the given notices that are due: pending with `next_attempt_at` passed, or sending under a
--- claim older than 5 minutes (its Worker stopped before finishing). A notice past its third round
--- is not claimed again. Rows another statement holds are skipped, so two Workers never claim one
--- notice at once.
+-- Claims the given notices that are due: pending with `next_attempt_at` passed and written in the
+-- last 24 hours, or sending under a claim older than 5 minutes (its Worker stopped before
+-- finishing) and before its third round. Rows another statement holds are skipped, so two
+-- Workers never claim one notice at once.
 CREATE FUNCTION uts.claim_notice_rows(p_ids uuid[]) RETURNS SETOF uts.claimed_notice
 LANGUAGE sql
 SET search_path = pg_catalog, pg_temp
@@ -311,7 +392,8 @@ AS $$
     SELECT notice.id FROM uts.notices AS notice
     WHERE notice.id = ANY (p_ids)
       AND (
-        (notice.delivery = 'pending' AND notice.next_attempt_at <= now())
+        (notice.delivery = 'pending' AND notice.next_attempt_at <= now()
+          AND notice.created_at >= now() - interval '24 hours')
         OR (notice.delivery = 'sending' AND notice.claimed_at < now() - interval '5 minutes'
             AND notice.rounds < 3)
       )
@@ -325,7 +407,8 @@ AS $$
     RETURNING notice.*
   )
   SELECT claimed.id, claimed.claim_id, claimed.account_id::text, claimed.kind, claimed.details,
-    claimed.created_at, claimed.rounds, account.primary_email::text, claimed.old_email::text,
+    claimed.created_at, claimed.rounds, claimed.recipient_email::text,
+    account.primary_email::text, claimed.old_email::text,
     ARRAY(
       SELECT DISTINCT attempt.channel FROM uts.notice_attempts AS attempt
       WHERE attempt.notice_id = claimed.id
@@ -346,7 +429,8 @@ AS $$
 $$;
 
 -- Claims the `credential_created` notice that the create statement wrote for one PAT or org bot
--- key: the account's notices are few, so this reads `notices_account_idx` for the account.
+-- key. Only a pending notice of the last hour qualifies, so the read is a range of
+-- `notices_account_idx` that an account's older notices do not lengthen.
 CREATE FUNCTION uts.claim_credential_notice(
   p_account_id text,
   p_credential text,
@@ -359,6 +443,8 @@ AS $$
   SELECT * FROM uts.claim_notice_rows(ARRAY(
     SELECT notice.id FROM uts.notices AS notice
     WHERE notice.account_id = p_account_id
+      AND notice.created_at > now() - interval '1 hour'
+      AND notice.delivery = 'pending'
       AND notice.kind = 'credential_created'
       AND notice.details @> jsonb_build_object(
         'credential', p_credential,
@@ -369,7 +455,9 @@ $$;
 
 -- The background pass: up to `p_limit` due notices, oldest first. A pending notice older than 24
 -- hours is no longer sent, and a third-round claim that was never finished is not retried: each is
--- delivered when an earlier attempt sent it, else failed (its in-app row stays).
+-- delivered when an earlier attempt sent it, else failed (its in-app row stays). Up to 500 such
+-- rows are settled per call; the claim itself never takes them, so a larger backlog only waits
+-- for the next calls and never delays fresh notices.
 CREATE FUNCTION uts.claim_due_notices(p_limit integer) RETURNS SETOF uts.claimed_notice
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -390,24 +478,26 @@ BEGIN
         AND stale.created_at < now() - interval '24 hours')
       OR (stale.delivery = 'sending' AND stale.rounds = 3
         AND stale.claimed_at < now() - interval '5 minutes')
-    LIMIT p_limit
+    LIMIT 500
     FOR UPDATE SKIP LOCKED
   )
   UPDATE uts.notices AS notice
   SET delivery = CASE WHEN given_up.sent THEN 'delivered' ELSE 'failed' END::uts.notice_delivery,
     delivered_at = CASE WHEN given_up.sent THEN now() END,
     failed_at = CASE WHEN given_up.sent THEN NULL ELSE now() END,
-    claim_id = NULL, claimed_at = NULL, old_email = NULL
+    claim_id = NULL, claimed_at = NULL, recipient_email = NULL, old_email = NULL
   FROM given_up
   WHERE notice.id = given_up.id;
   RETURN QUERY SELECT * FROM uts.claim_notice_rows(ARRAY(
     SELECT due.id FROM (
       (SELECT pending.id, pending.next_attempt_at AS due_at FROM uts.notices AS pending
        WHERE pending.delivery = 'pending' AND pending.next_attempt_at <= now()
+         AND pending.created_at >= now() - interval '24 hours'
        ORDER BY pending.next_attempt_at LIMIT p_limit)
       UNION ALL
       (SELECT sending.id, sending.claimed_at FROM uts.notices AS sending
        WHERE sending.delivery = 'sending' AND sending.claimed_at < now() - interval '5 minutes'
+         AND sending.rounds < 3
        ORDER BY sending.claimed_at LIMIT p_limit)
     ) AS due
     ORDER BY due.due_at
@@ -481,13 +571,13 @@ BEGIN
     next_state := 'delivered';
     UPDATE uts.notices AS target
     SET delivery = 'delivered', delivered_at = now(), claim_id = NULL, claimed_at = NULL,
-      old_email = NULL
+      recipient_email = NULL, old_email = NULL
     WHERE target.id = p_notice_id;
   ELSE
     next_state := 'failed';
     UPDATE uts.notices AS target
     SET delivery = 'failed', failed_at = now(), claim_id = NULL, claimed_at = NULL,
-      old_email = NULL
+      recipient_email = NULL, old_email = NULL
     WHERE target.id = p_notice_id;
   END IF;
   outcome := 'finished';
@@ -496,8 +586,54 @@ BEGIN
 END
 $$;
 
+-- Retention, one bounded step per call (each background pass runs it): known devices and
+-- networks unseen for 90 days (they count as new again anyway), and finished notices with their
+-- attempts 400 days after they were written. Each kind deletes at most `p_batch` rows.
+CREATE FUNCTION uts.maintain_notice_rows(p_batch integer)
+RETURNS TABLE (kind text, deleted integer)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF p_batch NOT BETWEEN 1 AND 5000 THEN
+    RAISE EXCEPTION 'delete between 1 and 5000 rows' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  DELETE FROM uts.known_devices AS known
+  WHERE (known.account_id, known.device_key) IN (
+    SELECT stale.account_id, stale.device_key FROM uts.known_devices AS stale
+    WHERE stale.last_seen_at < now() - interval '90 days'
+    LIMIT p_batch
+  );
+  kind := 'known_devices';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.known_networks AS known
+  WHERE (known.account_id, known.network_key) IN (
+    SELECT stale.account_id, stale.network_key FROM uts.known_networks AS stale
+    WHERE stale.last_seen_at < now() - interval '90 days'
+    LIMIT p_batch
+  );
+  kind := 'known_networks';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.notices AS notice
+  WHERE notice.id IN (
+    SELECT old.id FROM uts.notices AS old
+    WHERE old.delivery IN ('delivered', 'failed') AND old.created_at < now() - interval '400 days'
+    LIMIT p_batch
+  );
+  kind := 'notices';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+END
+$$;
+
 -- Views for the security page, read through the replica config. They leave out client addresses,
--- device keys and the old address of an email change.
+-- device keys and the recipient and old addresses of a notice.
 CREATE VIEW uts_read.notices AS
   SELECT id, account_id, kind, details, created_at, delivery, delivered_at, failed_at, read_at
   FROM uts.notices;
@@ -520,5 +656,6 @@ GRANT EXECUTE ON FUNCTION
   uts.claim_notice(uuid),
   uts.claim_credential_notice(text, text, uuid),
   uts.claim_due_notices(integer),
-  uts.finish_notice(uuid, uuid, uts.notice_channel[], jsonb)
+  uts.finish_notice(uuid, uuid, uts.notice_channel[], jsonb),
+  uts.maintain_notice_rows(integer)
 TO uts_app;

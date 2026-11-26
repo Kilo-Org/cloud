@@ -4,18 +4,18 @@ import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provide
 import { onlyRoute } from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
 import type { CustomPricingTiers } from '@kilocode/db/schema-types';
+import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
+  testCustomLlmCredentialsEnvelope,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
@@ -32,10 +32,10 @@ const pricing: CustomPricingTiers = [
     },
   },
 ];
-const encryptedApiKey = encryptApiKey(
-  JSON.stringify({ type: 'api_key', api_key: 'sk-upstream' }),
-  BYOK_ENCRYPTION_KEY
-);
+const encryptedApiKey = testCustomLlmCredentialsEnvelope({
+  type: 'api_key',
+  api_key: 'sk-upstream',
+});
 
 function providerInput(
   requestedModel: string,
@@ -52,6 +52,8 @@ function providerInput(
     organizationId,
   };
 }
+
+useFakeByokKms();
 
 describe('getProvider with public custom LLMs', () => {
   beforeAll(async () => {

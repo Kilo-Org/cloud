@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
+import { scrubBreadcrumb } from './sentry-scrub';
+import { scrubEvent } from './sentry-scrub.test-helpers';
 
 // Assembled from parts so the fixture reads as a plain URL value.
 const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');

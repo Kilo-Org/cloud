@@ -18,8 +18,15 @@ export async function POST(request: Request): Promise<Response> {
 
   const first = await exchangeOnce({ baseToken: input.baseToken, audience: INTERMEDIATE_AUDIENCE });
   if (first.token === undefined) {
+    // No first-hop token, no chain to try: the run says nothing about chaining.
     return Response.json(
-      { intermediate: { status: first.status, errorBody: first.errorBody }, chained: null },
+      {
+        intermediate: { status: first.status, errorBody: first.errorBody },
+        chained: null,
+        vercelRefusedChain: false,
+        chainedRateLimited: false,
+        chainInconclusive: true,
+      },
       { headers: { 'cache-control': 'no-store' } }
     );
   }

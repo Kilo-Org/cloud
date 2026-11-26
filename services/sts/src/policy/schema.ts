@@ -16,17 +16,30 @@ const SlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
 const StableIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const NumericIdSchema = z.string().regex(/^[0-9]{1,20}$/);
 const RefSchema = z.string().regex(/^refs\/[A-Za-z0-9._/-]{1,200}$/);
-const GithubEnvironmentSchema = z.string().min(1).max(255);
+/** GitHub's own limits: an owner name of up to 39 characters, a repository name of up to 100. */
+const GithubRepositorySchema = z.string().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/);
+/** Plain names only, so the token's `sub` carries the name as written, with nothing escaped. */
+const GithubEnvironmentSchema = z.string().regex(/^[A-Za-z0-9._-]{1,255}$/);
+const JobWorkflowRefSchema = z
+  .string()
+  .regex(
+    /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}\/\.github\/workflows\/[A-Za-z0-9._-]{1,200}\.ya?ml@refs\/[A-Za-z0-9._/-]{1,200}$/
+  );
 
 /**
- * GitHub events that run with the base repository's privileges on code or input from someone
- * else. A token from one of them is refused unless the policy names the event.
+ * The events a GitHub policy may accept, an allowlist (kilocode CI design 3.1). Every event a fork
+ * author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
+ * `pull_request_review`, `discussion`, `merge_group` and the rest) is in no list, so no policy can
+ * accept it. `workflow_run` runs with the base repository's privileges after a run that a pull
+ * request may have started, so a policy that accepts it accepts nothing else.
  */
-export const GITHUB_PRIVILEGED_EVENTS = [
-  'pull_request_target',
-  'workflow_run',
-  'issue_comment',
-] as const;
+export const GITHUB_EVENTS = ['push', 'schedule', 'workflow_dispatch', 'workflow_run'] as const;
+
+/** A production GitHub policy accepts only jobs that run on this ref (design 4.2). */
+export const GITHUB_PRODUCTION_REF = 'refs/heads/main';
+
+/** The bundle folder of a GitHub policy is `/ci/<workload>`, so its name starts with this. */
+export const GITHUB_WORKLOAD_PREFIX = 'ci-';
 
 export const WorkerBindingIdentitySchema = z.strictObject({
   kind: z.literal('worker-binding'),
@@ -46,22 +59,47 @@ export const FlyIdentitySchema = z.strictObject({
 });
 
 /**
- * GitHub Actions tokens bound to the repository and owner ids. `environments` binds the GitHub
- * environment claim and is required for any policy that grants production; `refs` is an extra
- * filter. https://docs.github.com/en/actions/reference/security/oidc
+ * GitHub Actions job tokens (https://docs.github.com/en/actions/reference/security/oidc). The
+ * repository and owner ids bind the identity; `repository` (`<owner>/<name>`) builds the exact
+ * immutable-format subject the token must carry. `environment` is the one GitHub environment the
+ * policy trusts, required for production and for any token grant. `jobWorkflowRefs` lists every
+ * workflow file whose jobs may use the policy, each with its ref; a called reusable workflow is its
+ * own entry, because its jobs carry its own `job_workflow_ref`.
  */
-export const GithubIdentitySchema = z
-  .strictObject({
-    kind: z.literal('github-oidc'),
-    repositoryId: NumericIdSchema,
-    repositoryOwnerId: NumericIdSchema,
-    environments: z.array(GithubEnvironmentSchema).min(1).max(32).optional(),
-    refs: z.array(RefSchema).min(1).max(32).optional(),
-    allowedEvents: z.array(z.enum(GITHUB_PRIVILEGED_EVENTS)).min(1).max(3).optional(),
-  })
-  .refine(identity => identity.environments !== undefined || identity.refs !== undefined, {
-    message: 'github-oidc binds environments, refs, or both',
-  });
+export const GithubIdentitySchema = z.strictObject({
+  kind: z.literal('github-oidc'),
+  repository: GithubRepositorySchema,
+  repositoryId: NumericIdSchema,
+  repositoryOwnerId: NumericIdSchema,
+  environment: GithubEnvironmentSchema.optional(),
+  refs: z.array(RefSchema).min(1).max(32).default([GITHUB_PRODUCTION_REF]),
+  jobWorkflowRefs: z.array(JobWorkflowRefSchema).min(1).max(32),
+  events: z.array(z.enum(GITHUB_EVENTS)).min(1).max(GITHUB_EVENTS.length),
+});
+
+export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
+
+/**
+ * The `sub` a token for this identity must carry: GitHub's immutable format, which names the owner
+ * and repository ids next to the names. A job with an environment carries the environment form; any
+ * other job carries the ref form for its `ref` claim.
+ */
+export function githubSubject(identity: GithubIdentity, ref: string): string {
+  const [owner, name] = identity.repository.split('/');
+  const repository = `repo:${owner}@${identity.repositoryOwnerId}/${name}@${identity.repositoryId}`;
+  return identity.environment === undefined
+    ? `${repository}:ref:${ref}`
+    : `${repository}:environment:${identity.environment}`;
+}
+
+/**
+ * The manager folder a policy's own secrets live in (design 4.2), under the root folder the
+ * refresher reads; `/shared` is the fallback for every policy.
+ */
+export function bundleFolder(policy: Policy): { root: '/ci' | '/workloads'; path: string } {
+  const root = policy.identity.kind === 'github-oidc' ? '/ci' : '/workloads';
+  return { root, path: `${root}/${policy.workload}` };
+}
 
 /**
  * The Vercel environments a policy may list. `development` is not one: its tokens come from a
@@ -184,6 +222,47 @@ function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
 
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 
+function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
+  const problems: string[] = [];
+  if (!policy.workload.startsWith(GITHUB_WORKLOAD_PREFIX)) {
+    problems.push(
+      `a github-oidc workload is named ${GITHUB_WORKLOAD_PREFIX}<job>; its bundle folder is /ci/<workload>`
+    );
+  }
+  if (hasDuplicates(identity.refs)) problems.push('identity.refs contains a duplicate');
+  if (hasDuplicates(identity.jobWorkflowRefs)) {
+    problems.push('identity.jobWorkflowRefs contains a duplicate');
+  }
+  if (hasDuplicates(identity.events)) problems.push('identity.events contains a duplicate');
+  if (identity.events.includes('workflow_run') && identity.events.length > 1) {
+    problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
+  }
+  const workflowPrefix = `${identity.repository}/.github/workflows/`;
+  for (const entry of identity.jobWorkflowRefs) {
+    if (!entry.startsWith(workflowPrefix)) {
+      problems.push(`job workflow ${entry} is not a workflow file of ${identity.repository}`);
+    }
+    const ref = entry.slice(entry.indexOf('@') + 1);
+    if (!identity.refs.includes(ref)) {
+      problems.push(`job workflow ${entry} runs on a ref that identity.refs does not list`);
+    }
+  }
+  if (policy.environments.includes('production')) {
+    if (identity.environment === undefined) {
+      problems.push('a github-oidc policy that grants production must bind identity.environment');
+    }
+    if (identity.refs.some(ref => ref !== GITHUB_PRODUCTION_REF)) {
+      problems.push(
+        `a github-oidc policy that grants production accepts only ${GITHUB_PRODUCTION_REF}`
+      );
+    }
+  }
+  if (policy.audiences.length > 0 && identity.environment === undefined) {
+    problems.push('a github-oidc policy that grants tokens must bind identity.environment');
+  }
+  return problems;
+}
+
 /**
  * Cross-field checks a single schema cannot express. Returns one message per problem. `registry`
  * is the scope registry the grants are checked against; tests pass their own.
@@ -203,17 +282,7 @@ export function policyFileProblems(
     }
   }
   if (policy.identity.kind === 'github-oidc') {
-    const { refs, environments, allowedEvents } = policy.identity;
-    if (refs && hasDuplicates(refs)) problems.push('refs contains a duplicate');
-    if (environments && hasDuplicates(environments)) {
-      problems.push('identity.environments contains a duplicate');
-    }
-    if (allowedEvents && hasDuplicates(allowedEvents)) {
-      problems.push('allowedEvents contains a duplicate');
-    }
-    if (policy.environments.includes('production') && environments === undefined) {
-      problems.push('a github-oidc policy that grants production must bind identity.environments');
-    }
+    problems.push(...githubProblems(policy, policy.identity));
   }
   if (policy.identity.kind === 'vercel-oidc') {
     const sources = policy.identity.environments;

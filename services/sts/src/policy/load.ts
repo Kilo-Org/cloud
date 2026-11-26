@@ -35,23 +35,31 @@ function canonicalIdentity(policy: Policy): string {
     case 'fly-oidc':
       return `fly-oidc|${identity.org}|${identity.orgId}|${identity.app}|${identity.appId}`;
     case 'github-oidc':
-      return `github-oidc|${identity.repositoryId}|${identity.repositoryOwnerId}|${sortedList(identity.environments)}|${sortedList(identity.refs)}|${sortedList(identity.allowedEvents)}`;
+      return `github-oidc|${identity.repository}|${identity.repositoryId}|${identity.repositoryOwnerId}|${identity.environment ?? ''}|${sortedList(identity.refs)}|${sortedList(identity.jobWorkflowRefs)}|${sortedList(identity.events)}`;
     case 'vercel-oidc':
       return `vercel-oidc|${identity.teamSlug}|${identity.teamId}|${identity.projectId}|${identity.projectName}|${sortedList(identity.environments.map(vercelEnvironmentKey))}`;
   }
 }
 
-function bindingKey(policy: Policy): string | null {
+/**
+ * The keys under which a policy accepts a provider token; two policies with a common key would both
+ * match one token, so loading refuses them. A GitHub policy has one key per workflow file: several
+ * policies share a repository, each for its own environment and workflows.
+ */
+function bindingKeys(policy: Policy): string[] {
   const identity = policy.identity;
   switch (identity.kind) {
     case 'worker-binding':
-      return null;
+      return [];
     case 'fly-oidc':
-      return `fly-oidc|${identity.orgId}|${identity.appId}`;
+      return [`fly-oidc|${identity.orgId}|${identity.appId}`];
     case 'github-oidc':
-      return `github-oidc|${identity.repositoryOwnerId}|${identity.repositoryId}`;
+      return identity.jobWorkflowRefs.map(
+        workflow =>
+          `github-oidc|${identity.repositoryOwnerId}|${identity.repositoryId}|${identity.environment ?? ''}|${workflow}`
+      );
     case 'vercel-oidc':
-      return `vercel-oidc|${identity.teamId}|${identity.projectId}`;
+      return [`vercel-oidc|${identity.teamId}|${identity.projectId}`];
   }
 }
 
@@ -92,13 +100,13 @@ export function loadPolicies(
       throw new Error(`more than one policy file declares workload ${policy.workload}`);
     }
     workloads.add(policy.workload);
-    const key = bindingKey(policy);
-    if (key === null) continue;
-    const existing = bindings.get(key);
-    if (existing !== undefined) {
-      throw new Error(`workloads ${existing} and ${policy.workload} declare the same identity`);
+    for (const key of bindingKeys(policy)) {
+      const existing = bindings.get(key);
+      if (existing !== undefined) {
+        throw new Error(`workloads ${existing} and ${policy.workload} declare the same identity`);
+      }
+      bindings.set(key, policy.workload);
     }
-    bindings.set(key, policy.workload);
   }
 
   const entries: PolicySnapshotEntry[] = policies.map(policy => ({

@@ -30,15 +30,9 @@ import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/refresher-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import { InfisicalClient, type ManagerFolder } from '../infisical/client';
-import {
-  currentPolicyHash,
-  policiesFor,
-  policyFor,
-  policySnapshot,
-  workloadPolicyHash,
-} from '../policy';
-import type { PolicySnapshotEntry } from '../policy/load';
-import { PolicySnapshotSchema, type Policy } from '../policy/schema';
+import { policyIndex } from '../policy';
+import type { PolicyIndex, PolicySnapshotEntry } from '../policy/load';
+import { PolicySnapshotSchema, bundleFolder, type Policy } from '../policy/schema';
 import type { FillResult, WorkloadBundle } from '../types';
 import { getBundleStub, getSignerStub } from './stubs';
 
@@ -48,8 +42,21 @@ type RefresherDatabase = DrizzleSqliteDODatabase<typeof schema>;
 const SEAL_KEY_NAME = 'refresher-seal-key';
 type RefresherState = typeof schema.refresherState.$inferSelect;
 
-/** Both folder copies from one successful read pair. */
-type ManagerView = { workloads: FolderCopy; shared: FolderCopy; fetchedAt: number };
+/** The folder copies from one successful read; `ci` stays empty where no policy reads `/ci`. */
+type ManagerView = { workloads: FolderCopy; shared: FolderCopy; ci: FolderCopy; fetchedAt: number };
+
+const EMPTY_FOLDER: FolderCopy = { entries: [], refused: [] };
+
+function managerView(copies: Map<ManagerFolder, FolderCopy>, fetchedAt: number): ManagerView {
+  return {
+    workloads: copies.get('/workloads') ?? EMPTY_FOLDER,
+    shared: copies.get('/shared') ?? EMPTY_FOLDER,
+    ci: copies.get('/ci') ?? EMPTY_FOLDER,
+    fetchedAt,
+  };
+}
+
+type FolderRead = Exclude<FolderOutcome, { status: 'unreachable' }>;
 
 type ReadOutcome =
   | { status: 'ok'; view: ManagerView }
@@ -88,24 +95,31 @@ function errorName(error: unknown): string {
 }
 
 /**
- * One object per environment. It reads the manager's `/workloads` and `/shared` folders together
- * every 4 minutes, sooner after a signed `secrets.modified` webhook (merged per 30-second window)
- * or a policy change, and with backoff after a failure. Each read rebuilds every workload's bundle
- * from policy and pushes it to that workload's object. Concurrent reads, including the logins they
- * need, merge into one. It also owns the policy-change and refused-reference audit events.
+ * One object per environment. It reads the manager's `/workloads` and `/shared` folders, and `/ci`
+ * when a GitHub policy here needs it, together every 4 minutes, sooner after a signed
+ * `secrets.modified` webhook (merged per 30-second window) or a policy change, and with backoff
+ * after a failure. Each read rebuilds every workload's bundle from policy and pushes it to that
+ * workload's object. Concurrent reads, including the logins they need, merge into one. It also owns
+ * the policy-change and refused-reference audit events.
  */
 export class RefresherDO extends DurableObject<Env> {
+  /** The policies this object serves; a test fixture's subclass sets its own. */
+  static readonly policies: PolicyIndex = policyIndex;
+
   private readonly config: StsConfig;
   private readonly db: RefresherDatabase;
   private readonly audit: AuditLog;
   private readonly stream: string;
   private readonly client: InfisicalClient;
+  // An instance field, not a method: RPC exposes prototype methods, never instance fields.
+  private readonly policies: PolicyIndex;
   private pendingRead: Promise<ReadOutcome> | null = null;
   private sealKey: Promise<string> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.config = readConfig(env);
+    this.policies = (this.constructor as typeof RefresherDO).policies;
     this.db = drizzle(ctx.storage, { schema });
     this.stream = `sts:${this.config.environment}:refresher`;
     this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
@@ -160,7 +174,7 @@ export class RefresherDO extends DurableObject<Env> {
    * last copy is served stale.
    */
   async buildBundle(workload: string): Promise<FillResult> {
-    const policy = policyFor(this.config.environment, WorkloadNameSchema.parse(workload));
+    const policy = this.policies.get(this.config.environment, WorkloadNameSchema.parse(workload));
     if (policy === null) return { status: 'no_policy' };
     const now = Date.now();
     const stored = await this.storedView();
@@ -230,22 +244,32 @@ export class RefresherDO extends DurableObject<Env> {
     return pending;
   }
 
+  /** `/ci` holds the bundles of GitHub policies only, so it is read where one of them applies. */
+  private managerFolders(): ManagerFolder[] {
+    const readsCi = this.policies
+      .forEnvironment(this.config.environment)
+      .some(policy => bundleFolder(policy).root === '/ci');
+    return readsCi ? ['/workloads', '/shared', '/ci'] : ['/workloads', '/shared'];
+  }
+
   private async performRead(): Promise<ReadOutcome> {
     const startedAt = Date.now();
     const stored = await this.storedFolders();
-    const [workloads, shared] = await Promise.all([
-      this.readFolder('/workloads', stored.get('/workloads') ?? null),
-      this.readFolder('/shared', stored.get('/shared') ?? null),
-    ]);
-    if (workloads.status === 'unreachable') return this.failedRead(startedAt, workloads);
-    if (shared.status === 'unreachable') return this.failedRead(startedAt, shared);
+    const outcomes = await Promise.all(
+      this.managerFolders().map(
+        async folder => [folder, await this.readFolder(folder, stored.get(folder) ?? null)] as const
+      )
+    );
+    const reads: Array<readonly [ManagerFolder, FolderRead]> = [];
+    for (const [folder, outcome] of outcomes) {
+      if (outcome.status === 'unreachable') return this.failedRead(startedAt, outcome);
+      reads.push([folder, outcome]);
+    }
 
     const key = await this.snapshotKey();
-    const outcomes = [
-      ['/workloads', workloads],
-      ['/shared', shared],
-    ] as const;
-    for (const [folder, outcome] of outcomes) {
+    const copies = new Map<ManagerFolder, FolderCopy>();
+    for (const [folder, outcome] of reads) {
+      copies.set(folder, outcome.copy);
       if (outcome.status === 'unchanged') {
         this.db
           .update(schema.managerFolder)
@@ -273,10 +297,7 @@ export class RefresherDO extends DurableObject<Env> {
       await this.reportRefused(outcome.newlyRefused);
     }
     this.recordSuccess(startedAt);
-    return {
-      status: 'ok',
-      view: { workloads: workloads.copy, shared: shared.copy, fetchedAt: startedAt },
-    };
+    return { status: 'ok', view: managerView(copies, startedAt) };
   }
 
   private failedRead(
@@ -383,7 +404,7 @@ export class RefresherDO extends DurableObject<Env> {
 
   private async pushAll(view: ManagerView, stale: boolean): Promise<void> {
     await Promise.all(
-      policiesFor(this.config.environment).map(async policy => {
+      this.policies.forEnvironment(this.config.environment).map(async policy => {
         const bundle = await this.bundleFor(policy, view, stale);
         try {
           const result = await withDORetry(
@@ -411,10 +432,11 @@ export class RefresherDO extends DurableObject<Env> {
     view: ManagerView,
     stale: boolean
   ): Promise<WorkloadBundle> {
+    const folder = bundleFolder(policy);
     const { secrets, missing } = resolveWorkloadSecrets(
-      policy.workload,
+      folder.path,
       policy.secrets,
-      view.workloads,
+      folder.root === '/ci' ? view.ci : view.workloads,
       view.shared
     );
     return {
@@ -422,13 +444,13 @@ export class RefresherDO extends DurableObject<Env> {
       secrets,
       missing,
       fetchedAt: new Date(view.fetchedAt).toISOString(),
-      policyHash: await workloadPolicyHash(policy.workload),
+      policyHash: await this.policies.workloadHash(policy.workload),
       stale,
     };
   }
 
   private async applyPolicyChange(): Promise<boolean> {
-    const hash = await currentPolicyHash();
+    const hash = await this.policies.hash();
     const state = this.db
       .select()
       .from(schema.policyState)
@@ -437,7 +459,7 @@ export class RefresherDO extends DurableObject<Env> {
     if (state?.hash === hash) return false;
 
     const previous: PolicySnapshotEntry[] = state ? PolicySnapshotSchema.parse(state.snapshot) : [];
-    const current = policySnapshot();
+    const current = this.policies.snapshot();
     await this.audit.append(
       this.stream,
       policyChangedEvent({
@@ -477,17 +499,18 @@ export class RefresherDO extends DurableObject<Env> {
     return folders;
   }
 
-  /** The last successful read pair, or null when this object has never completed one. */
+  /** The last successful read of every folder this environment needs, or null without one. */
   private async storedView(): Promise<ManagerView | null> {
-    const folders = await this.storedFolders();
-    const workloads = folders.get('/workloads');
-    const shared = folders.get('/shared');
-    if (!workloads?.copy || !shared?.copy) return null;
-    return {
-      workloads: workloads.copy,
-      shared: shared.copy,
-      fetchedAt: Math.min(workloads.fetchedAt, shared.fetchedAt),
-    };
+    const stored = await this.storedFolders();
+    const copies = new Map<ManagerFolder, FolderCopy>();
+    let fetchedAt = Number.POSITIVE_INFINITY;
+    for (const folder of this.managerFolders()) {
+      const entry = stored.get(folder);
+      if (!entry?.copy) return null;
+      copies.set(folder, entry.copy);
+      fetchedAt = Math.min(fetchedAt, entry.fetchedAt);
+    }
+    return managerView(copies, fetchedAt);
   }
 
   private snapshotKey(): Promise<string> {

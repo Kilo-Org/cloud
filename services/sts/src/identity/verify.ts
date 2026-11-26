@@ -11,9 +11,10 @@ import {
 import { z } from 'zod';
 import { PROVIDER_FETCH_TIMEOUT_MS } from '../constants';
 import {
-  GITHUB_PRIVILEGED_EVENTS,
   VERCEL_ISSUER_PREFIX,
+  githubSubject,
   vercelStsEnvironments,
+  type GithubIdentity,
   type Policy,
   type PolicyIdentity,
   type VercelEnvironment,
@@ -102,6 +103,7 @@ function providerFor(issuer: string): IdentityProvider {
 }
 
 const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
+  // `run_id` and the other per-run claims stay out: they would make each refusal its own row.
   github: [
     'repository_id',
     'repository_owner_id',
@@ -109,6 +111,8 @@ const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
     'environment',
     'ref',
     'event_name',
+    'job_workflow_ref',
+    'sub',
   ],
   fly: ['org_id', 'org_name', 'app_id', 'app_name', 'machine_id'],
   // Ids only: team and project names can be renamed and never authorize. `user_id` names the
@@ -184,8 +188,16 @@ function isExchangedFromFunctionToken(payload: JWTPayload, issuer: string): bool
   return 'aud' in act && act.aud === `https://vercel.com/${teamSlug}`;
 }
 
-function isPrivilegedEvent(event: string | null): boolean {
-  return GITHUB_PRIVILEGED_EVENTS.some(privileged => privileged === event);
+/**
+ * The bindings of the one policy a GitHub token's environment and workflow file selected: the exact
+ * subject, a listed ref, and a listed event (an allowlist, so an event no policy lists is refused).
+ */
+function meetsGithubBindings(payload: JWTPayload, identity: GithubIdentity): boolean {
+  const ref = claim(payload, 'ref');
+  if (ref === null || !identity.refs.includes(ref)) return false;
+  const event = claim(payload, 'event_name');
+  if (!identity.events.some(listed => listed === event)) return false;
+  return claim(payload, 'sub') === githubSubject(identity, ref);
 }
 
 /** Classifies a failed `jwtVerify`: a dependency failure is retryable, anything else is a rejection. */
@@ -332,6 +344,8 @@ export class IdentityVerifier {
       }
     }
     let mismatchedWorkload: string | null = null;
+    // A GitHub token named a policy's repository but no policy for its environment and workflow.
+    let unmatchedRepository = false;
     for (const policy of candidates) {
       const identity = policy.identity;
       switch (identity.kind) {
@@ -349,17 +363,18 @@ export class IdentityVerifier {
         case 'github-oidc': {
           if (claim(payload, 'repository_id') !== identity.repositoryId) continue;
           if (claim(payload, 'repository_owner_id') !== identity.repositoryOwnerId) continue;
-          // From here the token names this policy's repository: a failed binding is a
-          // rejection, not an unknown workload.
-          const environment = claim(payload, 'environment');
-          if (identity.environments && !identity.environments.includes(environment ?? '')) {
-            return rejected(policy.workload, 'identity_rejected');
+          // The loader admits one policy per repository, GitHub environment and workflow file, so
+          // at most one policy gets past these two checks.
+          if (
+            claim(payload, 'environment') !== (identity.environment ?? null) ||
+            !identity.jobWorkflowRefs.includes(claim(payload, 'job_workflow_ref') ?? '')
+          ) {
+            unmatchedRepository = true;
+            continue;
           }
-          if (identity.refs && !identity.refs.includes(claim(payload, 'ref') ?? '')) {
-            return rejected(policy.workload, 'identity_rejected');
-          }
-          const event = claim(payload, 'event_name');
-          if (isPrivilegedEvent(event) && !identity.allowedEvents?.some(name => name === event)) {
+          // From here the token names this policy's workflow: a failed binding is a rejection,
+          // not an unknown workload.
+          if (!meetsGithubBindings(payload, identity)) {
             return rejected(policy.workload, 'identity_rejected');
           }
           if (!policy.environments.includes(this.options.environment)) {
@@ -391,8 +406,7 @@ export class IdentityVerifier {
       }
     }
 
-    return mismatchedWorkload !== null
-      ? rejected(mismatchedWorkload, 'environment_mismatch')
-      : rejected(null, 'unknown_workload');
+    if (mismatchedWorkload !== null) return rejected(mismatchedWorkload, 'environment_mismatch');
+    return rejected(null, unmatchedRepository ? 'identity_rejected' : 'unknown_workload');
   }
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { policyChangedEvent } from '../../src/audit/events';
+import { resolveWorkloadSecrets } from '../../src/bundle/resolve';
 import { loadPolicies } from '../../src/policy/load';
 import { policyFor, policyIndex } from '../../src/policy';
+import { bundleFolder } from '../../src/policy/schema';
 
 const REGISTRY = {
   gateway: { scopes: ['gateway:models.read', 'gateway:usage.write'] },
@@ -182,39 +184,195 @@ secrets: [APP_ONE_SECRET]
     );
   });
 
-  it('rejects a GitHub identity that binds neither environments nor refs', () => {
-    expectThrow(
-      {
-        'gh.yaml': `
-workload: gh
-environments: [staging]
+  describe('github-oidc', () => {
+    const RELEASE = 'acme/repo/.github/workflows/publish.yml@refs/heads/main';
+    const github = (options: {
+      workload?: string;
+      environments?: string;
+      environment?: string | null;
+      identity?: string;
+      workflows?: string;
+      events?: string;
+      extra?: string;
+    }) => `
+workload: ${options.workload ?? 'ci-release'}
+environments: ${options.environments ?? '[production]'}
 identity:
   kind: github-oidc
-  repositoryId: '1'
-  repositoryOwnerId: '2'
+  repository: acme/repo
+  repositoryId: '123'
+  repositoryOwnerId: '456'${options.environment === null ? '' : `\n  environment: ${options.environment ?? 'release'}`}
+  jobWorkflowRefs: ${options.workflows ?? `[${RELEASE}]`}
+  events: ${options.events ?? '[workflow_dispatch]'}${options.identity ?? ''}
 secrets: [APP_ONE_SECRET]
-`,
-      },
-      'binds environments, refs, or both'
-    );
-  });
+${options.extra ?? ''}`;
 
-  it('requires a GitHub environment binding for a policy that grants production', () => {
-    expectThrow(
-      {
-        'gh.yaml': `
-workload: gh
-environments: [production]
-identity:
-  kind: github-oidc
-  repositoryId: '1'
-  repositoryOwnerId: '2'
-  refs: [refs/heads/main]
-secrets: [APP_ONE_SECRET]
-`,
-      },
-      'must bind identity.environments'
+    it('loads several policies on one repository and defaults refs to refs/heads/main', () => {
+      const index = loadPolicies({
+        'ci-release.yaml': github({}),
+        'ci-automation.yaml': github({
+          workload: 'ci-automation',
+          environment: 'automation',
+          workflows: `[${RELEASE}, acme/repo/.github/workflows/beta.yml@refs/heads/main]`,
+          events: '[push, schedule]',
+        }),
+      });
+      expect(index.get('production', 'ci-release')?.identity).toMatchObject({
+        kind: 'github-oidc',
+        environment: 'release',
+        refs: ['refs/heads/main'],
+      });
+      expect(index.snapshot().map(entry => entry.identity)).toEqual([
+        `github-oidc|acme/repo|123|456|automation|refs/heads/main|acme/repo/.github/workflows/beta.yml@refs/heads/main,${RELEASE}|push,schedule`,
+        `github-oidc|acme/repo|123|456|release|refs/heads/main|${RELEASE}|workflow_dispatch`,
+      ]);
+    });
+
+    it('refuses two policies that accept the same environment and workflow file', () => {
+      expectThrow(
+        {
+          'ci-release.yaml': github({}),
+          'ci-release-two.yaml': github({
+            workload: 'ci-release-two',
+            workflows: `[acme/repo/.github/workflows/other.yml@refs/heads/main, ${RELEASE}]`,
+          }),
+        },
+        'workloads ci-release and ci-release-two declare the same identity'
+      );
+    });
+
+    it('requires identity.environment for production and for token grants', () => {
+      expectThrow(
+        { 'ci-release.yaml': github({ environment: null }) },
+        'a github-oidc policy that grants production must bind identity.environment'
+      );
+      expect(() =>
+        loadPolicies(
+          {
+            'ci-release.yaml': github({
+              environment: null,
+              environments: '[staging]',
+              extra: `audiences: [gateway]\nscopes: ['gateway:models.read']\n`,
+            }),
+          },
+          { scopeRegistry: REGISTRY }
+        )
+      ).toThrow('a github-oidc policy that grants tokens must bind identity.environment');
+    });
+
+    it('accepts only refs/heads/main for production', () => {
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            identity: '\n  refs: [refs/heads/main, refs/heads/release]',
+          }),
+        },
+        'a github-oidc policy that grants production accepts only refs/heads/main'
+      );
+    });
+
+    it('rejects a workflow of another repository, a wildcard, and a ref refs does not list', () => {
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            workflows: '[acme/other/.github/workflows/publish.yml@refs/heads/main]',
+          }),
+        },
+        'is not a workflow file of acme/repo'
+      );
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            workflows: "['acme/repo/.github/workflows/*.yml@refs/heads/main']",
+          }),
+        },
+        'does not match the policy schema'
+      );
+      expectThrow(
+        { 'ci-release.yaml': github({ workflows: '[acme/repo/.github/workflows/publish.yml]' }) },
+        'does not match the policy schema'
+      );
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            environments: '[staging]',
+            identity: '\n  refs: [refs/heads/develop]',
+          }),
+        },
+        'runs on a ref that identity.refs does not list'
+      );
+    });
+
+    it.each(['pull_request', 'pull_request_target', 'issues', 'issue_comment', 'merge_group'])(
+      'cannot list the %s event',
+      event => {
+        expectThrow(
+          { 'ci-release.yaml': github({ events: `[${event}]` }) },
+          'does not match the policy schema'
+        );
+      }
     );
+
+    it('accepts workflow_run only as the one event of a policy', () => {
+      expect(() =>
+        loadPolicies({ 'ci-release.yaml': github({ events: '[workflow_run]' }) })
+      ).not.toThrow();
+      expectThrow(
+        { 'ci-release.yaml': github({ events: '[workflow_run, push]' }) },
+        'a github-oidc policy that accepts workflow_run accepts no other event'
+      );
+    });
+
+    it('rejects the removed allowedEvents and environments fields', () => {
+      expectThrow(
+        { 'ci-release.yaml': github({ identity: '\n  allowedEvents: [workflow_run]' }) },
+        'does not match the policy schema'
+      );
+      expectThrow(
+        { 'ci-release.yaml': github({ identity: '\n  environments: [release]' }) },
+        'does not match the policy schema'
+      );
+    });
+
+    it('names a GitHub workload ci-<job> and resolves its bundle from /ci/<workload>', () => {
+      expectThrow(
+        { 'release.yaml': github({ workload: 'release' }) },
+        'a github-oidc workload is named ci-<job>'
+      );
+      const index = loadPolicies({ 'ci-release.yaml': github({}), 'app-one.yaml': valid });
+      const ci = index.get('production', 'ci-release');
+      const app = index.get('production', 'app-one');
+      if (ci === null || app === null) throw new Error('policies did not load');
+      expect(bundleFolder(ci)).toEqual({ root: '/ci', path: '/ci/ci-release' });
+      expect(bundleFolder(app)).toEqual({ root: '/workloads', path: '/workloads/app-one' });
+      const entry = (path: string, name: string, value: string) => ({
+        path,
+        name,
+        id: `${path}/${name}`,
+        version: 1,
+        value,
+      });
+      const resolved = resolveWorkloadSecrets(
+        bundleFolder(ci).path,
+        ['APP_ONE_SECRET', 'SHARED_ONE', 'NESTED_ONE'],
+        {
+          entries: [
+            entry('/ci/ci-release', 'APP_ONE_SECRET', 'ci-value'),
+            entry('/ci/ci-release/nested', 'NESTED_ONE', 'nested-value'),
+            entry('/ci/minting', 'SHARED_ONE', 'minting-value'),
+          ],
+          refused: [],
+        },
+        { entries: [entry('/shared', 'SHARED_ONE', 'shared-value')], refused: [] }
+      );
+      expect(resolved).toEqual({
+        secrets: {
+          APP_ONE_SECRET: { value: 'ci-value', version: 1, id: '/ci/ci-release/APP_ONE_SECRET' },
+          SHARED_ONE: { value: 'shared-value', version: 1, id: '/shared/SHARED_ONE' },
+        },
+        missing: ['NESTED_ONE'],
+      });
+    });
   });
 
   describe('vercel-oidc', () => {

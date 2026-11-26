@@ -27,7 +27,8 @@ import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
 import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/bundle-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
-import { policyExists, policyFor, workloadPolicyHash } from '../policy';
+import { policyIndex } from '../policy';
+import type { PolicyIndex } from '../policy/load';
 import type { Policy } from '../policy/schema';
 import {
   BundleSecretsSchema,
@@ -73,9 +74,14 @@ function utcMinute(time: number): string {
  * out. Callers do not retry a delivery: a retry after a committed append would audit twice.
  */
 export class BundleDO extends DurableObject<Env> {
+  /** The policies this object serves; a test fixture's subclass sets its own. */
+  static readonly policies: PolicyIndex = policyIndex;
+
   private readonly config: StsConfig;
   private readonly db: BundleDatabase;
   private readonly audit: AuditLog;
+  // An instance field, not a method: RPC exposes prototype methods, never instance fields.
+  private readonly policies: PolicyIndex;
   private keys: Promise<BundleKeys> | null = null;
   private pendingFill: Promise<BundleRow | null> | null = null;
   private refresherCheckedAt = 0;
@@ -83,6 +89,7 @@ export class BundleDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.config = readConfig(env);
+    this.policies = (this.constructor as typeof BundleDO).policies;
     this.db = drizzle(ctx.storage, { schema });
     this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
     void ctx.blockConcurrencyWhile(async () => {
@@ -109,11 +116,11 @@ export class BundleDO extends DurableObject<Env> {
         retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
       };
     }
-    const policy = policyFor(this.config.environment, target.workload);
+    const policy = this.policies.get(this.config.environment, target.workload);
     if (policy === null) {
       return {
         status: 'denied',
-        reason: policyExists(target.workload) ? 'environment_mismatch' : 'unknown_workload',
+        reason: this.policies.has(target.workload) ? 'environment_mismatch' : 'unknown_workload',
       };
     }
     this.checkRefresher();
@@ -282,7 +289,7 @@ export class BundleDO extends DurableObject<Env> {
    * removed grant is never served (design 4.4: STS refuses any read the policy does not list).
    */
   private async serve(row: BundleRow, policy: Policy): Promise<ServedBundle | null> {
-    const policyHash = await workloadPolicyHash(policy.workload);
+    const policyHash = await this.policies.workloadHash(policy.workload);
     if (row.policyHash === policyHash) return { kind: 'stored', row };
     const stored = await this.open(row);
     if (stored === null) return null;

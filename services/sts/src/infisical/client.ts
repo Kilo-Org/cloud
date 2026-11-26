@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { MANAGER_FETCH_TIMEOUT_MS } from '../constants';
 import type { ManagerConfig } from '../env';
 
-/** The two folders the refresher reads in each environment (design 4.2). */
-export type ManagerFolder = '/workloads' | '/shared';
+/** The folders the refresher reads in each environment (design 4.2); `/ci` only for GitHub policies. */
+export type ManagerFolder = '/workloads' | '/shared' | '/ci';
 
 const LoginResponseSchema = z.object({
   accessToken: z.string().min(1),

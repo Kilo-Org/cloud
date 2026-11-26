@@ -34,6 +34,7 @@ import { type DeviceDeps, handleDeviceAuthorization } from '../signin/device/aut
 import { deviceCodeGrant } from '../signin/device/grant';
 import { userCodeSecret } from '../signin/device/user-code';
 import { handleDeviceDecision, handleDevicePage } from '../signin/device/verification';
+import { emailSignIn, platformFetch } from '../signin/email/delivery';
 import { handleEmailRequest } from '../signin/email/routes';
 import { signInChoices } from '../signin/flows';
 import { requestSession, signInHandoff } from '../signin/handoff';
@@ -119,10 +120,11 @@ const exchangeWindows = newExchangeWindows();
  * `options.signer` null uses the grant's signer object; only the development entry passes another
  * one, to show a signing failure in the local end-to-end run (src/dev.ts). `options.scopes` is the
  * scope registry (`utsScopeEntry`) in every deployed entry; the development entry adds its fixture
- * scopes. `options.mailer` is the email sign-in's mail port; no deployed sender is wired yet, so
- * the deployed entry passes null and email sign-in is not offered there. `options.stsCallers`
- * verifies the broker exchange's STS tokens; the deployed entry passes null until
- * `@kilocode/verify` is on this branch, so the exchange is not offered there.
+ * scopes. `options.recordingMailer` is the development entry's mail port; every other entry
+ * passes null, so the email sign-in is offered only where the mail settings are on
+ * (src/signin/email/delivery.ts). `options.stsCallers` verifies the broker exchange's STS tokens;
+ * the deployed entry passes null until `@kilocode/verify` is on this branch, so the exchange is not
+ * offered there.
  */
 export function oauthService(
   env: Env,
@@ -133,14 +135,15 @@ export function oauthService(
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return binding;
   const { scopes } = options;
+  const settings = signInConfigFor(env, config);
   const signIn: SignInDeps = {
     config,
     signIn: signInAccess(binding.connectionString, ctx),
     methods: {
       config,
-      settings: signInConfigFor(env, config),
+      settings,
       store: providerSignInAccess(binding.connectionString, ctx),
-      mailer: options.mailer,
+      email: emailSignIn(settings, config.endpoints.issuer, options.recordingMailer, platformFetch),
     },
   };
   const signer = options.signer ?? signerAccess(env, config);

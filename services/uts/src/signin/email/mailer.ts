@@ -1,8 +1,8 @@
 /**
  * The mail port of the email sign-in (design 5.1, 5.3). UTS stores the sign-in email's link and
- * code hashes first, then hands the message to the port; the deployed Worker wires no sender yet,
- * so email sign-in is offered only where one is wired (the development entry records messages,
- * src/dev.ts). The message carries the link and the code, nothing else about the account.
+ * code hashes first, then hands the message to the port: Mailgun where the mail settings are on
+ * (src/signin/email/delivery.ts), or the development entry's recording port (src/dev.ts). The
+ * message carries the link and the code, nothing else about the account.
  */
 export type SignInEmail = {
   to: string;

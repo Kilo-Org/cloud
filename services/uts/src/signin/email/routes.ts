@@ -24,13 +24,17 @@ import { normalizeEmail } from '../providers/exchange';
 import { requestNetwork } from '../network';
 import { isSameOriginPost } from '../requests';
 import { anonymousWriteRetryAfter } from '../limits';
+import { recipientAllowed } from '../providers/config';
+import { TURNSTILE_RESPONSE_FIELD } from './turnstile';
 
 /**
  * Email sign-in (design 5.1, 5.3): one email carries a link and, unless codes are stopped for the
  * address, a six-digit code; both live 10 minutes.
  *
  * * `POST /signin/email/start` (a form of the sign-in page) stores the email's hashes in one
- *   statement, then hands the message to the mail port, and shows the code entry.
+ *   statement, then hands the message to the mail port, and shows the code entry. With the
+ *   Mailgun sender it first refuses an address the environment's recipient rule does not allow
+ *   and a request whose Turnstile token does not pass, so nothing is stored or sent for them.
  * * `POST /signin/email/code` checks the newest code sent to the address. The fifth wrong entry
  *   exhausts the code; the email's link still works, so wrong entries by someone else cannot lock
  *   the address's owner out (design 5.3). A client network (IPv4 /24, IPv6 /48) may enter 30
@@ -155,14 +159,13 @@ export async function handleEmailRequest(
   ) {
     return null;
   }
-  const keySetting = methods.settings.emailHashKey;
-  if (keySetting.status === 'off' || methods.mailer === null) return null;
-  if (keySetting.status === 'misconfigured') {
-    logMisconfigured('email', keySetting.missing);
+  const setting = methods.email;
+  if (setting.status === 'off') return null;
+  if (setting.status === 'misconfigured') {
+    logMisconfigured('email', setting.missing);
     return messagePage('Sign in to Kilo', 'Email sign-in is not available.', 500, null);
   }
-  const { hashKey } = keySetting;
-  const mailer = methods.mailer;
+  const { hashKey, delivery } = setting;
   const { environment, endpoints } = methods.config;
 
   if (pathname === UTS_EMAIL_LINK_PATH && request.method === 'GET') {
@@ -197,6 +200,22 @@ export async function handleEmailRequest(
     // The start stores an email row and sends mail before anyone is signed in.
     const retryAfter = anonymousWriteRetryAfter(network.clientIp, 'email_sign_in_start');
     if (retryAfter !== null) return rateLimitedPage(retryAfter, returnTo);
+    if (delivery.kind === 'mailgun') {
+      if (!recipientAllowed(delivery.recipients, email)) {
+        console.error(JSON.stringify({ event: 'uts.signin.mail_recipient_refused', environment }));
+        return refusalPage('recipient_not_allowed', returnTo);
+      }
+      const checked = await delivery.turnstile(
+        form.get(TURNSTILE_RESPONSE_FIELD),
+        network.clientIp
+      );
+      if (checked === 'refused') return refusalPage('check_failed', returnTo);
+      if (checked === 'retryable') return upstreamFailurePage(true, returnTo);
+      if (checked === 'misconfigured') {
+        logMisconfigured('email', ['UTS_TURNSTILE_SECRET_KEY']);
+        return messagePage('Sign in to Kilo', 'Email sign-in is not available.', 500, returnTo);
+      }
+    }
     const linkToken = randomCredential();
     const linkHash = await sha256(linkToken);
     const binder = randomCredential();
@@ -221,7 +240,7 @@ export async function handleEmailRequest(
       logSignInOutcome('email', null, stored.outcome);
       return refusalPage('sso_required', returnTo);
     }
-    const sent = await mailer({
+    const sent = await delivery.mailer({
       to: email,
       link: `${endpoints.issuer}${UTS_EMAIL_LINK_PATH}?token=${linkToken}`,
       code: stored.withCode ? code : null,

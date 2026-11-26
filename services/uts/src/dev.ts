@@ -42,7 +42,9 @@ import type { SignerAccess } from './token/mint';
  *   scope.
  * * The email sign-in's mail port records each message in the isolate instead of sending it, and
  *   `GET /__dev/mail?to=<address>` answers the newest message for that address (its link and code
- *   are synthetic local values), for the email end-to-end run.
+ *   are synthetic local values), for the email end-to-end run. It needs no Turnstile check, as it
+ *   sends nothing; with the mail settings set (and `SIGNIN_DEV_ENDPOINTS` naming local Mailgun and
+ *   Turnstile stand-ins) the entry uses the deployed Mailgun sender and Turnstile check instead.
  * * The notice routes under `/__dev/notices/` and the security view with a development caller
  *   check (`src/dev-notices.ts`).
  * * The `/internal/` routes take a stand-in STS token, `uts-dev-sts:<workload>:<scope>`, for the
@@ -192,7 +194,7 @@ export async function handleDevRequest(
           : await developmentHandoff(authorization, pending),
       signer,
       scopes: developmentScopes,
-      mailer: recordingMailer,
+      recordingMailer,
       serviceTokens: developmentServiceTokens,
       metadataFetcher: devMetadataFetcher(env) ?? ((url, init) => fetch(url, init)),
       stsCallers: devStsCallers(env),

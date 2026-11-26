@@ -1,6 +1,7 @@
 import { createExecutionContext } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleRequest } from '../../src/http';
+import type { EmailSignIn } from '../../src/signin/email/delivery';
 import type { SignInEmail } from '../../src/signin/email/mailer';
 import { handleEmailRequest } from '../../src/signin/email/routes';
 import { type SignInMethods, flowCookieName } from '../../src/signin/flows';
@@ -23,7 +24,21 @@ const HASH_KEY = 'A'.repeat(43);
 
 type Call = { method: keyof ProviderSignInStore; input: unknown };
 
-function methodsWith(implementation: Partial<ProviderSignInStore>, mail: SignInEmail[] = []) {
+function methodsWith(
+  implementation: Partial<ProviderSignInStore>,
+  mail: SignInEmail[] = [],
+  email: EmailSignIn = {
+    status: 'on',
+    hashKey: new Uint8Array(32),
+    delivery: {
+      kind: 'recording',
+      mailer: async message => {
+        mail.push(message);
+        return 'sent';
+      },
+    },
+  }
+) {
   const calls: Call[] = [];
   const record =
     <Input, Output>(method: keyof ProviderSignInStore, run?: (input: Input) => Promise<Output>) =>
@@ -55,10 +70,7 @@ function methodsWith(implementation: Partial<ProviderSignInStore>, mail: SignInE
       config
     ),
     store: work => work(store),
-    mailer: async message => {
-      mail.push(message);
-      return 'sent';
-    },
+    email,
   };
   return { methods, calls };
 }
@@ -329,7 +341,7 @@ describe('sign-in page', () => {
       returnTo: '/authorize?client_id=kilo-cli&state=a"b',
       rpId: 'app.kilo.ai',
       providers: [{ provider: 'google', name: 'Google' }],
-      email: true,
+      email: { turnstileSiteKey: null },
       sso: true,
     });
     const html = await response.text();

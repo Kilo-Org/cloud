@@ -6,6 +6,7 @@ import {
   messagePage,
   passkeysPage,
   signInPage,
+  type SignInChoices,
 } from '../../src/signin/pages';
 import type { PendingDevice } from '../../src/signin/store';
 
@@ -22,14 +23,16 @@ const device: PendingDevice = {
   city: null,
 };
 
-function choices(methods: { email: boolean }) {
+const RECORDING_EMAIL = { turnstileSiteKey: null };
+
+function choices(methods: { email: SignInChoices['email'] }): SignInChoices {
   return { returnTo: '/signin/done', rpId: RP_ID, providers: [], email: methods.email, sso: false };
 }
 
 describe('sign-in page policy', () => {
   it('lets the passkey pages reach the relying party well-known URL, and nothing else on its host', () => {
     for (const response of [
-      signInPage(choices({ email: true })),
+      signInPage(choices({ email: RECORDING_EMAIL })),
       passkeysPage(RP_ID),
       deviceApprovalPage('ABCD-EFGH', 'link', 'Kilo', device, RP_ID),
       deviceApprovalPage('ABCD-EFGH', 'typed', 'Kilo', device, RP_ID),
@@ -59,11 +62,35 @@ describe('sign-in page policy', () => {
     expect(policy).toContain("form-action 'self' com.kilocode.kiloapp:;");
     expect(policy).not.toContain('well-known');
   });
+
+  it('lets Cloudflare Turnstile run only on a sign-in page whose email form carries the widget', async () => {
+    const response = signInPage(choices({ email: { turnstileSiteKey: '0x4AAAAAAA-test_key' } }));
+    const policy = response.headers.get('Content-Security-Policy');
+    expect(policy).toContain(
+      "default-src 'none'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com;"
+    );
+    const html = await response.text();
+    expect(html).toContain(
+      '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>'
+    );
+    expect(html).toContain(
+      '<div class="cf-turnstile" data-sitekey="0x4AAAAAAA-test_key" data-action="email-sign-in" data-response-field-name="cf-turnstile-response"></div>'
+    );
+    for (const page of [
+      signInPage(choices({ email: RECORDING_EMAIL })),
+      signInPage(choices({ email: null })),
+    ]) {
+      expect(page.headers.get('Content-Security-Policy')).not.toContain(
+        'challenges.cloudflare.com'
+      );
+      expect(await page.text()).not.toContain('cf-turnstile');
+    }
+  });
 });
 
 describe('passkey fallback markup', () => {
   it('names the relying party for the script and keeps the unavailable notice hidden', async () => {
-    const html = await signInPage(choices({ email: true })).text();
+    const html = await signInPage(choices({ email: RECORDING_EMAIL })).text();
     expect(html).toContain('<body data-page="sign-in" data-rp-id="app.kilo.ai">');
     expect(html).toContain(
       '<p id="passkey-unavailable" role="alert" hidden>This browser cannot use a Kilo passkey on this page. Sign in another way below.</p>'
@@ -72,7 +99,7 @@ describe('passkey fallback markup', () => {
   });
 
   it('tells a sign-in page without other methods to change the browser', async () => {
-    const html = await signInPage(choices({ email: false })).text();
+    const html = await signInPage(choices({ email: null })).text();
     expect(html).toContain('Update the browser or use another one.</p>');
   });
 

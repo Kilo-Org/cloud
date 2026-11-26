@@ -6,14 +6,8 @@ import { readConfig, type Env, type UtsConfig } from './env';
 import { identityStoreBinding } from './grants/binding';
 import { sweepNotices } from './notices/dispatch';
 import { noticesAccess } from './notices/store';
-import type { NoticeTransports } from './notices/transports';
-
-/**
- * No deployed environment has a push or email provider wired yet (README, "Security notices"), so
- * the sweep settles each out-of-band channel as `not_configured`; the in-app row shows every
- * notice, and the sweep's retention step still runs.
- */
-const DEPLOYED_NOTICE_TRANSPORTS: NoticeTransports = { push: null, email: null };
+import { noticeEmail, platformFetch } from './signin/email/delivery';
+import { logMisconfigured, signInConfigFor } from './signin/providers/config';
 
 /** Arms each shard's relay object; logs `uts.audit_relay.not_started` for one that failed or refused. */
 export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
@@ -40,6 +34,8 @@ export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
  * (`src/audit/maintenance.ts`); then runs one notice sweep, whose claim and finish statements
  * open their own connections (`src/notices/dispatch.ts`). Nothing runs until the environment binds
  * its identity store. Every statement is its own transaction, and each step logs its own failure.
+ * Email goes through Mailgun where the mail settings are on (src/signin/email/delivery.ts); push
+ * has no deployed provider yet, so the sweep settles it as `not_configured`.
  */
 export async function scheduled(
   _controller: ScheduledController,
@@ -54,9 +50,11 @@ export async function scheduled(
     withIdentityStore(binding.connectionString, context, store => runMaintenance(store))
   );
   await step('notices', async () => {
+    const mail = signInConfigFor(env, config).mail;
+    if (mail.status === 'misconfigured') logMisconfigured('notice_email', mail.missing);
     await sweepNotices({
       notices: noticesAccess(binding.connectionString, context),
-      transports: DEPLOYED_NOTICE_TRANSPORTS,
+      transports: { push: null, email: noticeEmail(mail, platformFetch) },
       now: () => new Date(),
     });
   });

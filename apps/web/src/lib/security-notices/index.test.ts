@@ -20,14 +20,17 @@ jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
 }));
 
 import { captureException } from '@sentry/nextjs';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { transactional_email_log, type User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import * as email from '@kilocode/web-shared/lib/email';
 import type { SecurityNoticeRequest } from '@kilocode/web-shared/lib/email';
 import { internalDispatchRequestSchema } from '@kilocode/notifications/schemas';
 import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import {
   scheduleSecurityNotice,
@@ -67,12 +70,7 @@ beforeEach(async () => {
 // later suite in the same worker that deletes every user would hit them. The
 // rows go after each test, while the database connection is still open.
 afterEach(async () => {
-  const userIds = createdUserIds.splice(0);
-  if (userIds.length > 0) {
-    await db
-      .delete(transactional_email_log)
-      .where(inArray(transactional_email_log.user_id, userIds));
-  }
+  await deleteTransactionalEmailLogForUsers(createdUserIds.splice(0));
 });
 
 async function noticeRows(userId: string) {

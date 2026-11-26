@@ -6,9 +6,9 @@ import {
   kilocode_users,
   magic_link_tokens,
   pending_auth_links,
-  transactional_email_log,
 } from '@kilocode/db/schema';
 import { and, eq, gt, sql } from 'drizzle-orm';
+import { deleteTransactionalEmailLogForUsers } from '@kilocode/web-shared/tests/helpers/user.helper';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import {
@@ -104,7 +104,7 @@ describe('Device Auth', () => {
     await db.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, testUserId));
     // A completed pending link sends a security notice, which claims its key
     // under the user.
-    await db.delete(transactional_email_log).where(eq(transactional_email_log.user_id, testUserId));
+    await deleteTransactionalEmailLogForUsers([testUserId]);
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUserId));
   });
 

@@ -22,6 +22,7 @@ import { signerForGrant } from '../../src/keys/signer-choice';
 import type { AuthorizationHandoff, PendingAuthorization } from '../../src/oauth/authorize';
 import { type OAuthDeps, handleOAuthRequest } from '../../src/oauth/routes';
 import { s256Challenge } from '../../src/oauth/pkce';
+import type { ThirdPartyClients } from '../../src/third-party/clients';
 import {
   firstPartyRefreshToken,
   firstPartyRefreshTokenOfExchange,
@@ -695,8 +696,9 @@ describe('authorization endpoint', () => {
   });
 
   it('shows an error without redirecting for a bad client or redirect URI', async () => {
-    const deps = oauthDeps(fakeGrants({ findThirdPartyClient: async () => null }).access, {
+    const deps = oauthDeps(fakeGrants().access, {
       handoff: approve,
+      clients: async () => ({ kind: 'refused', reason: 'document missing' }),
     });
     // An empty parameter counts as absent (RFC 6749 section 3.1).
     for (const [params, status, error] of [
@@ -840,13 +842,14 @@ describe('authorization endpoint', () => {
     }
   });
 
-  it('authorizes a third-party client from its cached metadata with the consent the hand-off names', async () => {
+  /** A third-party client whose metadata names one redirect URI. */
+  const knownClient: ThirdPartyClients = async clientId => ({
+    kind: 'client',
+    client: { clientId, name: 'Example', redirectUris: ['https://client.example.com/callback'] },
+  });
+
+  it('authorizes a third-party client from its metadata with the consent the hand-off names', async () => {
     const grants = fakeGrants({
-      findThirdPartyClient: async clientId => ({
-        clientId,
-        name: 'Example',
-        redirectUris: ['https://client.example.com/callback'],
-      }),
       issueCode: async () => ({ outcome: 'issued', orgRole: null }),
     });
     const response = await call(
@@ -856,10 +859,10 @@ describe('authorization endpoint', () => {
         redirect_uri: 'https://client.example.com/callback',
         dpop_jkt: '',
       }),
-      oauthDeps(grants.access, { handoff: approve })
+      oauthDeps(grants.access, { handoff: approve, clients: knownClient })
     );
     expect(redirectOf(response).searchParams.get('code')).not.toBeNull();
-    expect((grants.calls[1].input as IssueCodeInput).client).toMatchObject({
+    expect((grants.calls[0].input as IssueCodeInput).client).toMatchObject({
       kind: 'third_party',
       clientId: THIRD_PARTY,
     });
@@ -870,16 +873,13 @@ describe('authorization endpoint', () => {
         client_id: THIRD_PARTY,
         redirect_uri: 'https://client.example.com/callback',
       }),
-      oauthDeps(
-        fakeGrants({
-          findThirdPartyClient: async () => {
-            throw storeFailure('retryable');
-          },
-        }).access,
-        { handoff: approve }
-      )
+      oauthDeps(fakeGrants().access, {
+        handoff: approve,
+        clients: async () => ({ kind: 'unavailable' }),
+      })
     );
     expect(lookupFailure.status).toBe(503);
+    expect(lookupFailure.headers.get('Retry-After')).not.toBeNull();
     expect(lookupFailure.headers.get('Location')).toBeNull();
   });
 
@@ -889,13 +889,10 @@ describe('authorization endpoint', () => {
     ['a scope for the web app only', 'kilo-cli', 'uts:security.read'],
     ['a scope that is not third-party-safe', THIRD_PARTY, 'kilo-api:profile.read'],
     ['a first-party-only service scope', THIRD_PARTY, 'event-service:events.subscribe'],
+    ['an exchange-only scope for a third-party client', THIRD_PARTY, 'kilo-api:mcp.read'],
+    ['an exchange-only scope for the CLI', 'kilo-cli', 'kilo-api:mcp.read'],
   ])('refuses %s before the hand-off and stores nothing', async (_name, clientId, scope) => {
     const grants = fakeGrants({
-      findThirdPartyClient: async id => ({
-        clientId: id,
-        name: 'Example',
-        redirectUris: ['https://client.example.com/callback'],
-      }),
       issueCode: async () => ({ outcome: 'issued', orgRole: null }),
     });
     let handedOff = false;
@@ -910,6 +907,7 @@ describe('authorization endpoint', () => {
           : {}),
       }),
       oauthDeps(grants.access, {
+        clients: knownClient,
         handoff: async (request, next) => {
           handedOff = true;
           return await approve(request, next);

@@ -1,6 +1,7 @@
 import { UTS_GRANT_TYPES, UTS_MAX_TOKENS_PER_CALL, UTS_TOKEN_PATH } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { UtsConfig } from '../env';
+import { type ExchangeService, handleTokenExchange } from '../exchange/endpoint';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
 import type { FeedPublish } from '../revocation/publish';
@@ -55,6 +56,11 @@ export type TokenDeps = {
   scopes: ScopeRegistry;
   publish: FeedPublish;
   deviceCodeGrant: DeviceCodeGrant | null;
+  /**
+   * The RFC 8693 broker exchange (src/exchange/endpoint.ts); null where no STS token verifier is
+   * wired, and the grant is then not offered.
+   */
+  exchange: ExchangeService | null;
 };
 
 /** The token endpoint on the issuer origin: the `htu` of every token request's DPoP proof. */
@@ -338,6 +344,9 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
       case UTS_GRANT_TYPES.deviceCode:
         if (deps.deviceCodeGrant !== null) return await deps.deviceCodeGrant(request, form.params);
         return oauthError('unsupported_grant_type', 400);
+      case UTS_GRANT_TYPES.tokenExchange:
+        if (deps.exchange === null) return oauthError('unsupported_grant_type', 400);
+        return await handleTokenExchange(request, form.params, { ...deps, exchange: deps.exchange });
       default:
         return oauthError('unsupported_grant_type', 400);
     }

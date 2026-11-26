@@ -45,6 +45,7 @@ export function authorizationServerMetadata(
       UTS_GRANT_TYPES.authorizationCode,
       UTS_GRANT_TYPES.refreshToken,
       ...(device ? [UTS_GRANT_TYPES.deviceCode] : []),
+      ...(oauth.deps.exchange === null ? [] : [UTS_GRANT_TYPES.tokenExchange]),
     ],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
@@ -52,5 +53,6 @@ export function authorizationServerMetadata(
     introspection_endpoint_auth_methods_supported: ['none'],
     dpop_signing_alg_values_supported: [...UTS_DPOP_ALGORITHMS],
     authorization_response_iss_parameter_supported: true,
+    client_id_metadata_document_supported: true,
   };
 }

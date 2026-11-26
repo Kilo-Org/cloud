@@ -57,7 +57,7 @@ secrets: [APP_SECRET]
 `,
   'ci-commit.yaml': `
 workload: ci-commit
-environments: [production]
+environments: [staging]
 identity:
   kind: github-oidc
   repository: acme/repo
@@ -239,19 +239,26 @@ describe('GitHub Actions identity', () => {
   });
 
   it('routes two policies on one repository by environment and workflow file', async () => {
-    const { verify, provider } = await fixture('production');
-    const beta = await signToken(provider(GITHUB_ISSUER), {
+    const production = await fixture('production');
+    const beta = await signToken(production.provider(GITHUB_ISSUER), {
       ...AUTOMATION_CLAIMS,
       event_name: 'schedule',
       job_workflow_ref: 'acme/repo/.github/workflows/beta.yml@refs/heads/main',
     });
-    expect(await verify(beta)).toMatchObject({ status: 'verified', workload: 'ci-automation' });
-    const commit = await signToken(provider(GITHUB_ISSUER), {
+    expect(await production.verify(beta)).toMatchObject({
+      status: 'verified',
+      workload: 'ci-automation',
+    });
+    const staging = await fixture('staging');
+    const commit = await signToken(staging.provider(GITHUB_ISSUER), {
       ...AUTOMATION_CLAIMS,
       event_name: 'workflow_run',
       job_workflow_ref: 'acme/repo/.github/workflows/baselines.yml@refs/heads/main',
     });
-    expect(await verify(commit)).toMatchObject({ status: 'verified', workload: 'ci-commit' });
+    expect(await staging.verify(commit)).toMatchObject({
+      status: 'verified',
+      workload: 'ci-commit',
+    });
   });
 
   it.each([

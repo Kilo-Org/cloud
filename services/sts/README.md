@@ -544,11 +544,15 @@ Rules the loader enforces:
   when every caller on `main` may hold it.
 - `events` is an allowlist of `push`, `schedule`, `workflow_dispatch` and `workflow_run`. No event
   that a fork author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
-  `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed, and a policy that
-  lists `workflow_run` lists no other event.
+  `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that
+  lists `workflow_run` lists no other event, binds an `environment`, and does not grant
+  `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
+  pull request started the upstream run, and STS cannot see that run.
 - A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`; a
   policy with token grants binds an `environment`.
-- The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`).
+- The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`). No
+  other kind of policy may use a `ci-` name, so a workload's name alone fixes its folder and a
+  stored bundle never moves between `/workloads` and `/ci`.
 
 Preconditions on the GitHub side, which STS cannot check:
 

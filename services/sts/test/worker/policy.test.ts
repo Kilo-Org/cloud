@@ -330,29 +330,46 @@ ${options.extra ?? ''}`;
 
     it('accepts workflow_run only as the one event of a policy', () => {
       expect(() =>
-        loadPolicies({ 'ci-release.yaml': github({ events: '[workflow_run]' }) })
+        loadPolicies({
+          'ci-release.yaml': github({ environments: '[staging]', events: '[workflow_run]' }),
+        })
       ).not.toThrow();
       expectThrow(
-        { 'ci-release.yaml': github({ events: '[workflow_run, push]' }) },
+        {
+          'ci-release.yaml': github({ environments: '[staging]', events: '[workflow_run, push]' }),
+        },
         'a github-oidc policy that accepts workflow_run accepts no other event'
       );
     });
 
-    it.each(['production', 'staging'])(
-      'requires identity.environment for a workflow_run policy in %s',
-      environment => {
-        expectThrow(
-          {
-            'ci-release.yaml': github({
-              environments: `[${environment}]`,
-              environment: null,
-              events: '[workflow_run]',
-            }),
-          },
-          'a github-oidc policy that accepts workflow_run must bind identity.environment'
-        );
-      }
-    );
+    it('refuses workflow_run for production, whose upstream run STS cannot see', () => {
+      expectThrow(
+        { 'ci-release.yaml': github({ events: '[workflow_run]' }) },
+        'a github-oidc policy that accepts workflow_run cannot grant production'
+      );
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            environments: '[staging, production]',
+            events: '[workflow_run]',
+          }),
+        },
+        'a github-oidc policy that accepts workflow_run cannot grant production'
+      );
+    });
+
+    it('requires identity.environment for a workflow_run policy', () => {
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            environments: '[staging]',
+            environment: null,
+            events: '[workflow_run]',
+          }),
+        },
+        'a github-oidc policy that accepts workflow_run must bind identity.environment'
+      );
+    });
 
     it('rejects the removed allowedEvents and environments fields', () => {
       expectThrow(
@@ -369,6 +386,11 @@ ${options.extra ?? ''}`;
       expectThrow(
         { 'release.yaml': github({ workload: 'release' }) },
         'a github-oidc workload is named ci-<job>'
+      );
+      // A ci-<job> name always means /ci, so a stored bundle never changes folder under one name.
+      expectThrow(
+        { 'ci-app.yaml': valid.replace('workload: app-one', 'workload: ci-app') },
+        'only a github-oidc workload is named ci-<job>'
       );
       const index = loadPolicies({ 'ci-release.yaml': github({}), 'app-one.yaml': valid });
       const ci = index.get('production', 'ci-release');

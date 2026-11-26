@@ -36,7 +36,8 @@ export const JobWorkflowRefSchema = z
  * author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
  * `pull_request_review`, `discussion`, `merge_group` and the rest) is in no list, so no policy can
  * accept it. `workflow_run` runs with the base repository's privileges after a run that a pull
- * request may have started, so a policy that accepts it accepts nothing else.
+ * request, even a fork's, may have started, and its token names the default branch whatever that
+ * run was, so a policy that accepts it accepts nothing else and grants no production.
  */
 export const GITHUB_EVENTS = ['push', 'schedule', 'workflow_dispatch', 'workflow_run'] as const;
 
@@ -242,10 +243,15 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   if (identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }
-  // A workflow_run job follows a run a pull request may have started; only an environment's
-  // protection rules stand between it and the policy's values, in any STS environment.
+  // A workflow_run job follows a run a pull request may have started, and its token carries the
+  // default branch whatever that run was; only an environment's protection rules stand between it
+  // and the policy's values, in any STS environment. STS cannot see the upstream run, so no
+  // production policy accepts it.
   if (identity.events.includes('workflow_run') && identity.environment === undefined) {
     problems.push('a github-oidc policy that accepts workflow_run must bind identity.environment');
+  }
+  if (identity.events.includes('workflow_run') && policy.environments.includes('production')) {
+    problems.push('a github-oidc policy that accepts workflow_run cannot grant production');
   }
   const workflowPrefix = `${identity.repository}/.github/workflows/`;
   for (const entry of identity.jobWorkflowRefs) {
@@ -293,6 +299,10 @@ export function policyFileProblems(
   }
   if (policy.identity.kind === 'github-oidc') {
     problems.push(...githubProblems(policy, policy.identity));
+  } else if (policy.workload.startsWith(GITHUB_WORKLOAD_PREFIX)) {
+    // The name alone fixes the bundle folder, so a stored bundle can never move between `/ci` and
+    // `/workloads` while its workload keeps its name.
+    problems.push(`only a github-oidc workload is named ${GITHUB_WORKLOAD_PREFIX}<job>`);
   }
   if (policy.identity.kind === 'vercel-oidc') {
     const sources = policy.identity.environments;

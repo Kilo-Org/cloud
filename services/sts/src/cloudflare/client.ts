@@ -87,7 +87,10 @@ export type CreatedToken = {
 
 export type TokenCreation =
   | { status: 'created'; token: CreatedToken }
-  /** Cloudflare answered 4xx: it made no token. */
+  /**
+   * Cloudflare answered 4xx: it made no token. Only a 401 refuses the credential: a 403 can refuse
+   * just this request (a group outside the member's role), so it starts no credential hold.
+   */
   | {
       status: 'refused';
       httpStatus: number;
@@ -212,7 +215,7 @@ export class CloudflareTokens {
       return {
         status: 'refused',
         httpStatus: response.status,
-        credentialRefused: isCredentialRefused(response.status),
+        credentialRefused: response.status === 401,
         retryAfterMs: retryAfterMs(response),
       };
     }

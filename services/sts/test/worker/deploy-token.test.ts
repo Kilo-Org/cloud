@@ -529,6 +529,18 @@ async function windowCheckOf(
   );
 }
 
+/** The deploy-token object's stored credential hold, or undefined when none runs. */
+async function credentialHold(): Promise<{ until: number; hold_ms: number } | undefined> {
+  return await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) =>
+    state.storage.sql
+      .exec<{ until: number; hold_ms: number }>(
+        'SELECT until, hold_ms FROM deploy_token_credential_hold'
+      )
+      .toArray()
+      .at(0)
+  );
+}
+
 async function deployTokenEvents(type: string): Promise<Event[]> {
   return (await tokenEvents()).filter(event => event.type === `ai.kilo.sts.deploy_token.${type}`);
 }
@@ -937,10 +949,10 @@ describe('mint', () => {
     expect(result.retryAfterSeconds).toBeLessThanOrEqual(30 * 60);
   });
 
-  it('drops a credential Cloudflare refused, audits the refusal, and reads the manager again on the next mint', async () => {
+  it('drops a credential Cloudflare refused with 401, holds the alarm, audits the refusal, and reads the manager again on the next mint', async () => {
     const cloudflare = installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    cloudflare.setCreateStatus(403);
+    cloudflare.setCreateStatus(401);
     expect((await mint()).result).toMatchObject({ status: 'unavailable' });
     const [failed] = await tokenEvents();
     expect(failed.type).toBe('ai.kilo.sts.deploy_token.mint_failed');
@@ -948,15 +960,30 @@ describe('mint', () => {
     expect(failed.data.attributes).toMatchObject({
       workload: 'ci-deploy-bouncer',
       outcome: 'refused',
-      httpStatus: 403,
+      httpStatus: 401,
       runId: '9001',
     });
     expect(failed.data.attributes.tokenName).toMatch(
       /^sts-development-ci-deploy-bouncer-9001-\d+$/
     );
+    expect((await credentialHold())?.hold_ms).toBe(DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_MS);
     cloudflare.setCreateStatus(200);
     issued((await mint()).result);
     expect(cloudflare.manager.reads).toHaveLength(2);
+    // Cloudflare took the credential again: the hold ended.
+    expect(await credentialHold()).toBeUndefined();
+  });
+
+  it('keeps the credential and starts no hold after a 403 on token creation', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    cloudflare.setCreateStatus(403);
+    expect((await mint()).result).toMatchObject({ status: 'unavailable' });
+    expect((await deployTokenEvents('mint_failed'))[0].data.attributes.httpStatus).toBe(403);
+    expect(await credentialHold()).toBeUndefined();
+    cloudflare.setCreateStatus(200);
+    issued((await mint()).result);
+    expect(cloudflare.manager.reads).toHaveLength(1);
   });
 
   it('waits out a 429 from Cloudflare without another call', async () => {

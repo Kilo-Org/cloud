@@ -515,10 +515,29 @@ async function deviceCode(scopes = ['gateway:models.read', 'kilo-chat:messages.r
     userCodeHash,
     clientId: 'kilo-cli',
     scopes,
-    network,
+    // Each code from its own address, so the 5-pending cap per address never applies here.
+    network: { ...network, clientIp: `10.${randomBytes(3).join('.')}` },
   });
   expect(created).toMatchObject({ outcome: 'created', interval: 5 });
   return { code, userCodeHash };
+}
+
+/** An address on a client network of its own, an IPv4 /24 no other test uses. */
+function ownNetwork(): (host: number) => string {
+  const [first, second] = randomBytes(2);
+  return host => `10.${first}.${second}.${host}`;
+}
+
+/** `count` wrong user codes entered by the session from `clientIp`. */
+async function enterWrongCodes(sessionHash: Buffer, clientIp: string, count: number) {
+  for (let attempt = 0; attempt < count; attempt++) {
+    const read = await signIn.readDeviceCode({
+      userCodeHash: randomBytes(32),
+      sessionTokenHash: sessionHash,
+      clientIp,
+    });
+    expect(read.outcome).toBe('unknown_code');
+  }
 }
 
 function exchangeInput(
@@ -564,14 +583,15 @@ describe('device grant', () => {
     ).toEqual({ outcome: 'user_code_taken' });
   });
 
-  it('shows a pending code only to a live session, and allows 10 wrong codes per session per hour', async () => {
+  it('shows a pending code only to a live session, and allows an account 10 wrong codes per hour over all its sessions', async () => {
     const accountId = await insertAccount(owner);
-    const session = await browserSession(accountId);
+    const first = await browserSession(accountId);
+    const second = await browserSession(accountId);
     const { userCodeHash } = await deviceCode();
-    expect(await signIn.readDeviceCode(userCodeHash, randomBytes(32))).toEqual({
-      outcome: 'no_session',
-    });
-    expect(await signIn.readDeviceCode(userCodeHash, session.hash)).toMatchObject({
+    const read = (sessionHash: Buffer, clientIp: string | null = ownNetwork()(1)) =>
+      signIn.readDeviceCode({ userCodeHash, sessionTokenHash: sessionHash, clientIp });
+    expect(await read(randomBytes(32))).toEqual({ outcome: 'no_session' });
+    expect(await read(first.hash)).toMatchObject({
       outcome: 'pending',
       clientId: 'kilo-cli',
       scopes: ['gateway:models.read', 'kilo-chat:messages.read'],
@@ -579,27 +599,65 @@ describe('device grant', () => {
       country: 'DE',
       city: 'Berlin',
     });
-    for (let attempt = 0; attempt < 10; attempt++) {
-      expect((await signIn.readDeviceCode(randomBytes(32), session.hash)).outcome).toBe(
-        'unknown_code'
-      );
-    }
-    expect((await signIn.readDeviceCode(userCodeHash, session.hash)).outcome).toBe(
-      'too_many_attempts'
-    );
+    // Each from its own network, so only the account's count can stop them.
+    await enterWrongCodes(first.hash, ownNetwork()(1), 5);
+    await enterWrongCodes(second.hash, ownNetwork()(1), 4);
+    const withoutAddress = await signIn.readDeviceCode({
+      userCodeHash: randomBytes(32),
+      sessionTokenHash: second.hash,
+      clientIp: null,
+    });
+    expect(withoutAddress.outcome).toBe('unknown_code');
+    const third = await browserSession(accountId);
+    expect((await read(third.hash)).outcome).toBe('too_many_attempts');
     expect(
       await signIn.decideDeviceCode({
         environment,
         userCodeHash,
-        sessionTokenHash: session.hash,
+        sessionTokenHash: third.hash,
+        clientIp: ownNetwork()(1),
+        source: 'typed',
         approve: true,
       })
     ).toBe('too_many_attempts');
-    await owner.query(
-      `UPDATE uts.browser_sessions SET user_code_window_started_at = now() - interval '61 minutes' WHERE id = $1`,
-      [session.id]
+    const counted = await owner.query<{ failures: number }>(
+      'SELECT failures FROM uts.account_user_code_failures WHERE account_id = $1',
+      [accountId]
     );
-    expect((await signIn.readDeviceCode(userCodeHash, session.hash)).outcome).toBe('pending');
+    expect(counted.rows).toEqual([{ failures: 10 }]);
+    await owner.query(
+      `UPDATE uts.account_user_code_failures SET window_started_at = now() - interval '61 minutes'
+       WHERE account_id = $1`,
+      [accountId]
+    );
+    expect((await read(third.hash)).outcome).toBe('pending');
+  });
+
+  it('allows a client network 30 wrong codes per hour over all its accounts', async () => {
+    const host = ownNetwork();
+    const { userCodeHash } = await deviceCode();
+    // Four accounts, none at its own limit of 10, spend the network's 30 from three addresses.
+    for (const [index, count] of [9, 9, 9, 3].entries()) {
+      const session = await browserSession(await insertAccount(owner));
+      await enterWrongCodes(session.hash, host(index + 1), count);
+    }
+    const fresh = await browserSession(await insertAccount(owner));
+    const read = (clientIp: string) =>
+      signIn.readDeviceCode({ userCodeHash, sessionTokenHash: fresh.hash, clientIp });
+    expect((await read(host(200))).outcome).toBe('too_many_attempts');
+    expect((await read(ownNetwork()(200))).outcome).toBe('pending');
+    const counted = await owner.query<{ network: string; failures: number }>(
+      `SELECT client_network::text AS network, failures FROM uts.network_user_code_failures
+       WHERE client_network = $1::inet`,
+      [`${host(0)}/24`]
+    );
+    expect(counted.rows).toEqual([{ network: `${host(0)}/24`, failures: 30 }]);
+    const networks = await owner.query<{ v4: string; v6: string; none: string | null }>(
+      `SELECT uts.user_code_network('192.0.2.77')::text AS v4,
+              uts.user_code_network('2001:db8:1:2::5')::text AS v6,
+              uts.user_code_network(NULL)::text AS none`
+    );
+    expect(networks.rows).toEqual([{ v4: '192.0.2.0/24', v6: '2001:db8:1::/48', none: null }]);
   });
 
   it('answers pending, then slow_down for a poll inside the interval, which grows by 5 seconds', async () => {
@@ -619,12 +677,14 @@ describe('device grant', () => {
     const accountId = await insertAccount(owner);
     const stale = await browserSession(accountId, 20);
     const { code, userCodeHash } = await deviceCode();
-    const decide = (sessionHash: Buffer, approve = true) =>
+    const decide = (sessionHash: Buffer, hash = userCodeHash) =>
       signIn.decideDeviceCode({
         environment,
-        userCodeHash,
+        userCodeHash: hash,
         sessionTokenHash: sessionHash,
-        approve,
+        clientIp: network.clientIp,
+        source: 'typed',
+        approve: true,
       });
     expect(await decide(stale.hash)).toBe('gate_required');
     expect(await auditTypes(accountId)).toEqual(['ai.kilo.uts.gate.refused']);
@@ -672,20 +732,46 @@ describe('device grant', () => {
 
     const fresh = await browserSession(accountId);
     const second = await deviceCode();
-    expect(
-      await signIn.decideDeviceCode({
-        environment,
-        userCodeHash: second.userCodeHash,
-        sessionTokenHash: fresh.hash,
-        approve: true,
-      })
-    ).toBe('approved');
+    expect(await decide(fresh.hash, second.userCodeHash)).toBe('approved');
     const pass = await owner.query<{ satisfied_by: string }>(
       `SELECT pass.satisfied_by::text FROM uts.device_codes AS code
        JOIN uts.gate_passes AS pass ON pass.id = code.gate_pass_id WHERE code.device_code_hash = $1`,
       [sha256(second.code)]
     );
     expect(pass.rows[0].satisfied_by).toBe('{recent_sign_in}');
+  });
+
+  it('needs a passkey step-up for a code that came in a link, whatever the sign-in age', async () => {
+    const accountId = await insertAccount(owner);
+    const fresh = await browserSession(accountId);
+    const { code, userCodeHash } = await deviceCode();
+    const decideLinked = () =>
+      signIn.decideDeviceCode({
+        environment,
+        userCodeHash,
+        sessionTokenHash: fresh.hash,
+        clientIp: network.clientIp,
+        source: 'link',
+        approve: true,
+      });
+    expect(await decideLinked()).toBe('gate_required');
+    const refusals = await auditRows(accountId);
+    expect(refusals.map(row => row.type)).toEqual(['ai.kilo.uts.gate.refused']);
+    expect(JSON.stringify(refusals[0].event)).toContain('passkey check required for a linked code');
+
+    const passkey = await storedPasskey(accountId);
+    await owner.query(
+      `INSERT INTO uts.step_ups (account_id, browser_session_id, purpose, passkey_credential_id, expires_at)
+       VALUES ($1, $2, 'gate', $3, now() + interval '10 minutes')`,
+      [accountId, fresh.id, passkey.id]
+    );
+    expect(await decideLinked()).toBe('approved');
+    const pass = await owner.query<{ satisfied_by: string }>(
+      `SELECT pass.satisfied_by::text FROM uts.device_codes AS code
+       JOIN uts.gate_passes AS pass ON pass.id = code.gate_pass_id WHERE code.device_code_hash = $1`,
+      [sha256(code)]
+    );
+    expect(pass.rows[0].satisfied_by).toBe('{passkey}');
   });
 
   it('issues a DPoP-bound desktop grant once, lets the same poll retry, and revokes on any other reuse', async () => {
@@ -697,6 +783,8 @@ describe('device grant', () => {
         environment,
         userCodeHash,
         sessionTokenHash: session.hash,
+        clientIp: network.clientIp,
+        source: 'typed',
         approve: true,
       })
     ).toBe('approved');
@@ -779,6 +867,8 @@ describe('device grant', () => {
         environment,
         userCodeHash: denied.userCodeHash,
         sessionTokenHash: session.hash,
+        clientIp: network.clientIp,
+        source: 'typed',
         approve: false,
       })
     ).toBe('denied');
@@ -1013,5 +1103,85 @@ describe('sign-in row maintenance', () => {
       [[old.hash, kept.hash]]
     );
     expect(left.rows[0].count).toBe(1);
+  });
+
+  it('deletes a browser session a day after it ended, never a live one or one that holds a gate pass', async () => {
+    const accountId = await insertAccount(owner);
+    const live = await browserSession(accountId);
+    const ended = await browserSession(accountId);
+    const endedWithPass = await browserSession(accountId);
+    const revoked = await browserSession(accountId);
+    // An idle end two days ago; the CHECK needs the idle end within 14 days of the last sight.
+    for (const session of [ended, endedWithPass]) {
+      await owner.query(
+        `UPDATE uts.browser_sessions SET created_at = now() - interval '20 days',
+                last_seen_at = now() - interval '16 days', idle_expires_at = now() - interval '2 days',
+                expires_at = now() + interval '10 days' WHERE id = $1`,
+        [session.id]
+      );
+    }
+    await insertGatePass(owner, accountId, 'pat_create', endedWithPass.id);
+    await owner.query(
+      `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now() - interval '25 hours',
+              revoke_reason = 'sign_out' WHERE id = $1`,
+      [revoked.id]
+    );
+    const app = await db.connect('uts_app_a');
+    const result = await app.query<{ kind: string; deleted: number }>(
+      'SELECT kind, deleted FROM uts.maintain_sign_in_rows()'
+    );
+    expect(result.rows.find(row => row.kind === 'browser_sessions')?.deleted).toBe(2);
+    const left = await owner.query<{ id: string }>(
+      'SELECT id FROM uts.browser_sessions WHERE account_id = $1 ORDER BY id',
+      [accountId]
+    );
+    expect(left.rows.map(row => row.id).sort()).toEqual([live.id, endedWithPass.id].sort());
+  });
+
+  it('deletes wrong user-code counts whose hour has passed, and keeps a running one', async () => {
+    const running = await insertAccount(owner);
+    const passed = await insertAccount(owner);
+    const host = ownNetwork();
+    for (const accountId of [running, passed]) {
+      await enterWrongCodes((await browserSession(accountId)).hash, host(1), 1);
+    }
+    await owner.query(
+      `UPDATE uts.account_user_code_failures SET window_started_at = now() - interval '61 minutes'
+       WHERE account_id = $1`,
+      [passed]
+    );
+    await owner.query(
+      `UPDATE uts.network_user_code_failures SET window_started_at = now() - interval '61 minutes'
+       WHERE client_network = $1::inet`,
+      [`${host(0)}/24`]
+    );
+    const app = await db.connect('uts_app_a');
+    await app.query('SELECT * FROM uts.maintain_sign_in_rows()');
+    const accounts = await owner.query<{ account_id: string }>(
+      'SELECT account_id FROM uts.account_user_code_failures WHERE account_id = ANY($1)',
+      [[running, passed]]
+    );
+    expect(accounts.rows).toEqual([{ account_id: running }]);
+    const networks = await owner.query(
+      'SELECT 1 FROM uts.network_user_code_failures WHERE client_network = $1::inet',
+      [`${host(0)}/24`]
+    );
+    expect(networks.rows).toEqual([]);
+  });
+});
+
+describe('anonymous write limits', () => {
+  it('holds at most 5 pending device codes per client address', async () => {
+    const address = `198.51.100.${Math.floor(Math.random() * 200) + 20}`;
+    const create = () =>
+      signIn.createDeviceCode({
+        deviceCodeHash: sha256(token()),
+        userCodeHash: randomBytes(32),
+        clientId: 'kilo-cli',
+        scopes: ['gateway:models.read'],
+        network: { ...network, clientIp: address },
+      });
+    for (let index = 0; index < 5; index++) expect((await create()).outcome).toBe('created');
+    expect(await create()).toEqual({ outcome: 'too_many_pending' });
   });
 });

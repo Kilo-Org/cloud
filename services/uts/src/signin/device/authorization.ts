@@ -9,6 +9,7 @@ import { parseScopes, readForm } from '../../oauth/params';
 import { jsonResponse } from '../../responses';
 import { randomCredential, sha256 } from '../../token/credentials';
 import type { SignInDeps } from '../deps';
+import { anonymousWriteRefusal } from '../limits';
 import { requestNetwork } from '../network';
 import { formatUserCode, importUserCodeKey, newUserCode, userCodeHash } from './user-code';
 
@@ -47,6 +48,8 @@ export async function handleDeviceAuthorization(
 
   const deviceCode = randomCredential();
   const network = requestNetwork(request);
+  const limited = anonymousWriteRefusal(network.clientIp, 'device_authorization');
+  if (limited !== null) return limited;
   try {
     const key = await importUserCodeKey(deps.userCodeSecret);
     const deviceCodeHash = await sha256(deviceCode);
@@ -62,6 +65,19 @@ export async function handleDeviceAuthorization(
         })
       );
       if (created.outcome === 'user_code_taken') continue;
+      if (created.outcome === 'too_many_pending') {
+        console.log(
+          JSON.stringify({
+            event: 'auth_action',
+            action: 'device_authorization',
+            outcome: 'too_many_pending',
+            stored: false,
+          })
+        );
+        return oauthError('slow_down', 429, 'too many pending device codes from this address', {
+          'Retry-After': '60',
+        });
+      }
       const verification = `${deps.config.endpoints.issuer}${UTS_DEVICE_VERIFICATION_PATH}`;
       const body: DeviceAuthorizationResponse = {
         device_code: deviceCode,

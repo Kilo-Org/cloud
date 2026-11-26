@@ -3,9 +3,8 @@
  * reverse domain name of the app, with a single slash after the scheme. The app opens the
  * authorization request in the system browser and receives the code on this URI; PKCE and the
  * DPoP-bound code (RFC 9449 section 10) keep another app that claims the same scheme from using a
- * code it intercepts, and the sign-in hand-off asks such a client for a fresh sign-in
- * (`FRESH_SIGN_IN_SECONDS`, src/signin/handoff.ts) so a request it starts is never approved
- * without the user.
+ * code it intercepts, and the sign-in hand-off shows such a client's every request a sign-in or
+ * confirm page (src/signin/handoff.ts), so a request it starts is never approved without the user.
  */
 
 /** `<reverse domain>:/<path>`, such as `com.example.app:/oauth/callback`. */

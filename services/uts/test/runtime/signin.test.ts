@@ -9,12 +9,12 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { PendingAuthorization } from '../../src/oauth/authorize';
 import { handleOAuthRequest } from '../../src/oauth/routes';
-import { handleDeviceAuthorization } from '../../src/signin/device/authorization';
+import { type DeviceDeps, handleDeviceAuthorization } from '../../src/signin/device/authorization';
 import { deviceCodeGrant } from '../../src/signin/device/grant';
 import { handleDeviceDecision, handleDevicePage } from '../../src/signin/device/verification';
 import { signInHandoff } from '../../src/signin/handoff';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../../src/signin/passkey/ceremonies';
-import type { BrowserSession, DeviceExchangeResult } from '../../src/signin/store';
+import type { BrowserSession, DeviceCodeRead, DeviceExchangeResult } from '../../src/signin/store';
 import { TICKET_REDEEMERS, handleTicketIssue, redeemTicket } from '../../src/tickets/routes';
 import { createFirstPartyRefreshToken, randomCredential } from '../../src/token/credentials';
 import { signerAccess } from '../../src/token/mint';
@@ -27,7 +27,7 @@ import {
   oauthDeps,
   storeFailure,
 } from './oauth-support';
-import { ORIGIN, deviceDeps, fakeSignIn, fakeTickets, pageJson } from './signin-support';
+import { ORIGIN, deviceDeps, fakeSignIn, fakeTickets, pageForm, pageJson } from './signin-support';
 import { config, env } from './test-env';
 
 const COOKIE = randomCredential();
@@ -54,7 +54,10 @@ function pending(
       clientClass: redirectKind === 'loopback' ? 'desktop' : 'mobile',
       redirectKind,
     },
-    redirectUri: 'http://127.0.0.1:4100/callback',
+    redirectUri:
+      redirectKind === 'loopback'
+        ? 'http://127.0.0.1:4100/callback'
+        : 'com.kilocode.kiloapp:/oauth/callback',
     scopes: ['gateway:models.read'],
     audiences: ['gateway'],
     orgHint: null,
@@ -75,6 +78,8 @@ describe('sign-in hand-off', () => {
     expect(result.response.status).toBe(200);
     expect(result.response.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
     expect(result.response.headers.get('X-Frame-Options')).toBe('DENY');
+    // `no-referrer` would make the browser send `Origin: null` with the pages' own form posts.
+    expect(result.response.headers.get('Referrer-Policy')).toBe('same-origin');
     expect(await result.response.text()).toContain('Sign in with a passkey');
     expect(store.calls).toEqual([]);
   });
@@ -99,17 +104,23 @@ describe('sign-in hand-off', () => {
     });
   });
 
-  it('asks a private-use-scheme client for a sign-in under 5 minutes old (RFC 8252 section 8.6)', async () => {
-    const stale = fakeSignIn({ readSession: async () => session(6) });
-    expect(
-      (await signInHandoff(stale.deps)(withCookie(authorizeUrl), pending('private_use_scheme')))
-        .status
-    ).toBe('interaction');
-    const fresh = fakeSignIn({ readSession: async () => session(1) });
-    expect(
-      (await signInHandoff(fresh.deps)(withCookie(authorizeUrl), pending('private_use_scheme')))
-        .status
-    ).toBe('approved');
+  it('shows every private-use-scheme request a page, and approves only the confirm page POST (RFC 8252 section 8.6)', async () => {
+    const handoff = signInHandoff(fakeSignIn({ readSession: async () => session(0) }).deps);
+    const mobile = pending('private_use_scheme');
+    const shown = await handoff(withCookie(authorizeUrl), mobile);
+    if (shown.status !== 'interaction') throw new Error('expected the confirm page');
+    expect(await shown.response.text()).toContain('id="confirm-app"');
+    // The form's POST ends in a redirect to the app, which `form-action` must allow.
+    expect(shown.response.headers.get('Content-Security-Policy')).toContain(
+      "form-action 'self' com.kilocode.kiloapp:;"
+    );
+    const confirm = (origin: string) =>
+      new Request(authorizeUrl, {
+        method: 'POST',
+        headers: { Cookie: `__Host-uts_session=${COOKIE}`, Origin: origin },
+      });
+    expect((await handoff(confirm('https://evil.example'), mobile)).status).toBe('interaction');
+    expect((await handoff(confirm(ORIGIN), mobile)).status).toBe('approved');
   });
 
   it('denies a third-party client until the consent screen serves it', async () => {
@@ -374,11 +385,42 @@ describe('device authorization', () => {
       ).status
     ).toBe(503);
   });
+
+  it('answers 429 with Retry-After when the address holds too many pending codes', async () => {
+    const store = fakeSignIn({ createDeviceCode: async () => ({ outcome: 'too_many_pending' }) });
+    const response = await handleDeviceAuthorization(
+      formRequest(
+        '/device_authorization',
+        { client_id: 'kilo-cli', scope: 'gateway:models.read' },
+        { 'CF-Connecting-IP': '198.51.100.9' }
+      ),
+      deviceDeps(store.deps)
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('60');
+    expect(await errorOf(response)).toBe('slow_down');
+    expect(store.calls).toHaveLength(1);
+  });
 });
 
 describe('device verification page', () => {
   const pageUrl = (code?: string) =>
     `${config.endpoints.issuer}/device${code === undefined ? '' : `?user_code=${code}`}`;
+  const pendingDevice: DeviceCodeRead = {
+    outcome: 'pending',
+    clientId: 'kilo-cli',
+    scopes: ['gateway:models.read'],
+    createdAt: new Date('2026-11-26T10:00:00Z'),
+    expiresAt: new Date('2026-11-26T10:10:00Z'),
+    userAgent: '<script>alert(1)</script>',
+    country: 'DE',
+    city: 'Berlin',
+  };
+  const EntryInputSchema = z.object({
+    userCodeHash: z.instanceof(Uint8Array),
+    sessionTokenHash: z.instanceof(Uint8Array),
+    clientIp: z.string().nullable(),
+  });
 
   it('shows the sign-in page without a session cookie', async () => {
     const store = fakeSignIn();
@@ -390,53 +432,113 @@ describe('device verification page', () => {
     expect(store.calls).toEqual([]);
   });
 
-  it('shows what asks and from where, escaped, with one statement', async () => {
-    const store = fakeSignIn({
-      readDeviceCode: async () => ({
-        outcome: 'pending',
-        clientId: 'kilo-cli',
-        scopes: ['gateway:models.read'],
-        createdAt: new Date('2026-11-26T10:00:00Z'),
-        expiresAt: new Date('2026-11-26T10:10:00Z'),
-        userAgent: '<script>alert(1)</script>',
-        country: 'DE',
-        city: 'Berlin',
-      }),
-    });
+  it('only fills in a code from the URL: GET reads the session, never the code', async () => {
+    const store = fakeSignIn({ readSession: async () => session() });
+    const html = await (
+      await handleDevicePage(withCookie(pageUrl('bcdf ghjk')), deviceDeps(store.deps))
+    ).text();
+    expect(html).toContain('<form method="post" action="/device">');
+    expect(html).toContain('name="linked_code" value="BCDF-GHJK"');
+    expect(html).toContain('name="user_code" value="BCDF-GHJK"');
+    expect(store.calls.map(call => call.method)).toEqual(['readSession']);
+
+    const malformed = fakeSignIn({ readSession: async () => session() });
+    const empty = await (
+      await handleDevicePage(withCookie(pageUrl('AAAA-1111')), deviceDeps(malformed.deps))
+    ).text();
+    expect(empty).not.toContain('linked_code');
+    expect(empty).toContain('name="user_code" value=""');
+  });
+
+  it('looks a posted code up with one statement and shows what asks and from where, escaped', async () => {
+    const store = fakeSignIn({ readDeviceCode: async () => pendingDevice });
     const response = await handleDevicePage(
-      withCookie(pageUrl('bcdf ghjk')),
+      pageForm(
+        '/device',
+        { user_code: 'bcdf ghjk', linked_code: 'BCDF-GHJK' },
+        { cookie: COOKIE, clientIp: '198.51.100.7' }
+      ),
       deviceDeps(store.deps)
     );
     const html = await response.text();
     expect(html).toContain('BCDF-GHJK');
+    expect(html).toContain('data-code-source="link"');
+    expect(html).toContain('approving asks for your passkey');
     expect(html).toContain('Kilo CLI');
     expect(html).toContain('Berlin, DE');
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert');
     expect(store.calls.map(call => call.method)).toEqual(['readDeviceCode']);
+    expect(EntryInputSchema.parse(store.calls[0].input[0]).clientIp).toBe('198.51.100.7');
   });
 
-  it('answers an unknown code with the entry page and too many with 429', async () => {
+  it('treats a code that differs from the linked one, or with no link, as typed', async () => {
+    const entries: Record<string, string>[] = [
+      { user_code: 'BCDF-GHJK' },
+      { user_code: 'BCDF-GHJK', linked_code: 'BCDF-GHJL' },
+    ];
+    for (const fields of entries) {
+      const store = fakeSignIn({ readDeviceCode: async () => pendingDevice });
+      const posted = pageForm('/device', fields, { cookie: COOKIE });
+      const html = await (await handleDevicePage(posted, deviceDeps(store.deps))).text();
+      expect(html).toContain('data-code-source="typed"');
+      expect(html).not.toContain('approving asks for your passkey');
+    }
+  });
+
+  it('refuses a code posted from another site before any statement', async () => {
+    const store = fakeSignIn();
+    const response = await handleDevicePage(
+      pageForm(
+        '/device',
+        { user_code: 'BCDF-GHJK' },
+        { cookie: COOKIE, origin: 'https://evil.example' }
+      ),
+      deviceDeps(store.deps)
+    );
+    expect(response.status).toBe(403);
+    expect(store.calls).toEqual([]);
+  });
+
+  it('sends a POST without a session back to the entry page', async () => {
+    const store = fakeSignIn();
+    const response = await handleDevicePage(
+      pageForm('/device', { user_code: 'BCDF-GHJK' }),
+      deviceDeps(store.deps)
+    );
+    expect(response.status).toBe(303);
+    expect(response.headers.get('Location')).toBe(pageUrl());
+    expect(store.calls).toEqual([]);
+
+    const ended = fakeSignIn({ readDeviceCode: async () => ({ outcome: 'no_session' }) });
+    const redirected = await handleDevicePage(
+      pageForm('/device', { user_code: 'BCDF-GHJK' }, { cookie: COOKIE }),
+      deviceDeps(ended.deps)
+    );
+    expect(redirected.status).toBe(303);
+  });
+
+  it('answers an unknown code with the entry page, too many with 429, and a store failure with 503', async () => {
+    const post = (deps: DeviceDeps, code = 'BCDF-GHJK') =>
+      handleDevicePage(pageForm('/device', { user_code: code }, { cookie: COOKIE }), deps);
     const unknown = fakeSignIn({ readDeviceCode: async () => ({ outcome: 'unknown_code' }) });
-    expect(
-      await (
-        await handleDevicePage(withCookie(pageUrl('BCDF-GHJK')), deviceDeps(unknown.deps))
-      ).text()
-    ).toContain('unknown or has expired');
+    expect(await (await post(deviceDeps(unknown.deps))).text()).toContain('unknown or has expired');
     const limited = fakeSignIn({ readDeviceCode: async () => ({ outcome: 'too_many_attempts' }) });
-    expect(
-      (await handleDevicePage(withCookie(pageUrl('BCDF-GHJK')), deviceDeps(limited.deps))).status
-    ).toBe(429);
+    expect((await post(deviceDeps(limited.deps))).status).toBe(429);
     const malformed = fakeSignIn();
-    expect(
-      await (
-        await handleDevicePage(withCookie(pageUrl('AAAA-1111')), deviceDeps(malformed.deps))
-      ).text()
-    ).toContain('unknown or has expired');
+    expect(await (await post(deviceDeps(malformed.deps), 'AAAA-1111')).text()).toContain(
+      'unknown or has expired'
+    );
     expect(malformed.calls).toEqual([]);
+    const failing = fakeSignIn({
+      readDeviceCode: async () => {
+        throw storeFailure('retryable');
+      },
+    });
+    expect((await post(deviceDeps(failing.deps))).status).toBe(503);
   });
 
-  it('answers each decision outcome with its status', async () => {
+  it('answers each decision outcome with its status, and passes the code source on', async () => {
     for (const [outcome, status] of [
       ['approved', 200],
       ['denied', 200],
@@ -447,22 +549,33 @@ describe('device verification page', () => {
     ] as const) {
       const store = fakeSignIn({ decideDeviceCode: async () => outcome });
       const response = await handleDeviceDecision(
-        pageJson('/device/decision', { user_code: 'BCDF-GHJK', approve: true }, { cookie: COOKIE }),
+        pageJson(
+          '/device/decision',
+          { user_code: 'BCDF-GHJK', source: 'link', approve: true },
+          { cookie: COOKIE }
+        ),
         deviceDeps(store.deps)
       );
       expect(response.status).toBe(status);
+      expect(z.object({ source: z.string() }).parse(store.calls[0].input[0]).source).toBe('link');
     }
     const crossOrigin = fakeSignIn();
     const refused = await handleDeviceDecision(
       pageJson(
         '/device/decision',
-        { user_code: 'BCDF-GHJK', approve: true },
+        { user_code: 'BCDF-GHJK', source: 'typed', approve: true },
         { cookie: COOKIE, origin: 'https://evil.example' }
       ),
       deviceDeps(crossOrigin.deps)
     );
     expect(refused.status).toBe(403);
-    expect(crossOrigin.calls).toEqual([]);
+    const sourceless = fakeSignIn();
+    const invalid = await handleDeviceDecision(
+      pageJson('/device/decision', { user_code: 'BCDF-GHJK', approve: true }, { cookie: COOKIE }),
+      deviceDeps(sourceless.deps)
+    );
+    expect(invalid.status).toBe(400);
+    expect([...crossOrigin.calls, ...sourceless.calls]).toEqual([]);
   });
 });
 

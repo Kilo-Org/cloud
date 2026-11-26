@@ -105,12 +105,13 @@ const SCRIPT = `'use strict';
   };
 
   const decide = async approve => {
-    const code = document.getElementById('device-user-code').dataset.userCode;
-    let result = await post(DECISION, { user_code: code, approve });
+    const element = document.getElementById('device-user-code');
+    const decision = { user_code: element.dataset.userCode, source: element.dataset.codeSource, approve };
+    let result = await post(DECISION, decision);
     if (!result.ok && result.data.error === 'gate_required') {
       status('Confirm with your passkey.');
       await assertion('step_up');
-      result = await post(DECISION, { user_code: code, approve });
+      result = await post(DECISION, decision);
     }
     if (!result.ok) throw failure(result.data);
     return result.data.outcome;

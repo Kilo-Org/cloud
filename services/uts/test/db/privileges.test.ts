@@ -35,6 +35,8 @@ const FUNCTION_WRITTEN_TABLES = [
   'sign_in_methods',
   'email_codes',
   'email_code_limits',
+  'account_user_code_failures',
+  'network_user_code_failures',
 ];
 
 /** Tables the app login cannot even read: only the sign-in functions reach them. */
@@ -48,6 +50,8 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   step_ups: 'purpose',
   sign_in_methods: 'provider',
   email_code_limits: 'sent_in_hour',
+  account_user_code_failures: 'failures',
+  network_user_code_failures: 'failures',
 };
 
 let db: TestDatabase;
@@ -164,6 +168,9 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
       'device_codes',
       'tickets',
       'step_ups',
+      'account_user_code_failures',
+      'network_user_code_failures',
+      'browser_sessions',
     ]);
   });
 

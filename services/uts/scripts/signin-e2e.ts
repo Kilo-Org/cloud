@@ -4,11 +4,13 @@
  * authenticator (CDP `WebAuthn` domain):
  *
  * 1. passkey registration on the passkeys page of a seeded browser session with a tier A pass;
- * 2. passkey sign-in on the sign-in page of the mobile app's authorization request, the native
- *    code exchange with PKCE and DPoP, and the mobile refresh lifetime (60 days idle, 1 year);
- * 3. the fresh sign-in the mobile client needs, and the CLI's loopback request on the session;
- * 4. the RFC 8628 device grant: authorization, pending and slow_down polls, approval on the
- *    device page with a passkey step-up (tier B), and the token;
+ * 2. passkey sign-in on the sign-in page of the mobile app's authorization request, then its
+ *    confirm page, the native code exchange with PKCE and DPoP, and the mobile refresh lifetime
+ *    (60 days idle, 1 year);
+ * 3. the CLI's loopback request on the session, and the confirm page every mobile request shows;
+ * 4. the RFC 8628 device grant: authorization, pending and slow_down polls; a code in the URL
+ *    only fills the page and a cross-site POST is refused; approval of a typed code on the recent
+ *    sign-in, and of a code from the link with a passkey step-up (tier B); and the token;
  * 5. a one-time ticket: mint from the mobile grant, redeem once, refuse the second use;
  * 6. the audit rows, which name every credential by reference only.
  *
@@ -63,6 +65,14 @@ const TokenSchema = z.looseObject({
   refresh_token_expires_in: z.number().optional(),
 });
 const ErrorSchema = z.looseObject({ error: z.string() });
+const DeviceAuthorizationSchema = z.object({
+  device_code: z.string(),
+  user_code: z.string(),
+  verification_uri: z.string(),
+  verification_uri_complete: z.string(),
+  expires_in: z.number(),
+  interval: z.number(),
+});
 
 async function dpop() {
   const { publicKey, privateKey } = await generateKeyPair('ES256', { extractable: true });
@@ -98,8 +108,11 @@ function authorizeUrl(params: Record<string, string>): string {
   return url.toString();
 }
 
-/** Opens `url`; resolves with the code of the authorization redirect it ends in. */
-async function codeFrom(page: Page, url: string, signIn: boolean): Promise<URL> {
+/**
+ * Opens `url`; resolves with the code of the authorization redirect it ends in. `signIn` clicks
+ * the passkey sign-in, and `confirm` the confirm page a private-use-scheme client always gets.
+ */
+async function codeFrom(page: Page, url: string, signIn: boolean, confirm = false): Promise<URL> {
   const redirect = page.waitForResponse(
     response => new URL(response.url()).pathname === '/authorize' && response.status() === 302,
     { timeout: 30_000 }
@@ -107,6 +120,9 @@ async function codeFrom(page: Page, url: string, signIn: boolean): Promise<URL> 
   await page.goto(url).catch(() => undefined);
   if (signIn) {
     await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
+  }
+  if (confirm) {
+    await page.getByRole('button', { name: 'Continue' }).click();
   }
   const response = await redirect;
   return new URL(z.string().parse(response.headers().location));
@@ -216,6 +232,7 @@ async function main() {
       state: 'mobile-e2e',
       dpop_jkt: mobile.jkt,
     }),
+    true,
     true
   );
   const code = z.string().parse(mobileRedirect.searchParams.get('code'));
@@ -291,8 +308,8 @@ async function main() {
   });
   check(refreshed.status === 200, 'mobile refresh');
 
-  // 3. The CLI's loopback request completes on the session; the mobile client's needs a fresh
-  // sign-in once the session's sign-in is older than 5 minutes.
+  // 3. The CLI's loopback request completes on the session; the mobile client's shows the
+  // confirm page however recent the sign-in is.
   const cli = await dpop();
   const cliVerifier = randomBytes(32).toString('base64url');
   const cliRedirect = await codeFrom(
@@ -313,10 +330,6 @@ async function main() {
   log('3 CLI loopback on the session', {
     redirect: `${cliRedirect.origin}${cliRedirect.pathname}`,
   });
-  await admin.query(
-    `UPDATE uts.browser_sessions SET auth_time = now() - interval '12 minutes' WHERE account_id = $1 AND amr = '{passkey}'`,
-    [ACCOUNT]
-  );
   // The request context shares the page's cookies and follows no redirect.
   const stale = await context.request.get(
     authorizeUrl({
@@ -331,29 +344,53 @@ async function main() {
     { maxRedirects: 0 }
   );
   const stalePage = /<title>([^<]*)<\/title>/.exec(await stale.text())?.[1];
-  check(stale.status() === 200 && stalePage === 'Sign in to Kilo', 'stale session shows sign-in');
-  log('3 mobile request, sign-in 12 min old', { status: stale.status(), page: stalePage });
+  check(
+    stale.status() === 200 && stalePage === 'Continue to the app',
+    'mobile request shows a page'
+  );
+  log('3 mobile request on a live session', { status: stale.status(), page: stalePage });
   await page.goto('about:blank');
 
   // 4. Device grant: the CLI asks, polls, the user approves on the device page.
+  const authorize = async () => {
+    const started = await post('/device_authorization', {
+      client_id: 'kilo-cli',
+      scope: 'gateway:models.read',
+    });
+    check(started.status === 200, 'device authorization');
+    const parsed = DeviceAuthorizationSchema.parse(started.body);
+    secrets.push(parsed.device_code, parsed.user_code);
+    return parsed;
+  };
+  const approval = async (deviceCode: string) =>
+    (
+      await admin.query<{ status: string; amr: string; satisfied_by: string; step_ups: number }>(
+        `SELECT code.status, code.amr::text, pass.satisfied_by::text,
+                (SELECT count(*)::int FROM uts.step_ups WHERE account_id = $1) AS step_ups
+         FROM uts.device_codes AS code JOIN uts.gate_passes AS pass ON pass.id = code.gate_pass_id
+         WHERE code.device_code_hash = $2`,
+        [ACCOUNT, sha256(deviceCode)]
+      )
+    ).rows[0];
+
+  // A typed code: the sign-in of step 2 is under 10 minutes old, which tier B accepts.
+  const typed = await authorize();
+  await page.goto(new URL('/device', base).toString());
+  await page.getByLabel('Code shown on your device').fill(typed.user_code.toLowerCase());
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const typedSource = await page.locator('#device-user-code').getAttribute('data-code-source');
+  await page.getByRole('button', { name: 'Approve' }).click();
+  await page.getByText('Device approved.', { exact: false }).waitFor({ timeout: 20_000 });
+  const typedApproval = await approval(typed.device_code);
+  check(
+    typedSource === 'typed' && typedApproval?.satisfied_by === '{recent_sign_in}',
+    'typed code approved on the recent sign-in'
+  );
+  log('4 typed code (recent sign-in, tier B)', { source: typedSource, ...typedApproval });
+
   const device = await dpop();
-  const started = await post('/device_authorization', {
-    client_id: 'kilo-cli',
-    scope: 'gateway:models.read',
-  });
-  const authorization = z
-    .object({
-      device_code: z.string(),
-      user_code: z.string(),
-      verification_uri: z.string(),
-      verification_uri_complete: z.string(),
-      expires_in: z.number(),
-      interval: z.number(),
-    })
-    .parse(started.body);
-  secrets.push(authorization.device_code, authorization.user_code);
+  const authorization = await authorize();
   log('4 device authorization', {
-    status: started.status,
     userCodeShape: authorization.user_code.replace(/[A-Z]/g, 'X'),
     verification: authorization.verification_uri,
     expiresIn: authorization.expires_in,
@@ -380,25 +417,47 @@ async function main() {
   check(ErrorSchema.parse(pending.body).error === 'authorization_pending', 'pending');
   check(ErrorSchema.parse(tooSoon.body).error === 'slow_down', 'slow_down');
 
+  // A link with a wrong code only fills the page: nothing is looked up or counted. A POST from
+  // another site is refused.
+  await page.goto(new URL('/device?user_code=BBBB-BBBB', base).toString());
+  const filled = await page.getByLabel('Code shown on your device').inputValue();
+  const crossSite = await context.request.post(new URL('/device', base).toString(), {
+    form: { user_code: 'BBBB-BBBB' },
+    headers: { Origin: 'https://evil.example' },
+    maxRedirects: 0,
+  });
+  const counted = await admin.query<{ failures: number }>(
+    'SELECT failures FROM uts.account_user_code_failures WHERE account_id = $1',
+    [ACCOUNT]
+  );
+  check(
+    filled === 'BBBB-BBBB' && crossSite.status() === 403 && counted.rows.length === 0,
+    'GET fills only, cross-site POST refused, nothing counted'
+  );
+  log('4 linked wrong code and cross-site POST', {
+    filled,
+    crossSiteStatus: crossSite.status(),
+    wrongCodesCounted: counted.rows.length,
+  });
+
+  // The code from the link needs a passkey step-up, though the sign-in is recent.
   const approvalUrl = new URL(authorization.verification_uri_complete);
   await page.goto(new URL(`${approvalUrl.pathname}${approvalUrl.search}`, base).toString());
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const linkedSource = await page.locator('#device-user-code').getAttribute('data-code-source');
   const approvalTitle = await page.title();
   await page.getByRole('button', { name: 'Approve' }).click();
   await page.getByText('Device approved.', { exact: false }).waitFor({ timeout: 20_000 });
-  const approved = await admin.query<{
-    status: string;
-    amr: string;
-    satisfied_by: string;
-    step_ups: number;
-  }>(
-    `SELECT code.status, code.amr::text, pass.satisfied_by::text,
-            (SELECT count(*)::int FROM uts.step_ups WHERE account_id = $1) AS step_ups
-     FROM uts.device_codes AS code JOIN uts.gate_passes AS pass ON pass.id = code.gate_pass_id
-     WHERE code.device_code_hash = $2`,
-    [ACCOUNT, sha256(authorization.device_code)]
+  const approved = await approval(authorization.device_code);
+  check(
+    linkedSource === 'link' && approved?.satisfied_by === '{passkey}',
+    'linked code approved by passkey step-up'
   );
-  check(approved.rows[0]?.satisfied_by === '{passkey}', 'approval by passkey step-up');
-  log('4 approval page (step-up, tier B)', { page: approvalTitle, ...approved.rows[0] });
+  log('4 linked code (step-up, tier B)', {
+    page: approvalTitle,
+    source: linkedSource,
+    ...approved,
+  });
 
   await sleep(10_500);
   const deviceTokensResponse = await poll();

@@ -425,7 +425,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` and `uts.maintain_oauth_rows()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations, DPoP proof `jti`s, passkeys, browser sessions, step-ups, device codes, tickets, WebAuthn challenges and wrong user-code counts, which it reads and writes only through the OAuth and sign-in functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()` and `uts.maintain_sign_in_rows()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -582,6 +582,22 @@ dedicated maintenance role. It deletes:
 | `rotated_refresh_tokens` | A rotated token of a live family 30 days after its rotation, the longest idle window a token has, oldest first | Reuse detection covers tokens rotated within 30 days; an older one is then unknown (`invalid_grant`) instead of revoking the family. A thief who rotates a stolen token is still caught when the real client next presents its own token, rotated minutes before. Oldest first, a token's child is mostly in the same batch |
 | `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
 | `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
+
+`uts.maintain_sign_in_rows()` (migration 0008) does the same for the sign-in rows, on the same
+terms (5,000 per kind per call, no input, time-gated, `uts_app` until slice 3.9), and the cron calls
+it beside `uts.maintain_oauth_rows()`:
+
+| Rows | When | Why that is safe |
+|---|---|---|
+| `webauthn_challenges`, `device_codes`, `tickets`, `step_ups` | 1 hour past their lifetime (5 minutes, 10 minutes, 60 seconds, 10 minutes), used or not | No statement accepts them after their lifetime |
+| `account_user_code_failures`, `network_user_code_failures` | 1 hour after the window's first wrong code | The next wrong code after the hour starts a new window anyway |
+| `browser_sessions` | 1 day after the session ended (idle end, absolute end or revocation), unless it holds a gate pass; cascades to its challenges, codes and step-ups | An ended session never answers again; a gate pass a credential refers to keeps its session, one per gated action |
+
+Row growth: with one sign-in per active client per 14 days, a session lives at most 31 days, so
+about 2.2 session rows (about 300 bytes each) per client: 7 MB at 10k clients, 33 MB at 50k and
+132 MB at 200k. The short-lived rows hold their rate times about 70 minutes, far less; a wrong
+user-code count holds one row per account or client network that entered a wrong code in the last
+2 hours.
 
 `parent_id` is `ON DELETE SET NULL`, so the order of a batch never decides what it deletes: each
 deleted token whose child stays gives that child one `parent_id` update. Rotated tokens go oldest

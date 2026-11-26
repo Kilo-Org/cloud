@@ -1,22 +1,26 @@
-import {
-  type AuthenticationResponseJSON,
-  type RegistrationResponseJSON,
-  generateAuthenticationOptions,
-  generateRegistrationOptions,
-  verifyAuthenticationResponse,
-  verifyRegistrationResponse,
-} from '@simplewebauthn/server';
-import { decodeClientDataJSON } from '@simplewebauthn/server/helpers';
+import type * as WebAuthn from '@simplewebauthn/server';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
+import type * as WebAuthnHelpers from '@simplewebauthn/server/helpers';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import { failureResponse } from '../../oauth/errors';
 import { jsonResponse } from '../../responses';
 import { base64url, randomCredential, sha256 } from '../../token/credentials';
+import { anonymousWriteRefusal } from '../limits';
 import { requestNetwork } from '../network';
 import { readSameOriginJson } from '../requests';
 import { sessionCookie, sessionCookieValue } from '../session';
 import type { PasskeyDescriptor, SignInStore, StoredPasskey } from '../store';
 import type { SignInDeps } from '../deps';
+
+/**
+ * `@simplewebauthn/server` and its ASN.1 parsers load on an isolate's first ceremony, not at its
+ * start, so the token, refresh and ticket paths of the same Worker never pay for them.
+ */
+let library: Promise<typeof WebAuthn> | null = null;
+let helpers: Promise<typeof WebAuthnHelpers> | null = null;
+const webauthn = () => (library ??= import('@simplewebauthn/server'));
+const webauthnHelpers = () => (helpers ??= import('@simplewebauthn/server/helpers'));
 
 /**
  * The WebAuthn ceremonies of the sign-in pages (design 5.14), through `@simplewebauthn/server`:
@@ -144,7 +148,7 @@ async function challengeHashOf(
 ): Promise<{ challenge: string; hash: Uint8Array } | null> {
   let challenge: string;
   try {
-    challenge = decodeClientDataJSON(clientDataJSON).challenge;
+    challenge = (await webauthnHelpers()).decodeClientDataJSON(clientDataJSON).challenge;
   } catch {
     return null;
   }
@@ -164,6 +168,11 @@ export async function handlePasskeyOptions(request: Request, deps: SignInDeps): 
   const { ceremony } = body;
   const sessionTokenHash = ceremony === 'sign_in' ? null : await sessionHashOf(request);
   if (ceremony !== 'sign_in' && sessionTokenHash === null) return refused('no_session');
+  if (ceremony === 'sign_in') {
+    const address = requestNetwork(request).clientIp;
+    const limited = anonymousWriteRefusal(address, 'passkey_sign_in_challenge');
+    if (limited !== null) return limited;
+  }
   const challenge = await newChallenge();
 
   try {
@@ -180,6 +189,7 @@ export async function handlePasskeyOptions(request: Request, deps: SignInDeps): 
     if (created.outcome !== 'created') return refused(created.outcome);
     if (ceremony === 'registration') {
       if (created.registration === null) throw new Error('a registration challenge without a user');
+      const { generateRegistrationOptions } = await webauthn();
       const options = await generateRegistrationOptions({
         rpName: RP_NAME,
         rpID: rpId,
@@ -193,6 +203,7 @@ export async function handlePasskeyOptions(request: Request, deps: SignInDeps): 
       });
       return jsonResponse({ options }, 200);
     }
+    const { generateAuthenticationOptions } = await webauthn();
     const options = await generateAuthenticationOptions({
       rpID: rpId,
       challenge: challenge.value,
@@ -223,6 +234,7 @@ async function verifyAssertion(
   }
   const json: AuthenticationResponseJSON = { ...response, clientExtensionResults: {} };
   try {
+    const { verifyAuthenticationResponse } = await webauthn();
     const verified = await verifyAuthenticationResponse({
       response: json,
       expectedChallenge: challenge,
@@ -332,6 +344,7 @@ async function verifyRegistration(
   const json: RegistrationResponseJSON = { ...body.response, clientExtensionResults: {} };
   let info;
   try {
+    const { verifyRegistrationResponse } = await webauthn();
     const verified = await verifyRegistrationResponse({
       response: json,
       // The registration statement accepts only a challenge this session was given.

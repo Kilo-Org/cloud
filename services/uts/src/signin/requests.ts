@@ -8,6 +8,21 @@ import { jsonResponse } from '../responses';
  * host of the same registrable domain, which `SameSite=Lax` would let carry the cookie, is
  * refused before any statement runs.
  */
+
+/**
+ * True for a POST from a page on this origin: the browser's `Origin` is this origin and, where
+ * sent, `Sec-Fetch-Site` is `same-origin`. A page on another site cannot forge either.
+ */
+export function isSameOriginPost(request: Request): boolean {
+  const fetchSite = request.headers.get('Sec-Fetch-Site');
+  return (
+    request.method === 'POST' &&
+    request.headers.get('Origin') === new URL(request.url).origin &&
+    (fetchSite === null || fetchSite === 'same-origin')
+  );
+}
+
+/** The JSON body of a sign-in page call, or the error response; see `isSameOriginPost`. */
 export async function readSameOriginJson<Schema extends z.ZodType>(
   request: Request,
   schema: Schema,
@@ -16,11 +31,7 @@ export async function readSameOriginJson<Schema extends z.ZodType>(
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });
   }
-  const fetchSite = request.headers.get('Sec-Fetch-Site');
-  if (
-    request.headers.get('Origin') !== new URL(request.url).origin ||
-    (fetchSite !== null && fetchSite !== 'same-origin')
-  ) {
+  if (!isSameOriginPost(request)) {
     return jsonResponse({ error: 'forbidden_origin' }, 403);
   }
   const contentType = request.headers.get('Content-Type') ?? '';

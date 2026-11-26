@@ -5,8 +5,9 @@ import type { Env } from '../../env';
 /**
  * RFC 8628 user codes (section 6.1): 8 characters from 20 consonants, shown as `XXXX-XXXX`, so a
  * code is easy to read and type and spells no word. 20^8 is about 2^34.6 codes; the identity store
- * keeps only an HMAC-SHA-256 of the normalized code under a key only UTS holds (design 5.2), and
- * a session may enter at most 10 wrong codes per hour (`uts.read_device_code`).
+ * keeps only an HMAC-SHA-256 of the normalized code under a key only UTS holds (design 5.2). An
+ * account may enter at most 10 wrong codes per hour over all its sessions, and a client network
+ * 30 (`uts.user_code_entries_left`).
  */
 const ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
 const LENGTH = 8;

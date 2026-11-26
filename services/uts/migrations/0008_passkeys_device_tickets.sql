@@ -75,12 +75,29 @@ ALTER TABLE uts.passkey_credentials
     FOREIGN KEY (gate_pass_id, account_id, gate_pass_action)
     REFERENCES uts.gate_passes (id, account_id, action);
 
--- Failed user-code entries of the session in its current hour, which stop at 10, and when the
--- session's last denied audit row was written.
+-- When the session's last denied audit row was written.
 ALTER TABLE uts.browser_sessions
-  ADD COLUMN user_code_failures smallint NOT NULL DEFAULT 0 CHECK (user_code_failures BETWEEN 0 AND 10),
-  ADD COLUMN user_code_window_started_at timestamptz,
   ADD COLUMN denied_audited_at timestamptz;
+
+-- Wrong user codes entered on the device page in the hour that started with the first of them,
+-- counted per account (over all its browser sessions) and per client network (an IPv4 /24 or an
+-- IPv6 /48), so neither a new session nor another account on the same network adds guesses. An
+-- account has 10 per hour and a network 30 (`uts.user_code_entries_left`). The first failure
+-- after the hour starts a new one; `uts.maintain_sign_in_rows` deletes rows whose hour has passed.
+CREATE TABLE uts.account_user_code_failures (
+  account_id uts.account_id PRIMARY KEY REFERENCES uts.accounts (id) ON DELETE CASCADE,
+  failures smallint NOT NULL CHECK (failures BETWEEN 1 AND 10),
+  window_started_at timestamptz NOT NULL
+);
+CREATE INDEX account_user_code_failures_window_idx
+  ON uts.account_user_code_failures (window_started_at);
+CREATE TABLE uts.network_user_code_failures (
+  client_network inet PRIMARY KEY CHECK (client_network = network(client_network)::inet),
+  failures smallint NOT NULL CHECK (failures BETWEEN 1 AND 30),
+  window_started_at timestamptz NOT NULL
+);
+CREATE INDEX network_user_code_failures_window_idx
+  ON uts.network_user_code_failures (window_started_at);
 
 -- An approval records when and how the user authenticated, which become the device session's
 -- `auth_time` and `amr`; a consumed code names the grant it created and the DPoP key that grant
@@ -106,7 +123,9 @@ ALTER TABLE uts.tickets
   ADD COLUMN org_id uuid,
   ADD COLUMN denied_audited_at timestamptz;
 
-GRANT SELECT ON uts.webauthn_challenges TO uts_app;
+GRANT SELECT ON
+  uts.webauthn_challenges, uts.account_user_code_failures, uts.network_user_code_failures
+TO uts_app;
 
 -- The live browser session a cookie names: active, within its idle and maximum lifetime, of an
 -- active account. One probe of `browser_sessions_token_hash_key`, then `accounts_pkey`.
@@ -116,16 +135,13 @@ RETURNS TABLE (
   account_id text,
   auth_time timestamptz,
   amr uts.auth_method[],
-  last_seen_at timestamptz,
-  user_code_failures smallint,
-  user_code_window_started_at timestamptz
+  last_seen_at timestamptz
 )
 LANGUAGE sql
 STABLE
 SET search_path = pg_catalog, pg_temp
 AS $$
-  SELECT session.id, session.account_id, session.auth_time, session.amr, session.last_seen_at,
-    session.user_code_failures, session.user_code_window_started_at
+  SELECT session.id, session.account_id, session.auth_time, session.amr, session.last_seen_at
   FROM uts.browser_sessions AS session
   JOIN uts.accounts AS account ON account.id = session.account_id
   WHERE session.token_hash = $1
@@ -656,8 +672,9 @@ END
 $$;
 
 -- POST /device_authorization (RFC 8628 section 3.1): a pending 10-minute device code. It names
--- no account, so it writes no audit row. Outcomes: `created`; `user_code_taken` (the caller draws
--- another user code).
+-- no account, so it writes no audit row. One client address holds at most 5 pending codes, so an
+-- anonymous caller cannot fill the table (design 3, "Anonymous sign-in writes"). Outcomes:
+-- `created`; `user_code_taken` (the caller draws another user code); `too_many_pending`.
 CREATE FUNCTION uts.create_device_code(
   p_device_code_hash bytea,
   p_user_code_hash bytea,
@@ -674,6 +691,14 @@ SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
+  IF p_client_ip IS NOT NULL AND (
+    SELECT count(*) FROM uts.device_codes AS pending
+    WHERE pending.client_ip = p_client_ip AND pending.status = 'pending' AND pending.expires_at > now()
+  ) >= 5 THEN
+    outcome := 'too_many_pending';
+    RETURN NEXT;
+    RETURN;
+  END IF;
   INSERT INTO uts.device_codes (
     device_code_hash, user_code_hash, client_id, scopes, expires_at, user_agent, client_ip, asn,
     country, city
@@ -688,44 +713,68 @@ BEGIN
 END
 $$;
 
--- Counts one failed user-code entry of a session. A session has 10 entries per hour
--- (`uts.user_code_entries_left`); the first failure after the hour starts a new one.
-CREATE FUNCTION uts.count_user_code_failure(p_session_id uuid) RETURNS void
+-- The client network whose wrong user codes share one count: the address's IPv4 /24 or IPv6
+-- /48, or NULL without an address.
+CREATE FUNCTION uts.user_code_network(p_client_ip inet) RETURNS inet
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog, pg_temp
+RETURN network(set_masklen(p_client_ip, CASE family(p_client_ip) WHEN 4 THEN 24 ELSE 48 END))::inet;
+
+-- Counts one wrong user code against the account and the client network; the first failure after
+-- an hour starts a new one.
+CREATE FUNCTION uts.count_user_code_failure(p_account_id text, p_network inet) RETURNS void
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
-  UPDATE uts.browser_sessions AS session
-  SET user_code_failures = CASE
-      WHEN session.user_code_window_started_at IS NULL
-        OR session.user_code_window_started_at <= now() - interval '1 hour' THEN 1
-      ELSE least(10, session.user_code_failures + 1)
-    END,
-    user_code_window_started_at = CASE
-      WHEN session.user_code_window_started_at IS NULL
-        OR session.user_code_window_started_at <= now() - interval '1 hour' THEN now()
-      ELSE session.user_code_window_started_at
-    END
-  WHERE session.id = p_session_id;
+  INSERT INTO uts.account_user_code_failures AS counted (account_id, failures, window_started_at)
+  VALUES (p_account_id, 1, now())
+  ON CONFLICT (account_id) DO UPDATE
+  SET failures = CASE WHEN counted.window_started_at <= now() - interval '1 hour' THEN 1
+      ELSE least(10, counted.failures + 1) END,
+    window_started_at = CASE WHEN counted.window_started_at <= now() - interval '1 hour' THEN now()
+      ELSE counted.window_started_at END;
+  IF p_network IS NOT NULL THEN
+    INSERT INTO uts.network_user_code_failures AS counted (client_network, failures, window_started_at)
+    VALUES (p_network, 1, now())
+    ON CONFLICT (client_network) DO UPDATE
+    SET failures = CASE WHEN counted.window_started_at <= now() - interval '1 hour' THEN 1
+        ELSE least(30, counted.failures + 1) END,
+      window_started_at = CASE WHEN counted.window_started_at <= now() - interval '1 hour' THEN now()
+        ELSE counted.window_started_at END;
+  END IF;
 END
 $$;
 
--- True while the session may enter another user code.
-CREATE FUNCTION uts.user_code_entries_left(
-  p_failures smallint,
-  p_window_started_at timestamptz
-) RETURNS boolean
+-- True while the account and the client network may enter another user code: the account has
+-- fewer than 10 wrong codes in its hour and the network fewer than 30. One primary-key probe each.
+CREATE FUNCTION uts.user_code_entries_left(p_account_id text, p_network inet) RETURNS boolean
 LANGUAGE sql
 STABLE
 SET search_path = pg_catalog, pg_temp
-RETURN p_window_started_at IS NULL
-  OR p_window_started_at <= now() - interval '1 hour'
-  OR p_failures < 10;
+RETURN NOT EXISTS (
+    SELECT 1 FROM uts.account_user_code_failures AS counted
+    WHERE counted.account_id = p_account_id
+      AND counted.failures >= 10
+      AND counted.window_started_at > now() - interval '1 hour'
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM uts.network_user_code_failures AS counted
+    WHERE counted.client_network = p_network
+      AND counted.failures >= 30
+      AND counted.window_started_at > now() - interval '1 hour'
+  );
 
--- GET /device with a user code: the pending device code and the context the approval page shows,
--- for a live session only. An unknown code counts against the session's 10 entries per hour.
--- Outcomes: `pending` with the context; `no_session`; `unknown_code`; `too_many_attempts`.
-CREATE FUNCTION uts.read_device_code(p_user_code_hash bytea, p_session_token_hash bytea)
+-- POST /device with a user code: the pending device code and the context the approval page
+-- shows, for a live session only. An unknown code counts against the account's 10 and the client
+-- network's 30 wrong codes per hour. Outcomes: `pending` with the context; `no_session`;
+-- `unknown_code`; `too_many_attempts`.
+CREATE FUNCTION uts.read_device_code(
+  p_user_code_hash bytea,
+  p_session_token_hash bytea,
+  p_client_ip inet
+)
 RETURNS TABLE (
   outcome text,
   code_client_id text,
@@ -742,6 +791,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   live record;
+  entry_network inet := uts.user_code_network(p_client_ip);
 BEGIN
   SELECT * INTO live FROM uts.live_browser_session(p_session_token_hash);
   IF NOT FOUND THEN
@@ -749,7 +799,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF NOT uts.user_code_entries_left(live.user_code_failures, live.user_code_window_started_at) THEN
+  IF NOT uts.user_code_entries_left(live.account_id, entry_network) THEN
     outcome := 'too_many_attempts';
     RETURN NEXT;
     RETURN;
@@ -763,7 +813,7 @@ BEGIN
     AND code.status = 'pending'
     AND code.expires_at > now();
   IF NOT FOUND THEN
-    PERFORM uts.count_user_code_failure(live.id);
+    PERFORM uts.count_user_code_failure(live.account_id, entry_network);
     outcome := 'unknown_code';
     RETURN NEXT;
     RETURN;
@@ -774,16 +824,20 @@ END
 $$;
 
 -- POST /device/decision: the signed-in user approves or denies a pending device code. An approval
--- is a tier B action (design 5.4 and 5.11): a sign-in of this session within 10 minutes, or a
--- passkey step-up of this session within 10 minutes. It records a consumed gate pass with the
--- checks met, the time and methods of the user's authentication (they become the device
--- session's `auth_time` and `amr`, with `device_grant` added), the notice and the audit row.
--- Outcomes: `approved`; `denied`; `no_session`; `unknown_code`; `too_many_attempts`;
--- `gate_required`.
+-- is a tier B action (design 5.4 and 5.11): a passkey step-up of this session within 10 minutes,
+-- or, when the user typed the code (`p_typed`), a sign-in of this session within 10 minutes. A
+-- code that came filled in from a link (`verification_uri_complete`) needs the step-up: whoever
+-- sent the link chose the code, and the sign-in the link led to proves nothing about it. It
+-- records a consumed gate pass with the checks met, the time and methods of the user's
+-- authentication (they become the device session's `auth_time` and `amr`, with `device_grant`
+-- added), the notice and the audit row. Outcomes: `approved`; `denied`; `no_session`;
+-- `unknown_code`; `too_many_attempts`; `gate_required`.
 CREATE FUNCTION uts.decide_device_code(
   p_environment text,
   p_user_code_hash bytea,
   p_session_token_hash bytea,
+  p_client_ip inet,
+  p_typed boolean,
   p_approve boolean
 ) RETURNS TABLE (outcome text)
 LANGUAGE plpgsql
@@ -792,6 +846,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   live record;
+  entry_network inet := uts.user_code_network(p_client_ip);
   code uts.device_codes%ROWTYPE;
   step_up_time timestamptz;
   checks uts.gate_check[];
@@ -805,7 +860,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF NOT uts.user_code_entries_left(live.user_code_failures, live.user_code_window_started_at) THEN
+  IF NOT uts.user_code_entries_left(live.account_id, entry_network) THEN
     outcome := 'too_many_attempts';
     RETURN NEXT;
     RETURN;
@@ -816,7 +871,7 @@ BEGIN
     AND stored.expires_at > now()
   FOR UPDATE;
   IF NOT FOUND THEN
-    PERFORM uts.count_user_code_failure(live.id);
+    PERFORM uts.count_user_code_failure(live.account_id, entry_network);
     outcome := 'unknown_code';
     RETURN NEXT;
     RETURN;
@@ -847,13 +902,15 @@ BEGIN
     AND step_up.completed_at > now() - interval '10 minutes'
     AND step_up.expires_at > now();
   checks := array_remove(ARRAY[
-    CASE WHEN live.auth_time > now() - interval '10 minutes' AND live.auth_time <= now()
+    CASE WHEN p_typed AND live.auth_time > now() - interval '10 minutes' AND live.auth_time <= now()
       THEN 'recent_sign_in'::uts.gate_check END,
     CASE WHEN step_up_time IS NOT NULL THEN 'passkey'::uts.gate_check END
   ], NULL);
   IF cardinality(checks) = 0 THEN
     PERFORM uts.audit_session_gate_refusal(
-      p_environment, live.account_id, live.id, 'device_approve', 'sign-in or passkey check required'
+      p_environment, live.account_id, live.id, 'device_approve',
+      CASE WHEN p_typed THEN 'sign-in or passkey check required'
+        ELSE 'passkey check required for a linked code' END
     );
     outcome := 'gate_required';
     RETURN NEXT;
@@ -1294,16 +1351,22 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
+  -- The grant, its device session and the account must be live, and an organization ticket needs
+  -- the membership and SSO requirement it was minted under (design 5.8).
   SELECT true INTO live
   FROM uts.refresh_grants AS grant_row
   JOIN uts.device_sessions AS session ON session.id = grant_row.device_session_id
   JOIN uts.accounts AS account ON account.id = grant_row.account_id
+  LEFT JOIN uts.org_memberships AS membership
+    ON membership.org_id = ticket.org_id AND membership.account_id = ticket.account_id
+  LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = ticket.org_id
   WHERE grant_row.id = ticket.grant_id
     AND grant_row.status = 'active'
     AND grant_row.expires_at > now()
     AND grant_row.idle_expires_at > now()
     AND session.status = 'active'
-    AND account.status = 'active';
+    AND account.status = 'active'
+    AND uts.org_requirement_met(ticket.org_id, membership.status, policy.enforcement, session.amr);
   IF live IS NULL THEN
     outcome := 'unknown';
     RETURN NEXT;
@@ -1334,7 +1397,11 @@ $$;
 
 -- Deletes sign-in rows that no statement reads again, at most 5,000 of each kind per call, as
 -- `uts.maintain_oauth_rows()` does: WebAuthn challenges, device codes, tickets and step-ups 1
--- hour past their lifetime, used or not. The UTS cron calls both until every count is under
+-- hour past their lifetime, used or not, wrong user-code counts whose hour has passed, and
+-- browser sessions 1 day after they ended (idle, absolute or revoked). Deleting a session
+-- cascades to its challenges, codes and step-ups. A session that holds a gate pass stays: a
+-- credential's foreign key keeps the pass, and the pass keeps its session; those sessions number
+-- at most one per gated action. The UTS cron calls both functions until every count is under
 -- 5,000.
 CREATE FUNCTION uts.maintain_sign_in_rows()
 RETURNS TABLE (kind text, deleted integer)
@@ -1384,9 +1451,54 @@ BEGIN
   kind := 'step_ups';
   GET DIAGNOSTICS deleted = ROW_COUNT;
   RETURN NEXT;
+
+  DELETE FROM uts.account_user_code_failures AS counted
+  WHERE counted.account_id IN (
+    SELECT stale.account_id FROM uts.account_user_code_failures AS stale
+    WHERE stale.window_started_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'account_user_code_failures';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.network_user_code_failures AS counted
+  WHERE counted.client_network IN (
+    SELECT stale.client_network FROM uts.network_user_code_failures AS stale
+    WHERE stale.window_started_at < now() - interval '1 hour'
+    LIMIT batch
+  );
+  kind := 'network_user_code_failures';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.browser_sessions AS session
+  WHERE session.id IN (
+    SELECT ended.id FROM uts.browser_sessions AS ended
+    WHERE least(ended.idle_expires_at, ended.expires_at, coalesce(ended.revoked_at, 'infinity'))
+      < now() - interval '1 day'
+      AND NOT EXISTS (
+        SELECT 1 FROM uts.gate_passes AS pass WHERE pass.browser_session_id = ended.id
+      )
+    LIMIT batch
+  );
+  kind := 'browser_sessions';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
 END
 $$;
 CREATE INDEX step_ups_expires_idx ON uts.step_ups (expires_at);
+-- The session cleanup reads ended sessions by their end, and its cascades find a session's rows.
+CREATE INDEX browser_sessions_end_idx
+  ON uts.browser_sessions (least(idle_expires_at, expires_at, coalesce(revoked_at, 'infinity')));
+CREATE INDEX gate_passes_browser_session_idx ON uts.gate_passes (browser_session_id)
+  WHERE browser_session_id IS NOT NULL;
+CREATE INDEX step_ups_browser_session_idx ON uts.step_ups (browser_session_id)
+  WHERE browser_session_id IS NOT NULL;
+CREATE INDEX authorization_codes_browser_session_idx ON uts.authorization_codes (browser_session_id)
+  WHERE browser_session_id IS NOT NULL;
+-- The pending-code cap of `uts.create_device_code`.
+CREATE INDEX device_codes_pending_ip_idx ON uts.device_codes (client_ip) WHERE status = 'pending';
 
 GRANT EXECUTE ON FUNCTION
   uts.read_browser_session(bytea),
@@ -1401,8 +1513,8 @@ GRANT EXECUTE ON FUNCTION
   ),
   uts.complete_passkey_step_up(text, bytea, bytea, uuid, bigint, bigint, boolean),
   uts.create_device_code(bytea, bytea, text, text[], text, inet, integer, text, text),
-  uts.read_device_code(bytea, bytea),
-  uts.decide_device_code(text, bytea, bytea, boolean),
+  uts.read_device_code(bytea, bytea, inet),
+  uts.decide_device_code(text, bytea, bytea, inet, boolean, boolean),
   uts.exchange_device_code(
     text, bytea, text, uts.client_class, bytea, text, uuid, bytea, text, text, inet, integer, text,
     text, text[], text[]

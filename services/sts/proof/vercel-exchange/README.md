@@ -87,8 +87,8 @@ Vercel workload, and it passed.**
    no deployment claim). Vercel documents separate partitions for `preview` and `production` only,
    so a custom environment such as `staging` may share the preview partition, and any preview
    deployment could then read the staging token. The proof audience is not an STS issuer, so this
-   harness exposes nothing STS accepts; the phase 2 slice-4 client encrypts every
-   custom-environment entry (below).
+   harness exposes nothing STS accepts; the slice-4 client keeps a custom environment's token in
+   instance memory only (below).
 3. Instance memory, then the Runtime Cache: a hit is used. On a miss, a base token with under 60 s
    left fails the request at once: no exchange, no waiting.
 4. Miss: wait a random 0 to 500 ms, read again.
@@ -113,11 +113,15 @@ once instead of polling a cache that cannot bring a token. Cost: about 100 reque
 token, the rest of a cold wave fail fast (no 20 s of function time each), and their STS calls fail
 until the cache is back.
 
-**Carried into the phase 2 slice-4 client.** It encrypts every custom-environment entry,
-whether or not that environment shares the preview partition: AES-GCM under a key only that
-environment holds, with the cache key as associated data, so an entry decrypts only under the key
-it was written for. Its fetches to `oidc.vercel.com` use `redirect: 'error'`, so the base token in
-the request body never follows a redirect.
+**Custom environments and redirects in the slice-4 client.** A custom environment's token (a base
+token with `custom_environment_id`, or an `environment` other than `preview` and `production`)
+stays in instance memory only and never touches the Runtime Cache, whether or not that environment
+shares the preview partition: on a miss the request exchanges at once and a 429 fails it, so a
+custom environment costs one exchange per instance per base-token renewal. Encrypting its entries
+(AES-GCM under a key only that environment holds, the cache key as associated data, so an entry
+decrypts only under the key it was written for) is the way to share them through the cache again
+later. The client refuses redirects on `oidc.vercel.com` (a 3xx fails the exchange), so the base
+token in the request body never follows one.
 
 **Cache cost.** A memory hit reads nothing. A cache hit is 1 read. A miss that reaches the claim is
 4 reads (read, read after the random wait, claim check, read-back) and 1 write (2 for the

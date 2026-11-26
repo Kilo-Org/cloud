@@ -403,4 +403,89 @@ describe('shared exchanged token (D10)', () => {
     expect((await instance.get(BASE_TOKEN, AUDIENCE, exchange)).report.source).toBe('memory');
     expect(calls.attempts).toBe(1);
   });
+
+  describe('a custom environment (step 2b)', () => {
+    /** A cache that records every call: a custom environment must make none. */
+    function watchedCache() {
+      const calls: string[] = [];
+      const inner = fakeCache();
+      const cache: SharedCache = {
+        async get(key) {
+          calls.push(`get ${key}`);
+          return await inner.get(key);
+        },
+        async set(key, value, options) {
+          calls.push(`set ${key}`);
+          await inner.set(key, value, options);
+        },
+        async delete(key) {
+          calls.push(`delete ${key}`);
+          await inner.delete(key);
+        },
+      };
+      return { cache, calls };
+    }
+
+    const STAGING = baseToken({
+      environment: 'staging',
+      custom_environment_id: 'env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b',
+    });
+
+    it('keeps its token in instance memory only, never reading or writing the Runtime Cache', async () => {
+      const { cache, calls } = watchedCache();
+      const { calls: exchanges, exchange } = fakeExchange({ budget: 100 });
+      const instance = new SharedExchangedToken(cache);
+      const first = await instance.get(STAGING, AUDIENCE, exchange);
+      expect(first).toMatchObject({
+        status: 'ok',
+        report: { source: 'exchanged', cacheReads: 0, cacheWrites: 0, waitedMs: 0 },
+      });
+      expect((await instance.get(STAGING, AUDIENCE, exchange)).report.source).toBe('memory');
+      // Another instance shares nothing: it exchanges for itself.
+      const other = await new SharedExchangedToken(cache).get(STAGING, AUDIENCE, exchange);
+      expect(other.report.source).toBe('exchanged');
+      expect(exchanges.attempts).toBe(2);
+      // STS refusing its own token keeps it and writes no refusal marker.
+      expect(first.status === 'ok' && (await instance.invalidate(first.token))).toBe(false);
+      expect(calls).toEqual([]);
+    });
+
+    it('treats an environment other than preview and production as custom even without its id', async () => {
+      const { cache, calls } = watchedCache();
+      const { exchange } = fakeExchange({ budget: 100 });
+      const result = await new SharedExchangedToken(cache).get(
+        baseToken({ environment: 'staging' }),
+        AUDIENCE,
+        exchange
+      );
+      expect(result.report.source).toBe('exchanged');
+      expect(calls).toEqual([]);
+    });
+
+    it('fails at once on a 429, with no poll', async () => {
+      const { cache, calls } = watchedCache();
+      const { exchange } = fakeExchange({ budget: 0 });
+      const result = await new SharedExchangedToken(cache).get(STAGING, AUDIENCE, exchange);
+      expect(result).toMatchObject({
+        status: 'failed',
+        detail: 'the exchange answered 429 and a custom environment shares no token',
+        report: { exchangeAttempts: 1, rateLimited: 1, waitedMs: 0 },
+      });
+      expect(calls).toEqual([]);
+    });
+
+    it('still uses the shared cache for preview and production', async () => {
+      const { cache, calls } = watchedCache();
+      const { exchange } = fakeExchange({ budget: 100 });
+      const preview = baseToken({ environment: 'preview' });
+      await new SharedExchangedToken(cache, { settings: { jitterMs: 1 } }).get(
+        preview,
+        AUDIENCE,
+        exchange
+      );
+      const later = await new SharedExchangedToken(cache).get(preview, AUDIENCE, exchange);
+      expect(later.report.source).toBe('cache');
+      expect(calls.length).toBeGreaterThan(0);
+    });
+  });
 });

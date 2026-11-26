@@ -409,11 +409,14 @@ deployments of the project in the same environment) can read and present that to
 a deployment's exchanges, but cannot make a deployment present another deployment's token (the
 reader checks the claims, STS checks the signature). Within one environment a read gains nothing,
 since STS takes no deployment claim. Vercel documents separate partitions only for preview and
-production, so a custom environment may share the preview partition; the phase 2 slice-4 client
-therefore encrypts every custom-environment entry (AES-GCM under a key only that environment
-holds, the cache key as associated data) and fetches `oidc.vercel.com` with `redirect: 'error'`.
-There is no
-early refresh: the exchanged token keeps the base token's `exp`, so
+production, so a custom environment may share the preview partition; the client therefore keeps a
+custom environment's token (a base token with `custom_environment_id`, or an `environment` other
+than `preview` and `production`) in instance memory only, never in the Runtime Cache, at the cost
+of one exchange per instance per base-token renewal for custom environments only. Encrypting
+custom-environment entries (AES-GCM under a key only that environment holds, the cache key as
+associated data) is the way to share them through the cache again later. The client refuses
+redirects on `oidc.vercel.com` (a 3xx fails the exchange), so the base token in the request body
+never follows one. There is no early refresh: the exchanged token keeps the base token's `exp`, so
 exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
 the request at once. When the cache is down (the claim marker does not read back), each request
 exchanges once and fails at once on a 429: about 100 requests per 65 seconds get a token and the

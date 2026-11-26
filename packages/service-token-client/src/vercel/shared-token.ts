@@ -23,15 +23,20 @@
  *    signature); the caller then calls `invalidate`, which drops it from memory and the cache so
  *    the next request exchanges again (once per STS refusal). The entry holds the whole token
  *    under a key anyone can compute, so code that can use the same Runtime Cache partition can
- *    read and present it. Vercel separates `preview` and `production`; a custom environment may
- *    share the preview partition, so every custom-environment entry is to be encrypted
- *    (`services/sts/proof/vercel-exchange/README.md`, "Carried into the phase 2 slice-4 client").
+ *    read and present it. Vercel separates `preview` and `production` only; a custom environment
+ *    may share the preview partition, so it never uses the cache (step 2b).
  * 2a. When STS refuses a token this instance exchanged itself, `invalidate` writes a refusal
  *    marker for the deployment and audience that lives `refusedTtlSeconds` (the client's
  *    `DENIED_RECHECK_MS`, 60 s). While it lives no instance of the deployment drops a cached token
  *    STS refused, nor exchanges: each answers from its client's denied state. A deployment STS
  *    refuses outright (a policy naming the wrong project or environment) so costs at most one
  *    exchange per marker lifetime and region, not one per claim-marker lifetime.
+ * 2b. A custom environment (a base token with `custom_environment_id`, or an `environment` other
+ *    than `preview` and `production`) keeps its token in instance memory only: on a miss the
+ *    request exchanges at once, with no cache read, jitter, claim or poll, and a 429 fails it; a
+ *    refused token writes no refusal marker. That costs one exchange per instance per base-token
+ *    renewal, for custom environments only. Encrypting its entries (AES-GCM under a key only that
+ *    environment holds, the cache key as associated data) is the way to share them again later.
  * 3. Instance memory, then the shared cache: a hit is used. On a miss, a base token with under
  *    60 seconds left fails the request at once: no exchange, no waiting.
  * 4. Otherwise wait a random 0..`jitterMs` and read again, so a cold wave spreads out.
@@ -59,7 +64,8 @@
  * for the exchanger 1 more read, the refusal marker, and 1 more write, the token), then 2 reads
  * per poll step (claim check and token read; 3 reads and 1 write in the step where the marker has
  * expired and it claims again). `invalidate` adds 1 write for a token this instance exchanged, and
- * 1 or 2 reads and at most 1 delete for one it took from the cache.
+ * 1 or 2 reads and at most 1 delete for one it took from the cache. A custom environment (step
+ * 2b) makes no cache call.
  */
 
 /** The part of `getCache()` from `@vercel/functions` this uses. */
@@ -217,6 +223,15 @@ function isExchangedFunctionToken(claims: Record<string, unknown>): boolean {
   return 'aud' in act && act.aud === `https://vercel.com/${owner}`;
 }
 
+/**
+ * Step 2b: a custom environment may share the preview Runtime Cache partition (Vercel documents
+ * separate partitions for `preview` and `production` only), so its token stays in memory.
+ */
+function isCustomEnvironment(claims: Record<string, unknown>): boolean {
+  if (claims.custom_environment_id !== undefined) return true;
+  return claims.environment !== 'preview' && claims.environment !== 'production';
+}
+
 function asEntry(value: unknown, deployment: string, audience: string): Entry | null {
   if (typeof value !== 'object' || value === null) return null;
   if (!('token' in value) || typeof value.token !== 'string') return null;
@@ -298,7 +313,8 @@ export class SharedExchangedToken {
    * lives (step 2a): then it is kept and `false` returned. A token this instance exchanged itself
    * is kept and `false` returned, and the refusal marker written: Vercel issued it for this
    * deployment, so exchanging again would get the same refusal and spend the project's exchange
-   * budget, which previews share with production.
+   * budget, which previews share with production. A custom environment's token (step 2b) is kept
+   * the same way, with no marker: it never touches the cache.
    */
   async invalidate(token: string): Promise<boolean> {
     const claims = claimsOf(token);
@@ -310,6 +326,7 @@ export class SharedExchangedToken {
     if (remembered?.token !== token) return false;
     // A cache that fails keeps no marker and no deletion; this instance still exchanges no more.
     if (!remembered.shared) {
+      if (claims !== null && isCustomEnvironment(claims)) return false;
       await this.cache
         .set(`${key}:refused`, { refused: true }, { ttl: this.settings.refusedTtlSeconds })
         .catch(() => undefined);
@@ -407,7 +424,10 @@ export class SharedExchangedToken {
 
     const baseClaims = claimsOf(baseToken);
     const deployment = deploymentOf(baseClaims);
-    if (deployment === null) return fail('the base token lacks a deployment claim');
+    if (baseClaims === null || deployment === null) {
+      return fail('the base token lacks a deployment claim');
+    }
+    const memoryOnly = isCustomEnvironment(baseClaims);
     const key = await cacheKey(settings.keyPrefix, deployment, audience);
     const claimKey = `${key}:claim`;
     const owner = crypto.randomUUID();
@@ -425,13 +445,40 @@ export class SharedExchangedToken {
       if (ttl !== null) this.remember(key, entry, ttl, true);
       return finish(source, entry);
     };
+    // A token this request exchanged: checked like a cached one, then kept in memory and, unless
+    // memory-only, in the cache.
+    const adopt = async (token: string): Promise<SharedTokenResult> => {
+      const exchanged = asEntry({ token, exp: expOf(token) }, deployment, audience);
+      if (exchanged === null) {
+        return fail('the exchanged token is not one STS accepts for this deployment and audience');
+      }
+      const ttl = cacheTtlSeconds(exchanged.exp, nowSeconds());
+      if (ttl === null) return fail('the exchanged token expires within 60 seconds');
+      this.remember(key, exchanged, ttl, false);
+      // The write ends at the deadline at the latest; the token in hand is valid either way.
+      if (!memoryOnly) await write(key, exchanged, ttl);
+      return finish('exchanged', exchanged);
+    };
 
-    let entry = await readShared();
+    let entry = memoryOnly ? null : await readShared();
     if (entry !== null) return keep('cache', entry);
-    const baseExp = baseClaims?.exp;
+    const baseExp = baseClaims.exp;
     if (typeof baseExp !== 'number') return fail('the base token has no exp');
     if (baseExp - MIN_REMAINING_SECONDS <= nowSeconds()) {
       return fail('the base token expires within 60 seconds');
+    }
+    if (memoryOnly) {
+      report.exchangeAttempts += 1;
+      const attempt = await beforeDeadline(
+        async signal => await exchange(baseToken, audience, signal)
+      );
+      if (attempt === LATE) return fail('no token before the deadline');
+      if (attempt.kind === 'failed') return fail(attempt.detail);
+      if (attempt.kind === 'rate_limited') {
+        report.rateLimited += 1;
+        return fail('the exchange answered 429 and a custom environment shares no token');
+      }
+      return await adopt(attempt.token);
     }
     await wait(Math.floor(clock.random() * settings.jitterMs));
     entry = await readShared();
@@ -473,22 +520,7 @@ export class SharedExchangedToken {
             return fail('the exchange answered 429 and the shared cache keeps nothing');
           }
         } else {
-          const exchanged = asEntry(
-            { token: attempt.token, exp: expOf(attempt.token) },
-            deployment,
-            audience
-          );
-          if (exchanged === null) {
-            return fail(
-              'the exchanged token is not one STS accepts for this deployment and audience'
-            );
-          }
-          const ttl = cacheTtlSeconds(exchanged.exp, nowSeconds());
-          if (ttl === null) return fail('the exchanged token expires within 60 seconds');
-          this.remember(key, exchanged, ttl, false);
-          // The write ends at the deadline at the latest; the token in hand is valid either way.
-          await write(key, exchanged, ttl);
-          return finish('exchanged', exchanged);
+          return await adopt(attempt.token);
         }
       }
       await wait(Math.floor(pollMs / 2 + clock.random() * (pollMs / 2)));

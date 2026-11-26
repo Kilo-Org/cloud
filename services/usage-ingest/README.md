@@ -862,7 +862,10 @@ so with a run every 300 s each side mints once per run, warm or cold. Per run an
 | Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal | at most about 1,700 operations |
 | Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
 
-Both environments together double each daily figure.
+Both environments together double each daily figure, except the Vercel rows: the web app's
+staging is a custom environment, whose client keeps the exchanged token in instance memory only
+(it may share the preview Runtime Cache partition). Staging therefore makes no Runtime Cache
+operation and one Vercel exchange per web instance per base-token renewal.
 
 The client's cost on a real caller does not grow with its request rate. A request that finds a
 usable token reads an in-memory entry and makes no network call. Each caller instance makes one
@@ -876,8 +879,9 @@ each verifier isolate fetches the key set once per 5 minutes. At one audience pe
 | 200,000 | about 833 per second (843 with the 2,200 Vercel instances of design section 6.1) | about 1.7 per second |
 
 A Vercel caller adds one exchange per deployment, audience and base-token renewal, shared through
-the Runtime Cache, and one cache read per new instance. A deployment STS refuses adds at most one
-exchange per minute per audience and region, through the refusal marker.
+the Runtime Cache, and one cache read per new instance; in a custom environment, one exchange per
+instance, audience and base-token renewal, with no cache read. A deployment STS refuses adds at
+most one exchange per minute per audience and region, through the refusal marker.
 
 ## Deploy
 

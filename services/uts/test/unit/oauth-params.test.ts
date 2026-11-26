@@ -173,9 +173,9 @@ describe('credentials', () => {
     );
     expect(await grantIdOfCode(code)).toBe(grantId);
     expect(await grantIdOfCode(randomCredential())).not.toBe(grantId);
-    expect(grantIdOfFirstPartyRefreshToken(firstPartyRefreshToken(grantId, randomCredential()))).toBe(
-      grantId
-    );
+    expect(
+      grantIdOfFirstPartyRefreshToken(firstPartyRefreshToken(grantId, randomCredential()))
+    ).toBe(grantId);
   });
 
   it('derive one first-party refresh token per code and verifier, naming the code grant', async () => {

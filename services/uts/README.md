@@ -145,9 +145,11 @@ UTS_E2E_BASE_URL=http://127.0.0.1:8800/ UTS_E2E_ADMIN_URL=... UTS_E2E_APP_URL=..
   pnpm exec tsx scripts/oauth-e2e.ts
 ```
 
-`scripts/oauth-e2e.ts` runs code, token, refresh, third-party rotation, reuse (the family is
-revoked), revoke and introspect, prints the audit rows (token ids only), checks that no token value
-reached an audit row, and times the mint path.
+`scripts/oauth-e2e.ts` runs code, token, refresh, a replayed proof (also at another grant of the
+same device key), a code-exchange retry and two concurrent exchanges of one code, third-party
+rotation, reuse (the family is revoked), a blocked third-party client, a streamed oversized body,
+revoke and introspect, prints the audit rows (token ids only), checks that no token value reached
+an audit row, and times the mint path.
 
 ## OAuth endpoints
 
@@ -155,7 +157,7 @@ reached an audit row, and times the mint path.
 |---|---|---|
 | `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
 | `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A first-party retry of the same request while the code's 60-second lifetime lasts gets the same grant and the same refresh token (below); any other second use of a code, a third-party one included, revokes the grant | `uts.exchange_authorization_code` |
-| `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation, 60-second grace, reuse after the grace revokes the family and writes a feed entry; a token rotated more than 30 days ago is deleted and then unknown | `uts.refresh_first_party`, `uts.refresh_third_party` |
+| `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation with no grace; any later use of a replaced token revokes the family and writes a feed entry, until the family's 90-day end | `uts.refresh_first_party`, `uts.refresh_third_party` |
 | `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; a token issued to another client answers 200 like an unknown token and writes a denied row (at most one per grant per minute); an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
 | `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
 
@@ -448,17 +450,18 @@ The relay reads only the newest rows, so the tier needs disk more than memory. T
 moves up one compute size when its buffer cache hit ratio stays below 99 percent for an hour at
 peak, and its disk grows before data and indexes pass 70 percent of it.
 
-Third-party refresh tokens are the other table that grows with traffic. A token row with its six
-indexes takes about 300 bytes. Each refresh rotates the token, and `uts.maintain_oauth_rows()`
-deletes a rotated token 30 days after its rotation (below), so a family keeps at most 30 days / 8
-minutes = 5,400 rotated tokens plus its current one. As an upper bound, with every family
-refreshing every 8 minutes for 30 days:
+Third-party refresh tokens are the other table that grows with traffic. A family keeps one
+current token row; each refresh replaces it and keeps the replaced token as a tombstone in
+`third_party_rotated_tokens` (16-byte key, family id, family end) until the family is past its
+90-day end (below). A tombstone with its two index entries takes about 120 bytes. As an upper
+bound, with every family refreshing every 8 minutes, a family gathers 90 days / 8 minutes =
+16,200 tombstones by its end, and families of evenly spread ages hold half that on average:
 
-| Active third-party families | Token rows | Table and indexes |
-|---|---|---|
-| 10k | 54M | ~16 GB |
-| 50k | 270M | ~81 GB |
-| 200k | 1.08B | ~324 GB |
+| Active third-party families | Tombstones, average | Table and indexes, average | At most (every family at its end) |
+|---|---|---|---|
+| 10k | 81M | ~10 GB | ~19 GB |
+| 50k | 405M | ~49 GB | ~97 GB |
+| 200k | 1.62B | ~194 GB | ~389 GB |
 
 ### OAuth row maintenance
 
@@ -473,30 +476,29 @@ dedicated maintenance role. It deletes:
 | Rows | When | Why that is safe |
 |---|---|---|
 | `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
-| `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end | Each such token fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
-| `rotated_refresh_tokens` | A rotated token of a live family 30 days after its rotation, the longest idle window a token has, oldest first | Reuse detection covers tokens rotated within 30 days; an older one is then unknown (`invalid_grant`) instead of revoking the family. A thief who rotates a stolen token is still caught when the real client next presents its own token, rotated minutes before. Oldest first, a token's child is mostly in the same batch |
+| `third_party_refresh_tokens` | The current token of a family that is revoked or past its 90-day end | It fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
+| `third_party_rotated_tokens` | Past the family's 90-day end, oldest first | No token of the family can be issued or refreshed again, so no reuse check needs the tombstone. Until then a replaced token that comes back revokes the family, however long ago it was replaced |
 | `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
 | `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
 
-`parent_id` is `ON DELETE SET NULL`, so the order of a batch never decides what it deletes: each
-deleted token whose child stays gives that child one `parent_id` update. Rotated tokens go oldest
-first, so that is mostly one update per family per batch.
+It never deletes a grant, a family row, the current token of a live family, a tombstone of a
+family that can still issue tokens, or a code within its lifetime (`test/db/oauth-grants.test.ts`).
+At one mint per active client every 8 minutes, the DPoP rows arrive at 21, 104 and 417 per second
+for 10k, 50k and 200k clients: 1,250, 6,250 and 25,000 per minute; in a steady state tombstones
+age out at the rate they arrive, at most the same per third-party family, so a cron that runs
+every minute makes 1 to 5 calls.
 
-It never deletes a grant, a family row, a family's current token, or a code within its lifetime
-(`test/db/oauth-grants.test.ts`). At one mint per active client every 8 minutes, the DPoP rows
-arrive at 21, 104 and 417 per second for 10k, 50k and 200k clients: 1,250, 6,250 and 25,000 per
-minute, and rotated third-party tokens age out at the same rate per third-party family, so a cron
-that runs every minute makes 1 to 5 calls.
+### Third-party reuse detection
 
-### Third-party grace window
-
-A rotated third-party token stays usable for 60 seconds (OAuth 2.1 section 4.3.3), so a client
-that lost a response can retry. A presentation inside the grace rotates the family's current
-token, so two holders can briefly hold tokens of one family: a client and a thief who presents a
-just-rotated token inside the grace each get a token, and the legitimate client's current token
-is rotated away. Reuse is then detected when either side later presents a rotated token after
-its grace: the whole family is revoked and a feed entry is written (`test/db/oauth-grants.test.ts`,
-"third-party grace window"). First-party grants do not rotate; their DPoP key is the sender
+A third-party client has no sender constraint, so a replaced token that comes back is treated as
+stolen, whoever presents it: the whole family is revoked, a feed entry is written, and the
+refresh fails (`reuse_detected`, which answers `invalid_grant`). A replaced token has no grace
+window: with one, a second holder of a just-replaced token (a thief, or a copy) would get a
+fresh token that outlives the grace and rotates the client's current token away. A client that
+lost a rotation response authorizes again; its consent stands, so it sees no consent screen. The
+tombstone keeps that evidence until the family ends, so a client that returns weeks later with a
+token a thief replaced still revokes the thief's chain (`test/db/oauth-grants.test.ts`,
+"third-party reuse detection"). First-party grants do not rotate; their DPoP key is the sender
 constraint.
 
 ### Hot-path index probes
@@ -508,6 +510,7 @@ primary-key probes for the rows that hang off it (`test/db/index-probes.test.ts`
 |---|---|
 | Mint and first-party refresh (`uts.read_refresh_grant`) | `refresh_grants_token_hash_key`, then `device_sessions_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
 | Third-party refresh (`uts.read_third_party_refresh_token`) | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey`, `third_party_clients_pkey`, `third_party_consents_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
+| Replaced third-party token (`uts.read_rotated_third_party_token`), only when the hash is no current token | `third_party_rotated_tokens_pkey`, then `third_party_grant_families_pkey` |
 | PAT lookup (`uts.lookup_pat`) | `personal_access_tokens_token_hash_key`, then `accounts_pkey` |
 | Org bot key lookup (`uts.lookup_bot_key`) | `org_bot_keys_token_hash_key` |
 | Web session check | `browser_sessions_token_hash_key` |

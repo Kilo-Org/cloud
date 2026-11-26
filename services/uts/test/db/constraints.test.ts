@@ -196,10 +196,10 @@ describe('third-party refresh tokens', () => {
     return family.rows[0].id;
   }
 
-  function insertToken(familyId: string, fields = '', values = '') {
+  function insertToken(familyId: string) {
     return writer.query(
-      `INSERT INTO uts.third_party_refresh_tokens (family_id, token_hash, idle_expires_at${fields})
-       VALUES ($1, $2, now() + interval '30 days'${values})`,
+      `INSERT INTO uts.third_party_refresh_tokens (family_id, token_hash, idle_expires_at)
+       VALUES ($1, $2, now() + interval '30 days')`,
       [familyId, randomHash()]
     );
   }
@@ -214,31 +214,10 @@ describe('third-party refresh tokens', () => {
     ).toBe(CHECK_VIOLATION);
   });
 
-  it('allow one active token per family', async () => {
+  it('allow one current token per family', async () => {
     const familyId = await insertFamily();
     await insertToken(familyId);
     expect(await sqlStateOf(() => insertToken(familyId))).toBe(UNIQUE_VIOLATION);
-  });
-
-  it('accept a rotated token with a 60-second grace and reject any other grace', async () => {
-    const familyId = await insertFamily();
-    await insertToken(
-      familyId,
-      ', status, rotated_at, grace_until',
-      ", 'rotated', now(), now() + interval '60 seconds'"
-    );
-    expect(
-      await sqlStateOf(() =>
-        insertToken(
-          familyId,
-          ', status, rotated_at, grace_until',
-          ", 'rotated', now(), now() + interval '5 minutes'"
-        )
-      )
-    ).toBe(CHECK_VIOLATION);
-    expect(
-      await sqlStateOf(() => insertToken(familyId, ', status, rotated_at', ", 'rotated', now()"))
-    ).toBe(CHECK_VIOLATION);
   });
 
   it('reject a token idle window over 30 days', async () => {

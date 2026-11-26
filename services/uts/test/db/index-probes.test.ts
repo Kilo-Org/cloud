@@ -49,14 +49,14 @@ const SEED = `
   FROM uts.browser_sessions
   CROSS JOIN unnest(ARRAY['third_party_approve', 'pat_create', 'bot_key_create']) AS action;
 
+  -- Many clients, so the planner probes the client's primary key rather than scanning the table.
   INSERT INTO uts.third_party_clients
     (client_id, client_name, redirect_uris, document, fetched_at, cache_expires_at)
-  SELECT 'https://client' || n || '.example.com/metadata', 'Example', '{https://client.example.com/callback}',
-         '{}', now(), now() + interval '1 hour'
-  FROM generate_series(1, 2000) AS n
-  UNION ALL
-  SELECT 'https://client.example.com/metadata', 'Example', '{https://client.example.com/callback}',
-         '{}', now(), now() + interval '1 hour';
+  SELECT CASE WHEN n = 0 THEN 'https://client.example.com/metadata'
+              ELSE 'https://client' || n || '.example.com/metadata' END,
+         'Example', '{https://client.example.com/callback}'::text[], '{}'::jsonb, now(),
+         now() + interval '1 hour'
+  FROM generate_series(0, 2000) AS n;
 
   INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
   SELECT account_id, 'https://client.example.com/metadata', '{mcp:tools.read}', id
@@ -74,6 +74,11 @@ const SEED = `
   SELECT id, sha256(convert_to(id::text, 'UTF8')), now() + interval '30 days'
   FROM uts.third_party_grant_families;
 
+  INSERT INTO uts.third_party_rotated_tokens (token_key, family_id, family_expires_at)
+  SELECT gen_random_uuid(), id, expires_at
+  FROM uts.third_party_grant_families
+  CROSS JOIN generate_series(1, 3);
+
   INSERT INTO uts.personal_access_tokens
     (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
   SELECT account_id, 'seed', sha256(convert_to('pat' || id, 'UTF8')), 'abcd', 'gateway',
@@ -88,8 +93,9 @@ const SEED = `
 
   ANALYZE uts.accounts, uts.org_sso_policies, uts.org_memberships, uts.device_sessions,
     uts.refresh_grants, uts.browser_sessions, uts.third_party_clients,
-    uts.third_party_grant_families, uts.third_party_refresh_tokens, uts.third_party_consents,
-    uts.personal_access_tokens, uts.org_bot_keys;
+    uts.third_party_grant_families, uts.third_party_refresh_tokens,
+    uts.third_party_rotated_tokens, uts.third_party_consents, uts.personal_access_tokens,
+    uts.org_bot_keys;
 `;
 
 beforeAll(async () => {
@@ -160,6 +166,14 @@ const CASES: [string, () => Promise<string>, Record<string, string>][] = [
       third_party_clients: 'third_party_clients_pkey',
       org_memberships: 'org_memberships_pkey',
       org_sso_policies: 'org_sso_policies_pkey',
+    },
+  ],
+  [
+    'a replaced third-party token',
+    () => functionBody('uts.read_rotated_third_party_token(bytea)'),
+    {
+      third_party_rotated_tokens: 'third_party_rotated_tokens_pkey',
+      third_party_grant_families: 'third_party_grant_families_pkey',
     },
   ],
   [

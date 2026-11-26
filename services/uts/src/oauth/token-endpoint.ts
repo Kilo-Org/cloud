@@ -26,11 +26,11 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * Each call verifies at most one DPoP proof, before the grant read, runs one SQL statement, which
  * also records the proof's `jti` under the proof's key, and signs one token per scope (up to 8)
  * in one call to the grant's signer object. A failure after the statement committed leaves the
- * grant as the statement left it and answers an error, and the client retries: a first-party
- * code exchange while the code's 60-second lifetime lasts gets the same grant and the same refresh
- * token, which derives from the code and the PKCE verifier (a third-party client authorizes
- * again, because a second use of its code revokes the family), and a third-party refresh within
- * the 60-second grace of its rotated token gets the family's next token.
+ * grant as the statement left it and answers an error. A first-party client retries: a code
+ * exchange while the code's 60-second lifetime lasts gets the same grant and the same refresh
+ * token, which derives from the code and the PKCE verifier. A third-party client that lost an
+ * answer authorizes again: a second use of its code, like a second use of a replaced refresh
+ * token, revokes the family.
  */
 
 /** The RFC 8628 device grant, which the device sign-in slice provides. */

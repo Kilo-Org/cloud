@@ -231,15 +231,16 @@ export const ThirdPartyGrantFamilyRowSchema = z.strictObject({
 });
 
 export const ThirdPartyRefreshTokenRowSchema = z.strictObject({
-  id: uuid,
   family_id: uuid,
-  parent_id: uuid.nullable(),
   token_hash: sha256,
   issued_at: timestamp,
   idle_expires_at: timestamp,
-  status: z.enum(enums.REFRESH_TOKEN_STATUSES),
-  rotated_at: timestamp.nullable(),
-  grace_until: timestamp.nullable(),
+});
+
+export const ThirdPartyRotatedTokenRowSchema = z.strictObject({
+  token_key: uuid,
+  family_id: uuid,
+  family_expires_at: timestamp,
 });
 
 export const AuthorizationCodeRowSchema = z.strictObject({
@@ -462,6 +463,7 @@ export const IDENTITY_STORE_TABLES = {
   third_party_consents: ThirdPartyConsentRowSchema,
   third_party_grant_families: ThirdPartyGrantFamilyRowSchema,
   third_party_refresh_tokens: ThirdPartyRefreshTokenRowSchema,
+  third_party_rotated_tokens: ThirdPartyRotatedTokenRowSchema,
   authorization_codes: AuthorizationCodeRowSchema,
   device_codes: DeviceCodeRowSchema,
   email_codes: EmailCodeRowSchema,

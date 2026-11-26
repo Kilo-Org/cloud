@@ -6,8 +6,8 @@
 --   role loses direct writes on the tables these functions own, so no grant, code, device session
 --   or revocation can change without its audit row.
 -- * The functions read a grant through one unique-index probe on its hash plus primary-key probes
---   (`uts.read_refresh_grant`, `uts.read_third_party_refresh_token`; `test/db/index-probes.test.ts`
---   plans their bodies).
+--   (`uts.read_refresh_grant`, `uts.read_third_party_refresh_token`,
+--   `uts.read_rotated_third_party_token`; `test/db/index-probes.test.ts` plans their bodies).
 -- * `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour.
 -- * Each statement that accepts a DPoP proof records the proof's `jti` under the proof's key
 --   (`uts.dpop_proofs`), so a proof is accepted once (RFC 9449 section 11.1, design 5.7).
@@ -49,6 +49,32 @@ CREATE TABLE uts.dpop_proofs (
   CONSTRAINT dpop_proofs_pkey PRIMARY KEY (jkt, jti)
 );
 GRANT SELECT ON uts.dpop_proofs TO uts_app;
+
+-- The tokens a third-party rotation replaced (design 5.4): the evidence that a replaced token
+-- comes back, which revokes its family. A row stays until its family can no longer issue tokens
+-- (`family_expires_at`, at most 90 days after the family began), so a client that returns late
+-- with a token a thief replaced still revokes the thief's chain. A revoked family's rows stay
+-- until then too; its tokens already fail on the family's status. The key is the first 16 bytes
+-- of the token's SHA-256 (`uts.rotated_token_key`), so a row with its two index entries takes
+-- about 120 bytes, and 128 bits keep the chance that an unknown token matches a stored key
+-- negligible; a live token is always found first, by its whole hash, in
+-- `third_party_refresh_tokens`. No foreign key: a cascade from the family would need an index on
+-- `family_id` beside every row, and a row whose family was deleted with its account names nothing
+-- and goes at its expiry.
+CREATE TABLE uts.third_party_rotated_tokens (
+  token_key uuid PRIMARY KEY,
+  family_id uuid NOT NULL,
+  family_expires_at timestamptz NOT NULL
+);
+CREATE INDEX third_party_rotated_tokens_expires_idx
+  ON uts.third_party_rotated_tokens (family_expires_at);
+GRANT SELECT ON uts.third_party_rotated_tokens TO uts_app;
+
+-- The tombstone key of a third-party refresh token hash: its first 16 bytes as a uuid.
+CREATE FUNCTION uts.rotated_token_key(p_hash bytea) RETURNS uuid
+LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+SET search_path = pg_catalog, pg_temp
+RETURN encode(substring(p_hash FROM 1 FOR 16), 'hex')::uuid;
 
 -- When the grant's last denied audit row was written (`uts.claim_denied_audit`).
 ALTER TABLE uts.refresh_grants ADD COLUMN denied_audited_at timestamptz;
@@ -246,10 +272,7 @@ $$;
 -- after another.
 CREATE FUNCTION uts.read_third_party_refresh_token(p_token_hash bytea)
 RETURNS TABLE (
-  token_id uuid,
-  token_status uts.refresh_token_status,
   token_idle_expires_at timestamptz,
-  grace_until timestamptz,
   family_id uuid,
   account_id text,
   client_id text,
@@ -272,7 +295,7 @@ AS $$
   -- The client, the membership and the policy are scalar subqueries, so each is one primary-key
   -- probe with its keys known; as outer joins beside the locked rows the planner may pick another
   -- index.
-  SELECT token.id, token.status, token.idle_expires_at, token.grace_until, family.id,
+  SELECT token.idle_expires_at, family.id,
     family.account_id, family.client_id, family.scopes, family.org_id, family.auth_time,
     family.amr, family.expires_at, family.status,
     (SELECT client.status FROM uts.third_party_clients AS client
@@ -288,6 +311,28 @@ AS $$
   JOIN uts.accounts AS account ON account.id = family.account_id
   WHERE token.token_hash = $1
   FOR UPDATE OF token, family
+$$;
+
+-- The family of a replaced third-party token, read when the hash is not a current token: one
+-- probe of `third_party_rotated_tokens_pkey`, then `third_party_grant_families_pkey`. It locks the
+-- family, so a reuse and a rotation of one family run one after another.
+CREATE FUNCTION uts.read_rotated_third_party_token(p_token_hash bytea)
+RETURNS TABLE (
+  family_id uuid,
+  account_id text,
+  client_id text,
+  family_expires_at timestamptz,
+  family_status uts.grant_status
+)
+LANGUAGE sql
+VOLATILE
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT family.id, family.account_id, family.client_id, family.expires_at, family.status
+  FROM uts.third_party_rotated_tokens AS rotated
+  JOIN uts.third_party_grant_families AS family ON family.id = rotated.family_id
+  WHERE rotated.token_key = uts.rotated_token_key($1)
+  FOR UPDATE OF family
 $$;
 
 -- Revokes one grant and writes its feed entry. A first-party grant also ends its device session
@@ -859,12 +904,14 @@ END
 $$;
 
 -- POST /token with `refresh_token` for a third-party client: rotation with reuse detection
--- (design sections 5.3 and 5.4). The active token rotates to `p_new_token_hash`. A rotated token
--- presented within its 60-second grace (a retry after a lost response) rotates the family's
--- current token instead. A rotated token presented after its grace revokes the whole family,
--- writes the feed entry and a denied audit row, and fails. `uts.maintain_oauth_rows()` deletes a
--- token 30 days after its rotation, so a token rotated longer ago is unknown (`invalid_grant`)
--- and revokes nothing.
+-- (design sections 5.3 and 5.4). The current token rotates to `p_new_token_hash`, and its hash
+-- becomes a tombstone (`uts.third_party_rotated_tokens`) until the family can no longer issue
+-- tokens. A third-party client has no sender constraint, so a replaced token that comes back is
+-- treated as stolen, whoever presents it: the statement revokes the whole family, writes the feed
+-- entry and a denied audit row, and fails. There is no grace for a replaced token: a grace would
+-- hand a fresh token, which outlives the grace, to a second holder of a just-replaced token. A
+-- client that lost a rotation response authorizes again; its consent stands, so it sees no
+-- consent screen.
 -- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `reuse_detected`.
 CREATE FUNCTION uts.refresh_third_party(
   p_environment text,
@@ -890,64 +937,50 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   presented record;
+  replaced record;
   chosen record;
-  current_token_id uuid;
-  rotation text;
 BEGIN
   PERFORM uts.require_inputs('uts.refresh_third_party',
     p_environment IS NOT NULL AND p_token_hash IS NOT NULL AND p_client_id IS NOT NULL
     AND p_new_token_hash IS NOT NULL);
   SELECT * INTO presented FROM uts.read_third_party_refresh_token(p_token_hash);
-  IF NOT FOUND
-    OR presented.client_id IS DISTINCT FROM p_client_id
-    OR presented.family_status IS DISTINCT FROM 'active'
-    OR presented.family_expires_at <= now()
-    OR presented.client_status IS DISTINCT FROM 'active'
-    OR presented.consent_status IS DISTINCT FROM 'active'
-    OR presented.account_status IS DISTINCT FROM 'active'
-  THEN
-    outcome := 'invalid_grant';
-    RETURN NEXT;
-    RETURN;
-  END IF;
-
-  IF presented.token_status = 'active' AND presented.token_idle_expires_at > now() THEN
-    rotation := 'rotated';
-    current_token_id := presented.token_id;
-  ELSIF presented.token_status = 'rotated' AND presented.grace_until > now() THEN
-    rotation := 'grace';
-    SELECT token.id INTO current_token_id
-    FROM uts.third_party_refresh_tokens AS token
-    WHERE token.family_id = presented.family_id AND token.status = 'active'
-      AND token.idle_expires_at > now();
-    IF NOT FOUND THEN
-      outcome := 'invalid_grant';
+  IF NOT FOUND THEN
+    SELECT * INTO replaced FROM uts.read_rotated_third_party_token(p_token_hash);
+    IF FOUND
+      AND replaced.client_id IS NOT DISTINCT FROM p_client_id
+      AND replaced.family_status IS NOT DISTINCT FROM 'active'
+      AND replaced.family_expires_at > now()
+    THEN
+      PERFORM uts.end_grant('third_party', replaced.family_id, 'reuse_detected');
+      PERFORM uts.write_audit_event(
+        p_environment, 'ai.kilo.uts.refresh_token.reuse_detected', 6003, 99, 'denied',
+        'family revoked', replaced.account_id,
+        jsonb_build_object(
+          'clientId', uts.audit_client_id(replaced.client_id),
+          'grantId', replaced.family_id,
+          'refreshRef', uts.credential_reference(p_token_hash)
+        )
+      );
+      outcome := 'reuse_detected';
       RETURN NEXT;
       RETURN;
     END IF;
-  ELSIF presented.token_status = 'rotated' THEN
-    PERFORM uts.end_grant('third_party', presented.family_id, 'reuse_detected');
-    PERFORM uts.write_audit_event(
-      p_environment, 'ai.kilo.uts.refresh_token.reuse_detected', 6003, 99, 'denied',
-      'family revoked', presented.account_id,
-      jsonb_build_object(
-        'clientId', uts.audit_client_id(presented.client_id),
-        'grantId', presented.family_id,
-        'refreshRef', uts.credential_reference(p_token_hash)
-      )
-    );
-    outcome := 'reuse_detected';
-    RETURN NEXT;
-    RETURN;
-  ELSE
     outcome := 'invalid_grant';
     RETURN NEXT;
     RETURN;
   END IF;
 
-  IF NOT uts.org_requirement_met(
-    presented.org_id, presented.membership_status, presented.sso_enforcement, presented.amr
-  ) THEN
+  IF presented.client_id IS DISTINCT FROM p_client_id
+    OR presented.family_status IS DISTINCT FROM 'active'
+    OR presented.family_expires_at <= now()
+    OR presented.token_idle_expires_at <= now()
+    OR presented.client_status IS DISTINCT FROM 'active'
+    OR presented.consent_status IS DISTINCT FROM 'active'
+    OR presented.account_status IS DISTINCT FROM 'active'
+    OR NOT uts.org_requirement_met(
+      presented.org_id, presented.membership_status, presented.sso_enforcement, presented.amr
+    )
+  THEN
     outcome := 'invalid_grant';
     RETURN NEXT;
     RETURN;
@@ -960,12 +993,12 @@ BEGIN
     RETURN;
   END IF;
 
-  UPDATE uts.third_party_refresh_tokens AS token
-  SET status = 'rotated', rotated_at = now(), grace_until = now() + interval '60 seconds'
-  WHERE token.id = current_token_id;
+  INSERT INTO uts.third_party_rotated_tokens (token_key, family_id, family_expires_at)
+  VALUES (uts.rotated_token_key(p_token_hash), presented.family_id, presented.family_expires_at);
   refresh_expires_at := least(now() + interval '30 days', presented.family_expires_at);
-  INSERT INTO uts.third_party_refresh_tokens (family_id, parent_id, token_hash, idle_expires_at)
-  VALUES (presented.family_id, current_token_id, p_new_token_hash, refresh_expires_at);
+  UPDATE uts.third_party_refresh_tokens AS token
+  SET token_hash = p_new_token_hash, issued_at = now(), idle_expires_at = refresh_expires_at
+  WHERE token.family_id = presented.family_id;
 
   token_ids := ARRAY(SELECT gen_random_uuid() FROM generate_series(1, cardinality(chosen.scopes)));
   PERFORM uts.write_audit_event(
@@ -975,7 +1008,7 @@ BEGIN
       'clientId', uts.audit_client_id(presented.client_id),
       'clientKind', 'third_party',
       'grantId', presented.family_id,
-      'rotation', rotation,
+      'rotation', 'rotated',
       'previousRefreshRef', uts.credential_reference(p_token_hash),
       'refreshRef', uts.credential_reference(p_new_token_hash),
       'tokenRefs', to_jsonb(token_ids::text[]),
@@ -997,9 +1030,10 @@ END
 $$;
 
 -- POST /revoke (RFC 7009) with a refresh token: revokes the first-party grant or the third-party
--- family it belongs to, writes the feed entry and the audit row. Outcomes: `revoked`,
--- `already_revoked`, `unknown` (no such token), `client_mismatch` (issued to another client; a
--- denied `grant.revoked` row, at most one per grant per minute, records it).
+-- family it belongs to, writes the feed entry and the audit row. A replaced third-party token
+-- (a tombstone) names its family too, so a client can sign out with any token it was given.
+-- Outcomes: `revoked`, `already_revoked`, `unknown` (no such token), `client_mismatch` (issued
+-- to another client; a denied `grant.revoked` row, at most one per grant per minute, records it).
 CREATE FUNCTION uts.revoke_refresh_token(p_environment text, p_token_hash bytea, p_client_id text)
 RETURNS TABLE (outcome text)
 LANGUAGE plpgsql
@@ -1024,6 +1058,13 @@ BEGIN
     FROM uts.third_party_refresh_tokens AS token
     JOIN uts.third_party_grant_families AS family ON family.id = token.family_id
     WHERE token.token_hash = p_token_hash;
+  END IF;
+  IF NOT FOUND THEN
+    SELECT 'third_party', family.id, family.account_id, family.client_id
+    INTO grant_kind, grant_ref, grant_account, owner_client
+    FROM uts.third_party_rotated_tokens AS rotated
+    JOIN uts.third_party_grant_families AS family ON family.id = rotated.family_id
+    WHERE rotated.token_key = uts.rotated_token_key(p_token_hash);
   END IF;
   IF NOT FOUND THEN
     outcome := 'unknown';
@@ -1154,7 +1195,6 @@ BEGIN
   LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = family.org_id
   WHERE token.token_hash = p_token_hash
     AND family.client_id = p_client_id
-    AND token.status = 'active'
     AND token.idle_expires_at > now()
     AND family.status = 'active'
     AND family.expires_at > now()
@@ -1167,30 +1207,21 @@ BEGIN
 END
 $$;
 
--- Every token of a family, for `uts.maintain_oauth_rows()` on an ended family.
-CREATE INDEX third_party_refresh_tokens_family_idx ON uts.third_party_refresh_tokens (family_id);
--- Rotated tokens by rotation time, for `uts.maintain_oauth_rows()`.
-CREATE INDEX third_party_refresh_tokens_rotated_idx ON uts.third_party_refresh_tokens (rotated_at)
-  WHERE status = 'rotated';
-
 -- Deletes OAuth rows that no statement reads again, at most 5,000 of each kind per call (README,
 -- "OAuth row maintenance"). The UTS cron (slice 3.9) calls it until every count is under 5,000;
 -- each call is one statement, so through Hyperdrive each batch is its own short transaction. The
 -- app role holds it until that cron gets its own maintenance role. It never deletes a grant, a
--- family, a family's current token, or a code within its lifetime:
+-- family, the current token of a live family, a tombstone of a family that can still issue
+-- tokens, or a code within its lifetime:
 -- * authorization codes 1 hour past their 60-second lifetime, used or not (until then a second
 --   use of a used code still revokes its grant);
--- * every refresh token of a third-party family that ended (revoked, or past its 90-day end):
---   such a token already fails, so no reuse check needs it;
--- * rotated refresh tokens of a live family 30 days after their rotation, the longest idle window
---   a token has. Reuse detection covers a token rotated within the last 30 days; an older one is
---   then unknown. A thief who rotates a stolen token is still caught when the real client next
---   presents its token, which was rotated minutes before. Oldest first through
---   `third_party_refresh_tokens_rotated_idx`, so a token's child is mostly in the same batch.
+-- * the current token of a third-party family that ended (revoked, or past its 90-day end): it
+--   already fails on the family's status;
+-- * tombstones of replaced third-party tokens once their family is past its 90-day end, oldest
+--   first through `third_party_rotated_tokens_expires_idx`: no token of the family can be issued
+--   or refreshed again, so no reuse check needs them;
 -- * revocation feed entries past `feed_expires_at`;
 -- * DPoP proof `jti`s past `expires_at`, which no clock accepts again.
--- A deleted token's child that stays gets one `parent_id` update to NULL (`ON DELETE SET NULL`),
--- so the order of a batch never decides what it deletes.
 CREATE FUNCTION uts.maintain_oauth_rows()
 RETURNS TABLE (kind text, deleted integer)
 LANGUAGE plpgsql
@@ -1211,8 +1242,8 @@ BEGIN
   RETURN NEXT;
 
   DELETE FROM uts.third_party_refresh_tokens AS token
-  WHERE token.id IN (
-    SELECT ended.id
+  WHERE token.family_id IN (
+    SELECT ended.family_id
     FROM uts.third_party_grant_families AS family
     JOIN uts.third_party_refresh_tokens AS ended ON ended.family_id = family.id
     WHERE family.status = 'revoked' OR family.expires_at <= now()
@@ -1222,14 +1253,14 @@ BEGIN
   GET DIAGNOSTICS deleted = ROW_COUNT;
   RETURN NEXT;
 
-  DELETE FROM uts.third_party_refresh_tokens AS token
-  WHERE token.id IN (
-    SELECT old.id FROM uts.third_party_refresh_tokens AS old
-    WHERE old.status = 'rotated' AND old.rotated_at < now() - interval '30 days'
-    ORDER BY old.rotated_at
+  DELETE FROM uts.third_party_rotated_tokens AS rotated
+  WHERE rotated.token_key IN (
+    SELECT stale.token_key FROM uts.third_party_rotated_tokens AS stale
+    WHERE stale.family_expires_at <= now()
+    ORDER BY stale.family_expires_at
     LIMIT batch
   );
-  kind := 'rotated_refresh_tokens';
+  kind := 'third_party_rotated_tokens';
   GET DIAGNOSTICS deleted = ROW_COUNT;
   RETURN NEXT;
 

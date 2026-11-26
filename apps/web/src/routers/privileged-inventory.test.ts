@@ -461,7 +461,7 @@ describe('privileged inventory covers discovered route handlers', () => {
     ]);
     // An exemption lets a credential reach an admin route from any network.
     // Only a third-party server lookup may need one, after a security review.
-    expect(sitesUsing('adminNetworkExemptCredentials')).toEqual([
+    expect(sitesUsing('adminNetworkExemptCredential')).toEqual([
       'apps/web/src/app/api/private/users/route.ts',
       'packages/web-shared/src/lib/user/server.ts',
     ]);

@@ -61,6 +61,7 @@ import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-obse
 import {
   adminNetworkRefusal,
   type AdminNetworkDenialReason,
+  type AdminNetworkRefusal,
 } from '@kilocode/web-shared/lib/admin/admin-network';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
@@ -76,6 +77,7 @@ import {
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   KILO_EXCHANGE_SAFE_CLAIM_NAMES,
+  LEGACY_API_TOKEN_LIFETIMES_SECONDS,
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
@@ -218,14 +220,17 @@ export type RequiredPermissions = {
    */
   stepUpExemptCredentials?: readonly StepUpExemptibleCredential[];
   /**
-   * Non-session credential kinds exempt from the admin network allowlist. Only
-   * for a caller that is a third-party server, never a person: such a caller
-   * cannot be on the corporate network. `'session'` is excluded by the type,
-   * and like the step-up exemption it applies only to a `credentialExemptible`
-   * (read-grade) action class. `privileged-inventory.test.ts` pins the routes
-   * allowed to set it.
+   * The one credential exempt from the admin network allowlist for this call:
+   * `'personal_api_key'`, the audience-less personal API key the profile page
+   * mints, for a third-party server that cannot be on the corporate network
+   * (`GET /api/private/users`, for Pylon). Verified from the token's own
+   * claims (`isPersonalApiKey`), so a device-session token, a CLI device-auth
+   * token, an organization-bound, bot or workload token, and a browser session
+   * never qualify. Like the step-up exemption it applies only to a
+   * `credentialExemptible` (read-grade) action class.
+   * `privileged-inventory.test.ts` pins the routes allowed to set it.
    */
-  adminNetworkExemptCredentials?: readonly StepUpExemptibleCredential[];
+  adminNetworkExemptCredential?: 'personal_api_key';
 };
 
 export type StepUpExemptibleCredential = Exclude<PrivilegedCredentialKind, 'session'>;
@@ -362,16 +367,18 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
 
     if (result.user) {
-      // The network exemption has the same two conditions as the step-up
-      // exemption, so a write handler added to an exempt route is not exempt.
+      // The network exemption needs the same exemptible action class as the
+      // step-up exemption, so a write handler added to an exempt route is not
+      // exempt. The token is re-verified only when every cheaper condition holds.
       const networkExempt =
-        credential !== 'session' &&
-        (opts.adminNetworkExemptCredentials?.some(kind => kind === credential) ?? false) &&
-        isCredentialExemptibleClass(routeAttribution().actionClass);
-      const networkFailure = networkExempt
+        credential === 'human_bearer' &&
+        opts.adminNetworkExemptCredential === 'personal_api_key' &&
+        isCredentialExemptibleClass(routeAttribution().actionClass) &&
+        (await isPersonalApiKey(headersList));
+      const networkRefusal = networkExempt
         ? null
-        : adminNetworkAuthFailure(headersList, result, route);
-      if (networkFailure) {
+        : adminNetworkRefusal(headersList, { route, kiloUserId: result.user.id });
+      if (networkRefusal) {
         if (credential !== 'session') {
           const { actionClass, inventoryId } = routeAttribution();
           emitPrivilegedAccessEvent({
@@ -387,10 +394,11 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
             tokenSource: result.tokenSource ?? null,
             route,
             method,
-            ip: clientIpFromHeaders(headersList),
+            // The network decision's address, never `x-forwarded-for`.
+            ip: networkRefusal.clientAddress,
           });
         }
-        return networkFailure;
+        return adminNetworkAuthFailure(result, networkRefusal);
       }
 
       emitAdminAccessEvent({
@@ -515,22 +523,20 @@ export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
   const result = await resolveSessionOnly({ adminOnly: true });
   if (!result.user) return result;
   const headersList = await headers();
-  return adminNetworkAuthFailure(headersList, result, routeFromHeaders(headersList)) ?? result;
+  const refusal = adminNetworkRefusal(headersList, {
+    route: routeFromHeaders(headersList),
+    kiloUserId: result.user.id,
+  });
+  return refusal ? adminNetworkAuthFailure(result, refusal) : result;
 }
 
-/**
- * The 403 for an admin whose request came from outside the admin network
- * allowlist, or null when the network check passes.
- */
+/** The 403 for an admin whose request the admin network allowlist refused. */
 function adminNetworkAuthFailure(
-  headersList: Headers,
   admin: Pick<GetAuthResponse, 'internalApiUse' | 'tokenSource' | 'cloudAgentAuthority'> & {
     user: User;
   },
-  route: string | null
-): GetAuthResponse | null {
-  const refusal = adminNetworkRefusal(headersList, { route, kiloUserId: admin.user.id });
-  if (refusal === null) return null;
+  refusal: AdminNetworkRefusal
+): GetAuthResponse {
   return authError(403, refusal.message, admin.user.id, {
     authorizationRefused: true,
     adminNetworkDenial: refusal.reason,
@@ -565,6 +571,36 @@ async function verifyKiloApiBearer(requestHeaders: Headers) {
   } catch {
     return null;
   }
+}
+
+/** Claims a personal API key carries: `generateApiToken` with no extra payload. */
+const PERSONAL_API_KEY_CLAIM_NAMES: ReadonlySet<string> = new Set([
+  'version',
+  'kiloUserId',
+  'apiTokenPepper',
+  'env',
+  'iat',
+  'exp',
+] satisfies (keyof KiloTokenPolicyClaims)[]);
+
+/**
+ * Whether the request's bearer is a personal API key: audience-less, only the
+ * base claims, and a personal-key lifetime (30 days now, five years before the
+ * cap). Every other token kind carries another claim (`deviceSessionId`,
+ * `deviceAuthRequestCode`, `organizationId`, `botId`, `tokenSource`,
+ * `internalApiUse`, `aud`, `tokenPurpose`) or a shorter lifetime, so none
+ * qualifies.
+ */
+async function isPersonalApiKey(requestHeaders: Headers): Promise<boolean> {
+  const auth = await verifyKiloApiBearer(requestHeaders);
+  if (!auth) return false;
+  const { claims, claimNames } = auth;
+  return (
+    claims.env === process.env.NODE_ENV &&
+    claims.apiTokenPepper !== undefined &&
+    claimNames.every(name => PERSONAL_API_KEY_CLAIM_NAMES.has(name)) &&
+    LEGACY_API_TOKEN_LIFETIMES_SECONDS.some(lifetime => claims.exp - claims.iat === lifetime)
+  );
 }
 
 export async function getUserFromBearerForCredentialExchange(

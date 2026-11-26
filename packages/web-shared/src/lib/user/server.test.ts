@@ -2158,7 +2158,48 @@ describe('admin network allowlist (REST)', () => {
     return user;
   }
 
-  async function bearerAdmin(clientAddress: string) {
+  type BearerKind = 'personal' | 'device' | 'cli' | 'organization' | 'short-lived';
+
+  async function bearerToken(admin: User, kind: BearerKind): Promise<string> {
+    switch (kind) {
+      case 'personal':
+        return generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+      case 'device': {
+        // The legacy native token route mints a 30-day device-session token.
+        const [session] = await db
+          .insert(device_sessions)
+          .values({ kilo_user_id: admin.id })
+          .returning({ id: device_sessions.id });
+        return generateApiToken(
+          admin,
+          { deviceSessionId: session!.id },
+          { expiresIn: TOKEN_EXPIRY.thirtyDays }
+        );
+      }
+      case 'cli':
+        return generateApiToken(
+          admin,
+          { deviceAuthRequestCode: 'network-cli-code' },
+          { expiresIn: TOKEN_EXPIRY.thirtyDays }
+        );
+      case 'organization': {
+        const organization = await createTestOrganization('Network Org', admin.id, 0);
+        return generateApiToken(
+          admin,
+          { organizationId: organization.id, organizationRole: 'owner' },
+          { expiresIn: TOKEN_EXPIRY.fifteenMinutes }
+        );
+      }
+      case 'short-lived':
+        return generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
+    }
+  }
+
+  async function bearerAdmin(
+    clientAddress: string | null,
+    kind: BearerKind = 'personal',
+    extraHeaders: Record<string, string> = {}
+  ) {
     const admin = await insertTestUser({
       google_user_email: `network-bearer-${crypto.randomUUID()}@kilocode.ai`,
       hosted_domain: 'kilocode.ai',
@@ -2167,9 +2208,10 @@ describe('admin network allowlist (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${await bearerToken(admin, kind)}`,
         'x-pathname': '/api/private/users',
-        'x-vercel-forwarded-for': clientAddress,
+        ...(clientAddress === null ? {} : { 'x-vercel-forwarded-for': clientAddress }),
+        ...extraHeaders,
       })
     );
     return admin;
@@ -2225,18 +2267,49 @@ describe('admin network allowlist (REST)', () => {
     expect(result.user?.id).toBe(user.id);
   });
 
-  it('exempts only the listed non-session credential on a read route', async () => {
+  it('exempts an admin personal API key off-network on the exempt read route only', async () => {
     const admin = await bearerAdmin('198.51.100.1');
 
     const exempt = await getUserFromAuth({
       adminOnly: true,
       requestMethod: 'GET',
-      adminNetworkExemptCredentials: ['human_bearer'],
+      adminNetworkExemptCredential: 'personal_api_key',
     });
     expect(exempt.user?.id).toBe(admin.id);
 
     const notExempt = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
     expect(notExempt.adminNetworkDenial).toBe('outside-allowlist');
+  });
+
+  it.each([
+    ['a device-session token', 'device'],
+    ['a CLI device-auth token', 'cli'],
+    ['an organization-bound token', 'organization'],
+    ['a short-lived key of the personal shape', 'short-lived'],
+  ] as const)('refuses %s off-network on the exempt route', async (_label, kind) => {
+    await bearerAdmin('198.51.100.1', kind);
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      adminNetworkExemptCredential: 'personal_api_key',
+    });
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
+    expect((result.authFailedResponse as Response).status).toBe(403);
+  });
+
+  it('admits an admin device-session token from inside the allowlist', async () => {
+    const admin = await bearerAdmin('203.0.113.7', 'device');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      adminNetworkExemptCredential: 'personal_api_key',
+    });
+
+    expect(result.user?.id).toBe(admin.id);
   });
 
   it('refuses an exempt credential off-network on a write route', async () => {
@@ -2245,7 +2318,7 @@ describe('admin network allowlist (REST)', () => {
     const result = await getUserFromAuth({
       adminOnly: true,
       requestMethod: 'POST',
-      adminNetworkExemptCredentials: ['human_bearer'],
+      adminNetworkExemptCredential: 'personal_api_key',
     });
 
     expect(result.user).toBeNull();
@@ -2258,7 +2331,7 @@ describe('admin network allowlist (REST)', () => {
     const result = await getUserFromAuth({
       adminOnly: true,
       requestMethod: 'GET',
-      adminNetworkExemptCredentials: ['human_bearer'],
+      adminNetworkExemptCredential: 'personal_api_key',
     });
 
     expect(result.adminNetworkDenial).toBe('outside-allowlist');
@@ -2277,7 +2350,9 @@ describe('admin network allowlist (REST)', () => {
     });
 
     it('emits exactly one denied privileged_access event for a refused bearer admin', async () => {
-      const admin = await bearerAdmin('198.51.100.1');
+      const admin = await bearerAdmin('198.51.100.1', 'personal', {
+        'x-forwarded-for': '192.0.2.9',
+      });
 
       const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
 
@@ -2292,7 +2367,18 @@ describe('admin network allowlist (REST)', () => {
         route: '/api/private/users',
         method: 'GET',
         wouldBlock: true,
+        ip: '198.51.100.1',
       });
+    });
+
+    it('records a null address, not x-forwarded-for, when the trusted header is missing', async () => {
+      await bearerAdmin(null, 'personal', { 'x-forwarded-for': '203.0.113.7' });
+
+      const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+      expect(result.adminNetworkDenial).toBe('no-client-address');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ outcome: 'denied', ip: null });
     });
 
     it('emits no admin_access event for a refused session admin', async () => {

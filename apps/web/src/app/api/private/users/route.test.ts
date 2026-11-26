@@ -56,7 +56,7 @@ describe('GET /api/private/users', () => {
     expect(response).toBe(authFailedResponse);
   });
 
-  test('exempts only human bearer keys from the step-up guard', async () => {
+  test('exempts only human bearer keys from step-up and personal API keys from the network check', async () => {
     await setAdminAuth();
 
     await GET(makeRequest('someone@example.com'));
@@ -65,7 +65,7 @@ describe('GET /api/private/users', () => {
       adminOnly: true,
       requestMethod: 'GET',
       stepUpExemptCredentials: ['human_bearer'],
-      adminNetworkExemptCredentials: ['human_bearer'],
+      adminNetworkExemptCredential: 'personal_api_key',
     });
   });
 

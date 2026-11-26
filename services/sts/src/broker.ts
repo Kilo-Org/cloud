@@ -161,7 +161,12 @@ export async function serveBundle(
   const parsed = BundleRequestSchema.parse(request);
   const outcome = await callWithDeadline(
     async () =>
-      await getBundleStub(env, config, workload).getBundle(workload, config.environment, parsed, options.run ?? null),
+      await getBundleStub(env, config, workload).getBundle(
+        workload,
+        config.environment,
+        parsed,
+        options.run ?? null
+      ),
     options.deadlineMs ?? BUNDLE_OBJECT_DEADLINE_MS
   );
   if (outcome.status === 'answered') return outcome.value;

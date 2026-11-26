@@ -380,7 +380,9 @@ async function bundleRequest(
   const body = await readBundleRequest(request);
   if (body.status === 'too_large') return jsonResponse({ error: 'too_large' }, 413, 'no-store');
   if (body.status === 'invalid') return jsonResponse({ error: 'invalid_request' }, 400, 'no-store');
-  return bundleResponse(await serveBundle(env, config, outcome.workload, body.value, { run: outcome.run }));
+  return bundleResponse(
+    await serveBundle(env, config, outcome.workload, body.value, { run: outcome.run })
+  );
 }
 
 function webhookGate(env: Env, config: StsConfig): WebhookGate {

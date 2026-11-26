@@ -26,13 +26,15 @@ export type TokenDeniedReason = (typeof TOKEN_DENIED_REASONS)[number];
 
 /**
  * Why STS refused a lease or a revoke: the caller's answer (`denied` or `limited`), or, for a
- * revoke the caller hears as `not_found`, whether the lease is another workload's (`not_owner`)
- * or one STS never issued (`unknown_lease`).
+ * revoke the caller hears as `not_found`, whether the lease is another workload's (`not_owner`),
+ * another GitHub run's of the same workload (`other_run`), or one STS never issued
+ * (`unknown_lease`).
  */
 export const LEASE_DENIAL_REASONS = [
   ...LEASE_DENIED_REASONS,
   ...LEASE_LIMITED_REASONS,
   'not_owner',
+  'other_run',
   'unknown_lease',
 ] as const;
 export type LeaseDenialReason = (typeof LEASE_DENIAL_REASONS)[number];

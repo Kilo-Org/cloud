@@ -146,14 +146,25 @@ export const TOKEN_AUDIT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
 export const LEASE_REQUEST_MAX_BODY_BYTES = 1024;
 
 /**
- * The lease object gives up on a lease whose creation took longer than this, measured from the
- * call's start: it revokes the lease and answers `unavailable`, so no lease outlives a caller that
- * already stopped waiting. A creation is a login and one create call, 8 seconds each at most.
+ * The lease object gives up on a lease whose creation took longer than this, measured from when
+ * STS called the object (so the object's cold start and the call to it count), and checked again
+ * after the `lease.created` row is written: it revokes the lease and answers `unavailable`, so no
+ * lease outlives a caller that already stopped waiting. A creation is a login and one create call,
+ * 8 seconds each at most.
  */
 export const LEASE_CREATE_BUDGET_MS = 20_000;
 
 /** STS stops waiting for the lease object after this long, past the object's own budget. */
 export const LEASE_OBJECT_DEADLINE_MS = 25_000;
+
+/**
+ * A revocation Infisical could not take is retried by the lease object's alarm this often, until
+ * it succeeds or the lease expires.
+ */
+export const LEASE_REVOKE_RETRY_MS = 30_000;
+
+/** Owed revocations one alarm retries, oldest first; the next alarm takes the rest. */
+export const LEASE_REVOKE_RETRIES_PER_ALARM = 5;
 
 /** A failed lease or revoke call: the caller retries after this many seconds. */
 export const LEASE_RETRY_AFTER_SECONDS = 30;

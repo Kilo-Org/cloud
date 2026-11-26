@@ -9,8 +9,12 @@ import {
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDenialBuffers } from '../../src/audit/denials';
 import { SecretsBroker } from '../../src/broker';
-import { LEASE_CREATES_PER_MINUTE, LEASE_RETRY_AFTER_SECONDS } from '../../src/constants';
-import { LeaseDO } from '../../src/dos/LeaseDO';
+import {
+  LEASE_CREATE_BUDGET_MS,
+  LEASE_CREATES_PER_MINUTE,
+  LEASE_RETRY_AFTER_SECONDS,
+} from '../../src/constants';
+import { LeaseDO, type LeaseCreateRequest } from '../../src/dos/LeaseDO';
 import { getDenialStub, getLeaseStub } from '../../src/dos/stubs';
 import { handleRequest, leaseResponse, leaseRevokeResponse } from '../../src/http';
 import { loadPolicies } from '../../src/policy/load';
@@ -100,6 +104,8 @@ type LeaseManager = {
   setRevokeStatus: (status: number) => void;
   /** Added to the expiry the fake reports, to stand in for a misconfigured dynamic secret. */
   setExpirySkewMs: (ms: number) => void;
+  /** Runs as the fake answers a create, after it computed the expiry (a test moves the clock). */
+  setOnCreate: (hook: () => void) => void;
 };
 
 /**
@@ -114,6 +120,7 @@ function installLeaseManager(
   let createStatus = 200;
   let revokeStatus = 200;
   let expirySkewMs = 0;
+  let onCreate = (): void => {};
   let serial = 0;
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(
@@ -131,7 +138,7 @@ function installLeaseManager(
       if (createStatus !== 200) return new Response('refused', { status: createStatus });
       serial += 1;
       const ttlSeconds = Number(String(body.ttl).replace(/s$/, ''));
-      return Response.json({
+      const response = Response.json({
         lease: {
           id: crypto.randomUUID(),
           version: 1,
@@ -144,6 +151,8 @@ function installLeaseManager(
         dynamicSecret: { name: body.dynamicSecretName, defaultTTL: '1h', maxTTL: '8h' },
         data: { DB_USERNAME: `lease_user_${serial}`, DB_PASSWORD: `synthetic-password-${serial}` },
       });
+      onCreate();
+      return response;
     }
     if (method === 'DELETE' && url.pathname.startsWith('/api/v1/dynamic-secrets/leases/')) {
       if (revokeStatus !== 200) return new Response('refused', { status: revokeStatus });
@@ -164,6 +173,9 @@ function installLeaseManager(
     },
     setExpirySkewMs: ms => {
       expirySkewMs = ms;
+    },
+    setOnCreate: hook => {
+      onCreate = hook;
     },
   };
 }
@@ -190,9 +202,29 @@ function issued(result: LeaseResult): Extract<LeaseResult, { status: 'ok' }> {
   return result;
 }
 
+/** A creation request straight to the lease object, as `serveLease` sends it. */
+function objectRequest(overrides: Partial<LeaseCreateRequest> = {}): LeaseCreateRequest {
+  return {
+    environment: 'development',
+    caller: {
+      workload: 'bouncer-watch',
+      identity: 'worker-binding',
+      channel: 'worker-binding',
+      run: null,
+    },
+    grant: 'replica-read',
+    ttlSeconds: 3600,
+    requestedTtlSeconds: null,
+    clamped: false,
+    maxActive: 2,
+    requestedAt: Date.now(),
+    ...overrides,
+  };
+}
+
 type Event = {
   type: string;
-  data: { outcomeDetail?: string; attributes: Record<string, unknown> };
+  data: { outcome: string; outcomeDetail?: string; attributes: Record<string, unknown> };
 };
 
 async function leaseEvents(): Promise<Event[]> {
@@ -426,30 +458,58 @@ describe('worker-binding lease', () => {
     expect(events.map(event => [event.type, event.data.outcomeDetail])).toEqual([
       ['ai.kilo.sts.lease.revoked', 'expiry_mismatch'],
     ]);
-    expect(events[0].data.attributes).toMatchObject({ cause: 'expiry_mismatch', wasActive: true });
+    expect(events[0].data.attributes).toMatchObject({
+      cause: 'expiry_mismatch',
+      result: 'revoked',
+    });
   });
 
   it('creates no lease in an environment without a project slug', async () => {
     const manager = installLeaseManager();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = await runInDurableObject(getLeaseStub(env, config), async (_instance, state) =>
-      new LeaseDO(state, { ...env, MANAGER_PROJECT_SLUG: '' }).create({
-        environment: 'development',
-        caller: {
-          workload: 'bouncer-watch',
-          identity: 'worker-binding',
-          channel: 'worker-binding',
-          run: null,
-        },
-        grant: 'replica-read',
-        ttlSeconds: 3600,
-        requestedTtlSeconds: null,
-        clamped: false,
-        maxActive: 2,
-      })
+      new LeaseDO(state, { ...env, MANAGER_PROJECT_SLUG: '' }).create(objectRequest())
     );
     expect(result).toEqual({ status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS });
     expect(manager.calls).toEqual([]);
+  });
+
+  it('makes no lease for a request that reached the object after its budget', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await getLeaseStub(env, config).create(
+      objectRequest({ requestedAt: Date.now() - LEASE_CREATE_BUDGET_MS - 1000 })
+    );
+    expect(result).toEqual({ status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS });
+    expect(manager.calls).toEqual([]);
+    expect(await leaseEvents()).toEqual([]);
+  });
+
+  it('revokes a lease whose creation outlasted the budget counted from the STS call', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // The object took 15 seconds to start; Infisical then answers 6 seconds later. Only Date is
+    // faked, so the RPC and the fake manager keep their real timers.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const requestedAt = Date.now() - 15_000;
+      manager.setOnCreate(() => vi.setSystemTime(Date.now() + 6_000));
+      expect(await getLeaseStub(env, config).create(objectRequest({ requestedAt }))).toEqual({
+        status: 'unavailable',
+        retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(manager.revokes()).toHaveLength(1);
+    const events = await leaseEvents();
+    expect(events.map(event => [event.type, event.data.attributes.cause])).toEqual([
+      ['ai.kilo.sts.lease.revoked', 'late'],
+    ]);
+    // The undelivered lease holds no slot.
+    manager.setOnCreate(() => {});
+    issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    issued(await lease('bouncer-watch', { grant: 'replica-read' }));
   });
 });
 
@@ -499,7 +559,7 @@ describe('revoke', () => {
       workload: 'bouncer-watch',
       leaseId: created.leaseId,
       cause: 'caller',
-      wasActive: true,
+      result: 'revoked',
     });
     const denials = (await flushedDenials()).map(event => event.data.attributes);
     expect(denials).toEqual(
@@ -546,7 +606,87 @@ describe('revoke', () => {
     const revoked = (await leaseEvents()).filter(
       event => event.type === 'ai.kilo.sts.lease.revoked'
     );
-    expect(revoked.map(event => event.data.attributes.wasActive)).toEqual([false]);
+    expect(revoked.map(event => event.data.attributes.result)).toEqual(['revoke_failed', 'gone']);
+  });
+
+  it('audits a revocation Infisical could not take once, and retries it from the alarm', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    manager.setRevokeStatus(503);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toMatchObject({
+        status: 'unavailable',
+      });
+    }
+    const stub = getLeaseStub(env, config);
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(3);
+    manager.setRevokeStatus(200);
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(4);
+    const revoked = (await leaseEvents()).filter(
+      event => event.type === 'ai.kilo.sts.lease.revoked'
+    );
+    expect(
+      revoked.map(event => [
+        event.data.outcome,
+        event.data.attributes.cause,
+        event.data.attributes.result,
+      ])
+    ).toEqual([
+      ['failure', 'caller', 'revoke_failed'],
+      ['success', 'caller', 'revoked'],
+    ]);
+    expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toEqual({
+      status: 'revoked',
+      leaseId: created.leaseId,
+    });
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(4);
+  });
+
+  it('audits an undelivered lease Infisical could not revoke, and retries it from the alarm', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    manager.setExpirySkewMs(60 * 60 * 1000);
+    manager.setRevokeStatus(503);
+    expect(await lease('bouncer-watch', { grant: 'replica-read' })).toMatchObject({
+      status: 'unavailable',
+    });
+    const events = await leaseEvents();
+    expect(events.map(event => [event.type, event.data.outcomeDetail])).toEqual([
+      ['ai.kilo.sts.lease.revoked', 'revoke_failed'],
+    ]);
+    expect(events[0].data.attributes).toMatchObject({
+      cause: 'expiry_mismatch',
+      result: 'revoke_failed',
+    });
+    const stub = getLeaseStub(env, config);
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm())
+    ).not.toBeNull();
+    manager.setRevokeStatus(200);
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(2);
+    expect((await leaseEvents()).map(event => event.data.attributes.result)).toEqual([
+      'revoke_failed',
+      'revoked',
+    ]);
+  });
+
+  it('stops retrying a revocation once the lease expired', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    manager.setRevokeStatus(503);
+    await broker('bouncer-watch').revokeLease(created.leaseId);
+    const stub = getLeaseStub(env, config);
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec('UPDATE lease SET expires_at = ?', Date.now() - 1000);
+    });
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(1);
   });
 
   it('answers revoked for an expired lease of the caller without a manager call', async () => {
@@ -660,6 +800,39 @@ describe('HTTP lease', () => {
       status: 'revoked',
       leaseId: result.leaseId,
     });
+  });
+
+  it('lets only the job run that got a ci-migration lease revoke it', async () => {
+    const manager = installLeaseManager(providerFetch([github]).fetch);
+    const response = await post(
+      '/v1/lease',
+      JSON.stringify({ grant: 'ci-migration' }),
+      await signToken(github, jobClaims)
+    );
+    const result = issued(LeaseResultSchema.parse(await response.json()));
+    const otherRun = await post(
+      '/v1/lease/revoke',
+      JSON.stringify({ leaseId: result.leaseId }),
+      await signToken(github, { ...jobClaims, run_id: '778' })
+    );
+    expect(otherRun.status).toBe(404);
+    expect(manager.revokes()).toEqual([]);
+    // A re-run attempt of the same run may revoke it.
+    const sameRun = await post(
+      '/v1/lease/revoke',
+      JSON.stringify({ leaseId: result.leaseId }),
+      await signToken(github, { ...jobClaims, run_attempt: '2' })
+    );
+    expect(sameRun.status).toBe(200);
+    expect(manager.revokes()).toHaveLength(1);
+    const denials = (await flushedDenials()).map(event => event.data.attributes);
+    expect(denials).toEqual([
+      expect.objectContaining({
+        reason: 'other_run',
+        workload: 'ci-migrate',
+        leaseId: result.leaseId,
+      }),
+    ]);
   });
 
   it('refuses a missing token, a job of another workflow, a big body and a bad grant', async () => {

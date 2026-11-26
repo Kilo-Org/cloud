@@ -461,16 +461,23 @@ export function leaseCreatedEvent(input: {
  */
 export type LeaseRevokeCause = 'caller' | 'late' | 'expiry_mismatch' | 'audit_failed';
 
+/**
+ * What the revocation at Infisical gave: `revoked`; `gone` (Infisical no longer had the lease: it
+ * had expired or was already revoked there); `revoke_failed` (Infisical could not be reached, and
+ * the lease object retries until the lease expires; a later row records the outcome).
+ */
+export type LeaseRevocationResult = 'revoked' | 'gone' | 'revoke_failed';
+
 export function leaseRevokedEvent(input: {
   environment: StsEnvironment;
   caller: LeaseAuditCaller;
   grant: LeaseGrant;
   leaseId: string;
   cause: LeaseRevokeCause;
-  /** False when Infisical no longer had the lease (it had expired or was already revoked there). */
-  wasActive: boolean;
+  result: LeaseRevocationResult;
 }): AuditEvent {
   const { caller } = input;
+  const failed = input.result === 'revoke_failed';
   return AuditEventSchema.parse({
     specversion: '1.0',
     id: crypto.randomUUID(),
@@ -481,8 +488,8 @@ export function leaseRevokedEvent(input: {
     data: {
       classUid: OCSF_CLASS.apiActivity,
       activityId: OCSF_API_ACTIVITY.delete,
-      outcome: 'success',
-      outcomeDetail: input.cause,
+      outcome: failed ? 'failure' : 'success',
+      outcomeDetail: failed ? 'revoke_failed' : input.cause,
       actor:
         input.cause === 'caller'
           ? { kind: 'workload', id: caller.workload }
@@ -495,7 +502,7 @@ export function leaseRevokedEvent(input: {
         grant: input.grant,
         leaseId: input.leaseId,
         cause: input.cause,
-        wasActive: input.wasActive,
+        result: input.result,
         ...runAttributes(caller.run),
       },
     },

@@ -1,5 +1,6 @@
 import type { LeaseGrant } from '@kilocode/sts-contracts';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import type { LeaseRevokeCause } from '../audit/events';
 
 export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
 
@@ -21,6 +22,10 @@ export const lease = sqliteTable(
     /** Infisical's lease id; null until the creation answered. */
     leaseId: text('lease_id').unique(),
     workload: text('workload').notNull(),
+    /** The caller's audit fields (`LeaseAuditCaller` as JSON), for the rows the alarm writes. */
+    caller: text('caller').notNull(),
+    /** A GitHub caller's run id: only a job of the same run may revoke the lease. Null for a Worker. */
+    runId: text('run_id'),
     grant: text('lease_grant').$type<LeaseGrant>().notNull(),
     state: text('state').$type<LeaseState>().notNull(),
     createdAt: integer('created_at').notNull(),
@@ -28,6 +33,11 @@ export const lease = sqliteTable(
     expiresAt: integer('expires_at').notNull(),
     /** When the row stopped counting: revoked, failed, or (unset) at `expiresAt`. */
     endedAt: integer('ended_at'),
+    /**
+     * Set while a revocation is owed and Infisical could not be reached: the alarm retries it until
+     * it succeeds or the lease expires. The cause its `lease.revoked` rows carry.
+     */
+    revokeCause: text('revoke_cause').$type<LeaseRevokeCause>(),
   },
   table => [index('lease_workload_created').on(table.workload, table.createdAt)]
 );

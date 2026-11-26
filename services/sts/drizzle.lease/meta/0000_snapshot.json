@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7478399e-a82c-4500-9254-55325051ce38",
+  "id": "5644385d-86d9-4626-aedc-43b6bcfee9b9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_event": {
@@ -107,6 +107,20 @@
           "notNull": true,
           "autoincrement": false
         },
+        "caller": {
+          "name": "caller",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "lease_grant": {
           "name": "lease_grant",
           "type": "text",
@@ -138,6 +152,13 @@
         "ended_at": {
           "name": "ended_at",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoke_cause": {
+          "name": "revoke_cause",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

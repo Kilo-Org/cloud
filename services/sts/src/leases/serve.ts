@@ -80,6 +80,7 @@ export async function serveLease(
   const wanted = requestedTtlSeconds ?? entry.defaultTtlSeconds;
   const ttlSeconds = Math.min(wanted, entry.maxTtlSeconds);
   const clamped = wanted > entry.maxTtlSeconds;
+  const requestedAt = Date.now();
   const outcome = await callWithDeadline(
     async () =>
       await getLeaseStub(env, config).create({
@@ -90,6 +91,7 @@ export async function serveLease(
         requestedTtlSeconds,
         clamped,
         maxActive: entry.maxActive,
+        requestedAt,
       }),
     LEASE_OBJECT_DEADLINE_MS
   );
@@ -125,8 +127,9 @@ export async function serveLease(
 
 /**
  * Revokes one of the caller's own leases through the lease object, which knows each lease's
- * workload. Another workload's lease and an unknown id both answer `not_found`, and both are
- * audited as lease denials with the reason the object found.
+ * workload and, for a GitHub caller, its run. Another workload's lease, another run's lease and an
+ * unknown id all answer `not_found`, and each is audited as a lease denial with the reason the
+ * object found.
  */
 export async function serveLeaseRevoke(
   env: Env,

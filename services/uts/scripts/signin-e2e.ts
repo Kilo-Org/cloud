@@ -42,7 +42,8 @@ const issuer = UTS_ENDPOINTS.development.issuer;
 const ACCOUNT = `e2e:passkey-${randomUUID()}`;
 const MOBILE_REDIRECT = 'com.kilocode.kiloapp:/oauth/callback';
 const CLI_REDIRECT = 'http://127.0.0.1:4100/callback';
-const SCOPES = 'gateway:models.read kilo-chat:messages.read';
+/** Scopes the registry gives both the CLI and the mobile app. */
+const SCOPES = 'session-sync:grants.exchange event-service:events.subscribe';
 const DAY_SECONDS = 86_400;
 
 /** Every credential value the run handles; none may appear in an audit row. */
@@ -298,7 +299,7 @@ async function main() {
       grant_type: 'refresh_token',
       refresh_token: mobileGrant,
       client_id: 'kilo-mobile',
-      scope: 'gateway:models.read',
+      scope: 'event-service:events.subscribe',
     },
     await mobile.proof('/token')
   );
@@ -320,7 +321,7 @@ async function main() {
     redirect_uri: CLI_REDIRECT,
     code_challenge: sha256(cliVerifier).toString('base64url'),
     code_challenge_method: 'S256',
-    scope: 'gateway:models.read',
+    scope: 'event-service:events.subscribe',
     state: 'cli-e2e',
     dpop_jkt: cli.jkt,
   });
@@ -361,7 +362,7 @@ async function main() {
   const authorize = async () => {
     const started = await post('/device_authorization', {
       client_id: 'kilo-cli',
-      scope: 'gateway:models.read',
+      scope: 'event-service:events.subscribe',
     });
     check(started.status === 200, 'device authorization');
     const parsed = DeviceAuthorizationSchema.parse(started.body);
@@ -508,14 +509,14 @@ async function main() {
       client_id: 'kilo-mobile',
       refresh_token: mobileGrant,
       purpose: 'stream',
-      resource: 'urn:kilo:service:kilo-chat',
+      resource: 'urn:kilo:service:event-service',
       resource_id: 'session-e2e',
     },
     await mobile.proof('/tickets')
   );
   const ticket = z.object({ ticket: z.string(), expires_in: z.number() }).parse(issued.body);
   secrets.push(ticket.ticket);
-  // The development redeemer `uts-ticket-test` may redeem for gateway and kilo-chat only.
+  // The development redeemer `uts-ticket-test` may redeem for its listed audiences only.
   const redeem = async (audience: string) => {
     const response = await fetch(new URL('/__dev/tickets/redeem', base), {
       method: 'POST',
@@ -528,8 +529,8 @@ async function main() {
     };
   };
   const otherAudience = await redeem('session-ingest');
-  const firstUse = await redeem('kilo-chat');
-  const secondUse = await redeem('kilo-chat');
+  const firstUse = await redeem('event-service');
+  const secondUse = await redeem('event-service');
   check(otherAudience.body.status === 'refused', 'redeemer refused outside its audiences');
   check(firstUse.status === 200 && secondUse.body.status === 'invalid_ticket', 'ticket single use');
   log('5 ticket', {

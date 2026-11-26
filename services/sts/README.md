@@ -618,11 +618,13 @@ per request that arrives before the first call lands, since requests share only 
 set, never a pending call; while `SignerDO` fails, each request makes its own call (up to 3
 attempts) and nothing is cached.
 
-The identity's project role grants `readValue` on `/workloads/**` and `/shared/**` of its own
-environment in the `kilo` project, and no write. Before the first GitHub policy reaches an
-environment, the role also grants `readValue` on `/ci/**` there. Without that grant the `/ci` read
-fails, which fails every refresh in that environment, so every bundle there goes stale until the
-grant is added. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
+The identity's project role grants `describeSecret` and `readValue` on `/workloads/**` and
+`/shared/**` of its own environment in the `kilo` project, and no write. Infisical reads a value
+only with both: `readValue` requires `describeSecret` as well
+(https://infisical.com/docs/internals/permissions/project-permissions). Before the first GitHub
+policy reaches an environment, the role also grants both on `/ci/**` there. Without that grant the
+`/ci` read fails: CI bundles in that environment stay empty or go stale, and every other bundle
+refreshes as usual. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
 `/ci/minting`. The STS deploy job's own token lives outside it, under `/sts-deploy` (design 4.2).
 
 **Webhook.** One `secrets.modified` webhook per environment, scoped to that environment, of type
@@ -699,9 +701,9 @@ production. Complete and verify every item below before merging.
    and not the 4-day default. Verify: `wrangler queues info kilo-audit` prints the queue, and the
    Queues API shows `message_retention_period: 1209600`.
 3. **Infisical identity.** The production machine identity `c531ad9b-eec9-4f93-b173-e14d3d94f6ef`
-   exists in the `kilo` project with a role that grants `readValue` on `/workloads/**` and
-   `/shared/**` in `production` and no write. Verify: Infisical → Access Control → Machine
-   Identities → that id → Projects shows `kilo` with the role.
+   exists in the `kilo` project with a role that grants `describeSecret` and `readValue` on
+   `/workloads/**` and `/shared/**` in `production` and no write. Verify: Infisical → Access
+   Control → Machine Identities → that id → Projects shows `kilo` with the role.
 4. **Runtime secrets.** Each policy file's names exist in `production` under
    `/workloads/<workload>` or `/shared`. Verify: Infisical → `kilo` → `production` lists them. A
    missing name is reported in the bundle's `missing` list rather than failing the read, so this
@@ -728,14 +730,19 @@ Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, i
 **Before an environment's first GitHub policy deploys** (a `policy/ci-*.yaml` naming that
 environment), in this order:
 
-1. **`/ci` read grant.** Grant the environment's Infisical STS role `readValue` on `/ci/**` there.
-   Without it every refresh in that environment fails and every bundle there goes stale. Verify:
-   Infisical → Access Control → the identity's role lists `/ci/**` for that environment.
-2. **Deploy the policy.** The refresher's stored copy has no `/ci` folder yet, so the first refresh
-   after this deploy needs a fresh manager read for every workload in that environment, not only
-   the CI ones. If the manager is down at that moment, an empty bundle object has no stale copy to
-   fill from until a read succeeds; objects that already hold a bundle keep serving it. Deploy
-   while the manager is up and check the Infisical audit log for the read within 5 minutes.
+1. **`/ci` read grant.** Grant the environment's Infisical STS role `describeSecret` and
+   `readValue` on `/ci/**` there. Without both, the `/ci` read fails and the CI bundles there stay
+   empty (other bundles are not affected). Verify with the STS identity itself, before the deploy:
+   Infisical → `kilo` → Access Control → the STS identity → Assume Privileges
+   (https://infisical.com/docs/documentation/platform/access-controls/assume-privilege), then open
+   that environment's `/ci` and a `/ci/ci-<job>` folder below it: each lists its secrets, and no
+   value shows as hidden. Do not reveal a value. Exit the session. Infisical records the session's
+   actions under your own account.
+2. **Deploy the policy.** The refresher has no `/ci` copy yet, so the CI bundles in that
+   environment stay empty until the first `/ci` read after this deploy succeeds; other bundles are
+   not affected. After the deploy, check the Infisical audit log for the `/ci` read within 5
+   minutes, and that the Worker logs show no `sts: /ci read failed` and no
+   `sts: manager hid secret values`.
 
 ## Tests
 

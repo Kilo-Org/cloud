@@ -9,6 +9,10 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import {
+  redactApiRequestLogRequest,
+  redactCredentialsInText,
+} from '@kilocode/web-shared/lib/ai-gateway/redact-api-request-log';
 import { stripNulBytesInPlace } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -62,28 +66,6 @@ export type RewriteModelResponseParams = {
 type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
-
-export function redactApiRequestLogRequest(request: GatewayRequest): Record<string, unknown> {
-  const gateway = request.body.providerOptions?.gateway;
-  if (!gateway?.byok) {
-    return { ...request.body };
-  }
-
-  const redactedByok = Object.fromEntries(
-    Object.entries(gateway.byok).map(([provider, credentials]) => [
-      provider,
-      credentials.map(() => ({ apiKey: '[redacted]' })),
-    ])
-  );
-
-  return {
-    ...request.body,
-    providerOptions: {
-      ...request.body.providerOptions,
-      gateway: { ...gateway, byok: redactedByok },
-    },
-  };
-}
 
 async function createRequestLogCapture(
   response: Response,
@@ -157,11 +139,16 @@ async function createRequestLogCapture(
       // response; Postgres text rejects NUL bytes. Stripping them, as microdollar_usage_metadata
       // does, keeps the session ID equal to the one stored there.
       stripNulBytesInPlace(row, []);
+      const enkrypt = await logging.enkrypt?.();
       const uploadError = await uploadApiRequestLogBlob(apiRequestLogBlobKey(row), {
         request: redactApiRequestLogRequest(request),
         response: responseText ?? null,
         error: detectedError,
-        enkrypt: await logging.enkrypt?.(),
+        // Enkrypt scans the prompt text, so it holds the same credentials as the request.
+        enkrypt: enkrypt?.map(call => ({
+          ...call,
+          request: { ...call.request, text: redactCredentialsInText(call.request.text) },
+        })),
       });
       if (uploadError !== null) {
         logExceptInTest(

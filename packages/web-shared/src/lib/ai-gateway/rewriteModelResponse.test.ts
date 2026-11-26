@@ -3,7 +3,6 @@ import { after } from 'next/server';
 import {
   rewriteModelResponse,
   logUnrewrittenResponse,
-  redactApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { rewriteModelResponse_ChatCompletions } from './rewriteModelResponse.chatCompletions';
@@ -2752,61 +2751,6 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
   };
 }
 
-describe('redactApiRequestLogRequest', () => {
-  test('replaces gateway BYOK credentials without mutating the upstream request', () => {
-    const request = {
-      kind: 'chat_completions',
-      body: {
-        model: 'zai/glm-5.2',
-        messages: [{ role: 'user', content: 'hello' }],
-        providerOptions: {
-          gateway: {
-            order: ['friendli', 'novita'],
-            byok: {
-              friendli: [{ apiKey: 'friendli-managed-key', baseURL: 'https://api.friendli.ai' }],
-              bedrock: [
-                {
-                  accessKeyId: 'AKIAEXAMPLE',
-                  secretAccessKey: 'bedrock-secret',
-                  region: 'us-east-1',
-                },
-                { apiKey: 'bedrock-api-key', region: 'us-west-2' },
-              ],
-            },
-          },
-          anthropic: { effort: 'high' },
-        },
-      },
-    } satisfies RequestLoggingParams['request'];
-
-    expect(redactApiRequestLogRequest(request)).toEqual({
-      model: 'zai/glm-5.2',
-      messages: [{ role: 'user', content: 'hello' }],
-      providerOptions: {
-        gateway: {
-          order: ['friendli', 'novita'],
-          byok: {
-            friendli: [{ apiKey: '[redacted]' }],
-            bedrock: [{ apiKey: '[redacted]' }, { apiKey: '[redacted]' }],
-          },
-        },
-        anthropic: { effort: 'high' },
-      },
-    });
-    expect(request.body.providerOptions.gateway.byok.friendli[0].apiKey).toBe(
-      'friendli-managed-key'
-    );
-    expect(request.body.providerOptions.gateway.byok.bedrock[0]).toMatchObject({
-      accessKeyId: 'AKIAEXAMPLE',
-      secretAccessKey: 'bedrock-secret',
-    });
-    expect(request.body.providerOptions.gateway.byok.bedrock[1]).toEqual({
-      apiKey: 'bedrock-api-key',
-      region: 'us-west-2',
-    });
-  });
-});
-
 describe('rewriteModelResponse', () => {
   describe.each(usageShapes)('$kind authoritative request context', shape => {
     test.each([
@@ -3245,6 +3189,55 @@ describe('api_request_log_2 storage', () => {
 
     expect(enkrypt).toHaveBeenCalledWith(false);
     expect(fakeR2.objects.size).toBe(0);
+  });
+
+  test('redacts credentials in the request and the Enkrypt scan text', async () => {
+    const call: EnkryptRequestLog = {
+      guardrail: 'input',
+      scan: 'blocking',
+      part: 'conversation',
+      request: {
+        text: 'curl -H "Authorization: Bearer sk-secret"',
+        detectors: {},
+        user_metadata: { organization_id: organizationId },
+      },
+      response: null,
+      status_code: 200,
+      error: null,
+    };
+    const logging = await logUpstreamResponse(
+      jsonResponse({ error: 'upstream error' }, 400),
+      'all',
+      null,
+      storageLogging({
+        request: {
+          kind: 'responses',
+          body: {
+            model: 'kilo-internal/my-model',
+            input: 'curl -H "Authorization: Bearer sk-secret"',
+            tools: [
+              {
+                type: 'mcp',
+                server_label: 'example',
+                server_url: 'https://mcp.example.com',
+                authorization: 'mcp-token',
+              },
+            ],
+          },
+        },
+        enkrypt: async () => [call],
+      })
+    );
+
+    expect(storedBlob(await selectLoggedRow())).toMatchObject({
+      request: {
+        input: 'curl -H "Authorization: Bearer [redacted]"',
+        tools: [{ authorization: '[redacted]' }],
+      },
+      enkrypt: [{ request: { text: 'curl -H "Authorization: Bearer [redacted]"' } }],
+    });
+    expect(call.request.text).toBe('curl -H "Authorization: Bearer sk-secret"');
+    expect(logging.request.body).toMatchObject({ tools: [{ authorization: 'mcp-token' }] });
   });
 
   test('awaits Enkrypt calls only in after() and stores them with the request and response in one PUT', async () => {

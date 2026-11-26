@@ -8,6 +8,7 @@ import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
 import { type ScopeRegistry, clientScopeRefusal, orgScopeRefusal } from '../scopes/policy';
+import type { ThirdPartyClients } from '../third-party/clients';
 import { randomCredential, sha256 } from '../token/credentials';
 import {
   type FirstPartyClient,
@@ -17,7 +18,7 @@ import {
   isRegisteredRedirect,
 } from './clients';
 import { jktOfParameter } from './dpop';
-import { classifyFailure, failureResponse, oauthError } from './errors';
+import { classifyFailure, oauthError, temporarilyUnavailable } from './errors';
 import { audiencesOfResources, paramsOf, parseScopes, targetMismatch } from './params';
 import { CodeChallengeSchema } from './pkce';
 
@@ -94,6 +95,8 @@ export type AuthorizeDeps = {
   grants: GrantsAccess;
   scopes: ScopeRegistry;
   handoff: AuthorizationHandoff;
+  /** Third-party clients by their Client ID Metadata Document (src/third-party/clients.ts). */
+  clients: ThirdPartyClients;
 };
 
 /** An error before the redirect URI is trusted: shown, never redirected. */
@@ -143,13 +146,10 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       redirectKind: identity.client.redirect.kind,
     };
   } else if (identity.kind === 'third_party') {
-    let record;
-    try {
-      record = await deps.grants(grants => grants.findThirdPartyClient(identity.clientId));
-    } catch (error) {
-      return failureResponse(error, 'authorize');
-    }
-    if (record === null) return directError('invalid_client', 'unknown client', 401);
+    const resolved = await deps.clients(identity.clientId);
+    if (resolved.kind === 'unavailable') return temporarilyUnavailable();
+    if (resolved.kind === 'refused') return directError('invalid_client', 'unknown client', 401);
+    const record = resolved.client;
     if (!record.redirectUris.includes(redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }

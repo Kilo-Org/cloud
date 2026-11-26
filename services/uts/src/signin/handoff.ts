@@ -1,3 +1,4 @@
+import type { ConsentStep } from '../third-party/consent';
 import type { AuthorizationHandoff } from '../oauth/authorize';
 import { classifyFailure } from '../oauth/errors';
 import { sha256 } from '../token/credentials';
@@ -23,17 +24,17 @@ export async function requestSession(
  * The authorization hand-off of the sign-in pages. Without a session the user sees the sign-in
  * page at the authorization URL, which reloads it once the user signed in. A first-party client is
  * approved for the session's account, with the organization it asked for (the identity store
- * checks the membership). A third-party client is denied until the consent screen serves it
- * (design 5.9).
+ * checks the membership). A third-party client goes on to the consent screen (`consent`,
+ * src/third-party/consent.ts, design 5.9); without one it is denied.
  *
  * RFC 8252 section 8.6: a client that receives its code on a private-use URI scheme cannot be
  * identified, because another app can claim the same scheme. Its request is approved only from
  * the confirm page's same-origin POST, so every such request shows the user a page (sign-in or
  * confirm) and a request another app started never completes without the user.
  */
-export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
+export function signInHandoff(deps: SignInDeps, consent: ConsentStep | null): AuthorizationHandoff {
   return async (request, pending) => {
-    if (pending.client.kind === 'third_party') return { status: 'denied' };
+    if (pending.client.kind === 'third_party' && consent === null) return { status: 'denied' };
     let session: BrowserSession | null;
     try {
       session = await requestSession(request, deps);
@@ -48,6 +49,9 @@ export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
       const { pathname, search } = new URL(request.url);
       const choices = signInChoices(deps.methods, returnPathOf(`${pathname}${search}`));
       return { status: 'interaction', response: signInPage(choices) };
+    }
+    if (pending.client.kind === 'third_party') {
+      return consent === null ? { status: 'denied' } : await consent(request, pending, session);
     }
     if (pending.client.redirectKind === 'private_use_scheme' && !isSameOriginPost(request)) {
       return {

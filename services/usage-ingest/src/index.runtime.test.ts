@@ -2,17 +2,33 @@ import { createTestHarness, unstable_readConfig, unstable_startWorker } from 'wr
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { expect, it } from 'vitest';
 import { usage } from './usage.test-fixture';
 
 it('starts the configured Worker entry in workerd', async () => {
+  // The config binds the STS SecretsBroker; workerd refuses to start a binding to a service it
+  // does not run, so the harness also runs an empty stand-in named `sts`, written outside the repo.
+  const directory = await mkdtemp(join(tmpdir(), 'usage-ingest-sts-stand-in-'));
+  await writeFile(
+    join(directory, 'sts.ts'),
+    [
+      "import { WorkerEntrypoint } from 'cloudflare:workers';",
+      'export class SecretsBroker extends WorkerEntrypoint {}',
+      'export default { fetch: () => new Response(null, { status: 404 }) };',
+    ].join('\n')
+  );
+  await writeFile(
+    join(directory, 'wrangler.json'),
+    JSON.stringify({ name: 'sts', main: 'sts.ts', compatibility_date: '2026-09-18' })
+  );
   const server = createTestHarness({
     workers: [
       {
         configPath: new URL('../wrangler.jsonc', import.meta.url),
         secrets: { USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret' },
       },
+      { configPath: pathToFileURL(join(directory, 'wrangler.json')) },
     ],
   });
   try {
@@ -23,6 +39,7 @@ it('starts the configured Worker entry in workerd', async () => {
     expect((await fetch(new URL('/usage', url), { method: 'POST' })).status).toBe(401);
   } finally {
     await server.close();
+    await rm(directory, { recursive: true, force: true });
   }
 }, 20_000);
 

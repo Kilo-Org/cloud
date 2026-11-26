@@ -766,6 +766,64 @@ Whoever triages #o11y-alerts, who hands it to the DLQ replay owner:
 by stable usage ID, and replay only as described under [Queue policy](#queue-policy),
 within the DLQ's retention.
 
+## STS canary
+
+usage-ingest and the web app are the STS pilot pair (decision D6c in the secrets and tokens
+design, section 4.4 "When STS is down"): each mints a service token for the other and verifies
+the other's token, every 5 minutes, in production and staging. It is a synthetic check on real
+deployments; no usage publish or consume code, queue or credential takes part in it.
+
+One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
+
+1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (default `"false"` in both
+   environments).
+2. Gets a `web:sts.canary` token from `@kilocode/service-token-client` over the `STS` service
+   binding (`SecretsBroker`, `props.caller: "usage-ingest"`; `sts` in production, `sts-staging` in
+   staging). The token lives 300 s and renews at 240 s, so a warm isolate mints at most about once
+   per run.
+3. Posts to `WEB_STS_CANARY_URL` with `Authorization: Bearer <token>` and `x-sts-canary-run:
+   <run id>`; staging adds `x-vercel-protection-bypass` from the optional
+   `USAGE_WRITER_PROTECTION_BYPASS` secret. The web route verifies the token (`web:sts.canary`),
+   mints `usage-ingest:sts.canary` with its Vercel identity, calls `POST /sts-canary/verify` here
+   (expect 204), presents the `web` token it received (expect 403 `insufficient_scope`), the same
+   claims signed by a key STS never held (expect 401) and, when the instance holds one, an earlier
+   token past `exp` plus 60 s (expect 401, else `skipped`), and answers a report
+   (`StsCanaryReportSchema` in `@kilocode/sts-contracts`).
+4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
+   `succeeded` only when every check passed, with `mint_result`, `web_status`, and
+   `<check>_result`/`_status`/`_detail` for `outbound`, `negative_wrong_audience`,
+   `negative_forged` and `negative_expired`. A failure carries `exception_name`:
+   `ServiceTokenError` (STS refused or failed the mint; `mint_detail` names the reason),
+   `StsCanaryWebRefused` (the web route answered other than 200), `StsCanaryReportInvalid`,
+   `StsCanaryCheckFailed` or `StsCanaryNotConfigured`. No token appears in any log line.
+
+`POST /sts-canary/verify` is matched before the publish routes and their 404 guard. It verifies
+the bearer token with `@kilocode/verify` (issuer `STS_URL`, audience `usage-ingest`, scope
+`usage-ingest:sts.canary`, key set from `STS_URL` over HTTPS) and answers 204 or the section 7
+refusal (401 `invalid_token`, 403 `insufficient_scope`, 503 `temporarily_unavailable`). Each
+outcome logs `sts_canary_verify_accepted` or `sts_canary_verify_refused` (status, error, reason,
+the run id), never the token. The route works whether or not the flag is on.
+
+| Var | Production | Staging |
+|---|---|---|
+| `STS_CANARY_ENABLED` | `"false"` | `"false"` |
+| `STS_URL` | `https://sts.kiloapps.io` | `https://sts-staging.kiloapps.io` |
+| `WEB_STS_CANARY_URL` | `https://app.kilo.ai/api/internal/sts-canary` | `https://staging-app.kilo.ai/api/internal/sts-canary` |
+
+Binding STS changes two settings of this Worker. `observability.traces` is off in every block,
+because the repo check in `services/sts/test/repo/worker-configs.test.ts` refuses traces for any
+config that binds STS (a trace records outbound URLs); this ends the 5 % trace sampling the
+Worker had, and Workers Logs stay on. `logpush` is on, so the canary's lines reach Axiom.
+
+Page on the canary with an Axiom threshold monitor over the Worker's Logpush dataset (field names
+depend on the Logpush job): no `succeeded` event for `usage_ingest.sts_canary` in 15 minutes, or
+any `failed` event in 15 minutes, per environment, notifying the existing alert route.
+
+Cost per environment: 288 runs a day; each is one scheduled invocation, at most one STS mint
+call (one `token.issued` audit row; usually none, since a warm isolate holds its token), one web
+call, and four verify-route invocations here. The verify route fetches the STS key set at most
+once per isolate per 5 minutes.
+
 ## Deploy
 
 The `detect-changes` job of `.github/workflows/deploy-workers.yml` discovers

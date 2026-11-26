@@ -23,6 +23,11 @@ export type Env = Omit<
   | 'USAGE_INGEST_HEDGE_DELAY_MS'
   | 'USAGE_INGEST_HEDGE_PERCENT'
   | 'USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED'
+  // The STS canary's binding and vars: `StsCanaryEnv` in sts-canary.ts types them.
+  | 'STS'
+  | 'STS_CANARY_ENABLED'
+  | 'STS_URL'
+  | 'WEB_STS_CANARY_URL'
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;
   USAGE_INGEST_HEDGE_QUEUE?: Queue<UsageQueueMessage>;

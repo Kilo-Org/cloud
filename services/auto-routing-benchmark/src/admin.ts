@@ -126,7 +126,7 @@ import { loadRunModelTotals, loadRunTotals } from './run-totals';
 import { loadRoutingTableResponse } from './routing-table-response';
 import { getSchedulerOverrides, resolveSchedulerConfig, saveSchedulerOverrides } from './scheduler';
 import type { HonoEnv } from './hono-env';
-import { fetchBenchmarkUserToken } from './benchmark-token';
+import { fetchBenchmarkUserToken, UNSPLIT_CLI_TOKEN } from './benchmark-token';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import {
   catalogCandidatePrices,
@@ -819,10 +819,13 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         if (error instanceof BenchmarkRunConfigError) return c.json({ error: error.message }, 400);
         throw error;
       }
+      // No case proxy here: the CLI sends this one key to every route it calls, so it
+      // keeps the unsplit mint (see UNSPLIT_CLI_TOKEN).
       const kiloToken = await fetchBenchmarkUserToken(
         c.env,
         benchmarkIdentity.benchmarkUserId,
-        benchmarkIdentity.benchmarkOrgId
+        benchmarkIdentity.benchmarkOrgId,
+        UNSPLIT_CLI_TOKEN
       );
       const result = await debugRunCli(c.env, {
         ...c.req.valid('json'),

@@ -69,6 +69,11 @@ import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { scheduleNewSignInCheck } from '@/lib/auth/new-sign-in-check';
 import { nativeSignInDevice } from '@/lib/auth/sign-in-context';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 const posthogClient = PostHogClient();
 
@@ -181,9 +186,15 @@ function checkNativeSignIn(
   });
 }
 
+/**
+ * Refuses a provider identity whose account is blocked or not eligible. The
+ * account it names becomes the attempt's subject, so a refusal row carries
+ * that account and its email.
+ */
 async function checkExistingProviderAccount(
   provider: 'apple' | 'google',
-  providerAccountId: string
+  providerAccountId: string,
+  attempt: AuthAuditAttempt
 ) {
   const userId = await findUserIdByAuthProvider(provider, providerAccountId);
   if (!userId) {
@@ -193,6 +204,8 @@ async function checkExistingProviderAccount(
   if (!user) {
     throw new Error(`Auth provider references missing user ${userId}`);
   }
+  attempt.userId = user.id;
+  attempt.email = user.google_user_email;
   if (isBlockedAccount(user)) {
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
@@ -310,8 +323,14 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // any branch so an early refusal is counted too; every call is a no-op for
   // other clients. A thrown request is still recorded, as the 500 it surfaces.
   const telemetry = startNativeTokenTelemetry(request);
+  // One audit row per request, success or the refusal code the response carries.
+  const attempt: AuthAuditAttempt = { action: 'auth.sign_in', metadata: { client: 'native' } };
   try {
-    const response = await runNativeTokenExchange(request, telemetry);
+    const response = await auditAuthRoute(
+      authAuditRequestFromHeaders(request.headers, '/api/auth/native/token'),
+      attempt,
+      () => runNativeTokenExchange(request, telemetry, attempt)
+    );
     telemetry.emit(response.status);
     return response;
   } catch (error) {
@@ -322,7 +341,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
 async function runNativeTokenExchange(
   request: Request,
-  telemetry: NativeTokenTelemetry
+  telemetry: NativeTokenTelemetry,
+  attempt: AuthAuditAttempt
 ): Promise<Response> {
   // A body that did not parse is a transport error; a body that parsed but did
   // not match the schema is a request error. They stay separate so neither is
@@ -340,6 +360,7 @@ async function runNativeTokenExchange(
   }
 
   const data = validation.data;
+  attempt.method = data.provider;
 
   // ── Step 0: Client-address rate limit ────────────────────────────────────
   // Counted before the admission gate so one address cannot spend the provider
@@ -411,6 +432,8 @@ async function runNativeTokenExchange(
     }
 
     const user = await findUserById(ticket.kilo_user_id);
+    attempt.userId = ticket.kilo_user_id;
+    attempt.email = user?.google_user_email ?? null;
     if (!user) {
       return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
     }
@@ -508,11 +531,17 @@ async function runNativeTokenExchange(
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    // The presented address until an account is resolved.
+    attempt.email = verified.email;
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
       return eligibilityResponse(eligibility);
     }
-    const existingAccountResponse = await checkExistingProviderAccount('apple', verified.sub);
+    const existingAccountResponse = await checkExistingProviderAccount(
+      'apple',
+      verified.sub,
+      attempt
+    );
     if (existingAccountResponse) {
       return existingAccountResponse;
     }
@@ -555,11 +584,17 @@ async function runNativeTokenExchange(
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    // The presented address until an account is resolved.
+    attempt.email = verified.email;
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
       return eligibilityResponse(eligibility);
     }
-    const existingAccountResponse = await checkExistingProviderAccount('google', verified.sub);
+    const existingAccountResponse = await checkExistingProviderAccount(
+      'google',
+      verified.sub,
+      attempt
+    );
     if (existingAccountResponse) {
       return existingAccountResponse;
     }
@@ -582,6 +617,8 @@ async function runNativeTokenExchange(
     // a different address: it settles the alias, and the signup rules refuse it
     // when the normalized address is already taken.
     const existingUser = await findUserBySignInCodeEmail(data.email);
+    attempt.userId = existingUser?.id ?? null;
+    attempt.email = existingUser?.google_user_email ?? data.email;
     const email = existingUser?.google_user_email ?? getDeliveredEmailAddress(data.email);
 
     const reserveResult = await reserveSignInCode(data.email, data.code, data.challengeId);
@@ -632,6 +669,10 @@ async function runNativeTokenExchange(
         true,
         verifyNewAccountAdmission
       );
+      if (result.success) {
+        attempt.userId = result.user.id;
+        attempt.email = result.user.google_user_email;
+      }
       if (!result.success) {
         phase = 'release';
         return settlementFailureResponse(result, args);
@@ -790,6 +831,10 @@ async function runNativeTokenExchange(
     true,
     verifyNewAccountAdmission
   );
+  if (result.success) {
+    attempt.userId = result.user.id;
+    attempt.email = result.user.google_user_email;
+  }
   if (!result.success) {
     return settlementFailureResponse(result, args);
   }

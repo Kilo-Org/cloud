@@ -3,6 +3,14 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { listBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  auditedAdminRoute,
+  recordAdminActions,
+  setAdminAuditActor,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import {
   backfillBlockBlacklistedDomainsBatch,
   findBlacklistedEmailDomains,
   type BlockBlacklistedDomainsBackfillResponse,
@@ -29,14 +37,32 @@ export async function GET(): Promise<
   return NextResponse.json({ unblocked });
 }
 
-export async function POST(): Promise<
-  NextResponse<BlockBlacklistedDomainsBackfillResponse | { error: string }>
-> {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
+// One summary row for the run, plus one row per user a batch blocked.
+export const POST = auditedAdminRoute(
+  { kind: 'declarative', action: 'backfill.block_blacklisted_domains.run' },
+  async (
+    request: Request
+  ): Promise<NextResponse<BlockBlacklistedDomainsBackfillResponse | { error: string }>> => {
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(user);
 
-  const domains = await listBlacklistedDomains();
-  return NextResponse.json(
-    await backfillBlockBlacklistedDomainsBatch({ actorId: user.id, domains })
-  );
-}
+    const auditContext = adminActionContextFromHeaders(user, request.headers);
+    const domains = await listBlacklistedDomains();
+    const result = await backfillBlockBlacklistedDomainsBatch({
+      actorId: user.id,
+      domains,
+      onBlocked: userIds =>
+        recordAdminActions(
+          auditContext,
+          userIds.map(userId => ({
+            action: 'user.domain_block',
+            target: userActionTarget(userId),
+            message: 'Blocked for a blacklisted email domain',
+          }))
+        ),
+    });
+    addAdminAuditMetadata({ ...result, blacklistedDomainCount: domains.length });
+    return NextResponse.json(result);
+  }
+);

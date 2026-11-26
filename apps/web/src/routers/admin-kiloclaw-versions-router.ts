@@ -1,4 +1,8 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kiloclaw_image_catalog,
@@ -179,8 +183,16 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   }),
 
   updateVersionStatus: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.version.status.set',
+        target: inputFieldTarget('other', 'imageTag'),
+      },
+    })
     .input(UpdateVersionStatusSchema)
     .mutation(async ({ input, ctx }) => {
+      addAdminAuditMetadata({ status: input.status });
       // Disabling: route through the kiloclaw service so status='disabled' AND
       // rollout_percent=0 land atomically along with a KV pointer refresh. The
       // service is the only place that can keep KV pointers consistent without
@@ -269,6 +281,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
    * pins/rollouts.
    */
   bulkDisableVersions: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'kiloclaw.version.bulk_disable' } })
     .input(BulkDisableVersionsSchema)
     .output(BulkDisableVersionsOutputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -324,10 +337,22 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
         }
       }
 
+      addAdminAuditMetadata({
+        disabledImageTags: disabled,
+        skippedCount: skippedLatest.length + skippedAlreadyDisabled.length + notFound.length,
+        errorCount: errors.length,
+      });
       return { disabled, skippedLatest, skippedAlreadyDisabled, notFound, errors };
     }),
 
   setRolloutPercent: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.version.rollout.set',
+        target: inputFieldTarget('other', 'imageTag'),
+      },
+    })
     .input(
       z.object({
         imageTag: z.string().min(1),
@@ -335,6 +360,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
+      addAdminAuditMetadata({ percent: input.percent });
       const client = new KiloClawInternalClient();
       try {
         return await client.setRolloutPercent(input.imageTag, input.percent);
@@ -353,6 +379,13 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     }),
 
   markLatest: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.version.mark_latest',
+        target: inputFieldTarget('other', 'imageTag'),
+      },
+    })
     .input(z.object({ imageTag: z.string().min(1) }))
     .mutation(async ({ input }) => {
       const client = new KiloClawInternalClient();
@@ -450,73 +483,92 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     };
   }),
 
-  setPin: adminProcedure.input(SetPinSchema).mutation(async ({ input, ctx }) => {
-    const resolvedInstanceId =
-      input.instanceId ?? (await requireActivePersonalInstance(input.userId)).id;
-    let result;
-    try {
-      [result] = await db
-        .insert(kiloclaw_version_pins)
-        .values({
-          instance_id: resolvedInstanceId,
-          image_tag: input.imageTag,
-          pinned_by: ctx.user.id,
-          reason: input.reason ?? null,
-        })
-        .onConflictDoUpdate({
-          target: kiloclaw_version_pins.instance_id,
-          set: {
+  setPin: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.version.pin',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(SetPinSchema)
+    .mutation(async ({ input, ctx }) => {
+      const resolvedInstanceId =
+        input.instanceId ?? (await requireActivePersonalInstance(input.userId)).id;
+      addAdminAuditMetadata({ instanceId: resolvedInstanceId, imageTag: input.imageTag });
+      let result;
+      try {
+        [result] = await db
+          .insert(kiloclaw_version_pins)
+          .values({
+            instance_id: resolvedInstanceId,
             image_tag: input.imageTag,
             pinned_by: ctx.user.id,
             reason: input.reason ?? null,
-            updated_at: new Date().toISOString(),
-          },
-        })
-        .returning();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('foreign key')) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Image tag '${input.imageTag}' not found in catalog`,
-        });
+          })
+          .onConflictDoUpdate({
+            target: kiloclaw_version_pins.instance_id,
+            set: {
+              image_tag: input.imageTag,
+              pinned_by: ctx.user.id,
+              reason: input.reason ?? null,
+              updated_at: new Date().toISOString(),
+            },
+          })
+          .returning();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '';
+        if (msg.includes('foreign key')) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Image tag '${input.imageTag}' not found in catalog`,
+          });
+        }
+        throw err;
       }
-      throw err;
-    }
 
-    if (!result) {
-      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
-    }
+      if (!result) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
+      }
 
-    // Push the resolved pin into DO state so the next redeploy boots the
-    // pinned image. Failures are logged but do NOT roll back the DB row —
-    // the pin is the intent of record; the DO will converge on next
-    // provision if this sync fails.
-    const ownerUserId = await resolveInstanceOwnerUserId(resolvedInstanceId, input.userId);
-    const workerSync = await pushPinToWorker(ownerUserId, resolvedInstanceId, input.imageTag);
+      // Push the resolved pin into DO state so the next redeploy boots the
+      // pinned image. Failures are logged but do NOT roll back the DB row —
+      // the pin is the intent of record; the DO will converge on next
+      // provision if this sync fails.
+      const ownerUserId = await resolveInstanceOwnerUserId(resolvedInstanceId, input.userId);
+      const workerSync = await pushPinToWorker(ownerUserId, resolvedInstanceId, input.imageTag);
 
-    return { ...result, worker_sync: workerSync };
-  }),
+      return { ...result, worker_sync: workerSync };
+    }),
 
-  removePin: adminProcedure.input(RemovePinSchema).mutation(async ({ input }) => {
-    // Look up the owner before deleting so we can still push the clear to
-    // the worker after the row is gone.
-    const ownerUserId = await resolveInstanceOwnerUserId(input.instanceId);
+  removePin: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.version.unpin',
+        target: inputFieldTarget('kiloclaw_instance', 'instanceId'),
+      },
+    })
+    .input(RemovePinSchema)
+    .mutation(async ({ input }) => {
+      // Look up the owner before deleting so we can still push the clear to
+      // the worker after the row is gone.
+      const ownerUserId = await resolveInstanceOwnerUserId(input.instanceId);
 
-    const [deleted] = await db
-      .delete(kiloclaw_version_pins)
-      .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
-      .returning();
+      const [deleted] = await db
+        .delete(kiloclaw_version_pins)
+        .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
+        .returning();
 
-    // Idempotent clear: always push null to the DO, even if no row
-    // existed. This makes `removePin` safe to retry after a failed
-    // worker sync — the DB row is already gone but a stale
-    // `trackedImageTag` in the DO can still be cleaned up by calling
-    // removePin again.
-    const workerSync = await pushPinToWorker(ownerUserId, input.instanceId, null);
+      // Idempotent clear: always push null to the DO, even if no row
+      // existed. This makes `removePin` safe to retry after a failed
+      // worker sync — the DB row is already gone but a stale
+      // `trackedImageTag` in the DO can still be cleaned up by calling
+      // removePin again.
+      const workerSync = await pushPinToWorker(ownerUserId, input.instanceId, null);
 
-    return { success: true, deleted: !!deleted, worker_sync: workerSync };
-  }),
+      return { success: true, deleted: !!deleted, worker_sync: workerSync };
+    }),
 
   getLatestTag: adminProcedure.query(async () => {
     // Catalog-driven: the :latest badge tracks the is_latest column directly,
@@ -628,78 +680,81 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     return { rows, total };
   }),
 
-  syncCatalog: adminProcedure.mutation(async () => {
-    const client = new KiloClawInternalClient();
-    let kvVersions;
-    try {
-      kvVersions = await client.listVersions();
-    } catch (err) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to fetch versions from KiloClaw service',
-        cause: err,
+  syncCatalog: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'kiloclaw.version.catalog_sync' } })
+    .mutation(async () => {
+      const client = new KiloClawInternalClient();
+      let kvVersions;
+      try {
+        kvVersions = await client.listVersions();
+      } catch (err) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch versions from KiloClaw service',
+          cause: err,
+        });
+      }
+
+      // Early return if KV has no versions
+      if (kvVersions.length === 0) {
+        return { synced: 0, alreadyExisted: 0, invalid: 0, total: 0 };
+      }
+
+      // Fetch only existing tags that match KV versions (more memory-efficient)
+      const kvTags = kvVersions.map(v => v.imageTag);
+      const existingTags = new Set(
+        (
+          await db
+            .select({ image_tag: kiloclaw_image_catalog.image_tag })
+            .from(kiloclaw_image_catalog)
+            .where(inArray(kiloclaw_image_catalog.image_tag, kvTags))
+        ).map(row => row.image_tag)
+      );
+
+      // Filter out entries that already exist in Postgres
+      const newEntries = kvVersions.filter(entry => !existingTags.has(entry.imageTag));
+
+      // Validate entries before inserting — KV data may be malformed.
+      // Uses the same rules as validateEntry() in catalog-registration.ts.
+      const IMAGE_TAG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+      const VERSION_RE = /^\d{4}\.\d{1,2}\.\d{1,2}$/;
+      const VARIANT_RE = /^[a-z0-9-]{1,64}$/;
+      const validEntries = newEntries.filter(entry => {
+        if (!IMAGE_TAG_RE.test(entry.imageTag) || entry.imageTag.length > 128) return false;
+        if (!VERSION_RE.test(entry.openclawVersion)) return false;
+        if (!VARIANT_RE.test(entry.variant)) return false;
+        const ts = new Date(entry.publishedAt).getTime();
+        if (isNaN(ts)) return false;
+        return true;
       });
-    }
+      const invalidCount = newEntries.length - validEntries.length;
 
-    // Early return if KV has no versions
-    if (kvVersions.length === 0) {
-      return { synced: 0, alreadyExisted: 0, invalid: 0, total: 0 };
-    }
-
-    // Fetch only existing tags that match KV versions (more memory-efficient)
-    const kvTags = kvVersions.map(v => v.imageTag);
-    const existingTags = new Set(
-      (
+      // Bulk insert validated new entries. onConflictDoNothing guards against
+      // concurrent syncs inserting the same tag between our check and insert.
+      if (validEntries.length > 0) {
         await db
-          .select({ image_tag: kiloclaw_image_catalog.image_tag })
-          .from(kiloclaw_image_catalog)
-          .where(inArray(kiloclaw_image_catalog.image_tag, kvTags))
-      ).map(row => row.image_tag)
-    );
+          .insert(kiloclaw_image_catalog)
+          .values(
+            validEntries.map(entry => ({
+              openclaw_version: entry.openclawVersion,
+              variant: entry.variant,
+              image_tag: entry.imageTag,
+              image_digest: entry.imageDigest,
+              status: 'available' as const,
+              published_at: entry.publishedAt,
+            }))
+          )
+          .onConflictDoNothing();
+      }
 
-    // Filter out entries that already exist in Postgres
-    const newEntries = kvVersions.filter(entry => !existingTags.has(entry.imageTag));
-
-    // Validate entries before inserting — KV data may be malformed.
-    // Uses the same rules as validateEntry() in catalog-registration.ts.
-    const IMAGE_TAG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
-    const VERSION_RE = /^\d{4}\.\d{1,2}\.\d{1,2}$/;
-    const VARIANT_RE = /^[a-z0-9-]{1,64}$/;
-    const validEntries = newEntries.filter(entry => {
-      if (!IMAGE_TAG_RE.test(entry.imageTag) || entry.imageTag.length > 128) return false;
-      if (!VERSION_RE.test(entry.openclawVersion)) return false;
-      if (!VARIANT_RE.test(entry.variant)) return false;
-      const ts = new Date(entry.publishedAt).getTime();
-      if (isNaN(ts)) return false;
-      return true;
-    });
-    const invalidCount = newEntries.length - validEntries.length;
-
-    // Bulk insert validated new entries. onConflictDoNothing guards against
-    // concurrent syncs inserting the same tag between our check and insert.
-    if (validEntries.length > 0) {
-      await db
-        .insert(kiloclaw_image_catalog)
-        .values(
-          validEntries.map(entry => ({
-            openclaw_version: entry.openclawVersion,
-            variant: entry.variant,
-            image_tag: entry.imageTag,
-            image_digest: entry.imageDigest,
-            status: 'available' as const,
-            published_at: entry.publishedAt,
-          }))
-        )
-        .onConflictDoNothing();
-    }
-
-    return {
-      synced: validEntries.length,
-      alreadyExisted: existingTags.size,
-      invalid: invalidCount,
-      total: kvVersions.length,
-    };
-  }),
+      addAdminAuditMetadata({ syncedCount: validEntries.length, invalidCount });
+      return {
+        synced: validEntries.length,
+        alreadyExisted: existingTags.size,
+        invalid: invalidCount,
+        total: kvVersions.length,
+      };
+    }),
 
   searchUsers: adminProcedure
     .input(z.object({ query: z.string().min(1) }))

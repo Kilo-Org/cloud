@@ -235,10 +235,14 @@ export async function purgeExpiredStripeRenewalBatches() {
   });
 }
 
+/**
+ * Starts a frozen preview. `startedUserIds` names the users whose renewals the
+ * batch will stop; it is empty when the batch had already started.
+ */
 export async function startStripeRenewalBatch(params: {
   previewId: string;
   actor: StripeRenewalBatchActor;
-}) {
+}): Promise<{ id: string; startedUserIds: string[] }> {
   return db.transaction(async tx => {
     await lockBatch(tx);
     const [stored] = await tx
@@ -267,7 +271,7 @@ export async function startStripeRenewalBatch(params: {
       header.canonical_result.state === 'completed' ||
       header.canonical_result.state === 'failed'
     ) {
-      return { id: params.previewId };
+      return { id: params.previewId, startedUserIds: [] };
     }
     const running = await tx
       .select({ id: operation_ledgers.resource_key })
@@ -298,11 +302,28 @@ export async function startStripeRenewalBatch(params: {
         lease_expires_at: new Date(Date.now() + CLAIM_LEASE_MS).toISOString(),
       })
       .where(eq(operation_ledgers.id, header.id));
-    return { id: params.previewId };
+    const items = await tx
+      .selectDistinct({ userId: operation_ledgers.kilo_user_id })
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.domain, DOMAIN),
+          eq(operation_ledgers.intent, ITEM_INTENT),
+          eq(operation_ledgers.resource_key, params.previewId)
+        )
+      );
+    return { id: params.previewId, startedUserIds: items.map(item => item.userId) };
   });
 }
 
-export async function retryStripeRenewalBatch(runId: string, actor: StripeRenewalBatchActor) {
+/**
+ * Requeues a run's failed items. `retriedUserIds` names the users of the
+ * requeued items; it is empty when nothing was requeued.
+ */
+export async function retryStripeRenewalBatch(
+  runId: string,
+  actor: StripeRenewalBatchActor
+): Promise<{ id: string; retriedUserIds: string[] }> {
   return db.transaction(async tx => {
     await lockBatch(tx);
     const [stored] = await tx
@@ -322,7 +343,7 @@ export async function retryStripeRenewalBatch(runId: string, actor: StripeRenewa
     if (header.canonical_result.state === 'preview') {
       throw new StripeRenewalBatchInputError('BAD_REQUEST', 'Preview has not been started');
     }
-    if (header.canonical_result.state === 'running') return { id: runId };
+    if (header.canonical_result.state === 'running') return { id: runId, retriedUserIds: [] };
     const active = await tx
       .select({ id: operation_ledgers.resource_key })
       .from(operation_ledgers)
@@ -351,10 +372,12 @@ export async function retryStripeRenewalBatch(runId: string, actor: StripeRenewa
         )
       )
       .for('update');
-    if (failed.length === 0) return { id: runId };
+    if (failed.length === 0) return { id: runId, retriedUserIds: [] };
+    const retriedUserIds = new Set<string>();
     for (const row of failed) {
       const item = parseItem(row);
       if (!item) continue;
+      retriedUserIds.add(row.kilo_user_id);
       await tx
         .update(operation_ledgers)
         .set({
@@ -388,7 +411,7 @@ export async function retryStripeRenewalBatch(runId: string, actor: StripeRenewa
         },
       })
       .where(eq(operation_ledgers.id, header.id));
-    return { id: runId };
+    return { id: runId, retriedUserIds: [...retriedUserIds] };
   });
 }
 

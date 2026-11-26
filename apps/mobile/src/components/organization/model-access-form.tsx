@@ -2,14 +2,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type OrgGatewaySettings,
@@ -42,6 +47,22 @@ import { orgModelAccessFormDraftKey } from '@/lib/persist/drafts';
 import { useFormDraft } from '@/lib/persist/use-form-draft';
 
 type Tab = 'models' | 'providers' | 'gateways';
+
+/**
+ * The largest font scale the footer's status line honours.
+ *
+ * The status slot reserves two `text-sm` line boxes at this cap and the status
+ * text is clamped by the same number, so the bar has one height per device and
+ * the Cancel/Save pair above it cannot move at any system font scale. 1.4 is
+ * the bounded-footer precedent (`CONSENT_DISCLOSURE_MAX_FONT_SCALE`).
+ */
+const STATUS_MAX_FONT_SCALE = 1.4;
+
+/**
+ * One `text-sm` line box at scale 1, in dp: `text-sm` is 0.875rem with a
+ * 1.25rem line height at the app's 14pt rem.
+ */
+const TEXT_SM_LINE_HEIGHT_DP = 17.5;
 
 /** The reason a save is refused, by the refusal `modelAccessSave` returned. */
 const BLOCKING_ISSUE_KEYS = {
@@ -100,9 +121,23 @@ export function ModelAccessForm({
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
-  // The lists take the tab-screen frame, which also carries the window side
-  // insets; the header above them takes the same ones so the controls and the
-  // rows stay in one column on a landscape display cutout.
+  // The pinned footer rides the keyboard: the lift around the body and the bar
+  // is the keyboard's own measured height less the bottom inset the footer
+  // already pads, so the actions sit just above the IME in every window. The
+  // body above them takes the room that is left and scrolls, so a short window
+  // leaves the list reachable instead of needing a reserve taken out of the pad.
+  const { bottom } = useSafeAreaInsets();
+  const fontScale = useLiveFontScale();
+  // The status slot reserves two `text-sm` lines at the capped scale, so the
+  // reserve and the text are bounded by the same number.
+  const statusSlotMinHeight =
+    TEXT_SM_LINE_HEIGHT_DP * 2 * Math.min(fontScale, STATUS_MAX_FONT_SCALE);
+  const keyboardHeight = useKeyboardState(state => state.height);
+  const keyboardLiftPad = Math.max(0, keyboardHeight - bottom);
+  const [tab, setTab] = useState<Tab>('models');
+  // The lists carry the window side insets on their own style; the header above
+  // them takes the same ones, so the controls and the rows stay in one column
+  // on a landscape display cutout.
   const sideInsetStyle = useSideInsetStyle();
   // The screen resolves the reader's role once and hands it down: this form
   // renders no billing step beside the failure line, so a money role reads the
@@ -110,7 +145,6 @@ export function ModelAccessForm({
   // must act.
   const save = useSaveOrgModelAccess(organizationId, canManageBilling);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<SettingsSaveFailure>();
-  const [tab, setTab] = useState<Tab>('models');
   // A provider saved in the allow list but no longer served by any catalog model
   // still gates routing, so the list keeps it instead of hiding a value the
   // admin can then never remove. The rows themselves come from the whole
@@ -307,126 +341,191 @@ export function ModelAccessForm({
 
   return (
     <View className="flex-1">
-      {/* The inset rides on this wrapper: inline padding on the padded block
-          would replace the page gutter its class draws. */}
-      <View style={sideInsetStyle}>
-        <View className="gap-3 px-4 pt-3">
-          {/* The warning tile marks missing data; the message takes the body
-            ink, because the muted neutral fails body-text contrast on it. */}
-          {notice === null ? null : (
-            <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
-              <Text className="flex-1 text-foreground">{notice}</Text>
-              <Button
-                variant="outline"
-                size="sm"
-                loading={catalogIsFetching}
-                onPress={onRetryCatalog}
-              >
-                <Text>{t('common.retry')}</Text>
-              </Button>
+      {/* The keyboard lifts the whole surface, not just the bar: the body shrinks
+          and the pinned footer rises with it. The lift is the keyboard's own
+          measured height less the bottom inset the footer already pads, so it
+          follows the keyboard instead of depending on a frame the platform
+          reports late — the same reasoning as the new-session form. With that
+          pad the bar's content ends exactly at the IME's top edge: the pad is the
+          keyboard's own height, and the footer pads the inset the reduction took
+          out, so neither one overlaps the other. */}
+      <KeyboardLiftView className="flex-1" height={keyboardLiftPad}>
+        {/* The header and the tab's body share one clipped region, and that
+            region is the only flexible child of the lifted column, so it takes
+            whatever room the bar leaves and nothing above can borrow the bar's:
+            `flex-1` grows into the free room, `min-h-0` lets yoga shrink the
+            region under its content's own height (a child keeps its intrinsic
+            box and would otherwise push the bar out), and `overflow-hidden` is
+            what actually keeps the content inside the region — a plain `flex-1`
+            View still paints its overflow over the bar. In a window too short for
+            the header, the list and the bar, the deficit therefore comes out of
+            this region: its bottom edge cuts the header, then the list, instead
+            of pushing the pinned actions down into the pad. */}
+        <View className="flex-1 min-h-0 overflow-hidden">
+          {/* The inset rides on this wrapper: inline padding on the padded block
+              would replace the page gutter its class draws. */}
+          <View style={sideInsetStyle}>
+            <View className="gap-3 px-4 pt-3">
+              {/* The warning tile marks missing data; the message takes the body
+                  ink, because the muted neutral fails body-text contrast on it. */}
+              {notice === null ? null : (
+                <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
+                  <Text className="flex-1 text-foreground">{notice}</Text>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={catalogIsFetching}
+                    onPress={onRetryCatalog}
+                  >
+                    <Text>{t('common.retry')}</Text>
+                  </Button>
+                </View>
+              )}
+              <SegmentedControl
+                options={[
+                  { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
+                  { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
+                  { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
+                ]}
+                value={tab}
+                onChange={nextTab => {
+                  // A tab change is the person looking elsewhere: a draft that lands
+                  // after it must not move the lists under the tab they chose. A
+                  // viewer has no edits of their own on the form, because the lists
+                  // show the saved policy either way, so looking at another tab is
+                  // not the person touching anything: marking the form touched would
+                  // keep a stored draft from being adopted if the role arrives later
+                  // in the same mount, and the person's next edit would overwrite it.
+                  if (canEdit) {
+                    touchedRef.current = true;
+                  }
+                  setTab(nextTab);
+                }}
+                accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
+              />
+              {canEdit ? null : (
+                <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>
+              )}
             </View>
-          )}
-          <SegmentedControl
-            options={[
-              { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
-              { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
-              { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
-            ]}
-            value={tab}
-            onChange={nextTab => {
-              // A tab change is the person looking elsewhere: a draft that lands
-              // after it must not move the lists under the tab they chose. A
-              // viewer has no edits of their own on the form, because the lists
-              // show the saved policy either way, so looking at another tab is
-              // not the person touching anything: marking the form touched would
-              // keep a stored draft from being adopted if the role arrives later
-              // in the same mount, and the person's next edit would overwrite it.
-              if (canEdit) {
-                touchedRef.current = true;
-              }
-              setTab(nextTab);
-            }}
-            accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
-          />
-          {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
-          {/* The buttons keep their place while the draft is clean, so a save
-            that settles never moves the list below them. */}
-          <View className="flex-row items-center gap-2">
-            <View className="min-h-5 flex-1 justify-center">
-              <AccessibleStatus
-                message={statusMessage}
-                tone={feedback.status === 'failed' ? 'error' : 'status'}
-                className="text-sm"
+          </View>
+
+          {tab === 'models' ? (
+            <ModelDenyList
+              models={denyRows}
+              draft={draft}
+              onChange={onDraftChange}
+              disabled={!canEdit || saving}
+            />
+          ) : null}
+          {/* An empty row set shows the screen-level notice above instead of a list
+              whose only row would be a misleading empty-policy message. */}
+          {tab === 'providers' && !providersEmpty ? (
+            <View className="flex-1">
+              {/* The refusal under the tabs carries this sentence only while no
+                  failure owns that line: a failed save shows its own message, so the
+                  caption stays to keep the read-only explanation on screen. */}
+              {providerRowsIncomplete &&
+              !(
+                savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed'
+              ) ? (
+                // The inset rides on this wrapper: an inline padding on the text
+                // would replace the page gutter its class draws.
+                <View style={sideInsetStyle}>
+                  <Text variant="caption" className="px-4 pb-2">
+                    {t('organizationModelAccess.providersNeedCatalog')}
+                  </Text>
+                </View>
+              ) : null}
+              <ProviderAllowList
+                providers={providers}
+                names={providerNames}
+                draft={draft}
+                onChange={onDraftChange}
+                disabled={!canEdit || saving || providerRowsIncomplete}
               />
             </View>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!dirty || saving}
-              onPress={() => {
-                clearWhere(() => true);
-                // Cancel is a deliberate discard: the stored copy goes with the
-                // screen's, or a language-direction reload would restore exactly
-                // the edits the person just threw away.
-                touchedRef.current = true;
-                formDraft.clear();
-                setForm(previous => ({ ...previous, draft: previous.baseline }));
-              }}
-            >
-              <Text>{t('common.cancel')}</Text>
-            </Button>
-            <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
-              <Text>{t('common.save')}</Text>
-            </Button>
-          </View>
-        </View>
-      </View>
-
-      {tab === 'models' ? (
-        <ModelDenyList
-          models={denyRows}
-          draft={draft}
-          onChange={onDraftChange}
-          disabled={!canEdit || saving}
-        />
-      ) : null}
-      {/* An empty row set shows the screen-level notice above instead of a list
-          whose only row would be a misleading empty-policy message. */}
-      {tab === 'providers' && !providersEmpty ? (
-        <View className="flex-1">
-          {/* The refusal under the tabs carries this sentence only while no
-              failure owns that line: a failed save shows its own message, so the
-              caption stays to keep the read-only explanation on screen. */}
-          {providerRowsIncomplete &&
-          !(savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed') ? (
-            // The inset rides on this wrapper: an inline padding on the text
-            // would replace the page gutter its class draws.
-            <View style={sideInsetStyle}>
-              <Text variant="caption" className="px-4 pb-2">
-                {t('organizationModelAccess.providersNeedCatalog')}
-              </Text>
-            </View>
           ) : null}
-          <ProviderAllowList
-            providers={providers}
-            names={providerNames}
-            draft={draft}
-            onChange={onDraftChange}
-            disabled={!canEdit || saving || providerRowsIncomplete}
-          />
+          {tab === 'gateways' ? (
+            <GatewaySettingsSection
+              organizationId={organizationId}
+              canManageBilling={canManageBilling}
+              settings={gateway}
+              isError={gatewayIsError}
+              isFetching={gatewayIsFetching}
+              canEdit={canEdit}
+              onRetry={onRetryGateway}
+            />
+          ) : null}
         </View>
-      ) : null}
-      {tab === 'gateways' ? (
-        <GatewaySettingsSection
-          organizationId={organizationId}
-          canManageBilling={canManageBilling}
-          settings={gateway}
-          isError={gatewayIsError}
-          isFetching={gatewayIsFetching}
-          canEdit={canEdit}
-          onRetry={onRetryGateway}
-        />
-      ) : null}
+        {/* The commit actions are the screen's one pinned footer, outside the
+            clipped region above, because both lists save together: a save that
+            settles must never move the rows it just wrote. The Gateways tab
+            saves each control as it changes, so it has nothing to commit and no
+            footer. It follows that region as a sibling, so the region takes the
+            slack and the bar keeps its whole height: the bar sets no shrink of
+            its own (React Native's `flexShrink` default is 0), so the only place
+            a short window can take room from is the region above it. */}
+        {tab === 'gateways' ? null : (
+          <ScreenFooter keyboard="host">
+            <View className="gap-3">
+              <View className="flex-row gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={!dirty || saving}
+                  onPress={() => {
+                    clearWhere(() => true);
+                    // Cancel is a deliberate discard: the stored copy goes with
+                    // the screen's, or a language-direction reload would restore
+                    // exactly the edits the person just threw away.
+                    touchedRef.current = true;
+                    formDraft.clear();
+                    setForm(previous => ({ ...previous, draft: previous.baseline }));
+                  }}
+                >
+                  <Text>{t('common.cancel')}</Text>
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabledFace="primary"
+                  loading={saving}
+                  disabled={cannotSave}
+                  onPress={() => void onSave()}
+                >
+                  <Text>{t('common.save')}</Text>
+                </Button>
+              </View>
+              {/* The status line keeps its place while the draft is clean, so a
+                  save that settles never moves the actions: the reservation sits
+                  here rather than on the line's own content. It follows the
+                  actions, as the consent footer's does, because a reserve above
+                  them leaves a band of empty page under the list's last row, and
+                  the row card then reads as clipped short of the bar.
+                  The reserve and the text share one font-scale cap, so the bar is
+                  one height per device at every system font scale: two `text-sm`
+                  line boxes, both the slot's `minHeight` and the status's
+                  `maxFontSizeMultiplier` off `STATUS_MAX_FONT_SCALE`. At scale 1
+                  the reserve equals the old `min-h-10` floor, and above it the cap
+                  holds, so the action pair above cannot move whatever the message:
+                  one that needs a third line ends in the tail ellipsis instead of
+                  raising the pair. `useStatusAnnouncement` still announces the
+                  whole sentence to assistive technology whatever the rendered
+                  height, a refused save also shows its full copy in the mutation's
+                  own error toast, and the outage itself is named, with its Retry,
+                  in the notice above the tabs. */}
+              <View className="justify-center" style={{ minHeight: statusSlotMinHeight }}>
+                <AccessibleStatus
+                  message={statusMessage}
+                  tone={feedback.status === 'failed' ? 'error' : 'status'}
+                  numberOfLines={2}
+                  maxFontSizeMultiplier={STATUS_MAX_FONT_SCALE}
+                  className="text-sm"
+                />
+              </View>
+            </View>
+          </ScreenFooter>
+        )}
+      </KeyboardLiftView>
       {guard.dialog}
     </View>
   );

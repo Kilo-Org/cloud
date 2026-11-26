@@ -285,6 +285,7 @@ describe('Button native target contract', () => {
     expect(classes).toContain('bg-muted');
     expect(classes).not.toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
+    expect(classes).not.toContain('bg-primary-disabled-action');
     expect(classes).not.toContain('opacity-50');
     const labelClasses = (button.findByType(NativeText).props.className as string).split(' ');
     expect(labelClasses).toContain('text-muted-foreground');
@@ -295,6 +296,33 @@ describe('Button native target contract', () => {
     expect((busy.findByType(NativeText).props.className as string).split(' ')).not.toContain(
       'text-muted-foreground'
     );
+  });
+
+  it('gives a screen primary action the plate its footer needs while it is disabled', () => {
+    // A full-width disabled primary in a pinned footer sits beside an outlined
+    // Cancel. The shared muted fill is only 1.1:1 off the page, so the caller
+    // asks for the plated face and the plate carries its own label ink.
+    const plated = renderButton({ disabled: true, disabledFace: 'primary' });
+    const classes = (plated.props.className as string).split(' ');
+    expect(classes).toContain('bg-primary-disabled-action');
+    // The plate must replace the brand fill, not sit beside it: with both
+    // present the stylesheet's order decides the paint, and a disabled Save
+    // that paints brand yellow is the failure this plate exists to prevent.
+    expect(classes).not.toContain('bg-primary');
+    expect(classes).not.toContain('bg-muted');
+    expect(classes).not.toContain('opacity-50');
+    const labelClasses = (plated.findByType(NativeText).props.className as string).split(' ');
+    expect(labelClasses).toContain('text-foreground');
+    expect(labelClasses).not.toContain('text-primary-foreground');
+    expect(labelClasses).not.toContain('text-muted-foreground');
+
+    // The face is ignored where it would lie about the control's state.
+    const enabled = renderButton({ disabledFace: 'primary' });
+    expect((enabled.props.className as string).split(' ')).toContain('bg-primary');
+    const busy = renderButton({ disabled: true, loading: true, disabledFace: 'primary' });
+    expect((busy.props.className as string).split(' ')).not.toContain('bg-primary-disabled-action');
+    const outlined = renderButton({ variant: 'outline', disabled: true, disabledFace: 'primary' });
+    expect((outlined.props.className as string).split(' ')).toContain('opacity-50');
   });
 
   it('keeps a busy primary on its brand fill so it still reads as working', () => {

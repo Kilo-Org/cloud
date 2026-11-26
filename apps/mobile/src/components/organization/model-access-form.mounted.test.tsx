@@ -10,8 +10,10 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
+import { compileClassName } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { ModelAccessForm } from './model-access-form';
 import {
   type AvailableModel,
@@ -25,6 +27,17 @@ import {
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
+
+/**
+ * The keyboard the form reads and the window's font scale. The lift is the
+ * keyboard's own measured height less the bottom inset the footer already pads,
+ * so a suite that asserts the pad drives the keyboard and that inset; the status
+ * slot's reserve follows the font scale, so the same fixture drives that too.
+ */
+const geometry = vi.hoisted(() => ({ keyboardHeight: 0, fontScale: 1 }));
+
+/** The window's bottom inset, which the pinned footer's own padding covers. */
+const insets = vi.hoisted(() => ({ bottom: 0 }));
 
 /**
  * What the durable draft answers. Both states carry `save`/`clear`: the real
@@ -66,7 +79,27 @@ vi.mock('@/lib/persist/drafts', () => ({
 // role, because this suite's subject is the refusal copy a billing role reads
 // and no billing step is rendered here.
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  // The status slot reads the font scale from this window (the live scale
+  // module has no native module here, so it falls back to it). The height is a
+  // fixed one no test drives: the lift is the keyboard's own height, never a
+  // measured frame, so a suite that changed it would prove nothing.
+  useWindowDimensions: () => ({ width: 400, height: 800, fontScale: geometry.fontScale }),
+}));
+// The pinned footer pads the bottom inset itself, so the lift subtracts it. A
+// suite that asserts the subtraction drives this one number.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: insets.bottom, left: 0 }),
+}));
+// The form reads one keyboard number: this store drives it, as the real
+// `useKeyboardState` selector would deliver it.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T,>(selector?: (state: { height: number }) => T) => {
+    const snapshot = { height: geometry.keyboardHeight };
+    return selector ? selector(snapshot) : snapshot;
+  },
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', async () => {
   const { createElement: h } = await import('react');
@@ -76,6 +109,9 @@ vi.mock('@/components/ui/button', async () => {
   };
 });
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
+// The pinned footer is a bar the suites query by type; its own band, hairline
+// and keyboard rule have their own suite, so this one stubs the bar.
+vi.mock('@/components/ui/screen-footer', () => ({ ScreenFooter: 'ScreenFooter' }));
 vi.mock('@/components/ui/text', async () => {
   const { createElement: h } = await import('react');
   return {
@@ -218,7 +254,7 @@ function list(root: ReactTestInstance, type: 'ModelDenyList' | 'ProviderAllowLis
   return root.findByType(type as never);
 }
 
-function selectTab(root: ReactTestInstance, tab: 'models' | 'providers') {
+function selectTab(root: ReactTestInstance, tab: 'models' | 'providers' | 'gateways') {
   act(() => {
     (root.findByType('SegmentedControl' as never).props.onChange as (next: string) => void)(tab);
   });
@@ -242,12 +278,9 @@ function changeProviders(root: ReactTestInstance, next: ModelAccessDraft) {
   });
 }
 
+/** The commit action: the footer's filled primary, found by the label it renders. */
 async function pressSave(root: ReactTestInstance) {
-  const buttons = root.findAllByType('Button' as never);
-  const save = buttons.at(-1);
-  if (!save) {
-    throw new Error('save button not found');
-  }
+  const save = buttonWithLabel(root, i18n.t('common.save'));
   await act(async () => {
     (save.props.onPress as () => void)();
     await Promise.resolve();
@@ -255,14 +288,9 @@ async function pressSave(root: ReactTestInstance) {
   return save;
 }
 
-/** The Cancel action: the outline button the form draws beside Save. */
+/** The Cancel action: the footer's outline button, found by the label it renders. */
 function pressCancel(root: ReactTestInstance) {
-  const cancel = root
-    .findAllByType('Button' as never)
-    .find(node => node.props.variant === 'outline');
-  if (!cancel) {
-    throw new Error('cancel button not found');
-  }
+  const cancel = buttonWithLabel(root, i18n.t('common.cancel'));
   act(() => {
     (cancel.props.onPress as () => void)();
   });
@@ -270,6 +298,29 @@ function pressCancel(root: ReactTestInstance) {
 
 function statusMessage(root: ReactTestInstance): unknown {
   return root.findByType('AccessibleStatus' as never).props.message;
+}
+
+/** The reserve view around the footer status: the slot the actions sit above. */
+function statusSlot(root: ReactTestInstance): ReactTestInstance {
+  const slot = root.findByType('AccessibleStatus' as never).parent;
+  if (slot === null || String(slot.type) !== 'View') {
+    throw new Error('the status line does not sit in the reserve view');
+  }
+  return slot;
+}
+
+/** The slot's reserved height in dp, read through the same style object the
+ *  form hands the layout pass. */
+function statusSlotMinHeight(root: ReactTestInstance): number {
+  const style: unknown = statusSlot(root).props.style;
+  if (typeof style !== 'object' || style === null || !('minHeight' in style)) {
+    throw new Error('the status slot sets no minHeight');
+  }
+  const { minHeight } = style;
+  if (typeof minHeight !== 'number') {
+    throw new TypeError('the status slot sets a non-numeric minHeight');
+  }
+  return minHeight;
 }
 
 /** The one button that carries `label`, so a state's way out is unambiguous. */
@@ -285,6 +336,32 @@ function buttonWithLabel(root: ReactTestInstance, label: string) {
   return button;
 }
 
+/** The lift the form asks for: the pad its `KeyboardLiftView` reserves. */
+function liftPad(root: ReactTestInstance): number {
+  return root.findByType(KeyboardLiftView as never).props.height as number;
+}
+
+/**
+ * The one region inside the lift that holds both the tab header and the tab's
+ * body: the lowest enclosing view of the segmented control that also holds the
+ * list. Finding it by structure rather than by class keeps the assertion about
+ * the region's place in the column, not about the string that spells it.
+ */
+function bodyRegion(
+  root: ReactTestInstance,
+  listType: 'ModelDenyList' | 'ProviderAllowList' = 'ModelDenyList'
+): ReactTestInstance {
+  const control = root.findByType('SegmentedControl' as never);
+  let node = control.parent;
+  while (node !== null) {
+    if (String(node.type) === 'View' && node.findAllByType(listType as never).length === 1) {
+      return node;
+    }
+    node = node.parent;
+  }
+  throw new Error('the tab header and the tab body share no enclosing region');
+}
+
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
@@ -293,6 +370,9 @@ afterEach(() => {
   draftStore.value = null;
   draftStore.save.mockReset();
   draftStore.clear.mockReset();
+  geometry.keyboardHeight = 0;
+  geometry.fontScale = 1;
+  insets.bottom = 0;
 });
 
 describe('ModelAccessForm save', () => {
@@ -373,6 +453,76 @@ describe('ModelAccessForm save', () => {
     expect(save.props.disabled).toBe(true);
     expect(saved.mutateAsync).not.toHaveBeenCalled();
     expect(String(statusMessage(root))).toContain('Leave at least one model on');
+  });
+
+  it('pins both commit actions in the screen footer, and gives the Gateways tab none', () => {
+    const root = render(undefined);
+
+    // The two lists save together, so they commit from the screen's one footer
+    // rather than from a row inside the body above them.
+    const footers = root.findAllByType('ScreenFooter' as never);
+    expect(footers).toHaveLength(1);
+    const footer = footers[0];
+    if (footer === undefined) {
+      throw new Error('footer missing');
+    }
+    // The helper throws when the label is missing, so a footer that lost an
+    // action fails here instead of passing on a default.
+    const save = buttonWithLabel(footer, i18n.t('common.save'));
+    const cancel = buttonWithLabel(footer, i18n.t('common.cancel'));
+    // Save is the filled primary, which is the Button component's own default:
+    // this suite stubs the Button, so the absent prop is the default variant.
+    expect(save.props.variant ?? 'default').toBe('default');
+    expect(cancel.props.variant).toBe('outline');
+    // The pair shares the bar's width evenly.
+    expect(save.props.className).toContain('flex-1');
+    expect(cancel.props.className).toContain('flex-1');
+
+    // The Gateways tab commits each control as it changes, so it has no footer.
+    selectTab(root, 'gateways');
+    expect(root.findAllByType('GatewaySettingsSection' as never)).toHaveLength(1);
+    expect(root.findAllByType('ScreenFooter' as never)).toHaveLength(0);
+  });
+
+  // The slot's reserve and the status's own scale cap come from one number, so
+  // a two-line refusal reserves exactly what the text may occupy on that
+  // device and the action pair above never moves.
+  function denyEveryModel(root: ReactTestInstance) {
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, setModelsAllowed(draft, ['anthropic/claude', 'openai/gpt'], false));
+  }
+
+  it('reserves two text-sm lines at the default scale and caps the status there', () => {
+    geometry.fontScale = 1;
+    const root = render(undefined);
+    denyEveryModel(root);
+
+    // The status is a real refusal, not the empty line: the reserve is what the
+    // sentence may take on this device.
+    expect(statusMessage(root)).toBe(i18n.t('organizationModelAccess.emptyModelList'));
+    const status = root.findByType('AccessibleStatus' as never);
+    expect(status.props.numberOfLines).toBe(2);
+    expect(status.props.maxFontSizeMultiplier).toBe(1.4);
+    expect(statusSlotMinHeight(root)).toBe(35);
+  });
+
+  it('holds the reserve at the cap when the system scale is past it', () => {
+    geometry.fontScale = 2;
+    const root = render(undefined);
+    denyEveryModel(root);
+
+    // Two 17.5dp lines at the 1.4 cap: 49dp, the same bar as at scale 1.4,
+    // because the text is clamped to that scale too.
+    expect(statusSlotMinHeight(root)).toBe(49);
+    expect(root.findByType('AccessibleStatus' as never).props.maxFontSizeMultiplier).toBe(1.4);
+  });
+
+  it('follows the scale down below 1, shrinking the reserve with the text', () => {
+    geometry.fontScale = 0.85;
+    const root = render(undefined);
+    denyEveryModel(root);
+
+    expect(statusSlotMinHeight(root)).toBeCloseTo(17.5 * 2 * 0.85);
   });
 });
 
@@ -482,8 +632,8 @@ describe('ModelAccessForm with both rebases in one render', () => {
     expect(draft.modelDenyList).toEqual(['openai/gpt']);
 
     // The form is clean on what the server answered, so save is off.
-    const cleanSave = root.findAllByType('Button' as never).at(-1);
-    expect(cleanSave?.props.disabled).toBe(true);
+    const cleanSave = buttonWithLabel(root, i18n.t('common.save'));
+    expect(cleanSave.props.disabled).toBe(true);
 
     // An edit writes the deny list the refetch brought, not the empty one the
     // form started from.
@@ -839,7 +989,7 @@ describe('ModelAccessForm durable draft', () => {
 
     expect(list(root, 'ModelDenyList').props.draft).toEqual(stored);
     // The restored lists differ from the saved ones, so the save is armed.
-    expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+    expect(buttonWithLabel(root, i18n.t('common.save')).props.disabled).toBe(false);
     // Nothing was typed, so nothing is written back over the restored draft.
     expect(draftStore.save).not.toHaveBeenCalled();
   });
@@ -1002,7 +1152,7 @@ describe('ModelAccessForm durable draft', () => {
     it('leaves Save disabled', () => {
       const root = renderAsViewer();
 
-      expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+      expect(buttonWithLabel(root, i18n.t('common.save')).props.disabled).toBe(true);
     });
 
     it('keeps the stored draft for a later editor session', () => {
@@ -1023,14 +1173,14 @@ describe('ModelAccessForm durable draft', () => {
       const root = render(['anthropic']);
       const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
       changeDraft(root, toggleModel(draft, 'openai/gpt', false));
-      expect(root.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+      expect(buttonWithLabel(root, i18n.t('common.save')).props.disabled).toBe(false);
 
       // The edit is still there, so the dirty flag alone no longer refuses the
       // write: the role has to, or the person could save from a screen that
       // told them the policy is read-only.
       const viewerRoot = rerender(['anthropic'], { canEdit: false });
 
-      expect(viewerRoot.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+      expect(buttonWithLabel(viewerRoot, i18n.t('common.save')).props.disabled).toBe(true);
       // The demoted session shows the organization's saved policy, not the edit
       // it made while it held the role.
       expect(list(viewerRoot, 'ModelDenyList').props.draft).toEqual({
@@ -1039,10 +1189,7 @@ describe('ModelAccessForm durable draft', () => {
       });
       // A clean draft disables Cancel, so no viewer press can clear the account's
       // stored copy of the person's work.
-      const cancel = viewerRoot
-        .findAllByType('Button' as never)
-        .find(node => node.props.variant === 'outline');
-      expect(cancel?.props.disabled).toBe(true);
+      expect(buttonWithLabel(viewerRoot, i18n.t('common.cancel')).props.disabled).toBe(true);
       expect(draftStore.clear).not.toHaveBeenCalled();
       await pressSave(viewerRoot);
       expect(saved.mutateAsync).not.toHaveBeenCalled();
@@ -1104,5 +1251,137 @@ describe('ModelAccessForm durable draft', () => {
       });
       expect(draftStore.clear).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('ModelAccessForm keyboard lift', () => {
+  it("lifts by the keyboard's own height, with no bottom inset to subtract", () => {
+    // The pinned footer is `keyboard="host"`, so this pad is its only lift: it
+    // has to be the whole keyboard band, or the bar spans the IME on a short
+    // window (272pt tall with a 162pt keyboard left it 20pt of the 104pt bar).
+    geometry.keyboardHeight = 300;
+    insets.bottom = 0;
+
+    expect(liftPad(render(undefined))).toBe(300);
+  });
+
+  it('subtracts the bottom inset the footer already pads itself', () => {
+    // The provider's Android height spans the translucent navigation bar, and
+    // the bar below the list pads that inset already: an unreduced pad would
+    // float the actions a navigation-bar height above the keyboard.
+    geometry.keyboardHeight = 300;
+    insets.bottom = 34;
+
+    expect(liftPad(render(undefined))).toBe(266);
+  });
+
+  it('never pads negatively when the inset is taller than the keyboard', () => {
+    geometry.keyboardHeight = 20;
+    insets.bottom = 34;
+
+    expect(liftPad(render(undefined))).toBe(0);
+  });
+
+  it('reads no frame, header or footer layout: the pad follows the keyboard alone', () => {
+    // A measured frame is what forced the old clamp: the pad had to fit inside
+    // the band the header and the bar left. The body above the bar now takes
+    // whatever room is left and scrolls, so nothing in this form is measured
+    // for the lift, and a layout pass that never lands cannot strand it.
+    const root = render(undefined);
+    const lift = root.findByType(KeyboardLiftView as never);
+
+    expect(lift.findAll(node => 'onLayout' in node.props)).toHaveLength(0);
+    expect(lift.parent?.props).not.toHaveProperty('onLayout');
+
+    geometry.keyboardHeight = 300;
+    const driven = rerender(undefined);
+
+    expect(liftPad(driven)).toBe(300);
+  });
+
+  it('lifts by the same band on the Gateways tab, which draws no footer', () => {
+    // The Gateways tab saves each control as it changes and renders no bar, but
+    // the keyboard still covers the same band: the lift is the keyboard's, not
+    // the footer's, so switching tabs cannot change it.
+    geometry.keyboardHeight = 300;
+    insets.bottom = 20;
+    const root = render(undefined);
+
+    expect(liftPad(root)).toBe(280);
+
+    selectTab(root, 'gateways');
+
+    expect(liftPad(root)).toBe(280);
+  });
+
+  it('lays the pinned footer out after the body region, never inside it', () => {
+    // The deficit of a short window has to come out of the body region. That
+    // holds only while the footer is a sibling that follows it: a footer nested
+    // in the region would be clipped by it, and a footer placed first would let
+    // the region's content paint over its edge. So the lifted column's own
+    // children are read in order — the region that holds the tab header, then
+    // the bar, and nothing else.
+    geometry.keyboardHeight = 300;
+    const root = render(undefined);
+    const region = bodyRegion(root);
+    const column = region.parent;
+    if (column === null) {
+      throw new Error('the body region has no column');
+    }
+    const siblings = column.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+    const regionIndex = siblings.findIndex(
+      child => child.findAllByType('SegmentedControl' as never).length === 1
+    );
+    const footerIndex = siblings.findIndex(
+      child => child.findAllByType('ScreenFooter' as never).length === 1
+    );
+
+    expect(regionIndex).toBe(0);
+    expect(footerIndex).toBe(regionIndex + 1);
+    expect(siblings).toHaveLength(2);
+    // The column is the lifted one, and the bar is not inside the region.
+    const ancestors: unknown[] = [];
+    for (let node: ReactTestInstance | null = column; node; node = node.parent) {
+      ancestors.push(node.type);
+    }
+    expect(ancestors).toContain(KeyboardLiftView);
+    expect(region.findAllByType('ScreenFooter' as never)).toHaveLength(0);
+    expect(region.findAllByType('ModelDenyList' as never)).toHaveLength(1);
+  });
+
+  it('gives the body region the only flexible, shrinkable and clipped box in the column', async () => {
+    // Two facts decide whether the bar reaches the pad. `flex-1` makes the
+    // region the child that takes the column's free room; `flexShrink` and
+    // `min-height: 0` are what let yoga take the deficit out of it instead of
+    // out of the bar (React Native's `flexShrink` default is 0, so a region
+    // without them keeps its content's height and pushes the bar down);
+    // `overflow-hidden` is what keeps the overflowing content from painting over
+    // the bar once the bar is in the right place.
+    //
+    // The renderer's `View` mock is a host string, so the class string is the
+    // only prop this tree exposes. The app's own class compiler turns that
+    // string into the declarations the layout pass applies, so the assertions
+    // read the resolved style rather than the spelling.
+    geometry.keyboardHeight = 300;
+    const region = bodyRegion(render(undefined));
+    const declarations = await compileClassName(String(region.props.className));
+
+    expect(declarations).toContainEqual(
+      expect.objectContaining({ flexGrow: 1, flexShrink: 1, minHeight: 0, overflow: 'hidden' })
+    );
+  });
+
+  it('keeps the header and the providers list in the one region the bar follows', () => {
+    // The Providers tab renders its own `flex-1` frame under the header: the
+    // region still has to be the one box holding both, with the bar after it.
+    const root = render(['anthropic']);
+    selectTab(root, 'providers');
+
+    const region = bodyRegion(root, 'ProviderAllowList');
+    expect(region.findAllByType('ProviderAllowList' as never)).toHaveLength(1);
+    expect(region.findAllByType('SegmentedControl' as never)).toHaveLength(1);
+    expect(region.findAllByType('ScreenFooter' as never)).toHaveLength(0);
   });
 });

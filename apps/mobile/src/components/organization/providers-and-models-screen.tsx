@@ -30,9 +30,10 @@ import {
 const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
 
 /**
- * The form's own loading frame: the segmented control's reserved height, the
- * save row's buttons and the grouped rows the first tab lists, in the body's
- * own spacing, so the swap to the form moves nothing.
+ * The form's own loading frame: the segmented control's reserved height and the
+ * grouped rows the first tab lists, in the body's own spacing, so the swap to
+ * the form moves nothing. The commit actions are the pinned footer, whose band
+ * does not depend on this body.
  */
 function ModelAccessSkeleton() {
   // The form's own frame sits inside the window's side insets; the placeholder
@@ -42,10 +43,6 @@ function ModelAccessSkeleton() {
     <View style={sideInsetStyle}>
       <View className="gap-3 px-4 pt-3">
         <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'w-full rounded-lg bg-muted-soft')} />
-        <View className="flex-row items-center justify-end gap-2">
-          <Skeleton className="h-9 w-20 rounded-md bg-muted-soft" />
-          <Skeleton className="h-9 w-16 rounded-md bg-muted-soft" />
-        </View>
         <RowGroup>
           {[0, 1, 2, 3, 4].map(index => (
             <RowSkeleton key={index} subtitle trailing="switch" />

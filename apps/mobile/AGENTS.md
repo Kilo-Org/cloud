@@ -122,19 +122,20 @@ Omit empty-state descriptions that repeat the title or tell the user to use a di
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
 `KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
-manual-review surfaces. The new-session form and the PR-discussion comment bar render
-`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
-and animates it with the keyboard's own motion progress. The Agents list and the stored history render
+manual-review surfaces. The new-session form, the PR-discussion comment bar and the providers-and-models form
+render `@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard
+state and animates it with the keyboard's own motion progress. The Agents list and the stored history render
 `@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
 writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
-the property it last applied stays on the native view). The pad never takes more room than the body can spare:
-it is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in `@/lib/body-viewport`, the same floor
-`TabScreenScrollView` applies to its frame), because a keyboard height belongs to the window it was measured in
-and a rotation replaces that window with a much shorter one — an unclamped pad then fills the body and the list
-renders nothing, with no rows, skeleton, empty state or error. The clamp measures the body frame and keys that
-measurement to `useWindowDimensions().height`: the layout pass that reports a new frame runs after the first
-render a rotation produces, so a frame measured in the previous window is released for that render instead of
-being trusted. `useKeyboardState` is the app's one keyboard-height read.
+the property it last applied stays on the native view). The pads of those owned-lift surfaces never take more
+room than the body can spare: each is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in
+`@/lib/body-viewport`, the same floor `TabScreenScrollView` applies to its frame), because a keyboard height
+belongs to the window it was measured in and a rotation replaces that window with a much shorter one — an
+unclamped pad then fills the body and the list renders nothing, with no rows, skeleton, empty state or error.
+That clamp measures the body frame and keys the measurement to `useWindowDimensions().height`: the layout pass
+that reports a new frame runs after the first render a rotation produces, so a frame measured in the previous
+window is released for that render instead of being trusted. `useKeyboardState` is the app's one keyboard-height
+read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
 pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to

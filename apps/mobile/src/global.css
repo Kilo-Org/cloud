@@ -34,6 +34,23 @@
    * the ink label (primary-foreground) legible: white on this fill clears 4.5:1,
    * so a disabled control reads as inactive without losing its label. */
   --primary-disabled: #6f6a61;
+  /* Fill of a disabled primary action the caller declares its screen's one
+   * primary action (a default-variant Button with `disabledFace="primary"`).
+   * A step lighter than `--primary-disabled`, because the enabled brand fill it
+   * replaces (#4f5a10) is itself dark: the palette's disabled neutral sat 1.4:1
+   * from the brand by luminance and carried the same white label, so enabled
+   * and disabled differed by hue alone and a greyscale reader saw no change.
+   * This step keeps headroom above the palette's 3:1 non-text floor — 3.2:1
+   * off the page and 3.4:1 off the card — so the disabled Save keeps the plate
+   * that makes it read as a control, while it sits 2.2:1 from the brand by
+   * luminance and takes `--foreground` ink (5.6:1) where the enabled label is
+   * white: two cues that survive greyscale. A lighter plate would gain a little
+   * more luminance separation but lose the standoff that makes the plate an
+   * object, and the 3:1 floor together with the 4.5:1 ink floor caps the
+   * separation at about 2.4:1. It is its own token because the dark plate
+   * that face needs differs from the dark `--primary-disabled`, which is too
+   * bright a neutral to sit on the near-black page (see the dark block). */
+  --primary-disabled-action: #918c82;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
   /* Solid destructive control fill. Separate from `--destructive` because the
@@ -201,6 +218,17 @@
      * The fill stays neutral and muted: a tinted fill reads as a second brand
      * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
+    /* Dark counterpart of a disabled primary action's fill. `--primary-disabled`
+     * (a light neutral, 5.3:1 above the near-black page) outshines every other
+     * element and reads as an enabled control, while the muted surface the
+     * shared disabled face paints (`--muted`, also `--secondary`) sits 1.2:1 off
+     * the page and leaves a full-width plate without presence: a disabled Save
+     * beside an outlined Cancel read as no control at all. This step is the
+     * smallest lift that clears the palette's own 3:1 non-text floor for a
+     * control surface (3.2:1 off the page) while it stays a full 4.5:1 below the
+     * enabled #ffdd00, so it cannot read as tappable, and `--foreground` clears
+     * 5.3:1 on it. A heavier plate would outshine the page it sits on. */
+    --primary-disabled-action: #66625b;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     /* The deep red the light scheme fills with, lifted just enough to stand off
@@ -332,6 +360,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-disabled: var(--primary-disabled);
+  --color-primary-disabled-action: var(--primary-disabled-action);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-fill: var(--secondary-fill);

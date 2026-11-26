@@ -819,10 +819,38 @@ Page on the canary with an Axiom threshold monitor over the Worker's Logpush dat
 depend on the Logpush job): no `succeeded` event for `usage_ingest.sts_canary` in 15 minutes, or
 any `failed` event in 15 minutes, per environment, notifying the existing alert route.
 
-Cost per environment: 288 runs a day; each is one scheduled invocation, at most one STS mint
-call (one `token.issued` audit row; usually none, since a warm isolate holds its token), one web
-call, and four verify-route invocations here. The verify route fetches the STS key set at most
-once per isolate per 5 minutes.
+### Cost
+
+A token lives 300 s and renews at 240 s, and a held token stops being served 30 s before `exp`,
+so with a run every 300 s each side mints once per run, warm or cold. Per run and environment:
+
+| Item | Per run | Per day (288 runs) |
+|---|---|---|
+| usage-ingest invocations | 1 scheduled + 3 verify-route calls (4 once the web instance holds a token past `exp` + 60 s) | 288 + 864 to 1,152 |
+| Web function invocations | 1 | 288 |
+| STS mint calls | 2: one RPC over the binding (usage-ingest), one `POST /v1/token` (web); each one signer Durable Object request | 576 |
+| STS audit rows | 2 `token.issued` (a denial adds one `token.denied`) | 576 |
+| Audit queue messages | at most 2; the signer relays up to 500 events per message, so usually they share one with other rows | at most 576 |
+| STS key-set fetches | one per verifier isolate with no copy younger than 5 minutes: usually 2 (usage-ingest, the web instance). The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | about 576 |
+| Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's) | at most 288; in practice one per base-token renewal or new deployment |
+| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 or 2 writes on a miss | at most about 1,700 operations |
+| Log lines | 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`, 1 web `sts_canary` | about 1,700 |
+
+Both environments together double each daily figure.
+
+The client's cost on a real caller does not grow with its request rate. A request that finds a
+usable token reads an in-memory entry and makes no network call. Each caller instance makes one
+STS call per 240 s for up to 8 audiences it actually calls (one more call per further 8), and
+each verifier isolate fetches the key set once per 5 minutes. At one audience per caller:
+
+| Caller instances | STS mint calls (= signer requests = audit rows) | Audit queue messages at 500 events each |
+|---|---|---|
+| 10,000 | about 42 per second | about 0.1 per second |
+| 50,000 | about 208 per second | about 0.4 per second |
+| 200,000 | about 833 per second (843 with the 2,200 Vercel instances of design section 6.1) | about 1.7 per second |
+
+A Vercel caller adds one exchange per deployment, audience and base-token renewal, shared through
+the Runtime Cache, and one cache read per new instance.
 
 ## Deploy
 

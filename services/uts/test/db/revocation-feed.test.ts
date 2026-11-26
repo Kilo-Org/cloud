@@ -71,6 +71,12 @@ describe('the stamp trigger', () => {
       id,
     ]);
     expect(await read()).toEqual({ fresh: true, kept: { hours: 1, minutes: 10 } });
+    // An update that sets the feed time keeps the value it set.
+    await owner.query(
+      `UPDATE uts.revocations SET feed_expires_at = now() + interval '3 hours' WHERE subject_id = $1`,
+      [id]
+    );
+    expect(await read()).toEqual({ fresh: true, kept: { hours: 3 } });
   });
 });
 

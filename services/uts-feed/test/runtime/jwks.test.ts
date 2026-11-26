@@ -534,6 +534,19 @@ describe('failures', () => {
     expect(response.status).toBe(503);
   });
 
+  it("counts Age from the signers' held read time, not from fresh feed-object keys", async () => {
+    // Every signer answers only the keys its shard held from a read 120 s ago; the feed objects
+    // were read now.
+    const held = T0 - 120_000;
+    const answer = answered(allSigners(0, held), [feedEntry(0, 0, T0), feedEntry(1, 0, T0)]);
+    const response = await get(
+      mintBinding(async () => answer),
+      T0
+    );
+    expect(response.status).toBe(200);
+    expectKeySetHeaders(response, '120', '120');
+  });
+
   it('takes an answer without the feed objects, from a mint Worker of the previous release', async () => {
     const response = await get(
       mintBinding(async () => ({ status: 'answered', answer: { signers: allSigners() } }))

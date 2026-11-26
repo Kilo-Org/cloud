@@ -18,6 +18,7 @@ import {
   FEED_BACKFILL_STALL_MS,
   FEED_EXPIRY_INTERVAL_MS,
   FEED_LIST_KEEP_MS,
+  FEED_MAX_OLD_LIST_BYTES,
   FEED_RECENT_READ_MAX_GAP_MS,
   FEED_RECENT_WINDOW_MS,
   FeedLedger,
@@ -211,6 +212,32 @@ describe('lists', () => {
     expect(sidsOf(ledger, head, T0)).toEqual(['g-1']);
     expect(ledger.list('not a hash', T0)).toBeNull();
     expect(ledger.list('A'.repeat(43), T0)).toBeNull();
+  });
+
+  it('drops the oldest kept lists first once their text passes 16 MB', async () => {
+    // Each step adds about 2.3 MB of ids (45,000 entries in all, under the 50,000 cap), so the lists
+    // are about 2.3, 4.5, 6.8, 9.1 and 11.3 MB. With the last one current, the 9.1 and 6.8 MB lists
+    // fit under the bound beside it and the two oldest go.
+    const big = (step: number) =>
+      Array.from({ length: 9_000 }, (_, index) => grant(`${step}-${index}-${'x'.repeat(240)}`));
+    const ledger = backfilled();
+    const hashes: string[] = [];
+    for (let step = 0; step < 5; step += 1) {
+      ledger.take(big(step), T0 + step);
+      hashes.push((await signed(ledger, T0 + step)).listHash);
+    }
+    const now = T0 + 10;
+    expect(hashes.map(hash => ledger.list(hash, now) !== null)).toEqual([
+      false,
+      false,
+      true,
+      true,
+      true,
+    ]);
+    const heldBytes = hashes
+      .slice(2, 4)
+      .reduce((total, hash) => total + (ledger.list(hash, now)?.text.length ?? 0), 0);
+    expect(heldBytes).toBeLessThanOrEqual(FEED_MAX_OLD_LIST_BYTES);
   });
 
   it('keeps every list for 30 seconds after it was replaced, at more than 4 changes per second', async () => {

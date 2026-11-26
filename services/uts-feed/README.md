@@ -67,13 +67,18 @@ this Worker's deployed name as `props.caller`) and serves (`src/revocation.ts`):
 
 - **Head** (a compact JWS, `typ: kilo-feed-head+jwt`, payload `{iat, list_hash}`): feed object 0
   gets 1 second to answer, then feed object 1 is read. An object that failed, answered
-  `unavailable`, or answered a head over 10 seconds old is skipped for 30 seconds, unless both
-  failed. The head stays in each data center's cache for 5 seconds; a cached head past 10 seconds
-  is not served. Both failing answers `unavailable`; both refusing to load answers `misconfigured`.
+  `unavailable`, or answered a head over 20 seconds old is skipped for 30 seconds, unless both
+  failed. A head's `iat` is the start of its object's last good backfill. The head stays in each
+  data center's cache for 5 seconds, under a key that carries this deployment's version id, and its
+  `iat` and hash are read from the head itself; a cached head past 20 seconds is not served. Both
+  failing answers `unavailable`; both refusing to load answers `misconfigured`.
 - **List** by its hash: from the data center's cache (10 minutes) when its bytes still hash to the
   name, otherwise from the objects; bytes that do not match the hash are refused and the other
-  object is read. `not_found` only when every object holds no such list.
+  object is read; objects skipped after a failure are read last. `not_found` only when every object
+  holds no such list.
 - **Bootstrap**: the key set, the head and the list it covers in one answer, whole or not at all.
+- **Key set over RPC** (`FeedReader.jwks()`): the held key set and its two ages, with no feed-object
+  read; `unavailable` while no signer key is held.
 
 Transports (`@kilocode/uts-contracts`, the shapes of `@kilocode/verify`'s ports):
 

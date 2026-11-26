@@ -142,10 +142,18 @@ only it writes entries. Each one:
   or every live entry after a restart or a gap over 15 minutes (`src/revocation/store.ts`), drops
   expired entries, and rotates its feed key;
 - signs a head (`typ: kilo-feed-head+jwt`, `{iat, list_hash}`) with its own Ed25519 key, kept in
-  its KV storage with the signer's 30-day rotation and published next key (`uts-feed-<n>-<thumbprint>`),
-  only while its last good backfill started under 60 seconds ago, and over more than 50,000 live
-  entries never; a head is signed again once 5 seconds old or when the list changed;
-- serves its current list and the 4 before it by hash.
+  its KV storage with the signer's 30-day rotation and published next key (`uts-feed-<n>-<thumbprint>`).
+  `iat` is the start of its last good backfill, so every revocation committed before it is in the
+  list; a new head is signed for each new list or backfill, and none once that backfill is 30
+  seconds old or the object holds more than 50,000 entries. A backfill is given up after 10
+  seconds (5 for the connect); expired entries leave the list at most once a minute;
+- serves its current list, and each list it replaced in the last 30 seconds (at most 64 lists and
+  16 MB of old list text, the oldest dropped first), by hash;
+- answers a publish with whether it vouches for its list; a revoke counts as published only when a
+  vouching object took its entries, and logs `uts.feed.publish_unvouched` (an alert: the backfill
+  is failing) when only objects that vouch for nothing took them. Every write to
+  `uts.revocations` is dated with its transaction time by a trigger (migration 0006), which keeps
+  an expiry an update sets.
 
 The list is canonical JSON: subject → `revoked_before` (whole seconds, rounded down); grant, third-party
 family, session and sandbox grant → `revoked_sids`; PAT and bot key → `revoked_pat_ids`; `kid` →
@@ -167,10 +175,10 @@ curl -s http://localhost:8801/.well-known/jwks.json
 The local revocation-feed run (`scripts/feed-e2e.ts`) needs the mint Worker with `IDENTITY_STORE`
 (below), the feed Worker and the verifier Worker of `services/uts-feed/test/fixtures/e2e` running
 together, with `UTS_E2E_BASE_URL`, `UTS_E2E_FEED_URL`, `UTS_E2E_READER_URL` and
-`UTS_E2E_ADMIN_URL` set. It checks that a revoke reaches the feed within 11 seconds, that the
+`UTS_E2E_ADMIN_URL` set. It checks that a revoke reaches the feed within 20 seconds, that the
 backfill adds an entry no publish carried, that the feed serves from feed object 1 while
 `POST /__dev/feed/stop` (development only, `src/dev-feed.ts`) stops feed object 0 for 90 seconds,
-that the head stays under 11 seconds old, and that every head verifies under a feed key of the key
+that the head stays under 20 seconds old, and that every head verifies under a feed key of the key
 set, over HTTPS and over the `FeedReader` binding.
 
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`

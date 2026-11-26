@@ -39,10 +39,13 @@ export const FEED_BACKFILL_STALL_MS = 30 * 1000;
 export const FEED_LIST_KEEP_MS = 30 * 1000;
 
 /**
- * The most old lists held, a memory bound: at the 50,000-entry cap a list is a few megabytes, so
- * the bound is in lists. At the design's rates the list changes well under once per second.
+ * Memory bounds of the old lists, oldest dropped first: at most this many lists, and at most
+ * `FEED_MAX_OLD_LIST_BYTES` of list text in all. At the 50,000-entry cap one list is a few
+ * megabytes, so the byte bound decides there; at the design's rates the list changes well under
+ * once per second and both bounds stay far away.
  */
 export const FEED_MAX_OLD_LISTS = 64;
+export const FEED_MAX_OLD_LIST_BYTES = 16 * 1024 * 1024;
 
 /**
  * Expired entries leave the list at most this often. An expired entry left in the list is
@@ -61,7 +64,7 @@ export type HeadAnswer = { status: 'signed'; head: SignedHead } | { status: 'ref
 
 type Backfill = { status: 'idle' } | { status: 'reading'; startedAt: number };
 
-type OldList = { list: SerializedList; replacedAt: number };
+type OldList = { list: SerializedList; replacedAt: number; bytes: number };
 
 /**
  * One feed object's entries, lists and head, as plain data (design 5.6). The object holds no entry
@@ -193,10 +196,17 @@ export class FeedLedger {
   #rebuildList(now: number): boolean {
     const list = serializeList(this.#entries.values());
     if (list.hash === this.#list.hash) return false;
-    this.#oldLists = [{ list: this.#list, replacedAt: now }, ...this.#oldLists].slice(
-      0,
-      FEED_MAX_OLD_LISTS
-    );
+    const replaced: OldList = {
+      list: this.#list,
+      replacedAt: now,
+      bytes: new TextEncoder().encode(this.#list.text).byteLength,
+    };
+    const kept = [replaced, ...this.#oldLists].slice(0, FEED_MAX_OLD_LISTS);
+    let bytes = kept.reduce((total, old) => total + old.bytes, 0);
+    while (bytes > FEED_MAX_OLD_LIST_BYTES && kept.length > 0) {
+      bytes -= kept.pop()?.bytes ?? 0;
+    }
+    this.#oldLists = kept;
     this.#list = list;
     return true;
   }

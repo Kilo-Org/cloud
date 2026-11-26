@@ -52,7 +52,7 @@ describe('feed objects', () => {
 
   it('take a valid batch, refuse anything else, and sign no head without a good backfill', async () => {
     const stub = feedStub(1);
-    expect(await stub.publish([grantEntry()])).toEqual({ status: 'stored' });
+    expect(await stub.publish([grantEntry()])).toEqual({ status: 'stored', vouching: false });
     expect(await stub.publish([{ kind: 'grant', id: 'x' }])).toEqual({
       status: 'refused',
       reason: 'invalid_entries',
@@ -89,12 +89,20 @@ describe('feed objects', () => {
 });
 
 describe('feed publisher', () => {
-  it('answers published once a feed object holds the entries, and writes nothing for none', async () => {
+  it('answers unpublished and logs the unvouched alert when the objects hold the entries but sign nothing', async () => {
+    // The pool's identity store is unreachable, so no feed object backfills or vouches.
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const ctx = createExecutionContext();
     const publish = feedPublisher(env, config, ctx);
-    expect(await publish([grantEntry(), grantEntry()])).toBe('published');
+    expect(await publish([grantEntry(), grantEntry()])).toBe('unpublished');
     expect(await publish([])).toBe('published');
     await waitOnExecutionContext(ctx);
+    const logged = errors.mock.calls.map(call => String(call[0])).join('\n');
+    expect(logged).toContain('"event":"uts.feed.publish_unvouched"');
+    expect(await feedStub(0).publish([grantEntry()])).toEqual({
+      status: 'stored',
+      vouching: false,
+    });
   });
 
   it('answers unpublished, logging kinds and counts only, when neither object takes the batch', async () => {

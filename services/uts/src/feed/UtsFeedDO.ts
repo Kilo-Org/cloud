@@ -35,9 +35,13 @@ export type FeedPublicKeysResult =
   | ({ status: 'ok' } & FeedPublicKeys)
   | { status: 'misconfigured'; reason: string };
 
-/** `invalid_entries`: not a list of feed entries, a caller bug that no retry fixes. */
+/**
+ * `stored` names whether the object vouches for its list now, that is, whether a head it signs
+ * carries the entries; `invalid_entries`: not a list of feed entries, a caller bug that no retry
+ * fixes.
+ */
 export type FeedPublishResult =
-  | { status: 'stored' }
+  | { status: 'stored'; vouching: boolean }
   | { status: 'refused'; reason: 'invalid_entries' }
   | { status: 'misconfigured'; reason: string };
 
@@ -61,11 +65,11 @@ type Settled = Exclude<Phase, { status: 'loading' }>;
  * - Its own Ed25519 feed key, generated inside it and kept in its KV storage, signs its heads;
  *   both objects' public keys reach the UTS key set through the key-set shards.
  * - `publish` takes the entries of one revoking statement from the mint Worker, the only Worker
- *   that binds this namespace. Every 5 seconds the alarm reads the revocations of the last 20
- *   minutes from the identity store and adds any entry it lacks, drops expired entries, and
- *   rotates the feed key when due.
- * - `head` signs a new head when the list changed or the held head is 5 seconds old, and only
- *   while the last good backfill started under 60 seconds ago.
+ *   that binds this namespace, and says whether the object vouches for its list. Every 5 seconds
+ *   the alarm reads the revocations of the last 20 minutes from the identity store and adds any
+ *   entry it lacks, drops expired entries at most once a minute, and rotates the feed key when due.
+ * - `head` signs a head dated by the start of the last good backfill, again for each new list or
+ *   backfill, and only while that backfill started under 30 seconds ago (`FeedLedger`).
  *
  * Workers RPC exposes every public method, so the only public members are the RPC methods
  * `publicKeys`, `head`, `list` and `publish` and the platform's `alarm`.
@@ -118,8 +122,9 @@ export class UtsFeedDO extends DurableObject<Env> {
     if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
     const parsed = FeedEntriesSchema.safeParse(entries);
     if (!parsed.success) return { status: 'refused', reason: 'invalid_entries' };
-    this.#ledger.take(parsed.data, Date.now());
-    return { status: 'stored' };
+    const now = Date.now();
+    this.#ledger.take(parsed.data, now);
+    return { status: 'stored', vouching: this.#ledger.vouches(now) };
   }
 
   override async alarm(): Promise<void> {

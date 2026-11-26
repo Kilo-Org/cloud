@@ -17,14 +17,20 @@ ALTER TYPE uts.revocation_kind ADD VALUE 'blocked_account';
 
 -- Every write to `uts.revocations` is stamped with the start time of its transaction: the statement
 -- entries and the recent backfill find a row only by `revoked_at`, so a row written with an older
--- time, or updated without moving it, would never reach a feed object that keeps running. The
--- feed time keeps its length (`feed_expires_at - revoked_at`), so every shape CHECK still holds.
+-- time, or updated without moving it, would never reach a feed object that keeps running. An
+-- insert, and an update that leaves `feed_expires_at` alone, keep the feed time's length
+-- (`feed_expires_at - revoked_at`), so every shape CHECK still holds; an update that sets
+-- `feed_expires_at` keeps the value it set.
 CREATE FUNCTION uts.stamp_revocation() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
-  NEW.feed_expires_at := now() + (NEW.feed_expires_at - NEW.revoked_at);
+  IF TG_OP = 'INSERT' THEN
+    NEW.feed_expires_at := now() + (NEW.feed_expires_at - NEW.revoked_at);
+  ELSIF NEW.feed_expires_at IS NOT DISTINCT FROM OLD.feed_expires_at THEN
+    NEW.feed_expires_at := now() + (OLD.feed_expires_at - OLD.revoked_at);
+  END IF;
   NEW.revoked_at := now();
   RETURN NEW;
 END

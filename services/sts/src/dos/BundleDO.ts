@@ -27,6 +27,7 @@ import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
 import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/bundle-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
+import type { GithubRun } from '../identity/verify';
 import { policyIndex } from '../policy';
 import type { PolicyIndex } from '../policy/load';
 import type { Policy } from '../policy/schema';
@@ -89,7 +90,7 @@ export class BundleDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.config = readConfig(env);
-    this.policies = (this.constructor as typeof BundleDO).policies;
+    this.policies = new.target.policies;
     this.db = drizzle(ctx.storage, { schema });
     this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
     void ctx.blockConcurrencyWhile(async () => {
@@ -100,7 +101,8 @@ export class BundleDO extends DurableObject<Env> {
   async getBundle(
     workload: string,
     environment: string,
-    request: BundleRequest
+    request: BundleRequest,
+    run: GithubRun | null = null
   ): Promise<BundleResult> {
     const target = BundleTargetSchema.parse({ workload, environment });
     const ifNoneMatch = BundleRequestSchema.parse(request).ifNoneMatch;
@@ -172,6 +174,7 @@ export class BundleDO extends DurableObject<Env> {
             version: secret.version,
           })),
           missing,
+          run,
         })
       );
     } catch (error) {

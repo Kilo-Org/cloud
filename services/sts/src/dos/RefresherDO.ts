@@ -119,7 +119,7 @@ export class RefresherDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.config = readConfig(env);
-    this.policies = (this.constructor as typeof RefresherDO).policies;
+    this.policies = new.target.policies;
     this.db = drizzle(ctx.storage, { schema });
     this.stream = `sts:${this.config.environment}:refresher`;
     this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);

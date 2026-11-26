@@ -1,5 +1,6 @@
 import {
   AudienceSchema,
+  STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
   ScopeSchema,
   SecretNameSchema,
@@ -199,13 +200,20 @@ export const PolicySnapshotEntrySchema = z.strictObject({
 
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
 
-/** Token grants: every scope registered and under a listed audience, every audience used. */
+/**
+ * Token grants: every scope registered and under a listed audience, every audience used. A
+ * reserved scope (`STS_RESERVED_SCOPES`, today the canary's denied probe) and its audience are
+ * refused whatever the registry says, so STS denies every request for one.
+ */
 function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
   const problems: string[] = [];
   if (hasDuplicates(policy.audiences)) problems.push('audiences contains a duplicate');
   if (hasDuplicates(policy.scopes)) problems.push('scopes contains a duplicate');
   for (const scope of policy.scopes) {
     const audience = scopeAudience(scope);
+    if (STS_RESERVED_SCOPES.includes(scope)) {
+      problems.push(`scope ${scope} is reserved and no policy may grant it`);
+    }
     if (!isRegisteredStsScope(audience, scope, registry)) {
       problems.push(`scope ${scope} is not in STS_SCOPE_REGISTRY`);
     }
@@ -216,6 +224,9 @@ function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
     }
   }
   for (const audience of policy.audiences) {
+    if (STS_RESERVED_SCOPES.some(scope => scopeAudience(scope) === audience)) {
+      problems.push(`audience ${audience} is reserved and no policy may grant it`);
+    }
     if (audience === policy.workload) {
       problems.push(`audience ${audience} is the workload itself`);
     }

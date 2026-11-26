@@ -1099,7 +1099,12 @@ with Infisical JWT Auth, the way STS logs in as its own identity:
   holds an ECDSA P-256 login key. It generates the key at the first login and never exports the
   private half. It is not a token signer key.
 - `GET /manager-auth/.well-known/jwks.json` on the issuer host serves the public half. Before the
-  first login the set is empty; while the object fails it answers 503, never 500.
+  first login the set is empty; while the object fails it answers 503 with `Retry-After: 30`, never
+  500. An isolate keeps the key set for 60 seconds, and an empty set or a failure for 5 seconds, so
+  a client that polls the route reaches the one key object at most once per window. A login JWT
+  signed in an isolate drops that isolate's empty set, so its next read asks the object again. A
+  manager read that reaches another isolate can still get the empty set for up to 5 seconds after
+  the first login; that login is refused and the next rotation run logs in again.
 - A login JWT lives 2 minutes, with issuer `<issuer>/manager-auth`, subject
   `uts:<environment>:rotation` and audience `https://eu.infisical.com/identities/<identity id>`.
   The identity ids are in `src/manager/config.ts`.

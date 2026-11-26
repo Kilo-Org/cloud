@@ -1,11 +1,11 @@
 import { createExecutionContext } from 'cloudflare:test';
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from 'jose';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { Env } from '../../src/env';
 import { handleRequest } from '../../src/http';
 import { MANAGER_IDENTITIES, MANAGER_JWKS_PATH, managerConfig } from '../../src/manager/config';
-import { signManagerLoginJwt } from '../../src/manager/key-set';
+import { resetManagerKeySet, signManagerLoginJwt } from '../../src/manager/key-set';
 import { config, env } from './test-env';
 
 const JwksSchema = z.strictObject({
@@ -43,25 +43,89 @@ const misnamedEnv: Env = {
   } as unknown as Env['UTS_MANAGER_AUTH_DO'],
 };
 
+/**
+ * `target` with a manager namespace that counts the stubs it hands out, so a test sees how often a
+ * key-set read reaches the key object. Only the members the stub helpers call are present, so the
+ * type is asserted.
+ */
+function counted(target: Env): { env: Env; stubs: () => number } {
+  const namespace = target.UTS_MANAGER_AUTH_DO;
+  let stubs = 0;
+  const wrapped = {
+    jurisdiction: () => wrapped,
+    idFromName: (name: string) => namespace.idFromName(name),
+    get: (id: DurableObjectId, options?: DurableObjectNamespaceGetDurableObjectOptions) => {
+      stubs += 1;
+      return namespace.get(id, options);
+    },
+  } as unknown as Env['UTS_MANAGER_AUTH_DO'];
+  return { env: { ...target, UTS_MANAGER_AUTH_DO: wrapped }, stubs: () => stubs };
+}
+
+afterEach(() => {
+  resetManagerKeySet();
+});
+
 // The cases share one object and run in order: the empty set before the first login creates the
 // key, then the key the login created.
 describe('manager login key', () => {
-  it('serves an empty key set, uncached, before the first login JWT creates the key', async () => {
-    const response = await fetchKeySet();
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(JwksSchema.parse(await response.json())).toEqual({ keys: [] });
+  it('serves an empty key set with no-store before the first login, and keeps it a few seconds', async () => {
+    const counting = counted(env);
+    for (let read = 0; read < 3; read++) {
+      const response = await fetchKeySet(counting.env);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(JwksSchema.parse(await response.json())).toEqual({ keys: [] });
+    }
+    expect(counting.stubs()).toBe(1);
   });
 
-  it('answers 503, never 500, when the key object refuses its name', async () => {
-    const response = await fetchKeySet(misnamedEnv);
-    expect(response.status).toBe(503);
-    expect(response.headers.get('Retry-After')).toBe('30');
-    expect(await response.json()).toEqual({ error: 'temporarily_unavailable' });
+  it('answers 503, never 500, when the key object refuses its name, and keeps the failure briefly', async () => {
+    const counting = counted(misnamedEnv);
+    for (let read = 0; read < 2; read++) {
+      const response = await fetchKeySet(counting.env);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBe('30');
+      expect(await response.json()).toEqual({ error: 'temporarily_unavailable' });
+    }
+    expect(counting.stubs()).toBe(1);
     expect(await signManagerLoginJwt(misnamedEnv, config)).toEqual({
       status: 'misconfigured',
       reason: 'manager auth object was not created by its name in this environment',
     });
+  });
+
+  it('logs only the error name and a fixed message when the key object throws', async () => {
+    const throwing: Env = {
+      ...env,
+      UTS_MANAGER_AUTH_DO: {
+        jurisdiction: () => throwing.UTS_MANAGER_AUTH_DO,
+        idFromName: (name: string) => env.UTS_MANAGER_AUTH_DO.idFromName(name),
+        get: () => ({
+          jwks: async () => {
+            throw new TypeError('transport detail');
+          },
+        }),
+      } as unknown as Env['UTS_MANAGER_AUTH_DO'],
+    };
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const response = await fetchKeySet(throwing);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBe('30');
+      const lines = error.mock.calls
+        .map(([line]) => line)
+        .filter(line => typeof line === 'string' && line.includes('uts.manager_auth.jwks_failed'));
+      expect(lines.map(line => JSON.parse(String(line)))).toEqual([
+        {
+          event: 'uts.manager_auth.jwks_failed',
+          error: 'TypeError',
+          message: 'manager key object did not answer',
+        },
+      ]);
+    } finally {
+      error.mockRestore();
+    }
   });
 
   it('refuses a method other than GET', async () => {
@@ -71,6 +135,8 @@ describe('manager login key', () => {
   });
 
   it('signs a login JWT that verifies against the published set with the exact claims', async () => {
+    // The isolate holds the empty set; the signed login drops it, so the next read has the key.
+    expect(JwksSchema.parse(await (await fetchKeySet()).json())).toEqual({ keys: [] });
     const signed = await signManagerLoginJwt(env, config);
     if (signed.status !== 'signed') throw new Error(`login JWT not signed: ${signed.status}`);
     const response = await fetchKeySet();

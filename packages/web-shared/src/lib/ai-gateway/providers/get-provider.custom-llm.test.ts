@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
@@ -9,7 +9,10 @@ import {
   insertCustomLlmForTest,
   testCustomLlmCredentialsEnvelope,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
-import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
+import {
+  testByokEnvelope,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import {
   createAnonymousContext,
   type AnonymousUserContext,
@@ -53,7 +56,7 @@ function resolveProvider(
   );
 }
 
-useFakeByokKms();
+const fakeKms = useFakeByokKms();
 
 describe('getProvider custom LLM credentials', () => {
   beforeEach(async () => {
@@ -142,10 +145,88 @@ describe('getProvider custom LLM credentials', () => {
     }
   );
 
-  it('fails closed when the custom LLM has no usable credentials', async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    await insertCustomLlmForTest(PUBLIC_ID, definition, null);
+  describe('when the credentials are unusable', () => {
+    afterEach(() => {
+      jest.mocked(console.error).mockRestore();
+    });
 
-    await expect(resolveProvider()).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+    async function expectUnavailable(cause: string, errorType: unknown) {
+      const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(resolveProvider()).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+
+      expect(error).toHaveBeenCalledWith('Custom LLM credentials are unusable', PUBLIC_ID, {
+        cause,
+        errorType,
+      });
+    }
+
+    it('fails closed when the custom LLM has no credentials', async () => {
+      await insertCustomLlmForTest(PUBLIC_ID, definition, null);
+
+      await expectUnavailable('missing', undefined);
+    });
+
+    it('fails closed when the credentials are not valid JSON', async () => {
+      await insertCustomLlmForTest(
+        PUBLIC_ID,
+        definition,
+        testCustomLlmCredentialsEnvelope('not json')
+      );
+
+      await expectUnavailable('unparseable', undefined);
+    });
+
+    it('fails closed when the credentials cannot be decrypted', async () => {
+      const wrongDataKey = Buffer.alloc(32, 9).toString('base64');
+      const credentials = JSON.stringify({ type: 'api_key', api_key: 'upstream-key' });
+      await insertCustomLlmForTest(PUBLIC_ID, definition, {
+        ...testCustomLlmCredentialsEnvelope({ type: 'api_key', api_key: 'upstream-key' }),
+        encrypted_data: testByokEnvelope(credentials, wrongDataKey).encrypted_data,
+      });
+
+      await expectUnavailable('decrypt-failed', expect.any(String));
+    });
+
+    it('fails closed when the KMS rejects the request', async () => {
+      await insertCustomLlm({ type: 'api_key', api_key: 'upstream-key' });
+      fakeKms.failWith('/decrypt', 403);
+
+      await expectUnavailable('kms-rejected', 'ByokKmsStatusError');
+      expect(fakeKms.requests.filter(request => request.path === '/decrypt')).toHaveLength(1);
+    });
+
+    it('fails closed when the KMS is unavailable', async () => {
+      await insertCustomLlm({ type: 'api_key', api_key: 'upstream-key' });
+      fakeKms.failWith('/decrypt', 503);
+
+      await expectUnavailable('kms-unavailable', 'ByokKmsStatusError');
+    });
+
+    it('fails closed when the Google service account cannot authenticate', async () => {
+      await insertCustomLlm({
+        type: 'service_account',
+        project_id: 'example-project',
+        private_key_id: 'key-id',
+        private_key: 'not a private key',
+        client_email: 'custom-llm@example-project.iam.gserviceaccount.com',
+        client_id: '1234567890',
+        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+        token_uri: 'https://oauth2.googleapis.com/token',
+        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+        client_x509_cert_url:
+          'https://www.googleapis.com/robot/v1/metadata/x509/custom-llm%40example-project.iam.gserviceaccount.com',
+      });
+
+      const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(resolveProvider()).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+
+      expect(error).toHaveBeenCalledWith(
+        'Custom LLM credentials are unusable',
+        PUBLIC_ID,
+        expect.objectContaining({ cause: 'auth-failed' })
+      );
+    });
   });
 });

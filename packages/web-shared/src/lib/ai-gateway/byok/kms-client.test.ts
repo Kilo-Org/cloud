@@ -18,6 +18,8 @@ jest.mock('@kilocode/web-shared/lib/redis', () => {
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import {
+  ByokKmsStatusError,
+  classifyByokKmsError,
   createByokDataKey,
   decryptByokEnvelope,
   encryptByokForStorage,
@@ -299,6 +301,24 @@ describe('byok kms client', () => {
     expect(init[1].signal).toBeInstanceOf(AbortSignal);
   });
 
+  test('rejects a non-2xx answer with an error that carries the status', async () => {
+    global.fetch = jest.fn(
+      async () => new Response('nope', { status: 403 })
+    ) as unknown as typeof fetch;
+
+    const error = await encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId }).then(
+      () => null,
+      (caught: unknown) => caught
+    );
+
+    expect(error).toBeInstanceOf(ByokKmsStatusError);
+    expect(error).toMatchObject({
+      name: 'ByokKmsStatusError',
+      status: 403,
+      message: 'BYOK KMS /data-key failed with status 403',
+    });
+  });
+
   test('retries a transient 5xx answer and returns the successful result', async () => {
     const dataKey = randomBytes(32).toString('base64');
     let calls = 0;
@@ -517,6 +537,32 @@ describe('byok kms client', () => {
     });
     const { data_key } = (await response.json()) as { data_key: string };
     expect(decryptApiKey(envelope.encrypted_data, data_key)).toBe('sk-secret');
+  });
+});
+
+describe('classifyByokKmsError', () => {
+  test.each([400, 401, 403, 404, 422])('treats status %i as rejected', status => {
+    expect(classifyByokKmsError(new ByokKmsStatusError('/decrypt', status))).toBe('rejected');
+  });
+
+  test.each([408, 429, 500, 502, 503])('treats status %i as unavailable', status => {
+    expect(classifyByokKmsError(new ByokKmsStatusError('/decrypt', status))).toBe('unavailable');
+  });
+
+  test.each([
+    ['a network failure', new TypeError('fetch failed')],
+    ['a timeout', new DOMException('The operation timed out.', 'TimeoutError')],
+    ['an abort', new DOMException('The operation was aborted.', 'AbortError')],
+  ])('treats %s as unavailable', (_name, error) => {
+    expect(classifyByokKmsError(error)).toBe('unavailable');
+  });
+
+  test.each([
+    ['an ordinary error', new Error('Unsupported state or unable to authenticate data')],
+    ['a string', 'boom'],
+    ['null', null],
+  ])('does not classify %s', (_name, error) => {
+    expect(classifyByokKmsError(error)).toBeNull();
   });
 });
 

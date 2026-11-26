@@ -44,25 +44,35 @@ export function isFakeByokKmsRequest(input: RequestInfo | URL): boolean {
   }
 }
 
+export type FakeByokKms = {
+  requests: FakeByokKmsRequest[];
+  /** Answers every request to `path` with `status` for the current test, until the next test. */
+  failWith: (path: '/data-key' | '/decrypt', status: number) => void;
+};
+
 /**
  * Points the BYOK KMS client at an in-process fake for each test. Every data key it issues or
  * returns is `TEST_BYOK_DATA_KEY`, so rows built with `testByokEnvelope` decrypt without
  * further setup. Other fetches pass through untouched.
  */
-export function useFakeByokKms(): { requests: FakeByokKmsRequest[] } {
+export function useFakeByokKms(): FakeByokKms {
   const requests: FakeByokKmsRequest[] = [];
+  const failures = new Map<string, number>();
   const originalFetch = global.fetch;
   const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
   const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
 
   beforeEach(() => {
     requests.length = 0;
+    failures.clear();
     process.env.BYOK_KMS_SERVICE_URL = TEST_KMS_URL;
     process.env.BYOK_KMS_SERVICE_TOKEN = 'test-token';
     global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       if (!isFakeByokKmsRequest(input)) return originalFetch(input, init);
       const url = requestUrl(input);
       requests.push({ path: url.pathname, body: requestBodyObject(init?.body) });
+      const failure = failures.get(url.pathname);
+      if (failure !== undefined) return new Response('{}', { status: failure });
       if (url.pathname === '/data-key') {
         return Response.json({
           data_key: TEST_BYOK_DATA_KEY,
@@ -84,5 +94,10 @@ export function useFakeByokKms(): { requests: FakeByokKmsRequest[] } {
     else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
   });
 
-  return { requests };
+  return {
+    requests,
+    failWith: (path, status) => {
+      failures.set(path, status);
+    },
+  };
 }

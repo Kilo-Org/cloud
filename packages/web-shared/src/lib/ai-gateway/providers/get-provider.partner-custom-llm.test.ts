@@ -108,7 +108,7 @@ const pricing: CustomPricingTiers = [
 ];
 const apiKeyCredentials = JSON.stringify({ type: 'api_key', api_key: 'partner-upstream-key' });
 
-useFakeByokKms();
+const fakeKms = useFakeByokKms();
 
 let user: User;
 
@@ -911,7 +911,7 @@ describe('getProvider skips the partner', () => {
     expect(console.error).toHaveBeenCalledWith(
       'Partner custom LLM credentials are unusable',
       MODEL,
-      { errorType: 'Error' }
+      { cause: 'missing', errorType: undefined }
     );
   });
 
@@ -920,6 +920,11 @@ describe('getProvider skips the partner', () => {
     await insertPartner({}, 'not json');
 
     await expectKiloRouteOnly({}, 'invalid-credentials');
+    expect(console.error).toHaveBeenCalledWith(
+      'Partner custom LLM credentials are unusable',
+      MODEL,
+      { cause: 'unparseable', errorType: undefined }
+    );
   });
 
   test('when the partner credentials cannot be decrypted', async () => {
@@ -935,5 +940,29 @@ describe('getProvider skips the partner', () => {
     );
 
     await expectKiloRouteOnly({}, 'invalid-credentials');
+    expect(console.error).toHaveBeenCalledWith(
+      'Partner custom LLM credentials are unusable',
+      MODEL,
+      expect.objectContaining({ cause: 'decrypt-failed' })
+    );
   });
+
+  test.each([
+    { status: 403, cause: 'kms-rejected' },
+    { status: 503, cause: 'kms-unavailable' },
+  ])(
+    'when the KMS answers $status while decrypting the partner credentials',
+    async ({ status, cause }) => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      fakeKms.failWith('/decrypt', status);
+      await insertPartner();
+
+      await expectKiloRouteOnly({}, 'invalid-credentials');
+      expect(console.error).toHaveBeenCalledWith(
+        'Partner custom LLM credentials are unusable',
+        MODEL,
+        { cause, errorType: 'ByokKmsStatusError' }
+      );
+    }
+  );
 });

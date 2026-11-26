@@ -97,6 +97,7 @@ import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { decryptCustomLlmCredentials } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/credentials-encryption';
+import { classifyByokKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   resolveEmbeddingOrDecisionRoute,
@@ -276,11 +277,54 @@ async function isEligibleForCustomLlm(
   return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
 }
 
-async function readCustomLlmCredentials(
-  customLlm: CustomLlm
-): Promise<CustomLlmCredentials | null> {
-  if (!customLlm.encrypted_api_key) return null;
-  return await decryptCustomLlmCredentials(customLlm.encrypted_api_key);
+/**
+ * Why a custom LLM's credentials could not be turned into upstream auth. Every cause rejects
+ * the same way; the cause is only logged, so an operator can tell a broken row from a KMS outage.
+ */
+type CustomLlmCredentialFailure =
+  | 'missing'
+  | 'unparseable'
+  | 'kms-rejected'
+  | 'kms-unavailable'
+  | 'decrypt-failed'
+  | 'auth-failed';
+
+type CustomLlmAuthResult =
+  | { ok: true; auth: DirectUpstreamAuth }
+  | { ok: false; cause: CustomLlmCredentialFailure; error?: unknown };
+
+async function loadCustomLlmAuth(customLlm: CustomLlm): Promise<CustomLlmAuthResult> {
+  if (!customLlm.encrypted_api_key) return { ok: false, cause: 'missing' };
+  let credentials: CustomLlmCredentials | null;
+  try {
+    credentials = await decryptCustomLlmCredentials(customLlm.encrypted_api_key);
+  } catch (error) {
+    const kmsFailure = classifyByokKmsError(error);
+    const cause = kmsFailure ? (`kms-${kmsFailure}` as const) : 'decrypt-failed';
+    return { ok: false, cause, error };
+  }
+  if (!credentials) return { ok: false, cause: 'unparseable' };
+  try {
+    return { ok: true, auth: await resolveCustomLlmAuth(credentials) };
+  } catch (error) {
+    return { ok: false, cause: 'auth-failed', error };
+  }
+}
+
+function logCustomLlmCredentialFailure(
+  message: string,
+  publicId: string,
+  failure: Extract<CustomLlmAuthResult, { ok: false }>
+) {
+  console.error(message, publicId, {
+    cause: failure.cause,
+    errorType:
+      failure.error === undefined
+        ? undefined
+        : failure.error instanceof Error
+          ? failure.error.name
+          : 'unknown',
+  });
 }
 
 async function resolveCustomLlmAuth(
@@ -329,9 +373,15 @@ async function resolveCustomLlmProvider(
   if (!(await isEligibleForCustomLlm(customLlm, user, organizationId))) {
     return reject('not-eligible');
   }
-  const credentials = await readCustomLlmCredentials(customLlm);
-  if (!credentials) {
-    console.error('Custom LLM credentials are missing or invalid', customLlm.public_id);
+  // Not a retryable error for the caller, even for a KMS outage: the KMS client has already
+  // retried transient failures within its budget.
+  const authResult = await loadCustomLlmAuth(customLlm);
+  if (!authResult.ok) {
+    logCustomLlmCredentialFailure(
+      'Custom LLM credentials are unusable',
+      customLlm.public_id,
+      authResult
+    );
     return reject('invalid-credentials');
   }
 
@@ -340,7 +390,7 @@ async function resolveCustomLlmProvider(
     isPublic ? 'custom-public' : 'custom',
     getCustomLlmApiKinds(definition),
     definition,
-    await resolveCustomLlmAuth(credentials)
+    authResult.auth
   );
   return servedBy({
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
@@ -477,20 +527,23 @@ async function resolvePartnerRoute(
   if (await recentUpstreamError) return 'recent-upstream-error';
   // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
   // credentials skip it instead of failing the request.
-  let auth: DirectUpstreamAuth;
-  try {
-    const credentials = await readCustomLlmCredentials(partner);
-    if (!credentials) throw new Error('missing or unparseable');
-    auth = await resolveCustomLlmAuth(credentials);
-  } catch (error) {
-    console.error('Partner custom LLM credentials are unusable', partner.public_id, {
-      errorType: error instanceof Error ? error.name : 'unknown',
-    });
+  const authResult = await loadCustomLlmAuth(partner);
+  if (!authResult.ok) {
+    logCustomLlmCredentialFailure(
+      'Partner custom LLM credentials are unusable',
+      partner.public_id,
+      authResult
+    );
     return 'invalid-credentials';
   }
   return {
     provider: {
-      ...buildDirectProvider('partner', getCustomLlmApiKinds(definition), definition, auth),
+      ...buildDirectProvider(
+        'partner',
+        getCustomLlmApiKinds(definition),
+        definition,
+        authResult.auth
+      ),
       inferenceProviderId: definition.partner.inference_provider,
     },
     userByok: null,

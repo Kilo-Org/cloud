@@ -219,7 +219,7 @@ const NO_DIRECT_BYOK_MODEL = {
 } as const;
 const CHATGPT_UNAVAILABLE = { step: 'chatgpt', outcome: 'skipped', reason: 'unavailable' } as const;
 
-useFakeByokKms();
+const fakeKms = useFakeByokKms();
 
 beforeEach(() => {
   jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
@@ -1531,6 +1531,23 @@ describe('getProvider routing decision for custom LLMs', () => {
 
     expect(decision.steps).toEqual([
       { step: 'custom-llm', outcome: 'rejected', visibility: 'private', reason },
+    ]);
+    expect(decision.result).toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test('records a custom LLM rejected as invalid-credentials when the KMS rejects the key', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    fakeKms.failWith('/decrypt', 403);
+
+    const decision = await routeCustomLlm();
+
+    expect(decision.steps).toEqual([
+      {
+        step: 'custom-llm',
+        outcome: 'rejected',
+        visibility: 'private',
+        reason: 'invalid-credentials',
+      },
     ]);
     expect(decision.result).toEqual({ kind: 'custom-llm-unavailable' });
   });

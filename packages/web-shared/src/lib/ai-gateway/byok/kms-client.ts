@@ -48,6 +48,34 @@ export function getByokKmsClientConfig(): ByokKmsClientConfig {
   return { url: url.replace(/\/+$/, ''), token };
 }
 
+/** The KMS service answered with a non-2xx status. */
+export class ByokKmsStatusError extends Error {
+  override name = 'ByokKmsStatusError';
+
+  constructor(
+    path: string,
+    readonly status: number
+  ) {
+    super(`BYOK KMS ${path} failed with status ${status}`);
+  }
+}
+
+/** 408 and 429 are the 4xx answers a lagging or rate-limited KMS returns. */
+function isRetryableKmsStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * `rejected` when the service refused the request itself, such as a context that does not
+ * match the wrapped key; `unavailable` when it could not answer. Null for any other error.
+ */
+export function classifyByokKmsError(error: unknown): 'rejected' | 'unavailable' | null {
+  if (error instanceof ByokKmsStatusError) {
+    return isRetryableKmsStatus(error.status) ? 'unavailable' : 'rejected';
+  }
+  return isTransientKmsError(error) ? 'unavailable' : null;
+}
+
 /** A timeout or a connection failure: the only transport failures a repeat can change. */
 function isTransientKmsError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
@@ -114,10 +142,9 @@ async function sendToKms(
       const { status } = outcome.response;
       // Release the unused body so the retry reuses the connection.
       void outcome.response.body?.cancel().catch(() => {});
-      error = new Error(`BYOK KMS ${new URL(url).pathname} failed with status ${status}`);
-      // 408 and 429 are the 4xx answers a lagging or rate-limited KMS returns; every other 4xx
-      // rejects the request itself, so a repeat would only add latency.
-      retryable = status === 408 || status === 429 || status >= 500;
+      error = new ByokKmsStatusError(new URL(url).pathname, status);
+      // Every other 4xx rejects the request itself, so a repeat would only add latency.
+      retryable = isRetryableKmsStatus(status);
       if (retryable) retryAfter = retryAfterMs(outcome.response, Date.now());
     } else {
       ({ error, retryable } = outcome);

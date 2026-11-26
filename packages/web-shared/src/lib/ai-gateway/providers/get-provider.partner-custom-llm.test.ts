@@ -20,7 +20,6 @@ import {
   getModelInferenceUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import type * as chatGptRoutingModule from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
@@ -31,7 +30,6 @@ import type {
   GatewayRequest,
   OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import {
@@ -46,6 +44,7 @@ import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
   partnerCustomLlmDefinition,
+  testCustomLlmCredentialsEnvelope,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -129,7 +128,7 @@ async function insertPartner(
       pricing,
       ...overrides,
     }),
-    credentials === null ? null : encryptApiKey(credentials, BYOK_ENCRYPTION_KEY)
+    credentials === null ? null : testCustomLlmCredentialsEnvelope(credentials)
   );
 }
 
@@ -925,10 +924,14 @@ describe('getProvider skips the partner', () => {
 
   test('when the partner credentials cannot be decrypted', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
+    const wrongDataKey = Buffer.alloc(32, 9).toString('base64');
     await insertCustomLlmForTest(
       MODEL,
       partnerCustomLlmDefinition(PARTNER_PROVIDER, { base_url: PARTNER_URL, pricing }),
-      { iv: 'AAAAAAAAAAAAAAAA', data: 'AAAA', authTag: 'AAAAAAAAAAAAAAAAAAAAAA==' }
+      {
+        ...testCustomLlmCredentialsEnvelope(apiKeyCredentials),
+        encrypted_data: testByokEnvelope(apiKeyCredentials, wrongDataKey).encrypted_data,
+      }
     );
 
     await expectKiloRouteOnly({}, 'invalid-credentials');

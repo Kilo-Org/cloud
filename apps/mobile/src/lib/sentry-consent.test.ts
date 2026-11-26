@@ -53,6 +53,7 @@ describe('sentryOptionsForConsent', () => {
     const options = sentryOptionsForConsent(true);
 
     expect(options.attachScreenshot).toBe(true);
+    expect(options.screenshot).toEqual({ maskAllText: true, maskAllImages: true });
     expect(options.attachViewHierarchy).toBe(false);
     expect(options.replaysSessionSampleRate).toBe(0.1);
     expect(options.replaysOnErrorSampleRate).toBe(1);

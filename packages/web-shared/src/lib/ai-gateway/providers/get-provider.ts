@@ -76,7 +76,6 @@ import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { getSupportedReasoningEfforts } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
-  CustomLlmCredentialsSchema,
   ReasoningDetailsTransform,
   ReasoningEffortSchema,
   type CustomLlmCredentials,
@@ -97,8 +96,7 @@ import {
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
-import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { decryptCustomLlmCredentials } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/credentials-encryption';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   resolveEmbeddingOrDecisionRoute,
@@ -278,16 +276,11 @@ async function isEligibleForCustomLlm(
   return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
 }
 
-function readCustomLlmCredentials(customLlm: CustomLlm): CustomLlmCredentials | null {
+async function readCustomLlmCredentials(
+  customLlm: CustomLlm
+): Promise<CustomLlmCredentials | null> {
   if (!customLlm.encrypted_api_key) return null;
-  const decrypted = decryptApiKey(customLlm.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(decrypted);
-  } catch {
-    return null;
-  }
-  return CustomLlmCredentialsSchema.safeParse(parsedJson).data ?? null;
+  return await decryptCustomLlmCredentials(customLlm.encrypted_api_key);
 }
 
 async function resolveCustomLlmAuth(
@@ -336,7 +329,7 @@ async function resolveCustomLlmProvider(
   if (!(await isEligibleForCustomLlm(customLlm, user, organizationId))) {
     return reject('not-eligible');
   }
-  const credentials = readCustomLlmCredentials(customLlm);
+  const credentials = await readCustomLlmCredentials(customLlm);
   if (!credentials) {
     console.error('Custom LLM credentials are missing or invalid', customLlm.public_id);
     return reject('invalid-credentials');
@@ -486,7 +479,7 @@ async function resolvePartnerRoute(
   // credentials skip it instead of failing the request.
   let auth: DirectUpstreamAuth;
   try {
-    const credentials = readCustomLlmCredentials(partner);
+    const credentials = await readCustomLlmCredentials(partner);
     if (!credentials) throw new Error('missing or unparseable');
     auth = await resolveCustomLlmAuth(credentials);
   } catch (error) {

@@ -276,6 +276,28 @@ describe('the consent screen', () => {
     });
   });
 
+  it('shows a loopback client with a consent the confirm page on GET too, and approves only its same-origin POST', async () => {
+    const store = fakeStore({ findConsent: async () => CONSENT_ID });
+    const loopback: PendingAuthorization = {
+      ...pending,
+      client: { ...pending.client, redirectKind: 'loopback' },
+      redirectUri: 'http://127.0.0.1:33418/callback',
+    };
+    const shown = await step(store.access)(new Request(authorizeUrl), loopback, session);
+    if (shown.status !== 'interaction') throw new Error('expected the confirm page, not a code');
+    expect(await shown.response.text()).toContain('id="confirm-app"');
+    expect(shown.response.headers.get('Content-Security-Policy')).toContain(
+      "form-action 'self' http://127.0.0.1:33418;"
+    );
+    expect(
+      (await step(store.access)(consentPost({}, 'https://evil.example'), loopback, session)).status
+    ).toBe('interaction');
+    expect(await step(store.access)(consentPost({}), loopback, session)).toMatchObject({
+      status: 'approved',
+      approval: { consentId: CONSENT_ID },
+    });
+  });
+
   it('approves at once with an active consent that covers the scopes', async () => {
     const store = fakeStore({ findConsent: async () => CONSENT_ID });
     const result = await step(store.access)(new Request(authorizeUrl), pending, session);

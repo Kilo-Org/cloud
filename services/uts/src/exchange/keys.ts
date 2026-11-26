@@ -85,7 +85,11 @@ export function isolateSignerKeys(
     const stale = current === null || at - current.readAt >= KEY_COPY_LIFETIME_MS;
     const missing = current !== null && !current.keys.has(kid);
     const mayRead = state.attemptedAt === null || at - state.attemptedAt >= KEY_REREAD_INTERVAL_MS;
-    if ((stale || missing) && mayRead) await reread();
+    if (stale || missing) {
+      // A read already in flight answers this lookup too, whatever the spacing says.
+      if (state.reading !== null) await state.reading;
+      else if (mayRead) await reread();
+    }
     const copy = state.copy;
     if (copy === null) return { status: 'unavailable' };
     if (now() - copy.readAt >= KEY_COPY_FAILURE_HOLD_MS) return { status: 'unavailable' };

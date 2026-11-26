@@ -327,7 +327,11 @@ Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata D
   `UTS_SCOPE_REGISTRY`). Its form posts the authorization URL back from this origin.
   `uts.grant_third_party_consent` writes the consumed tier B pass, the consent, the
   `third_party_client_approved` notice and the audit row in one statement. A sign-in older than 10
-  minutes needs the passkey step-up, which the page runs before it submits.
+  minutes needs the passkey step-up, which the page runs before it submits. A request whose
+  redirect is not HTTPS (loopback or private-use scheme) never completes on a plain GET, even
+  under an existing consent: it shows the confirm page, whose same-origin POST approves (RFC 8252
+  section 8.6). The sign-in hand-off applies the same rule to the first-party clients, the CLI's
+  loopback redirect included.
 - **Apps page** (`GET`/`POST /signin/apps`): it lists the account's consents, and a same-origin
   form POST withdraws one. `uts.withdraw_third_party_consent` revokes the consent and ends each
   live family with a `third_party_family` feed entry. It never writes `revoked_before`. The page

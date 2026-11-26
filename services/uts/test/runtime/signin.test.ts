@@ -86,13 +86,25 @@ describe('sign-in hand-off', () => {
     expect(store.calls).toEqual([]);
   });
 
-  it('approves a first-party loopback client for the session, whatever its sign-in age', async () => {
+  it('shows a first-party loopback request the confirm page on GET, then approves its same-origin POST for the session, whatever its sign-in age (RFC 8252 section 8.6)', async () => {
     const live = session(60);
     const store = fakeSignIn({ readSession: async () => live });
-    const result = await signInHandoff(store.deps, null)(withCookie(authorizeUrl), {
-      ...pending(),
-      orgHint: '0e6b1f0c-8d6d-4a51-9d63-1f7a4d2b9c11',
-    });
+    const handoff = signInHandoff(store.deps, null);
+    const cli = { ...pending(), orgHint: '0e6b1f0c-8d6d-4a51-9d63-1f7a4d2b9c11' };
+    const shown = await handoff(withCookie(authorizeUrl), cli);
+    if (shown.status !== 'interaction') throw new Error('expected the confirm page, not a code');
+    expect(await shown.response.text()).toContain('id="confirm-app"');
+    // `form-action` names the loopback origin itself, not every `http:` target.
+    expect(shown.response.headers.get('Content-Security-Policy')).toContain(
+      "form-action 'self' http://127.0.0.1:4100;"
+    );
+    const confirm = (origin: string) =>
+      new Request(authorizeUrl, {
+        method: 'POST',
+        headers: { Cookie: `__Host-uts_session=${COOKIE}`, Origin: origin },
+      });
+    expect((await handoff(confirm('https://evil.example'), cli)).status).toBe('interaction');
+    const result = await handoff(confirm(ORIGIN), cli);
     expect(result).toEqual({
       status: 'approved',
       approval: {

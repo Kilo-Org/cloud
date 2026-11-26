@@ -27,10 +27,12 @@ export async function requestSession(
  * checks the membership). A third-party client goes on to the consent screen (`consent`,
  * src/third-party/consent.ts, design 5.9); without one it is denied.
  *
- * RFC 8252 section 8.6: a client that receives its code on a private-use URI scheme cannot be
- * identified, because another app can claim the same scheme. Its request is approved only from
- * the confirm page's same-origin POST, so every such request shows the user a page (sign-in or
- * confirm) and a request another app started never completes without the user.
+ * RFC 8252 section 8.6: a native client cannot be identified by its redirect. Another app can
+ * claim the same private-use scheme, and any local process can listen on a loopback port and start
+ * an authorization request that names it. So a first-party request, whose redirect is always a
+ * loopback address or a private-use scheme, is approved only from the confirm page's same-origin
+ * POST, never a plain GET: every such request shows the user a page (sign-in or confirm), and a
+ * request another program started never completes without the user.
  */
 export function signInHandoff(deps: SignInDeps, consent: ConsentStep | null): AuthorizationHandoff {
   return async (request, pending) => {
@@ -53,7 +55,7 @@ export function signInHandoff(deps: SignInDeps, consent: ConsentStep | null): Au
     if (pending.client.kind === 'third_party') {
       return consent === null ? { status: 'denied' } : await consent(request, pending, session);
     }
-    if (pending.client.redirectKind === 'private_use_scheme' && !isSameOriginPost(request)) {
+    if (!isSameOriginPost(request)) {
       return {
         status: 'interaction',
         response: confirmAppPage(pending.client.name, pending.redirectUri),

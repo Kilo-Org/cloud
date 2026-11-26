@@ -109,9 +109,10 @@ export function consentStep(deps: ConsentDeps, methods: SignInMethods): ConsentS
         return failed(error);
       }
       if (consentId === null) return view('ask');
-      // RFC 8252 section 8.6: another app can claim a private-use scheme, so a request that
-      // returns to one completes only from the confirm page's same-origin POST, never a GET.
-      if (client.redirectKind === 'private_use_scheme') {
+      // RFC 8252 section 8.6: another app can claim a private-use scheme, and any local process
+      // can listen on a loopback port, so a request that returns to either completes only from
+      // the confirm page's same-origin POST, never a GET.
+      if (client.redirectKind !== 'https') {
         return interaction(confirmAppPage(client.name, pending.redirectUri));
       }
       return approved(session, pending, consentId);

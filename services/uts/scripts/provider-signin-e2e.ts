@@ -473,9 +473,20 @@ async function cliAuthorization(): Promise<CliAuthorization> {
   return { url: url.toString(), verifier, key };
 }
 
-/** The code the authorization request ends in, once the browser holds a session. */
+/**
+ * The code the authorization request ends in, once the browser holds a session. The CLI's
+ * loopback request first shows the confirm page (RFC 8252 section 8.6); its same-origin POST of
+ * the same URL gives the code.
+ */
 async function codeOf(authorizeUrl: string): Promise<string> {
-  const response = await browse(authorizeUrl);
+  const shown = await browse(authorizeUrl);
+  const title = /<title>([^<]*)<\/title>/.exec(await shown.text())?.[1];
+  check(shown.status === 200 && title === 'Continue to the app', 'the confirm page');
+  const response = await browse(authorizeUrl, {
+    method: 'POST',
+    headers: { Origin: base, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: '',
+  });
   const location = new URL(response.headers.get('Location') ?? '');
   check(
     response.status === 302 && location.origin + location.pathname === CLI_REDIRECT,

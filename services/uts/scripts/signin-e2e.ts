@@ -7,7 +7,8 @@
  * 2. passkey sign-in on the sign-in page of the mobile app's authorization request, then its
  *    confirm page, the native code exchange with PKCE and DPoP, and the mobile refresh lifetime
  *    (60 days idle, 1 year);
- * 3. the CLI's loopback request on the session, and the confirm page every mobile request shows;
+ * 3. the confirm page that every native request on a session shows, the CLI's loopback request
+ *    (whose plain GET gives no code) and the mobile app's alike, and the CLI's code on Continue;
  * 4. the RFC 8628 device grant: authorization, pending and slow_down polls; a code in the URL
  *    only fills the page and a cross-site POST is refused; approval of a typed code on the recent
  *    sign-in, and of a code from the link with a passkey step-up (tier B); and the token;
@@ -110,7 +111,8 @@ function authorizeUrl(params: Record<string, string>): string {
 
 /**
  * Opens `url`; resolves with the code of the authorization redirect it ends in. `signIn` clicks
- * the passkey sign-in, and `confirm` the confirm page a private-use-scheme client always gets.
+ * the passkey sign-in, and `confirm` the confirm page every native (loopback or private-use) client
+ * gets.
  */
 async function codeFrom(page: Page, url: string, signIn: boolean, confirm = false): Promise<URL> {
   const redirect = page.waitForResponse(
@@ -308,27 +310,31 @@ async function main() {
   });
   check(refreshed.status === 200, 'mobile refresh');
 
-  // 3. The CLI's loopback request completes on the session; the mobile client's shows the
-  // confirm page however recent the sign-in is.
+  // 3. The CLI's loopback request, like the mobile client's, shows the confirm page on the
+  // session however recent the sign-in is (RFC 8252 section 8.6), and completes on Continue.
   const cli = await dpop();
   const cliVerifier = randomBytes(32).toString('base64url');
-  const cliRedirect = await codeFrom(
-    page,
-    authorizeUrl({
-      response_type: 'code',
-      client_id: 'kilo-cli',
-      redirect_uri: CLI_REDIRECT,
-      code_challenge: sha256(cliVerifier).toString('base64url'),
-      code_challenge_method: 'S256',
-      scope: 'gateway:models.read',
-      state: 'cli-e2e',
-      dpop_jkt: cli.jkt,
-    }),
-    false
+  const cliUrl = authorizeUrl({
+    response_type: 'code',
+    client_id: 'kilo-cli',
+    redirect_uri: CLI_REDIRECT,
+    code_challenge: sha256(cliVerifier).toString('base64url'),
+    code_challenge_method: 'S256',
+    scope: 'gateway:models.read',
+    state: 'cli-e2e',
+    dpop_jkt: cli.jkt,
+  });
+  const cliGet = await context.request.get(cliUrl, { maxRedirects: 0 });
+  const cliPage = /<title>([^<]*)<\/title>/.exec(await cliGet.text())?.[1];
+  check(
+    cliGet.status() === 200 && cliPage === 'Continue to the app',
+    'a CLI GET shows the confirm page, not a code'
   );
+  const cliRedirect = await codeFrom(page, cliUrl, false, true);
   secrets.push(z.string().parse(cliRedirect.searchParams.get('code')));
   log('3 CLI loopback on the session', {
-    redirect: `${cliRedirect.origin}${cliRedirect.pathname}`,
+    plainGet: { status: cliGet.status(), page: cliPage },
+    afterContinue: `${cliRedirect.origin}${cliRedirect.pathname}`,
   });
   // The request context shares the page's cookies and follows no redirect.
   const stale = await context.request.get(

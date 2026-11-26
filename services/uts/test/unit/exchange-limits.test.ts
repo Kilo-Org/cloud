@@ -93,6 +93,24 @@ describe('the exchange key copy', () => {
     expect(keys.reads()).toBe(2);
   });
 
+  it('lets a lookup that starts while a read is pending wait for that read, even inside the spacing', async () => {
+    let now = 0;
+    const pending = Promise.withResolvers<readonly UtsPublicJwk[] | null>();
+    let reads = 0;
+    const deferred: SignerKeySource = async () => {
+      reads += 1;
+      return await pending.promise;
+    };
+    const lookup = isolateSignerKeys(deferred, newKeyCopyState(), () => now);
+    const first = lookup(KID_A);
+    now = 1_000;
+    const second = lookup(KID_A);
+    pending.resolve([jwk(KID_A)]);
+    expect(await first).toMatchObject({ status: 'found' });
+    expect(await second).toMatchObject({ status: 'found' });
+    expect(reads).toBe(1);
+  });
+
   it('shares one read between concurrent lookups', async () => {
     const keys = source([[jwk(KID_A)]]);
     const lookup = isolateSignerKeys(keys.read, newKeyCopyState(), () => 0);

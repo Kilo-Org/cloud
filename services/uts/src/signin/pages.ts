@@ -292,9 +292,10 @@ export function deviceMessagePage(message: string, status: number): Response {
 }
 
 /**
- * The confirm page of an app that receives its code on a private-use URI scheme: the form posts
- * the same authorization URL back from this origin, which the hand-off approves and redirects to
- * `redirectUri`, so the page's `form-action` allows that URI's scheme.
+ * The confirm page of a native app, which receives its code on a loopback address or a
+ * private-use URI scheme (RFC 8252 section 8.6): the form posts the same authorization URL back
+ * from this origin, which the hand-off approves and redirects to `redirectUri`, so the page's
+ * `form-action` allows that redirect's origin (loopback) or scheme (private use).
  */
 export function confirmAppPage(appName: string, redirectUri: string): Response {
   const response = page(
@@ -307,7 +308,7 @@ export function confirmAppPage(appName: string, redirectUri: string): Response {
   );
   response.headers.set(
     'Content-Security-Policy',
-    contentSecurityPolicy(`'self' ${new URL(redirectUri).protocol}`, null)
+    contentSecurityPolicy(formActionFor(redirectUri), null)
   );
   return response;
 }

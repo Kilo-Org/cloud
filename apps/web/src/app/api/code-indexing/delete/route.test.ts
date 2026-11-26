@@ -32,6 +32,12 @@ jest.mock('@/lib/code-indexing/availability.server', () => ({
     ),
 }));
 
+// A fixed minimum the gate enforces; the real version comparison runs.
+jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/trpc/min-version'),
+  getMinimumVersions: async () => ({ ios: '2.0.0', android: '2.0.0' }),
+}));
+
 type MilvusDelete = { collection_name: string; filter: string };
 
 jest.mock('@/lib/code-indexing/milvus', () => {
@@ -153,9 +159,10 @@ describe('POST /api/code-indexing/delete', () => {
     });
   });
 
-  test('keeps the 401 for a request without a usable account and changes nothing', async () => {
+  test('keeps the 401 for a blocked account off the mobile client and changes nothing', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
+      refusalReason: 'account_blocked',
       authFailedResponse: NextResponse.json(
         { success: false, error: 'Access denied (R1)' },
         { status: 403 }
@@ -242,5 +249,93 @@ describe('POST /api/code-indexing/delete', () => {
     });
     expect(await manifestFiles(organization.id)).toEqual(['src/old.ts']);
     expect(milvusDeletes()).toHaveLength(0);
+  });
+
+  test('refuses a Cloud Agent authority as the tRPC adapter did and changes nothing', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      authFailedResponse: null,
+      user: member,
+      credential: 'session',
+      cloudAgentAuthority: { ownerId: member.id },
+    } as never);
+
+    const response = await POST(
+      createRequest(
+        JSON.stringify({
+          organizationId: organization.id,
+          projectId: 'acme/app',
+          filePaths: ['src/old.ts'],
+        })
+      )
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Cloud Agent authority denied',
+      message: 'Cloud Agent authority denied',
+    });
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ requestPathname: ROUTE })
+    );
+    expect(await manifestFiles(organization.id)).toEqual(['src/old.ts']);
+    expect(milvusDeletes()).toHaveLength(0);
+  });
+
+  describe('mobile client', () => {
+    const mobileHeaders = (version: string) => ({
+      'x-kilo-client': 'mobile',
+      'x-kilo-app-platform': 'ios',
+      'x-kilo-app-version': version,
+    });
+    const body = () =>
+      JSON.stringify({
+        organizationId: organization.id,
+        projectId: 'acme/app',
+        filePaths: ['src/old.ts'],
+      });
+
+    test('refuses an app below the minimum version with the app update answer', async () => {
+      signInWithSession(member);
+
+      const response = await POST(createRequest(body(), mobileHeaders('1.9.9')));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: 'App update required',
+        message: 'App update required',
+      });
+      expect(await manifestFiles(organization.id)).toEqual(['src/old.ts']);
+      expect(milvusDeletes()).toHaveLength(0);
+    });
+
+    test('refuses a blocked account with the 403 blocked answer, not the 401', async () => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        refusalReason: 'account_blocked',
+        authFailedResponse: NextResponse.json(
+          { success: false, error: 'Access denied (R1)' },
+          { status: 403 }
+        ),
+      } as never);
+
+      const response = await POST(createRequest(body(), mobileHeaders('2.0.0')));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Account access is blocked',
+        message: 'Account access is blocked',
+      });
+      expect(await manifestFiles(organization.id)).toEqual(['src/old.ts']);
+    });
+
+    test('lets a current app delete files', async () => {
+      signInWithSession(member);
+
+      const response = await POST(createRequest(body(), mobileHeaders('2.0.0')));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ success: true, deletedFiles: 1 });
+      expect(await manifestFiles(organization.id)).toEqual([]);
+    });
   });
 });

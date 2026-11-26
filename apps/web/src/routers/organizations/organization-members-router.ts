@@ -349,7 +349,15 @@ export const organizationsMembersRouter = createTRPCRouter({
           message: 'User is not a member of this organization',
         });
       }
-      // Changing an owner or granting owner needs owner authority.
+
+      // Only an owner may grant the owner role or change an existing owner's
+      // role; admins match owners everywhere else. Checked before the audited
+      // write, so a caller refused here is never recorded as an admin bypass.
+      await requireOwnerAuthority(ctx, organizationId, {
+        currentRole: targetMember.role,
+        nextRole: role,
+      });
+
       return runElevatedOrganizationWrite(
         ctx,
         {
@@ -363,13 +371,6 @@ export const organizationsMembersRouter = createTRPCRouter({
           metadata: { memberKiloUserId: memberId, previousRole: targetMember.role, role },
         },
         async () => {
-          // Only an owner may grant the owner role or change an existing owner's
-          // role; admins match owners everywhere else.
-          await requireOwnerAuthority(ctx, organizationId, {
-            currentRole: targetMember.role,
-            nextRole: role,
-          });
-
           const updatedUser = await findUserById(memberId);
           const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
 

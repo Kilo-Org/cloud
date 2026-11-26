@@ -18,6 +18,7 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_memberships,
+  organization_user_limits,
   organizations,
   external_side_effect_outbox,
   passkey_credentials,
@@ -342,50 +343,71 @@ describe('organizations members trpc router', () => {
       const organization = await createOrganizationWithSeats('Owner Authority On Org', owner.id);
       const member = await insertTestUser({ is_admin: false });
       await addUserToOrganization(organization.id, member.id, 'member');
+      const coOwner = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, coOwner.id, 'owner');
       const kiloAdmin = await insertTestUser({ is_admin: true });
       await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
       const caller = await createSessionCallerForUser(kiloAdmin.id);
 
       enableSupportAccess(true);
       try {
-        await expect(
-          caller.organizations.members.update({
-            organizationId: organization.id,
-            memberId: member.id,
-            role: 'owner',
-          })
-        ).rejects.toMatchObject({
-          code: 'FORBIDDEN',
-          message: 'Only an organization owner can manage owners',
-        });
+        // Both halves of owner authority: granting owner, and changing an owner.
+        for (const change of [
+          { memberId: member.id, role: 'owner' as const },
+          { memberId: coOwner.id, role: 'member' as const },
+        ]) {
+          await expect(
+            caller.organizations.members.update({
+              organizationId: organization.id,
+              ...change,
+              dailyUsageLimitUsd: 10,
+            })
+          ).rejects.toMatchObject({
+            code: 'FORBIDDEN',
+            message: 'Only an organization owner can manage owners',
+          });
+        }
       } finally {
         enableSupportAccess(false);
       }
-      const membership = await db.query.organization_memberships.findFirst({
-        where: and(
-          eq(organization_memberships.organization_id, organization.id),
-          eq(organization_memberships.kilo_user_id, member.id)
-        ),
-      });
-      expect(membership?.role).toBe('member');
-      // The refused change is still an admin-bypass attempt, so it records one
-      // failure row naming the admin role the actor really holds.
-      expect(await elevatedAudits(kiloAdmin.id, organization.id)).toEqual([
-        expect.objectContaining({
-          action: 'organization.member.role.update',
-          outcome: 'failure',
-          actor_id: kiloAdmin.id,
-          target_type: 'organization',
-          target_id: organization.id,
-          metadata: expect.objectContaining({
-            memberKiloUserId: member.id,
-            previousRole: 'member',
-            role: 'owner',
-            heldRoles: ['admin'],
-            errorCode: 'FORBIDDEN',
-          }),
-        }),
-      ]);
+      const memberships = await db
+        .select({
+          userId: organization_memberships.kilo_user_id,
+          role: organization_memberships.role,
+        })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            inArray(organization_memberships.kilo_user_id, [member.id, coOwner.id])
+          )
+        );
+      expect(memberships).toEqual(
+        expect.arrayContaining([
+          { userId: member.id, role: 'member' },
+          { userId: coOwner.id, role: 'owner' },
+        ])
+      );
+      expect(
+        await db
+          .select()
+          .from(organization_user_limits)
+          .where(eq(organization_user_limits.organization_id, organization.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(organization_audit_logs)
+          .where(
+            and(
+              eq(organization_audit_logs.organization_id, organization.id),
+              eq(organization_audit_logs.action, 'organization.member.change_role')
+            )
+          )
+      ).toEqual([]);
+      // Refused before the audited write starts: the staff actor is never
+      // named in an admin-bypass row.
+      expect(await elevatedAudits(kiloAdmin.id, organization.id)).toEqual([]);
     });
 
     it('records Kilo admin self-removal with the roles held before removal', async () => {

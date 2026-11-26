@@ -197,6 +197,82 @@ export type CreateTRPCContextOpts = {
 };
 
 /**
+ * The context's refusal for an authentication result without a usable user,
+ * or `null` when `auth.user` is set. A REST handler that builds its own REST
+ * context from `getUserFromAuth` uses it to keep the tRPC context's answers.
+ */
+export function contextAuthRefusal(
+  auth: { user: unknown; refusalReason?: unknown },
+  headersList: Pick<Headers, 'get'> | null | undefined
+): TRPCError | null {
+  // Authorization refused the account itself (R0 domain blacklist / R1 blocked
+  // account) while the session is intact. That is a different answer from a
+  // missing session: the mobile app must show why the account cannot be used
+  // and keep the user signed in, so this refuses with its own cause instead of
+  // reaching the AuthContextError branch below.
+  //
+  // Both refusals keep the same HTTP/tRPC shape (FORBIDDEN, `data.accountBlocked`)
+  // and differ only in the reason published beside it. The reason is what lets
+  // the app drop a retry: R1 (`account_blocked`) is one account's property,
+  // which support can lift, while R0 (`email_domain_blocked`) is the email
+  // domain's, so no retry, sign-out or sign-in can satisfy it.
+  //
+  // Only the first-party mobile client gets that answer. The web app already
+  // routes a blocked account to /account-blocked from its UNAUTHORIZED path
+  // (sign-in -> after-sign-in -> /account-blocked), and no web consumer reads
+  // `data.accountBlocked`, so every other client falls through to the
+  // merge-base UNAUTHORIZED answer unchanged.
+  const accountBlockedReason = accountBlockedRefusalReason(auth.refusalReason);
+  if (accountBlockedReason !== null && isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
+    return new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Account access is blocked',
+      cause: new AccountBlockedError(accountBlockedReason),
+    });
+  }
+  if (auth.user) return null;
+  return new TRPCError({
+    code: 'UNAUTHORIZED',
+    message: 'User not authenticated - no user to set on context',
+    // Marks this as a genuine session failure (vs a procedure-level
+    // UNAUTHORIZED like org-access denial) so the mobile client signs out
+    // only here — see AuthContextError / data.authRequired.
+    cause: new AuthContextError(),
+  });
+}
+
+/**
+ * The context's authentication read, inside the control-plane budget. A REST
+ * handler that builds its own REST context reads through it so its auth read
+ * keeps the budget the tRPC route adapter gave it.
+ */
+export function readContextAuth(opts: {
+  headersList: Headers;
+  requestPathname: string | undefined;
+  info?: ControlPlaneRequestInfo;
+  startedAt?: number;
+}) {
+  return withControlPlaneBudget({
+    path: controlPlanePathFromInfo(opts.info),
+    type: controlPlaneTypeFromInfo(opts.info),
+    headersList: opts.headersList,
+    next: () =>
+      getUserFromAuth({
+        adminOnly: false,
+        requestHeaders: opts.headersList,
+        requestPathname: opts.requestPathname,
+        // A refused account still owns the session it is signing out of. The
+        // admission covers only the cleanup procedures (see
+        // admitsRefusedAccount), so every other call keeps the block refusal
+        // in contextAuthRefusal.
+        allowRefusedAccountSelfCleanup: admitsRefusedAccount(opts.info),
+      }),
+    startedAt: opts.startedAt,
+    surface: 'context',
+  });
+}
+
+/**
  * @see: https://trpc.io/docs/server/context
  *
  * The shared auth read (`getUserFromAuth` -> `findUserById(..., readDb)`) is
@@ -217,59 +293,15 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     webSessionId,
     webSessionPepper,
     refusalReason,
-  } = await withControlPlaneBudget({
-    path: controlPlanePathFromInfo(opts?.info),
-    type: controlPlaneTypeFromInfo(opts?.info),
+  } = await readContextAuth({
     headersList,
-    next: () =>
-      getUserFromAuth({
-        adminOnly: false,
-        requestHeaders: headersList,
-        requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
-        // A refused account still owns the session it is signing out of. The
-        // admission covers only the cleanup procedures (see
-        // admitsRefusedAccount), so every other call keeps the block refusal
-        // below.
-        allowRefusedAccountSelfCleanup: admitsRefusedAccount(opts?.info),
-      }),
+    requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
+    info: opts?.info,
     startedAt,
-    surface: 'context',
   });
-  // Authorization refused the account itself (R0 domain blacklist / R1 blocked
-  // account) while the session is intact. That is a different answer from a
-  // missing session: the mobile app must show why the account cannot be used
-  // and keep the user signed in, so this refuses with its own cause instead of
-  // reaching the AuthContextError branch below.
-  //
-  // Both refusals keep the same HTTP/tRPC shape (FORBIDDEN, `data.accountBlocked`)
-  // and differ only in the reason published beside it. The reason is what lets
-  // the app drop a retry: R1 (`account_blocked`) is one account's property,
-  // which support can lift, while R0 (`email_domain_blocked`) is the email
-  // domain's, so no retry, sign-out or sign-in can satisfy it.
-  //
-  // Only the first-party mobile client gets that answer. The web app already
-  // routes a blocked account to /account-blocked from its UNAUTHORIZED path
-  // (sign-in -> after-sign-in -> /account-blocked), and no web consumer reads
-  // `data.accountBlocked`, so every other client falls through to the
-  // merge-base UNAUTHORIZED answer unchanged.
-  const accountBlockedReason = accountBlockedRefusalReason(refusalReason);
-  if (accountBlockedReason !== null && isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Account access is blocked',
-      cause: new AccountBlockedError(accountBlockedReason),
-    });
-  }
-  if (!user) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'User not authenticated - no user to set on context',
-      // Marks this as a genuine session failure (vs a procedure-level
-      // UNAUTHORIZED like org-access denial) so the mobile client signs out
-      // only here — see AuthContextError / data.authRequired.
-      cause: new AuthContextError(),
-    });
-  }
+  // Non-null whenever `user` is null, so the second test only narrows `user`.
+  const refusal = contextAuthRefusal({ user, refusalReason }, headersList);
+  if (refusal !== null || !user) throw refusal;
   setTag('userId', user.id);
   const authViaToken = authViaTokenFromHeaders(headersList);
   return {
@@ -399,8 +431,14 @@ const auditContextMiddleware = t.middleware(({ ctx, path, type, next }) =>
 // the tRPC Sentry middleware must not capture one event per request during an
 // outage (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
 let lastNoRowReportAt = 0;
-const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
-  if (!isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))) return next();
+/**
+ * The minimum-version gate itself. A REST handler that calls a router's domain
+ * helper directly (not through a caller) runs it so that path keeps the gate.
+ */
+export async function assertMinimumAppVersion(
+  headersList: TRPCContext['headersList'] | null | undefined
+): Promise<void> {
+  if (!isMobileClient(headersList?.get(APP_CLIENT_HEADER))) return;
   const minimums = await getMinimumVersions();
   if (minimums === null) {
     // The gate's configuration is absent. Serve — an update cannot fix a
@@ -416,11 +454,14 @@ const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
         }
       );
     }
-    return next();
+    return;
   }
-  if (!enforceMinimumVersion(ctx.headersList, minimums).pass) {
+  if (!enforceMinimumVersion(headersList, minimums).pass) {
     throw appUpdateRequiredError();
   }
+}
+const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
+  await assertMinimumAppVersion(ctx.headersList);
   return next();
 });
 

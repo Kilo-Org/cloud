@@ -123,6 +123,8 @@ data.
   held one over another list (two feed objects sign heads, and `iat` has one-second resolution),
   a head over 30 s old, and a head more than 5 s in the future (the design 5.6 clock skew); a head
   up to 5 s ahead ages from its fetch time. It fetches the list only when `list_hash` changes.
+  An update signed in the held head's second therefore waits for the next head: a revocation in
+  it can arrive up to one re-sign later, still within the 30 s and 60 s head-age limits.
 
 ## PAT format
 

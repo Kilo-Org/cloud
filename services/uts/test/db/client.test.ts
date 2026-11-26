@@ -232,10 +232,12 @@ describe('identity-store client', () => {
 
 describe('PAT and bot key lookups', () => {
   it('find active credentials and skip revoked, expired, blocked or cut-off ones', async () => {
-    const app = await db.connect('uts_app_a');
-    const accountId = await insertAccount(app);
-    const blockedAccountId = await insertAccount(app);
-    await app.query(
+    // PATs, bot keys and gate passes change only through the account functions (migration 0005),
+    // so the fixtures are written as the owner.
+    const writer = await db.connectAsOwner();
+    const accountId = await insertAccount(writer);
+    const blockedAccountId = await insertAccount(writer);
+    await writer.query(
       `UPDATE uts.accounts SET status = 'blocked', blocked_at = now() WHERE id = $1`,
       [blockedAccountId]
     );
@@ -245,7 +247,7 @@ describe('PAT and bot key lookups', () => {
       createdDaysAgo = 0
     ) => {
       const tokenHash = randomHash();
-      await app.query(
+      await writer.query(
         `INSERT INTO uts.personal_access_tokens
            (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, created_at,
             expires_at, status, revoked_at, revoke_reason)
@@ -254,13 +256,19 @@ describe('PAT and bot key lookups', () => {
                  now() - make_interval(days => $5) + interval '90 days',
                  $4::uts.credential_status, CASE WHEN $4::uts.credential_status = 'revoked' THEN now() END,
                  CASE WHEN $4::uts.credential_status = 'revoked' THEN 'user_revoke'::uts.revoke_reason END)`,
-        [owner, tokenHash, await insertGatePass(app, owner, 'pat_create'), status, createdDaysAgo]
+        [
+          owner,
+          tokenHash,
+          await insertGatePass(writer, owner, 'pat_create'),
+          status,
+          createdDaysAgo,
+        ]
       );
       return tokenHash;
     };
     const insertBotKey = async (status: string, flaggedDaysAgo: number | null, kept: boolean) => {
       const tokenHash = randomHash();
-      await app.query(
+      await writer.query(
         `INSERT INTO uts.org_bot_keys
            (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id,
             created_at, expires_at, status, flagged_at, kept_by, kept_at)
@@ -270,7 +278,7 @@ describe('PAT and bot key lookups', () => {
         [
           accountId,
           tokenHash,
-          await insertGatePass(app, accountId, 'bot_key_create'),
+          await insertGatePass(writer, accountId, 'bot_key_create'),
           status,
           flaggedDaysAgo,
           kept,

@@ -6,6 +6,7 @@ import {
   TestDatabase,
   insertAccount,
   insertAudit,
+  insertBrowserSession,
   insertGatePass,
   loginPassword,
   randomHash,
@@ -14,7 +15,10 @@ import {
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 
-/** Tables the app login writes only through the OAuth grant functions (migration 0004). */
+/**
+ * Tables the app login writes only through security-definer functions: the OAuth grant functions
+ * (migration 0004) and the account functions (migration 0005).
+ */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
   'refresh_grants',
@@ -23,6 +27,9 @@ const FUNCTION_WRITTEN_TABLES = [
   'third_party_refresh_tokens',
   'revocations',
   'dpop_proofs',
+  'personal_access_tokens',
+  'org_bot_keys',
+  'gate_passes',
 ];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
@@ -107,18 +114,16 @@ describe('role attributes', () => {
 });
 
 describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
-  it('reads and writes the credential tables', async () => {
+  it('reads and writes the credential tables it owns directly', async () => {
     const app = await db.connect(login);
     const accountId = await insertAccount(app);
-    const gatePassId = await insertGatePass(app, accountId, 'pat_create');
+    await insertBrowserSession(app, accountId);
     const result = await app.query(
-      `INSERT INTO uts.personal_access_tokens
-         (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
-       VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')
-       RETURNING id`,
-      [accountId, randomHash(), gatePassId]
+      `INSERT INTO uts.notices (account_id, kind) VALUES ($1, 'sessions_revoked') RETURNING id`,
+      [accountId]
     );
     expect(result.rowCount).toBe(1);
+    await app.query('SELECT 1 FROM uts.personal_access_tokens LIMIT 1');
   });
 
   it('runs OAuth row maintenance', async () => {
@@ -227,7 +232,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
 
 describe.each(['uts_pat_a', 'uts_pat_b'] as const)('PAT login %s', login => {
   it('finds an active PAT and an active bot key by hash', async () => {
-    const app = await db.connect('uts_app_a');
+    const app = await db.connectAsOwner();
     const accountId = await insertAccount(app);
     const patHash = randomHash();
     await app.query(
@@ -433,18 +438,27 @@ describe('functions', () => {
        ORDER BY 1, 2`
     );
     expect(result.rows).toEqual([
+      { routine: 'create_bot_key', grantee: 'uts_app' },
+      { routine: 'create_pat', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
       { routine: 'is_scope_set', grantee: 'uts_app' },
       { routine: 'issue_authorization_code', grantee: 'uts_app' },
+      { routine: 'keep_bot_key', grantee: 'uts_app' },
+      { routine: 'list_bot_keys', grantee: 'uts_app' },
+      { routine: 'list_pats', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
+      { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'refresh_first_party', grantee: 'uts_app' },
       { routine: 'refresh_third_party', grantee: 'uts_app' },
+      { routine: 'remove_org_member', grantee: 'uts_app' },
+      { routine: 'revoke_bot_key', grantee: 'uts_app' },
+      { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
     ]);
   });

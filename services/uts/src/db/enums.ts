@@ -102,6 +102,7 @@ export const NOTICE_KINDS = [
   'sessions_revoked',
   'suspicious_sign_in',
   'sign_in_code_stopped',
+  'bot_key_flagged',
 ] as const;
 export const NOTICE_CHANNELS = ['push', 'email', 'in_app'] as const;
 export const NOTICE_DELIVERIES = ['pending', 'delivered', 'failed'] as const;

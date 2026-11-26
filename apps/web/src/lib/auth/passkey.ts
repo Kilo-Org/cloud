@@ -32,6 +32,12 @@ import {
 } from '@kilocode/web-shared/lib/drizzle';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import { deleteExpiredPasskeyManagementAuthorizations } from './passkey-management';
+import {
+  checkPasskeyEnrollmentCode,
+  consumePasskeyEnrollmentCode,
+  PasskeyEnrollmentCodeRefusedError,
+  type PasskeyEnrollmentEmailCode,
+} from './passkey-enrollment-email-code';
 
 /**
  * WebAuthn ceremonies for passkey registration and sign-in.
@@ -437,21 +443,33 @@ async function verifyRegistrationWithAuthorization(
  * the same row before it deletes passkeys. It therefore either commits first,
  * and this registration is refused, or waits for this insert and then deletes
  * the new credential.
+ *
+ * `emailCode` is the code emailed to the account for this session. It is
+ * checked before the ceremony, where a wrong code spends an attempt that a
+ * rolled-back transaction would otherwise undo, and it is used inside the
+ * insertion transaction, so one code adds at most one passkey. A refused code
+ * throws `PasskeyEnrollmentCodeRefusedError`.
  */
 export async function verifyRegistration(
   kiloUserId: string,
   challengeId: string,
   response: RegistrationResponseJSON,
-  sessionPepper: string | null | undefined
+  sessionPepper: string | null | undefined,
+  emailCode: PasskeyEnrollmentEmailCode
 ): Promise<PasskeyCredential> {
+  const checked = await checkPasskeyEnrollmentCode(emailCode);
+  if (checked.status !== 'ok') throw new PasskeyEnrollmentCodeRefusedError(checked);
+
   return verifyRegistrationWithAuthorization(
     kiloUserId,
     challengeId,
     response,
-    async (_tx, owner) => {
+    async (tx, owner) => {
       if (!owner || !isWebSessionCurrent(sessionPepper, owner)) {
         throw new PasskeyVerificationError('VERIFICATION_FAILED');
       }
+      const consumed = await consumePasskeyEnrollmentCode(tx, emailCode);
+      if (consumed.status !== 'ok') throw new PasskeyEnrollmentCodeRefusedError(consumed);
     }
   );
 }

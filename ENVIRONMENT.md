@@ -487,6 +487,7 @@ The WorkOS Directory Sync (SCIM) write path is `apps/web/src/app/api/internal/sc
 - `NEVERBOUNCE_API_KEY` - NeverBounce API key for email verification. In staging, only the effective internal sink is verified. `[SECRET]`
 - `STAGING_EMAIL_REDIRECT_TO` - Required when `VERCEL_TARGET_ENV=staging`. Must contain exactly one valid address in the `kilocode.ai` domain; every staging message is redirected there with a staging subject prefix and safe Reply-To. [SERVER]
 - `LOCAL_EMAIL_OPEN_BROWSER` - Set to `false` to stop locally captured emails from opening in a browser tab. Defaults to opening each capture. Local development only. [SERVER]
+- `LOCAL_EMAIL_OUTBOX_IN_AUTOMATED_TEST` - Set to `1` to capture automated-test emails under `dev/logs/emails/` instead of suppressing them, so browser end-to-end tests can read emailed codes. Ignored when `VERCEL_TARGET_ENV` or `VERCEL_ENV` is set. Only the Playwright web server sets it. [SERVER]
 
 When `VERCEL_TARGET_ENV` is absent in local development or a script process, transactional messages are captured as owner-only clickable HTML under `dev/logs/emails/` instead of being sent. Automated tests (including `IS_IN_AUTOMATED_TEST`) and non-production Vercel targets suppress provider delivery and report successful no-op delivery. A production-mode process without `VERCEL_TARGET_ENV` fails delivery as a configuration error so retryable email markers are not consumed as successful sends.
 

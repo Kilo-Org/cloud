@@ -6,43 +6,58 @@ import { organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, sql } from 'drizzle-orm';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import {
+  addAdminAuditMetadata,
+  auditedAdminRoute,
+  inputFieldTarget,
+  setAdminAuditActor,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse<{ success: boolean; consumed_usd: number } | { error: string }>> {
-  if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json({ error: 'Only available in development' }, { status: 403 });
+export const POST = auditedAdminRoute(
+  {
+    kind: 'declarative',
+    action: 'organization.dev_credits.consume',
+    target: inputFieldTarget('organization', 'id'),
+  },
+  async (
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+  ): Promise<NextResponse<{ success: boolean; consumed_usd: number } | { error: string }>> => {
+    if (process.env.NODE_ENV !== 'development') {
+      return NextResponse.json({ error: 'Only available in development' }, { status: 403 });
+    }
+
+    const id = (await params).id;
+    const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(operator);
+    if (!userCanManageCredits(operator)) {
+      return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
+    }
+
+    const org = await getOrganizationById(id);
+    if (!org) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const amount_usd = body.amount_usd;
+    if (typeof amount_usd !== 'number' || !Number.isFinite(amount_usd) || amount_usd <= 0) {
+      return NextResponse.json({ error: 'amount_usd must be a positive number' }, { status: 400 });
+    }
+    addAdminAuditMetadata({ amountUsd: amount_usd });
+
+    const microdollars = toMicrodollars(amount_usd);
+
+    await db
+      .update(organizations)
+      .set({
+        microdollars_used: sql`${organizations.microdollars_used} + ${microdollars}`,
+        microdollars_balance: sql`${organizations.microdollars_balance} - ${microdollars}`,
+      })
+      .where(eq(organizations.id, id));
+
+    return NextResponse.json({ success: true, consumed_usd: amount_usd });
   }
-
-  const id = (await params).id;
-  const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
-  if (!operator || !userCanManageCredits(operator)) {
-    return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
-  }
-
-  const org = await getOrganizationById(id);
-  if (!org) {
-    return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-  }
-
-  const body = await request.json();
-  const amount_usd = body.amount_usd;
-  if (typeof amount_usd !== 'number' || !Number.isFinite(amount_usd) || amount_usd <= 0) {
-    return NextResponse.json({ error: 'amount_usd must be a positive number' }, { status: 400 });
-  }
-
-  const microdollars = toMicrodollars(amount_usd);
-
-  await db
-    .update(organizations)
-    .set({
-      microdollars_used: sql`${organizations.microdollars_used} + ${microdollars}`,
-      microdollars_balance: sql`${organizations.microdollars_balance} - ${microdollars}`,
-    })
-    .where(eq(organizations.id, id));
-
-  return NextResponse.json({ success: true, consumed_usd: amount_usd });
-}
+);

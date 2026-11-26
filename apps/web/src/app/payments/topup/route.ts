@@ -17,6 +17,10 @@ import {
   CHARGE_GATE_BLOCKED_MESSAGE,
   decideCheckoutCharge,
 } from '@kilocode/web-shared/lib/bouncer/charge-gate';
+import {
+  adminActionContextFromHeaders,
+  runElevatedOrganizationWrite,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -74,7 +78,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
     return NextResponse.json({ error: 'Invalid org id' }, { status: 400 });
   }
 
-  let stripeCustomerId: string | null | undefined;
   let accountCreatedAt: Date | string = currentUser.created_at;
   let accountUsedMicrodollars = currentUser.microdollars_used;
   if (organizationId) {
@@ -86,52 +89,68 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
     }
     accountCreatedAt = orgContext.data.organization.created_at;
     accountUsedMicrodollars = orgContext.data.organization.microdollars_used;
-    stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
-  } else {
-    stripeCustomerId = currentUser.stripe_customer_id;
   }
 
-  const cancelPathRaw = searchParams.get('cancel-path');
-  const cancelPath = cancelPathRaw ? getSafeReturnUrlPath(cancelPathRaw) : null;
+  const createCheckout = async (): Promise<NextResponse<unknown>> => {
+    const stripeCustomerId: string | null | undefined = organizationId
+      ? await getOrCreateStripeCustomerIdForOrganization(organizationId)
+      : currentUser.stripe_customer_id;
 
-  // Refuse before Stripe creates a session when bouncer blocks this payer's charges.
-  const chargeVerdict = await decideCheckoutCharge({
-    userId: currentUser.id,
-    organizationId,
-    flow: 'topup',
-    ip: clientIpFromHeaders(request.headers),
-    ja4: ja4FromHeaders(request.headers),
-  });
-  if (chargeVerdict?.enforced) {
-    return NextResponse.json({ error: CHARGE_GATE_BLOCKED_MESSAGE }, { status: 403 });
-  }
+    const cancelPathRaw = searchParams.get('cancel-path');
+    const cancelPath = cancelPathRaw ? getSafeReturnUrlPath(cancelPathRaw) : null;
 
-  const url = await getStripeTopUpCheckoutUrl(
-    currentUser.id,
-    stripeCustomerId,
-    validationResult.amount as number,
-    origin,
-    organizationId,
-    cancelPath,
-    {
-      accountCreatedAt,
-      accountUsedMicrodollars,
+    // Refuse before Stripe creates a session when bouncer blocks this payer's charges.
+    const chargeVerdict = await decideCheckoutCharge({
+      userId: currentUser.id,
+      organizationId,
+      flow: 'topup',
       ip: clientIpFromHeaders(request.headers),
-      ipCountry: ipCountryFromHeaders(request.headers),
       ja4: ja4FromHeaders(request.headers),
-    }
-  );
-
-  if (!url) {
-    captureException(new Error('Failed to create checkout session'), {
-      extra: {
-        userId: currentUser.id,
-        organizationId,
-        amount: validationResult.amount,
-      },
     });
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
-  }
+    if (chargeVerdict?.enforced) {
+      return NextResponse.json({ error: CHARGE_GATE_BLOCKED_MESSAGE }, { status: 403 });
+    }
 
-  return NextResponse.redirect(url, { status: 303 });
+    const url = await getStripeTopUpCheckoutUrl(
+      currentUser.id,
+      stripeCustomerId,
+      validationResult.amount as number,
+      origin,
+      organizationId,
+      cancelPath,
+      {
+        accountCreatedAt,
+        accountUsedMicrodollars,
+        ip: clientIpFromHeaders(request.headers),
+        ipCountry: ipCountryFromHeaders(request.headers),
+        ja4: ja4FromHeaders(request.headers),
+      }
+    );
+
+    if (!url) {
+      captureException(new Error('Failed to create checkout session'), {
+        extra: {
+          userId: currentUser.id,
+          organizationId,
+          amount: validationResult.amount,
+        },
+      });
+      return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+    }
+
+    return NextResponse.redirect(url, { status: 303 });
+  };
+
+  if (!organizationId) return createCheckout();
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(currentUser, request.headers),
+    {
+      organizationId,
+      requiredRoles: ORGANIZATION_BILLING_ROLES,
+      action: 'organization.topup_checkout.create',
+      message: 'Created a top-up checkout session',
+      metadata: { amountUsd: validationResult.amount ?? null, origin },
+    },
+    createCheckout
+  );
 }

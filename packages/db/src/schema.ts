@@ -5681,7 +5681,13 @@ export const magic_link_tokens = pgTable(
     purpose: text()
       .default('magic_link')
       .notNull()
-      .$type<'magic_link' | 'sign_in_code' | 'data_export_download' | 'sign_in_method_change'>(),
+      .$type<
+        | 'magic_link'
+        | 'sign_in_code'
+        | 'data_export_download'
+        | 'sign_in_method_change'
+        | 'passkey_enrollment'
+      >(),
     challenge_id: uuid(),
   },
   table => [
@@ -5697,7 +5703,7 @@ export const magic_link_tokens = pgTable(
     // without this constraint the union above is a compile-time fiction.
     check(
       'check_magic_link_tokens_purpose',
-      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change')`
+      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change', 'passkey_enrollment')`
     ),
   ]
 );
@@ -10242,7 +10248,6 @@ export const auth_audit_logs = pgTable(
   table => [
     index('IDX_auth_audit_logs_created_at').on(table.created_at),
     index('IDX_auth_audit_logs_user_id_created_at').on(table.user_id, table.created_at),
-    index('IDX_auth_audit_logs_action_created_at').on(table.action, table.created_at),
     index('IDX_auth_audit_logs_subject_email_hash_created_at')
       .on(table.subject_email_hash, table.created_at)
       .where(sql`${table.subject_email_hash} IS NOT NULL`),

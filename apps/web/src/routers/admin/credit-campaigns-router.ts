@@ -2,7 +2,10 @@ import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
-import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import {
+  recordAdminAction,
+  setAdminAuditTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   credit_campaigns,
   credit_transactions,
@@ -181,6 +184,7 @@ export const creditCampaignsRouter = createTRPCRouter({
     }),
 
   create: creditManagerProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['credit_campaign.create'] } })
     .input(createCampaignInputSchema)
     .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
       const credit_category = credit_categoryForSlug(input.slug);
@@ -235,8 +239,10 @@ export const creditCampaignsRouter = createTRPCRouter({
     }),
 
   update: creditManagerProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['credit_campaign.update'] } })
     .input(updateCampaignInputSchema)
     .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
+      setAdminAuditTarget({ type: 'credit_campaign', id: String(input.id) });
       // slug + credit_category are deliberately excluded from the SET —
       // they're immutable after create to keep historical credit_transactions
       // rows tied to a stable category. See updateCampaignInputSchema.
@@ -289,8 +295,10 @@ export const creditCampaignsRouter = createTRPCRouter({
     }),
 
   setActive: creditManagerProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['credit_campaign.set_active'] } })
     .input(z.object({ id: z.number().int().positive(), active: z.boolean() }))
     .mutation(async ({ input, ctx }): Promise<CreditCampaign> => {
+      setAdminAuditTarget({ type: 'credit_campaign', id: String(input.id) });
       const [row] = await db
         .update(credit_campaigns)
         .set({ active: input.active, updated_at: new Date().toISOString() })

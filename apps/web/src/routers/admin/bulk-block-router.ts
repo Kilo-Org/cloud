@@ -50,30 +50,44 @@ export const adminBulkBlockRouter = createTRPCRouter({
     }));
   }),
 
-  unblockRecentBlock: adminProcedure.input(BulkBlockRowSchema).mutation(async ({ input, ctx }) => {
-    const { updatedCount, unblockedUserIds } = await unblockBulkBlockedUsers(
-      input.blocked_reason,
-      input.date,
-      input.blocked_by_kilo_user_id
-    );
+  unblockRecentBlock: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['user.unblock'] } })
+    .input(BulkBlockRowSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { updatedCount, unblockedUserIds } = await unblockBulkBlockedUsers(
+        input.blocked_reason,
+        input.date,
+        input.blocked_by_kilo_user_id
+      );
 
-    // Unblocking clears the block attribution columns, so record one audit row
-    // per user with the block group that was lifted.
-    await recordAdminActions(
-      ctx,
-      unblockedUserIds.map(userId => ({
-        action: 'user.unblock' as const,
-        target: userActionTarget(userId),
-        message: 'Unblocked user via bulk unblock',
-        metadata: {
-          bulk: true,
-          previousBlockedReason: input.blocked_reason,
-          previousBlockedDate: input.date,
-          previousBlockedByKiloUserId: input.blocked_by_kilo_user_id,
-        },
-      }))
-    );
+      // Unblocking clears the block attribution columns, so record one audit row
+      // per user with the block group that was lifted, or one summary row when
+      // the group matched nobody.
+      const metadata = {
+        bulk: true,
+        previousBlockedReason: input.blocked_reason,
+        previousBlockedDate: input.date,
+        previousBlockedByKiloUserId: input.blocked_by_kilo_user_id,
+      };
+      await recordAdminActions(
+        ctx,
+        unblockedUserIds.length > 0
+          ? unblockedUserIds.map(userId => ({
+              action: 'user.unblock' as const,
+              target: userActionTarget(userId),
+              message: 'Unblocked user via bulk unblock',
+              metadata,
+            }))
+          : [
+              {
+                action: 'user.unblock' as const,
+                target: null,
+                message: 'Unblocked users via bulk unblock: no users affected',
+                metadata,
+              },
+            ]
+      );
 
-    return { updatedCount };
-  }),
+      return { updatedCount };
+    }),
 });

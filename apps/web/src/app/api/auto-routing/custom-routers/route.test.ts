@@ -11,6 +11,7 @@ import {
   type CustomRouterVariantStatus,
 } from '@kilocode/auto-routing-contracts';
 import {
+  admin_action_audit_logs,
   auto_routing_custom_routers,
   organization_memberships,
   organizations,
@@ -1747,6 +1748,80 @@ describe('/api/auto-routing/custom-routers', () => {
         .from(auto_routing_custom_routers)
         .where(eq(auto_routing_custom_routers.slug, 'full'));
       expect(full?.entries).toHaveLength(20);
+    });
+  });
+
+  describe('organization admin bypass audit', () => {
+    async function orgRouter() {
+      const organization = await createTestOrganization('Audited', user.id, 0);
+      await create(
+        routerBody({ scope: 'org', slug: 'team' }),
+        `?organizationId=${organization.id}`
+      );
+      return organization;
+    }
+
+    async function deleteOrgRouter(organizationId: string) {
+      return deleteRouter(
+        request(`/org/team?organizationId=${organizationId}`, { method: 'DELETE' }),
+        params('org', 'team')
+      );
+    }
+
+    test('a Kilo admin outside the organization records the delete', async () => {
+      const organization = await orgRouter();
+      const admin = await insertTestUser({ is_admin: true });
+      signIn(admin);
+
+      expect((await deleteOrgRouter(organization.id)).status).toBe(204);
+      const rows = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'organization.custom_router.delete',
+          outcome: 'success',
+          target_type: 'organization',
+          target_id: organization.id,
+          metadata: { slug: 'team', heldRoles: [] },
+        }),
+      ]);
+    });
+
+    test('an organization owner deleting its own router records no admin row', async () => {
+      const organization = await orgRouter();
+
+      expect((await deleteOrgRouter(organization.id)).status).toBe(204);
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    });
+
+    test('a Kilo admin outside the organization records a failed delete with its status', async () => {
+      const organization = await createTestOrganization('Audited', user.id, 0);
+      const admin = await insertTestUser({ is_admin: true });
+      signIn(admin);
+
+      expect((await deleteOrgRouter(organization.id)).status).toBe(404);
+      const rows = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'organization.custom_router.delete',
+          outcome: 'failure',
+          target_type: 'organization',
+          target_id: organization.id,
+          metadata: { slug: 'team', heldRoles: [], errorCode: '404' },
+        }),
+      ]);
+    });
+
+    test('an organization owner whose delete fails records no admin row', async () => {
+      const organization = await createTestOrganization('Audited', user.id, 0);
+
+      expect((await deleteOrgRouter(organization.id)).status).toBe(404);
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
     });
   });
 });

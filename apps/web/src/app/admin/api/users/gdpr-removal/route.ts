@@ -7,6 +7,13 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getUserDeletionRequestById, getUserDeletionRequestForUser } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';
+import {
+  addAdminAuditMetadata,
+  auditedAdminRoute,
+  setAdminAuditActor,
+  setAdminAuditTarget,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export type GdprRemovalGetResponse =
   | { error: string }
@@ -48,9 +55,17 @@ export async function GET(request: NextRequest): Promise<NextResponse<GdprRemova
   });
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse<GdprRemovalPostResponse>> {
+export const POST = auditedAdminRoute(
+  { kind: 'declarative', action: 'user.gdpr_removal.enqueue' },
+  enqueueGdprRemoval
+);
+
+async function enqueueGdprRemoval(
+  request: NextRequest
+): Promise<NextResponse<GdprRemovalPostResponse>> {
   const { user: admin, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
+  setAdminAuditActor(admin);
 
   let body: unknown;
   try {
@@ -67,6 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
   if (!userId) {
     return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
   }
+  setAdminAuditTarget(userActionTarget(userId));
 
   const user = await findUserById(userId);
   if (!user) {
@@ -85,8 +101,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
     }
 
     if (result.status === 'refused' || result.status === 'invalid') {
+      addAdminAuditMetadata({ refusalCode: result.code });
       return NextResponse.json({ error: enqueueFailureMessage(result.code) }, { status: 400 });
     }
+
+    addAdminAuditMetadata({ requestId: result.requestId, status: result.status });
 
     return NextResponse.json(
       { requestId: result.requestId, status: result.status },

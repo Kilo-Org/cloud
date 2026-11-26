@@ -21,12 +21,12 @@ import { getAllUserProviders } from '@/lib/user';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 
-async function kiloPassAuditRows(targetUserId: string) {
+async function kiloPassAuditRows(targetUserId: string, outcome: 'success' | 'failure' = 'success') {
   const rows = await db
     .select()
     .from(admin_action_audit_logs)
     .where(eq(admin_action_audit_logs.action, 'kilo_pass.cancel_refund'));
-  return rows.filter(row => row.target_id === targetUserId);
+  return rows.filter(row => row.target_id === targetUserId && row.outcome === outcome);
 }
 
 async function getBlockState(id: string) {
@@ -192,7 +192,7 @@ describe('admin action audit logging', () => {
     expect(audits[0]?.metadata?.previousBlockedAt).toEqual(expect.any(String));
   });
 
-  test('blocking and no-op unblocks do not write unblock audits', async () => {
+  test('blocking and no-op unblocks record whether they changed the user', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
 
@@ -200,7 +200,22 @@ describe('admin action audit logging', () => {
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null });
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: 'abuse' });
 
-    expect(await getAdminActionAudits(admin.id)).toHaveLength(0);
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits).toHaveLength(2);
+    expect(audits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'user.unblock',
+          target_id: user.id,
+          metadata: expect.objectContaining({ changed: false }),
+        }),
+        expect.objectContaining({
+          action: 'user.block',
+          target_id: user.id,
+          metadata: { changed: true },
+        }),
+      ])
+    );
   });
 
   test('bulk unblock records one audit row per unblocked user', async () => {
@@ -229,6 +244,52 @@ describe('admin action audit logging', () => {
     expect(audits.every(audit => audit.action === 'user.unblock')).toBe(true);
   });
 
+  test('a bulk unblock that matches no users records one summary row', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.bulkBlock.unblockRecentBlock({
+      blocked_reason: 'no such wave',
+      date: '2026-01-15',
+      blocked_by_kilo_user_id: admin.id,
+    });
+    expect(result).toEqual({ updatedCount: 0 });
+
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'success',
+        target_type: null,
+        target_id: null,
+        message: 'Unblocked users via bulk unblock: no users affected',
+        metadata: expect.objectContaining({ previousBlockedReason: 'no such wave' }),
+      }),
+    ]);
+  });
+
+  test('a refused unblock records a failure row under user.unblock', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser({
+      blocked_reason: createSoftDeletedBlockedReason(new Date()),
+      blocked_at: new Date().toISOString(),
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(await getAdminActionAudits(admin.id)).toEqual([
+      expect.objectContaining({
+        action: 'user.unblock',
+        outcome: 'failure',
+        target_id: user.id,
+        metadata: { blocking: false, errorCode: 'FORBIDDEN' },
+      }),
+    ]);
+  });
+
   test('API key reset and session sign-out are recorded against the target user', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
@@ -243,6 +304,26 @@ describe('admin action audit logging', () => {
       'user.browser_sessions.revoke',
     ]);
     expect(audits.every(audit => audit.target_id === user.id)).toBe(true);
+  });
+
+  test('balance recompute is recorded against the target user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.recomputeBalances({ userId: user.id, dryRun: false });
+
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      action: 'user.balance.recompute',
+      outcome: 'success',
+      actor_id: admin.id,
+      target_type: 'user',
+      target_id: user.id,
+      message: 'admin.users.recomputeBalances',
+      metadata: { dryRun: false },
+    });
   });
 });
 
@@ -673,7 +754,7 @@ describe('admin.cancelAndRefundKiloPass', () => {
     ]);
   });
 
-  test('a refund that fails after the subscription was cancelled is still attributed', async () => {
+  test('a refund that fails after the subscription was cancelled records only a failure row', async () => {
     const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
     const target = await insertTestUser();
     await insertActiveKiloPass(target.id, `sub_fail_${crypto.randomUUID()}`);
@@ -692,12 +773,13 @@ describe('admin.cancelAndRefundKiloPass', () => {
       caller.admin.users.cancelAndRefundKiloPass({ userId: target.id, reason: 'chargeback' })
     ).rejects.toThrow('Stripe boom');
 
-    const audits = await kiloPassAuditRows(target.id);
-    expect(audits).toEqual([
+    expect(await kiloPassAuditRows(target.id)).toEqual([]);
+    expect(await kiloPassAuditRows(target.id, 'failure')).toEqual([
       expect.objectContaining({
         actor_id: superadmin.id,
         target_id: target.id,
-        message: 'Kilo Pass cancel attempted with unknown outcome',
+        // tRPC wraps an error that is not a TRPCError, so its code is the one the client sees.
+        metadata: { reason: 'chargeback', errorCode: 'INTERNAL_SERVER_ERROR' },
       }),
     ]);
   });
@@ -714,6 +796,15 @@ describe('admin.cancelAndRefundKiloPass', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
     expect(await kiloPassAuditRows('length-bound-target')).toEqual([]);
+    // The input never parsed, so the failure row names no target.
+    const [failure] = await getAdminActionAudits(superadmin.id);
+    expect(failure).toMatchObject({
+      action: 'kilo_pass.cancel_refund',
+      outcome: 'failure',
+      target_type: null,
+      target_id: null,
+      metadata: { errorCode: 'BAD_REQUEST' },
+    });
   });
 });
 

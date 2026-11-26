@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   security_advisor_check_catalog,
@@ -55,56 +56,74 @@ export const adminShellSecurityContentRouter = createTRPCRouter({
       return { items: rows };
     }),
 
-    upsert: adminProcedure.input(UpsertCheckSchema).mutation(async ({ input }) => {
-      // Atomic upsert keyed on check_id — avoids the TOCTOU race between two
-      // concurrent admin saves for the same check_id (a read-then-write
-      // pattern would have both branches see "no existing row" and both try
-      // to insert).
-      //
-      // By design, `check_id` is the natural key: creating a record with an
-      // existing check_id overwrites it, and there is no separate `id`-based
-      // rename path. The admin UI disables the check_id input in edit mode,
-      // so the only way to "rename" a check via this endpoint is to create
-      // a new one and delete the old. Keep in mind if the endpoint grows
-      // non-admin callers.
-      const [row] = await db
-        .insert(security_advisor_check_catalog)
-        .values(input)
-        .onConflictDoUpdate({
-          target: security_advisor_check_catalog.check_id,
-          set: {
-            severity: input.severity,
-            explanation: input.explanation,
-            risk: input.risk,
-            is_active: input.is_active,
-            updated_at: nowIso(),
-          },
-        })
-        .returning();
+    upsert: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'security_advisor.check.upsert',
+          target: inputFieldTarget('other', 'check_id'),
+        },
+      })
+      .input(UpsertCheckSchema)
+      .mutation(async ({ input }) => {
+        // Atomic upsert keyed on check_id — avoids the TOCTOU race between two
+        // concurrent admin saves for the same check_id (a read-then-write
+        // pattern would have both branches see "no existing row" and both try
+        // to insert).
+        //
+        // By design, `check_id` is the natural key: creating a record with an
+        // existing check_id overwrites it, and there is no separate `id`-based
+        // rename path. The admin UI disables the check_id input in edit mode,
+        // so the only way to "rename" a check via this endpoint is to create
+        // a new one and delete the old. Keep in mind if the endpoint grows
+        // non-admin callers.
+        const [row] = await db
+          .insert(security_advisor_check_catalog)
+          .values(input)
+          .onConflictDoUpdate({
+            target: security_advisor_check_catalog.check_id,
+            set: {
+              severity: input.severity,
+              explanation: input.explanation,
+              risk: input.risk,
+              is_active: input.is_active,
+              updated_at: nowIso(),
+            },
+          })
+          .returning();
 
-      if (!row) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to upsert check catalog entry',
-        });
-      }
+        if (!row) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to upsert check catalog entry',
+          });
+        }
 
-      invalidateShellSecurityContentCache();
-      return row;
-    }),
+        invalidateShellSecurityContentCache();
+        return row;
+      }),
 
-    delete: adminProcedure.input(DeleteByIdSchema).mutation(async ({ input }) => {
-      const result = await db
-        .delete(security_advisor_check_catalog)
-        .where(eq(security_advisor_check_catalog.id, input.id));
+    delete: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'security_advisor.check.delete',
+          target: inputFieldTarget('other', 'id'),
+        },
+      })
+      .input(DeleteByIdSchema)
+      .mutation(async ({ input }) => {
+        const result = await db
+          .delete(security_advisor_check_catalog)
+          .where(eq(security_advisor_check_catalog.id, input.id));
 
-      if ((result.rowCount ?? 0) === 0) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Check not found' });
-      }
+        if ((result.rowCount ?? 0) === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Check not found' });
+        }
 
-      invalidateShellSecurityContentCache();
-      return { success: true };
-    }),
+        invalidateShellSecurityContentCache();
+        return { success: true };
+      }),
   }),
 
   // ---- KiloClaw coverage ----
@@ -117,94 +136,112 @@ export const adminShellSecurityContentRouter = createTRPCRouter({
       return { items: rows };
     }),
 
-    upsert: adminProcedure.input(UpsertCoverageSchema).mutation(async ({ input }) => {
-      // Best-effort UX validation: reject if any incoming checkId is already
-      // claimed by a different active coverage row. The load-side
-      // `findCoverageForCheckId` already picks deterministically when
-      // overlaps exist, but overlaps make the report content confusing to
-      // edit, so catch the mistake at save time. Uses PostgreSQL array-
-      // overlap (&&) for a single indexed query rather than N per-checkId
-      // lookups.
-      //
-      // NOTE: This is a read-then-write check with a TOCTOU window — two
-      // concurrent admin saves for different areas that each introduce an
-      // overlap the other is about to introduce can both pass and both
-      // land. The load-side deterministic pick still keeps the report
-      // coherent; this check is a UX guardrail, not a DB-enforced
-      // invariant. Acceptable given admin-UI concurrency is low.
-      if (input.is_active && input.match_check_ids.length > 0) {
-        const conflicting = await db
-          .select({
-            area: security_advisor_kiloclaw_coverage.area,
-            match_check_ids: security_advisor_kiloclaw_coverage.match_check_ids,
-          })
-          .from(security_advisor_kiloclaw_coverage)
-          .where(
-            and(
-              eq(security_advisor_kiloclaw_coverage.is_active, true),
-              ne(security_advisor_kiloclaw_coverage.area, input.area),
-              // Native Drizzle helper — binds the JS array as a single PG
-              // `text[]` parameter. Hand-rolling this as raw SQL with
-              // `${arr}::text[]` serializes as a tuple `($1, $2, $3)` which
-              // `&&` rejects with a syntax error.
-              arrayOverlaps(
-                security_advisor_kiloclaw_coverage.match_check_ids,
-                input.match_check_ids
-              )
-            )
-          );
-        if (conflicting.length > 0) {
-          const overlaps = conflicting
-            .map(c => {
-              const shared = c.match_check_ids.filter(id => input.match_check_ids.includes(id));
-              return `"${c.area}" (shares: ${shared.join(', ')})`;
+    upsert: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'security_advisor.kiloclaw_coverage.upsert',
+          target: inputFieldTarget('other', 'area'),
+        },
+      })
+      .input(UpsertCoverageSchema)
+      .mutation(async ({ input }) => {
+        // Best-effort UX validation: reject if any incoming checkId is already
+        // claimed by a different active coverage row. The load-side
+        // `findCoverageForCheckId` already picks deterministically when
+        // overlaps exist, but overlaps make the report content confusing to
+        // edit, so catch the mistake at save time. Uses PostgreSQL array-
+        // overlap (&&) for a single indexed query rather than N per-checkId
+        // lookups.
+        //
+        // NOTE: This is a read-then-write check with a TOCTOU window — two
+        // concurrent admin saves for different areas that each introduce an
+        // overlap the other is about to introduce can both pass and both
+        // land. The load-side deterministic pick still keeps the report
+        // coherent; this check is a UX guardrail, not a DB-enforced
+        // invariant. Acceptable given admin-UI concurrency is low.
+        if (input.is_active && input.match_check_ids.length > 0) {
+          const conflicting = await db
+            .select({
+              area: security_advisor_kiloclaw_coverage.area,
+              match_check_ids: security_advisor_kiloclaw_coverage.match_check_ids,
             })
-            .join('; ');
+            .from(security_advisor_kiloclaw_coverage)
+            .where(
+              and(
+                eq(security_advisor_kiloclaw_coverage.is_active, true),
+                ne(security_advisor_kiloclaw_coverage.area, input.area),
+                // Native Drizzle helper — binds the JS array as a single PG
+                // `text[]` parameter. Hand-rolling this as raw SQL with
+                // `${arr}::text[]` serializes as a tuple `($1, $2, $3)` which
+                // `&&` rejects with a syntax error.
+                arrayOverlaps(
+                  security_advisor_kiloclaw_coverage.match_check_ids,
+                  input.match_check_ids
+                )
+              )
+            );
+          if (conflicting.length > 0) {
+            const overlaps = conflicting
+              .map(c => {
+                const shared = c.match_check_ids.filter(id => input.match_check_ids.includes(id));
+                return `"${c.area}" (shares: ${shared.join(', ')})`;
+              })
+              .join('; ');
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: `One or more checkIds are already covered by another active area: ${overlaps}. Remove them from the other area first, or deactivate it.`,
+            });
+          }
+        }
+
+        const [row] = await db
+          .insert(security_advisor_kiloclaw_coverage)
+          .values(input)
+          .onConflictDoUpdate({
+            target: security_advisor_kiloclaw_coverage.area,
+            set: {
+              summary: input.summary,
+              detail: input.detail,
+              match_check_ids: input.match_check_ids,
+              is_active: input.is_active,
+              updated_at: nowIso(),
+            },
+          })
+          .returning();
+
+        if (!row) {
           throw new TRPCError({
-            code: 'CONFLICT',
-            message: `One or more checkIds are already covered by another active area: ${overlaps}. Remove them from the other area first, or deactivate it.`,
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to upsert KiloClaw coverage entry',
           });
         }
-      }
 
-      const [row] = await db
-        .insert(security_advisor_kiloclaw_coverage)
-        .values(input)
-        .onConflictDoUpdate({
-          target: security_advisor_kiloclaw_coverage.area,
-          set: {
-            summary: input.summary,
-            detail: input.detail,
-            match_check_ids: input.match_check_ids,
-            is_active: input.is_active,
-            updated_at: nowIso(),
-          },
-        })
-        .returning();
+        invalidateShellSecurityContentCache();
+        return row;
+      }),
 
-      if (!row) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to upsert KiloClaw coverage entry',
-        });
-      }
+    delete: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'security_advisor.kiloclaw_coverage.delete',
+          target: inputFieldTarget('other', 'id'),
+        },
+      })
+      .input(DeleteByIdSchema)
+      .mutation(async ({ input }) => {
+        const result = await db
+          .delete(security_advisor_kiloclaw_coverage)
+          .where(eq(security_advisor_kiloclaw_coverage.id, input.id));
 
-      invalidateShellSecurityContentCache();
-      return row;
-    }),
+        if ((result.rowCount ?? 0) === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'KiloClaw coverage entry not found' });
+        }
 
-    delete: adminProcedure.input(DeleteByIdSchema).mutation(async ({ input }) => {
-      const result = await db
-        .delete(security_advisor_kiloclaw_coverage)
-        .where(eq(security_advisor_kiloclaw_coverage.id, input.id));
-
-      if ((result.rowCount ?? 0) === 0) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'KiloClaw coverage entry not found' });
-      }
-
-      invalidateShellSecurityContentCache();
-      return { success: true };
-    }),
+        invalidateShellSecurityContentCache();
+        return { success: true };
+      }),
   }),
 
   // ---- Content key-value store ----
@@ -217,43 +254,61 @@ export const adminShellSecurityContentRouter = createTRPCRouter({
       return { items: rows };
     }),
 
-    upsert: adminProcedure.input(UpsertContentSchema).mutation(async ({ input }) => {
-      const [row] = await db
-        .insert(security_advisor_content)
-        .values(input)
-        .onConflictDoUpdate({
-          target: security_advisor_content.key,
-          set: {
-            value: input.value,
-            description: input.description,
-            is_active: input.is_active,
-            updated_at: nowIso(),
-          },
-        })
-        .returning();
+    upsert: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'security_advisor.content.upsert',
+          target: inputFieldTarget('other', 'key'),
+        },
+      })
+      .input(UpsertContentSchema)
+      .mutation(async ({ input }) => {
+        const [row] = await db
+          .insert(security_advisor_content)
+          .values(input)
+          .onConflictDoUpdate({
+            target: security_advisor_content.key,
+            set: {
+              value: input.value,
+              description: input.description,
+              is_active: input.is_active,
+              updated_at: nowIso(),
+            },
+          })
+          .returning();
 
-      if (!row) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to upsert content entry',
-        });
-      }
+        if (!row) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to upsert content entry',
+          });
+        }
 
-      invalidateShellSecurityContentCache();
-      return row;
-    }),
+        invalidateShellSecurityContentCache();
+        return row;
+      }),
 
-    delete: adminProcedure.input(DeleteByIdSchema).mutation(async ({ input }) => {
-      const result = await db
-        .delete(security_advisor_content)
-        .where(eq(security_advisor_content.id, input.id));
+    delete: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'security_advisor.content.delete',
+          target: inputFieldTarget('other', 'id'),
+        },
+      })
+      .input(DeleteByIdSchema)
+      .mutation(async ({ input }) => {
+        const result = await db
+          .delete(security_advisor_content)
+          .where(eq(security_advisor_content.id, input.id));
 
-      if ((result.rowCount ?? 0) === 0) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Content key not found' });
-      }
+        if ((result.rowCount ?? 0) === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Content key not found' });
+        }
 
-      invalidateShellSecurityContentCache();
-      return { success: true };
-    }),
+        invalidateShellSecurityContentCache();
+        return { success: true };
+      }),
   }),
 });

@@ -23,6 +23,7 @@ import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotion
 import {
   organizationActionTarget,
   recordAdminAction,
+  setAdminAuditTarget,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { TRPCError } from '@trpc/server';
 import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
@@ -244,6 +245,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
    * Individual row failures don't fail the entire batch.
    */
   processOssCsv: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['oss_sponsorship.enroll'] } })
     .input(ProcessOssCsvInputSchema)
     .mutation(async ({ input, ctx }): Promise<ProcessOssCsvResult[]> => {
       const results: ProcessOssCsvResult[] = [];
@@ -264,6 +266,15 @@ export const ossSponsorshipRouter = createTRPCRouter({
             },
           });
         }
+      }
+
+      if (!results.some(result => result.success && result.orgId)) {
+        await recordAdminAction(ctx, {
+          action: 'oss_sponsorship.enroll',
+          target: null,
+          message: 'Enrolled no OSS sponsorship organizations from CSV',
+          metadata: { source: 'csv', rowCount: input.length },
+        });
       }
 
       return results;
@@ -482,6 +493,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
    * Optionally sends an email to the organization's owners.
    */
   addExistingOrgToOss: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['oss_sponsorship.enroll'] } })
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -493,6 +505,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const { organizationId, tier, monthlyTopUpDollars, addInitialGrant, sendEmail } = input;
+      setAdminAuditTarget(organizationActionTarget(organizationId));
       const creditsMicrodollars = monthlyTopUpDollars > 0 ? monthlyTopUpDollars * 1_000_000 : null;
       const now = new Date();
 

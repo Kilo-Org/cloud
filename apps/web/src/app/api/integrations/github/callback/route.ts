@@ -60,6 +60,11 @@ import {
 } from '@/lib/integrations/github/install-state';
 import { verifyAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  runElevatedOrganizationWrite,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { isGitHubSharedInstallationAdmissionEnabled } from '@/lib/integrations/github/multiple-installations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
@@ -312,7 +317,7 @@ export async function GET(request: NextRequest) {
 
 async function handleNewInstallFlow(
   request: NextRequest,
-  user: { id: string; google_user_email: string; google_user_name: string },
+  user: User,
   installRow: GitHubInstallState,
   installationId: string,
   setupAction: string | null
@@ -334,34 +339,51 @@ async function handleNewInstallFlow(
   });
 }
 
-/**
- * Handles access checks, pending approval, and installation storage.
- */
-async function handleCoreInstallFlow(params: {
+type CoreInstallFlowParams = {
   request: NextRequest;
-  user: { id: string; google_user_email: string; google_user_name: string };
+  user: User;
   owner: Owner;
   ownerId: string;
   returnTo: string | null;
   installationId: string;
   setupAction: string | null;
   githubAppType: GitHubAppType;
-}): Promise<Response> {
-  const { user, owner, ownerId, returnTo, installationId, setupAction, githubAppType } = params;
-  const searchParams = params.request.nextUrl.searchParams;
+};
 
-  // Verify user has access to the owner
-  if (owner.type === 'org') {
-    await ensureOrganizationAccess(
-      { user: user as unknown as User },
-      owner.id,
-      ORGANIZATION_MANAGE_ROLES
-    );
-  } else {
+/**
+ * Handles access checks, then the rest of the flow. An organization install a
+ * Kilo admin completes through the admin bypass is recorded with its outcome.
+ */
+async function handleCoreInstallFlow(params: CoreInstallFlowParams): Promise<Response> {
+  const { request, user, owner } = params;
+  if (owner.type !== 'org') {
     if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/', APP_URL));
     }
+    return completeInstallFlow(params);
   }
+
+  await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_MANAGE_ROLES);
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(user, request.headers),
+    {
+      organizationId: owner.id,
+      requiredRoles: ORGANIZATION_MANAGE_ROLES,
+      action: 'organization.github.connect',
+      message: 'GitHub: App installation callback',
+      metadata: { setupAction: params.setupAction, githubAppType: params.githubAppType },
+    },
+    () => completeInstallFlow(params)
+  );
+}
+
+/**
+ * Handles pending approval and installation storage once the caller may change
+ * the owner.
+ */
+async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Response> {
+  const { user, owner, ownerId, returnTo, installationId, setupAction, githubAppType } = params;
+  const searchParams = params.request.nextUrl.searchParams;
 
   const integrationPath =
     owner.type === 'org'
@@ -491,6 +513,7 @@ async function handleCoreInstallFlow(params: {
             githubRequest,
             githubAppType,
           });
+          addAdminAuditMetadata({ githubAccountId: githubRequest.accountId });
         }
       }
 
@@ -923,6 +946,8 @@ async function handleCoreInstallFlow(params: {
         repositoriesAdded: repositories,
       });
     }
+
+    addAdminAuditMetadata({ installationId });
   }
 
   // Redirect to success page

@@ -13,20 +13,55 @@ import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { lockCreditOwners, retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  auditedAdminRoute,
+  recordAdminAction,
+  setAdminAuditActor,
+  setAdminAuditTarget,
+  userActionTarget,
+  type AdminActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
-export async function POST(
+// A refusal answers 400, which the audit scope records, or 200 when the caller
+// asks for `force_200_response`, which the handler records itself.
+export const POST = auditedAdminRoute(
+  { kind: 'handler', actions: ['user.credit.grant', 'user.credit.debit'] },
+  addCredit
+);
+
+async function addCredit(
   request: NextRequest
 ): Promise<NextResponse<{ error: string } | { message: string }>> {
   const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
-  if (!operator || !userCanManageCredits(operator)) {
+  setAdminAuditActor(operator);
+  if (!userCanManageCredits(operator)) {
     return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
   }
 
+  const auditContext = adminActionContextFromHeaders(operator, request.headers);
   const requestData = (await request.json()) as AddCreditRequest;
   const force200 = request.nextUrl.searchParams.get('force_200_response') === 'true';
-  function warnAndCreateErrorResponse(message: string) {
+  const auditAction =
+    (requestData.amount_usd ?? requestData.creditAmount ?? 0) < 0
+      ? 'user.credit.debit'
+      : 'user.credit.grant';
+  addAdminAuditMetadata({ adjustment: auditAction });
+  let auditTarget: AdminActionTarget | null = null;
+  async function warnAndCreateErrorResponse(message: string) {
     console.warn(message);
+    if (force200) {
+      await recordAdminAction(auditContext, {
+        action: auditAction,
+        outcome: 'failure',
+        errorCode: '400',
+        target: auditTarget,
+        message: 'Credit adjustment refused',
+        metadata: { forced200: true },
+      });
+    }
     return NextResponse.json({ error: message }, { status: force200 ? 200 : 400 });
   }
   const { email } = requestData;
@@ -40,6 +75,8 @@ export async function POST(
   });
 
   if (!user) return warnAndCreateErrorResponse(`User with email ${email} not found in database`);
+  auditTarget = userActionTarget(user.id);
+  setAdminAuditTarget(auditTarget);
   if (user.blocked_reason) return warnAndCreateErrorResponse(`User with email ${email} is blocked`);
   const credit_category = requestData.credit_category ?? requestData.idempotencyKey;
   if (!credit_category) {
@@ -157,6 +194,12 @@ export async function POST(
         `Code ${credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${email}.`
       );
     }
+    await recordAdminAction(auditContext, {
+      action: 'user.credit.debit',
+      target: auditTarget,
+      message: 'Applied an admin credit debit',
+      metadata: { amountUsd: options.amount_usd, creditCategory: credit_category },
+    });
     return NextResponse.json({
       message: 'Credit debit applied',
       creditsAmount: options.amount_usd,
@@ -179,6 +222,16 @@ export async function POST(
 
   if (!result.success) return warnAndCreateErrorResponse(result.message);
 
+  await recordAdminAction(auditContext, {
+    action: 'user.credit.grant',
+    target: auditTarget,
+    message: 'Granted credits',
+    metadata: {
+      amountUsd: result.amount_usd,
+      creditKind,
+      creditCategory: credit_category,
+    },
+  });
   return NextResponse.json({
     message: result.message,
     creditsAmount: result.amount_usd,

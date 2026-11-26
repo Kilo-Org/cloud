@@ -5,6 +5,10 @@ import { kilocode_users } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { inArray } from 'drizzle-orm';
 import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import {
+  recordAdminActions,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const BulkUserCreditsInputSchema = z.object({
   emails: z.array(z.string().email()).max(1000),
@@ -62,6 +66,12 @@ export const bulkUserCreditsRouter = createTRPCRouter({
    * Returns matched users and unmatched emails.
    */
   matchUsers: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'mutation-typed read: matches emails to user accounts and writes nothing',
+      },
+    })
     .input(z.object({ emails: z.array(z.string().email()).max(1000) }))
     .mutation(async ({ input }): Promise<MatchUsersResult> => {
       const { emails } = input;
@@ -110,6 +120,7 @@ export const bulkUserCreditsRouter = createTRPCRouter({
    * Uses the standard credit granting function for each user.
    */
   grantBulkCredits: creditManagerProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['credits.bulk_grant'] } })
     .input(BulkUserCreditsInputSchema)
     .mutation(async ({ input, ctx }): Promise<BulkCreditResult[]> => {
       const { emails, amountUsd, expirationDate, description } = input;
@@ -183,6 +194,27 @@ export const bulkUserCreditsRouter = createTRPCRouter({
           });
         }
       }
+
+      const metadata = { amountUsd, expirationDate: expirationDate ?? null };
+      const granted = results.filter(result => result.success);
+      await recordAdminActions(
+        ctx,
+        granted.length > 0
+          ? granted.map(result => ({
+              action: 'credits.bulk_grant' as const,
+              target: userActionTarget(result.userId),
+              message: 'Granted credits in bulk',
+              metadata,
+            }))
+          : [
+              {
+                action: 'credits.bulk_grant' as const,
+                target: null,
+                message: 'Granted no credits in bulk',
+                metadata: { ...metadata, requestedCount: normalizedEmails.length },
+              },
+            ]
+      );
 
       return results;
     }),

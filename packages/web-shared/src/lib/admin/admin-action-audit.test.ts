@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { eq } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import { admin_action_audit_logs, organizations } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -15,9 +16,9 @@ import {
   isAuditedAdminRoute,
   organizationActionTarget,
   recordAdminAction,
-  recordElevatedOrganizationAdminAction,
   recordAdminActions,
   redactEmailAddressesInAuditText,
+  runElevatedOrganizationWrite,
   setAdminActionSinkForTest,
   setAdminAuditActor,
   userActionTarget,
@@ -137,7 +138,7 @@ describe('recordAdminAction', () => {
     });
   });
 
-  test('records one row and one event per entry across insert chunks', async () => {
+  test('records one row per entry and one log line per insert chunk', async () => {
     const userIds = Array.from({ length: 1_001 }, (_, index) => `bulk-user-${index}`);
 
     await recordAdminActions(
@@ -146,15 +147,64 @@ describe('recordAdminAction', () => {
         action: 'user.unblock' as const,
         target: userActionTarget(userId),
         message: 'Unblocked user via bulk unblock',
+        metadata: { bulk: true, userId },
       }))
     );
 
     const rows = await db
-      .select({ target_id: admin_action_audit_logs.target_id })
+      .select({ id: admin_action_audit_logs.id, target_id: admin_action_audit_logs.target_id })
       .from(admin_action_audit_logs);
     expect(rows.map(row => row.target_id).sort()).toEqual([...userIds].sort());
-    expect(events).toHaveLength(userIds.length);
-    expect(events.every(event => event.persisted && event.auditLogId !== null)).toBe(true);
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      event: 'admin_action',
+      action: 'user.unblock',
+      outcome: 'success',
+      entryCount: 1_000,
+      persisted: true,
+      route: 'admin.users.resetAPIKey',
+      targetType: 'user',
+      targetIds: userIds.slice(0, 1_000),
+      message: 'Unblocked user via bulk unblock',
+      // Each entry carries its own metadata, so the line names none.
+      metadata: null,
+    });
+    expect(events[1]).toMatchObject({ entryCount: 1, targetIds: [userIds[1_000]] });
+    const loggedIds = events.flatMap(event => ('auditLogIds' in event ? event.auditLogIds : []));
+    expect([...loggedIds].sort()).toEqual(rows.map(row => row.id).sort());
+    expect(Math.max(...events.map(event => JSON.stringify(event).length))).toBeLessThan(128_000);
+  });
+
+  test('splits a bulk log line by action and outcome', async () => {
+    await recordAdminActions(ctxFor(), [
+      { action: 'user.unblock', target: userActionTarget('user-1'), message: 'Unblocked' },
+      {
+        action: 'user.unblock',
+        outcome: 'failure',
+        errorCode: 'Error',
+        target: userActionTarget('user-2'),
+        message: 'Unblock failed',
+      },
+      { action: 'user.unblock', target: organizationActionTarget('org-3'), message: 'Unblocked' },
+    ]);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        outcome: 'success',
+        entryCount: 2,
+        targetType: null,
+        targetIds: ['user-1', 'org-3'],
+        message: 'Unblocked',
+      }),
+      expect.objectContaining({
+        outcome: 'failure',
+        entryCount: 1,
+        targetType: 'user',
+        targetIds: ['user-2'],
+        metadata: { errorCode: 'Error' },
+      }),
+    ]);
   });
 
   test('does nothing for an empty batch', async () => {
@@ -276,7 +326,7 @@ describe('redactEmailAddressesInAuditText', () => {
   });
 });
 
-describe('recordElevatedOrganizationAdminAction', () => {
+describe('runElevatedOrganizationWrite', () => {
   beforeEach(() => setAdminActionSinkForTest(() => {}));
   afterEach(async () => {
     setAdminActionSinkForTest(null);
@@ -294,45 +344,114 @@ describe('recordElevatedOrganizationAdminAction', () => {
     return { admin, childId: child.id };
   }
 
-  function record(
-    admin: Awaited<ReturnType<typeof insertTestUser>>,
+  function write<TResult>(
+    user: Awaited<ReturnType<typeof insertTestUser>>,
     organizationId: string,
+    run: () => Promise<TResult>,
     scope?: 'direct'
   ) {
-    return recordElevatedOrganizationAdminAction(
-      { ...ctxFor(), user: admin },
+    return runElevatedOrganizationWrite(
+      { ...ctxFor(), user },
       {
         organizationId,
         requiredRoles: ['owner'],
         membershipScope: scope,
         action: 'organization.gitlab_webhook_secret.rotate',
         message: 'GitLab webhook secret: rotate',
-      }
+      },
+      run
     );
   }
+
+  const succeed = async () => 'done';
 
   test('an inherited owner role satisfies inherited-scope guards but not direct-only guards', async () => {
     const { admin, childId } = await adminWithInheritedOwnerRole();
 
-    await record(admin, childId);
+    await write(admin, childId, succeed);
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
 
-    await record(admin, childId, 'direct');
+    await expect(write(admin, childId, succeed, 'direct')).resolves.toBe('done');
     const rows = await db.select().from(admin_action_audit_logs);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.metadata).toEqual({ heldRoles: [] });
+    expect(rows).toEqual([
+      expect.objectContaining({ outcome: 'success', metadata: { heldRoles: [] } }),
+    ]);
   });
 
-  test('does not record non-admins or admins holding a sufficient direct role', async () => {
+  test('records nothing for non-admins or admins holding a sufficient role, even when the write fails', async () => {
     const owner = await insertTestUser({ is_admin: false });
     const organization = await createOrganization('Owned Org', owner.id);
     const adminOwner = await insertTestUser({ is_admin: true });
     await addUserToOrganization(organization.id, adminOwner.id, 'owner');
+    const fail = async () => {
+      throw new TRPCError({ code: 'NOT_FOUND' });
+    };
 
-    await record(owner, organization.id);
-    await record(adminOwner, organization.id, 'direct');
+    await write(owner, organization.id, succeed);
+    await write(adminOwner, organization.id, succeed, 'direct');
+    await expect(write(owner, organization.id, fail)).rejects.toThrow(TRPCError);
+    await expect(write(adminOwner, organization.id, fail)).rejects.toThrow(TRPCError);
 
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  test('a failed write records a failure row with its code and the metadata it added, then rethrows', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organizationId = crypto.randomUUID();
+    const error = new TRPCError({ code: 'PRECONDITION_FAILED', message: 'secret text' });
+
+    await expect(
+      write(admin, organizationId, async () => {
+        addAdminAuditMetadata({ integrationId: 'integration-1' });
+        throw error;
+      })
+    ).rejects.toBe(error);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'organization.gitlab_webhook_secret.rotate',
+        outcome: 'failure',
+        target_type: 'organization',
+        target_id: organizationId,
+        metadata: {
+          integrationId: 'integration-1',
+          heldRoles: [],
+          errorCode: 'PRECONDITION_FAILED',
+        },
+      }),
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('secret text');
+  });
+
+  test.each([
+    ['a 4xx status', Response.json({ error: 'nope' }, { status: 403 }), 'failure', '403'],
+    [
+      'a redirect carrying an error code',
+      Response.redirect('http://localhost/integrations?error=installation_failed', 302),
+      'failure',
+      'installation_failed',
+    ],
+    [
+      'a redirect carrying provider free text',
+      Response.redirect('http://localhost/integrations?error=The%20user%20said%20no', 302),
+      'failure',
+      'redirect_error',
+    ],
+    [
+      'a success redirect',
+      Response.redirect('http://localhost/integrations?success=installed', 302),
+      'success',
+      undefined,
+    ],
+  ])('judges a response with %s', async (_label, response, outcome, errorCode) => {
+    const admin = await insertTestUser({ is_admin: true });
+
+    await expect(write(admin, crypto.randomUUID(), async () => response)).resolves.toBe(response);
+
+    const [row] = await db.select().from(admin_action_audit_logs);
+    expect(row?.outcome).toBe(outcome);
+    expect(row?.metadata).toEqual({ heldRoles: [], ...(errorCode ? { errorCode } : {}) });
   });
 
   test('records with unknown held roles instead of throwing when the membership lookup fails', async () => {
@@ -341,7 +460,7 @@ describe('recordElevatedOrganizationAdminAction', () => {
       throw new Error('database unavailable');
     });
     try {
-      await expect(record(admin, crypto.randomUUID())).resolves.toBeUndefined();
+      await expect(write(admin, crypto.randomUUID(), succeed)).resolves.toBe('done');
     } finally {
       select.mockRestore();
     }

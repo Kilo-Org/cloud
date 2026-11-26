@@ -11,6 +11,11 @@ import {
   listBenchmarkRuns,
   startBenchmarkRun,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import {
+  addAdminAuditMetadata,
+  auditedAdminRoute,
+  setAdminAuditActor,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET(request: NextRequest) {
@@ -33,9 +38,15 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result.body, { status: result.status });
 }
 
-export async function POST(request: NextRequest) {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+export const POST = auditedAdminRoute(
+  { kind: 'declarative', action: 'auto_routing.benchmark_run.start' },
+  startRun
+);
+
+async function startRun(request: NextRequest) {
+  const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
+  setAdminAuditActor(user);
 
   let rawBody: unknown;
   try {
@@ -48,12 +59,9 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid start benchmark run request' }, { status: 400 });
   }
+  const { kind, force, queue, router } = parsed.data;
+  addAdminAuditMetadata({ kind, force, queue, router });
 
-  const result = await startBenchmarkRun(
-    parsed.data.kind,
-    parsed.data.force,
-    parsed.data.queue,
-    parsed.data.router
-  );
+  const result = await startBenchmarkRun(kind, force, queue, router);
   return NextResponse.json(result.body, { status: result.status });
 }

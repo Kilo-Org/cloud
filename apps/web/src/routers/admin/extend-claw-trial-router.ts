@@ -1,4 +1,9 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  recordAdminActions,
+  userActionTarget,
+  type AdminActionContext,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { kilocode_users, kiloclaw_subscriptions, kiloclaw_email_log } from '@kilocode/db/schema';
@@ -327,6 +332,34 @@ async function processOneEmail(
   };
 }
 
+/** One admin row per user whose trial changed, or one summary row when none did. */
+async function recordTrialGrants(
+  ctx: AdminActionContext,
+  trialDays: number,
+  results: readonly ExtendTrialResult[]
+) {
+  const granted = results.filter(result => result.success && result.userId !== '');
+  await recordAdminActions(
+    ctx,
+    granted.length > 0
+      ? granted.map(result => ({
+          action: 'kiloclaw.subscription.bulk_trial_grant' as const,
+          target: userActionTarget(result.userId),
+          message:
+            result.action === 'restarted' ? 'Restarted KiloClaw trial' : 'Extended KiloClaw trial',
+          metadata: { trialDays, outcome: result.action ?? null, instanceId: result.instanceId },
+        }))
+      : [
+          {
+            action: 'kiloclaw.subscription.bulk_trial_grant' as const,
+            target: null,
+            message: 'Extended no KiloClaw trials',
+            metadata: { trialDays, requestedCount: results.length },
+          },
+        ]
+  );
+}
+
 export const extendClawTrialRouter = createTRPCRouter({
   /**
    * Match a list of emails to existing Kilo user accounts, including their
@@ -416,6 +449,7 @@ export const extendClawTrialRouter = createTRPCRouter({
    * - active / past_due / unpaid: skipped with an error.
    */
   extendTrials: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['kiloclaw.subscription.bulk_trial_grant'] } })
     .input(
       z.object({
         emails: z.array(z.string().email()).max(MAX_USERS),
@@ -425,7 +459,10 @@ export const extendClawTrialRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<ExtendTrialResult[]> => {
       const { emails, trialDays } = input;
 
-      if (emails.length === 0) return [];
+      if (emails.length === 0) {
+        await recordTrialGrants(ctx, trialDays, []);
+        return [];
+      }
 
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
@@ -451,7 +488,7 @@ export const extendClawTrialRouter = createTRPCRouter({
         )
       );
 
-      return settled.map((outcome, i) => {
+      const results = settled.map((outcome, i): ExtendTrialResult => {
         if (outcome.status === 'fulfilled') return outcome.value;
         const email = normalizedEmails[i];
         return {
@@ -462,5 +499,7 @@ export const extendClawTrialRouter = createTRPCRouter({
           error: outcome.reason instanceof Error ? outcome.reason.message : 'Unknown error',
         };
       });
+      await recordTrialGrants(ctx, trialDays, results);
+      return results;
     }),
 });

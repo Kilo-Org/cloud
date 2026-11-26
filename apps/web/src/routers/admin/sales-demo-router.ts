@@ -15,10 +15,12 @@ import { isAllowedSalesDemoEmail } from '@/lib/organizations/sales-demo-email';
 import {
   organizationActionTarget,
   recordAdminAction,
+  setAdminAuditTarget,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export const salesDemoRouter = createTRPCRouter({
   create: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['sales_demo.create'] } })
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input, ctx }) => {
       if (!isAllowedSalesDemoEmail(input.email)) {
@@ -70,8 +72,10 @@ export const salesDemoRouter = createTRPCRouter({
     }),
 
   reset: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['sales_demo.reset'] } })
     .input(z.object({ organizationId: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       try {
         const result = await db.transaction(async tx => {
           const organizationId = await restoreSalesDemoOrganization({

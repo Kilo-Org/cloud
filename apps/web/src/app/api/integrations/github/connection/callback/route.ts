@@ -20,6 +20,12 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import type { User } from '@kilocode/db/schema';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  responseAuditOutcome,
+  runElevatedOrganizationWrite,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 function redirect(path: string, error?: string) {
   const url = new URL(path, APP_URL);
@@ -68,61 +74,81 @@ export async function GET(request: NextRequest) {
   } catch {
     return redirect(path, 'authorization_revoked');
   }
-  try {
-    const oauth = await exchangeGitHubOAuthCode(code, attempt.github_app_type, state.codeVerifier);
-    const credentials = getGitHubAppCredentials(attempt.github_app_type);
-    if (state.stage === 'discover') {
-      const discovery = await discoverAuthorizedGitHubInstallations({
+  const connect = async () => {
+    try {
+      const oauth = await exchangeGitHubOAuthCode(
+        code,
+        attempt.github_app_type,
+        state.codeVerifier
+      );
+      const credentials = getGitHubAppCredentials(attempt.github_app_type);
+      if (state.stage === 'discover') {
+        const discovery = await discoverAuthorizedGitHubInstallations({
+          accessToken: oauth.accessToken,
+          githubAppType: attempt.github_app_type,
+          expectedAppId: credentials.appId,
+        });
+        await recordGitHubConnectionDiscovery({
+          attemptId: attempt.id,
+          userId: user.id,
+          githubUserId: discovery.identity.id,
+          candidates: discovery.candidates,
+        });
+        const url = new URL(path, APP_URL);
+        url.searchParams.set('github_connection_attempt', attempt.id);
+        return NextResponse.redirect(url);
+      }
+      if (
+        !attempt.selected_installation_id ||
+        state.selectedInstallationId !== attempt.selected_installation_id
+      )
+        return redirect(path, 'invalid_selection');
+      const proof = await verifyGitHubInstallationAuthorization({
         accessToken: oauth.accessToken,
         githubAppType: attempt.github_app_type,
         expectedAppId: credentials.appId,
+        installationId: attempt.selected_installation_id,
       });
-      await recordGitHubConnectionDiscovery({
+      if (!proof || proof.identity.id !== attempt.github_user_id)
+        return redirect(path, 'authorization_revoked');
+      const completed = await completeGitHubConnectionAttempt({
         attemptId: attempt.id,
         userId: user.id,
-        githubUserId: discovery.identity.id,
-        candidates: discovery.candidates,
+        githubUserId: proof.identity.id,
+        candidate: proof.candidate,
+        authorizeOwner: async owner => {
+          if (owner.type === 'org') {
+            await ensureOrganizationAccess(
+              { user: user as User },
+              owner.id,
+              ORGANIZATION_MANAGE_ROLES
+            );
+          } else if (owner.id !== user.id) {
+            throw new Error('GitHub connection owner authorization changed');
+          }
+        },
       });
-      const url = new URL(path, APP_URL);
-      url.searchParams.set('github_connection_attempt', attempt.id);
-      return NextResponse.redirect(url);
+      if (!completed.ok) return redirect(path, completed.reason);
+      addAdminAuditMetadata({ integrationId: completed.integrationId });
+      return redirect(`${path}?github_connection=success`);
+    } catch (error) {
+      if (isInstallationAdministrationListingOverflow(error)) {
+        return redirect(path, 'installation_listing_too_large');
+      }
+      return redirect(path, 'connection_failed');
     }
-    if (
-      !attempt.selected_installation_id ||
-      state.selectedInstallationId !== attempt.selected_installation_id
-    )
-      return redirect(path, 'invalid_selection');
-    const proof = await verifyGitHubInstallationAuthorization({
-      accessToken: oauth.accessToken,
-      githubAppType: attempt.github_app_type,
-      expectedAppId: credentials.appId,
-      installationId: attempt.selected_installation_id,
-    });
-    if (!proof || proof.identity.id !== attempt.github_user_id)
-      return redirect(path, 'authorization_revoked');
-    const completed = await completeGitHubConnectionAttempt({
-      attemptId: attempt.id,
-      userId: user.id,
-      githubUserId: proof.identity.id,
-      candidate: proof.candidate,
-      authorizeOwner: async owner => {
-        if (owner.type === 'org') {
-          await ensureOrganizationAccess(
-            { user: user as User },
-            owner.id,
-            ORGANIZATION_MANAGE_ROLES
-          );
-        } else if (owner.id !== user.id) {
-          throw new Error('GitHub connection owner authorization changed');
-        }
-      },
-    });
-    if (!completed.ok) return redirect(path, completed.reason);
-    return redirect(`${path}?github_connection=success`);
-  } catch (error) {
-    if (isInstallationAdministrationListingOverflow(error)) {
-      return redirect(path, 'installation_listing_too_large');
-    }
-    return redirect(path, 'connection_failed');
-  }
+  };
+  if (attempt.owner_type !== 'org') return connect();
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(user, request.headers),
+    {
+      organizationId: attempt.owner_id,
+      requiredRoles: ORGANIZATION_MANAGE_ROLES,
+      action: 'organization.github.connect',
+      message: 'GitHub: connection callback',
+      metadata: { attemptId: attempt.id, stage: state.stage },
+      outcomeOf: response => responseAuditOutcome(response, 'github_connection_error'),
+    },
+    connect
+  );
 }

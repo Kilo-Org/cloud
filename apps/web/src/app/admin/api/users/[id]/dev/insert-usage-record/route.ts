@@ -8,8 +8,23 @@ import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/
 import { insertUsageRecord } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import type { UsageMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import {
+  addAdminAuditMetadata,
+  auditedAdminRoute,
+  inputFieldTarget,
+  setAdminAuditActor,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
-export async function POST(
+export const POST = auditedAdminRoute(
+  {
+    kind: 'declarative',
+    action: 'user.dev_usage_record.insert',
+    target: inputFieldTarget('user', 'id'),
+  },
+  insertDevUsageRecord
+);
+
+async function insertDevUsageRecord(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<
@@ -22,8 +37,9 @@ export async function POST(
     );
   }
 
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user: admin, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
+  setAdminAuditActor(admin);
 
   const userId = decodeURIComponent((await params).id);
   const user = await findUserById(userId);
@@ -36,6 +52,8 @@ export async function POST(
   if (typeof dollarAmount !== 'number' || !Number.isFinite(dollarAmount) || dollarAmount <= 0) {
     return NextResponse.json({ error: 'Invalid dollarAmount' }, { status: 400 });
   }
+
+  addAdminAuditMetadata({ dollarAmount });
 
   const cost_mUsd = Math.ceil(dollarAmount * 1_000_000);
   const id = randomUUID();

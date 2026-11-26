@@ -25,6 +25,11 @@ import {
 } from '@/lib/integrations/oauth/common';
 import { storeGitLabOAuthIntegration } from '@/lib/integrations/platforms/gitlab/oauth-integration-writer';
 import { oauthStateHash } from '@/lib/integrations/oauth/callback-safety';
+import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  runElevatedOrganizationWrite,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 function buildGitLabRedirectPath(
@@ -115,97 +120,111 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     const { owner, instanceUrl, customCredentialsRef } = verifiedState;
     const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
 
-    if (owner.type === 'org') {
-      // Fresh authorization check: the organization's stored credential is
-      // shared, so the callback asks for the same governing role set the start
-      // asked for, and refuses before exchanging a code or writing a row when
-      // the caller's role changed in between.
-      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
-    } else if (user.id !== owner.id) {
+    if (owner.type === 'user' && user.id !== owner.id) {
       return NextResponse.redirect(
         new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
       );
     }
 
-    if (error) {
-      captureMessage('GitLab OAuth error', {
-        level: 'warning',
-        tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
-        extra: gitLabOAuthSentryContext(searchParams),
+    const connect = async () => {
+      if (error) {
+        captureMessage('GitLab OAuth error', {
+          level: 'warning',
+          tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
+          extra: gitLabOAuthSentryContext(searchParams),
+        });
+
+        const redirectPath = buildGitLabRedirectPath(
+          verifiedState,
+          `error=${encodeURIComponent(error)}`
+        );
+        return NextResponse.redirect(new URL(redirectPath, APP_URL));
+      }
+
+      if (!code) {
+        captureMessage('GitLab callback missing code', {
+          level: 'warning',
+          tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
+          extra: gitLabOAuthSentryContext(searchParams),
+        });
+
+        const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=missing_code');
+        return NextResponse.redirect(new URL(redirectPath, APP_URL));
+      }
+
+      const customCredentials = customCredentialsRef
+        ? ((await getGitLabOAuthCredentials(customCredentialsRef)) ?? undefined)
+        : undefined;
+
+      if (customCredentialsRef && !customCredentials) {
+        captureMessage('GitLab callback missing cached custom OAuth credentials', {
+          level: 'warning',
+          tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
+          extra: gitLabOAuthSentryContext(searchParams),
+        });
+
+        const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=connection_failed');
+        return NextResponse.redirect(new URL(redirectPath, APP_URL));
+      }
+
+      const tokens = await exchangeGitLabOAuthCode(code, normalizedInstanceUrl, customCredentials);
+
+      const gitlabUser = await fetchGitLabUser(tokens.access_token, normalizedInstanceUrl);
+
+      let repositories = null;
+      try {
+        repositories = await fetchGitLabProjects(tokens.access_token, normalizedInstanceUrl);
+      } catch (repoError) {
+        // Non-fatal - user can refresh later
+        console.error('Failed to fetch GitLab projects:', repoError);
+      }
+
+      const tokenExpiresAt = calculateTokenExpiry(tokens.created_at, tokens.expires_in);
+
+      const stored = await storeGitLabOAuthIntegration({
+        owner,
+        authorizedByUserId: user.id,
+        providerBaseUrl: normalizedInstanceUrl,
+        providerUser: { id: gitlabUser.id.toString(), login: gitlabUser.username },
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        accessTokenExpiresAt: tokenExpiresAt,
+        oauthClientId: customCredentials?.clientId ?? null,
+        oauthClientSecret: customCredentials?.clientSecret ?? null,
+        scopes: tokens.scope.split(' '),
+        repositories: repositories && repositories.length > 0 ? repositories : null,
       });
 
-      const redirectPath = buildGitLabRedirectPath(
-        verifiedState,
-        `error=${encodeURIComponent(error)}`
-      );
-      return NextResponse.redirect(new URL(redirectPath, APP_URL));
-    }
+      if (stored.instanceChanged || stored.accountChanged) {
+        await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
+      }
+      addAdminAuditMetadata({ integrationId: stored.integrationId });
 
-    if (!code) {
-      captureMessage('GitLab callback missing code', {
-        level: 'warning',
-        tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
-        extra: gitLabOAuthSentryContext(searchParams),
-      });
+      const successPath = verifiedState.returnTo
+        ? appendIntegrationOAuthRedirectQuery(verifiedState.returnTo, 'success=gitlab_connected')
+        : owner.type === 'org'
+          ? `/organizations/${owner.id}/integrations/gitlab?success=connected`
+          : `/integrations/gitlab?success=connected`;
 
-      const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=missing_code');
-      return NextResponse.redirect(new URL(redirectPath, APP_URL));
-    }
+      return NextResponse.redirect(new URL(successPath, APP_URL));
+    };
 
-    const customCredentials = customCredentialsRef
-      ? ((await getGitLabOAuthCredentials(customCredentialsRef)) ?? undefined)
-      : undefined;
-
-    if (customCredentialsRef && !customCredentials) {
-      captureMessage('GitLab callback missing cached custom OAuth credentials', {
-        level: 'warning',
-        tags: { endpoint: 'gitlab/callback', source: 'gitlab_oauth' },
-        extra: gitLabOAuthSentryContext(searchParams),
-      });
-
-      const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=connection_failed');
-      return NextResponse.redirect(new URL(redirectPath, APP_URL));
-    }
-
-    const tokens = await exchangeGitLabOAuthCode(code, normalizedInstanceUrl, customCredentials);
-
-    const gitlabUser = await fetchGitLabUser(tokens.access_token, normalizedInstanceUrl);
-
-    let repositories = null;
-    try {
-      repositories = await fetchGitLabProjects(tokens.access_token, normalizedInstanceUrl);
-    } catch (repoError) {
-      // Non-fatal - user can refresh later
-      console.error('Failed to fetch GitLab projects:', repoError);
-    }
-
-    const tokenExpiresAt = calculateTokenExpiry(tokens.created_at, tokens.expires_in);
-
-    const stored = await storeGitLabOAuthIntegration({
-      owner,
-      authorizedByUserId: user.id,
-      providerBaseUrl: normalizedInstanceUrl,
-      providerUser: { id: gitlabUser.id.toString(), login: gitlabUser.username },
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      accessTokenExpiresAt: tokenExpiresAt,
-      oauthClientId: customCredentials?.clientId ?? null,
-      oauthClientSecret: customCredentials?.clientSecret ?? null,
-      scopes: tokens.scope.split(' '),
-      repositories: repositories && repositories.length > 0 ? repositories : null,
-    });
-
-    if (stored.instanceChanged || stored.accountChanged) {
-      await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
-    }
-
-    const successPath = verifiedState.returnTo
-      ? appendIntegrationOAuthRedirectQuery(verifiedState.returnTo, 'success=gitlab_connected')
-      : owner.type === 'org'
-        ? `/organizations/${owner.id}/integrations/gitlab?success=connected`
-        : `/integrations/gitlab?success=connected`;
-
-    return NextResponse.redirect(new URL(successPath, APP_URL));
+    if (owner.type !== 'org') return await connect();
+    // Fresh authorization check: the organization's stored credential is
+    // shared, so the callback asks for the same governing role set the start
+    // asked for, and refuses before exchanging a code or writing a row when
+    // the caller's role changed in between.
+    await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
+    return await runElevatedOrganizationWrite(
+      adminActionContextFromHeaders(user, request.headers),
+      {
+        organizationId: owner.id,
+        requiredRoles: ORGANIZATION_BILLING_ROLES,
+        action: 'organization.gitlab.connect',
+        message: 'GitLab: OAuth connection stored',
+      },
+      connect
+    );
   } catch (error) {
     console.error('Error handling GitLab OAuth callback:', error);
 

@@ -32,6 +32,11 @@ import {
   type AutoRoutingCustomRouter,
   type User,
 } from '@kilocode/db/schema';
+import type { AdminActionAuditAction } from '@kilocode/db/schema-types';
+import {
+  adminActionContextFromHeaders,
+  runElevatedOrganizationWrite,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   getCustomRouterStatus,
   getPlatformMeasurements,
@@ -96,6 +101,7 @@ function invalidRequest(error: z.ZodError): CustomRouterApiError {
 export type CustomRouterRequestContext = {
   user: User;
   organization: { id: string; canEdit: boolean } | null;
+  headers: Headers;
 };
 
 async function resolveRequestContext(request: NextRequest): Promise<CustomRouterRequestContext> {
@@ -117,7 +123,7 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
     );
   }
   const organizationId = authOrganizationId ?? queryOrganizationId;
-  if (!organizationId) return { user: auth.user, organization: null };
+  if (!organizationId) return { user: auth.user, organization: null, headers: request.headers };
   if (!z.uuid().safeParse(organizationId).success) {
     throw new CustomRouterApiError('invalid_request', 'Invalid organization ID');
   }
@@ -130,6 +136,7 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
         id: organizationId,
         canEdit: ORGANIZATION_BILLING_ROLES.some(editorRole => editorRole === role),
       },
+      headers: request.headers,
     };
   } catch (error) {
     if (error instanceof TRPCError) {
@@ -149,6 +156,40 @@ export async function handleCustomRouterRequest(
     if (error instanceof CustomRouterApiError) return customRouterErrorResponse(error);
     throw error;
   }
+}
+
+/**
+ * Runs a router write for the owner `scope` names, from the editor check on. Its refusals become
+ * error responses here, so an organization write a Kilo admin makes through the admin bypass is
+ * recorded with the status it answered.
+ */
+async function runRouterWrite(
+  context: CustomRouterRequestContext,
+  scope: OwnerType,
+  audit: { action: AdminActionAuditAction; message: string; slug: string },
+  write: (owner: CustomRouterOwner) => Promise<NextResponse>
+): Promise<NextResponse> {
+  const { owner } = resolveScopedOwner(context, scope);
+  const run = async () => {
+    try {
+      return await write(await resolveEditableOwner(context, scope));
+    } catch (error) {
+      if (error instanceof CustomRouterApiError) return customRouterErrorResponse(error);
+      throw error;
+    }
+  };
+  if (owner.type !== 'org') return run();
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(context.user, context.headers),
+    {
+      organizationId: owner.id,
+      requiredRoles: ORGANIZATION_BILLING_ROLES,
+      action: audit.action,
+      message: audit.message,
+      metadata: { slug: audit.slug },
+    },
+    run
+  );
 }
 
 function bodyTooLarge(): CustomRouterApiError {
@@ -762,45 +803,55 @@ export async function createCustomRouterResponse(
   const parsed = CreateCustomRouterRequestSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) throw invalidRequest(parsed.error);
   const input = parsed.data;
-  const owner = await resolveEditableOwner(context, input.scope);
-  assertCanCreate(await ownerRouterSlugs(db, owner), input.slug);
-  const rejections = await gatewayEntryRejections({
-    userId: context.user.id,
-    owner,
-    entries: input.entries,
-  });
-  validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
-  await validateNewGatewayModels({
-    models: newlyAddedGatewayModels(input.entries, new Set()),
-    entries: input.entries,
-    baseRouter: input.baseRouter,
-  });
-  await validateLinkedEntries(input.entries, input.baseRouter);
-
-  const router = await db.transaction(async tx => {
-    await lockAliasPromotionWrite(tx);
-    await lockOwner(tx, owner);
-    assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
-    validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
-    const [row] = await tx
-      .insert(auto_routing_custom_routers)
-      .values({
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        created_by_user_id: context.user.id,
-        slug: input.slug,
-        name: input.name,
-        base_router: input.baseRouter,
-        mode: input.mode,
+  return runRouterWrite(
+    context,
+    input.scope,
+    {
+      action: 'organization.custom_router.create',
+      message: 'Created a custom router',
+      slug: input.slug,
+    },
+    async owner => {
+      assertCanCreate(await ownerRouterSlugs(db, owner), input.slug);
+      const rejections = await gatewayEntryRejections({
+        userId: context.user.id,
+        owner,
         entries: input.entries,
-        default_entry_key: input.defaultEntryKey,
-      })
-      .returning();
-    if (!row) throw new Error('Custom router insert returned no row');
-    return toCustomRouterDefinition(row);
-  });
+      });
+      validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
+      await validateNewGatewayModels({
+        models: newlyAddedGatewayModels(input.entries, new Set()),
+        entries: input.entries,
+        baseRouter: input.baseRouter,
+      });
+      await validateLinkedEntries(input.entries, input.baseRouter);
 
-  return singleRouterResponse(router, true, 201);
+      const router = await db.transaction(async tx => {
+        await lockAliasPromotionWrite(tx);
+        await lockOwner(tx, owner);
+        assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
+        validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
+        const [row] = await tx
+          .insert(auto_routing_custom_routers)
+          .values({
+            owned_by_user_id: owner.type === 'user' ? owner.id : null,
+            owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+            created_by_user_id: context.user.id,
+            slug: input.slug,
+            name: input.name,
+            base_router: input.baseRouter,
+            mode: input.mode,
+            entries: input.entries,
+            default_entry_key: input.defaultEntryKey,
+          })
+          .returning();
+        if (!row) throw new Error('Custom router insert returned no row');
+        return toCustomRouterDefinition(row);
+      });
+
+      return singleRouterResponse(router, true, 201);
+    }
+  );
 }
 
 function applyUpdate(
@@ -848,79 +899,84 @@ export async function updateCustomRouterResponse(
   const parsed = UpdateCustomRouterRequestSchema.safeParse(rawInput);
   if (!parsed.success) throw invalidRequest(parsed.error);
   const input = parsed.data;
-  const owner = await resolveEditableOwner(context, scope);
+  return runRouterWrite(
+    context,
+    scope,
+    { action: 'organization.custom_router.update', message: 'Updated a custom router', slug },
+    async owner => {
+      const rejections = await gatewayEntryRejections({
+        userId: context.user.id,
+        owner,
+        entries: input.entries ?? [],
+      });
 
-  const rejections = await gatewayEntryRejections({
-    userId: context.user.id,
-    owner,
-    entries: input.entries ?? [],
-  });
-
-  const existing = await findRouter(db, owner, slug);
-  const planned = applyUpdate(existing, input);
-  const existingKeys = new Set(existing.entries.map(customRouterEntryKey));
-  validateNewGatewayEntries({
-    entries: planned.entries,
-    existingKeys,
-    rejections,
-  });
-  const plannedAdditions = newlyAddedGatewayModels(planned.entries, existingKeys);
-  await validateNewGatewayModels({
-    models: plannedAdditions,
-    entries: planned.entries,
-    baseRouter: planned.baseRouter,
-  });
-  const changesPoolOrBase = input.entries !== undefined || input.baseRouter !== undefined;
-  if (changesPoolOrBase) {
-    await validateLinkedEntries(
-      planned.entries,
-      planned.baseRouter,
-      planned.baseRouter === existing.baseRouter ? existing.entries : []
-    );
-  }
-
-  const router = await db.transaction(async tx => {
-    await lockAliasPromotionWrite(tx);
-    await lockOwner(tx, owner);
-    const current = await findRouter(tx, owner, slug);
-    const next = applyUpdate(current, input);
-    const currentKeys = new Set(current.entries.map(customRouterEntryKey));
-    validateNewGatewayEntries({
-      entries: next.entries,
-      existingKeys: currentKeys,
-      rejections,
-    });
-    if (changesPoolOrBase) {
-      // Links the pre-lock check did not see (a concurrent save or base router change) are checked
-      // again; unchanged links cost no request.
-      await validateLinkedEntries(
-        next.entries,
-        next.baseRouter,
-        next.baseRouter === planned.baseRouter ? planned.entries : []
-      );
-      // A risky edit (removal, relink, or base move) stops the live request under this same lock,
-      // before the write commits, so no confirmed request keeps measuring a pool that lost a model.
-      // Additions alone change nothing in flight and start no work.
-      if (requiresPauseBeforeEdit(current, next)) {
-        await pausePoolBeforeMutation(owner, current.id);
+      const existing = await findRouter(db, owner, slug);
+      const planned = applyUpdate(existing, input);
+      const existingKeys = new Set(existing.entries.map(customRouterEntryKey));
+      validateNewGatewayEntries({
+        entries: planned.entries,
+        existingKeys,
+        rejections,
+      });
+      const plannedAdditions = newlyAddedGatewayModels(planned.entries, existingKeys);
+      await validateNewGatewayModels({
+        models: plannedAdditions,
+        entries: planned.entries,
+        baseRouter: planned.baseRouter,
+      });
+      const changesPoolOrBase = input.entries !== undefined || input.baseRouter !== undefined;
+      if (changesPoolOrBase) {
+        await validateLinkedEntries(
+          planned.entries,
+          planned.baseRouter,
+          planned.baseRouter === existing.baseRouter ? existing.entries : []
+        );
       }
-      // A concurrent save can change which entries this write adds, or move the base router. The
-      // blocked-model lookup then runs against the locked definition; a save that adds nothing new
-      // repeats no request.
-      const lockedAdditions = newlyAddedGatewayModels(next.entries, currentKeys);
-      const additionsMoved = [...lockedAdditions].some(model => !plannedAdditions.has(model));
-      if (next.baseRouter !== planned.baseRouter || additionsMoved) {
-        await validateNewGatewayModels({
-          models: lockedAdditions,
+
+      const router = await db.transaction(async tx => {
+        await lockAliasPromotionWrite(tx);
+        await lockOwner(tx, owner);
+        const current = await findRouter(tx, owner, slug);
+        const next = applyUpdate(current, input);
+        const currentKeys = new Set(current.entries.map(customRouterEntryKey));
+        validateNewGatewayEntries({
           entries: next.entries,
-          baseRouter: next.baseRouter,
+          existingKeys: currentKeys,
+          rejections,
         });
-      }
-    }
-    return saveRouter(tx, next);
-  });
+        if (changesPoolOrBase) {
+          // Links the pre-lock check did not see (a concurrent save or base router change) are
+          // checked again; unchanged links cost no request.
+          await validateLinkedEntries(
+            next.entries,
+            next.baseRouter,
+            next.baseRouter === planned.baseRouter ? planned.entries : []
+          );
+          // A risky edit (removal, relink, or base move) stops the live request under this same
+          // lock, before the write commits, so no confirmed request keeps measuring a pool that
+          // lost a model. Additions alone change nothing in flight and start no work.
+          if (requiresPauseBeforeEdit(current, next)) {
+            await pausePoolBeforeMutation(owner, current.id);
+          }
+          // A concurrent save can change which entries this write adds, or move the base router.
+          // The blocked-model lookup then runs against the locked definition; a save that adds
+          // nothing new repeats no request.
+          const lockedAdditions = newlyAddedGatewayModels(next.entries, currentKeys);
+          const additionsMoved = [...lockedAdditions].some(model => !plannedAdditions.has(model));
+          if (next.baseRouter !== planned.baseRouter || additionsMoved) {
+            await validateNewGatewayModels({
+              models: lockedAdditions,
+              entries: next.entries,
+              baseRouter: next.baseRouter,
+            });
+          }
+        }
+        return saveRouter(tx, next);
+      });
 
-  return singleRouterResponse(router, true);
+      return singleRouterResponse(router, true);
+    }
+  );
 }
 
 /**
@@ -973,17 +1029,23 @@ export async function deleteCustomRouterResponse(
   params: { scope: string; slug: string }
 ): Promise<NextResponse> {
   const { scope, slug } = parseRouterParams(params);
-  const owner = await resolveEditableOwner(context, scope);
-  await db.transaction(async tx => {
-    await lockAliasPromotionWrite(tx);
-    await lockOwner(tx, owner);
-    const current = await findRouter(tx, owner, slug);
-    await pausePoolBeforeMutation(owner, current.id);
-    await tx
-      .delete(auto_routing_custom_routers)
-      .where(eq(auto_routing_custom_routers.id, current.id));
-  });
-  return new NextResponse(null, { status: 204 });
+  return runRouterWrite(
+    context,
+    scope,
+    { action: 'organization.custom_router.delete', message: 'Deleted a custom router', slug },
+    async owner => {
+      await db.transaction(async tx => {
+        await lockAliasPromotionWrite(tx);
+        await lockOwner(tx, owner);
+        const current = await findRouter(tx, owner, slug);
+        await pausePoolBeforeMutation(owner, current.id);
+        await tx
+          .delete(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.id, current.id));
+      });
+      return new NextResponse(null, { status: 204 });
+    }
+  );
 }
 
 export async function registerClientEntryResponse(
@@ -996,49 +1058,59 @@ export async function registerClientEntryResponse(
   if (!parsed.success) throw invalidRequest(parsed.error);
   const incoming = parsed.data.entry;
   const key = customRouterEntryKey(incoming);
-  const owner = await resolveEditableOwner(context, scope);
+  return runRouterWrite(
+    context,
+    scope,
+    {
+      action: 'organization.custom_router.client_entry.register',
+      message: 'Registered a custom router client entry',
+      slug,
+    },
+    async owner => {
+      const planned = await findRouter(db, owner, slug);
+      // The link lookup runs before the owner lock, as in create and update, so a queued
+      // registration never holds a pooled connection across the outbound request. A registration
+      // that carries no new link validates nothing.
+      await validateLinkedEntries([incoming], planned.baseRouter, planned.entries);
 
-  const planned = await findRouter(db, owner, slug);
-  // The link lookup runs before the owner lock, as in create and update, so a queued registration
-  // never holds a pooled connection across the outbound request. A registration that carries no
-  // new link validates nothing.
-  await validateLinkedEntries([incoming], planned.baseRouter, planned.entries);
+      const router = await db.transaction(async tx => {
+        await lockAliasPromotionWrite(tx);
+        await lockOwner(tx, owner);
+        const current = await findRouter(tx, owner, slug);
+        if (incoming.measuredAs !== undefined && current.baseRouter !== planned.baseRouter) {
+          // The link was checked against the base router read before the lock, and a concurrent
+          // save changed it. No locked state proves the link for the new difficulty, and the
+          // lookup that would is the one that must stay outside this transaction, so the caller
+          // registers again.
+          throw new CustomRouterApiError(
+            'invalid_request',
+            'baseRouter: The benchmark difficulty changed while this request was in flight. Try again.'
+          );
+        }
+        const index = current.entries.findIndex(existing => customRouterEntryKey(existing) === key);
+        if (index === -1 && current.entries.length >= MAX_CUSTOM_ROUTER_ENTRIES) {
+          throw new CustomRouterApiError(
+            'invalid_request',
+            `A custom router can include at most ${MAX_CUSTOM_ROUTER_ENTRIES} models`
+          );
+        }
+        // Re-registering refreshes capabilities and pricing; a stored link stays unless the CLI
+        // sends a new one. The web editor clears links.
+        const storedLink = index === -1 ? undefined : current.entries[index]?.measuredAs;
+        const entry =
+          incoming.measuredAs === undefined && storedLink !== undefined
+            ? { ...incoming, measuredAs: storedLink }
+            : incoming;
+        const entries =
+          index === -1
+            ? [...current.entries, entry]
+            : current.entries.map((existing, i) => (i === index ? entry : existing));
+        return saveRouter(tx, { ...current, entries });
+      });
 
-  const router = await db.transaction(async tx => {
-    await lockAliasPromotionWrite(tx);
-    await lockOwner(tx, owner);
-    const current = await findRouter(tx, owner, slug);
-    if (incoming.measuredAs !== undefined && current.baseRouter !== planned.baseRouter) {
-      // The link was checked against the base router read before the lock, and a concurrent save
-      // changed it. No locked state proves the link for the new difficulty, and the lookup that
-      // would is the one that must stay outside this transaction, so the caller registers again.
-      throw new CustomRouterApiError(
-        'invalid_request',
-        'baseRouter: The benchmark difficulty changed while this request was in flight. Try again.'
-      );
+      return singleRouterResponse(router, true);
     }
-    const index = current.entries.findIndex(existing => customRouterEntryKey(existing) === key);
-    if (index === -1 && current.entries.length >= MAX_CUSTOM_ROUTER_ENTRIES) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        `A custom router can include at most ${MAX_CUSTOM_ROUTER_ENTRIES} models`
-      );
-    }
-    // Re-registering refreshes capabilities and pricing; a stored link stays unless the CLI sends
-    // a new one. The web editor clears links.
-    const storedLink = index === -1 ? undefined : current.entries[index]?.measuredAs;
-    const entry =
-      incoming.measuredAs === undefined && storedLink !== undefined
-        ? { ...incoming, measuredAs: storedLink }
-        : incoming;
-    const entries =
-      index === -1
-        ? [...current.entries, entry]
-        : current.entries.map((existing, i) => (i === index ? entry : existing));
-    return saveRouter(tx, { ...current, entries });
-  });
-
-  return singleRouterResponse(router, true);
+  );
 }
 
 export async function removeClientEntryResponse(
@@ -1053,24 +1125,33 @@ export async function removeClientEntryResponse(
   });
   if (!parsed.success) throw invalidRequest(parsed.error);
   const key = customRouterEntryKey({ kind: 'client', ...parsed.data });
-  const owner = await resolveEditableOwner(context, scope);
+  return runRouterWrite(
+    context,
+    scope,
+    {
+      action: 'organization.custom_router.client_entry.remove',
+      message: 'Removed a custom router client entry',
+      slug,
+    },
+    async owner => {
+      const router = await db.transaction(async tx => {
+        await lockAliasPromotionWrite(tx);
+        await lockOwner(tx, owner);
+        const current = await findRouter(tx, owner, slug);
+        if (!current.entries.some(entry => customRouterEntryKey(entry) === key)) return current;
+        if (current.defaultEntryKey === key) {
+          throw new CustomRouterApiError(
+            'invalid_request',
+            'Choose another default member before removing this entry'
+          );
+        }
+        return saveRouter(tx, {
+          ...current,
+          entries: current.entries.filter(entry => customRouterEntryKey(entry) !== key),
+        });
+      });
 
-  const router = await db.transaction(async tx => {
-    await lockAliasPromotionWrite(tx);
-    await lockOwner(tx, owner);
-    const current = await findRouter(tx, owner, slug);
-    if (!current.entries.some(entry => customRouterEntryKey(entry) === key)) return current;
-    if (current.defaultEntryKey === key) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        'Choose another default member before removing this entry'
-      );
+      return singleRouterResponse(router, true);
     }
-    return saveRouter(tx, {
-      ...current,
-      entries: current.entries.filter(entry => customRouterEntryKey(entry) !== key),
-    });
-  });
-
-  return singleRouterResponse(router, true);
+  );
 }

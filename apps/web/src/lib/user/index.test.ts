@@ -5952,6 +5952,70 @@ describe('User', () => {
       });
     });
 
+    it('should clear auth audit hashes of a linked provider email that differs from the primary', async () => {
+      const user = await insertTestUser({
+        google_user_email: `primary-${crypto.randomUUID()}@example.com`,
+      });
+      const providerEmail = `provider-${crypto.randomUUID()}@example.org`;
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'github',
+        provider_account_id: `github-${user.id}`,
+        email: providerEmail,
+        avatar_url: '',
+        hosted_domain: null,
+      });
+      const [inserted] = await db
+        .insert(auth_audit_logs)
+        .values({
+          action: 'auth.sign_in',
+          outcome: 'failure',
+          method: 'github',
+          failure_reason: 'account_blocked',
+          subject_email_hash: authAuditEmailHash(providerEmail),
+          metadata: { marker: 'provider-attempt' },
+        })
+        .returning({ id: auth_audit_logs.id });
+
+      await softDeleteUser(user.id);
+
+      const [row] = await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.id, inserted.id));
+      expect(row).toMatchObject({
+        user_id: null,
+        subject_email_hash: null,
+        metadata: { marker: 'provider-attempt' },
+      });
+    });
+
+    it('should keep the auth audit hash on a row another live account owns', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      // The other account signed in with an address the deleted user also holds,
+      // e.g. after it changed hands.
+      const sharedHash = authAuditEmailHash(user.google_user_email);
+      const [inserted] = await db
+        .insert(auth_audit_logs)
+        .values({
+          action: 'auth.sign_in',
+          outcome: 'success',
+          user_id: otherUser.id,
+          subject_email_hash: sharedHash,
+          metadata: { marker: 'other-account' },
+        })
+        .returning({ id: auth_audit_logs.id });
+
+      await softDeleteUser(user.id);
+
+      const [row] = await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.id, inserted.id));
+      expect(row).toMatchObject({ user_id: otherUser.id, subject_email_hash: sharedHash });
+    });
+
     it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {
       // Per the GDPR policy in softDeleteUser's doc-comment, scheduled
       // action targets are retained operational records. The user_id FK
@@ -7657,11 +7721,20 @@ describe('User', () => {
       const user = await insertTestUser({ google_user_email: 'magic@example.com' });
 
       const futureDate = new Date(Date.now() + 1000 * 60 * 60).toISOString();
-      await db.insert(magic_link_tokens).values({
-        token_hash: 'test-token-hash',
-        email: 'magic@example.com',
-        expires_at: futureDate,
-      });
+      await db.insert(magic_link_tokens).values([
+        {
+          token_hash: 'test-token-hash',
+          email: 'magic@example.com',
+          expires_at: futureDate,
+        },
+        {
+          token_hash: 'passkey-enrollment-token-hash',
+          email: 'magic@example.com',
+          expires_at: futureDate,
+          purpose: 'passkey_enrollment',
+          challenge_id: crypto.randomUUID(),
+        },
+      ]);
 
       await softDeleteUser(user.id);
 

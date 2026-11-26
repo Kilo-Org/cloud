@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
+  admin_action_audit_logs,
   kilocode_users,
   kiloclaw_subscriptions,
   user_deletion_audit_events,
@@ -150,6 +151,37 @@ describe('adminUserDeletionQueueRouter', () => {
       .where(eq(user_deletion_steps.request_id, result.requestId));
     expect(steps.map(step => step.stepKey).sort()).toEqual([...CATALOG_KEYS].sort());
     expect(steps).toHaveLength(CATALOG_KEYS.length);
+  });
+
+  it('submit records the queued deletion against the target user', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const [result] = await caller.admin.userDeletionQueue.submit({
+      entries: [{ email: targetUser.google_user_email }],
+    });
+    if (result?.status !== 'enqueued') throw new Error('expected enqueued');
+    requestIds.push(result.requestId);
+
+    const rows = await db
+      .select({
+        action: admin_action_audit_logs.action,
+        outcome: admin_action_audit_logs.outcome,
+        actor_id: admin_action_audit_logs.actor_id,
+        target_type: admin_action_audit_logs.target_type,
+        target_id: admin_action_audit_logs.target_id,
+        metadata: admin_action_audit_logs.metadata,
+      })
+      .from(admin_action_audit_logs)
+      .where(sql`${admin_action_audit_logs.metadata}->>'requestId' = ${result.requestId}`);
+    expect(rows).toEqual([
+      {
+        action: 'user_deletion.request.create',
+        outcome: 'success',
+        actor_id: admin.id,
+        target_type: 'user',
+        target_id: targetUser.id,
+        metadata: { requestId: result.requestId },
+      },
+    ]);
   });
 
   it('submit returns already_active for a duplicate target', async () => {

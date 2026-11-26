@@ -16,6 +16,10 @@ declare global {
     // is single-config production); supplied via `.dev.vars` by
     // `pnpm dev:env`. The runtime check is string equality on `'log'`.
     PUSH_SINK_MODE?: string;
+    // Staging push switch (`lib/push-gate.ts`). Read only when
+    // `WORKER_ENV` is `staging`; only the exact string `'true'` lets that
+    // deployment reach Expo or APNs.
+    NOTIFICATIONS_PUSH_ENABLED?: string;
     // Base origin of the web app, used to reach the internal
     // glanceable-agents-snapshot route (see ENVIRONMENT.md). Optional so a
     // missing value degrades to "skip aggregate delivery".

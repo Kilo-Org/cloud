@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
+import { captureException } from '@sentry/nextjs';
 
 import { callerAddressFromHeaders } from '@/lib/auth/caller-address';
 import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
@@ -109,8 +110,13 @@ async function authenticate(request: NextRequest, attempt: AuthAuditAttempt): Pr
     if (error instanceof PasskeyVerificationError) {
       // A refusal stored under the credential's owner hashes the owner's
       // email. Only a refusal pays for the read: a success writes no row here.
+      // A failed read leaves the hash out; the refusal is answered unchanged.
       if (attempt.userId) {
-        attempt.email = (await findUserById(attempt.userId))?.google_user_email ?? null;
+        try {
+          attempt.email = (await findUserById(attempt.userId))?.google_user_email ?? null;
+        } catch (lookupError) {
+          captureException(lookupError, { tags: { operation: 'passkey_refusal_owner_email' } });
+        }
       }
       return NextResponse.json({ error: error.code }, { status: 401 });
     }

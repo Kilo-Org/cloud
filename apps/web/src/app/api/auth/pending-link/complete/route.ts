@@ -25,6 +25,7 @@ import {
   authAuditRequestFromHeaders,
   type AuthAuditAttempt,
 } from '@/lib/auth/auth-audit';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const codeProofSchema = z.object({
   code: z.string().regex(new RegExp(`^\\d{${SIGN_IN_METHOD_CHANGE_CODE_LENGTH}}$`)),
@@ -148,6 +149,12 @@ async function attachPendingLink(request: Request, attempt: AuthAuditAttempt): P
 
   const session = await getUserFromSessionForCredentialIssuance();
   const sessionUser = session.user;
+  // A refusal row hashes the email of the account the link names; the session
+  // already holds it when it is that account.
+  attempt.email =
+    sessionUser?.id === row.kilo_user_id
+      ? sessionUser.google_user_email
+      : ((await findUserById(row.kilo_user_id))?.google_user_email ?? null);
   if (!sessionUser) {
     return NextResponse.json({ error: 'SESSION_REQUIRED' }, { status: 401 });
   }

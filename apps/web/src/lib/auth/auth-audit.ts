@@ -249,10 +249,25 @@ async function recordAttemptOutcome(
 }
 
 /**
+ * Lockouts by too many wrong codes, in audit form. A route answers each with
+ * a 429, but each is a security event on a known account that the table keeps
+ * (design section 10 item 6: one failure row per locked code), so the 429
+ * rule below does not apply to them. `email_code_locked` is the passkey
+ * enrollment code (`passkey/register`); `sign_in_method_code_locked` is the
+ * sign-in method change code (`pending-link/complete` and the device-auth
+ * `pendingLinkCodeLocked` refusal of `device-auth/tokens`).
+ */
+const LOCKOUT_FAILURE_CODES: Record<string, true> = {
+  email_code_locked: true,
+  sign_in_method_code_locked: true,
+};
+
+/**
  * Runs a route handler as one auth attempt. A response below 400 is a success;
  * a refused response records the code in its `error` field, or `http_<status>`
  * when it carries none. A 429 is a rate-limit refusal whatever its code, so it
- * is the log line only. A throw records `internal_error` and rethrows.
+ * is the log line only, except for a code lockout ({@link LOCKOUT_FAILURE_CODES}).
+ * A throw records `internal_error` and rethrows.
  */
 export async function auditAuthRoute(
   request: AuthAuditRequest,
@@ -268,7 +283,10 @@ export async function auditAuthRoute(
   }
   const failureReason =
     attempt.failureReason ?? (response.status >= 400 ? await responseFailureCode(response) : null);
-  await recordAttemptOutcome(request, attempt, failureReason, response.status === 429);
+  const rateLimited =
+    response.status === 429 &&
+    (failureReason === null || LOCKOUT_FAILURE_CODES[failureReason] !== true);
+  await recordAttemptOutcome(request, attempt, failureReason, rateLimited);
   return response;
 }
 

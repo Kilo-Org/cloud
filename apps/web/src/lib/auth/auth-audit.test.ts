@@ -198,6 +198,22 @@ describe('auditAuthRoute', () => {
     ]);
   });
 
+  test.each(['EMAIL_CODE_LOCKED', 'sign_in_method_code_locked'])(
+    'stores a %s lockout of a known account, though answered with 429',
+    async code => {
+      const attempt = { action: 'auth.passkey.add' as const, userId: 'user-1' };
+
+      await auditAuthRoute(request, attempt, async () =>
+        Response.json({ error: code }, { status: 429 })
+      );
+
+      expect(await db.select().from(auth_audit_logs)).toEqual([
+        expect.objectContaining({ user_id: 'user-1', failure_reason: code.toLowerCase() }),
+      ]);
+      expect(events).toEqual([expect.objectContaining({ stored: true, persisted: true })]);
+    }
+  );
+
   test('stores the same refusal of a known account when it is not a 429', async () => {
     const attempt = { action: 'auth.sign_in' as const, userId: 'user-1', method: 'email' };
 

@@ -30,6 +30,12 @@ import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/li
 import { authorizeSignInMethodChange } from '@/lib/auth/sign-in-method-change';
 import { consumeSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
 import { SIGN_IN_METHOD_CHANGE_REFUSAL_CODES } from '@/lib/auth/sign-in-method-change-codes';
+import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
+import { auth_audit_logs } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 
 const mockReadSecret = jest.mocked(readPendingLinkSecret);
 const mockGetPending = jest.mocked(getPendingLinkBySecret);
@@ -264,5 +270,51 @@ describe('/api/auth/pending-link/complete', () => {
 
     expect(response.status).toBe(404);
     expect(mockClearCookie).toHaveBeenCalled();
+  });
+
+  describe('audit rows', () => {
+    const rowsFor = (userId: string) =>
+      db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
+
+    it("stores a lockout, though answered with 429, under the linked account's email hash", async () => {
+      const owner = {
+        id: `link-${randomUUID()}`,
+        google_user_email: `owner-${randomUUID()}@example.com`,
+      };
+      mockGetPending.mockResolvedValue({ ...(liveRow as object), kilo_user_id: owner.id } as never);
+      mockSession.mockResolvedValue({ user: owner, webSessionId: 'web-session-1' } as never);
+      mockConsumeCode.mockResolvedValue('locked');
+
+      expect((await postComplete(codeProof)).status).toBe(429);
+
+      expect(await rowsFor(owner.id)).toEqual([
+        expect.objectContaining({
+          action: 'auth.sign_in_method.link',
+          outcome: 'failure',
+          failure_reason: 'sign_in_method_code_locked',
+          subject_email_hash: authAuditEmailHash(owner.google_user_email),
+        }),
+      ]);
+    });
+
+    it("hashes the linked account's email when another account is signed in", async () => {
+      const owner = await insertTestUser({
+        google_user_email: `owner-${randomUUID()}@example.com`,
+      });
+      mockGetPending.mockResolvedValue({ ...(liveRow as object), kilo_user_id: owner.id } as never);
+      mockSession.mockResolvedValue({
+        user: { id: 'someone-else', google_user_email: 'other@example.com' },
+        webSessionId: 'web-session-2',
+      } as never);
+
+      expect((await postComplete(codeProof)).status).toBe(403);
+
+      expect(await rowsFor(owner.id)).toEqual([
+        expect.objectContaining({
+          failure_reason: 'wrong_account',
+          subject_email_hash: authAuditEmailHash(owner.google_user_email),
+        }),
+      ]);
+    });
   });
 });

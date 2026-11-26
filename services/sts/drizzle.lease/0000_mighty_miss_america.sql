@@ -25,7 +25,9 @@ CREATE TABLE `lease` (
 	`created_at` integer NOT NULL,
 	`expires_at` integer NOT NULL,
 	`ended_at` integer,
-	`revoke_cause` text
+	`revoke_cause` text,
+	`revoke_retry_at` integer,
+	`revoke_failure_audited` integer DEFAULT false NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `lease_lease_id_unique` ON `lease` (`lease_id`);--> statement-breakpoint

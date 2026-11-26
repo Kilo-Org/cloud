@@ -10,7 +10,7 @@ import {
   type LeaseLimitedReason,
 } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
-import { and, asc, eq, gt, inArray, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -274,7 +274,7 @@ export class LeaseDO extends DurableObject<Env> {
         })
         .where(eq(schema.lease.slot, slot))
         .run();
-      await this.revokeOnce(created.leaseId, { firstAttempt: true });
+      await this.revokeOnce(created.leaseId);
       await this.scheduleAlarm(Date.now(), false);
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };
     }
@@ -318,8 +318,7 @@ export class LeaseDO extends DurableObject<Env> {
     }
     if (row.state === 'revoked' || row.expiresAt <= Date.now()) return { status: 'revoked' };
 
-    const firstAttempt = row.revokeCause === null;
-    if (firstAttempt) {
+    if (row.revokeCause === null) {
       // Owed from now on: the alarm retries it if Infisical cannot take it.
       this.db
         .update(schema.lease)
@@ -327,7 +326,7 @@ export class LeaseDO extends DurableObject<Env> {
         .where(eq(schema.lease.slot, row.slot))
         .run();
     }
-    const result = await this.revokeOnce(input.leaseId, { firstAttempt });
+    const result = await this.revokeOnce(input.leaseId);
     await this.scheduleAlarm(Date.now(), false);
     return result === 'revoke_failed'
       ? { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS }
@@ -406,13 +405,10 @@ export class LeaseDO extends DurableObject<Env> {
   }
 
   /** One revocation attempt of an owed lease, shared with any attempt already in flight. */
-  private async revokeOnce(
-    leaseId: string,
-    options: { firstAttempt: boolean }
-  ): Promise<LeaseRevocationResult> {
+  private async revokeOnce(leaseId: string): Promise<LeaseRevocationResult> {
     const inFlight = this.revoking.get(leaseId);
     if (inFlight !== undefined) return await inFlight;
-    const pending = this.attemptRevocation(leaseId, options.firstAttempt).finally(() => {
+    const pending = this.attemptRevocation(leaseId).finally(() => {
       this.revoking.delete(leaseId);
     });
     this.revoking.set(leaseId, pending);
@@ -420,19 +416,19 @@ export class LeaseDO extends DurableObject<Env> {
   }
 
   /**
-   * Asks Infisical to revoke an owed lease (its row carries `revokeCause`). On success it writes
-   * `lease.revoked` and ends the row. When Infisical cannot be reached, the first attempt writes
-   * `lease.revoked` with result `revoke_failed` and the row stays owed for the alarm. A failed
-   * audit append also leaves it owed: the retry finds the lease gone and writes the row then.
+   * Asks Infisical to revoke an owed lease (its row carries `revokeCause`), and sets when the alarm
+   * may try it next. On success it writes `lease.revoked` and ends the row. When Infisical cannot
+   * be reached, the first failure whose `revoke_failed` row is written marks the row, so later
+   * failures write none, and an append that failed is tried again on the next failure. A failed
+   * audit append after a success also leaves it owed: the retry finds the lease gone and writes
+   * the row then.
    */
-  private async attemptRevocation(
-    leaseId: string,
-    firstAttempt: boolean
-  ): Promise<LeaseRevocationResult> {
+  private async attemptRevocation(leaseId: string): Promise<LeaseRevocationResult> {
     const row = this.db.select().from(schema.lease).where(eq(schema.lease.leaseId, leaseId)).get();
     if (row === undefined || row.revokeCause === null) return 'gone';
     const cause = row.revokeCause;
     const caller: LeaseAuditCaller = CallerSchema.parse(JSON.parse(row.caller));
+    this.setRevokeRetryAt(row.slot, Date.now() + LEASE_REVOKE_RETRY_MS);
     const revocation = await this.client.revokeLease(LEASE_DYNAMIC_SECRETS[row.grant], leaseId);
     const result: LeaseRevocationResult =
       revocation.status === 'unreachable' ? 'revoke_failed' : revocation.status;
@@ -443,7 +439,10 @@ export class LeaseDO extends DurableObject<Env> {
         cause,
         detail: revocation.detail,
       });
-      if (!firstAttempt) return result;
+      if (revocation.retryAfterMs !== null && revocation.retryAfterMs > LEASE_REVOKE_RETRY_MS) {
+        this.setRevokeRetryAt(row.slot, Date.now() + revocation.retryAfterMs);
+      }
+      if (row.revokeFailureAudited) return result;
     }
     try {
       await this.audit.append(
@@ -464,22 +463,36 @@ export class LeaseDO extends DurableObject<Env> {
       });
       return 'revoke_failed';
     }
-    if (result !== 'revoke_failed') {
-      this.db
-        .update(schema.lease)
-        .set({
-          state: row.state === 'active' ? 'revoked' : 'failed',
-          endedAt: Date.now(),
-          revokeCause: null,
-        })
-        .where(eq(schema.lease.slot, row.slot))
-        .run();
-    }
+    this.db
+      .update(schema.lease)
+      .set(
+        result === 'revoke_failed'
+          ? { revokeFailureAudited: true }
+          : {
+              state: row.state === 'active' ? 'revoked' : 'failed',
+              endedAt: Date.now(),
+              revokeCause: null,
+              revokeRetryAt: null,
+            }
+      )
+      .where(eq(schema.lease.slot, row.slot))
+      .run();
     return result;
   }
 
-  /** The owed revocations of unexpired leases, oldest first; Infisical drops an expired one itself. */
-  private owedRevocations(now: number, limit: number): LeaseRow[] {
+  private setRevokeRetryAt(slot: number, at: number): void {
+    this.db
+      .update(schema.lease)
+      .set({ revokeRetryAt: at })
+      .where(eq(schema.lease.slot, slot))
+      .run();
+  }
+
+  /**
+   * The owed revocations of unexpired leases (Infisical drops an expired one itself) that are due
+   * by `dueBy`, least recently tried first.
+   */
+  private owedRevocations(now: number, dueBy: number, limit: number): LeaseRow[] {
     return this.db
       .select()
       .from(schema.lease)
@@ -488,18 +501,20 @@ export class LeaseDO extends DurableObject<Env> {
           isNotNull(schema.lease.revokeCause),
           isNotNull(schema.lease.leaseId),
           inArray(schema.lease.state, ['active', 'failed']),
-          gt(schema.lease.expiresAt, now)
+          gt(schema.lease.expiresAt, now),
+          or(isNull(schema.lease.revokeRetryAt), lte(schema.lease.revokeRetryAt, dueBy))
         )
       )
-      .orderBy(asc(schema.lease.slot))
+      .orderBy(sql`coalesce(${schema.lease.revokeRetryAt}, 0)`, asc(schema.lease.slot))
       .limit(limit)
       .all();
   }
 
   private async retryOwedRevocations(): Promise<void> {
-    for (const row of this.owedRevocations(Date.now(), LEASE_REVOKE_RETRIES_PER_ALARM)) {
+    const now = Date.now();
+    for (const row of this.owedRevocations(now, now, LEASE_REVOKE_RETRIES_PER_ALARM)) {
       if (row.leaseId === null) continue;
-      await this.revokeOnce(row.leaseId, { firstAttempt: false });
+      await this.revokeOnce(row.leaseId);
     }
   }
 
@@ -529,8 +544,11 @@ export class LeaseDO extends DurableObject<Env> {
     } else if (this.audit.hasRows()) {
       target = Math.max(now + 1_000, this.audit.nextPruneAt());
     }
-    if (this.owedRevocations(now, 1).length > 0)
-      target = Math.min(target, now + LEASE_REVOKE_RETRY_MS);
+    const [nextRevocation] = this.owedRevocations(now, Number.MAX_SAFE_INTEGER, 1);
+    if (nextRevocation !== undefined) {
+      const due = nextRevocation.revokeRetryAt ?? now;
+      target = Math.min(target, Math.max(now + 1_000, due));
+    }
     const rowPrune = this.nextRowPruneAt();
     if (rowPrune !== null) target = Math.min(target, Math.max(now + 1_000, rowPrune));
     if (target === Number.POSITIVE_INFINITY) return;

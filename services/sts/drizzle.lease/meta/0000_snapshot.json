@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5644385d-86d9-4626-aedc-43b6bcfee9b9",
+  "id": "396cdfe3-afe8-410e-981e-ef1f96ec0cf5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_event": {
@@ -162,6 +162,21 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "revoke_retry_at": {
+          "name": "revoke_retry_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoke_failure_audited": {
+          "name": "revoke_failure_audited",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {

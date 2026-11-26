@@ -464,7 +464,8 @@ export type LeaseRevokeCause = 'caller' | 'late' | 'expiry_mismatch' | 'audit_fa
 /**
  * What the revocation at Infisical gave: `revoked`; `gone` (Infisical no longer had the lease: it
  * had expired or was already revoked there); `revoke_failed` (Infisical could not be reached, and
- * the lease object retries until the lease expires; a later row records the outcome).
+ * the lease object retries until the lease expires; a later row records success, or none comes if
+ * the lease expires first, since Infisical drops an expired lease itself).
  */
 export type LeaseRevocationResult = 'revoked' | 'gone' | 'revoke_failed';
 

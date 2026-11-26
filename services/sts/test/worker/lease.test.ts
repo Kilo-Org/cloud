@@ -102,6 +102,8 @@ type LeaseManager = {
   /** Status the next lease calls answer with; 200 unless set. */
   setCreateStatus: (status: number) => void;
   setRevokeStatus: (status: number) => void;
+  /** Infisical refuses the revocation of this lease only (503), whatever the revoke status. */
+  refuseRevokeOf: (leaseId: string) => void;
   /** Added to the expiry the fake reports, to stand in for a misconfigured dynamic secret. */
   setExpirySkewMs: (ms: number) => void;
   /** Runs as the fake answers a create, after it computed the expiry (a test moves the clock). */
@@ -122,6 +124,7 @@ function installLeaseManager(
   let expirySkewMs = 0;
   let onCreate = (): void => {};
   let serial = 0;
+  const revokeRefused = new Set<string>();
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(
       typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -155,7 +158,14 @@ function installLeaseManager(
       return response;
     }
     if (method === 'DELETE' && url.pathname.startsWith('/api/v1/dynamic-secrets/leases/')) {
-      if (revokeStatus !== 200) return new Response('refused', { status: revokeStatus });
+      if (revokeStatus !== 200) {
+        const headers: Record<string, string> =
+          revokeStatus === 429 ? { 'retry-after': '120' } : {};
+        return new Response('refused', { status: revokeStatus, headers });
+      }
+      if (revokeRefused.has(url.pathname.split('/').pop() ?? '')) {
+        return new Response('refused', { status: 503 });
+      }
       return Response.json({ lease: { id: url.pathname.split('/').pop() } });
     }
     return new Response('not found', { status: 404 });
@@ -170,6 +180,9 @@ function installLeaseManager(
     },
     setRevokeStatus: status => {
       revokeStatus = status;
+    },
+    refuseRevokeOf: leaseId => {
+      revokeRefused.add(leaseId);
     },
     setExpirySkewMs: ms => {
       expirySkewMs = ms;
@@ -250,6 +263,20 @@ async function flushedDenials(): Promise<Event[]> {
       .toArray()
       .map(row => JSON.parse(row.event) as Event)
   );
+}
+
+/** Makes every owed revocation due for the next alarm, as if 30 s had passed since its attempt. */
+async function revocationsDue(): Promise<void> {
+  await runInDurableObject(getLeaseStub(env, config), (_instance, state) => {
+    state.storage.sql.exec(
+      'UPDATE lease SET revoke_retry_at = revoke_retry_at - 60000 WHERE revoke_retry_at IS NOT NULL'
+    );
+  });
+}
+
+/** The lease ids Infisical was asked to revoke, in call order. */
+function revokedIds(manager: LeaseManager): string[] {
+  return manager.revokes().map(call => call.path.split('/').pop() ?? '');
 }
 
 beforeEach(async () => {
@@ -620,9 +647,11 @@ describe('revoke', () => {
       });
     }
     const stub = getLeaseStub(env, config);
+    await revocationsDue();
     await runDurableObjectAlarm(stub);
     expect(manager.revokes()).toHaveLength(3);
     manager.setRevokeStatus(200);
+    await revocationsDue();
     await runDurableObjectAlarm(stub);
     expect(manager.revokes()).toHaveLength(4);
     const revoked = (await leaseEvents()).filter(
@@ -667,6 +696,7 @@ describe('revoke', () => {
       await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm())
     ).not.toBeNull();
     manager.setRevokeStatus(200);
+    await revocationsDue();
     await runDurableObjectAlarm(stub);
     expect(manager.revokes()).toHaveLength(2);
     expect((await leaseEvents()).map(event => event.data.attributes.result)).toEqual([
@@ -687,6 +717,107 @@ describe('revoke', () => {
     });
     await runDurableObjectAlarm(stub);
     expect(manager.revokes()).toHaveLength(1);
+  });
+
+  it('leaves a lease to its caller for 30 s after the caller tried to revoke it', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    manager.setRevokeStatus(503);
+    await broker('bouncer-watch').revokeLease(created.leaseId);
+    const stub = getLeaseStub(env, config);
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(1);
+    await revocationsDue();
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(2);
+  });
+
+  it('waits out Infisical’s Retry-After on a 429 before the alarm retries', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    manager.setRevokeStatus(429);
+    const before = Date.now();
+    await broker('bouncer-watch').revokeLease(created.leaseId);
+    const stub = getLeaseStub(env, config);
+    const [row] = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.sql.exec<{ at: number }>('SELECT revoke_retry_at AS at FROM lease').toArray()
+    );
+    expect(row.at).toBeGreaterThanOrEqual(before + 120_000);
+    // 60 s later (past the 30 s retry, inside Retry-After): still not retried.
+    await revocationsDue();
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(1);
+    await revocationsDue();
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(2);
+  });
+
+  it('writes the revoke_failed row on a later failure when its first append failed', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    manager.setRevokeStatus(503);
+    const stub = getLeaseStub(env, config);
+    await runInDurableObject(stub, instance => {
+      const { audit } = instance as unknown as { audit: { append: () => Promise<void> } };
+      vi.spyOn(audit, 'append').mockRejectedValueOnce(new Error('storage refused'));
+    });
+    await broker('bouncer-watch').revokeLease(created.leaseId);
+    expect(
+      (await leaseEvents()).filter(event => event.type === 'ai.kilo.sts.lease.revoked')
+    ).toEqual([]);
+    await revocationsDue();
+    await runDurableObjectAlarm(stub);
+    await revocationsDue();
+    await runDurableObjectAlarm(stub);
+    expect(manager.revokes()).toHaveLength(3);
+    const revoked = (await leaseEvents()).filter(
+      event => event.type === 'ai.kilo.sts.lease.revoked'
+    );
+    expect(revoked.map(event => event.data.attributes.result)).toEqual(['revoke_failed']);
+  });
+
+  it('retries every owed revocation when more than five keep failing', async () => {
+    const manager = installLeaseManager();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stuck: string[] = [];
+    for (let index = 0; index < 6; index += 1) {
+      const created = issued(
+        await lease('replica-reader', { grant: 'replica-read', ttlSeconds: 3600 })
+      );
+      manager.refuseRevokeOf(created.leaseId);
+      await broker('replica-reader').revokeLease(created.leaseId);
+      stuck.push(created.leaseId);
+      if (index === 3) {
+        // Past the per-minute cap and the active limit (a revoked-but-owed lease still counts).
+        await runInDurableObject(getLeaseStub(env, config), (_instance, state) => {
+          state.storage.sql.exec(
+            "UPDATE lease SET created_at = created_at - 120000, workload = 'old-reader'"
+          );
+        });
+      }
+    }
+    const newer = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
+    manager.setRevokeStatus(503);
+    await broker('bouncer-watch').revokeLease(newer.leaseId);
+    manager.setRevokeStatus(200);
+    const stub = getLeaseStub(env, config);
+    for (let alarm = 0; alarm < 3; alarm += 1) {
+      await revocationsDue();
+      await runDurableObjectAlarm(stub);
+    }
+    expect(revokedIds(manager).filter(id => id === newer.leaseId).length).toBeGreaterThan(1);
+    const states = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.sql
+        .exec<{ lease_id: string; state: string }>('SELECT lease_id, state FROM lease')
+        .toArray()
+    );
+    expect(states.find(row => row.lease_id === newer.leaseId)?.state).toBe('revoked');
+    expect(stuck.every(id => revokedIds(manager).filter(call => call === id).length >= 2)).toBe(
+      true
+    );
   });
 
   it('answers revoked for an expired lease of the caller without a manager call', async () => {

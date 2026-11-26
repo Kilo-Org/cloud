@@ -38,6 +38,16 @@ export const lease = sqliteTable(
      * it succeeds or the lease expires. The cause its `lease.revoked` rows carry.
      */
     revokeCause: text('revoke_cause').$type<LeaseRevokeCause>(),
+    /**
+     * An owed revocation: the earliest time the alarm may try it again (the last attempt plus
+     * `LEASE_REVOKE_RETRY_MS`, or Infisical's `Retry-After` when longer). The alarm takes the
+     * earliest first, so a lease that keeps failing cannot hold back the others.
+     */
+    revokeRetryAt: integer('revoke_retry_at'),
+    /** The `revoke_failed` row of an owed revocation is written; later failures write none. */
+    revokeFailureAudited: integer('revoke_failure_audited', { mode: 'boolean' })
+      .notNull()
+      .default(false),
   },
   table => [index('lease_workload_created').on(table.workload, table.createdAt)]
 );

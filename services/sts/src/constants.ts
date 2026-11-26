@@ -158,12 +158,13 @@ export const LEASE_CREATE_BUDGET_MS = 20_000;
 export const LEASE_OBJECT_DEADLINE_MS = 25_000;
 
 /**
- * A revocation Infisical could not take is retried by the lease object's alarm this often, until
- * it succeeds or the lease expires.
+ * A revocation Infisical could not take is retried by the lease object's alarm, until it succeeds
+ * or the lease expires. The alarm retries a lease no sooner than this after its last attempt,
+ * whether a caller or the alarm made it, or after Infisical's `Retry-After` on a 429 when longer.
  */
 export const LEASE_REVOKE_RETRY_MS = 30_000;
 
-/** Owed revocations one alarm retries, oldest first; the next alarm takes the rest. */
+/** Owed revocations one alarm retries, least recently tried first; the next alarm takes the rest. */
 export const LEASE_REVOKE_RETRIES_PER_ALARM = 5;
 
 /** A failed lease or revoke call: the caller retries after this many seconds. */

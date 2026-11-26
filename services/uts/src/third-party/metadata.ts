@@ -101,6 +101,16 @@ export function isAllowedThirdPartyRedirect(uri: string): boolean {
   return /^[a-z][a-z0-9+.-]*:$/.test(url.protocol) && !REFUSED_SCHEMES.has(url.protocol);
 }
 
+/** How a registered third-party redirect URI receives the code. */
+export type ThirdPartyRedirectKind = 'https' | 'loopback' | 'private_use_scheme';
+
+/** The kind of a redirect URI that `isAllowedThirdPartyRedirect` accepted. */
+export function thirdPartyRedirectKind(uri: string): ThirdPartyRedirectKind {
+  const { protocol } = new URL(uri);
+  if (protocol === 'https:') return 'https';
+  return protocol === 'http:' ? 'loopback' : 'private_use_scheme';
+}
+
 /** A display name: plain text without control characters, which the consent page shows escaped. */
 const ClientNameSchema = z
   .string()

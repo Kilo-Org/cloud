@@ -349,10 +349,13 @@ Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata D
   `org` only when present.
 
   Cost per request: one statement (`uts.exchange_delegated_token`: grant or family, consent,
-  subject and `kid` revocations, `token.exchanged` audit row), then one `signMany` call. Each
-  isolate allows 60 exchanges a minute per `sid` and 600 per caller workload. Above that it
-  answers `429 { error: "slow_down", limit: "subject" | "caller" }` with `Retry-After` of 1 to 60
-  seconds.
+  subject and `kid` revocations, `token.exchanged` audit row), then one `signMany` call. The
+  limits are attempt budgets, not success budgets. Each isolate allows 600 attempts a minute per
+  caller workload, counted once the STS token is verified, and 60 per subject `sid`, counted once
+  the subject token is verified. Both count refused attempts too, so a caller that retries a
+  refused subject spends the same budget. Above that it answers
+  `429 { error: "slow_down", limit: "subject" | "caller" }` with `Retry-After` of 1 to 60 seconds,
+  and a 429 itself counts nothing.
 
 The local run is `scripts/clients-e2e.ts`. Start the mint Worker with
 `--var DEV_CLIENT_METADATA_ORIGIN:http://127.0.0.1:9132 --var DEV_STS_JWKS_URL:http://127.0.0.1:9131/jwks.json`

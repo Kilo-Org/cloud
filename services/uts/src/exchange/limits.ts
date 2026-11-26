@@ -1,12 +1,13 @@
 import { UTS_EXCHANGE_LIMITS } from '@kilocode/uts-contracts';
 
 /**
- * The broker exchange's limits in each UTS isolate (design 3, "Kilo MCP exchange"): 60 exchanges
- * a minute per subject `sid` and 600 a minute per calling workload, both keyed by verified values
- * (the subject token's `sid`, the STS token's workload). Each is a fixed one-minute window held in
- * isolate memory, not shared across isolates: a caller spread over many UTS isolates can pass
- * either in total, and the identity store's pool and the feed stay the real bounds. A refused
- * attempt counts nothing and costs no SQL or signing.
+ * The broker exchange's limits in each UTS isolate (design 3, "Kilo MCP exchange"): attempt
+ * budgets of 60 a minute per subject `sid` and 600 a minute per calling workload, both keyed by
+ * verified values (the subject token's `sid`, the STS token's workload). Every attempt after its
+ * key is verified counts, a refused one included, so retrying a refused subject spends the budget
+ * too. Each is a fixed one-minute window held in isolate memory, not shared across isolates: a
+ * caller spread over many UTS isolates can pass either in total, and the identity store's pool and
+ * the feed stay the real bounds. A 429 counts nothing and costs no SQL or signing.
  */
 
 const WINDOW_MS = 60_000;

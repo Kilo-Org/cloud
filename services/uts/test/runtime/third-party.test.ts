@@ -222,7 +222,12 @@ describe('the third-party client resolver', () => {
 const authorizeUrl = `${config.endpoints.issuer}/authorize?client_id=${encodeURIComponent(CLIENT_ID)}`;
 
 const pending: PendingAuthorization = {
-  client: { kind: 'third_party', clientId: CLIENT_ID, name: 'Example <app>' },
+  client: {
+    kind: 'third_party',
+    clientId: CLIENT_ID,
+    name: 'Example <app>',
+    redirectKind: 'https',
+  },
   redirectUri: REDIRECT,
   scopes: [KILO_MCP_CATALOG_READ_SCOPE],
   audiences: ['kilo-mcp'],
@@ -248,6 +253,28 @@ function consentPost(fields: Record<string, string | string[]>, origin = ORIGIN)
 describe('the consent screen', () => {
   const step = (store: ThirdPartyAccess) =>
     consentStep({ config, thirdParty: store, scopes: testScopes }, noSignInMethods);
+
+  it('shows a private-use-scheme client with a consent the confirm page on GET, and approves only its same-origin POST', async () => {
+    const store = fakeStore({ findConsent: async () => CONSENT_ID });
+    const nativeApp: PendingAuthorization = {
+      ...pending,
+      client: { ...pending.client, redirectKind: 'private_use_scheme' },
+      redirectUri: 'com.example.app:/oauth/callback',
+    };
+    const shown = await step(store.access)(new Request(authorizeUrl), nativeApp, session);
+    if (shown.status !== 'interaction') throw new Error('expected the confirm page, not a code');
+    expect(await shown.response.text()).toContain('id="confirm-app"');
+    expect(shown.response.headers.get('Content-Security-Policy')).toContain(
+      "form-action 'self' com.example.app:;"
+    );
+    expect(
+      (await step(store.access)(consentPost({}, 'https://evil.example'), nativeApp, session)).status
+    ).toBe('interaction');
+    expect(await step(store.access)(consentPost({}), nativeApp, session)).toMatchObject({
+      status: 'approved',
+      approval: { consentId: CONSENT_ID },
+    });
+  });
 
   it('approves at once with an active consent that covers the scopes', async () => {
     const store = fakeStore({ findConsent: async () => CONSENT_ID });

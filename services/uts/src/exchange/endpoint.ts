@@ -1,4 +1,5 @@
 import {
+  KILO_MCP_AUDIENCE,
   type TokenExchangeResponse,
   type TokenExchangeSlowDown,
   type UtsAccessTokenClaims,
@@ -112,11 +113,16 @@ function one(params: Params, name: string): string | null {
   return param.status === 'present' ? param.value : null;
 }
 
-/** Step 3: the subject token, verified like any UTS token by UTS itself. */
+/**
+ * Step 3: the subject token, verified like any UTS token by UTS itself. Its audience must be
+ * `audience`, the resource the calling workload serves (`kilo-mcp` for Kilo MCP), so a workload
+ * exchanges only tokens issued to itself, and its scope must belong to that audience.
+ */
 async function verifySubject(
   token: string,
   config: UtsConfig,
   keys: AccessTokenKeys,
+  audience: string,
   nowSeconds: number
 ): Promise<SubjectCheck> {
   let header;
@@ -138,6 +144,7 @@ async function verifySubject(
       algorithms: ['EdDSA'],
       typ: UTS_ACCESS_TOKEN_TYPE,
       issuer: config.endpoints.issuer,
+      audience,
       clockTolerance: SKEW_SECONDS,
       currentDate: new Date(nowSeconds * 1000),
     });
@@ -150,7 +157,9 @@ async function verifySubject(
     !parsed.success ||
     parsed.data.env !== config.environment ||
     parsed.data.iat > nowSeconds + SKEW_SECONDS ||
-    parsed.data.act !== undefined
+    parsed.data.act !== undefined ||
+    parsed.data.aud !== audience ||
+    audienceOfScope(parsed.data.scope) !== audience
   ) {
     return { status: 'invalid' };
   }
@@ -212,7 +221,14 @@ export async function handleTokenExchange(
 
   // 3. The subject token.
   const nowSeconds = Math.floor(exchange.now() / 1000);
-  const verified = await verifySubject(subjectToken, config, exchange.keys, nowSeconds);
+  // The one workload the exchange serves is Kilo MCP (step 1), whose resource is `kilo-mcp`.
+  const verified = await verifySubject(
+    subjectToken,
+    config,
+    exchange.keys,
+    KILO_MCP_AUDIENCE,
+    nowSeconds
+  );
   if (verified.status === 'unavailable') return temporarilyUnavailable();
   if (verified.status === 'invalid') {
     return oauthError('invalid_grant', 400, 'the subject token is invalid, expired or revoked');

@@ -10,6 +10,7 @@ import {
   type AppListing,
   type ConsentView,
   appsPage,
+  confirmAppPage,
   consentPage,
   messagePage,
   signInPage,
@@ -90,21 +91,29 @@ export function consentStep(deps: ConsentDeps, methods: SignInMethods): ConsentS
     const failed = (error: unknown): HandoffResult =>
       interaction(unavailablePage(classifyFailure(error, 'consent') === 'retryable'));
 
+    const existing = () =>
+      deps.thirdParty(store =>
+        store.findConsent({
+          accountId: session.accountId,
+          clientId: client.clientId,
+          orgId: pending.orgHint,
+          scopes: pending.scopes,
+        })
+      );
+
     if (request.method !== 'POST') {
       let consentId: string | null;
       try {
-        consentId = await deps.thirdParty(store =>
-          store.findConsent({
-            accountId: session.accountId,
-            clientId: client.clientId,
-            orgId: pending.orgHint,
-            scopes: pending.scopes,
-          })
-        );
+        consentId = await existing();
       } catch (error) {
         return failed(error);
       }
       if (consentId === null) return view('ask');
+      // RFC 8252 section 8.6: another app can claim a private-use scheme, so a request that
+      // returns to one completes only from the confirm page's same-origin POST, never a GET.
+      if (client.redirectKind === 'private_use_scheme') {
+        return interaction(confirmAppPage(client.name, pending.redirectUri));
+      }
       return approved(session, pending, consentId);
     }
 
@@ -117,6 +126,16 @@ export function consentStep(deps: ConsentDeps, methods: SignInMethods): ConsentS
     }
     const decision = form.params.one('decision');
     if (decision.status === 'present' && decision.value === 'deny') return { status: 'denied' };
+    if (decision.status === 'absent') {
+      // The confirm page's POST: it approves only under a consent the account already holds.
+      let consentId: string | null;
+      try {
+        consentId = await existing();
+      } catch (error) {
+        return failed(error);
+      }
+      return consentId === null ? view('ask') : approved(session, pending, consentId);
+    }
     const ticked = new Set(form.params.all('consent'));
     if (
       decision.status !== 'present' ||

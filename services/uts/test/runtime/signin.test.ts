@@ -133,6 +133,7 @@ describe('sign-in hand-off', () => {
         kind: 'third_party',
         clientId: 'https://client.example.com/metadata',
         name: 'Example',
+        redirectKind: 'https',
       },
     });
     expect(result).toEqual({ status: 'denied' });
@@ -147,6 +148,7 @@ describe('sign-in hand-off', () => {
         kind: 'third_party' as const,
         clientId: 'https://client.example.com/metadata',
         name: 'Example',
+        redirectKind: 'https' as const,
       },
     };
     const seen: string[] = [];

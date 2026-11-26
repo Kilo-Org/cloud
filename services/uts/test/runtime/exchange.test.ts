@@ -318,7 +318,12 @@ describe('the broker exchange', () => {
       'a token of another audience',
       () =>
         subjectToken({ aud: 'kilo-api', scope: 'kilo-api:profile.read', client_id: 'kilo-cli' }),
-      'invalid_scope',
+      'invalid_grant',
+    ],
+    [
+      'a token of another audience with a kilo-mcp scope',
+      () => subjectToken({ aud: 'kilo-api' }),
+      'invalid_grant',
     ],
     [
       'a delegated subject token',

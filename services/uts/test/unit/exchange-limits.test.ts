@@ -111,8 +111,21 @@ describe('the exchange key copy', () => {
     expect(await lookup(KID_A)).toEqual({ status: 'unavailable' });
   });
 
-  it('answers unavailable before any read succeeded', async () => {
-    const lookup = isolateSignerKeys(source([null]).read, newKeyCopyState(), () => 0);
+  it('answers unavailable before any read succeeded, and reads at most once per 10 seconds meanwhile', async () => {
+    let now = 0;
+    const keys = source([null, null, [jwk(KID_A)]]);
+    const lookup = isolateSignerKeys(keys.read, newKeyCopyState(), () => now);
     expect(await lookup(KID_A)).toEqual({ status: 'unavailable' });
+    now = KEY_REREAD_INTERVAL_MS - 1;
+    for (let index = 0; index < 5; index += 1) {
+      expect(await lookup(KID_A)).toEqual({ status: 'unavailable' });
+    }
+    expect(keys.reads()).toBe(1);
+    now = KEY_REREAD_INTERVAL_MS;
+    expect(await lookup(KID_A)).toEqual({ status: 'unavailable' });
+    expect(keys.reads()).toBe(2);
+    now = 2 * KEY_REREAD_INTERVAL_MS;
+    expect(await lookup(KID_A)).toMatchObject({ status: 'found' });
+    expect(keys.reads()).toBe(3);
   });
 });

@@ -38,17 +38,22 @@ export function shardSignerKeys(env: Env, config: UtsConfig): SignerKeySource {
   };
 }
 
-/** Per isolate: the last good copy, when it was read, and when the last read started. */
-export type KeyCopy = {
-  keys: ReadonlyMap<string, UtsPublicJwk>;
-  readAt: number;
-  attemptedAt: number;
+/** Per isolate: the last good copy and when it was read. */
+export type KeyCopy = { keys: ReadonlyMap<string, UtsPublicJwk>; readAt: number };
+
+/**
+ * Per isolate: the copy, when the last read started (null before the first one), and the read in
+ * flight. The 10-second spacing counts from `attemptedAt`, so it also holds while no read has
+ * succeeded yet and the shard keeps failing.
+ */
+export type KeyCopyState = {
+  copy: KeyCopy | null;
+  attemptedAt: number | null;
+  reading: Promise<void> | null;
 };
 
-export type KeyCopyState = { copy: KeyCopy | null; reading: Promise<void> | null };
-
 export function newKeyCopyState(): KeyCopyState {
-  return { copy: null, reading: null };
+  return { copy: null, attemptedAt: null, reading: null };
 }
 
 /** The `kid` lookup over the isolate's copy, refreshing it as described above. */
@@ -60,16 +65,11 @@ export function isolateSignerKeys(
   const reread = async (): Promise<void> => {
     if (state.reading !== null) return await state.reading;
     const attemptedAt = now();
+    state.attemptedAt = attemptedAt;
     state.reading = (async () => {
       const keys = await source();
       if (keys !== null) {
-        state.copy = {
-          keys: new Map(keys.map(key => [key.kid, key])),
-          readAt: attemptedAt,
-          attemptedAt,
-        };
-      } else if (state.copy !== null) {
-        state.copy = { ...state.copy, attemptedAt };
+        state.copy = { keys: new Map(keys.map(key => [key.kid, key])), readAt: attemptedAt };
       }
     })();
     try {
@@ -84,7 +84,7 @@ export function isolateSignerKeys(
     const at = now();
     const stale = current === null || at - current.readAt >= KEY_COPY_LIFETIME_MS;
     const missing = current !== null && !current.keys.has(kid);
-    const mayRead = current === null || at - current.attemptedAt >= KEY_REREAD_INTERVAL_MS;
+    const mayRead = state.attemptedAt === null || at - state.attemptedAt >= KEY_REREAD_INTERVAL_MS;
     if ((stale || missing) && mayRead) await reread();
     const copy = state.copy;
     if (copy === null) return { status: 'unavailable' };

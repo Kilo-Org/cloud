@@ -9,6 +9,7 @@ import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
 import { type ScopeRegistry, clientScopeRefusal, orgScopeRefusal } from '../scopes/policy';
 import type { ThirdPartyClients } from '../third-party/clients';
+import { type ThirdPartyRedirectKind, thirdPartyRedirectKind } from '../third-party/metadata';
 import { randomCredential, sha256 } from '../token/credentials';
 import {
   type FirstPartyClient,
@@ -49,7 +50,16 @@ export type AuthorizingClient =
       /** How the client receives the code; a private-use scheme needs a fresh sign-in. */
       redirectKind: RedirectRule['kind'];
     }
-  | { kind: 'third_party'; clientId: string; name: string };
+  | {
+      kind: 'third_party';
+      clientId: string;
+      name: string;
+      /**
+       * How the client receives the code. Another app can claim a private-use scheme, so such a
+       * request completes only from a page the user posts (RFC 8252 section 8.6).
+       */
+      redirectKind: ThirdPartyRedirectKind;
+    };
 
 /** What the hand-off shows and decides on. */
 export type PendingAuthorization = {
@@ -153,7 +163,12 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
     if (!record.redirectUris.includes(redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }
-    client = { kind: 'third_party', clientId: record.clientId, name: record.name };
+    client = {
+      kind: 'third_party',
+      clientId: record.clientId,
+      name: record.name,
+      redirectKind: thirdPartyRedirectKind(redirectUri),
+    };
   } else {
     return directError('invalid_client', 'unknown client', 401);
   }

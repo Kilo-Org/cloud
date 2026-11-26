@@ -253,15 +253,16 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
   }),
   'kilo-api:feedback.write': firstPartyScope(KILO_API_AUDIENCE, [CLI], { requiresSession: true }),
   'kilo-api:credits.redeem': firstPartyScope(KILO_API_AUDIENCE, [CLI], { requiresSession: true }),
-  // Phase 4 Batch B (2026-11-26): the caller's own sessions in session ingest.
+  // Phase 4 Batch B (2026-11-26): the caller's own sessions in session ingest. Each token comes
+  // from a CLI or web grant, so it names its session in `sid`.
   'session-ingest:sessions.read': firstPartyScope('session-ingest', [CLI, BFF], {
-    requiresSession: false,
+    requiresSession: true,
   }),
   'session-ingest:sessions.write': firstPartyScope('session-ingest', [CLI, BFF], {
-    requiresSession: false,
+    requiresSession: true,
   }),
   'session-ingest:live.connect': firstPartyScope('session-ingest', [CLI, BFF], {
-    requiresSession: false,
+    requiresSession: true,
   }),
   'session-ingest:sessions.share': firstPartyScope('session-ingest', [BFF], {
     requiresSession: true,

@@ -186,9 +186,9 @@ describe('the UTS scope registry', () => {
   });
 
   it.each([
-    ['session-ingest:sessions.read', ['kilo-cli', 'kilo-web'], false, 600, false],
-    ['session-ingest:sessions.write', ['kilo-cli', 'kilo-web'], false, 600, false],
-    ['session-ingest:live.connect', ['kilo-cli', 'kilo-web'], false, 600, false],
+    ['session-ingest:sessions.read', ['kilo-cli', 'kilo-web'], true, 600, false],
+    ['session-ingest:sessions.write', ['kilo-cli', 'kilo-web'], true, 600, false],
+    ['session-ingest:live.connect', ['kilo-cli', 'kilo-web'], true, 600, false],
     ['session-ingest:sessions.share', ['kilo-web'], true, 600, false],
     ['cloud-agent-next:sessions.read', ['kilo-web'], true, 600, false],
     ['user-data-export:exports.dispatch', ['kilo-web'], true, 300, false],

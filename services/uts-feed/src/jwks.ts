@@ -12,8 +12,7 @@ import {
 
 /**
  * A set whose newest signer keys were read from their signer objects less than this long ago
- * serves with no new read. Past it, the first request starts one read in the background. A
- * response whose oldest keys are younger than this carries no `Age`.
+ * serves with no new read. Past it, the first request starts one read in the background.
  */
 export const KEY_SET_FRESH_MS = 10 * 1000;
 
@@ -50,8 +49,13 @@ export type KeySetFailure =
    */
   | { status: 'misconfigured'; reason: 'refused' | 'signer_refused' | 'invalid_answer' };
 
-/** `ageMs`: how long ago the oldest keys in `body` were read from their signer object. */
-export type KeySetRead = { status: 'ok'; body: string; ageMs: number } | KeySetFailure;
+/**
+ * `ageMs`: how long ago the newest keys in `body` were read from their signer object, the
+ * response's `Age`. `oldestAgeMs`: the same for the oldest keys, which bounds the last-good hold.
+ */
+export type KeySetRead =
+  | { status: 'ok'; body: string; ageMs: number; oldestAgeMs: number }
+  | KeySetFailure;
 
 type HeldSigner = { keys: UtsPublicJwk[]; readAt: number };
 
@@ -239,7 +243,12 @@ function isolateFor(environment: UtsEnvironment): FeedIsolate {
 }
 
 function okRead(set: ServedSet, now: number): KeySetRead {
-  return { status: 'ok', body: set.body, ageMs: Math.max(0, now - set.oldestReadAt) };
+  return {
+    status: 'ok',
+    body: set.body,
+    ageMs: Math.max(0, now - set.newestReadAt),
+    oldestAgeMs: Math.max(0, now - set.oldestReadAt),
+  };
 }
 
 /**

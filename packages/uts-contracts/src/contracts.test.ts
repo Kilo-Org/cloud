@@ -7,7 +7,7 @@ import {
   SignJWT,
 } from 'jose';
 import { describe, expect, it } from 'vitest';
-import { UTS_ENDPOINTS, utsJwksCacheControl } from './environment';
+import { UTS_ENDPOINTS, UTS_JWKS_CACHE_CONTROL, UTS_JWKS_OLDEST_AGE_HEADER } from './environment';
 import {
   signerOfTokenKid,
   tokenKid,
@@ -51,11 +51,9 @@ describe('UTS endpoints', () => {
     });
   });
 
-  it('shrinks both key-set cache limits by the age of the oldest keys', () => {
-    expect(utsJwksCacheControl(0)).toBe('max-age=300, stale-if-error=86400');
-    expect(utsJwksCacheControl(42)).toBe('max-age=258, stale-if-error=86358');
-    expect(utsJwksCacheControl(3600)).toBe('max-age=0, stale-if-error=82800');
-    expect(utsJwksCacheControl(90_000)).toBe('max-age=0, stale-if-error=0');
+  it('fixes the standard key-set cache limits and the oldest-age header name', () => {
+    expect(UTS_JWKS_CACHE_CONTROL).toBe('max-age=300, stale-if-error=86400');
+    expect(UTS_JWKS_OLDEST_AGE_HEADER).toBe('Kilo-Key-Set-Oldest-Age');
   });
 });
 

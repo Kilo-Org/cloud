@@ -17,8 +17,9 @@ export const UTS_SIGNER_KEYS_PATH = '/internal/signer-keys';
 
 /**
  * How long a signer's last good keys stand in for its failed reads, at the mint Worker and at the
- * feed Worker alike. Both count from the signer read, as the key set's `Age` does, so a verifier
- * that counts `Age` drops those keys 24 hours after that read too (design 5.7, 7).
+ * feed Worker alike. Both count from the signer read, as the key set's oldest-age header
+ * (`UTS_JWKS_OLDEST_AGE_HEADER`) does, so a verifier that counts that header drops those keys 24
+ * hours after that read too (design 5.7, 7).
  */
 export const UTS_SIGNER_KEYS_HOLD_MS = 24 * 60 * 60 * 1000;
 

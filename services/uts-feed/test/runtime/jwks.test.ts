@@ -102,6 +102,13 @@ async function xsOf(response: Response, signer: number): Promise<string[]> {
 const xs = (signer: number, generation: number) =>
   signerEntry(signer, generation, T0).keys.map(key => key.x);
 
+/** The standard cache limits, with `Age` from the newest keys and the oldest keys' age beside it. */
+function expectKeySetHeaders(response: Response, age: string, oldestAge: string): void {
+  expect(response.headers.get('Cache-Control')).toBe('max-age=300, stale-if-error=86400');
+  expect(response.headers.get('Age')).toBe(age);
+  expect(response.headers.get('Kilo-Key-Set-Oldest-Age')).toBe(oldestAge);
+}
+
 beforeEach(() => {
   resetIsolate();
 });
@@ -111,11 +118,10 @@ afterEach(() => {
 });
 
 describe('key set endpoint', () => {
-  it('serves the 32 keys of the 16 signers with the key-set cache header and no Age', async () => {
+  it('serves the 32 keys of the 16 signers with the key-set cache header and both ages at 0', async () => {
     const response = await get(mintBinding(async () => okAnswer()));
     expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('max-age=300, stale-if-error=86400');
-    expect(response.headers.get('Age')).toBeNull();
+    expectKeySetHeaders(response, '0', '0');
     expect(response.headers.get('Content-Type')).toBe('application/json');
     expect(await keysOf(response)).toHaveLength(32);
   });
@@ -180,12 +186,11 @@ describe('reads', () => {
     generation = 1;
     const stale = await get(mint, T0 + KEY_SET_FRESH_MS);
     expect(await xsOf(stale, 0)).toEqual(xs(0, 0));
-    expect(stale.headers.get('Age')).toBe('10');
-    expect(stale.headers.get('Cache-Control')).toBe('max-age=290, stale-if-error=86390');
+    expectKeySetHeaders(stale, '10', '10');
     expect(mint.calls).toBe(2);
     const refreshed = await get(mint, T0 + KEY_SET_FRESH_MS + 1);
     expect(await xsOf(refreshed, 0)).toEqual(xs(0, 1));
-    expect(refreshed.headers.get('Age')).toBeNull();
+    expectKeySetHeaders(refreshed, '0', '0');
     expect(mint.calls).toBe(2);
   });
 
@@ -204,7 +209,7 @@ describe('reads', () => {
     await get(mint, T0 + KEY_SET_FRESH_MS - 2000);
     expect(mint.calls).toBe(1);
     const response = await get(mint, T0 + KEY_SET_READ_GUARD_MS);
-    expect(response.headers.get('Age')).toBe('12');
+    expectKeySetHeaders(response, '12', '12');
     expect(mint.calls).toBe(2);
   });
 
@@ -285,8 +290,27 @@ describe('signers', () => {
     expect(await xsOf(response.clone(), 3)).toEqual(xs(3, 1));
     expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
     expect(await keysOf(response.clone())).toHaveLength(32);
-    expect(response.headers.get('Age')).toBe('20');
-    expect(response.headers.get('Cache-Control')).toBe('max-age=280, stale-if-error=86380');
+    expectKeySetHeaders(response, '0', '20');
+  });
+
+  it('keeps Age from the healthy signers past the 5-minute lifetime while one signer fails, and its oldest age grows', async () => {
+    let failing = false;
+    const mint = mintBinding(async () => {
+      if (!failing) return okAnswer(0);
+      const signers = allSigners(0);
+      signers[7] = { signer: 7, status: 'unavailable' };
+      return Response.json({ signers }, { status: 503 });
+    });
+    await get(mint, T0);
+    failing = true;
+    expectKeySetHeaders(await get(mint, T0 + 20_000), '0', '20');
+    const late = await get(mint, T0 + 400_000);
+    expectKeySetHeaders(late, '0', '400');
+    expect(await xsOf(late, 7)).toEqual(xs(7, 0));
+    expect(mint.calls).toBe(3);
+    const held = await get(mint, T0 + 405_000);
+    expectKeySetHeaders(held, '5', '405');
+    expect(mint.calls).toBe(3);
   });
 
   it('takes keys the mint Worker held for a failed signer, with their own read time', async () => {
@@ -297,8 +321,7 @@ describe('signers', () => {
     });
     const response = await get(mint, T0);
     expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
-    expect(response.headers.get('Age')).toBe('3600');
-    expect(response.headers.get('Cache-Control')).toBe('max-age=0, stale-if-error=82800');
+    expectKeySetHeaders(response, '0', '3600');
   });
 
   it("keeps its own newer keys for a signer over the mint Worker's older held ones", async () => {
@@ -342,11 +365,10 @@ describe('failures', () => {
     fail = true;
     const held = await get(mint, T0 + 60_000);
     expect(held.status).toBe(200);
-    expect(held.headers.get('Age')).toBe('60');
-    expect(held.headers.get('Cache-Control')).toBe('max-age=240, stale-if-error=86340');
+    expectKeySetHeaders(held, '60', '60');
     const last = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS - 1000);
     expect(last.status).toBe(200);
-    expect(last.headers.get('Cache-Control')).toBe('max-age=0, stale-if-error=1');
+    expectKeySetHeaders(last, '86399', '86399');
     const expired = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS + KEY_SET_READ_GUARD_MS);
     expect(expired.status).toBe(503);
   });

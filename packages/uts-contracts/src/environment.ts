@@ -9,20 +9,21 @@ export const UTS_JWKS_PATH = '/.well-known/jwks.json';
 /** RFC 8414 section 3: the metadata of an issuer without a path component. */
 export const UTS_AUTHORIZATION_SERVER_METADATA_PATH = '/.well-known/oauth-authorization-server';
 
-/** Design 5.7: a verifier keeps the key set 5 minutes and may serve it up to a day on error. */
-const UTS_JWKS_MAX_AGE_SECONDS = 300;
-const UTS_JWKS_STALE_IF_ERROR_SECONDS = 86_400;
+/**
+ * Design 5.7: a verifier keeps the key set 5 minutes and may serve it up to a day on error. The
+ * feed Worker sends these limits unchanged beside `Age` (RFC 9111 section 5.1), so a standard cache
+ * counts the age once.
+ */
+export const UTS_JWKS_CACHE_CONTROL = 'max-age=300, stale-if-error=86400';
 
 /**
- * The key set's `Cache-Control` for a set whose oldest keys were read from their signer objects
- * `ageSeconds` ago. The feed Worker sends that age as `Age` beside it, and both limits shrink by it,
- * so a verifier keeps no key longer than 5 minutes, or 24 hours on error, after its signer read.
+ * Response header with the seconds since the oldest keys in the key set were read from their
+ * signer object. `Age` counts from the newest read, which says when the set last got fresh keys,
+ * and drives the 5-minute lifetime; this header drives only the verifier's 24-hour last-good limit,
+ * so one failing signer neither expires every response nor keeps any key past 24 hours after its
+ * last good read (design 5.7, 7, decision Q55).
  */
-export function utsJwksCacheControl(ageSeconds: number): string {
-  const maxAge = Math.max(0, UTS_JWKS_MAX_AGE_SECONDS - ageSeconds);
-  const staleIfError = Math.max(0, UTS_JWKS_STALE_IF_ERROR_SECONDS - ageSeconds);
-  return `max-age=${maxAge}, stale-if-error=${staleIfError}`;
-}
+export const UTS_JWKS_OLDEST_AGE_HEADER = 'Kilo-Key-Set-Oldest-Age';
 
 export type UtsEndpoints = {
   /** The exact `iss` of every token this environment's UTS signs (design 7). */

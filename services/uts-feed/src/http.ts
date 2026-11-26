@@ -1,6 +1,10 @@
-import { UTS_JWKS_PATH, utsJwksCacheControl } from '@kilocode/uts-contracts';
+import {
+  UTS_JWKS_CACHE_CONTROL,
+  UTS_JWKS_OLDEST_AGE_HEADER,
+  UTS_JWKS_PATH,
+} from '@kilocode/uts-contracts';
 import { readConfig, type Env } from './env';
-import { KEY_SET_FRESH_MS, KEY_SET_READ_GUARD_MS, serveKeySet } from './jwks';
+import { KEY_SET_READ_GUARD_MS, serveKeySet } from './jwks';
 
 function errorResponse(
   error: string,
@@ -11,19 +15,18 @@ function errorResponse(
 }
 
 /**
- * Headers for a key set whose oldest keys were read from their signer objects `ageMs` ago. Past
- * the fresh window the response says that age in `Age`, and both cache limits shrink by it, so a
- * verifier keeps no key past 24 hours after its last good signer read (design 5.7, 7).
+ * Headers for a key set whose newest keys were read from their signer objects `ageMs` ago and
+ * whose oldest keys `oldestAgeMs` ago, both sent in whole seconds. `Age` (RFC 9111 section 5.1)
+ * beside the unchanged cache limits gives the 5-minute lifetime from the last fresh keys, so one
+ * failing signer does not expire the set; the oldest age gives the 24-hour last-good limit, so no
+ * verifier keeps a key past 24 hours after its last good signer read (design 5.7, 7).
  */
-function keySetHeaders(ageMs: number): Record<string, string> {
-  if (ageMs < KEY_SET_FRESH_MS) {
-    return { 'Content-Type': 'application/json', 'Cache-Control': utsJwksCacheControl(0) };
-  }
-  const age = Math.floor(ageMs / 1000);
+function keySetHeaders(ageMs: number, oldestAgeMs: number): Record<string, string> {
   return {
     'Content-Type': 'application/json',
-    'Cache-Control': utsJwksCacheControl(age),
-    Age: String(age),
+    'Cache-Control': UTS_JWKS_CACHE_CONTROL,
+    Age: String(Math.floor(ageMs / 1000)),
+    [UTS_JWKS_OLDEST_AGE_HEADER]: String(Math.floor(oldestAgeMs / 1000)),
   };
 }
 
@@ -32,7 +35,7 @@ async function keySet(env: Env, ctx: ExecutionContext): Promise<Response> {
   const read = await serveKeySet(env.UTS_MINT, config.environment, ctx);
   switch (read.status) {
     case 'ok':
-      return new Response(read.body, { headers: keySetHeaders(read.ageMs) });
+      return new Response(read.body, { headers: keySetHeaders(read.ageMs, read.oldestAgeMs) });
     case 'unavailable':
       // Reached only when the isolate holds no usable set; the next read may start this late.
       return errorResponse('temporarily_unavailable', 503, {

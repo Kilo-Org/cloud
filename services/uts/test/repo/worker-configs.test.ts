@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import { UTS_MINT_DEPLOYMENTS } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -480,12 +481,21 @@ describe('the UTS configs themselves', () => {
     ],
   });
 
+  // The feed Worker verifies STS tokens with jose for its HTTPS feed (src/https-auth.ts), so its
+  // configs follow the same rule.
+  const JOSE_BLOCKS: ReadonlyMap<string, readonly string[]> = new Map([
+    [MINT_CONFIG, ['(top level)', '(env.staging)']],
+    [MINT_DEV_CONFIG, ['(top level)']],
+    [MINT_TEST_CONFIG, ['(top level)']],
+    [FEED_CONFIG, ['(top level)', '(env.staging)', '(env.local)']],
+    [FEED_TEST_CONFIG, ['(top level)']],
+  ]);
+
   it('fail a jose-verifying config that drops below the fix without listing the flag', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const [path, blocks] of JOSE_BLOCKS) {
       const problems = utsConfigProblems(
         configWith(path, raw => ({ ...raw, compatibility_date: '2025-06-01' }))
       );
-      const blocks = path === MINT_CONFIG ? ['(top level)', '(env.staging)'] : ['(top level)'];
       expect(problems.map(problem => problem.split(':')[0])).toEqual(
         blocks.map(block => `${path} ${block}`)
       );
@@ -496,18 +506,17 @@ describe('the UTS configs themselves', () => {
   });
 
   it('accept a jose-verifying config before the fix that lists the flag', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const path of JOSE_BLOCKS.keys()) {
       const problems = utsConfigProblems(configWith(path, raw => withFlag(raw, '2025-06-01')));
       expect(problems).toEqual([]);
     }
   });
 
   it('fail a jose-verifying config that lists the flag where workerd makes it the default', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const [path, blocks] of JOSE_BLOCKS) {
       const problems = utsConfigProblems(
         configWith(path, raw => withFlag(raw, JOSE_UNHANDLED_REJECTION_DATE))
       );
-      const blocks = path === MINT_CONFIG ? ['(top level)', '(env.staging)'] : ['(top level)'];
       expect(problems.map(problem => problem.split(':')[0])).toEqual(
         blocks.map(block => `${path} ${block}`)
       );
@@ -516,7 +525,7 @@ describe('the UTS configs themselves', () => {
   });
 
   it('fail a jose-verifying config that leaves the compatibility date out', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const path of JOSE_BLOCKS.keys()) {
       const problems = utsConfigProblems(
         configWith(path, ({ compatibility_date: _date, ...raw }) => raw)
       );
@@ -525,5 +534,51 @@ describe('the UTS configs themselves', () => {
         problems.every(problem => problem.includes('compatibility_date resolves to undefined'))
       ).toBe(true);
     }
+  });
+
+  it('leave the HTTPS feed off in staging and production, and on only in the local block', () => {
+    const feed = configAt(FEED_CONFIG).config;
+    const varsOf = (vars: Record<string, unknown> | undefined) => ({
+      enabled: vars?.FEED_HTTPS_ENABLED,
+      sts: vars?.STS_URL,
+    });
+    expect(varsOf(feed.vars)).toEqual({ enabled: undefined, sts: undefined });
+    expect(varsOf(feed.env?.staging?.vars)).toEqual({ enabled: undefined, sts: undefined });
+    expect(varsOf(feed.env?.local?.vars)).toEqual({
+      enabled: 'true',
+      sts: STS_ISSUERS.development,
+    });
+  });
+
+  it('fail a feed switch that is not exactly true, and an STS issuer of another environment', () => {
+    const edited = (top: Record<string, unknown>, staging: Record<string, unknown>) =>
+      configWith(FEED_CONFIG, raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        const stagingVars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        return {
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), ...top },
+          env: { ...env, staging: { ...env.staging, vars: { ...stagingVars, ...staging } } },
+        };
+      });
+    expect(utsConfigProblems(edited({ FEED_HTTPS_ENABLED: 'yes' }, {}))).toEqual([
+      expect.stringContaining(`${FEED_CONFIG} (top level): FEED_HTTPS_ENABLED`),
+    ]);
+    expect(
+      utsConfigProblems(
+        edited(
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.staging },
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.staging }
+        )
+      )
+    ).toEqual([expect.stringContaining(`${FEED_CONFIG} (top level): STS_URL`)]);
+    expect(
+      utsConfigProblems(
+        edited(
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.production },
+          { STS_URL: 'http://localhost:8825' }
+        )
+      )
+    ).toEqual([expect.stringContaining(`${FEED_CONFIG} (env.staging): STS_URL`)]);
   });
 });

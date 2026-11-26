@@ -3887,6 +3887,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 4.20260605.1
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3914,9 +3917,15 @@ importers:
 
   services/uts-feed:
     dependencies:
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/uts-contracts':
         specifier: workspace:*
         version: link:../../packages/uts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3933,6 +3942,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.17
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -1,6 +1,8 @@
 import {
   encodeBase64Url,
+  FeedListHashSchema,
   UTS_BOOTSTRAP_PATH,
+  UTS_FEED_HEAD_AGE_HEADER,
   UTS_FEED_HEAD_PATH,
   UTS_FEED_LIST_PATH_PREFIX,
   UTS_JWKS_MAX_AGE_SECONDS,
@@ -12,8 +14,14 @@ import {
 } from '@kilocode/uts-contracts';
 import { serveBootstrap } from './bootstrap';
 import { readConfig, type Env, type FeedConfig } from './env';
+import { admitFeedRequest } from './https-auth';
 import { KEY_SET_READ_GUARD_MS, serveKeySet } from './jwks';
-import { FEED_RETRY_AFTER_SECONDS, serveHead, serveList } from './revocation';
+import {
+  FEED_LIST_CACHE_SECONDS,
+  FEED_RETRY_AFTER_SECONDS,
+  serveHead,
+  serveList,
+} from './revocation';
 
 function errorResponse(
   error: string,
@@ -71,14 +79,17 @@ function feedFailure(status: 'unavailable' | 'misconfigured'): Response {
       });
 }
 
-const NO_STORE = { 'Cache-Control': 'no-store' };
-
 /**
- * The revocation feed over HTTPS, for Vercel and Fly verifiers (design 5.6). The feed names
- * accounts and grants, so it answers only callers with a verified workload identity, and that
- * check verifies STS audience tokens with `@kilocode/verify` (phase 2, decision Q7). Until the feed
- * Worker carries it, staging and production answer these paths 404 and serve the feed over
- * service bindings only (`FeedReader`); development serves them to the local end-to-end run.
+ * The revocation feed over HTTPS, for Vercel and Fly verifiers (design 5.6), in every environment
+ * behind the switch and the caller check of `src/https-auth.ts`. The answers carry the feed's
+ * names, so a shared cache keeps none (`private`); the caller's own cache may revalidate:
+ *
+ * - head: `no-cache` with a weak `ETag` of the head's time and list hash; an `If-None-Match` that
+ *   matches answers 304 with no body. Two feed objects can sign the same time and list under
+ *   different keys; either head says the same, so the tag is weak (RFC 9110 section 8.8.1).
+ * - list: named by its hash, so it never changes: `max-age=600, immutable` and the hash as a
+ *   strong `ETag`; a matching `If-None-Match` answers 304 without reading a feed object.
+ * - bootstrap: `no-store`; it runs once per cold verifier.
  */
 type FeedRoute = { kind: 'head' } | { kind: 'list'; hash: string } | { kind: 'bootstrap' };
 
@@ -91,8 +102,29 @@ function feedRoute(pathname: string): FeedRoute | null {
   return null;
 }
 
+const NO_STORE = { 'Cache-Control': 'no-store' };
+const HEAD_CACHE = { 'Cache-Control': 'private, no-cache' };
+const LIST_CACHE = { 'Cache-Control': `private, max-age=${FEED_LIST_CACHE_SECONDS}, immutable` };
+
+/**
+ * Whether `If-None-Match` names `etag`, by the weak comparison RFC 9110 section 13.1.2 prescribes
+ * for it: `W/` is ignored on both sides, and `*` matches any current representation.
+ */
+function noneMatch(request: Request, etag: string): boolean {
+  const header = request.headers.get('If-None-Match');
+  if (header === null) return false;
+  const opaque = (tag: string) => tag.trim().replace(/^W\//, '');
+  return header.split(',').some(tag => tag.trim() === '*' || opaque(tag) === opaque(etag));
+}
+
+/** Whole seconds since a head's `iat`; 0 for a head up to 5 seconds ahead of this clock. */
+function headAge(issuedAt: number): string {
+  return String(Math.max(0, Math.floor(Date.now() / 1000) - issuedAt));
+}
+
 async function revocationFeed(
   route: FeedRoute,
+  request: Request,
   env: Env,
   config: FeedConfig,
   ctx: ExecutionContext
@@ -101,16 +133,28 @@ async function revocationFeed(
     case 'head': {
       const read = await serveHead(env.UTS_FEED_READS, config, ctx);
       if (read.status !== 'ok') return feedFailure(read.status);
+      const etag = `W/"${read.issuedAt}-${read.listHash}"`;
+      const headers = {
+        ETag: etag,
+        [UTS_FEED_HEAD_AGE_HEADER]: headAge(read.issuedAt),
+        ...HEAD_CACHE,
+      };
+      if (noneMatch(request, etag)) return new Response(null, { status: 304, headers });
       return new Response(read.head, {
-        headers: { 'Content-Type': 'application/jwt', ...NO_STORE },
+        headers: { 'Content-Type': 'application/jwt', ...headers },
       });
     }
     case 'list': {
+      const etag = `"${route.hash}"`;
+      // The client holds exactly the bytes this hash names, so nothing needs reading.
+      if (FeedListHashSchema.safeParse(route.hash).success && noneMatch(request, etag)) {
+        return new Response(null, { status: 304, headers: { ETag: etag, ...LIST_CACHE } });
+      }
       const read = await serveList(env.UTS_FEED_READS, config, route.hash, ctx);
       if (read.status === 'not_found') return errorResponse('not_found', 404);
       if (read.status !== 'ok') return feedFailure(read.status);
       return new Response(read.bytes, {
-        headers: { 'Content-Type': 'application/json', ...NO_STORE },
+        headers: { 'Content-Type': 'application/json', ETag: etag, ...LIST_CACHE },
       });
     }
     case 'bootstrap': {
@@ -128,22 +172,30 @@ async function revocationFeed(
           ...NO_STORE,
           Age: String(read.keyAges.newest),
           [UTS_JWKS_OLDEST_AGE_HEADER]: String(read.keyAges.oldest),
+          [UTS_FEED_HEAD_AGE_HEADER]: headAge(read.headIssuedAt),
         },
       });
     }
   }
 }
 
+/**
+ * The key set is public. The feed paths answer 503 with `Retry-After` while the switch is off or
+ * no STS issuer is set, then 401 or 403 without a valid STS token of an admitted workload; only an
+ * admitted request reads the feed.
+ */
 export async function handleRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
   const { pathname } = new URL(request.url);
-  const config = readConfig(env);
-  const route = config.environment === 'development' ? feedRoute(pathname) : null;
+  const route = feedRoute(pathname);
   if (pathname !== UTS_JWKS_PATH && route === null) return errorResponse('not_found', 404);
   if (request.method !== 'GET') return errorResponse('method_not_allowed', 405, { Allow: 'GET' });
   if (route === null) return await keySet(env, ctx);
-  return await revocationFeed(route, env, config, ctx);
+  const config = readConfig(env);
+  const admission = await admitFeedRequest(request, config, ctx);
+  if (admission.status !== 'admitted') return admission.response;
+  return await revocationFeed(route, request, env, config, ctx);
 }

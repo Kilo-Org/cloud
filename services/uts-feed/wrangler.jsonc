@@ -31,6 +31,9 @@
   // This deployment's version id keys the feed's data-center cache, so no other Worker on the zone
   // can read or plant an entry (src/revocation.ts). Every env block binds it too.
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // The HTTPS feed (head, list, bootstrap; src/https-auth.ts) stays off here and in staging:
+  // without FEED_HTTPS_ENABLED "true" and STS_URL set to this environment's STS issuer, those paths
+  // answer 503 with Retry-After. services/uts/test/repo checks both blocks leave it off.
   "vars": {
     "UTS_ENVIRONMENT": "production",
   },
@@ -88,8 +91,11 @@
       "workers_dev": false,
       "routes": [],
       "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      // The local end-to-end runs replace STS_URL with their own stand-in STS on loopback.
       "vars": {
         "UTS_ENVIRONMENT": "development",
+        "FEED_HTTPS_ENABLED": "true",
+        "STS_URL": "http://localhost:8825",
       },
       "services": [
         {

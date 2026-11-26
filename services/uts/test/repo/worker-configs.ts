@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import {
   UTS_ENDPOINTS,
   UTS_FEED_READER_ENTRYPOINT,
@@ -519,11 +520,45 @@ function devConfigProblems(dev: WorkerConfig): string[] {
 }
 
 /**
- * The mint Worker's configs, every one of which runs the jose verification path. The rule below
+ * The feed Worker's HTTPS switch and STS issuer in one block: `FEED_HTTPS_ENABLED` is absent (off)
+ * or exactly `true`, and `STS_URL`, when set, is the STS issuer of the block's own environment, so
+ * a deployed block can never accept another environment's service tokens. A loopback stand-in is
+ * set only on the command line of a local run, never here.
+ */
+function feedHttpsProblems(block: Block): string[] {
+  const problems: string[] = [];
+  const vars = block.bindings.vars ?? {};
+  const enabled = vars.FEED_HTTPS_ENABLED;
+  if (enabled !== undefined && enabled !== 'true') {
+    problems.push(
+      `${block.where}: FEED_HTTPS_ENABLED is ${JSON.stringify(enabled)}; it is exactly "true" or absent (off)`
+    );
+  }
+  const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+  if (
+    vars.STS_URL !== undefined &&
+    (environment === undefined || vars.STS_URL !== STS_ISSUERS[environment])
+  ) {
+    problems.push(
+      `${block.where}: STS_URL is ${JSON.stringify(vars.STS_URL)}; it must be the STS issuer of ${String(environment)}`
+    );
+  }
+  return problems;
+}
+
+/**
+ * The configs that run the jose verification path: every mint Worker config, and the feed
+ * Worker's, which verifies STS tokens for its HTTPS feed (`@kilocode/verify`). The rule below
  * covers only these: asserted repo-wide it would fail Workers that reach jose through a package
  * with an older date, such as services/ai-attribution, which is not this rule's subject.
  */
-const JOSE_CONFIGS: ReadonlySet<string> = new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]);
+const JOSE_CONFIGS: ReadonlySet<string> = new Set([
+  MINT_CONFIG,
+  MINT_DEV_CONFIG,
+  MINT_TEST_CONFIG,
+  FEED_CONFIG,
+  FEED_TEST_CONFIG,
+]);
 
 /**
  * The first compatibility date that carries workerd's fix for jose's verification path: jose's
@@ -575,7 +610,9 @@ function joseCompatibilityProblems({ path, config }: WorkerConfig): string[] {
  * its objects in the `eu` jurisdiction, and places its fetch handler next to the identity store;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
- * without placement, binds no Durable Object, and binds each mint entrypoint once; and every
+ * without placement, binds no Durable Object, binds each mint entrypoint once, and turns its HTTPS
+ * feed on only with `FEED_HTTPS_ENABLED` exactly `true` and the STS issuer of its own environment;
+ * and every
  * jose-verifying config lists `unhandled_rejection_after_microtask_checkpoint` exactly when its
  * compatibility date is before 2026-03-03, the date the flag became workerd's default (jose#892).
  */
@@ -656,6 +693,7 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
           `${block.where}: binds the mint Worker at ${mintEntrypoints.join(', ') || 'no entrypoint'}; expected ${MINT_ENTRYPOINTS.join(' and ')} once each`
         );
       }
+      problems.push(...feedHttpsProblems(block));
     }
   }
   // The test configs run only in the Workers test pool; each deploys only its own name, so neither

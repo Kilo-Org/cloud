@@ -44,8 +44,12 @@ import {
   httpsFeedSources,
   RevocationListWireSchema,
   UTS_BOOTSTRAP_PATH,
+  UTS_FEED_AUDIENCE,
+  UTS_FEED_HEAD_AGE_HEADER,
   UTS_FEED_HEAD_PATH,
+  UTS_FEED_HTTPS_WORKLOADS,
   UTS_FEED_LIST_PATH_PREFIX,
+  UTS_FEED_READ_SCOPE,
   UTS_FEED_READER_ENTRYPOINT,
   UTS_FEED_READS_ENTRYPOINT,
   type FeedReaderBinding,
@@ -469,6 +473,64 @@ describe('revocation feed shapes', () => {
       async () => new Response('', { status: 503 })
     );
     await expect(failing.feed.head(signal)).rejects.toThrow('HTTP 503');
+  });
+
+  it('ask for the head with the last ETag, answer a 304 with the held head, and keep the newest', async () => {
+    const sent: Array<string | undefined> = [];
+    const answers: Array<() => Response> = [
+      () => new Response('head.one.x', { headers: { etag: 'W/"1-a"' } }),
+      () => new Response(null, { status: 304, headers: { etag: 'W/"1-a"' } }),
+      () => new Response('head.two.x', { headers: { etag: 'W/"2-a"' } }),
+    ];
+    const sources = httpsFeedSources('https://feed.example', async (_url, init) => {
+      sent.push(init.headers['if-none-match']);
+      const answer = answers.shift();
+      if (answer === undefined) throw new Error('no answer');
+      return answer();
+    });
+    const signal = new AbortController().signal;
+    expect(await sources.feed.head(signal)).toBe('head.one.x');
+    expect(await sources.feed.head(signal)).toBe('head.one.x');
+    expect(await sources.feed.head(signal)).toBe('head.two.x');
+    expect(sent).toEqual([undefined, 'W/"1-a"', 'W/"1-a"']);
+
+    // A 304 to a request that sent no ETag is a failed fetch.
+    const bare = httpsFeedSources(
+      'https://feed.example',
+      async () => new Response(null, { status: 304 })
+    );
+    await expect(bare.feed.head(signal)).rejects.toThrow('HTTP 304');
+
+    // A late answer to an earlier request never replaces the head a later request read.
+    const late = Promise.withResolvers<Response>();
+    const order: Array<() => Promise<Response>> = [
+      () => late.promise,
+      async () => new Response('head.new.x', { headers: { etag: 'W/"9-b"' } }),
+    ];
+    const seen: Array<string | undefined> = [];
+    const racing = httpsFeedSources('https://feed.example', async (_url, init) => {
+      seen.push(init.headers['if-none-match']);
+      const next = order.shift();
+      if (next === undefined) return new Response(null, { status: 304 });
+      return await next();
+    });
+    const first = racing.feed.head(signal);
+    expect(await racing.feed.head(signal)).toBe('head.new.x');
+    late.resolve(new Response('head.old.x', { headers: { etag: 'W/"8-b"' } }));
+    expect(await first).toBe('head.old.x');
+    expect(await racing.feed.head(signal)).toBe('head.new.x');
+    expect(seen).toEqual([undefined, undefined, 'W/"9-b"']);
+  });
+
+  it('name the STS audience, scope and admitted workloads of the HTTPS feed', () => {
+    expect(UTS_FEED_AUDIENCE).toBe('uts-feed');
+    expect(UTS_FEED_READ_SCOPE).toBe('uts-feed:revocation.read');
+    expect(UTS_FEED_HTTPS_WORKLOADS).toEqual({
+      production: [],
+      staging: ['web', 'kilo-gateway'],
+      development: ['web', 'kilo-gateway'],
+    });
+    expect(UTS_FEED_HEAD_AGE_HEADER).toBe('Kilo-Feed-Head-Age');
   });
 });
 

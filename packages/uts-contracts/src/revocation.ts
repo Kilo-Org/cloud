@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { UtsEnvironment } from './environment';
 
 /**
  * The UTS revocation feed (design 5.6, 7): a signed head and the list it covers, served by the
@@ -47,6 +48,29 @@ export const UTS_FEED_HEAD_PATH = '/revocation/head';
 /** Followed by the list hash. */
 export const UTS_FEED_LIST_PATH_PREFIX = '/revocation/list/';
 export const UTS_BOOTSTRAP_PATH = '/revocation/bootstrap';
+
+/**
+ * The STS audience and scope of the authenticated HTTPS feed (design 5.6). A Vercel or Fly
+ * verifier sends an STS service token for exactly this audience and scope on every head, list and
+ * bootstrap request; STS mints one only for a workload its policy lists.
+ */
+export const UTS_FEED_AUDIENCE = 'uts-feed';
+export const UTS_FEED_READ_SCOPE = 'uts-feed:revocation.read';
+
+/**
+ * The STS workloads whose tokens the HTTPS feed admits, per environment: the web app (`web`, the
+ * `kilocode-app` Vercel project) and the AI gateway (`kilo-gateway`, the `kilocode-ai-gateway`
+ * project). Production admits none until the HTTPS feed is activated there. A valid token of any
+ * other workload is refused with 403.
+ */
+export const UTS_FEED_HTTPS_WORKLOADS: Readonly<Record<UtsEnvironment, readonly string[]>> = {
+  production: [],
+  staging: ['web', 'kilo-gateway'],
+  development: ['web', 'kilo-gateway'],
+};
+
+/** Whole seconds since the served head's `iat`, on every HTTPS head and bootstrap answer. */
+export const UTS_FEED_HEAD_AGE_HEADER = 'Kilo-Feed-Head-Age';
 
 /**
  * The two ages of a UTS key set in whole seconds, measured at the feed Worker when it answers:
@@ -305,7 +329,11 @@ export function feedReaderSources(
   };
 }
 
-/** The subset of `fetch` the HTTPS sources use. */
+/**
+ * The subset of `fetch` the HTTPS sources use. Every feed, head, list and bootstrap request needs
+ * `Authorization: Bearer <STS token>` for `UTS_FEED_AUDIENCE` and `UTS_FEED_READ_SCOPE`; the
+ * caller's fetcher adds it to `init.headers`, from its service-token client, on each call.
+ */
 export type FeedFetch = (
   url: string,
   init: { signal: AbortSignal; headers: Record<string, string> }
@@ -327,26 +355,48 @@ async function okResponse(
 
 /**
  * The feed and bootstrap ports over HTTPS on the feed Worker's origin, for Vercel and Fly
- * verifiers. A non-200 answer or a body of the wrong shape is a failed fetch.
+ * verifiers. A non-200 answer or a body of the wrong shape is a failed fetch. The head is asked
+ * for with the `ETag` of the last head this source read (`If-None-Match`); a 304 answers that
+ * head again, so an unchanged head costs no body. Only an answer to a later request replaces the
+ * held head, so a late answer never brings back an older one.
  */
 export function httpsFeedSources(
   feedOrigin: string,
   fetcher: FeedFetch = (url, init) => fetch(url, init)
 ): UtsFeedSources {
   const origin = feedOrigin.replace(/\/+$/, '');
+  let held: { etag: string; head: string; request: number } | null = null;
+  let requests = 0;
   return {
     feed: {
       async head(signal) {
-        const response = await okResponse(
-          fetcher,
-          `${origin}${UTS_FEED_HEAD_PATH}`,
-          'application/jwt',
-          signal
-        );
-        return z
+        requests += 1;
+        const request = requests;
+        const condition = held;
+        const response = await fetcher(`${origin}${UTS_FEED_HEAD_PATH}`, {
+          signal,
+          headers: {
+            accept: 'application/jwt',
+            ...(condition === null ? {} : { 'if-none-match': condition.etag }),
+          },
+        });
+        if (response.status === 304 && condition !== null) {
+          await response.body?.cancel();
+          return condition.head;
+        }
+        if (response.status !== 200) {
+          await response.body?.cancel();
+          throw new Error(`feed answered HTTP ${response.status}`);
+        }
+        const head = z
           .string()
           .min(1)
           .parse(await response.text());
+        const etag = response.headers.get('etag');
+        if (etag !== null && (held === null || held.request < request)) {
+          held = { etag, head, request };
+        }
+        return head;
       },
       async list(listHash, signal) {
         const hash = FeedListHashSchema.parse(listHash);

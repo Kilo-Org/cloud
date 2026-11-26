@@ -97,7 +97,10 @@ primary and its 16 signer calls start next to the signer objects; an RPC method 
 entrypoint would run in the caller's data center. It answers only a service binding to the default
 entrypoint whose `props.caller` is the feed Worker's deployed name for its own environment; every
 other request, from the internet or another binding, gets the same `404 not_found` as an unknown
-path.
+path. The default export is a `WorkerEntrypoint` class whose `fetch` serves every route: a deployed
+Worker delivers a binding's `props` to an entrypoint class only, not to a plain handler object
+(`wrangler dev` and the test runtime deliver them to both, so `test/runtime/entrypoint.test.ts`
+checks the class).
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
 UTS Durable Object class or binds the mint Worker, any feed binding at a named entrypoint or whose
 caller is not the feed block's own name, and any drift in the UTS configs (names, `eu`

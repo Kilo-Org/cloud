@@ -1204,6 +1204,8 @@ export const AuthAuditAction = z.enum([
   'auth.passkey.add',
   'auth.passkey.rename',
   'auth.passkey.remove',
+  'auth.passkey.enrollment_code.send',
+  'auth.passkey.enrollment_code.verify',
   'auth.device_auth.create',
   'auth.device_auth.approve',
   'auth.device_auth.deny',

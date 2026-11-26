@@ -327,9 +327,13 @@ async function handleNativeRegistration(
 }
 
 /**
- * Every request is one audited `auth.passkey.add` attempt: a refusal at
- * either step, or the verified enrollment. Minting options records only a
- * refusal.
+ * Every request is one audited attempt. A browser `send_code` request records
+ * `auth.passkey.enrollment_code.send`: the sent code, or the refusal. A
+ * missing, wrong, expired or locked emailed code records
+ * `auth.passkey.enrollment_code.verify` as a failure; the code is accepted as
+ * part of the `auth.passkey.add` row its verify step writes. Every other
+ * outcome is `auth.passkey.add`: a refusal at either step, or the verified
+ * enrollment. Minting options records only a refusal.
  */
 export async function POST(request: NextRequest) {
   const attempt: AuthAuditAttempt = { action: 'auth.passkey.add' };
@@ -366,6 +370,11 @@ async function registerPasskey(request: NextRequest, attempt: AuthAuditAttempt):
   }
   const input = parsed.data;
   attempt.metadata = { step: input.action };
+  if (input.action === 'send_code') attempt.action = 'auth.passkey.enrollment_code.send';
+  const refuseEmailCode = (refusal: PasskeyEnrollmentCodeRefusal): NextResponse => {
+    attempt.action = 'auth.passkey.enrollment_code.verify';
+    return emailCodeRefused(refusal);
+  };
 
   if (input.action !== 'verify') {
     const limit = await checkFirewallRateLimit(REGISTRATION_OPTIONS_RATE_LIMIT_ID, {
@@ -392,6 +401,7 @@ async function registerPasskey(request: NextRequest, attempt: AuthAuditAttempt):
   }
 
   if (!input.emailCode) {
+    attempt.action = 'auth.passkey.enrollment_code.verify';
     return NextResponse.json({ error: 'EMAIL_CODE_REQUIRED' }, { status: 401 });
   }
   const emailCode: PasskeyEnrollmentEmailCode = { binding, ...input.emailCode };
@@ -399,7 +409,7 @@ async function registerPasskey(request: NextRequest, attempt: AuthAuditAttempt):
   try {
     if (input.action === 'options') {
       const checked = await checkPasskeyEnrollmentCode(emailCode);
-      if (checked.status !== 'ok') return emailCodeRefused(checked);
+      if (checked.status !== 'ok') return refuseEmailCode(checked);
 
       const { challengeId, options } = await createRegistrationOptions(
         user.id,
@@ -428,7 +438,7 @@ async function registerPasskey(request: NextRequest, attempt: AuthAuditAttempt):
     return NextResponse.json({ credentialId: credential.credential_id });
   } catch (error) {
     if (error instanceof PasskeyEnrollmentCodeRefusedError) {
-      return emailCodeRefused(error.refusal);
+      return refuseEmailCode(error.refusal);
     }
     if (error instanceof PasskeyVerificationError) {
       return NextResponse.json({ error: error.code }, { status: 401 });

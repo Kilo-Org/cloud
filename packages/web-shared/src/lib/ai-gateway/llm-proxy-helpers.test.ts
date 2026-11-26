@@ -1846,11 +1846,13 @@ describe('captureProxyError', () => {
         model: 'vendor/model',
       });
 
-      expect(await capturedErrorData()).toMatchObject({
+      const data = await capturedErrorData();
+      expect(data).toMatchObject({
         status,
         model: 'vendor/model',
-        first4kOfResponse: '{"error":"upstream unavailable"}',
+        responseBodyReadLength: JSON.stringify({ error: 'upstream unavailable' }).length,
       });
+      expect(data.first4kOfResponse).toBe('{"error":"upstream unavailable"}');
       expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
         `openrouter returned error ${status}`,
         expect.anything()
@@ -1893,7 +1895,7 @@ describe('captureProxyError', () => {
       byokProviderIds: 'opencode-go',
       requestFields: 'messages,model,reasoning',
       messageFields: 'content,reasoning,role',
-      first4kOfResponse: '{"error":"unknown field"}',
+      responseBodyReadLength: '{"error":"unknown field"}'.length,
     });
     expect(JSON.stringify(data)).not.toContain('secret');
   });
@@ -2037,48 +2039,87 @@ describe('captureProxyError', () => {
       )
     );
 
-    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data.upstreamErrorParam).toBe('a'.repeat(512));
     expect(data.upstreamErrorCode).toBe('b'.repeat(512));
   });
 
-  it('redacts secret-shaped values in the logged response', async () => {
-    const fakeKey = 'sk-or-v1-fake0000000000000000000000';
-    const fakeJwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
-    const data = await captureResponsesError(
-      {},
-      Response.json(
-        { error: { message: `invalid key ${fakeKey}`, echo: `Bearer ${fakeJwt}` } },
-        { status: 401 }
-      )
-    );
-
-    expect(data.first4kOfResponse).toBe(
-      '{"error":{"message":"invalid key [Filtered]","echo":"Bearer [Filtered]"}}'
-    );
-  });
-
   it.each([
-    ['a JWT', 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU'],
-    ['a provider key', 'sk-or-v1-fake0000000000000000000000'],
-  ])('drops the part of %s that the 4k limit cuts', async (_name, secret) => {
-    const data = await captureResponsesError(
-      {},
-      new Response(`${'x '.repeat(2045)} ${secret}`, { status: 400 })
-    );
+    [
+      'OpenAI',
+      {
+        error: {
+          message: 'm',
+          type: 'invalid_request_error',
+          param: 'model',
+          code: 'model_not_found',
+        },
+      },
+      {
+        upstreamErrorType: 'invalid_request_error',
+        upstreamErrorParam: 'model',
+        upstreamErrorCode: 'model_not_found',
+      },
+    ],
+    [
+      'Anthropic',
+      { type: 'error', error: { type: 'overloaded_error', message: 'm' } },
+      { upstreamErrorType: 'overloaded_error' },
+    ],
+    [
+      'OpenRouter',
+      {
+        error: { code: 402, message: 'm', metadata: { provider_name: 'Fake Provider', raw: 'x' } },
+      },
+      { upstreamErrorCode: '402', upstreamProviderName: 'Fake Provider' },
+    ],
+    [
+      'Google',
+      { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'm' } },
+      { upstreamErrorCode: '429', upstreamErrorStatus: 'RESOURCE_EXHAUSTED' },
+    ],
+  ])('extracts the %s error schema fields', async (_provider, body, expected) => {
+    const data = await captureResponsesError({}, Response.json(body, { status: 400 }));
 
-    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2045)} [Truncated]`);
+    expect(data).toMatchObject(expected);
   });
 
-  it('redacts only the first 4k of a long response', async () => {
-    const started = performance.now();
-    const data = await captureResponsesError(
-      {},
-      new Response('eyJ-'.repeat(50_000), { status: 400 })
-    );
+  it('sends Sentry no upstream response text and logs only a redacted prefix', async () => {
+    const fakeKey = ['sk', '-proj-', 'fake'.repeat(8)].join('');
+    const body = {
+      error: {
+        message: `invalid key ${fakeKey} for user`,
+        echo: `Bearer ${fakeKey}`,
+        code: 'invalid_api_key',
+      },
+    };
+    await captureProxyError({
+      errorMessage: 'openai returned error 401',
+      user: { id: 'synthetic-user' },
+      request: {},
+      response: Response.json(body, { status: 401 }),
+      organizationId: undefined,
+      model: 'openai/gpt-6.1-sol',
+      trackInSentry: true,
+    });
 
-    expect(performance.now() - started).toBeLessThan(50);
-    expect(data.first4kOfResponse).toBe('[Truncated]');
+    const logged = await capturedErrorData();
+    expect(logged.first4kOfResponse).toBe(
+      '{"error":{"message":"invalid key [Filtered] for user","echo":"Bearer [Filtered]","code":"invalid_api_key"}}'
+    );
+    expect(JSON.stringify(logged)).not.toContain(fakeKey);
+
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+    const sentExtra = jest.mocked(captureMessage).mock.calls[0]?.[1];
+    expect(sentExtra).toMatchObject({
+      extra: {
+        upstreamErrorCode: 'invalid_api_key',
+        responseBodyReadLength: JSON.stringify(body).length,
+      },
+    });
+    const sent = JSON.stringify(sentExtra);
+    expect(sent).not.toContain('first4kOfResponse');
+    expect(sent).not.toContain(fakeKey);
+    expect(sent).not.toContain('invalid key');
   });
 
   it('reads only a bounded prefix of a large error body', async () => {
@@ -2100,7 +2141,7 @@ describe('captureProxyError', () => {
     const data = await captureResponsesError({}, response);
     await response.body?.cancel();
 
-    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2048)}[Truncated]`);
+    expect(String(data.first4kOfResponse)).toBe(`${'x '.repeat(2048)}[Truncated]`);
     expect(pulledChunks).toBeLessThan(8);
     expect(cancelled).toBe(true);
   });
@@ -2112,7 +2153,6 @@ describe('captureProxyError', () => {
     );
     const data = await captureResponsesError({}, response);
 
-    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data).not.toHaveProperty('upstreamErrorParam');
     expect(data).not.toHaveProperty('upstreamErrorCode');
     expect(await response.json()).toMatchObject({ error: { param: 'input' } });

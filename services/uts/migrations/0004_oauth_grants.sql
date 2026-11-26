@@ -1105,15 +1105,16 @@ CREATE INDEX third_party_refresh_tokens_rotated_idx ON uts.third_party_refresh_t
 -- * authorization codes 1 hour past their 60-second lifetime, used or not (until then a second
 --   use of a used code still revokes its grant);
 -- * every refresh token of a third-party family that ended (revoked, or past its 90-day end):
---   such a token already fails, so no reuse check needs it. Newest first, so a deleted token
---   leaves no child outside the batch whose `parent_id` must be cleared;
+--   such a token already fails, so no reuse check needs it;
 -- * rotated refresh tokens of a live family 30 days after their rotation, the longest idle window
 --   a token has. Reuse detection covers a token rotated within the last 30 days; an older one is
 --   then unknown. A thief who rotates a stolen token is still caught when the real client next
---   presents its token, which was rotated minutes before. The oldest kept token's `parent_id`
---   becomes NULL;
+--   presents its token, which was rotated minutes before. Oldest first through
+--   `third_party_refresh_tokens_rotated_idx`, so a token's child is mostly in the same batch.
 -- * revocation feed entries past `feed_expires_at`;
 -- * DPoP proof `jti`s past `expires_at`, which no clock accepts again.
+-- A deleted token's child that stays gets one `parent_id` update to NULL (`ON DELETE SET NULL`),
+-- so the order of a batch never decides what it deletes.
 CREATE FUNCTION uts.maintain_oauth_rows()
 RETURNS TABLE (kind text, deleted integer)
 LANGUAGE plpgsql
@@ -1139,7 +1140,6 @@ BEGIN
     FROM uts.third_party_grant_families AS family
     JOIN uts.third_party_refresh_tokens AS ended ON ended.family_id = family.id
     WHERE family.status = 'revoked' OR family.expires_at <= now()
-    ORDER BY ended.issued_at DESC
     LIMIT batch
   );
   kind := 'third_party_refresh_tokens';
@@ -1150,6 +1150,7 @@ BEGIN
   WHERE token.id IN (
     SELECT old.id FROM uts.third_party_refresh_tokens AS old
     WHERE old.status = 'rotated' AND old.rotated_at < now() - interval '30 days'
+    ORDER BY old.rotated_at
     LIMIT batch
   );
   kind := 'rotated_refresh_tokens';

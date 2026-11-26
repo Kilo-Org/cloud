@@ -427,10 +427,14 @@ dedicated maintenance role. It deletes:
 | Rows | When | Why that is safe |
 | --- | --- | --- |
 | `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
-| `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end, newest first | Each such token fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
-| `rotated_refresh_tokens` | A rotated token of a live family 30 days after its rotation, the longest idle window a token has | Reuse detection covers tokens rotated within 30 days; an older one is then unknown (`invalid_grant`) instead of revoking the family. A thief who rotates a stolen token is still caught when the real client next presents its own token, rotated minutes before. The oldest kept token's `parent_id` becomes NULL |
+| `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end | Each such token fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
+| `rotated_refresh_tokens` | A rotated token of a live family 30 days after its rotation, the longest idle window a token has, oldest first | Reuse detection covers tokens rotated within 30 days; an older one is then unknown (`invalid_grant`) instead of revoking the family. A thief who rotates a stolen token is still caught when the real client next presents its own token, rotated minutes before. Oldest first, a token's child is mostly in the same batch |
 | `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
 | `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
+
+`parent_id` is `ON DELETE SET NULL`, so the order of a batch never decides what it deletes: each
+deleted token whose child stays gives that child one `parent_id` update. Rotated tokens go oldest
+first, so that is mostly one update per family per batch.
 
 It never deletes a grant, a family row, a family's current token, or a code within its lifetime
 (`test/db/oauth-grants.test.ts`). At one mint per active client every 8 minutes, the DPoP rows

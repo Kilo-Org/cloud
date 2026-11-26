@@ -315,6 +315,26 @@ describe('redactSecretValues', () => {
       '{"user_code":"WDJB-MJHT","interval":5}',
       '{"user_code":"[Filtered]","interval":5}',
     ],
+    [
+      'an authorization header line after a newline',
+      'GET /v1/models\nAuthorization: Splunk fake-hec-0000 extra\nHost: api.example.com',
+      'GET /v1/models\nAuthorization: [Filtered]\nHost: api.example.com',
+    ],
+    [
+      'an inline authorization field and keeps the fields after it',
+      'error: denied; authorization: Splunk fake-hec-0000; model: gpt-5 retry',
+      'error: denied; authorization: [Filtered]; model: gpt-5 retry',
+    ],
+    [
+      'an inline known scheme and keeps the fields after it',
+      'rejected {authorization: Token fake-0000, model: gpt-5}',
+      'rejected {authorization: Token [Filtered], model: gpt-5}',
+    ],
+    [
+      'an inline cookie field and keeps the fields after it',
+      'request failed cookie: kilo_sid=fake-0000; model=gpt-5',
+      'request failed cookie: [Filtered]; model=gpt-5',
+    ],
   ])('replaces %s', (_name, input, expected) => {
     expect(redactSecretValues(input)).toBe(expected);
   });
@@ -412,6 +432,9 @@ describe('redactSecretValues', () => {
       'inspect pair: one unterminated value after a quoted name',
       `{ 'token': '${'a'.repeat(200_000)}`,
     ],
+    ['header line: repeated inline authorization fields', nearMatches(' authorization: a ')],
+    ['header line: repeated line-start authorization fields', nearMatches('\nauthorization:')],
+    ['header line: repeated inline cookie fields', nearMatches(' cookie: a=')],
   ])('redacts 200 KB of %s in linear time', (_name, input) => {
     const started = performance.now();
     redactSecretValues(input, input.length);

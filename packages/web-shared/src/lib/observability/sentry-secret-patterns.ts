@@ -62,12 +62,15 @@ const INSPECT_PAIR_PATTERN =
   /(^|[\s{,])(?:'([A-Za-z0-9_.$-]{1,64})'|([A-Za-z_$][\w$]{0,63}))(:[ \t]{0,8})(?:'((?:[^'\\]|\\.)*)'|(\d{1,20}))/g;
 
 // A `Name: value` header line in log or error text. An authorization or cookie
-// header is filtered to the end of its line, because its value can hold any
-// scheme or several cookies. Any other value is either quoted or a run whose
-// class excludes every character the prefix can be, so no match attempt starts
-// inside an earlier value and each character is read a bounded number of times.
+// header at the start of the text or of a line is filtered to the end of that
+// line, because its value can hold any scheme or several cookies. Elsewhere,
+// such as inside a one-line provider payload, an authorization value is filtered
+// with the word before it, and the fields after it stay. Any other value is
+// either quoted or a run whose class excludes every character the prefix can be,
+// so no match attempt starts inside an earlier value and each character is read
+// a bounded number of times.
 const HEADER_LINE_PATTERN =
-  /(^|[\s"'{,])(?:((?:proxy-)?authorization|(?:set-)?cookie)(:[ \t]{0,8})([^\r\n]*)|([A-Za-z0-9_.-]{1,64})(:[ \t]{0,8})((?:basic|bearer|bot|digest|dpop|key|negotiate|token)[ \t]{1,8})?(?:"((?:[^"\\]|\\.)*)"|([^\s"',;{}]+)))/gi;
+  /(^|[\s"'{,])(?:(?<![^\r\n])((?:proxy-)?authorization|(?:set-)?cookie)(:[ \t]{0,8})([^\r\n]*)|((?:proxy-)?authorization)(:[ \t]{0,8})([A-Za-z][\w-]{0,24}[ \t]{1,8})?(?:"(?:[^"\\]|\\.)*"|[^\s"',;{}]+)|([A-Za-z0-9_.-]{1,64})(:[ \t]{0,8})((?:basic|bearer|bot|digest|dpop|key|negotiate|token)[ \t]{1,8})?(?:"((?:[^"\\]|\\.)*)"|([^\s"',;{}]+)))/gi;
 // A known authorization scheme stays readable in front of the filtered value.
 const AUTHORIZATION_SCHEME = /^(?:basic|bearer|bot|digest|dpop|key|negotiate|token)[ \t]{1,8}/i;
 
@@ -221,6 +224,9 @@ function redactSensitiveHeaderLine(
   lineName: string | undefined,
   lineSeparator: string | undefined,
   lineValue: string | undefined,
+  authName: string | undefined,
+  authSeparator: string | undefined,
+  authScheme: string | undefined,
   name: string | undefined,
   separator: string | undefined,
   scheme: string | undefined,
@@ -232,6 +238,10 @@ function redactSensitiveHeaderLine(
     }
     const keptScheme = AUTHORIZATION_SCHEME.exec(lineValue)?.[0] ?? '';
     return `${prefix}${lineName}${lineSeparator}${keptScheme}${FILTERED_VALUE}`;
+  }
+  if (authName !== undefined) {
+    const keptScheme = AUTHORIZATION_SCHEME.exec(authScheme ?? '')?.[0] ?? '';
+    return `${prefix}${authName}${authSeparator}${keptScheme}${FILTERED_VALUE}`;
   }
   if (name === undefined || !isSensitiveName(name)) {
     return match;

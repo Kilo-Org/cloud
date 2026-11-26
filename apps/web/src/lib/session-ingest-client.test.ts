@@ -2,7 +2,7 @@ import { captureException } from '@sentry/nextjs';
 // The client deadline the upstream budget must stay under. Imported from source
 // rather than restated so the two constants can never drift apart.
 import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
-import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
   ServiceFetchTimeoutError,
@@ -31,7 +31,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateBoundedInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
 }));
 

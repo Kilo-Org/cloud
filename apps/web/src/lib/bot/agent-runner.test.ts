@@ -148,7 +148,7 @@ jest.mock('@/lib/web-config.server', () => ({ CALLBACK_TOKEN_SECRET: 'callback-s
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://app.example.test',
 }));
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateApiToken: () => 'auth-token',
   generateCloudAgentWorkflowToken: () => 'workflow-token',
   TOKEN_EXPIRY: { oneHour: 3600 },

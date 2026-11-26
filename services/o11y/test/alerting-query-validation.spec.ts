@@ -119,7 +119,8 @@ describe('baseline route validation', () => {
       {
         headers: { 'X-O11Y-ADMIN-TOKEN': 'test-admin-token' },
       },
-      makeRouteEnv()
+      makeRouteEnv(),
+      { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext
     );
   }
 

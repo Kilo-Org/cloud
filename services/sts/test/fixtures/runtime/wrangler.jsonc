@@ -1,0 +1,61 @@
+// Test-only Worker that test/runtime/runtime.test.ts starts in local workerd. It is never deployed
+// because it sits under test/fixtures/: the production deploy job (deploy-workers.yml) finds
+// Worker directories with `find services -name wrangler.jsonc -not -path "*/test/fixtures/*"`, and
+// test/repo/worker-configs.test.ts fails if a test config sits anywhere else. Every value is local
+// and synthetic. BROKER binds this Worker's own ProbeBroker entrypoint, as a consumer binds
+// SecretsBroker, so the bundle read is a real RPC call; SELF sends real requests to STS's own
+// HTTP routes. The Worker and queue names stay outside the `sts-*` and `kilo-audit-*` names
+// test/repo/worker-configs.ts reserves for deployments.
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "secrets-broker-rpc-test",
+  "main": "worker.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "traces": { "enabled": false } },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+    {
+      "type": "Text",
+      "globs": ["**/*.yaml"],
+      "fallthrough": true,
+    },
+  ],
+  "vars": {
+    "STS_ENVIRONMENT": "development",
+    "STS_ISSUER": "https://sts.sts-test.invalid",
+    "MANAGER_BASE_URL": "https://manager.sts-test.invalid",
+    "MANAGER_PROJECT_ID": "test-project-id",
+    "MANAGER_ENVIRONMENT_SLUG": "development",
+    "MANAGER_IDENTITY_ID": "test-identity-id",
+    "DO_JURISDICTION": "none",
+  },
+  "services": [
+    {
+      "binding": "BROKER",
+      "service": "secrets-broker-rpc-test",
+      "entrypoint": "ProbeBroker",
+      "props": { "caller": "o11y" },
+    },
+    { "binding": "SELF", "service": "secrets-broker-rpc-test" },
+  ],
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "secrets-broker-rpc-test-audit" }],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+      { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+      { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+      { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
+  ],
+}

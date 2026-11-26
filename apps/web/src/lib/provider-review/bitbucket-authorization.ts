@@ -22,7 +22,7 @@ import {
 } from '@kilocode/app-shared/provider-review';
 import { BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
-import { generateInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import {
   getBitbucketWorkspaceAccessTokenStatus,
   readCachedBitbucketWorkspaceAccessTokenRepositories,

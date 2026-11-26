@@ -206,14 +206,25 @@ unknown-kid limit). Leave the kid in the list; a later cleanup may remove it onc
 
 ## The refresher
 
-One `RefresherDO` per environment reads the manager in pairs: `GET /api/v4/secrets` for `/workloads`
-and for `/shared`, both with `recursive=true`, `expandSecretReferences=false` and
+One `RefresherDO` per environment reads the manager's folders together: `GET /api/v4/secrets` for
+`/workloads`, for `/shared` and, where a GitHub policy applies, for `/ci`, each with
+`recursive=true`, `expandSecretReferences=false` and
 `includeImports=false` (https://infisical.com/docs/api-reference/endpoints/secrets/list). It
 revalidates each folder with its ETag, so an unchanged folder costs a 304.
 
-- **Resolution.** A workload's policy names secrets. Each name resolves from
-  `/workloads/<workload>` first, then `/shared`; secrets in deeper folders are never served. A name
-  found in neither is listed in the bundle's `missing`.
+- **Resolution.** A workload's policy names secrets. Each name resolves from the workload's own
+  folder first, then `/shared`; secrets in deeper folders are never served. The own folder is
+  `/workloads/<workload>`, or `/ci/<workload>` for a GitHub policy. A name found in neither is listed
+  in the bundle's `missing`.
+- **`/ci`.** The refresher reads `/ci` as a third folder, in the same read and with the same rules,
+  only in an environment where at least one GitHub policy applies; elsewhere it makes no `/ci` call.
+  A `/ci` read that fails holds back nothing else: `/workloads` and `/shared` are stored and every
+  other bundle is rebuilt as usual, while each CI bundle keeps the last `/ci` copy, marked stale, or
+  stays empty if `/ci` was never read. STS logs `sts: /ci read failed` and retries at the next
+  regular refresh, with no backoff. The refresher records the failure
+  (`refresher_state.ci_failed_at`), so until then a fill of an empty CI bundle object makes no
+  manager read while `/workloads` and `/shared` are current: a refused `/ci` costs at most one read
+  per refresh interval, not one per CI request.
 - **Missing folder.** Infisical answers a folder that does not exist with 404 and error
   `SecretPathNotFound`; STS reads that as an empty folder, not an outage. Only a transport error, a
   timeout, 429, 5xx, a refused login or a malformed response counts as unreachable.
@@ -224,10 +235,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 - **Cadence.** Every 4 minutes. A signed `secrets.modified` webhook opens a 30-second merge window;
   the refresh runs at the window's end and never sooner than 30 seconds after the last refresh. A
   policy change after a deploy refreshes within about 5 seconds.
-- **Backoff.** After a failed read the next attempt waits 15 s, 30 s, 60 s, 120 s, then 240 s
-  (each jittered over its upper half; a 429's `Retry-After` raises it, capped at 4 minutes).
-  Webhooks do not shorten a running backoff. Bundle objects keep serving their copies, marked
-  stale, and an empty object is filled stale from the refresher's last copy.
+- **Backoff.** After a failed read of `/workloads` or `/shared` the next attempt waits 15 s, 30 s,
+  60 s, 120 s, then 240 s (each jittered over its upper half; a 429's `Retry-After` raises it,
+  capped at 4 minutes). Webhooks do not shorten a running backoff. Bundle objects keep serving their
+  copies, marked stale, and an empty object is filled stale from the refresher's last copy.
 - **Token.** The Infisical access token is cached until 60 seconds before it expires; concurrent
   logins merge into one.
 - **Starting the loop.** A cron trigger (`*/5 * * * *` in production and staging, none locally)
@@ -291,10 +302,9 @@ Identity kinds:
 - `fly-oidc`: `org`, `orgId`, `app`, `appId`. The token's `org_id` and `app_id` must match, as well
   as the names, so a recreated app with the same name is refused
   (https://fly.io/docs/security/openid-connect/).
-- `github-oidc`: `repositoryId`, `repositoryOwnerId`, plus `environments` (the GitHub environment
-  claim), `refs`, or both; both must match when both are set. A policy that grants `production` must
-  bind `environments`. Tokens from `pull_request_target`, `workflow_run` and `issue_comment` are
-  refused unless `allowedEvents` names the event.
+- `github-oidc`: `repository`, `repositoryId`, `repositoryOwnerId`, `environment`, `refs`,
+  `jobWorkflowRefs`, `events`. Several policies may share a repository. See
+  [GitHub Actions callers](#github-actions-callers).
 
 - `vercel-oidc`: `teamSlug`, `teamId`, `projectId`, `projectName`, and `environments`
   (`production`, `preview`, or `{ customEnvironmentId: env_... }`). See
@@ -515,6 +525,106 @@ plus at most once per 30 seconds after an unknown `kid` (its cooldown). Requests
 finished key set, so a cold isolate makes one fetch pair per request that arrives before the first
 pair lands; each fetch gives up after 5 seconds, so that window lasts at most 10 seconds.
 
+### GitHub Actions callers
+
+A CI job proves itself with its GitHub Actions OIDC token
+(https://docs.github.com/en/actions/reference/security/oidc), requested with the STS issuer of the
+environment it calls as the audience (`https://sts.kiloapps.io`, staging
+`https://sts-staging.kiloapps.io`):
+`curl -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://sts.kiloapps.io"`.
+The job needs `permissions: id-token: write`. It sends that token as the bearer of
+`POST /v1/bundle` and gets its policy's bundle. Any other audience, including the GitHub default,
+is refused.
+
+```yaml
+workload: ci-kilocode-release
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '<repository id>'
+  repositoryOwnerId: '<owner id>'
+  environment: release
+  refs: [refs/heads/main]   # the default
+  jobWorkflowRefs:
+    - Kilo-Org/kilocode/.github/workflows/publish.yml@refs/heads/main
+    - Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main
+  events: [workflow_dispatch]
+secrets: [KILOCODE_ANACONDA_API_KEY, KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
+```
+
+How a token finds its policy, in this order:
+
+1. **Repository.** `repository_id` and `repository_owner_id` equal the policy's ids. A token of a
+   repository no policy names is refused `unknown_workload`.
+2. **One policy.** The token's `environment` claim (absent matches a policy without an
+   `environment`) and its `job_workflow_ref` select the policy. The loader refuses two policies
+   that share a repository, an environment and a workflow file, so at most one matches. A token
+   that names the repository but matches no policy is refused `identity_rejected` and audited as
+   `github:<repository id>`: a workflow file that no policy lists, or a listed one on another ref.
+3. **Exact bindings.** On that policy, `sub` must equal the immutable-format subject
+   `repo:<owner>@<owner id>/<repo>@<repository id>:environment:<environment>` (a policy without an
+   `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, the matched `jobWorkflowRefs`
+   entry must be pinned to that same `ref`, and `event_name` must be in `events`. A failure is
+   refused `identity_rejected` and audited under the policy's workload.
+
+Rules the loader enforces:
+
+- `jobWorkflowRefs` lists every workflow file whose jobs may use the policy, each as
+  `<owner>/<repo>/.github/workflows/<file>@<ref>` with a ref from `refs`, all in the policy's own
+  repository, with no wildcard. A token's `job_workflow_ref` must equal an entry whose ref equals the
+  token's own `ref`. A called reusable workflow is its own entry: its jobs carry its own
+  `job_workflow_ref`, at the ref it was called with, while `ref` and `event_name` come from the
+  calling run, so a run on one listed ref that calls a workflow pinned to another listed ref is
+  refused. STS does not check the caller (`workflow_ref`) or compare commits (`workflow_sha`,
+  `job_workflow_sha`): any workflow on a listed ref that calls a listed reusable workflow at that
+  ref, with a listed event and in the policy's environment, gets the bundle, so list a reusable
+  workflow only when every caller on that ref may hold it.
+- `events` is an allowlist of `push`, `schedule`, `workflow_dispatch` and `workflow_run`. No event
+  that a fork author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
+  `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that
+  lists `workflow_run` lists no other event, binds an `environment`, and does not grant
+  `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
+  pull request started the upstream run, and STS cannot see that run.
+- A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`; a
+  policy with token grants binds an `environment`.
+- The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`). No
+  other kind of policy may use a `ci-` name, so a workload's name alone fixes its folder and a
+  stored bundle never moves between `/workloads` and `/ci`.
+
+Preconditions on the GitHub side, which STS cannot check:
+
+- **Immutable subjects.** The repository must issue the immutable subject format: repositories
+  created after 2026-07-15 do, an older one needs the opt-in in its (or its organization's) OIDC
+  settings (https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens).
+  A name-only subject (`repo:<owner>/<repo>:...`) is refused, and so is a customized subject
+  template.
+- **Protected environment.** STS trusts the `environment` claim; the GitHub environment's branch
+  rule (`main`) and its required reviewers are what make that claim mean something.
+- **Environment names** use only letters, digits, `.`, `_` and `-`, and the workflow spells them
+  exactly as the policy does.
+
+Denial rows carry `repository_id`, `repository_owner_id`, `repository`, `environment`, `ref`,
+`event_name`, `job_workflow_ref` and `sub_format`, never the token, the raw `sub`, or per-run
+claims such as `run_id` (they would make every refusal its own row). `sub_format` names the
+subject's shape: `immutable:` or `name-only:` followed by `environment`, `ref` or `pull_request`
+for GitHub's default forms, `custom` for a customized template (which can carry per-run claims),
+or `absent`. A delivery writes the usual
+`ai.kilo.sts.bundle.delivered` row for the policy's workload, plus the verified token's
+`jobWorkflowRef`, `runId` and, when present, `runAttempt` as flat string attributes (a run id or
+attempt that is not 1-20 decimal digits is left out). GitHub tokens carry no job claim, so the row
+names the workflow file and run, not the job.
+
+**Cost per CI job.** One `POST /v1/bundle`: the token check runs in the Worker, with GitHub's
+discovery document and key set cached per isolate (a cold isolate fetches both once), then one
+`BundleDO` call and one delivery audit row. No manager call: the bundle comes from the object's
+copy. At the kilocode CI design's load (about 90 bundle reads a day, at most 1,000 credential jobs
+a day) that is under 1,000 Worker requests, `BundleDO` calls and audit rows a day. The refresher
+cost of `/ci` is one more conditional `GET /api/v4/secrets` every 4 minutes per environment that
+has a GitHub policy (360 a day per environment; a 304 when nothing changed), and one more bundle
+push per GitHub policy per refresh: with the 8 kilocode policies, 8 `BundleDO` calls every 4
+minutes, or 2,880 a day per environment.
+
 ## Infisical setup, per environment
 
 **Machine identity with JWT Auth** (https://infisical.com/docs/documentation/platform/identities/jwt-auth;
@@ -542,8 +652,14 @@ per request that arrives before the first call lands, since requests share only 
 set, never a pending call; while `SignerDO` fails, each request makes its own call (up to 3
 attempts) and nothing is cached.
 
-The identity's project role grants `readValue` on `/workloads/**` and `/shared/**` of its own
-environment in the `kilo` project, and no write.
+The identity's project role grants `describeSecret` and `readValue` on `/workloads/**` and
+`/shared/**` of its own environment in the `kilo` project, and no write. Infisical reads a value
+only with both: `readValue` requires `describeSecret` as well
+(https://infisical.com/docs/internals/permissions/project-permissions). Before the first GitHub
+policy reaches an environment, the role also grants both on `/ci/**` there. Without that grant the
+`/ci` read fails: CI bundles in that environment stay empty or go stale, and every other bundle
+refreshes as usual. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
+`/ci/minting`. The STS deploy job's own token lives outside it, under `/sts-deploy` (design 4.2).
 
 **Webhook.** One `secrets.modified` webhook per environment, scoped to that environment, of type
 General, to `https://sts.kiloapps.io/manager-webhook` (staging: `https://sts-staging.kiloapps.io/manager-webhook`),
@@ -619,9 +735,9 @@ production. Complete and verify every item below before merging.
    and not the 4-day default. Verify: `wrangler queues info kilo-audit` prints the queue, and the
    Queues API shows `message_retention_period: 1209600`.
 3. **Infisical identity.** The production machine identity `c531ad9b-eec9-4f93-b173-e14d3d94f6ef`
-   exists in the `kilo` project with a role that grants `readValue` on `/workloads/**` and
-   `/shared/**` in `production` and no write. Verify: Infisical → Access Control → Machine
-   Identities → that id → Projects shows `kilo` with the role.
+   exists in the `kilo` project with a role that grants `describeSecret` and `readValue` on
+   `/workloads/**` and `/shared/**` in `production` and no write. Verify: Infisical → Access
+   Control → Machine Identities → that id → Projects shows `kilo` with the role.
 4. **Runtime secrets.** Each policy file's names exist in `production` under
    `/workloads/<workload>` or `/shared`. Verify: Infisical → `kilo` → `production` lists them. A
    missing name is reported in the bundle's `missing` list rather than failing the read, so this
@@ -644,6 +760,23 @@ After the merge, in this order:
 
 Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, identity
 `5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4`) follows the same list for its own environment.
+
+**Before an environment's first GitHub policy deploys** (a `policy/ci-*.yaml` naming that
+environment), in this order:
+
+1. **`/ci` read grant.** Grant the environment's Infisical STS role `describeSecret` and
+   `readValue` on `/ci/**` there. Without both, the `/ci` read fails and the CI bundles there stay
+   empty (other bundles are not affected). Verify with the STS identity itself, before the deploy:
+   Infisical → `kilo` → Access Control → the STS identity → Assume Privileges
+   (https://infisical.com/docs/documentation/platform/access-controls/assume-privilege), then open
+   that environment's `/ci` and a `/ci/ci-<job>` folder below it: each lists its secrets, and no
+   value shows as hidden. Do not reveal a value. Exit the session. Infisical records the session's
+   actions under your own account.
+2. **Deploy the policy.** The refresher has no `/ci` copy yet, so the CI bundles in that
+   environment stay empty until the first `/ci` read after this deploy succeeds; other bundles are
+   not affected. After the deploy, check the Infisical audit log for the `/ci` read within 5
+   minutes, and that the Worker logs show no `sts: /ci read failed` and no
+   `sts: manager hid secret values`.
 
 ## Tests
 
@@ -683,3 +816,25 @@ npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/
 The script mints two tokens, verifies each with `@kilocode/verify` against the served key set,
 checks that a forged token (same claims and kid, another key) and an expired token get 401 and a
 wrong-audience token 403, and waits for the issued and denied events on the queue.
+
+**Local end-to-end check of a CI bundle.** The same test build also carries one GitHub policy,
+`ci-e2e-release`, and sends its requests for GitHub's issuer and for the manager to a local fake on
+port 8830 that `ci-bundle-check.ts` serves (a fresh RS256 key with its discovery document and key
+set, and an Infisical stand-in with synthetic values):
+
+```sh
+cd services/sts
+../../node_modules/.bin/tsx test/fixtures/e2e/ci-bundle-check.ts
+# in another shell
+npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/wrangler.sts.jsonc
+```
+
+The script signs a job token the way GitHub does and checks that the listed workflow's job gets its
+bundle (its `/ci/ci-e2e-release` value and its `/shared` value, not the `/workloads` or `/ci/minting`
+decoys), that the refresher read `/ci`, and that a job of another workflow file, a `pull_request`
+job, a name-only subject, a customized subject carrying the run id, and a run on the policy's
+second listed ref (`refs/heads/release`) calling the workflow pinned to `main` each get 401
+`identity_rejected`. It then waits for the `bundle.delivered` row, which must carry the job's
+workflow file, run id and attempt, and for the `bundle.denied` rows that name the refused
+`job_workflow_ref`, `event_name`, `ref` and `sub_format` and no run id or raw subject, and checks
+that no audit row carries a value.

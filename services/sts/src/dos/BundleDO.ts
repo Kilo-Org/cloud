@@ -27,7 +27,9 @@ import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
 import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/bundle-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
-import { policyExists, policyFor, workloadPolicyHash } from '../policy';
+import { GithubRunSchema, type GithubRun } from '../identity/verify';
+import { policyIndex } from '../policy';
+import type { PolicyIndex } from '../policy/load';
 import type { Policy } from '../policy/schema';
 import {
   BundleSecretsSchema,
@@ -73,9 +75,14 @@ function utcMinute(time: number): string {
  * out. Callers do not retry a delivery: a retry after a committed append would audit twice.
  */
 export class BundleDO extends DurableObject<Env> {
+  /** The policies this object serves; a test fixture's subclass sets its own. */
+  static readonly policies: PolicyIndex = policyIndex;
+
   private readonly config: StsConfig;
   private readonly db: BundleDatabase;
   private readonly audit: AuditLog;
+  // An instance field, not a method: RPC exposes prototype methods, never instance fields.
+  private readonly policies: PolicyIndex;
   private keys: Promise<BundleKeys> | null = null;
   private pendingFill: Promise<BundleRow | null> | null = null;
   private refresherCheckedAt = 0;
@@ -83,6 +90,7 @@ export class BundleDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.config = readConfig(env);
+    this.policies = new.target.policies;
     this.db = drizzle(ctx.storage, { schema });
     this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
     void ctx.blockConcurrencyWhile(async () => {
@@ -93,10 +101,24 @@ export class BundleDO extends DurableObject<Env> {
   async getBundle(
     workload: string,
     environment: string,
-    request: BundleRequest
+    request: BundleRequest,
+    run: GithubRun | null = null
   ): Promise<BundleResult> {
     const target = BundleTargetSchema.parse({ workload, environment });
     const ifNoneMatch = BundleRequestSchema.parse(request).ifNoneMatch;
+    // RPC hands over whatever the caller sent; the broker sends a verified token's run, so
+    // anything else is a bug, refused before it can reach the delivery row.
+    const parsedRun = GithubRunSchema.nullable().safeParse(run);
+    if (!parsedRun.success) {
+      console.error('sts: malformed GitHub run at the bundle boundary; the read is refused', {
+        workload: target.workload,
+      });
+      return {
+        status: 'unavailable',
+        reason: 'internal',
+        retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
+      };
+    }
 
     if (target.environment !== this.config.environment) {
       return { status: 'denied', reason: 'environment_mismatch' };
@@ -109,11 +131,11 @@ export class BundleDO extends DurableObject<Env> {
         retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
       };
     }
-    const policy = policyFor(this.config.environment, target.workload);
+    const policy = this.policies.get(this.config.environment, target.workload);
     if (policy === null) {
       return {
         status: 'denied',
-        reason: policyExists(target.workload) ? 'environment_mismatch' : 'unknown_workload',
+        reason: this.policies.has(target.workload) ? 'environment_mismatch' : 'unknown_workload',
       };
     }
     this.checkRefresher();
@@ -165,6 +187,7 @@ export class BundleDO extends DurableObject<Env> {
             version: secret.version,
           })),
           missing,
+          run: parsedRun.data,
         })
       );
     } catch (error) {
@@ -282,7 +305,7 @@ export class BundleDO extends DurableObject<Env> {
    * removed grant is never served (design 4.4: STS refuses any read the policy does not list).
    */
   private async serve(row: BundleRow, policy: Policy): Promise<ServedBundle | null> {
-    const policyHash = await workloadPolicyHash(policy.workload);
+    const policyHash = await this.policies.workloadHash(policy.workload);
     if (row.policyHash === policyHash) return { kind: 'stored', row };
     const stored = await this.open(row);
     if (stored === null) return null;

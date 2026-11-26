@@ -88,6 +88,7 @@ describe('Vercel function identity', () => {
       provider: 'vercel',
       attestationExp: issuedAt + 7200,
       attestationIat: issuedAt,
+      run: null,
     });
   });
 

@@ -11,9 +11,11 @@ import {
 import { z } from 'zod';
 import { PROVIDER_FETCH_TIMEOUT_MS } from '../constants';
 import {
-  GITHUB_PRIVILEGED_EVENTS,
+  JobWorkflowRefSchema,
   VERCEL_ISSUER_PREFIX,
+  githubSubject,
   vercelStsEnvironments,
+  type GithubIdentity,
   type Policy,
   type PolicyIdentity,
   type VercelEnvironment,
@@ -46,6 +48,8 @@ export type VerifyOutcome =
       /** The provider token's own `exp` and `iat`, in seconds; a minted token never outlives it. */
       attestationExp: number;
       attestationIat: number;
+      /** A GitHub token's `job_workflow_ref`, `run_id` and `run_attempt`, for the delivery row only; refusals omit them. */
+      run: GithubRun | null;
     }
   | { status: 'denied'; reason: DeniedReason; subject?: VerifiedSubject }
   /** A provider's discovery document or key set could not be fetched; the caller retries. */
@@ -85,6 +89,30 @@ function claim(payload: JWTPayload, name: string): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+/** GitHub's run ids are decimal; anything else (or longer than 20 digits) is left out. */
+const RUN_NUMBER = /^[0-9]{1,20}$/;
+
+/**
+ * The run a verified GitHub token came from; bounded flat strings for the delivery row.
+ * `BundleDO.getBundle` parses it, because RPC hands over whatever its caller sent.
+ */
+export const GithubRunSchema = z.strictObject({
+  jobWorkflowRef: JobWorkflowRefSchema,
+  runId: z.string().regex(RUN_NUMBER),
+  runAttempt: z.string().regex(RUN_NUMBER).optional(),
+});
+export type GithubRun = z.infer<typeof GithubRunSchema>;
+
+/** Runs once `job_workflow_ref` equals a listed entry, which the policy schema bounds. */
+function githubRun(payload: JWTPayload): GithubRun | null {
+  const jobWorkflowRef = claim(payload, 'job_workflow_ref');
+  const runId = claim(payload, 'run_id');
+  if (jobWorkflowRef === null || runId === null || !RUN_NUMBER.test(runId)) return null;
+  const run = { jobWorkflowRef, runId };
+  const runAttempt = claim(payload, 'run_attempt');
+  return runAttempt !== null && RUN_NUMBER.test(runAttempt) ? { ...run, runAttempt } : run;
+}
+
 function isKnownProviderIssuer(issuer: string): boolean {
   if (issuer === GITHUB_ISSUER) return true;
   if (issuer.startsWith(VERCEL_ISSUER_PREFIX)) {
@@ -102,6 +130,8 @@ function providerFor(issuer: string): IdentityProvider {
 }
 
 const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
+  // `run_id` and the other per-run claims stay out: they would make each refusal its own row. So
+  // does `sub`, which a customized template can build from them; `sub_format` stands in for it.
   github: [
     'repository_id',
     'repository_owner_id',
@@ -109,12 +139,34 @@ const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
     'environment',
     'ref',
     'event_name',
+    'job_workflow_ref',
   ],
   fly: ['org_id', 'org_name', 'app_id', 'app_name', 'machine_id'],
   // Ids only: team and project names can be renamed and never authorize. `user_id` names the
   // person whose `vercel env pull` or `vercel dev` token was refused.
   vercel: ['owner_id', 'project_id', 'environment', 'custom_environment_id', 'user_id'],
 };
+
+/** GitHub's default subject: a repository, then the job's environment, its ref, or a pull request. */
+const GITHUB_DEFAULT_SUBJECT = /^repo:([^:]+):(environment|ref|pull_request)(?::[^:]+)?$/;
+const GITHUB_IMMUTABLE_REPOSITORY = /^[A-Za-z0-9-]+@[0-9]+\/[A-Za-z0-9._-]+@[0-9]+$/;
+const GITHUB_NAME_ONLY_REPOSITORY = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+
+/**
+ * The shape of a GitHub token's `sub`, one of a fixed set (`immutable:environment`,
+ * `name-only:ref`, `custom`, ...), never the subject itself: a customized template can carry
+ * per-run claims such as `run_id`, which would make each refusal its own row.
+ */
+function githubSubjectFormat(subject: string | null): string {
+  if (subject === null) return 'absent';
+  const match = GITHUB_DEFAULT_SUBJECT.exec(subject);
+  const repository = match?.[1] ?? '';
+  const context = match?.[2];
+  if (context === undefined) return 'custom';
+  if (GITHUB_IMMUTABLE_REPOSITORY.test(repository)) return `immutable:${context}`;
+  if (GITHUB_NAME_ONLY_REPOSITORY.test(repository)) return `name-only:${context}`;
+  return 'custom';
+}
 
 function verifiedSubject(
   provider: IdentityProvider,
@@ -126,6 +178,7 @@ function verifiedSubject(
     const value = claim(payload, name);
     if (value !== null) claims[name] = value.slice(0, 200);
   }
+  if (provider === 'github') claims.sub_format = githubSubjectFormat(claim(payload, 'sub'));
   return { provider, actor: workload ?? providerId(provider, claims), claims };
 }
 
@@ -184,8 +237,20 @@ function isExchangedFromFunctionToken(payload: JWTPayload, issuer: string): bool
   return 'aud' in act && act.aud === `https://vercel.com/${teamSlug}`;
 }
 
-function isPrivilegedEvent(event: string | null): boolean {
-  return GITHUB_PRIVILEGED_EVENTS.some(privileged => privileged === event);
+/**
+ * The bindings of the one policy a GitHub token's environment and workflow file selected: the exact
+ * subject, a listed ref, a listed event (an allowlist, so an event no policy lists is refused), and
+ * a workflow entry pinned to the run's own ref. A called reusable workflow's `job_workflow_ref`
+ * names the ref it was called at, while `ref` is the calling run's: an entry pinned to one listed
+ * ref never admits a run on another.
+ */
+function meetsGithubBindings(payload: JWTPayload, identity: GithubIdentity): boolean {
+  const ref = claim(payload, 'ref');
+  if (ref === null || !identity.refs.includes(ref)) return false;
+  if (!claim(payload, 'job_workflow_ref')?.endsWith(`@${ref}`)) return false;
+  const event = claim(payload, 'event_name');
+  if (!identity.events.some(listed => listed === event)) return false;
+  return claim(payload, 'sub') === githubSubject(identity, ref);
 }
 
 /** Classifies a failed `jwtVerify`: a dependency failure is retryable, anything else is a rejection. */
@@ -317,6 +382,7 @@ export class IdentityVerifier {
       provider,
       attestationExp: exp,
       attestationIat: iat,
+      run: provider === 'github' ? githubRun(payload) : null,
     });
     const rejected = (workload: string | null, reason: DeniedReason): VerifyOutcome => ({
       status: 'denied',
@@ -332,6 +398,8 @@ export class IdentityVerifier {
       }
     }
     let mismatchedWorkload: string | null = null;
+    // A GitHub token named a policy's repository but no policy for its environment and workflow.
+    let unmatchedRepository = false;
     for (const policy of candidates) {
       const identity = policy.identity;
       switch (identity.kind) {
@@ -349,17 +417,18 @@ export class IdentityVerifier {
         case 'github-oidc': {
           if (claim(payload, 'repository_id') !== identity.repositoryId) continue;
           if (claim(payload, 'repository_owner_id') !== identity.repositoryOwnerId) continue;
-          // From here the token names this policy's repository: a failed binding is a
-          // rejection, not an unknown workload.
-          const environment = claim(payload, 'environment');
-          if (identity.environments && !identity.environments.includes(environment ?? '')) {
-            return rejected(policy.workload, 'identity_rejected');
+          // The loader admits one policy per repository, GitHub environment and workflow file, so
+          // at most one policy gets past these two checks.
+          if (
+            claim(payload, 'environment') !== (identity.environment ?? null) ||
+            !identity.jobWorkflowRefs.includes(claim(payload, 'job_workflow_ref') ?? '')
+          ) {
+            unmatchedRepository = true;
+            continue;
           }
-          if (identity.refs && !identity.refs.includes(claim(payload, 'ref') ?? '')) {
-            return rejected(policy.workload, 'identity_rejected');
-          }
-          const event = claim(payload, 'event_name');
-          if (isPrivilegedEvent(event) && !identity.allowedEvents?.some(name => name === event)) {
+          // From here the token names this policy's workflow: a failed binding is a rejection,
+          // not an unknown workload.
+          if (!meetsGithubBindings(payload, identity)) {
             return rejected(policy.workload, 'identity_rejected');
           }
           if (!policy.environments.includes(this.options.environment)) {
@@ -391,8 +460,7 @@ export class IdentityVerifier {
       }
     }
 
-    return mismatchedWorkload !== null
-      ? rejected(mismatchedWorkload, 'environment_mismatch')
-      : rejected(null, 'unknown_workload');
+    if (mismatchedWorkload !== null) return rejected(mismatchedWorkload, 'environment_mismatch');
+    return rejected(null, unmatchedRepository ? 'identity_rejected' : 'unknown_workload');
   }
 }

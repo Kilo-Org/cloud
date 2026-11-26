@@ -1,4 +1,5 @@
 export {
+  MAX_AUTHORIZATION_LENGTH,
   createVerifier,
   type AcceptsPats,
   type Caller,
@@ -61,12 +62,14 @@ export {
   type UtsBootstrapSource,
 } from './bootstrap';
 export {
+  MAX_PENDING_LOOKUPS,
   PAT_LOOKUPS_PER_SECOND_PER_ADDRESS,
   PAT_LOOKUP_TIMEOUT_MS,
   PAT_MAX_STALE_MS,
   PAT_NEGATIVE_TTL_MS,
   PAT_POSITIVE_TTL_MS,
   PAT_RETRY_MS,
+  PAT_SHARED_CACHE_TIMEOUT_MS,
   PatRecordSchema,
   type PatCacheKey,
   type PatCacheKeys,

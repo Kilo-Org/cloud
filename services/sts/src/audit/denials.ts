@@ -45,11 +45,14 @@ export type TokenDenial = DenialBase & {
 
 export type Denial = BundleDenial | TokenDenial;
 
+/** The longest actor, claim value, audience or scope a denial row holds. */
+export const DENIAL_FIELD_MAX_LENGTH = 256;
+
 const DenialBaseSchema = {
   channel: z.enum(['worker-binding', 'http']),
-  actor: z.string().min(1).max(256),
+  actor: z.string().min(1).max(DENIAL_FIELD_MAX_LENGTH),
   claims: z
-    .record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.string().max(256))
+    .record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.string().max(DENIAL_FIELD_MAX_LENGTH))
     .refine(claims => Object.keys(claims).length <= 16, { message: 'at most 16 claims' }),
 };
 
@@ -63,8 +66,8 @@ export const DenialSchema: z.ZodType<Denial> = z.union([
     ...DenialBaseSchema,
     kind: z.literal('token'),
     reason: z.enum(TOKEN_DENIED_REASONS),
-    audience: AudienceSchema.max(256).optional(),
-    scope: ScopeSchema.max(256).optional(),
+    audience: AudienceSchema.max(DENIAL_FIELD_MAX_LENGTH).optional(),
+    scope: ScopeSchema.max(DENIAL_FIELD_MAX_LENGTH).optional(),
   }),
 ]);
 
@@ -263,13 +266,24 @@ const buffers = new Map<string, DenialBuffer>();
 /**
  * Counts refused requests in this isolate's buffer and returns the one denial-object hop to pass
  * to `waitUntil`, or null. A failed hop is logged and its counts are kept for the next hop: the
- * request is refused either way.
+ * request is refused either way. A denial the denial object would refuse (`DenialSchema`) is
+ * logged and dropped here, so it never makes the valid denials of its hop, or of later hops it
+ * would be retried with, fail too.
  */
 export function recordDenial(
   env: Env,
   config: StsConfig,
   ...denials: Denial[]
 ): Promise<void> | null {
+  const recordable = denials.filter(denial => {
+    if (DenialSchema.safeParse(denial).success) return true;
+    console.error('sts: denial does not fit a denial row; dropped', {
+      kind: denial.kind ?? 'bundle',
+      reason: denial.reason,
+    });
+    return false;
+  });
+  if (recordable.length === 0) return null;
   let buffer = buffers.get(config.environment);
   if (buffer === undefined) {
     buffer = new DenialBuffer(
@@ -284,7 +298,7 @@ export function recordDenial(
     );
     buffers.set(config.environment, buffer);
   }
-  return buffer.add(...denials);
+  return buffer.add(...recordable);
 }
 
 /** Test seam: forgets every isolate buffer, so a test's first denial is sent again. */

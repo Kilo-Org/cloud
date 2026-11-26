@@ -347,4 +347,59 @@ describe('shared exchanged token (D10)', () => {
       report: { exchangeAttempts: 1, rateLimited: 1 },
     });
   });
+
+  it('abandons and aborts an exchange still running at the deadline', async () => {
+    let aborted = false;
+    const slow: Exchange = async (_base, _audience, signal) => {
+      signal.addEventListener('abort', () => (aborted = true), { once: true });
+      await sleep(2_000);
+      return { kind: 'token', token: unsignedJwt({ ...DEPLOYMENT, exp: nowSeconds() + 7200 }) };
+    };
+    const [result] = await coldWave(1, fakeCache(), slow, { jitterMs: 1, deadlineMs: 400 });
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'no token before the deadline',
+      report: { exchangeAttempts: 1 },
+    });
+    expect(result?.report.timeToTokenMs).toBeLessThan(600);
+    expect(aborted).toBe(true);
+  });
+
+  it('stops waiting on a cache that answers after the deadline', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const [result] = await coldWave(1, fakeCache(2_000), exchange, {
+      jitterMs: 1,
+      deadlineMs: 300,
+    });
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'no token before the deadline',
+      report: { exchangeAttempts: 0, cacheReads: 1 },
+    });
+    expect(result?.report.timeToTokenMs).toBeLessThan(500);
+    expect(calls.attempts).toBe(0);
+  });
+
+  it('returns the token in hand at the deadline when writing it runs past it, and keeps it in memory', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const stored = new Map<string, unknown>();
+    // Reads and the claim marker are quick; the token write hangs.
+    const cache: SharedCache = {
+      get: async key => stored.get(key) ?? null,
+      set: async (key, value) => {
+        if (!key.endsWith(':claim')) await sleep(2_000);
+        stored.set(key, value);
+      },
+    };
+    const instance = new SharedExchangedToken(cache, {
+      settings: { jitterMs: 1, deadlineMs: 400 },
+    });
+    const first = await instance.get(BASE_TOKEN, AUDIENCE, exchange);
+    expect(first).toMatchObject({ status: 'ok', report: { source: 'exchanged' } });
+    // The write was cut at the 400 ms deadline instead of taking its 2 s.
+    expect(first.report.timeToTokenMs).toBeGreaterThanOrEqual(390);
+    expect(first.report.timeToTokenMs).toBeLessThan(600);
+    expect((await instance.get(BASE_TOKEN, AUDIENCE, exchange)).report.source).toBe('memory');
+    expect(calls.attempts).toBe(1);
+  });
 });

@@ -53,7 +53,7 @@ export async function resetAllSigners(): Promise<void> {
   for (let signer = 0; signer < UTS_SIGNER_COUNT; signer += 1) await resetSigner(signer);
 }
 
-/** Restarts every key-set shard, which drops its copy and held keys, as a deploy does. */
+/** Restarts every key-set shard, as a deploy does: it drops its copy and reloads its held keys. */
 export async function resetKeySetShards(): Promise<void> {
   for (let shard = 0; shard < KEY_SET_SHARD_COUNT; shard += 1) {
     await runInDurableObject(getKeySetShardStub(env, config, shard), (_instance, state) =>

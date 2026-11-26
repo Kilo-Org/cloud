@@ -1,6 +1,7 @@
+import { runInDurableObject } from 'cloudflare:test';
 import { signerOfTokenKid, UTS_ENDPOINTS, UTS_SIGNER_COUNT } from '@kilocode/uts-contracts';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
+import { getSignerStub, KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
 import { handleRequest } from '../../src/http';
 import { SIGNER_KEYS_COPY_MS, signerKeysRead } from '../../src/signer-keys';
 import {
@@ -10,6 +11,7 @@ import {
   resetAllSigners,
   resetKeySetShards,
   resetSigner,
+  restartSigner,
 } from './support';
 import { config, env } from './test-env';
 
@@ -116,5 +118,28 @@ describe('SignerKeys entrypoint reads', () => {
     expect(await signerKeysRead(env, staging, { caller: 'uts-feed-staging' }, 0)).toEqual({
       status: 'misconfigured',
     });
+  });
+
+  it("keeps a failing signer's last good keys across a restart of every key-set shard", async () => {
+    const before = await feedAnswer();
+    const held = before.signers[9];
+    if (held?.status !== 'ok') throw new Error('signer 9 has no keys');
+    // Signer 9's object now holds signer 3's state, so it refuses to load: every read of it fails.
+    const borrowed = await runInDurableObject(getSignerStub(env, config, 3), (_instance, object) =>
+      object.storage.get('signer-state')
+    );
+    try {
+      await runInDurableObject(getSignerStub(env, config, 9), async (_instance, object) => {
+        await object.storage.deleteAlarm();
+        await object.storage.put('signer-state', borrowed);
+      });
+      await restartSigner(9);
+      await resetKeySetShards();
+      const after = await feedAnswer();
+      expect(after.signers[9]).toEqual(held);
+      expect(after.signers[3]).toMatchObject({ status: 'ok' });
+    } finally {
+      await resetSigner(9);
+    }
   });
 });

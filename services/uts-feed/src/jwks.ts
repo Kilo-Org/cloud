@@ -201,7 +201,10 @@ function merge(
 
 /**
  * Runs one read and records its outcome. Keys newer than those held replace them signer by
- * signer, so a read that finishes late changes nothing a newer read brought.
+ * signer, so a read that finishes late changes nothing a newer read brought. A cold isolate holds
+ * no keys of its own; the mint Worker's key-set shard answers a failing signer's last good keys
+ * from its storage, also after the shard restarted, so a cold read during a signer outage still
+ * builds the whole set while that signer's hold lasts.
  */
 async function runRead(
   state: FeedIsolate,

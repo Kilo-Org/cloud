@@ -1,6 +1,8 @@
 import {
+  signerOfTokenKid,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
+  UtsPublicJwkSchema,
   type SignerKeysAnswer,
   type SignerKeysBinding,
   type SignerKeysEntry,
@@ -39,7 +41,38 @@ export const KEY_SET_SHARD_DEADLINE_MS = 8 * 1000;
 
 const WAIT_STEP_MS = 20;
 
+/**
+ * A shard stores its held keys when any signer's kids change, and otherwise at most once per this
+ * long. A restarted shard counts each signer's 24-hour hold from the stored read time, which is at
+ * most this much earlier than that signer's last good read, so a restart can shorten a hold but
+ * never lengthen it.
+ */
+export const HELD_KEYS_STORE_MS = 10 * 60 * 1000;
+
 export type HeldSignerKeys = { keys: UtsPublicJwk[]; readAt: number };
+
+/**
+ * The held keys as a shard stores them: one entry per signer, in signer order, each `kid` a token
+ * `kid` of its signer. Public keys only.
+ */
+export const StoredHeldKeysSchema = z
+  .array(
+    z
+      .strictObject({
+        keys: z.array(UtsPublicJwkSchema).min(1),
+        readAt: z.number().int().positive(),
+      })
+      .nullable()
+  )
+  .length(UTS_SIGNER_COUNT)
+  .refine(
+    held =>
+      held.every(
+        (entry, signer) =>
+          entry === null || entry.keys.every(key => signerOfTokenKid(key.kid) === signer)
+      ),
+    'every kid must be a token kid of its signer'
+  );
 
 export type SignerAnswers = ReadonlyArray<PromiseSettledResult<PublicKeysResult>>;
 
@@ -53,6 +86,8 @@ export type ReadSigners = (startedAt: number) => Promise<SignerAnswers>;
 export type SignerKeysCache = {
   /** Each signer's last good keys, which stand in for its failed calls for 24 hours. */
   held: ReadonlyArray<HeldSignerKeys | null>;
+  /** The held keys as last stored, and when; null until this shard instance stores them. */
+  stored: { held: ReadonlyArray<HeldSignerKeys | null>; at: number } | null;
   copy: { answer: SignerKeysAnswer; readAt: number } | null;
   read: { status: 'idle' } | { status: 'reading'; startedAt: number };
 };
@@ -60,9 +95,33 @@ export type SignerKeysCache = {
 export function newSignerKeysCache(): SignerKeysCache {
   return {
     held: Array.from({ length: UTS_SIGNER_COUNT }, () => null),
+    stored: null,
     copy: null,
     read: { status: 'idle' },
   };
+}
+
+const kidsOf = (entry: HeldSignerKeys | null | undefined) =>
+  entry?.keys.map(key => key.kid).join(' ') ?? '';
+
+/**
+ * The held keys a shard must store at `now`, or null when its stored copy still stands: no keys
+ * are held, or a copy under 10 minutes old lists the same kids for every signer.
+ */
+export function heldKeysToStore(
+  cache: SignerKeysCache,
+  now: number
+): ReadonlyArray<HeldSignerKeys | null> | null {
+  const { held, stored } = cache;
+  if (held.every(entry => entry === null)) return null;
+  if (
+    stored !== null &&
+    now - stored.at < HELD_KEYS_STORE_MS &&
+    held.every((entry, signer) => kidsOf(entry) === kidsOf(stored.held[signer]))
+  ) {
+    return null;
+  }
+  return held;
 }
 
 const CallerPropsSchema = z.strictObject({ caller: z.string().min(1) });

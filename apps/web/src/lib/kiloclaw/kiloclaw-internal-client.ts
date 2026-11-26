@@ -6,6 +6,8 @@ import type {
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
 import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { internalApiSecretFromSts } from '@/lib/sts-secret-reader';
 import type {
   ImageVersionEntry,
   ProvisionInput,
@@ -122,24 +124,31 @@ type RequestContext = { userId: string };
  */
 export class KiloClawInternalClient {
   private baseUrl: string;
-  private apiSecret: string;
 
   constructor() {
     if (!KILOCLAW_API_URL) {
       throw new Error('KILOCLAW_API_URL is not configured');
     }
-    if (!INTERNAL_API_SECRET) {
+    // The env source is known here; an STS secret is read, and checked, on each request.
+    if (!internalApiSecretFromSts() && !INTERNAL_API_SECRET) {
       throw new Error('INTERNAL_API_SECRET is not configured');
     }
     this.baseUrl = KILOCLAW_API_URL;
-    this.apiSecret = INTERNAL_API_SECRET;
+  }
+
+  private async apiSecret(): Promise<string> {
+    const secret = await readInternalApiSecret();
+    if (!secret) {
+      throw new Error('INTERNAL_API_SECRET is not configured');
+    }
+    return secret;
   }
 
   private async request<T>(path: string, options?: RequestInit, ctx?: RequestContext): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       ...options,
       headers: {
-        'x-internal-api-key': this.apiSecret,
+        'x-internal-api-key': await this.apiSecret(),
         'Content-Type': 'application/json',
         ...options?.headers,
       },
@@ -1143,7 +1152,7 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         headers: {
-          'x-internal-api-key': this.apiSecret,
+          'x-internal-api-key': await this.apiSecret(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ userId, ...request }),

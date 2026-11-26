@@ -1,7 +1,8 @@
 import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 import type { WebhookTriggerTarget } from '@kilocode/worker-utils/webhook-trigger-target';
 import 'server-only';
-import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
+import { WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import * as z from 'zod';
@@ -161,7 +162,7 @@ async function workerFetch<T>(path: string, options: RequestInit = {}): Promise<
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
+      'x-internal-api-key': await readInternalApiSecret(),
       ...options.headers,
     },
   });
@@ -325,7 +326,7 @@ export async function invokeWorkerScheduledTrigger(
     const response = await fetch(`${WEBHOOK_AGENT_URL}${path}`, {
       method: 'POST',
       headers: {
-        'x-internal-api-key': INTERNAL_API_SECRET,
+        'x-internal-api-key': await readInternalApiSecret(),
       },
       signal: AbortSignal.timeout(30_000),
     });

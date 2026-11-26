@@ -186,7 +186,7 @@ function isNotificationStillEligible(
 }
 
 export async function POST(req: NextRequest) {
-  const unauthorized = authorizeInternalApiRequest(req);
+  const unauthorized = await authorizeInternalApiRequest(req);
   if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);

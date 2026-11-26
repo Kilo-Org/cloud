@@ -1,5 +1,5 @@
 /**
- * The policy files this Worker bundles. `src/policy/index.ts` types its imports
+ * The policy and registration files this Worker bundles. `src/policy/index.ts` types its imports
  * against this tuple, so a file added here without an import fails typecheck and
  * `test/repo/policy-files.test.ts` fails when the directory and the tuple differ.
  */
@@ -17,6 +17,32 @@ export const POLICY_FILES = [
   'ci-kilocode-community.yaml',
   'ci-kilocode-notify.yaml',
   'ci-kilocode-opencode-watch.yaml',
+  'ai-gateway.yaml',
+  'ai-gateway-secure-proxy.yaml',
+  'auto-routing.yaml',
+  'auto-routing-benchmark.yaml',
+  'cloud-agent-next.yaml',
+  'cloudflare-gmail-push.yaml',
+  'cloudflare-scim-sync.yaml',
+  'cloudflare-security-sync.yaml',
+  'cloudflare-webhook-agent-ingest.yaml',
+  'container-usage-meter.yaml',
+  'event-service.yaml',
+  'git-token-service.yaml',
+  'kilo-ai-attribution.yaml',
+  'kilo-chat.yaml',
+  'kilo-code-review-worker.yaml',
+  'kilo-mcp.yaml',
+  'kilo-ops.yaml',
+  'kiloclaw.yaml',
+  'kiloclaw-billing.yaml',
+  'kiloclaw-inbound-email.yaml',
+  'model-eval-ingest.yaml',
+  'pages-dev.yaml',
+  'security-auto-analysis.yaml',
+  'session-ingest.yaml',
+  'session-sync.yaml',
+  'user-data-export.yaml',
 ] as const;
 
 export type PolicyFile = (typeof POLICY_FILES)[number];

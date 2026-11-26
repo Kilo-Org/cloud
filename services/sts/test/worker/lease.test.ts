@@ -694,23 +694,23 @@ describe('revoke', () => {
     ]);
   });
 
-  it('stops a revocation as unconfirmed when Infisical answers 404 after a recorded failure', async () => {
+  it('confirms a revocation as gone when Infisical answers 404 after a recorded failure', async () => {
     const manager = installLeaseManager();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
     manager.setRevokeStatus(503);
     await broker('bouncer-watch').revokeLease(created.leaseId);
+    errors.mockClear();
+    // Infisical keeps a lease whose revocation failed and deletes it only once a revocation
+    // succeeded, so its 404 for that lease confirms the revocation (trial check 3, 2026-11-26).
     manager.setRevokeStatus(404);
     expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toMatchObject({
-      status: 'unavailable',
+      status: 'revoked',
     });
-    expect(errors).toHaveBeenCalledWith(
-      expect.stringContaining('the revocation is unconfirmed'),
-      expect.objectContaining({ leaseId: created.leaseId })
-    );
-    // Stopped: neither a later revoke nor the alarm asks Infisical again or writes another row.
+    expect(errors).not.toHaveBeenCalled();
+    // Ended: neither a later revoke nor the alarm asks Infisical again or writes another row.
     expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toMatchObject({
-      status: 'unavailable',
+      status: 'revoked',
     });
     await revocationsDue();
     await runDurableObjectAlarm(getLeaseStub(env, config));
@@ -720,7 +720,7 @@ describe('revoke', () => {
     );
     expect(revoked.map(event => [event.data.outcome, event.data.attributes.result])).toEqual([
       ['failure', 'revoke_failed'],
-      ['failure', 'unconfirmed'],
+      ['success', 'gone'],
     ]);
   });
 
@@ -897,7 +897,8 @@ describe('revoke', () => {
       status: 'unavailable',
     });
     // Infisical's own retry may have dropped the role meanwhile; the row it answers with still
-    // carries the earlier status, so STS waits for the 404 that confirms the lease is gone.
+    // carries the earlier status (a successful revocation's 200 does too), so STS waits for the
+    // 404 that confirms the lease is gone.
     const stub = getLeaseStub(env, config);
     await revocationsDue();
     await runDurableObjectAlarm(stub);
@@ -908,17 +909,17 @@ describe('revoke', () => {
     await runDurableObjectAlarm(stub);
     expect(manager.revokes()).toHaveLength(3);
     const events = await leaseEvents();
-    // A 404 after the recorded failure stays unconfirmed until the trial settles what it means.
+    // Infisical deletes a lease only once its revocation succeeded, so this 404 confirms it.
     expect(
       events
         .filter(event => event.type === 'ai.kilo.sts.lease.revoked')
         .map(event => event.data.attributes.result)
-    ).toEqual(['revoke_failed', 'unconfirmed']);
+    ).toEqual(['revoke_failed', 'gone']);
     expect(JSON.stringify(events)).not.toContain('synthetic-db-error');
     expect(JSON.stringify(errors.mock.calls)).not.toContain('synthetic-db-error');
     manager.setRevokeStatus(200);
     expect(await broker('bouncer-watch').revokeLease(created.leaseId)).toMatchObject({
-      status: 'unavailable',
+      status: 'revoked',
     });
     expect(manager.revokes()).toHaveLength(3);
   });

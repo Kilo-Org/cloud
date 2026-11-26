@@ -852,10 +852,12 @@ error that says the sessions may still be open. A day after the expiry the objec
 `lease.revoked` with result `unconfirmed`, logs an error naming the lease id, for a person to end
 the role's sessions by hand (Risks below), and ends a delivered lease's row in state `unconfirmed`,
 so a later revoke does not make it owed again; if that row cannot be written, it tries again 30
-seconds later. It stops the same way on a 404 after a recorded `revoke_failed`: until trial check 3
-shows that Infisical keeps a lease whose revocation failed until a revocation succeeds, a missing
-lease may be one deleted without its role being revoked. The alarm takes at most 5 leases, least recently tried
-first, so leases that keep failing cannot hold back a newer one; it retries a lease no sooner than
+seconds later. A 404 after a recorded `revoke_failed` is `gone`: trial check 3 showed (staging,
+2026-11-26) that Infisical keeps a lease whose revocation failed, answering every later revoke with
+200 and the kept row, until a revocation succeeds, and that the 200 of that success still carries
+the stale `Failed to delete` status; the 404 that follows is the confirmation. The alarm takes at
+most 5 leases, least recently tried first, so leases that keep failing cannot hold back a newer
+one; it retries a lease no sooner than
 30 seconds after its last attempt, the caller's included, or after Infisical's `Retry-After` on a
 429 when that is longer. A caller's revoke then answers `unavailable`, and the caller may retry
 too. A creation that times out may still have made a role at the database. Its password reached no
@@ -867,8 +869,7 @@ identity, channel, grant, lease id, `ttlSeconds`, `requestedTtlSeconds` when giv
 `expiresAt`, and a GitHub caller's `jobWorkflowRef`, `runId`, `runAttempt`) and
 `ai.kilo.sts.lease.revoked` (`cause`: `caller`, `late`, `expiry_mismatch` or `audit_failed`;
 `result`: `revoked`, `gone` when Infisical no longer had it, `revoke_failed` when Infisical did not
-confirm it, or `unconfirmed` when the object stopped a day after the expiry or on a 404 after a
-recorded failure; the last two with
+confirm it, or `unconfirmed` when the object stopped a day after the expiry; the last two with
 outcome `failure`). Refusals of an identified caller become
 `ai.kilo.sts.lease.denied` through the denial object, merged per minute: the answer's reason, or
 for a revoke the caller heard as `not_found`, `not_owner` (another workload's lease), `other_run`
@@ -1062,8 +1063,8 @@ passwords, nor read a creation statement in `pg_stat_activity` (`check.sh`).
    object audit covers schema `kilo_lease`. Force a revocation failure (for example, revoke
    `EXECUTE` on `kilo_lease.revoke_lease` from the admin login for the test) and check that every
    later revoke answers 200 with the kept row (`status` `Failed to delete`) and never a 404 until a
-   revocation succeeds; until this is confirmed, STS treats a 404 after a recorded failure as
-   `unconfirmed`.
+   revocation succeeds (confirmed on staging on 2026-11-26: the successful revoke's 200 still
+   carried `Failed to delete`, and the next revoke got the 404; STS reads that 404 as `gone`).
 7. STS: set `MANAGER_PROJECT_SLUG` (Infisical → project settings) and `LEASE_CI_MIGRATION_TARGET`
    in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants. In
    production, grant no `replica-read` until the replica-side session sweeper ships, and leave

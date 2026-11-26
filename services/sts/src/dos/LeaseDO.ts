@@ -132,9 +132,9 @@ function errorName(error: unknown): string {
 }
 
 /**
- * The row of a revocation STS stopped without Infisical confirming it, after a day past expiry or
- * on a 404 after a recorded failure: a delivered lease ends in state `unconfirmed` (a later revoke
- * answers without making it owed again), an undelivered one stays `failed`.
+ * The row of a revocation STS stopped without Infisical confirming it, a day past the lease's
+ * expiry: a delivered lease ends in state `unconfirmed` (a later revoke answers without making it
+ * owed again), an undelivered one stays `failed`.
  */
 function unconfirmedEnd(row: LeaseRow, now: number): Partial<LeaseRow> {
   return {
@@ -449,9 +449,10 @@ export class LeaseDO extends DurableObject<Env> {
    * be reached, the first failure whose `revoke_failed` row is written marks the row, so later
    * failures write none, and an append that failed is tried again on the next failure. A failed
    * audit append after a success also leaves it owed: the retry finds the lease gone and writes
-   * the row then. A 404 after a recorded failure is `unconfirmed`, not `gone`: until the trial
-   * shows that Infisical keeps a lease whose revocation failed until one succeeds, a missing lease
-   * may be one deleted without its role being revoked, so the row ends and a person checks it.
+   * the row then. A 404 after a recorded failure is `gone` as well: Infisical keeps a lease whose
+   * revocation statement failed (a 200 with the row and its "Failed to delete" status, never a 404)
+   * and deletes it only once a revocation succeeds; the success's own 200 still carries that stale
+   * status, so the 404 that follows is the confirmation (README trial check 3, run on 2026-11-26).
    */
   async #attemptRevocation(leaseId: string): Promise<LeaseRevocationResult> {
     const row = this.#db.select().from(schema.lease).where(eq(schema.lease.leaseId, leaseId)).get();
@@ -460,15 +461,8 @@ export class LeaseDO extends DurableObject<Env> {
     const caller: LeaseAuditCaller = CallerSchema.parse(JSON.parse(row.caller));
     this.#setRevokeRetryAt(row.slot, Date.now() + LEASE_REVOKE_RETRY_MS);
     const revocation = await this.#client.revokeLease(LEASE_DYNAMIC_SECRETS[row.grant], leaseId);
-    let result: LeaseRevocationResult =
+    const result: LeaseRevocationResult =
       revocation.status === 'unreachable' ? 'revoke_failed' : revocation.status;
-    if (result === 'gone' && row.revokeFailureAudited) {
-      result = 'unconfirmed';
-      console.error(
-        'sts: Infisical no longer has a lease whose revocation failed before; the revocation is unconfirmed, end the role sessions by hand',
-        { workload: row.workload, grant: row.grant, cause, leaseId }
-      );
-    }
     if (revocation.status === 'unreachable') {
       const expired = row.expiresAt <= Date.now();
       console.error(

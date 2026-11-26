@@ -12,7 +12,7 @@ import {
 
 // The web app runs only in Frankfurt, next to the primary database.
 export async function POST(request: Request) {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
   const owner = ClaudeBillingOwnerSchema.safeParse(await request.json().catch(() => null));
   if (!owner.success) return NextResponse.json({ error: 'Invalid owner' }, { status: 400 });

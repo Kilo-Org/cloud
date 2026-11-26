@@ -1,4 +1,4 @@
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import * as z from 'zod';
 
@@ -31,7 +31,9 @@ export function createWorkerAdminFetch(options: {
     schema: z.ZodType<T>
   ): Promise<WorkerAdminResult<T | ErrorBody>> {
     const endpoint = parseInternalServiceEndpoint(options.workerUrl, path);
-    if (!INTERNAL_API_SECRET || !endpoint) {
+    // A secret that cannot be read sends nothing and answers like a missing one, without its reason.
+    const internalApiSecret = endpoint ? await readInternalApiSecret().catch(() => '') : '';
+    if (!internalApiSecret || !endpoint) {
       return {
         status: 500,
         body: { error: options.unconfiguredError },
@@ -44,7 +46,7 @@ export function createWorkerAdminFetch(options: {
         ...init,
         signal: init.signal ?? deadline,
         headers: {
-          authorization: `Bearer ${INTERNAL_API_SECRET}`,
+          authorization: `Bearer ${internalApiSecret}`,
           ...init.headers,
         },
       });

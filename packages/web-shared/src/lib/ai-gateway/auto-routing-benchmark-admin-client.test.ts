@@ -422,14 +422,13 @@ describe('auto routing benchmark admin client', () => {
   it('applies an abort deadline to profile registration', async () => {
     const controller = new AbortController();
     const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
-    mockFetch.mockImplementation(
-      (_url: string, init: RequestInit) =>
-        new Promise<Response>((_resolve, reject) => {
-          init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
-            once: true,
-          });
-        })
-    );
+    mockFetch.mockImplementation((_url: string, init: RequestInit) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      // The secret read awaits before fetch, so the deadline can already have fired by now.
+      if (init.signal?.aborted) reject(init.signal.reason);
+      init.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      return promise;
+    });
 
     try {
       const pending = registerOwnerBenchmarkProfiles({

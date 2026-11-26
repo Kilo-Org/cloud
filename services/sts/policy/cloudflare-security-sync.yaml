@@ -1,0 +1,4 @@
+# Registration only: services/security-sync/wrangler.jsonc. No environment, identity or grant.
+workload: cloudflare-security-sync
+registered: true
+secrets: []

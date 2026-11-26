@@ -754,6 +754,92 @@ secrets: [APP_TWO_SECRET]
   });
 });
 
+describe('policy registrations', () => {
+  const registration = `
+workload: app-two
+registered: true
+secrets: []
+`;
+  const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
+
+  it('reserves a name that STS serves, admits, bundles, audits and hashes nothing for', async () => {
+    const policiesOnly = loadPolicies({ 'app-one.yaml': valid });
+    const index = loadPolicies({ 'app-one.yaml': valid, 'app-two.yaml': registration });
+    expect(index.registered()).toEqual(['app-two']);
+    expect(index.all()).toEqual(policiesOnly.all());
+    expect(index.has('app-two')).toBe(false);
+    for (const environment of ENVIRONMENTS) {
+      expect(index.get(environment, 'app-two')).toBeNull();
+      expect(index.forEnvironment(environment)).toEqual(policiesOnly.forEnvironment(environment));
+      expect(index.snapshot(environment)).toEqual(policiesOnly.snapshot(environment));
+      expect(await index.hash(environment)).toBe(await policiesOnly.hash(environment));
+      for (const workload of ['app-one', 'app-two']) {
+        expect(await index.workloadHash(environment, workload)).toBe(
+          await policiesOnly.workloadHash(environment, workload)
+        );
+      }
+    }
+  });
+
+  it('refuses any environment, identity, grant or secret, and registered other than true', () => {
+    const refused = 'does not match the registration schema';
+    for (const extra of [
+      'environments: [production]\n',
+      'identity:\n  kind: worker-binding\n',
+      'audiences: [gateway]\n',
+      "scopes: ['gateway:models.read']\n",
+      'dynamic: []\n',
+      'environmentGrants: {}\n',
+      'owner: someone\n',
+    ]) {
+      expectThrow({ 'app-two.yaml': `${registration}${extra}` }, refused);
+    }
+    expectThrow(
+      { 'app-two.yaml': registration.replace('secrets: []', 'secrets: [APP_TWO_SECRET]') },
+      refused
+    );
+    expectThrow({ 'app-two.yaml': registration.replace('secrets: []\n', '') }, refused);
+    expectThrow(
+      { 'app-two.yaml': registration.replace('registered: true', 'registered: false') },
+      refused
+    );
+    // A policy that also sets `registered` is read as a registration, so it is refused whole.
+    expectThrow({ 'app-one.yaml': `${valid}registered: true\n` }, refused);
+  });
+
+  it('rejects a file whose name is not its workload', () => {
+    expectThrow({ 'other.yaml': registration }, 'must be named app-two.yaml');
+  });
+
+  it('turns into a policy only by passing every policy check', () => {
+    const converted = valid.replaceAll('app-one', 'app-two').replace('APP_ONE', 'APP_TWO');
+    expect(loadPolicies({ 'app-two.yaml': converted }).get('production', 'app-two')).toMatchObject({
+      secrets: ['APP_TWO_SECRET'],
+    });
+    expectThrow(
+      { 'app-two.yaml': converted.replace('APP_TWO_SECRET', 'APP_TWO_SECRET_PROD') },
+      'carries an environment suffix'
+    );
+  });
+
+  it('refuses every shipped registration in every environment and keeps it out of the policies', () => {
+    const active = policyIndex.all().map(policy => policy.workload);
+    for (const workload of policyIndex.registered()) {
+      expect(active).not.toContain(workload);
+      expect(policyIndex.has(workload)).toBe(false);
+      for (const environment of ENVIRONMENTS) {
+        expect(policyFor(environment, workload)).toBeNull();
+        expect(
+          policyIndex.forEnvironment(environment).map(policy => policy.workload)
+        ).not.toContain(workload);
+        expect(policyIndex.snapshot(environment).map(entry => entry.workload)).not.toContain(
+          workload
+        );
+      }
+    }
+  });
+});
+
 describe('policy lease grants', () => {
   const grant = (name: string, max: number, fallback: number, active: number) =>
     `  - grant: ${name}\n    maxTtlSeconds: ${max}\n    defaultTtlSeconds: ${fallback}\n    maxActive: ${active}\n`;
@@ -1041,6 +1127,5 @@ scopes: ['gateway:models.read']
         secrets: [],
       });
     }
-    expect(policyIndex.has('kilo-mcp')).toBe(false);
   });
 });

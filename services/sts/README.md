@@ -420,6 +420,26 @@ Adding a file also means adding it to `src/policy/registry.ts`; the typed import
 `src/policy/index.ts` makes the two disagree at typecheck, and `test/repo/policy-files.test.ts`
 checks the directory itself.
 
+A registration file reserves a workload name before its policy exists. It holds exactly three
+fields, and the strict schema refuses any other field, any secret, and `registered` other than
+`true`:
+
+```yaml
+workload: cloud-agent-next
+registered: true
+secrets: []
+```
+
+A file that sets `registered` is always read as a registration. Its name must be `<workload>.yaml`
+and no policy may declare the same workload. The loader keeps registrations out of every read STS
+makes: `all`, `has`, `get`, `forEnvironment`, `snapshot`, `hash` and `workloadHash` answer as if the
+file did not exist. A registered name therefore matches no token, gets no bundle, refresher push or
+grant, is refused as `unknown_workload`, and changes no `policy.changed` event, stored snapshot or
+hash. `registered()` lists the names for the repository checks only. The workload's own change turns
+its file into a policy, and then every policy and Worker binding check applies, as for a new file;
+a config here that binds STS under a registered name still fails, because that name has no
+`worker-binding` policy.
+
 Token and secret grants (secrets of the Worker-binding workloads are in their files):
 
 | Workload | Audience: scopes | Secrets | STS environments |
@@ -429,16 +449,16 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
-| `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | none yet, so STS refuses it |
+| `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (the policy lists only `development`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
-is reserved: its policy (`worker-binding`, `props.caller` `kilo-mcp`, development first) lands once
-`services/kilo-mcp/wrangler.jsonc` binds STS, because the config check below refuses a
-`worker-binding` policy that no config here binds. Its local block must bind `sts-local`, the
-development STS: its `dev` block may only bind `sts-dev`, which STS does not deploy, so the binding
-goes in an `env.local` block named `kilo-mcp-local`, with `observability.traces.enabled: false` in
-every block.
+is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
+`kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the
+config check below refuses a `worker-binding` policy that no config here binds. Its local block
+must bind `sts-local`, the development STS: its `dev` block may only bind `sts-dev`, which STS does
+not deploy, so the binding goes in an `env.local` block named `kilo-mcp-local`, with
+`observability.traces.enabled: false` in every block.
 
 The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
 exists for the gateway's authenticated UTS HTTPS feed transport. It lists development only. Staging
@@ -461,6 +481,9 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+
+A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
+config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's

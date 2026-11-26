@@ -480,15 +480,14 @@ describe('policy audit stream', () => {
     expect(rows).toHaveLength(1);
     const event = JSON.parse(rows[0]);
     expect(event.type).toBe('ai.kilo.sts.policy.changed');
-    expect([...event.data.attributes.addedWorkloads].sort()).toEqual([
-      'ai-gateway',
-      'audit-relay',
-      'bouncer-watch',
-      'notifications',
-      'o11y',
-      'usage-ingest',
-      'web',
-    ]);
+    // Every active policy the refresher applies, and no registration: a workload that activates
+    // its own policy file changes this list without a change here.
+    const policies = RefresherDO.policies;
+    const active = policies.snapshot(config.environment).map(entry => entry.workload);
+    expect(active.length).toBeGreaterThan(0);
+    const added: string[] = event.data.attributes.addedWorkloads;
+    expect([...added].sort()).toEqual([...active].sort());
+    expect(added.filter(workload => policies.registered().includes(workload))).toEqual([]);
     expect(event.data.attributes.removedWorkloads).toEqual([]);
   });
 

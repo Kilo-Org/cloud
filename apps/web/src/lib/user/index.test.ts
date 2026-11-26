@@ -38,6 +38,7 @@ import {
   device_sessions,
   device_refresh_tokens,
   native_attested_keys,
+  user_sign_in_contexts,
   native_admission_challenges,
   stytch_fingerprints,
   kiloclaw_instances,
@@ -178,6 +179,7 @@ import {
   unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { recordSignInContext } from '@/lib/auth/sign-in-context';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
@@ -8336,6 +8338,46 @@ describe('User', () => {
           .where(eq(device_refresh_tokens.device_session_id, otherSession.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should delete sign-in contexts', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      for (const userId of [user.id, otherUser.id]) {
+        await recordSignInContext({
+          userId,
+          device: { kind: 'browser_cookie', secret: 'laptop' },
+          network: 'DE 203.0.0.0/16',
+        });
+      }
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db
+        .selectDistinct({ userId: user_sign_in_contexts.user_id })
+        .from(user_sign_in_contexts)
+        .where(inArray(user_sign_in_contexts.user_id, [user.id, otherUser.id]));
+      expect(remaining).toEqual([{ userId: otherUser.id }]);
+    });
+
+    it('a sign-in check after soft deletion writes no sign-in contexts', async () => {
+      const user = await insertTestUser();
+
+      await softDeleteUser(user.id);
+
+      await expect(
+        recordSignInContext({
+          userId: user.id,
+          device: { kind: 'browser_cookie', secret: 'laptop' },
+          network: 'DE 203.0.0.0/16',
+        })
+      ).resolves.toEqual({ kind: 'account_inactive' });
+      expect(
+        await db
+          .select({ kind: user_sign_in_contexts.kind })
+          .from(user_sign_in_contexts)
+          .where(eq(user_sign_in_contexts.user_id, user.id))
+      ).toEqual([]);
     });
 
     it('should delete native attested keys and admission challenges', async () => {

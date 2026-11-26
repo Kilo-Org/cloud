@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { SignJWT, exportJWK, generateKeyPair, type CryptoKey as JoseKey } from 'jose';
 import type { ServiceTokens } from '@kilocode/service-token-client';
 import { ServiceTokenError } from '@kilocode/service-token-client';
 import { createVerifier, failureResponse } from '@kilocode/verify';
-import type { StsCanaryReport } from '@kilocode/sts-contracts';
+import {
+  STS_CANARY_ROUTE_MAX_DURATION_SECONDS,
+  type StsCanaryReport,
+} from '@kilocode/sts-contracts';
 import { createStsCanaryHandler } from './sts-canary';
 
 // The canary handler against a real verifier on both sides: the STS key set is a local key, the
@@ -169,5 +174,42 @@ describe('STS canary route handler', () => {
     expect(report.outbound).toMatchObject({ result: 'failed', status: null });
     expect(report.negatives.wrongAudience).toEqual({ result: 'ok', status: 403 });
     expect(report.negatives.forged).toMatchObject({ result: 'failed', status: null });
+  });
+
+  it('never follows a redirect from usage-ingest: every call is manual and a 3xx fails its check', async () => {
+    const { fetchFn: verify } = usageIngest();
+    const redirects: (RequestRedirect | undefined)[] = [];
+    const fetchFn: typeof fetch = async (url, init) => {
+      redirects.push(init?.redirect);
+      // A host that redirects: followed, the token would reach the target, which verifies it.
+      if (init?.redirect === 'manual') {
+        return new Response(null, {
+          status: 308,
+          headers: { location: 'https://elsewhere.test/' },
+        });
+      }
+      return await verify(url, init);
+    };
+    const own = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
+    const response = await call(
+      handler(
+        fakeTokens(async () => own),
+        fetchFn
+      ),
+      await stsToken('usage-ingest', 'web', 'web:sts.canary')
+    );
+    const report = (await response.json()) as StsCanaryReport;
+    expect(redirects).toEqual(['manual', 'manual', 'manual']);
+    expect(report.outbound).toEqual({
+      result: 'failed',
+      status: 308,
+      detail: 'expected 204, refused a redirect',
+    });
+    expect(report.negatives.wrongAudience).toMatchObject({ result: 'failed', status: 308 });
+  });
+
+  it('keeps the route maxDuration equal to the budget usage-ingest waits under', () => {
+    const route = readFileSync(join(__dirname, '../app/api/internal/sts-canary/route.ts'), 'utf8');
+    expect(route).toContain(`export const maxDuration = ${STS_CANARY_ROUTE_MAX_DURATION_SECONDS};`);
   });
 });

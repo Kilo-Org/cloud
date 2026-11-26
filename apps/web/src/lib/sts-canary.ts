@@ -1,9 +1,13 @@
 import {
+  AccessTokenClaimsSchema,
   STS_CANARY_RUN_HEADER,
+  STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
   StsCanaryRunIdSchema,
   TOKEN_CLOCK_SKEW_SECONDS,
   USAGE_INGEST_CANARY_TOKEN,
   WEB_CANARY_TOKEN,
+  stsCanaryDetail,
+  stsCanaryPassed,
   type StsCanaryCheck,
   type StsCanaryReport,
 } from '@kilocode/sts-contracts';
@@ -28,27 +32,20 @@ export type StsCanaryDeps = {
   now?: () => number;
 };
 
-/** Each call to usage-ingest; it answers from memory once its key set is warm. */
-const VERIFY_CALL_TIMEOUT_MS = 10_000;
-
 type HeldToken = { token: string; exp: number };
 
-function base64urlJson(segment: string): unknown {
-  return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
-}
+const ExpClaimSchema = AccessTokenClaimsSchema.pick({ exp: true });
 
+/** The `exp` of a token STS issued to this instance, read without verifying it. */
 function expOf(token: string): number | null {
+  let claims: unknown;
   try {
-    const claims = base64urlJson(token.split('.')[1] ?? '');
-    return typeof claims === 'object' &&
-      claims !== null &&
-      'exp' in claims &&
-      typeof claims.exp === 'number'
-      ? claims.exp
-      : null;
+    claims = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
   } catch {
     return null;
   }
+  const parsed = ExpClaimSchema.safeParse(claims);
+  return parsed.success ? parsed.data.exp : null;
 }
 
 function log(level: 'info' | 'warn', fields: Record<string, unknown>): void {
@@ -68,12 +65,17 @@ export function createStsCanaryHandler(
    */
   let held: HeldToken | null = null;
 
+  /**
+   * The request carries an STS token, so a redirect is never followed: a 3xx is the status of a
+   * failed check.
+   */
   async function present(token: string, run: string): Promise<number | null> {
     try {
       const response = await fetchFn(deps.verifyUrl, {
         method: 'POST',
         headers: { authorization: `Bearer ${token}`, [STS_CANARY_RUN_HEADER]: run },
-        signal: AbortSignal.timeout(VERIFY_CALL_TIMEOUT_MS),
+        redirect: 'manual',
+        signal: AbortSignal.timeout(STS_CANARY_VERIFY_CALL_TIMEOUT_MS),
       });
       await response.body?.cancel();
       return response.status;
@@ -83,19 +85,27 @@ export function createStsCanaryHandler(
   }
 
   function check(status: number | null, expected: number): StsCanaryCheck {
-    return status === expected
-      ? { result: 'ok', status }
-      : { result: 'failed', status, detail: `expected ${expected}` };
+    if (status === expected) return { result: 'ok', status };
+    const redirected = status !== null && status >= 300 && status < 400;
+    return {
+      result: 'failed',
+      status,
+      detail: stsCanaryDetail(
+        redirected ? `expected ${expected}, refused a redirect` : `expected ${expected}`
+      ),
+    };
   }
 
   /** The same header and claims, signed by a key STS never held. */
   async function forge(token: string): Promise<string> {
-    forgeryKey ??= (
-      (await crypto.subtle.generateKey({ name: 'Ed25519' }, false, [
+    if (forgeryKey === null) {
+      const generated = await crypto.subtle.generateKey({ name: 'Ed25519' }, false, [
         'sign',
         'verify',
-      ])) as CryptoKeyPair
-    ).privateKey;
+      ]);
+      if (!('privateKey' in generated)) throw new Error('Ed25519 generateKey returned no key pair');
+      forgeryKey = generated.privateKey;
+    }
     const [header = '', payload = ''] = token.split('.');
     const signature = await crypto.subtle.sign(
       'Ed25519',
@@ -134,7 +144,7 @@ export function createStsCanaryHandler(
         error instanceof ServiceTokenError
           ? `mint ${error.reason}: ${error.deniedReason ?? `retry in ${error.retryAfterSeconds} s`}`
           : 'mint failed';
-      outbound = { result: 'failed', status: null, detail };
+      outbound = { result: 'failed', status: null, detail: stsCanaryDetail(detail) };
     }
 
     const authorization = request.headers.get('authorization') ?? '';
@@ -159,8 +169,13 @@ export function createStsCanaryHandler(
       outbound,
       negatives: { wrongAudience, forged, expired },
     };
-    log('info', {
+    // One line per run with every check and no token: the Vercel log drain carries it to Axiom,
+    // where the canary's monitors read `outcome` (services/usage-ingest README, "STS canary").
+    const passed = stsCanaryPassed(report);
+    log(passed ? 'info' : 'warn', {
       run,
+      step: 'report',
+      outcome: passed ? 'succeeded' : 'failed',
       caller: inbound.caller.kind === 'service' ? inbound.caller.workload : inbound.caller.kind,
       ...report,
     });

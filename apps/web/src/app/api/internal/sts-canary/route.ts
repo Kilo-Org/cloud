@@ -6,6 +6,7 @@ import { createHttpServiceTokens } from '@kilocode/service-token-client';
 import { vercelIdentity } from '@kilocode/service-token-client/vercel';
 import { createVerifier, httpJwksSource } from '@kilocode/verify';
 import { STS_URL, USAGE_INGEST_URL } from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { usageIngestSiblingUrl } from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
 import { createStsCanaryHandler } from '@/lib/sts-canary';
 
@@ -15,8 +16,9 @@ import { createStsCanaryHandler } from '@/lib/sts-canary';
  * with that token, never with the internal API secret.
  */
 
-// A cold Vercel wave can take up to 20 s to share the exchanged identity token, then one mint and
-// four calls to usage-ingest of at most 10 s each.
+// The slowest run is a 5 s key-set fetch, a 30 s mint attempt and four 10 s calls to usage-ingest,
+// 75 s; usage-ingest waits 80 s. `STS_CANARY_ROUTE_MAX_DURATION_SECONDS` in
+// `@kilocode/sts-contracts` states the arithmetic; Next.js needs the literal here.
 export const maxDuration = 90;
 
 let handler: ((request: Request) => Promise<Response>) | null = null;
@@ -26,7 +28,7 @@ let handler: ((request: Request) => Promise<Response>) | null = null;
  * tokens and the shared Vercel identity serve every later request. A missing or invalid setting
  * leaves it unbuilt and answers 503.
  */
-function canaryHandler(origin: string): ((request: Request) => Promise<Response>) | null {
+function canaryHandler(): ((request: Request) => Promise<Response>) | null {
   if (handler !== null) return handler;
   const verifyUrl = usageIngestSiblingUrl(USAGE_INGEST_URL, STS_CANARY_VERIFY_PATH);
   if (!STS_URL || verifyUrl === undefined) return null;
@@ -35,8 +37,9 @@ function canaryHandler(origin: string): ((request: Request) => Promise<Response>
     handler = createStsCanaryHandler({
       verifier: createVerifier({
         audience: 'web',
-        // RFC 9728 metadata URL of this app; it appears only in 401 challenges.
-        resourceMetadataUrl: `${origin}/.well-known/oauth-protected-resource`,
+        // RFC 9728 metadata URL of this app, from configuration, never from a request's Host; it
+        // appears only in 401 challenges.
+        resourceMetadataUrl: `${new URL(APP_URL).origin}/.well-known/oauth-protected-resource`,
         sts: { issuer: STS_URL, jwks: httpJwksSource(STS_URL) },
       }),
       tokens: createHttpServiceTokens({
@@ -60,7 +63,7 @@ function canaryHandler(origin: string): ((request: Request) => Promise<Response>
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const canary = canaryHandler(new URL(request.url).origin);
+  const canary = canaryHandler();
   if (canary === null) {
     return NextResponse.json(
       { error: 'sts canary is not configured: STS_URL and USAGE_INGEST_URL are required' },

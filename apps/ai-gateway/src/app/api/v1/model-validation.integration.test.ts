@@ -1,11 +1,17 @@
-import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import type {
+  RuntimeAuthorization,
+  RuntimeTokenDestination,
+  RuntimeTokens,
+} from '@kilocode/worker-utils/runtime-authorization-contract';
 const mockFetchSessionMetadata = jest.fn();
 const mockGetRuntimeToken = jest.fn();
 jest.mock('../../../../../../services/cloud-agent-next/src/session/metadata', () => ({
   fetchSessionMetadata: (...args: unknown[]) => mockFetchSessionMetadata(...args),
 }));
 jest.mock('../../../../../../services/cloud-agent-next/src/sandbox-session/session-stub', () => ({
-  getSandboxSessionStub: () => ({ getRuntimeToken: () => mockGetRuntimeToken() }),
+  getSandboxSessionStub: () => ({
+    getRuntimeToken: (destination?: RuntimeTokenDestination) => mockGetRuntimeToken(destination),
+  }),
 }));
 let currentHeaders = new Headers();
 const mockHeaders = jest.fn(() => currentHeaders);
@@ -50,8 +56,14 @@ import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { auto_routing_custom_routers } from '@kilocode/db/schema';
 
+// `withDORetry` logs a failed RPC through the logger itself, not `withFields`.
 jest.mock('../../../../../../services/cloud-agent-next/src/logger', () => ({
-  logger: { withFields: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
+  logger: {
+    withFields: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
 }));
 import jwt from 'jsonwebtoken';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -112,7 +124,11 @@ const { renewStoredRuntimeAuthorization } = jest.requireActual<{
     putAuthorization(authorization: RuntimeAuthorization): Promise<void>;
     getMetadata(): Promise<TestSessionMetadata>;
     putMetadata(metadata: TestSessionMetadata): Promise<void>;
-    renew(authorization: RuntimeAuthorization): Promise<{ token: string }>;
+    renew(
+      authorization: RuntimeAuthorization
+    ): Promise<{ tokens: RuntimeTokens; expiresAt: string }>;
+    audienceMode: 'combined' | 'per-destination';
+    destination: RuntimeTokenDestination | undefined;
   }): Promise<string | null>;
 }>('../../../../../../services/cloud-agent-next/src/session/runtime-authorization-persistence');
 
@@ -343,10 +359,17 @@ describe('cloud-agent model validation through real web authentication', () => {
         bindings: { userPepperDigest: 'a'.repeat(64), authorizationPepperDigest: 'a'.repeat(64) },
         source: { admissionSource: 'user' },
       };
-      const renew = jest.fn(async () => sign(new Date()));
+      // The production default `combined` issuance: one token for every destination.
+      const renew = jest.fn(async () => {
+        const { token, expiresAt } = await sign(new Date());
+        return {
+          tokens: { 'kilo-api': token, 'kilo-gateway': token, 'session-ingest': token },
+          expiresAt,
+        };
+      });
       mockFetchSessionMetadata.mockImplementation(async () => metadata);
       // Exercise the same persistence/renewal function used by the owning DO's RPC.
-      mockGetRuntimeToken.mockImplementation(() =>
+      mockGetRuntimeToken.mockImplementation((destination: RuntimeTokenDestination | undefined) =>
         renewStoredRuntimeAuthorization({
           metadata,
           getAuthorization: async () => record,
@@ -356,6 +379,8 @@ describe('cloud-agent model validation through real web authentication', () => {
             metadata = value;
           },
           renew,
+          audienceMode: 'combined',
+          destination,
         })
       );
       getDirectByokModelsForUser.mockResolvedValue([{ id: privateModel }]);
@@ -370,11 +395,17 @@ describe('cloud-agent model validation through real web authentication', () => {
         expect(renew).toHaveBeenCalledTimes(1);
         expect(getDirectByokModelsForUser).toHaveBeenCalledWith(user.id);
       } else {
-        await expect(validation).rejects.toThrow();
+        await expect(validation).rejects.toThrow(
+          state === 'revoked'
+            ? 'Runtime authorization has been revoked'
+            : 'Runtime authorization delegation has expired'
+        );
         expect(renew).not.toHaveBeenCalled();
         expect(global.fetch).not.toHaveBeenCalled();
       }
+      // A personal session's catalogue lives behind the gateway.
       expect(mockGetRuntimeToken).toHaveBeenCalledTimes(1);
+      expect(mockGetRuntimeToken).toHaveBeenCalledWith('kilo-gateway');
     }
   );
 

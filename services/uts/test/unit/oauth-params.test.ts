@@ -5,7 +5,7 @@ import {
   protectedResourceMetadataFor,
 } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
-import { identifyClient, isLoopbackRedirect } from '../../src/oauth/clients';
+import { clientServedIn, identifyClient, isRegisteredRedirect } from '../../src/oauth/clients';
 import {
   audiencesOfResources,
   paramsOf,
@@ -272,10 +272,14 @@ describe('request parameters', () => {
 });
 
 describe('clients', () => {
-  it('know the CLI as a desktop client and a metadata URL as a third-party client', () => {
+  it('know the CLI as a desktop client, the mobile app as a mobile client and a metadata URL as a third-party client', () => {
     expect(identifyClient('kilo-cli')).toMatchObject({
       kind: 'first_party',
-      client: { clientClass: 'desktop' },
+      client: { clientClass: 'desktop', deviceGrant: true },
+    });
+    expect(identifyClient('kilo-mobile')).toMatchObject({
+      kind: 'first_party',
+      client: { clientClass: 'mobile', deviceGrant: false },
     });
     expect(identifyClient('https://client.example.com/oauth/metadata.json')).toEqual({
       kind: 'third_party',
@@ -289,7 +293,7 @@ describe('clients', () => {
   it('allow the CLI any loopback port on its callback path, and nothing else', () => {
     const identity = identifyClient('kilo-cli');
     if (identity.kind !== 'first_party') throw new Error('kilo-cli is first-party');
-    const allowed = (uri: string) => isLoopbackRedirect(identity.client, uri);
+    const allowed = (uri: string) => isRegisteredRedirect(identity.client, uri);
     expect(allowed('http://127.0.0.1:4100/callback')).toBe(true);
     expect(allowed('http://[::1]:61000/callback')).toBe(true);
     expect(allowed('http://localhost:4100/callback')).toBe(false);
@@ -300,6 +304,28 @@ describe('clients', () => {
     expect(allowed('http://user@127.0.0.1:4100/callback')).toBe(false);
     expect(allowed('http://127.0.0.1:4100/a/../callback')).toBe(false);
     expect(allowed('not a url')).toBe(false);
+  });
+
+  it('allow the mobile app exactly its private-use-scheme redirect', () => {
+    const identity = identifyClient('kilo-mobile');
+    if (identity.kind !== 'first_party') throw new Error('kilo-mobile is first-party');
+    const allowed = (uri: string) => isRegisteredRedirect(identity.client, uri);
+    expect(allowed('com.kilocode.kiloapp:/oauth/callback')).toBe(true);
+    expect(allowed('com.kilocode.kiloapp://oauth/callback')).toBe(false);
+    expect(allowed('com.kilocode.kiloapp:/oauth/callback?x=1')).toBe(false);
+    expect(allowed('com.kilocode.kiloapp:/oauth/other')).toBe(false);
+    expect(allowed('kiloapp:/oauth/callback')).toBe(false);
+    expect(allowed('http://127.0.0.1:4100/callback')).toBe(false);
+  });
+
+  it('serve the mobile app, which needs device attestation, in development only', () => {
+    const mobile = identifyClient('kilo-mobile');
+    const cli = identifyClient('kilo-cli');
+    if (mobile.kind !== 'first_party' || cli.kind !== 'first_party') throw new Error('first-party');
+    expect(clientServedIn(mobile.client, 'development')).toBe(true);
+    expect(clientServedIn(mobile.client, 'staging')).toBe(false);
+    expect(clientServedIn(mobile.client, 'production')).toBe(false);
+    expect(clientServedIn(cli.client, 'production')).toBe(true);
   });
 });
 

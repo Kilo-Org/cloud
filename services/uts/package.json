@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev -c wrangler.dev.jsonc",
-    "test": "pnpm run test:workers && pnpm run test:repo",
+    "test": "pnpm run test:workers && pnpm run test:repo && pnpm run test:script",
     "test:workers": "vitest run",
     "test:repo": "vitest run --config vitest.node.config.ts --project repo",
+    "test:script": "vitest run --config vitest.node.config.ts --project script",
     "test:postgres": "vitest run --config vitest.node.config.ts --project db",
     "typecheck": "tsgo --noEmit",
     "db:up": "bash scripts/local-db.sh up",
@@ -20,6 +21,7 @@
     "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/uts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
+    "@simplewebauthn/server": "14.0.1",
     "jose": "catalog:",
     "pg": "8.23.1",
     "zod": "catalog:"
@@ -30,6 +32,7 @@
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
+    "playwright": "1.65.0",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

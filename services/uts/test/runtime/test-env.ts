@@ -5,6 +5,9 @@ import type {
   SignerKeysBinding,
 } from '@kilocode/uts-contracts';
 import { readConfig, type Env, type UtsConfig } from '../../src/env';
+import type { SignInMethods } from '../../src/signin/flows';
+import { readSignInConfig } from '../../src/signin/providers/config';
+import type { TicketRedeemer } from '../../src/tickets/redeemer';
 
 /**
  * The bindings `wrangler.test.jsonc` adds for the tests: the mint Worker's SignerKeys entrypoint
@@ -21,6 +24,8 @@ export type TestEnv = Env & {
   PROPLESS_PAT_LOOKUP: PatLookupBinding;
   FEED_READS: FeedReadsBinding;
   OTHER_READS: FeedReadsBinding;
+  TICKET_REDEEMER: Service<TicketRedeemer>;
+  OTHER_REDEEMER: Service<TicketRedeemer>;
 };
 
 // The runtime env is untyped here; this binds it to the bindings `wrangler.test.jsonc` declares
@@ -28,3 +33,13 @@ export type TestEnv = Env & {
 export const env = runtimeEnv as TestEnv;
 
 export const config: UtsConfig = readConfig(env);
+
+/** No provider, SSO or email sign-in: the deps of tests that reach none of them. */
+export const noSignInMethods: SignInMethods = {
+  config,
+  settings: readSignInConfig({}, config),
+  store: async () => {
+    throw new Error('unexpected sign-in method store call');
+  },
+  mailer: null,
+};

@@ -13,6 +13,8 @@
     "UTS_ENVIRONMENT": "development",
     "DO_JURISDICTION": "none",
     "PAT_LOOKUP_CONNECTIONS": "34",
+    "WEBAUTHN_RP_ID": "localhost",
+    "WEBAUTHN_ORIGINS": "http://localhost:8800",
   },
   "durable_objects": {
     "bindings": [
@@ -99,6 +101,20 @@
       "binding": "OTHER_READS",
       "service": "uts-test",
       "entrypoint": "FeedReads",
+      "props": { "caller": "o11y" },
+    },
+    // The TicketRedeemer entrypoint as the development redeemer binds it, and as a caller it
+    // refuses.
+    {
+      "binding": "TICKET_REDEEMER",
+      "service": "uts-test",
+      "entrypoint": "TicketRedeemer",
+      "props": { "caller": "uts-ticket-test" },
+    },
+    {
+      "binding": "OTHER_REDEEMER",
+      "service": "uts-test",
+      "entrypoint": "TicketRedeemer",
       "props": { "caller": "o11y" },
     },
   ],

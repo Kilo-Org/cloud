@@ -14,12 +14,17 @@ The issuer, key set URL and local ports of each environment live in
 ## Mint Worker
 
 - `GET /.well-known/oauth-authorization-server` serves RFC 8414 metadata: `issuer` and `jwks_uri`
-  (on the feed Worker) always; the token, revocation and introspection endpoints once the
-  environment binds the identity store (`IDENTITY_STORE`); the authorization endpoint and the code
-  grant once a sign-in hand-off is wired; the device grant once its hook is. An endpoint joins the
-  document when it answers, so no listed endpoint returns 404.
-- The OAuth endpoints (`src/oauth/`, see "OAuth endpoints") run in this fetch handler. Staging and
-  production bind no identity store yet, so they serve none of them.
+  (on the feed Worker) always; the authorization, token, revocation and introspection endpoints
+  once the environment binds the identity store (`IDENTITY_STORE`); the device grant once
+  `DEVICE_USER_CODE_KEY` is set. An endpoint joins the document when it answers, so no listed
+  endpoint returns 404.
+- The OAuth endpoints (`src/oauth/`, see "OAuth endpoints"), the sign-in pages and passkey calls
+  (`src/signin/`), the device grant (`src/signin/device/`) and ticket minting (`src/tickets/`) run
+  in this fetch handler. Staging and production bind no identity store yet, so they serve none of
+  them. Tickets are redeemed only through the `TicketRedeemer` entrypoint, by a caller listed in
+  `TICKET_REDEEMERS` (empty in staging and production).
+- The mobile app (`kilo-mobile`) needs device attestation (design 5.5), which UTS does not verify
+  yet, so the authorization endpoint serves it in development only.
 - Placement runs the fetch handler next to the identity store's primary in Frankfurt:
   `"placement": { "region": "aws:eu-central-1" }`, a Cloudflare placement hint
   (https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region), which
@@ -408,6 +413,148 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
   only), each desktop client to a loopback path, and each mobile client to one reverse-domain
   private-use URI and attestation.
 
+## Sign-in providers, SSO and email
+
+The sign-in page of an authorization request (and of `/device`, `/signin/passkeys` and
+`/signin/done`) offers the passkey, every configured provider, SSO and the email sign-in. Each
+provider, SSO or email sign-in ends in a browser session (`__Host-uts_session`, design 5.3) and
+returns to the page that offered it, so an authorization request then issues its code
+(`src/signin/handoff.ts`).
+
+The passkey's relying-party id is the app host (`WEBAUTHN_RP_ID`), so on the issuer host a passkey
+ceremony needs the browser's WebAuthn related-origin support (design 5.14). The page script
+(`src/signin/script.ts`) asks `PublicKeyCredential.getClientCapabilities()`, and treats a
+`SecurityError` from the ceremony the same way: without support, the passkey controls are hidden
+and the page says why and points to the other methods. The add-a-passkey page refuses in the same
+way, before it asks for a challenge when the browser has already answered. The passkey pages'
+`connect-src` names `https://<WEBAUTHN_RP_ID>/.well-known/webauthn`, the URL the browser fetches
+for the related-origin check.
+
+| Route | Behaviour | SQL |
+|---|---|---|
+| `GET /signin/oauth/<provider>/start` | Stores the flow (`state` hash, binder hash, return path) and redirects to the provider; `intent=link&gate_pass=<id>` adds the method to the signed-in account instead | `uts.start_sign_in_flow` |
+| `GET /signin/oauth/<provider>/callback` (`POST` for Apple, `form_post`) | Exchanges the code, checks the identity, then consumes the flow and signs in or links | `uts.complete_provider_sign_in` |
+| `POST /signin/sso/start` | The address's domain picks the org's one active WorkOS connection | `uts.start_sign_in_flow` |
+| `GET /signin/sso/callback` | Buys the WorkOS profile; its connection and domain must be the flow's | `uts.complete_provider_sign_in` |
+| `POST /signin/email/start` | Stores the email (link hash, keyed code hash), then sends it through the mail port | `uts.start_email_sign_in` |
+| `POST /signin/email/code` | Checks the newest code for the address; the fifth wrong entry exhausts it | `uts.verify_email_code` |
+| `GET /signin/email/link` | A confirmation page only, so a mail scanner changes nothing | none |
+| `POST /signin/email/link` | Signs in with the link, once | `uts.complete_email_link` |
+
+Every provider callback makes one SQL statement, after the provider calls. A flow's `state` and
+binder are 32 random bytes each; the identity store keeps only their SHA-256, and the binder lives
+in a `__Host-uts_flow_<16 hex>` cookie (`SameSite=None`, because Apple posts the callback from its
+own site) of the browser that started the flow. The PKCE verifier and the OpenID Connect nonce are
+HMAC-SHA-256 values of the binder (`src/signin/flows.ts`), so no flow secret is stored. The sign-in
+forms post only from the issuer's own pages (`Origin`), so another site cannot sign a visitor into
+an account it chose.
+
+### Protocols
+
+The endpoints are fixed in `src/signin/providers/specs.ts`, checked against each provider's
+OpenID Connect discovery document or API reference; nothing is discovered per request. An ID
+token is verified against the provider's key set (signature, `iss`, `aud`, `exp`, `iat` and the
+flow's `nonce`); `jose` keeps each key set per isolate for 10 minutes (`cacheMaxAge`) and
+refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`).
+
+| Provider | Protocol | PKCE | Client authentication | Scopes | Proof of the address |
+|---|---|---|---|---|---|
+| Google | OpenID Connect | S256 | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
+| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | `client_secret_basic` | `openid profile email` | `email_verified` |
+| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
+| Anaconda | OpenID Connect | S256 | `client_secret_post` | `openid profile email` | `email_verified` |
+| Apple | OpenID Connect, `response_mode=form_post` | none offered | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
+| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
+| GitLab | OpenID Connect | S256 | `client_secret_post` | `openid email` | `email_verified` |
+| Discord | OAuth 2; `/users/@me` | S256 | `client_secret_post` | `identify email` | `verified` |
+| LinkedIn | OpenID Connect | none offered | `client_secret_post` | `openid profile email` | `email_verified` |
+| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
+
+### Accounts and linking (design 5.2)
+
+- A known method signs in to its account. A blocked account, or an account whose address is in a
+  verified domain of an org that requires SSO (for any method but SSO, passkeys included: 0009
+  redefines `uts.complete_passkey_sign_in()`), is refused.
+- A new method links to an existing account only when the provider proves the address and exactly
+  one account holds it as its primary email, or inside a browser session of the account with an
+  open tier A `method_add` pass of that session, which the link consumes and the method's row
+  keeps. Any other new method on an existing address is refused (`link_required`): the user signs
+  in with a method the account has and links the new one.
+- SSO accepts a profile only of the flow's connection and in a domain that connection's org
+  verified, and outside a domain whose org requires SSO it never links by email. Inside such a
+  domain every other method is refused, so SSO settles onto the one account that holds the
+  address (`linkedBy: sso_required_domain`, with a notice): otherwise a member whose account
+  existed before the org required SSO would be locked out (Q48 notices).
+- A new account needs a proven address, so nobody can create an account under an address they do
+  not control and wait for its owner to sign in. An SSO profile counts as proven by its domain.
+  Its id is `uts_` and 26 lower-case base32 characters of 128 random bits, a form no app user id
+  has, so accounts imported from the app keep their ids.
+- Settling a new method takes a transaction-scoped advisory lock on the address first, so two
+  first sign-ins of one address settle one after the other and only one account results.
+- A refusal that names an account writes at most one denied row per account per minute; a link
+  writes `ai.kilo.uts.sign_in_method.linked` and an in-app notice.
+- A provider or SSO callback that comes back with `error` (the user cancelled) clears the flow's
+  binder cookie; the flow row expires unused.
+- The SSO start is a form post; it answers with a page that navigates to WorkOS (`continuePage`)
+  instead of a redirect, because a browser applies the page's `form-action` to every redirect of a
+  form submission, and WorkOS redirects on to the org's identity provider.
+
+Email: one email carries a link and, unless codes are stopped for the address, a six-digit code;
+both live 10 minutes. Only the newest code of an address counts: a new email exhausts every
+earlier pending code (their links keep working). The fifth wrong code entry exhausts the code
+(each wrong entry writes a denied row when the address has an account), but the email's link
+keeps working, so wrong entries by someone else cannot lock the owner out. At most 5 codes per
+address per hour; past that cap codes stop for 1 hour. The 20th wrong entry in a day stops codes
+until that day window ends, exhausts every pending code, and gives the account a notice; while
+codes are stopped every code entry is refused (`codes_stopped`). The link page names the address
+(`p…@example.com`). The email start sets a binder cookie, like a flow's; a link opened in a browser
+without it says so and signs in only after a second confirmation, so a link someone else asked
+for cannot sign the reader into that person's account in one click. The address and the code are
+stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`. Deployed Workers wire no mail sender
+yet (`src/signin/email/mailer.ts`), so the email sign-in is offered only where one is wired; the
+development entry records each message (`GET /__dev/mail?to=`).
+
+Open items before deploy:
+
+- The provider, SSO and email sign-in starts are anonymous sign-in writes (`src/signin/limits.ts`):
+  per isolate, 10 a minute per IPv4 address or IPv6 /48, shared with passkey challenges and device
+  authorizations, and SSO starts 60 a minute in their own window, because an org's staff often
+  share one egress address. A refused start answers the sign-in page's message page with 429 and
+  `Retry-After`.
+- Before a mail sender is wired: past the code cap every sign-in email still carries the link, so
+  an address can be sent many emails. Wiring a sender needs first a Turnstile check on the email
+  start form (its secret is production configuration) and a per-network counter of wrong email
+  code entries (the per-address counter alone lets one network guess across many addresses). A
+  total cap per address is not used, because anyone could then spend the owner's emails and lock
+  the owner out.
+- The UTS cron (slice 3.9) must call `uts.maintain_provider_sign_in_rows()` beside
+  `uts.maintain_sign_in_rows()` before any environment offers these methods; without it flow and
+  email rows grow without bound.
+
+### Configuration
+
+A method is offered only when every value it needs is set; with some set and others missing it is
+not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only).
+
+| Method | Vars | Secrets |
+|---|---|---|
+| Google, OpenAI, Anaconda, GitHub, GitLab, Discord, LinkedIn | `SIGNIN_<PROVIDER>_CLIENT_ID` | `SIGNIN_<PROVIDER>_CLIENT_SECRET` |
+| Apple | `SIGNIN_APPLE_CLIENT_ID` (services id), `SIGNIN_APPLE_TEAM_ID`, `SIGNIN_APPLE_KEY_ID` | `SIGNIN_APPLE_PRIVATE_KEY` (P-256, PKCS #8 PEM) |
+| Anthropic | `SIGNIN_ANTHROPIC_CLIENT_ID`, `SIGNIN_ANTHROPIC_ASSERTION_{AUDIENCE,ISSUER,SUBJECT,KEY_ID}` | `SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY` (P-256) |
+| WorkOS SSO | `SIGNIN_WORKOS_CLIENT_ID` | `SIGNIN_WORKOS_API_KEY` |
+| Email | none | `SIGNIN_EMAIL_HASH_KEY` (32 bytes, base64url) |
+
+`SIGNIN_DEV_ENDPOINTS` (development only, loopback URLs only) points providers at local
+stand-ins. Each registration lists the callback of its environment's issuer:
+`https://uts-staging.kiloapps.io/signin/oauth/<provider>/callback` and
+`https://uts-staging.kiloapps.io/signin/sso/callback` for staging, `https://uts.kiloapps.io/...`
+for production.
+
+`scripts/provider-signin-e2e.ts` runs the whole surface locally against `wrangler dev --env local`
+and three stand-in providers it serves itself (OpenID Connect, GitHub-style, WorkOS-style): sign-in
+-> code -> token for each, Apple's `form_post`, the email lock, the linking refusals, and a check
+that no audit row names a token, a code or an address.
+
 ## Tests
 
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
@@ -425,7 +572,9 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
   the feed ledger.
 - `pnpm test:repo`: the repository config check and the scope registry check (`test/repo`), with
   no database.
-- `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
+- `pnpm test:script`: the sign-in pages' browser script (`test/script`), run against the rendered
+  pages in a fresh `node:vm` context with stand-ins for the DOM, `fetch` and WebAuthn.
+- `pnpm test` runs all three; none needs Postgres. `pnpm test:postgres` runs the identity store
   tests (`test/db`, see "Local database and tests"), the OAuth grant functions, the DPoP `jti`
   check and the account functions (gates, PATs, bot keys, member removal) included.
 
@@ -517,6 +666,15 @@ production sets 32 (cap 96), the PAT config's 20 percent of `max_connections` 16
 config's connection limit changes the var in the same deploy. Staging and production refuse to
 start without a valid var; development may leave it out (cap 100).
 
+### Provisioning per environment
+
+| Setting | Kind | Value |
+|---|---|---|
+| `IDENTITY_STORE` | Hyperdrive binding | The identity store's primary config (design 5.2); unset, no OAuth or sign-in endpoint is served |
+| `WEBAUTHN_RP_ID` | var | The app host whose passkeys users hold: `app.kilo.ai`, `staging-app.kilo.ai` |
+| `WEBAUTHN_ORIGINS` | var | The issuer origin; the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
+| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset, the device grant is not served. Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
+
 ## Identity store
 
 UTS keeps its credential state in a dedicated Postgres database, the identity store. Only UTS binds
@@ -546,7 +704,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations. Holds the privileges of every UTS login (no SET), so `uts.end_long_transactions()` can end their sessions |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, account API, audit relay | DML on the ungated credential tables; on gated rows (CI trust policies, third-party consents, device approvals) SELECT, DELETE and UPDATE of lifecycle columns only; PATs, org bot keys and gate passes SELECT only, written only through the account functions (migration 0005); codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()` and `uts.end_long_transactions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, account API, audit relay | DML on the ungated credential tables; on gated rows (CI trust policies, third-party consents) SELECT, DELETE and UPDATE of lifecycle columns only; PATs, org bot keys and gate passes SELECT only, written only through the account functions (migration 0005); codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, and passkeys, browser sessions, step-ups, device codes, tickets, WebAuthn challenges, sign-in methods, email codes and wrong user-code counts only through the sign-in functions (migration 0008), keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()`, `uts.maintain_provider_sign_in_rows()` and `uts.end_long_transactions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -813,6 +971,22 @@ At one mint per active client every 8 minutes, the DPoP rows arrive at 21, 104 a
 for 10k, 50k and 200k clients: 1,250, 6,250 and 25,000 per minute; in a steady state tombstones
 age out at the rate they arrive, at most the same per third-party family, so a cron that runs
 every minute makes 1 to 5 calls.
+
+`uts.maintain_sign_in_rows()` (migration 0008) does the same for the sign-in rows, on the same
+terms (5,000 per kind per call, no input, time-gated, `uts_app`), and the minute cron calls it
+beside `uts.maintain_oauth_rows()`, with `uts.maintain_provider_sign_in_rows()` (migration 0009):
+
+| Rows | When | Why that is safe |
+|---|---|---|
+| `webauthn_challenges`, `device_codes`, `tickets`, `step_ups` | 1 hour past their lifetime (5 minutes, 10 minutes, 60 seconds, 10 minutes), used or not | No statement accepts them after their lifetime |
+| `account_user_code_failures`, `network_user_code_failures` | 1 hour after the window's first wrong code | The next wrong code after the hour starts a new window anyway |
+| `browser_sessions` | 1 day after the session ended (idle end, absolute end or revocation), unless a row still refers to one of its gate passes (a passkey, PAT, bot key, CI trust policy, third-party consent or device code); cascades to its challenges, codes, step-ups and passes | An ended session never answers again; a credential's foreign key would refuse the cascade, so only such a session stays, one per credential. A pass nothing refers to, such as a device approval's once its code is deleted, keeps nothing. A kept session gets `cleanup_kept_at` and is looked at again a day later, so a call reads about a 1,440th of the kept sessions rather than all of them |
+
+Row growth: with one sign-in per active client per 14 days, a session lives at most 31 days, so
+about 2.2 session rows (about 300 bytes each) per client: 7 MB at 10k clients, 33 MB at 50k and
+132 MB at 200k. The short-lived rows hold their rate times about 70 minutes, far less; a wrong
+user-code count holds one row per account or client network that entered a wrong code in the last
+2 hours.
 
 ### Third-party reuse detection
 

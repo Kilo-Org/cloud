@@ -1,6 +1,7 @@
 import {
   type AuthorizationServerMetadata,
   UTS_AUTHORIZE_PATH,
+  UTS_DEVICE_AUTHORIZATION_PATH,
   UTS_DPOP_ALGORITHMS,
   UTS_GRANT_TYPES,
   UTS_INTROSPECT_PATH,
@@ -12,10 +13,10 @@ import type { OAuthService } from '../oauth/routes';
 
 /**
  * RFC 8414 metadata for the issuer. It lists only what answers: the issuer and the key set on the
- * feed Worker always; the token, revocation and introspection endpoints once the identity store is
- * bound; the authorization endpoint and the code grant once a sign-in hand-off is wired, and the
- * device grant once its hook is. Without `grant_types_supported`, a reader would assume
- * `authorization_code` and `implicit`.
+ * feed Worker always; the authorization, token, revocation and introspection endpoints once the
+ * identity store is bound; and the device grant (RFC 8628 section 4) once its user-code secret is
+ * set. Without `grant_types_supported`, a reader would assume `authorization_code` and
+ * `implicit`.
  */
 export function authorizationServerMetadata(
   config: UtsConfig,
@@ -29,18 +30,21 @@ export function authorizationServerMetadata(
     return { ...base, response_types_supported: [], grant_types_supported: [] };
   }
   const { issuer } = config.endpoints;
-  const authorize = oauth.deps.handoff !== null;
+  const device = oauth.deps.device !== null;
   return {
     ...base,
-    ...(authorize ? { authorization_endpoint: `${issuer}${UTS_AUTHORIZE_PATH}` } : {}),
+    authorization_endpoint: `${issuer}${UTS_AUTHORIZE_PATH}`,
     token_endpoint: `${issuer}${UTS_TOKEN_PATH}`,
     revocation_endpoint: `${issuer}${UTS_REVOKE_PATH}`,
     introspection_endpoint: `${issuer}${UTS_INTROSPECT_PATH}`,
-    response_types_supported: authorize ? ['code'] : [],
+    ...(device
+      ? { device_authorization_endpoint: `${issuer}${UTS_DEVICE_AUTHORIZATION_PATH}` }
+      : {}),
+    response_types_supported: ['code'],
     grant_types_supported: [
-      ...(authorize ? [UTS_GRANT_TYPES.authorizationCode] : []),
+      UTS_GRANT_TYPES.authorizationCode,
       UTS_GRANT_TYPES.refreshToken,
-      ...(oauth.deps.deviceCodeGrant === null ? [] : [UTS_GRANT_TYPES.deviceCode]),
+      ...(device ? [UTS_GRANT_TYPES.deviceCode] : []),
     ],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],

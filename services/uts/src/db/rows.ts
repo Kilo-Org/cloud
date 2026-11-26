@@ -44,6 +44,7 @@ export const AccountRowSchema = z.strictObject({
   event_version: z.bigint(),
   created_at: timestamp,
   updated_at: timestamp,
+  sign_in_denied_audited_at: timestamp.nullable(),
 });
 
 export const SsoConnectionRowSchema = z.strictObject({
@@ -91,6 +92,8 @@ export const SignInMethodRowSchema = z.strictObject({
   sso_connection_id: uuid.nullable(),
   added_at: timestamp,
   last_used_at: timestamp.nullable(),
+  gate_pass_id: uuid.nullable(),
+  gate_pass_action: z.enum(enums.GATED_ACTIONS),
 });
 
 export const PasskeyCredentialRowSchema = z.strictObject({
@@ -107,6 +110,10 @@ export const PasskeyCredentialRowSchema = z.strictObject({
   name: z.string(),
   added_at: timestamp,
   last_used_at: timestamp.nullable(),
+  user_handle: bytes,
+  gate_pass_id: uuid,
+  gate_pass_action: z.enum(enums.GATED_ACTIONS),
+  denied_audited_at: timestamp.nullable(),
 });
 
 export const BrowserSessionRowSchema = z.strictObject({
@@ -124,6 +131,8 @@ export const BrowserSessionRowSchema = z.strictObject({
   status: z.enum(enums.SESSION_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  denied_audited_at: timestamp.nullable(),
+  cleanup_kept_at: timestamp.nullable(),
 });
 
 export const DeviceSessionRowSchema = z.strictObject({
@@ -284,6 +293,11 @@ export const DeviceCodeRowSchema = z.strictObject({
   approved_at: timestamp.nullable(),
   denied_at: timestamp.nullable(),
   consumed_at: timestamp.nullable(),
+  auth_time: timestamp.nullable(),
+  amr: amr.nullable(),
+  grant_id: uuid.nullable(),
+  dpop_jkt: sha256.nullable(),
+  anonymous_writer: z.string().nullable(),
 });
 
 export const EmailCodeRowSchema = z.strictObject({
@@ -291,13 +305,17 @@ export const EmailCodeRowSchema = z.strictObject({
   purpose: z.enum(enums.EMAIL_CODE_PURPOSES),
   email_hash: sha256,
   account_id: z.string().nullable(),
-  code_hash: sha256,
+  code_hash: sha256.nullable(),
   attempts: z.number().int(),
   created_at: timestamp,
   expires_at: timestamp,
   status: z.enum(enums.EMAIL_CODE_STATUSES),
   consumed_at: timestamp.nullable(),
   address: z.enum(enums.EMAIL_CODE_ADDRESSES).nullable(),
+  email: z.string().nullable(),
+  link_hash: sha256.nullable(),
+  return_to: z.string().nullable(),
+  binder_hash: sha256.nullable(),
 });
 
 export const EmailCodeLimitRowSchema = z.strictObject({
@@ -321,6 +339,50 @@ export const TicketRowSchema = z.strictObject({
   expires_at: timestamp,
   status: z.enum(enums.CODE_STATUSES),
   consumed_at: timestamp.nullable(),
+  grant_id: uuid,
+  client_id: z.string(),
+  org_id: uuid.nullable(),
+  denied_audited_at: timestamp.nullable(),
+});
+
+export const WebauthnChallengeRowSchema = z.strictObject({
+  challenge_hash: sha256,
+  ceremony: z.enum(enums.WEBAUTHN_CEREMONIES),
+  rp_id: z.string(),
+  account_id: z.string().nullable(),
+  browser_session_id: uuid.nullable(),
+  user_handle: bytes.nullable(),
+  created_at: timestamp,
+  expires_at: timestamp,
+  status: z.enum(enums.CODE_STATUSES),
+  consumed_at: timestamp.nullable(),
+});
+
+export const SignInFlowRowSchema = z.strictObject({
+  state_hash: sha256,
+  provider: z.enum(enums.SIGN_IN_PROVIDERS),
+  binder_hash: sha256,
+  intent: z.enum(enums.SIGN_IN_INTENTS),
+  link_session_id: uuid.nullable(),
+  gate_pass_id: uuid.nullable(),
+  sso_connection_id: uuid.nullable(),
+  return_to: z.string(),
+  created_at: timestamp,
+  expires_at: timestamp,
+  status: z.enum(enums.CODE_STATUSES),
+  consumed_at: timestamp.nullable(),
+});
+
+export const AccountUserCodeFailureRowSchema = z.strictObject({
+  account_id: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
+});
+
+export const NetworkUserCodeFailureRowSchema = z.strictObject({
+  client_network: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
 });
 
 export const PersonalAccessTokenRowSchema = z.strictObject({
@@ -470,6 +532,10 @@ export const IDENTITY_STORE_TABLES = {
   email_codes: EmailCodeRowSchema,
   email_code_limits: EmailCodeLimitRowSchema,
   tickets: TicketRowSchema,
+  webauthn_challenges: WebauthnChallengeRowSchema,
+  sign_in_flows: SignInFlowRowSchema,
+  account_user_code_failures: AccountUserCodeFailureRowSchema,
+  network_user_code_failures: NetworkUserCodeFailureRowSchema,
   personal_access_tokens: PersonalAccessTokenRowSchema,
   org_bot_keys: OrgBotKeyRowSchema,
   ci_trust_policies: CiTrustPolicyRowSchema,

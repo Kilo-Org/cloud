@@ -111,6 +111,8 @@ export const NOTICE_KINDS = [
 ] as const;
 export const NOTICE_CHANNELS = ['push', 'email', 'in_app'] as const;
 export const NOTICE_DELIVERIES = ['pending', 'delivered', 'failed'] as const;
+export const SIGN_IN_INTENTS = ['sign_in', 'link'] as const;
+export const WEBAUTHN_CEREMONIES = ['registration', 'sign_in', 'step_up'] as const;
 
 /** Each enum by its type name in the `uts` schema. */
 export const IDENTITY_STORE_ENUMS = {
@@ -147,4 +149,6 @@ export const IDENTITY_STORE_ENUMS = {
   notice_kind: NOTICE_KINDS,
   notice_channel: NOTICE_CHANNELS,
   notice_delivery: NOTICE_DELIVERIES,
+  webauthn_ceremony: WEBAUTHN_CEREMONIES,
+  sign_in_intent: SIGN_IN_INTENTS,
 } as const;

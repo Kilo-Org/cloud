@@ -12,6 +12,7 @@ export { UtsSignerDO } from './dos/UtsSignerDO';
 export { FeedReads } from './feed/reads';
 export { PatLookup } from './pat/entrypoint';
 export { SignerKeys } from './signer-keys';
+export { TicketRedeemer } from './tickets/redeemer';
 
 import { handleDevRequest } from './dev';
 import type { Env } from './env';

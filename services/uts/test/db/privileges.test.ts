@@ -19,7 +19,8 @@ const INSUFFICIENT_PRIVILEGE = '42501';
 
 /**
  * Tables the app login writes only through security-definer functions: the OAuth grant functions
- * (migration 0004) and the account functions (migration 0005).
+ * (migration 0004), the account functions (migration 0005) and the sign-in functions (migration
+ * 0008).
  */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
@@ -33,7 +34,21 @@ const FUNCTION_WRITTEN_TABLES = [
   'personal_access_tokens',
   'org_bot_keys',
   'gate_passes',
+  'passkey_credentials',
+  'browser_sessions',
+  'step_ups',
+  'device_codes',
+  'tickets',
+  'webauthn_challenges',
+  'sign_in_methods',
+  'email_codes',
+  'email_code_limits',
+  'account_user_code_failures',
+  'network_user_code_failures',
 ];
+
+/** Tables the app login cannot even read: only the sign-in functions reach them. */
+const FUNCTION_ONLY_TABLES = ['sign_in_flows'];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
 const UPDATE_COLUMN: Partial<Record<string, string>> = {
@@ -41,6 +56,12 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   third_party_rotated_tokens: 'family_id',
   revocations: 'kind',
   dpop_proofs: 'jti',
+  passkey_credentials: 'name',
+  step_ups: 'purpose',
+  sign_in_methods: 'provider',
+  email_code_limits: 'sent_in_hour',
+  account_user_code_failures: 'failures',
+  network_user_code_failures: 'failures',
 };
 
 let db: TestDatabase;
@@ -202,12 +223,11 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
   it('reads and writes the ungated credential tables', async () => {
     const app = await db.connect(login);
     const accountId = await insertAccount(app);
-    const sessionId = await insertBrowserSession(app, accountId);
+    // Browser sessions, PATs and gate passes change only through the sign-in and account
+    // functions (migrations 0005 and 0008); a notice is a table the app login still writes.
     const result = await app.query(
-      `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now(),
-         revoke_reason = 'sign_out'
-       WHERE id = $1`,
-      [sessionId]
+      `INSERT INTO uts.notices (account_id, kind) VALUES ($1, 'sessions_revoked') RETURNING id`,
+      [accountId]
     );
     expect(result.rowCount).toBe(1);
   });
@@ -256,7 +276,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     ).toBe('23514');
   });
 
-  it('runs OAuth row maintenance', async () => {
+  it('runs OAuth and sign-in row maintenance', async () => {
     const app = await db.connect(login);
     const maintenance = await app.query<{ kind: string }>(
       'SELECT kind FROM uts.maintain_oauth_rows()'
@@ -268,6 +288,18 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
       'third_party_rotated_tokens',
       'revocations',
       'dpop_proofs',
+    ]);
+    const signIn = await app.query<{ kind: string }>(
+      'SELECT kind FROM uts.maintain_sign_in_rows()'
+    );
+    expect(signIn.rows.map(row => row.kind)).toEqual([
+      'webauthn_challenges',
+      'device_codes',
+      'tickets',
+      'step_ups',
+      'account_user_code_failures',
+      'network_user_code_failures',
+      'browser_sessions',
     ]);
   });
 
@@ -381,6 +413,18 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
       `SELECT uts.write_audit_event('development', 'ai.kilo.uts.test', 6003, 1, 'success', NULL, 'a', '{}')`,
     ],
     ['read a grant through the hot-path read', `SELECT * FROM uts.read_refresh_grant('\\x00')`],
+    [
+      'read a session without the sign-in functions',
+      `SELECT * FROM uts.live_browser_session('\\x00')`,
+    ],
+    [
+      'move a passkey counter without the sign-in functions',
+      `SELECT uts.use_passkey(gen_random_uuid(), NULL, 0, 1, false)`,
+    ],
+    [
+      'open a gate refusal row without the sign-in functions',
+      `SELECT uts.audit_session_gate_refusal('development', 'a', gen_random_uuid(), 'device_approve', 'x')`,
+    ],
   ])('cannot %s', async (_name, statement) => {
     const app = await db.connect(login);
     expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
@@ -578,7 +622,10 @@ describe('table privileges', () => {
     ];
     const credentialTables = Object.keys(IDENTITY_STORE_TABLES).filter(
       table =>
-        table !== 'audit_events' && table !== 'audit_relay_watermarks' && !(table in gatedUpdates)
+        table !== 'audit_events' &&
+        table !== 'audit_relay_watermarks' &&
+        !(table in gatedUpdates) &&
+        !FUNCTION_ONLY_TABLES.includes(table)
     );
     const views = await admin.query<{ relname: string }>(
       `SELECT relname FROM pg_class WHERE relnamespace = 'uts_read'::regnamespace AND relkind = 'v'`
@@ -633,16 +680,25 @@ describe('functions', () => {
     );
     expect(result.rows).toEqual([
       { routine: 'advance_audit_watermark', grantee: 'uts_app' },
+      { routine: 'complete_email_link', grantee: 'uts_app' },
+      { routine: 'complete_passkey_sign_in', grantee: 'uts_app' },
+      { routine: 'complete_passkey_step_up', grantee: 'uts_app' },
+      { routine: 'complete_provider_sign_in', grantee: 'uts_app' },
       { routine: 'create_bot_key', grantee: 'uts_app' },
+      { routine: 'create_device_code', grantee: 'uts_app' },
       { routine: 'create_pat', grantee: 'uts_app' },
+      { routine: 'create_webauthn_challenge', grantee: 'uts_app' },
+      { routine: 'decide_device_code', grantee: 'uts_app' },
       { routine: 'end_long_transactions', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'exchange_device_code', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
       { routine: 'is_scope_set', grantee: 'uts_app' },
       { routine: 'issue_authorization_code', grantee: 'uts_app' },
+      { routine: 'issue_ticket', grantee: 'uts_app' },
       { routine: 'keep_bot_key', grantee: 'uts_app' },
       { routine: 'list_bot_keys', grantee: 'uts_app' },
       { routine: 'list_pats', grantee: 'uts_app' },
@@ -650,13 +706,24 @@ describe('functions', () => {
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
+      { routine: 'maintain_provider_sign_in_rows', grantee: 'uts_app' },
+      { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
+      { routine: 'read_browser_session', grantee: 'uts_app' },
+      { routine: 'read_device_code', grantee: 'uts_app' },
+      { routine: 'read_passkey_assertion', grantee: 'uts_app' },
+      { routine: 'record_passkey_failure', grantee: 'uts_app' },
+      { routine: 'redeem_ticket', grantee: 'uts_app' },
       { routine: 'refresh_first_party', grantee: 'uts_app' },
       { routine: 'refresh_third_party', grantee: 'uts_app' },
+      { routine: 'register_passkey', grantee: 'uts_app' },
       { routine: 'remove_org_member', grantee: 'uts_app' },
       { routine: 'revoke_bot_key', grantee: 'uts_app' },
       { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
+      { routine: 'start_email_sign_in', grantee: 'uts_app' },
+      { routine: 'start_sign_in_flow', grantee: 'uts_app' },
+      { routine: 'verify_email_code', grantee: 'uts_app' },
     ]);
   });
 });

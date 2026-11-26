@@ -3791,6 +3791,9 @@ importers:
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
+      '@simplewebauthn/server':
+        specifier: 14.0.1
+        version: 14.0.1
       jose:
         specifier: 'catalog:'
         version: 6.2.17
@@ -3816,6 +3819,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
+      playwright:
+        specifier: 1.65.0
+        version: 1.65.0
       tsx:
         specifier: 'catalog:'
         version: 4.23.15

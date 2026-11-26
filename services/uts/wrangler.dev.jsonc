@@ -28,6 +28,9 @@
     // workerd enforces no data residency, so local development keeps objects unscoped.
     "DO_JURISDICTION": "none",
     "PAT_LOOKUP_CONNECTIONS": "34",
+    // A run on another port names its origin with `--var WEBAUTHN_ORIGINS:<origin>`.
+    "WEBAUTHN_RP_ID": "localhost",
+    "WEBAUTHN_ORIGINS": "http://localhost:8800",
   },
   "durable_objects": {
     "bindings": [

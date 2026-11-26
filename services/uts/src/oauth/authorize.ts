@@ -9,7 +9,13 @@ import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
 import { type ScopeRegistry, clientScopeRefusal, orgScopeRefusal } from '../scopes/policy';
 import { randomCredential, sha256 } from '../token/credentials';
-import { type FirstPartyClient, identifyClient, isLoopbackRedirect } from './clients';
+import {
+  type FirstPartyClient,
+  type RedirectRule,
+  identifyClient,
+  clientServedIn,
+  isRegisteredRedirect,
+} from './clients';
 import { jktOfParameter } from './dpop';
 import { classifyFailure, failureResponse, oauthError } from './errors';
 import { audiencesOfResources, paramsOf, parseScopes, targetMismatch } from './params';
@@ -20,7 +26,8 @@ import { CodeChallengeSchema } from './pkce';
  * redirect URI are checked first; an error there is shown to the user and never redirected
  * (RFC 6749 section 4.1.2.1). Every later error, and the code itself, goes back to the redirect
  * URI with `state` and `iss` (RFC 9207). The user's sign-in and consent come from the
- * authorization hand-off, which the sign-in and consent screens implement.
+ * authorization hand-off, which the sign-in and consent screens implement. A POST carries the same
+ * query; only the hand-off's confirm page sends one, and its parameters stay those of the URL.
  */
 
 /**
@@ -38,6 +45,8 @@ export type AuthorizingClient =
       clientId: string;
       name: string;
       clientClass: FirstPartyClient['clientClass'];
+      /** How the client receives the code; a private-use scheme needs a fresh sign-in. */
+      redirectKind: RedirectRule['kind'];
     }
   | { kind: 'third_party'; clientId: string; name: string };
 
@@ -72,8 +81,8 @@ export type HandoffResult =
   | { status: 'interaction'; response: Response };
 
 /**
- * The sign-in and consent hand-off. The deployed entry wires none yet, so the authorization
- * endpoint is not served there; the sign-in slice provides it.
+ * The sign-in and consent hand-off: the sign-in pages' session (src/signin/handoff.ts) in a
+ * deployed entry.
  */
 export type AuthorizationHandoff = (
   request: Request,
@@ -100,8 +109,8 @@ function redirect(location: URL): Response {
 }
 
 export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Promise<Response> {
-  if (request.method !== 'GET') {
-    return oauthError('invalid_request', 405, 'use GET', { Allow: 'GET' });
+  if (request.method !== 'GET' && request.method !== 'POST') {
+    return oauthError('invalid_request', 405, 'use GET', { Allow: 'GET, POST' });
   }
   const params = paramsOf(new URL(request.url).searchParams);
 
@@ -117,14 +126,21 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   const identity = identifyClient(clientIdParam.value);
   let client: AuthorizingClient;
   if (identity.kind === 'first_party') {
-    if (!isLoopbackRedirect(identity.client, redirectUri)) {
+    if (!isRegisteredRedirect(identity.client, redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
+    }
+    if (!clientServedIn(identity.client, deps.config.environment)) {
+      return directError(
+        'unauthorized_client',
+        'this client needs device attestation, which this environment does not verify yet'
+      );
     }
     client = {
       kind: 'first_party',
       clientId: identity.client.clientId,
       name: identity.client.name,
       clientClass: identity.client.clientClass,
+      redirectKind: identity.client.redirect.kind,
     };
   } else if (identity.kind === 'third_party') {
     let record;

@@ -5,11 +5,15 @@ import type { DevUtsFeedDO } from './dev-feed';
 import { getFeedStub, getSignerStub } from './dos/stubs';
 import type { SignResult } from './dos/UtsSignerDO';
 import { readConfig, type Env, type UtsConfig } from './env';
+import { identityStoreBinding } from './grants/binding';
 import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
 import type { AuthorizationHandoff } from './oauth/authorize';
 import { jsonResponse } from './responses';
 import { developmentScopes } from './scopes/development-fixtures';
+import type { SignInEmail, SignInMailer } from './signin/email/mailer';
+import { redeemTicket } from './tickets/routes';
+import { ticketAccess } from './tickets/store';
 import type { SignerAccess } from './token/mint';
 
 /**
@@ -27,16 +31,57 @@ import type { SignerAccess } from './token/mint';
  *   account, `DEV_ACCOUNT_ID`, signed in by passkey now, bound to the organization the request
  *   names in `org` (the identity store checks the membership). `dev_decision=deny` on the
  *   authorization request denies it, and a third-party request names its consent in
- *   `dev_consent_id`. The account and any consent must exist in the local identity store.
+ *   `dev_consent_id`. The account and any consent must exist in the local identity store. An
+ *   authorization request with `dev_handoff=signin` uses the deployed sign-in pages instead, for
+ *   the passkey and the provider end-to-end runs.
  * * The OAuth endpoints apply the scope registry plus the development fixture scopes
  *   (`fixture:*`, `src/scopes/development-fixtures.ts`), so the local run has a third-party-safe
  *   scope.
+ * * The email sign-in's mail port records each message in the isolate instead of sending it, and
+ *   `GET /__dev/mail?to=<address>` answers the newest message for that address (its link and code
+ *   are synthetic local values), for the email end-to-end run.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 export const DEV_FEED_STOP_PATH = '/__dev/feed/stop';
+export const DEV_MAIL_PATH = '/__dev/mail';
+
+/**
+ * `POST /__dev/tickets/redeem` with `{ ticket, audience }` redeems as the development redeemer
+ * `uts-ticket-test`, as its `TicketRedeemer` binding would, for the local end-to-end run, which
+ * cannot hold a service binding.
+ */
+export const DEV_TICKET_REDEEM_PATH = '/__dev/tickets/redeem';
+const DevRedeemSchema = z.strictObject({ ticket: z.unknown(), audience: z.unknown() });
+
+async function handleDevTicketRedeem(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  config: UtsConfig
+): Promise<Response> {
+  const binding = identityStoreBinding(env);
+  const body = DevRedeemSchema.safeParse(await request.json().catch(() => undefined));
+  if (request.method !== 'POST' || binding.kind === 'unprovisioned' || !body.success) {
+    return jsonResponse({ error: 'invalid_request' }, 400);
+  }
+  const result = await redeemTicket(
+    { config, tickets: ticketAccess(binding.connectionString, ctx) },
+    'uts-ticket-test',
+    body.data.ticket,
+    body.data.audience
+  );
+  return jsonResponse(result, result.status === 'redeemed' ? 200 : 400);
+}
 
 /** The synthetic account the development hand-off signs in. */
 export const DEV_ACCOUNT_ID = 'dev:uts-local';
+
+const outbox = new Map<string, SignInEmail>();
+
+const recordingMailer: SignInMailer = async message => {
+  outbox.set(message.to, message);
+  return 'sent';
+};
 
 const DevSignRequestSchema = z.strictObject({
   grantId: z.string().min(1),
@@ -91,9 +136,18 @@ export async function handleDevRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   if (config.environment !== 'development') return await handleRequest(request, env, ctx);
-  const { pathname } = new URL(request.url);
+  const { pathname, searchParams } = new URL(request.url);
   if (pathname === DEV_FEED_STOP_PATH && request.method === 'POST') {
     return await stopFeedObject(request, env, config);
+  }
+  if (pathname === DEV_MAIL_PATH) {
+    const message = outbox.get(searchParams.get('to') ?? '');
+    return message === undefined
+      ? jsonResponse({ error: 'not_found' }, 404)
+      : jsonResponse(message, 200);
+  }
+  if (pathname === DEV_TICKET_REDEEM_PATH) {
+    return await handleDevTicketRedeem(request, env, ctx, config);
   }
   if (pathname !== DEV_SIGN_PATH) {
     // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant
@@ -104,9 +158,13 @@ export async function handleDevRequest(
         ? async () => ({ status: 'unavailable' })
         : null;
     return await handleRequest(request, env, ctx, {
-      authorizationHandoff: developmentHandoff,
+      authorizationHandoff: signInPages => async (authorization, pending) =>
+        new URL(authorization.url).searchParams.get('dev_handoff') === 'signin'
+          ? await signInPages(authorization, pending)
+          : await developmentHandoff(authorization, pending),
       signer,
       scopes: developmentScopes,
+      mailer: recordingMailer,
     });
   }
   if (request.method !== 'POST') {

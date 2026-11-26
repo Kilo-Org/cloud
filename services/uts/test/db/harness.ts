@@ -149,9 +149,12 @@ export async function insertDeviceSession(
 }
 
 /**
- * Inserts an open tier B pass with `client`, which must act as `uts_owner`: no login role can
- * write a pass. Tests use it to build rows in a chosen state; UTS itself writes a pass only
- * consumed, in the statement of the gated row (`uts.write_gated_pat`, `uts.write_gated_bot_key`).
+ * An open gate pass of a new browser session of `accountId`, as the gate slice opens one: tier A
+ * for `passkey_add` and `method_add` (a recent sign-in and an email code), tier B otherwise.
+ * `sessionId` puts the pass on an existing session instead. `client` must act as `uts_owner`: no
+ * login role can write a pass or a browser session. Tests use it to build rows in a chosen state;
+ * UTS itself writes a tier B pass only consumed, in the statement of the gated row
+ * (`uts.write_gated_pat`, `uts.write_gated_bot_key`).
  */
 export async function insertGatePass(
   client: pg.Client,
@@ -162,13 +165,23 @@ export async function insertGatePass(
     | 'device_approve'
     | 'third_party_approve'
     | 'ci_policy_create'
+    | 'passkey_add'
+    | 'method_add',
+  sessionId?: string
 ): Promise<string> {
-  const browserSessionId = await insertBrowserSession(client, accountId);
+  const browserSessionId = sessionId ?? (await insertBrowserSession(client, accountId));
+  const tierA = action === 'passkey_add' || action === 'method_add';
   const result = await client.query<{ id: string }>(
     `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
-     VALUES ($1, $2, 'b', $3, '{recent_sign_in}', now() + interval '10 minutes')
+     VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes')
      RETURNING id`,
-    [accountId, browserSessionId, action]
+    [
+      accountId,
+      browserSessionId,
+      tierA ? 'a' : 'b',
+      action,
+      tierA ? '{recent_sign_in,email_code}' : '{recent_sign_in}',
+    ]
   );
   return result.rows[0].id;
 }

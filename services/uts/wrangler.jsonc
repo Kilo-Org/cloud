@@ -34,6 +34,10 @@
     // The PAT lookup Hyperdrive config's connection limit: 20 percent of max_connections 160. The
     // per-isolate PAT lookup cap is min(100, 3 x this) = 96 (src/env.ts, design 3).
     "PAT_LOOKUP_CONNECTIONS": "32",
+    // Passkeys belong to the app host; the sign-in pages on the issuer origin use them as a
+    // WebAuthn related origin that the app host lists (design 5.14).
+    "WEBAUTHN_RP_ID": "app.kilo.ai",
+    "WEBAUTHN_ORIGINS": "https://uts.kiloapps.io",
   },
   "durable_objects": {
     "bindings": [
@@ -78,6 +82,8 @@
         "DO_JURISDICTION": "eu",
         // The staging PAT lookup config's connection limit; per-isolate cap min(100, 36) = 36.
         "PAT_LOOKUP_CONNECTIONS": "12",
+        "WEBAUTHN_RP_ID": "staging-app.kilo.ai",
+        "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
       },
       "durable_objects": {
         "bindings": [

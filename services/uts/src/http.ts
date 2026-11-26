@@ -12,28 +12,35 @@ import { patLookupsInFlight, readConfig, type Env, type UtsConfig } from './env'
 import { identityStoreBinding } from './grants/binding';
 import { authorizationServerMetadata } from './metadata/authorization-server';
 import { protectedResourceMetadata } from './metadata/protected-resource';
-import type { AuthorizationHandoff } from './oauth/authorize';
-import { handleOAuthRequest, oauthService } from './oauth/routes';
+import { type HandoffChoice, handleOAuthRequest, oauthService } from './oauth/routes';
 import type { AddressWindows } from './pat/address-limit';
 import { identityStorePatLookup, lookupPatHash, patStoreBinding } from './pat/lookup';
 import { type PatProbeDeps, handlePatProbe } from './pat/probe';
 import { jsonResponse } from './responses';
 import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
+import type { SignInMailer } from './signin/email/mailer';
 import type { SignerAccess } from './token/mint';
 
 /**
- * What only the development entry adds: the development sign-in hand-off, a failing signer for
- * the local end-to-end run, and the development fixture scopes on top of the scope registry
- * (src/dev.ts). The deployed options are no hand-off, the grant's signer and the registry alone.
+ * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
+ * signer for the local end-to-end run, the development fixture scopes on top of the scope registry
+ * and a recording mail port for the email sign-in (src/dev.ts). The deployed options are the
+ * sign-in pages, the grant's signer, the registry alone and no mail port.
  */
 export type MintOptions = {
-  authorizationHandoff: AuthorizationHandoff | null;
+  authorizationHandoff: HandoffChoice | null;
   signer: SignerAccess | null;
   scopes: ScopeRegistry;
+  mailer: SignInMailer | null;
 };
 
-const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null, scopes: utsScopeEntry };
+const DEPLOYED: MintOptions = {
+  authorizationHandoff: null,
+  signer: null,
+  scopes: utsScopeEntry,
+  mailer: null,
+};
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
 const probeWindows: AddressWindows = new Map();
@@ -71,11 +78,12 @@ function probeDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): PatProbe
 /**
  * The mint Worker's fetch handler. Placement runs it next to the identity store's primary, which
  * applies to fetch handlers only, not to RPC methods or named entrypoints (design 5.2). It serves
- * the issuer metadata, the OAuth endpoints once the identity store is bound
- * (src/oauth/routes.ts), the account API (src/account/routes.ts) and the PAT probe route
- * (src/pat/probe.ts) once their identity-store configs are bound. Signer keys are served by the
- * `SignerKeys` entrypoint (src/signer-keys.ts), and PAT lookups for verifiers by the `PatLookup`
- * entrypoint (src/pat/entrypoint.ts), never by this handler.
+ * the issuer metadata; the OAuth endpoints, the sign-in pages, the device grant and the tickets
+ * once the identity store is bound (src/oauth/routes.ts); and the account API
+ * (src/account/routes.ts) and the PAT probe route (src/pat/probe.ts) once their identity-store
+ * configs are bound. Signer keys are served by the `SignerKeys` entrypoint (src/signer-keys.ts),
+ * and PAT lookups for verifiers by the `PatLookup` entrypoint (src/pat/entrypoint.ts), never by
+ * this handler.
  */
 export async function handleRequest(
   request: Request,
@@ -91,7 +99,8 @@ export async function handleRequest(
     config,
     options.authorizationHandoff,
     options.signer,
-    options.scopes
+    options.scopes,
+    options.mailer
   );
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {

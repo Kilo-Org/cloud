@@ -8,7 +8,7 @@ import type { FeedEntry } from '../../src/revocation/entries';
 import type { FeedPublish, PublishOutcome } from '../../src/revocation/publish';
 import type { ScopeRegistry } from '../../src/scopes/policy';
 import { signerAccess } from '../../src/token/mint';
-import { config, env } from './test-env';
+import { config, env, noSignInMethods } from './test-env';
 
 /** Helpers for the OAuth runtime tests: DPoP keys and proofs, a recording grant store, requests. */
 
@@ -159,6 +159,11 @@ export function grantEntry(id: string = crypto.randomUUID()): FeedEntry {
   return { kind: 'grant', id, revokedBefore: null, revokedAt: now, expiresAt: now + 1_200_000 };
 }
 
+/** A store access that fails the request: a test that reaches it ran a statement it did not expect. */
+export const unexpectedStore = async (): Promise<never> => {
+  throw new Error('unexpected store call');
+};
+
 /** Endpoint dependencies with the real signer objects of the test pool. */
 export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
   return {
@@ -167,8 +172,12 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
     sign: signerAccess(env, config),
     scopes: testScopes,
     publish: recordingPublisher().publish,
-    handoff: null,
-    deviceCodeGrant: null,
+    handoff: async () => {
+      throw new Error('unexpected hand-off');
+    },
+    device: null,
+    signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
+    tickets: { config, tickets: unexpectedStore },
     ...overrides,
   };
 }

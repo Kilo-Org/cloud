@@ -126,7 +126,7 @@ it at deploy. `pnpm typecheck` and `pnpm lint` in `services/sts` check this dire
 | `api/exchange.ts` | `POST /api/exchange?n=2500&c=50`: a burst from one instance. Its latency numbers are the ones to quote; the limit is measured only by a fan-out. |
 | `api/chain.ts` | `POST /api/chain`: exchanges for `https://example.invalid`, then exchanges that token again; `vercelRefusedChain` is true only for a non-429 refusal (`chainedRateLimited` marks a 429). |
 | `lib/pass-rule.ts` | The run-3 pass rule `drive.ts` applies. |
-| `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline and budget scope), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. Shared mode salts each run with a fresh `run` id. |
+| `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline and budget scope), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. Shared mode salts each run with a fresh `run` id. It takes only an `https` `--url` and follows no redirect, since every request carries the proof key. |
 | `inspect-env-token.ts` | Pulls `VERCEL_OIDC_TOKEN` with `vercel env pull` per environment of the proof project, exchanges it for `https://sts-proof.invalid`, and prints for both tokens `environment`, `custom_environment_id`, whether `user_id` is present, the `act` shape and `scope`, plus the gate outcome. Never a token. |
 | `vercel.json` | `fluid: false`, so concurrent invocations land on separate instances, as cold instances would. |
 | `.vercelignore` | The deploy allowlist: `api/`, `lib/`, `package.json`, `tsconfig.json`, `vercel.json`. |

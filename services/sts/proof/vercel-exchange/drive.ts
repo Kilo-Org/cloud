@@ -62,6 +62,8 @@ const deadlineMs = positiveInteger(values['deadline-ms'], 'deadline-ms');
 
 function targetFor(base: string): URL {
   const url = new URL(mode === 'shared' ? '/api/shared' : '/api/cold', base);
+  // Every request carries the proof key: never in clear text.
+  if (url.protocol !== 'https:') throw new Error('--url must be an https URL');
   if (mode === 'shared') {
     url.searchParams.set('run', runId);
     if (jitterMs !== undefined) url.searchParams.set('jitterMs', String(jitterMs));
@@ -174,6 +176,8 @@ async function invoke(url: URL): Promise<Invocation> {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'x-proof-key': proofKey ?? '' },
+      // A redirect would carry the proof key to wherever it points; it fails the invocation instead.
+      redirect: 'error',
       signal: AbortSignal.timeout(90_000),
     });
     const text = await response.text();

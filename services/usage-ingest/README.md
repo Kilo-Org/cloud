@@ -790,7 +790,8 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
    Every call that carries a token or the bypass secret uses `redirect: 'manual'`: a 3xx fails
    the check (web side) or the run (`StsCanaryWebRefused` here), and is never followed.
    usage-ingest waits 80 s for the answer: the route's slowest run is a 5 s key-set fetch, a
-   30 s mint attempt and four 10 s calls here, 75 s, and its `maxDuration` is 90 s.
+   30 s mint attempt (both tries after an identity refusal end within it) and four 10 s calls
+   here, 75 s, and its `maxDuration` is 90 s.
 4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
    `succeeded` only when every check passed, with `mint_result`, `web_status`, and
    `<check>_result`/`_status`/`_detail` for `outbound`, `negative_wrong_audience`,

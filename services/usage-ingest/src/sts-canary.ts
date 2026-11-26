@@ -52,10 +52,11 @@ export type StsCanaryEnv = {
 export const STS_CANARY_JOB_NAME = 'usage_ingest.sts_canary';
 /**
  * The web route's slowest run: a cold key-set fetch to verify this Worker's token
- * (`JWKS_FETCH_TIMEOUT_MS`, 5 s), one mint attempt (`HTTP_ATTEMPT_TIMEOUT_MS`, 30 s), then four
- * calls to this Worker (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each): 5 + 30 + 4 x 10 = 75 s.
- * This Worker waits 5 s past that, 80 s, under the route's 90 s `maxDuration`
- * (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`), so even the slowest run lands its report here.
+ * (`JWKS_FETCH_TIMEOUT_MS`, 5 s), one mint attempt (`HTTP_ATTEMPT_TIMEOUT_MS`, 30 s, both tries
+ * after an identity refusal included), then four calls to this Worker
+ * (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each): 5 + 30 + 4 x 10 = 75 s. This Worker waits 5 s
+ * past that, 80 s, under the route's 90 s `maxDuration` (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`),
+ * so even the slowest run lands its report here.
  */
 export const WEB_CALL_TIMEOUT_MS =
   JWKS_FETCH_TIMEOUT_MS +

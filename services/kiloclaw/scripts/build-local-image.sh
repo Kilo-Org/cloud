@@ -126,7 +126,7 @@ GIT_SHA="$(git -C "$KILOCLAW_DIR" rev-parse HEAD 2>/dev/null || echo 'unknown')"
 # plugin builder stages reference `COPY --from=workspace pnpm-workspace.yaml
 # ...` to bring in the monorepo's pnpm-workspace.yaml + lockfile + patches/.
 # CI passes the same `--build-context workspace=.` from the repo root (see
-# .github/workflows/deploy-kiloclaw.yml + push-dev-kiloclaw.yml); without it
+# .github/workflows/push-dev-kiloclaw.yml); without it
 # Docker tries to pull a non-existent `workspace:latest` from Docker Hub
 # and fails with `insufficient_scope`.
 REPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"

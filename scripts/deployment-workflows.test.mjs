@@ -905,22 +905,6 @@ test('staging and production Worker changes use independent deployment baselines
   assert.match(workers.jobs['detect-changes'].if, /inputs\.worker_matrix == ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
   assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
-  assert.equal(
-    production.jobs['deploy-kiloclaw'],
-    undefined,
-    'production must not run deploy-kiloclaw on the schedule: dispatch it manually'
-  );
-  assert.doesNotMatch(
-    production.jobs['record-deployment'].if,
-    /deploy-kiloclaw/,
-    'production record-deployment must not wait on the manual kiloclaw deploy'
-  );
-  const kiloclaw = workflow('deploy-kiloclaw');
-  assert.ok(
-    Object.hasOwn(kiloclaw.on, 'workflow_dispatch'),
-    'deploy-kiloclaw must be dispatchable manually'
-  );
-  assert.ok(Object.hasOwn(kiloclaw.on.workflow_dispatch.inputs, 'source_sha'));
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
@@ -1215,7 +1199,6 @@ test('deployment gate only deploys changes since the last complete run', () => {
       base_sha: deployedSha,
       target_sha: git('rev-parse', 'HEAD'),
       should_deploy: 'true',
-      deploy_kiloclaw: 'false',
     });
     assert.match(
       readFileSync(join(directory, '.git', 'test-summary'), 'utf8'),
@@ -1224,12 +1207,9 @@ test('deployment gate only deploys changes since the last complete run', () => {
 
     writeFileSync(join(directory, 'services/kiloclaw/file'), 'worker');
     commit('worker');
-    assert.equal(runGate(deployedSha).deploy_kiloclaw, 'true');
-    const kiloclawSha = git('rev-parse', 'HEAD');
     mkdirSync(join(directory, 'packages/kiloclaw-secret-catalog'), { recursive: true });
     writeFileSync(join(directory, 'packages/kiloclaw-secret-catalog/file'), 'shared package');
     commit('shared package');
-    assert.equal(runGate(kiloclawSha).deploy_kiloclaw, 'true');
     const greenSha = git('rev-parse', 'HEAD');
     writeFileSync(join(directory, 'apps/web/file'), 'untested');
     commit('untested');

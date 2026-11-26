@@ -168,6 +168,9 @@ CREATE TABLE uts.sign_ins (
   CONSTRAINT sign_ins_notice_shape CHECK (notice_id IS NULL OR (new_device AND new_network))
 );
 CREATE INDEX sign_ins_account_idx ON uts.sign_ins (account_id, signed_in_at);
+-- Deleting a notice (retention, `uts.maintain_notice_rows`) sets `notice_id` NULL in the sign-ins
+-- that name it; this index makes that a probe instead of a scan of every sign-in per notice.
+CREATE INDEX sign_ins_notice_idx ON uts.sign_ins (notice_id) WHERE notice_id IS NOT NULL;
 
 -- The network a sign-in came from: `as<number>` when the autonomous system is known, else the
 -- client address's /24 or /48 prefix, else NULL (nothing to compare).

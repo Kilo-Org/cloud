@@ -603,6 +603,21 @@ describe('notice delivery statements', () => {
     expect(states.rows).toEqual([{ delivery: 'failed', count: 25 }]);
   });
 
+  it('clears the sign-ins of a deleted notice through an index probe', async () => {
+    // The foreign key's ON DELETE SET NULL runs this update for each deleted notice.
+    await owner.query('BEGIN');
+    try {
+      await owner.query('SET LOCAL enable_seqscan = off');
+      const plan = await owner.query<{ 'QUERY PLAN': string }>(
+        `EXPLAIN UPDATE uts.sign_ins SET notice_id = NULL WHERE notice_id = $1`,
+        [randomUUID()]
+      );
+      expect(plan.rows.map(row => row['QUERY PLAN']).join('\n')).toContain('sign_ins_notice_idx');
+    } finally {
+      await owner.query('ROLLBACK');
+    }
+  });
+
   it('deletes devices and networks unseen for 90 days and finished notices after 400 days', async () => {
     const { accountId } = await accountWithBaseline();
     await deviceSignIn(owner, accountId, randomBytes(32), PARIS);

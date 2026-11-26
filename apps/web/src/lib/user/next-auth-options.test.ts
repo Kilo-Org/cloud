@@ -1051,7 +1051,7 @@ describe('new sign-in check on browser sign-in', () => {
       .select({ kind: user_sign_in_contexts.kind })
       .from(user_sign_in_contexts)
       .where(eq(user_sign_in_contexts.user_id, user.id));
-    expect(contexts.map(row => row.kind).sort()).toEqual(['device', 'network']);
+    expect(contexts.map(row => row.kind).sort()).toEqual(['device', 'history', 'network']);
   });
 
   test('a session read records nothing', async () => {

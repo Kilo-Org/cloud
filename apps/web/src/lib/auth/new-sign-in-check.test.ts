@@ -12,6 +12,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { captureException } from '@sentry/nextjs';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { scheduleSecurityNotice } from '@/lib/security-notices';
 import { scheduleNewSignInCheck } from '@/lib/auth/new-sign-in-check';
@@ -95,8 +96,11 @@ describe('scheduleNewSignInCheck', () => {
   });
 
   test('a failed detection resolves and is reported without user data', async () => {
-    // No such user row: the statement fails on its foreign key.
-    const user = { id: `missing-${crypto.randomUUID()}`, google_user_email: 'a@example.com' };
+    const user = await insertTestUser();
+    // A database error's message names the query parameters.
+    const transaction = jest
+      .spyOn(db, 'transaction')
+      .mockRejectedValueOnce(new Error(`failed query with params ${user.id}`));
 
     await expect(
       scheduleNewSignInCheck({
@@ -113,5 +117,20 @@ describe('scheduleNewSignInCheck', () => {
     expect(reported).toEqual(new Error('sign_in_context_check_failed'));
     expect(reported).not.toHaveProperty('cause');
     expect(context).toEqual({ tags: { source: 'sign_in_context_check' } });
+    transaction.mockRestore();
+  });
+
+  test('a sign-in of an account that is gone sends nothing and reports nothing', async () => {
+    const user = { id: `missing-${crypto.randomUUID()}`, google_user_email: 'a@example.com' };
+
+    await scheduleNewSignInCheck({
+      user,
+      method: 'email',
+      device: { kind: 'browser_cookie', secret: 'laptop' },
+      headers: requestHeaders('203.0.113.45', 'DE'),
+    });
+
+    expect(mockScheduleSecurityNotice).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

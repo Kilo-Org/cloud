@@ -1,5 +1,5 @@
 {
-  "id": "25c8a006-07c4-4326-8c17-66ef8b337c6a",
+  "id": "777a9097-e656-425a-9a74-9269e4664a15",
   "prevId": "c30af322-5bfd-4918-9ad0-431b9ad84057",
   "version": "7",
   "dialect": "postgresql",
@@ -43903,6 +43903,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "key_id": {
+          "name": "key_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "first_seen_at": {
           "name": "first_seen_at",
           "type": "timestamp with time zone",
@@ -43916,7 +43922,35 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "IDX_user_sign_in_contexts_key_kind_last_seen": {
+          "name": "IDX_user_sign_in_contexts_key_kind_last_seen",
+          "columns": [
+            {
+              "expression": "key_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "last_seen_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "user_sign_in_contexts_user_id_kilocode_users_id_fk": {
           "name": "user_sign_in_contexts_user_id_kilocode_users_id_fk",
@@ -43947,7 +43981,7 @@
       "checkConstraints": {
         "user_sign_in_contexts_kind_check": {
           "name": "user_sign_in_contexts_kind_check",
-          "value": "\"user_sign_in_contexts\".\"kind\" IN ('device', 'network', 'notice')"
+          "value": "\"user_sign_in_contexts\".\"kind\" IN ('device', 'network', 'notice', 'history')"
         }
       },
       "isRLSEnabled": false

@@ -1,13 +1,7 @@
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { runAfterResponse } from '@/lib/after-response';
-import {
-  hashSignInDevice,
-  hashSignInKey,
-  networkKey,
-  recordSignInContext,
-  type SignInDevice,
-} from '@/lib/auth/sign-in-context';
+import { networkKey, recordSignInContext, type SignInDevice } from '@/lib/auth/sign-in-context';
 import { scheduleSecurityNotice, securityNoticeRequestFromHeaders } from '@/lib/security-notices';
 
 /**
@@ -34,8 +28,8 @@ export async function scheduleNewSignInCheck(params: {
     try {
       const decision = await recordSignInContext({
         userId: user.id,
-        deviceKeyHash: hashSignInDevice(user.id, device),
-        networkKeyHash: network === null ? null : hashSignInKey(user.id, 'network', network),
+        device,
+        network,
         now: request.occurredAt,
       });
       if (decision.kind !== 'new_device_new_network') return;

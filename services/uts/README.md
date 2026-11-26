@@ -189,6 +189,102 @@ grant. The audit row of a mint lists the `jti` of each token the call is about t
 failed signing no token carries those ids, and the retry's row (`token.issued`, `rotation`
 `code_retry`) lists the ids of the tokens it signs.
 
+## Sign-in providers, SSO and email
+
+The sign-in page of an authorization request (and of `/device`, `/signin/passkeys` and
+`/signin/done`) offers the passkey, every configured provider, SSO and the email sign-in. Each
+provider, SSO or email sign-in ends in a browser session (`__Host-uts_session`, design 5.3) and
+returns to the page that offered it, so an authorization request then issues its code
+(`src/signin/handoff.ts`).
+
+| Route | Behaviour | SQL |
+|---|---|---|
+| `GET /signin/oauth/<provider>/start` | Stores the flow (`state` hash, binder hash, return path) and redirects to the provider; `intent=link&gate_pass=<id>` adds the method to the signed-in account instead | `uts.start_sign_in_flow` |
+| `GET /signin/oauth/<provider>/callback` (`POST` for Apple, `form_post`) | Exchanges the code, checks the identity, then consumes the flow and signs in or links | `uts.complete_provider_sign_in` |
+| `POST /signin/sso/start` | The address's domain picks the org's one active WorkOS connection | `uts.start_sign_in_flow` |
+| `GET /signin/sso/callback` | Buys the WorkOS profile; its connection and domain must be the flow's | `uts.complete_provider_sign_in` |
+| `POST /signin/email/start` | Stores the email (link hash, keyed code hash), then sends it through the mail port | `uts.start_email_sign_in` |
+| `POST /signin/email/code` | Checks the newest code for the address; the fifth wrong entry exhausts it | `uts.verify_email_code` |
+| `GET /signin/email/link` | A confirmation page only, so a mail scanner changes nothing | none |
+| `POST /signin/email/link` | Signs in with the link, once | `uts.complete_email_link` |
+
+Every provider callback makes one SQL statement, after the provider calls. A flow's `state` and
+binder are 32 random bytes each; the identity store keeps only their SHA-256, and the binder lives
+in a `__Host-uts_flow_<16 hex>` cookie (`SameSite=None`, because Apple posts the callback from its
+own site) of the browser that started the flow. The PKCE verifier and the OpenID Connect nonce are
+HMAC-SHA-256 values of the binder (`src/signin/flows.ts`), so no flow secret is stored. The sign-in
+forms post only from the issuer's own pages (`Origin`), so another site cannot sign a visitor into
+an account it chose.
+
+### Protocols
+
+The endpoints are fixed in `src/signin/providers/specs.ts`, checked against each provider's
+OpenID Connect discovery document or API reference; nothing is discovered per request. An ID
+token is verified against the provider's key set (signature, `iss`, `aud`, `exp`, `iat` and the
+flow's `nonce`); `jose` keeps each key set per isolate and refetches it on an unknown `kid`.
+
+| Provider | Protocol | PKCE | Client authentication | Scopes | Proof of the address |
+|---|---|---|---|---|---|
+| Google | OpenID Connect | S256 | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
+| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | `client_secret_basic` | `openid profile email` | `email_verified` |
+| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
+| Anaconda | OpenID Connect | S256 | `client_secret_post` | `openid profile email` | `email_verified` |
+| Apple | OpenID Connect, `response_mode=form_post` | none offered | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
+| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
+| GitLab | OpenID Connect | S256 | `client_secret_post` | `openid email` | `email_verified` |
+| Discord | OAuth 2; `/users/@me` | S256 | `client_secret_post` | `identify email` | `verified` |
+| LinkedIn | OpenID Connect | none offered | `client_secret_post` | `openid profile email` | `email_verified` |
+| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | API key | none | never: SSO never links by email |
+
+### Accounts and linking (design 5.2)
+
+- A known method signs in to its account. A blocked account, or an account whose address is in a
+  verified domain of an org that requires SSO (for any method but SSO), is refused.
+- A new method links to an existing account only when the provider proves the address and exactly
+  one account holds it as its primary email, or inside a browser session of the account with an
+  open tier A `method_add` pass of that session, which the link consumes and the method's row
+  keeps. Any other new method on an existing address is refused (`link_required`): the user signs
+  in with a method the account has and links the new one.
+- SSO accepts a profile only of the flow's connection and in a domain that connection's org
+  verified, and it never links by email.
+- A new account needs a proven address, so nobody can create an account under an address they do
+  not control and wait for its owner to sign in. An SSO profile counts as proven by its domain.
+- A refusal that names an account writes at most one denied row per account per minute; a link
+  writes `ai.kilo.uts.sign_in_method.linked` and an in-app notice.
+
+Email: one email carries a link and, unless codes are stopped for the address, a six-digit code;
+both live 10 minutes. The fifth wrong code entry exhausts the code (each wrong entry writes a
+denied row when the address has an account), but the email's link keeps working, so wrong entries
+by someone else cannot lock the owner out. At most 5 codes per address per hour; past that cap, or
+after 20 wrong entries in a day, codes stop for 1 hour and the account gets a notice. The address
+and the code are stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`. Deployed Workers wire
+no mail sender yet (`src/signin/email/mailer.ts`), so the email sign-in is offered only where one
+is wired; the development entry records each message (`GET /__dev/mail?to=`).
+
+### Configuration
+
+A method is offered only when every value it needs is set; with some set and others missing it is
+not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only).
+
+| Method | Vars | Secrets |
+|---|---|---|
+| Google, OpenAI, Anaconda, GitHub, GitLab, Discord, LinkedIn | `SIGNIN_<PROVIDER>_CLIENT_ID` | `SIGNIN_<PROVIDER>_CLIENT_SECRET` |
+| Apple | `SIGNIN_APPLE_CLIENT_ID` (services id), `SIGNIN_APPLE_TEAM_ID`, `SIGNIN_APPLE_KEY_ID` | `SIGNIN_APPLE_PRIVATE_KEY` (P-256, PKCS #8 PEM) |
+| Anthropic | `SIGNIN_ANTHROPIC_CLIENT_ID`, `SIGNIN_ANTHROPIC_ASSERTION_{AUDIENCE,ISSUER,SUBJECT,KEY_ID}` | `SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY` (P-256) |
+| WorkOS SSO | `SIGNIN_WORKOS_CLIENT_ID` | `SIGNIN_WORKOS_API_KEY` |
+| Email | none | `SIGNIN_EMAIL_HASH_KEY` (32 bytes, base64url) |
+
+`SIGNIN_DEV_ENDPOINTS` (development only, loopback URLs only) points providers at local
+stand-ins. Each registration lists the callback of its environment's issuer:
+`https://uts-staging.kiloapps.io/signin/oauth/<provider>/callback` and
+`https://uts-staging.kiloapps.io/signin/sso/callback` for staging, `https://uts.kiloapps.io/...`
+for production.
+
+`scripts/provider-signin-e2e.ts` runs the whole surface locally against `wrangler dev --env local`
+and three stand-in providers it serves itself (OpenID Connect, GitHub-style, WorkOS-style): sign-in
+-> code -> token for each, Apple's `form_post`, the email lock, the linking refusals, and a check
+that no audit row names a token, a code or an address.
+
 ## Tests
 
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,

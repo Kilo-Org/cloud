@@ -3,7 +3,7 @@ import type { DeviceDeps } from '../../src/signin/device/authorization';
 import type { SignInAccess, SignInStore } from '../../src/signin/store';
 import type { TicketDeps } from '../../src/tickets/routes';
 import type { TicketAccess, TicketStore } from '../../src/tickets/store';
-import { config } from './test-env';
+import { config, noSignInMethods } from './test-env';
 
 /** Helpers for the sign-in runtime tests: recording sign-in and ticket stores, requests. */
 
@@ -45,7 +45,7 @@ export function fakeSignIn(implementation: Partial<SignInStore> = {}) {
     exchangeDeviceCode: recorded('exchangeDeviceCode', calls, implementation.exchangeDeviceCode),
   };
   const access: SignInAccess = work => work(store);
-  const deps: SignInDeps = { config, signIn: access };
+  const deps: SignInDeps = { config, signIn: access, methods: noSignInMethods };
   return { deps, calls };
 }
 

@@ -4,7 +4,7 @@ import { IdentityStoreError } from '../../src/db/client';
 import type { GrantStore, GrantsAccess, Minted } from '../../src/grants/store';
 import type { OAuthDeps } from '../../src/oauth/routes';
 import { signerAccess } from '../../src/token/mint';
-import { config, env } from './test-env';
+import { config, env, noSignInMethods } from './test-env';
 
 /** Helpers for the OAuth runtime tests: DPoP keys and proofs, a recording grant store, requests. */
 
@@ -121,7 +121,7 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
       throw new Error('unexpected hand-off');
     },
     device: null,
-    signIn: { config, signIn: unexpectedStore },
+    signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
     tickets: { config, tickets: unexpectedStore },
     ...overrides,
   };

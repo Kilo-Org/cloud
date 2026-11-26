@@ -2,6 +2,7 @@ import type { AuthorizationHandoff } from '../oauth/authorize';
 import { classifyFailure } from '../oauth/errors';
 import { sha256 } from '../token/credentials';
 import type { SignInDeps } from './deps';
+import { returnPathOf, signInChoices } from './flows';
 import { signInPage, unavailablePage } from './pages';
 import { sessionCookieValue } from './session';
 import type { BrowserSession } from './store';
@@ -48,7 +49,12 @@ export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
       session !== null &&
       (pending.client.redirectKind === 'loopback' ||
         Date.now() - session.authTime.getTime() < FRESH_SIGN_IN_SECONDS * 1000);
-    if (session === null || !fresh) return { status: 'interaction', response: signInPage() };
+    if (session === null || !fresh) {
+      // A provider, SSO or email sign-in returns to this authorization request.
+      const { pathname, search } = new URL(request.url);
+      const choices = signInChoices(deps.methods, returnPathOf(`${pathname}${search}`));
+      return { status: 'interaction', response: signInPage(choices) };
+    }
     return {
       status: 'approved',
       approval: {

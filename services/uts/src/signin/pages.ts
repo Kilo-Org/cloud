@@ -1,4 +1,11 @@
-import { UTS_DEVICE_VERIFICATION_PATH, UTS_SIGNIN_SCRIPT_PATH } from '@kilocode/uts-contracts';
+import {
+  UTS_DEVICE_VERIFICATION_PATH,
+  UTS_EMAIL_START_PATH,
+  UTS_SIGNIN_SCRIPT_PATH,
+  UTS_SSO_START_PATH,
+  type UtsOAuthProvider,
+  utsProviderStartPath,
+} from '@kilocode/uts-contracts';
 import type { PendingDevice } from './store';
 
 /**
@@ -7,15 +14,22 @@ import type { PendingDevice } from './store';
  * inline script, no third-party resource, no framing. Every value a page shows is escaped.
  */
 
-const SECURITY_HEADERS = {
-  'Content-Type': 'text/html; charset=utf-8',
-  'Cache-Control': 'no-store',
-  'Content-Security-Policy':
-    "default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-} as const;
+/**
+ * `form-action` also covers the redirect a form post answers with, so a page whose form leads to
+ * another origin (the SSO start redirects to WorkOS) names that origin.
+ */
+function securityHeaders(formActionOrigins: readonly string[]): Record<string, string> {
+  return {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self'; style-src 'self'; form-action ${["'self'", ...formActionOrigins].join(' ')}; base-uri 'none'; frame-ancestors 'none'`,
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    // `no-referrer` would make browsers send `Origin: null` with the pages' own form posts, which
+    // the sign-in forms check (src/signin/flows.ts `isSameOriginPost`).
+    'Referrer-Policy': 'same-origin',
+  };
+}
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -25,12 +39,18 @@ const ESCAPES: Record<string, string> = {
   "'": '&#39;',
 };
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ESCAPES[character] ?? character);
 }
 
 /** One page: `page` names what the script wires up (`data-page`). */
-function page(title: string, pageName: string, body: string, status = 200): Response {
+export function page(
+  title: string,
+  pageName: string,
+  body: string,
+  status = 200,
+  formActionOrigins: readonly string[] = []
+): Response {
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -49,16 +69,73 @@ ${body}
 </body>
 </html>
 `;
-  return new Response(html, { status, headers: SECURITY_HEADERS });
+  return new Response(html, { status, headers: securityHeaders(formActionOrigins) });
 }
 
-/** The sign-in page an interaction shows; after a sign-in the script reloads the same URL. */
-export function signInPage(): Response {
+/** The sign-in methods the page offers besides the passkey (`signInChoices`, src/signin/flows.ts). */
+export type SignInChoices = {
+  /** The path the sign-in returns to: the authorization URL that showed the page, or another. */
+  returnTo: string;
+  providers: readonly { provider: UtsOAuthProvider; name: string }[];
+  email: boolean;
+  /** The origin the SSO start redirects to, when SSO is offered. */
+  sso: { origin: string } | null;
+};
+
+/**
+ * The sign-in page an interaction shows. After a passkey sign-in the script reloads the same URL;
+ * a provider, SSO or email sign-in returns to `returnTo`.
+ */
+export function signInPage(choices: SignInChoices): Response {
+  const returnTo = escapeHtml(choices.returnTo);
+  const returnQuery = escapeHtml(new URLSearchParams({ return_to: choices.returnTo }).toString());
+  const parts = [
+    '<p>Use a passkey saved for your Kilo account.</p>\n<button type="button" id="passkey-sign-in">Sign in with a passkey</button>',
+  ];
+  if (choices.providers.length > 0) {
+    parts.push(
+      `<ul>${choices.providers
+        .map(
+          ({ provider, name }) =>
+            `<li><a href="${escapeHtml(utsProviderStartPath(provider))}?${returnQuery}">Continue with ${escapeHtml(name)}</a></li>`
+        )
+        .join('')}</ul>`
+    );
+  }
+  if (choices.email) {
+    parts.push(`<form method="post" action="${UTS_EMAIL_START_PATH}">
+<input type="hidden" name="return_to" value="${returnTo}">
+<label for="email-address">Email address</label>
+<input id="email-address" name="email" type="email" autocomplete="email" maxlength="320" required>
+<button type="submit">Email me a sign-in link and code</button>
+</form>`);
+  }
+  if (choices.sso !== null) {
+    parts.push(`<form method="post" action="${UTS_SSO_START_PATH}">
+<input type="hidden" name="return_to" value="${returnTo}">
+<label for="sso-email">Work email address</label>
+<input id="sso-email" name="email" type="email" autocomplete="email" maxlength="320" required>
+<button type="submit">Sign in with SSO</button>
+</form>`);
+  }
   return page(
     'Sign in to Kilo',
     'sign-in',
-    '<p>Use a passkey saved for your Kilo account.</p>\n<button type="button" id="passkey-sign-in">Sign in with a passkey</button>'
+    parts.join('\n'),
+    200,
+    choices.sso === null ? [] : [choices.sso.origin]
   );
+}
+
+/** A page that tells the user one thing, with a way back to `back` when there is one. */
+export function messagePage(
+  title: string,
+  message: string,
+  status: number,
+  back: string | null
+): Response {
+  const link = back === null ? '' : `\n<p><a href="${escapeHtml(back)}">Back</a></p>`;
+  return page(title, 'message', `<p>${escapeHtml(message)}</p>${link}`, status);
 }
 
 /** The page where a signed-in user adds a passkey (a tier A action, design 5.11). */

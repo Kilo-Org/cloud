@@ -7,6 +7,7 @@ import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
 import type { AuthorizationHandoff } from './oauth/authorize';
 import { jsonResponse } from './responses';
+import type { SignInEmail, SignInMailer } from './signin/email/mailer';
 import type { SignerAccess } from './token/mint';
 
 /**
@@ -21,13 +22,24 @@ import type { SignerAccess } from './token/mint';
  *   account, `DEV_ACCOUNT_ID`, signed in by passkey now. `dev_decision=deny` on the authorization
  *   request denies it, and a third-party request names its consent in `dev_consent_id`. The
  *   account and any consent must exist in the local identity store. An authorization request
- *   with `dev_handoff=signin` uses the deployed sign-in pages instead, for the passkey
- *   end-to-end run.
+ *   with `dev_handoff=signin` uses the deployed sign-in pages instead, for the passkey and the
+ *   provider end-to-end runs.
+ * * The email sign-in's mail port records each message in the isolate instead of sending it, and
+ *   `GET /__dev/mail?to=<address>` answers the newest message for that address (its link and code
+ *   are synthetic local values), for the email end-to-end run.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
+export const DEV_MAIL_PATH = '/__dev/mail';
 
 /** The synthetic account the development hand-off signs in. */
 export const DEV_ACCOUNT_ID = 'dev:uts-local';
+
+const outbox = new Map<string, SignInEmail>();
+
+const recordingMailer: SignInMailer = async message => {
+  outbox.set(message.to, message);
+  return 'sent';
+};
 
 const DevSignRequestSchema = z.strictObject({
   grantId: z.string().min(1),
@@ -62,7 +74,14 @@ export async function handleDevRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   if (config.environment !== 'development') return await handleRequest(request, env, ctx);
-  if (new URL(request.url).pathname !== DEV_SIGN_PATH) {
+  const { pathname, searchParams } = new URL(request.url);
+  if (pathname === DEV_MAIL_PATH) {
+    const message = outbox.get(searchParams.get('to') ?? '');
+    return message === undefined
+      ? jsonResponse({ error: 'not_found' }, 404)
+      : jsonResponse(message, 200);
+  }
+  if (pathname !== DEV_SIGN_PATH) {
     // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant
     // statement, as a signer object that does not answer would, for the retry check of the local
     // end-to-end run.
@@ -76,6 +95,7 @@ export async function handleDevRequest(
           ? await signInPages(authorization, pending)
           : await developmentHandoff(authorization, pending),
       signer,
+      mailer: recordingMailer,
     });
   }
   if (request.method !== 'POST') {

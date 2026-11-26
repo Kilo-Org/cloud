@@ -3,18 +3,21 @@ import { readConfig, type Env } from './env';
 import { authorizationServerMetadata } from './metadata/authorization-server';
 import { type HandoffChoice, handleOAuthRequest, oauthService } from './oauth/routes';
 import { jsonResponse } from './responses';
+import type { SignInMailer } from './signin/email/mailer';
 import type { SignerAccess } from './token/mint';
 
 /**
- * What only the development entry adds: a choice of the synthetic sign-in hand-off and a failing
- * signer for the local end-to-end run (src/dev.ts). Null is the deployed behaviour.
+ * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
+ * signer for the local end-to-end run and a recording mail port for the email sign-in
+ * (src/dev.ts). Null is the deployed behaviour.
  */
 export type MintOptions = {
   authorizationHandoff: HandoffChoice | null;
   signer: SignerAccess | null;
+  mailer: SignInMailer | null;
 };
 
-const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null };
+const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null, mailer: null };
 
 /**
  * The mint Worker's fetch handler. Placement runs it next to the identity store's primary, which
@@ -31,7 +34,14 @@ export async function handleRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
-  const oauth = oauthService(env, ctx, config, options.authorizationHandoff, options.signer);
+  const oauth = oauthService(
+    env,
+    ctx,
+    config,
+    options.authorizationHandoff,
+    options.signer,
+    options.mailer
+  );
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });

@@ -3,6 +3,7 @@ import { identifyClient } from '../../oauth/clients';
 import { classifyFailure } from '../../oauth/errors';
 import { jsonResponse } from '../../responses';
 import { sha256 } from '../../token/credentials';
+import { returnPathOf, signInChoices } from '../flows';
 import { requestSession } from '../handoff';
 import {
   deviceApprovalPage,
@@ -37,13 +38,17 @@ export async function handleDevicePage(request: Request, deps: DeviceDeps): Prom
   if (request.method !== 'GET') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
   }
-  const entered = new URL(request.url).searchParams.get('user_code');
+  const { pathname, search, searchParams } = new URL(request.url);
+  const entered = searchParams.get('user_code');
+  // A provider, SSO or email sign-in returns to this device page.
+  const signIn = () =>
+    signInPage(signInChoices(deps.methods, returnPathOf(`${pathname}${search}`)));
   const cookie = sessionCookieValue(request);
-  if (cookie === null) return signInPage();
+  if (cookie === null) return signIn();
   try {
     if (entered === null || entered === '') {
       const session = await requestSession(request, deps);
-      return session === null ? signInPage() : deviceCodeEntryPage(null);
+      return session === null ? signIn() : deviceCodeEntryPage(null);
     }
     const normalized = normalizeUserCode(entered);
     if (normalized === null) return deviceCodeEntryPage(UNKNOWN_CODE);
@@ -58,7 +63,7 @@ export async function handleDevicePage(request: Request, deps: DeviceDeps): Prom
         return deviceApprovalPage(formatUserCode(normalized), name, read);
       }
       case 'no_session':
-        return signInPage();
+        return signIn();
       case 'unknown_code':
         return deviceCodeEntryPage(UNKNOWN_CODE);
       case 'too_many_attempts':

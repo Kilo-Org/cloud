@@ -8,6 +8,7 @@ import {
   UTS_PASSKEY_VERIFY_PATH,
   UTS_PASSKEYS_PAGE_PATH,
   UTS_REVOKE_PATH,
+  UTS_SIGNED_IN_PATH,
   UTS_SIGNIN_SCRIPT_PATH,
   UTS_TOKEN_PATH,
   UTS_TICKET_REDEEM_PATH,
@@ -21,10 +22,17 @@ import { type DeviceDeps, handleDeviceAuthorization } from '../signin/device/aut
 import { deviceCodeGrant } from '../signin/device/grant';
 import { userCodeSecret } from '../signin/device/user-code';
 import { handleDeviceDecision, handleDevicePage } from '../signin/device/verification';
+import type { SignInMailer } from '../signin/email/mailer';
+import { handleEmailRequest } from '../signin/email/routes';
+import { signInChoices } from '../signin/flows';
 import { requestSession, signInHandoff } from '../signin/handoff';
-import { passkeysPage, signInPage, unavailablePage } from '../signin/pages';
+import { messagePage, passkeysPage, signInPage, unavailablePage } from '../signin/pages';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../signin/passkey/ceremonies';
+import { readSignInConfig } from '../signin/providers/config';
+import { handleProviderRequest } from '../signin/providers/routes';
+import { providerSignInAccess } from '../signin/providers/store';
 import { signInScript } from '../signin/script';
+import { handleSsoRequest } from '../signin/sso/routes';
 import { signInAccess } from '../signin/store';
 import { type TicketDeps, handleTicketIssue, handleTicketRedeem } from '../tickets/routes';
 import { ticketAccess } from '../tickets/store';
@@ -63,20 +71,29 @@ export type HandoffChoice = (signInPages: AuthorizationHandoff) => Authorization
 
 /**
  * `sign` null uses the grant's signer object; only the development entry passes another one, to
- * show a signing failure in the local end-to-end run (src/dev.ts).
+ * show a signing failure in the local end-to-end run (src/dev.ts). `mailer` is the email sign-in's
+ * mail port; no deployed sender is wired yet, so the deployed entry passes null and email sign-in
+ * is not offered there.
  */
 export function oauthService(
   env: Env,
   ctx: ExecutionContext,
   config: UtsConfig,
   handoff: HandoffChoice | null,
-  sign: SignerAccess | null
+  sign: SignerAccess | null,
+  mailer: SignInMailer | null
 ): OAuthService {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return binding;
   const signIn: SignInDeps = {
     config,
     signIn: signInAccess(binding.connectionString, ctx),
+    methods: {
+      config,
+      settings: readSignInConfig(env, config),
+      store: providerSignInAccess(binding.connectionString, ctx),
+      mailer,
+    },
   };
   const signer = sign ?? signerAccess(env, config);
   const secret = userCodeSecret(env);
@@ -104,9 +121,22 @@ export function oauthService(
 /** GET /signin/passkeys: the add-a-passkey page for a signed-in user, else the sign-in page. */
 async function handlePasskeysPage(request: Request, deps: SignInDeps): Promise<Response> {
   try {
-    return (await requestSession(request, deps)) === null ? signInPage() : passkeysPage();
+    return (await requestSession(request, deps)) === null
+      ? signInPage(signInChoices(deps.methods, UTS_PASSKEYS_PAGE_PATH))
+      : passkeysPage();
   } catch (error) {
     return unavailablePage(classifyFailure(error, 'passkeys_page') === 'retryable');
+  }
+}
+
+/** GET /signin/done: where a sign-in without another destination lands. */
+async function handleSignedInPage(request: Request, deps: SignInDeps): Promise<Response> {
+  try {
+    return (await requestSession(request, deps)) === null
+      ? signInPage(signInChoices(deps.methods, UTS_SIGNED_IN_PATH))
+      : messagePage('Signed in', 'You are signed in to Kilo. You can close this page.', 200, null);
+  } catch (error) {
+    return unavailablePage(classifyFailure(error, 'signed_in_page') === 'retryable');
   }
 }
 
@@ -116,7 +146,15 @@ export async function handleOAuthRequest(
   pathname: string,
   deps: OAuthDeps
 ): Promise<Response | null> {
+  const methods = deps.signIn.methods;
+  const signInMethod =
+    (await handleProviderRequest(request, pathname, methods)) ??
+    (await handleSsoRequest(request, pathname, methods)) ??
+    (await handleEmailRequest(request, pathname, methods));
+  if (signInMethod !== null) return signInMethod;
   switch (pathname) {
+    case UTS_SIGNED_IN_PATH:
+      return await handleSignedInPage(request, deps.signIn);
     case UTS_AUTHORIZE_PATH:
       return await handleAuthorize(request, deps);
     case UTS_TOKEN_PATH:

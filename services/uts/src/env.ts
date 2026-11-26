@@ -7,6 +7,7 @@ import {
 import { z } from 'zod';
 import type { UtsKeySetDO } from './dos/UtsKeySetDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
+import type { SignInEnv } from './signin/providers/config';
 
 const HostSchema = z
   .string()
@@ -79,7 +80,7 @@ export type Env = {
    * is served only where it is set (src/signin/device/user-code.ts).
    */
   DEVICE_USER_CODE_KEY?: string;
-};
+} & SignInEnv;
 
 /** The mint Worker's deployed name in each environment. */
 export const MINT_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {

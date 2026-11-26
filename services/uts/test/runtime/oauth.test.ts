@@ -40,7 +40,7 @@ import {
   unexpectedStore,
   storeFailure,
 } from './oauth-support';
-import { config, env } from './test-env';
+import { config, env, noSignInMethods } from './test-env';
 
 const THIRD_PARTY = 'https://client.example.com/oauth/metadata.json';
 const VERIFIER = randomCredential();
@@ -465,7 +465,12 @@ describe('token endpoint: request shape', () => {
       oauthDeps(fakeGrants().access, {
         device: {
           grant: async () => new Response('hook', { status: 418 }),
-          pages: { config, signIn: unexpectedStore, userCodeSecret: 'A'.repeat(43) },
+          pages: {
+            config,
+            signIn: unexpectedStore,
+            methods: noSignInMethods,
+            userCodeSecret: 'A'.repeat(43),
+          },
         },
       })
     );

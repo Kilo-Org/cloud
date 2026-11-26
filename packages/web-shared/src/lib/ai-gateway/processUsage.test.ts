@@ -1628,7 +1628,8 @@ describe('logMicrodollarUsage', () => {
       expect(usageRecord?.provider).toBe('openrouter');
       expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
       expect(metadataRecord?.system_prompt_length).toBe(27);
-      expect(metadataRecord?.user_prompt_prefix).toBe('Please help me with');
+      expect(metadataRecord?.user_prompt_prefix).toBeNull();
+      expect(metadataRecord?.system_prompt_prefix_id).toBeNull();
       expect(metadataRecord?.max_tokens).toBe(200);
       expect(metadataRecord?.has_middle_out_transform).toBe(true);
       if (expected === null) {
@@ -1827,7 +1828,7 @@ describe('logMicrodollarUsage', () => {
       },
     };
 
-    // Record 2: overlapping IP, country, ja4, and system prompt with record 1
+    // Record 2: overlapping IP, country, and ja4 with record 1
     const usageStats2 = { ...BASE_USAGE_STATS, messageId: 'dedup-msg-2', cost_mUsd: 400 };
     const baseContext2 = createBaseUsageContext(user);
     const usageContext2: MicrodollarUsageContext = {
@@ -1914,9 +1915,11 @@ describe('logMicrodollarUsage', () => {
     expect(metadata1.ja4_digest_id).toBe(metadata2.ja4_digest_id);
     expect(metadata1.ja4_digest_id).not.toBe(metadata3.ja4_digest_id);
 
-    // Records 1 and 2 should share the same system prompt prefix ID (both use 'You are helpful')
-    expect(metadata1.system_prompt_prefix_id).toBe(metadata2.system_prompt_prefix_id);
-    expect(metadata1.system_prompt_prefix_id).not.toBe(metadata3.system_prompt_prefix_id);
+    // Prompt text is never recorded, whatever the request sent
+    for (const metadata of [metadata1, metadata2, metadata3]) {
+      expect(metadata.system_prompt_prefix_id).toBeNull();
+      expect(metadata.user_prompt_prefix).toBeNull();
+    }
 
     // All records should have their expected non-shared metadata
     expect(metadata1.max_tokens).toBe(200);
@@ -3244,7 +3247,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
   // realistically carry NULs in production. The realistic vector is fields
   // sourced from the JSON request body or upstream LLM responses:
   // `model`, `requested_model`, `inference_provider`, `upstream_id`,
-  // `finish_reason`, `message_id`, `system_prompt_prefix`, `user_prompt_prefix`.
+  // `finish_reason`, `message_id`.
   // The sanitizer still covers every string field defensively.
   const makeUsageContext = (overrides: Partial<MicrodollarUsageContext> = {}) =>
     ({
@@ -3311,9 +3314,9 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(core.inference_provider).toBe('prov');
     expect(core.requested_model).toBe('reqmodel');
 
-    // metadata fields (from prompt extraction + upstream response)
-    expect(metadata.system_prompt_prefix).toBe('sysprefix');
-    expect(metadata.user_prompt_prefix).toBe('usrprefix');
+    // metadata fields (prompt text is never recorded; the rest come from the upstream response)
+    expect(metadata.system_prompt_prefix).toBeNull();
+    expect(metadata.user_prompt_prefix).toBeNull();
     expect(metadata.upstream_id).toBe('up');
     expect(metadata.finish_reason).toBe('stop');
     expect(metadata.message_id).toBe('msgid');

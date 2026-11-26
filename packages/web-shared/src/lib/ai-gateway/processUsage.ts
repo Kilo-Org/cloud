@@ -218,8 +218,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
  *
  * NULs have been observed in client-populated fields on the LLM gateway hot
  * path: HTTP headers from the VS Code extension (machine_id, session_id,
- * http_user_agent) and prompt-derived fields (system_prompt_prefix,
- * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
+ * http_user_agent) and prompt-derived fields, which are no longer recorded. Sanitizing at the DB boundary is a safety net; once
  * the upstream source is identified via the `console.warn` in
  * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
  * and remove this.
@@ -362,11 +361,9 @@ export async function toInsertableDbUsageRecord(
     });
   }
 
-  if (organization_id) {
-    //never log any sensitive data for orgs
-    metadata.user_prompt_prefix = null;
-    metadata.system_prompt_prefix = null;
-  }
+  // Prompt text is never recorded.
+  metadata.user_prompt_prefix = null;
+  metadata.system_prompt_prefix = null;
 
   // Strip NUL bytes before returning. Postgres `text` columns reject them
   // (error 22021) and crash the microdollar_usage CTE insert, leaving the
@@ -1120,7 +1117,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`vercel_ip_country`, metadataFields.http_x_vercel_ip_country)}
           , ${createUpsertCTE(sql`vercel_ip_city`, metadataFields.http_x_vercel_ip_city)}
           , ${createUpsertCTE(sql`ja4_digest`, metadataFields.http_x_vercel_ja4_digest)}
-          , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
           , ${createUpsertCTE(sql`api_kind`, metadataFields.api_kind)}
@@ -1134,7 +1130,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               id,
               message_id,
               created_at,
-              user_prompt_prefix,
               vercel_ip_latitude,
               vercel_ip_longitude,
               system_prompt_length,
@@ -1163,7 +1158,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               vercel_ip_country_id,
               vercel_ip_city_id,
               ja4_digest_id,
-              system_prompt_prefix_id,
               finish_reason_id,
               editor_name_id,
               api_kind_id,
@@ -1177,7 +1171,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.id},
               ${metadataFields.message_id ?? '<missing>'},
               ${metadataFields.created_at},
-              ${metadataFields.user_prompt_prefix},
               ${metadataFields.http_x_vercel_ip_latitude},
               ${metadataFields.http_x_vercel_ip_longitude},
               ${metadataFields.system_prompt_length},
@@ -1206,7 +1199,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT vercel_ip_country_id FROM vercel_ip_country_cte),
               (SELECT vercel_ip_city_id FROM vercel_ip_city_cte),
               (SELECT ja4_digest_id FROM ja4_digest_cte),
-              (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
               (SELECT editor_name_id FROM editor_name_cte),
               (SELECT api_kind_id FROM api_kind_cte),

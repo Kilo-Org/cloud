@@ -193,14 +193,15 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
     return { tokens, exchanges: calls, presented, poisoned };
   }
 
+  // These tests fake only `Date` and let timers run for real: the shared cache hashes its key with
+  // `crypto.subtle.digest`, which finishes on real time, so a fixed fake-timer advance could end
+  // before it and leave the read's later timers unfired.
   async function settled<T>(promise: Promise<T>): Promise<T | unknown> {
-    const outcome = promise.catch((error: unknown) => error);
-    await vi.advanceTimersByTimeAsync(1_000);
-    return await outcome;
+    return await promise.catch((error: unknown) => error);
   }
 
   it('drops the poisoned entry and exchanges once more in the same attempt', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
     try {
       const { tokens, exchanges, presented, poisoned } = setup(() => false);
       expect(await settled(tokens.get(INGEST))).toBe('usage-ingest:sts.canary#2');
@@ -214,7 +215,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
   });
 
   it('does not loop: one re-exchange per refusal, then the denial holds until the recheck', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
     try {
       const { tokens, exchanges, presented } = setup(() => true);
       expect(await settled(tokens.get(INGEST))).toMatchObject({
@@ -229,7 +230,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
       expect(presented).toHaveLength(2);
 
       // The recheck presents the token this instance exchanged itself: refused, kept, not re-exchanged.
-      await vi.advanceTimersByTimeAsync(DENIED_RECHECK_MS);
+      vi.setSystemTime(Date.now() + DENIED_RECHECK_MS);
       expect(await settled(tokens.get(INGEST))).toMatchObject({ reason: 'denied' });
       expect(presented).toHaveLength(3);
       expect(exchanges).toEqual([STS]);

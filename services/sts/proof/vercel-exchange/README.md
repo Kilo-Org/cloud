@@ -62,12 +62,13 @@ token through the Vercel Runtime Cache.
   token: STS cannot tell them apart, and build code is trusted like the deployment's own code
   (design 6.2).
 
-`lib/shared-token.ts` implements the algorithm, the one the slice-4 Vercel client copies or imports;
-`test/proof/shared-token.test.ts` checks its logic against stand-ins, and
+The algorithm lives in the Vercel client, `packages/service-token-client/src/vercel/shared-token.ts`
+(its one source; `vercelIdentity` uses it and `lib/shared-token.ts` here re-exports it);
+`packages/service-token-client/test/shared-token.test.ts` checks its logic against stand-ins, and
 `test/proof/pass-rule.test.ts` checks the pass rule. **Proof run 3 was the merge gate for the first
 Vercel workload, and it passed.**
 
-## The shared-cache algorithm (`lib/shared-token.ts`)
+## The shared-cache algorithm (`packages/service-token-client/src/vercel/shared-token.ts`)
 
 1. Key: SHA-256 of a per-run salt (`?run=`, empty in production), the base token's `owner_id`,
    `project_id`, `environment`, `custom_environment_id` and `deployment_id` (decoded, not
@@ -125,6 +126,7 @@ it at deploy. `pnpm typecheck` and `pnpm lint` in `services/sts` check this dire
 | `api/cold.ts` | `POST /api/cold`: one exchange per invocation, no cache (run 1's mode), plus the base token's `iat`/`exp`, the clock, the exchanged `exp` and the rate-limit headers. |
 | `api/exchange.ts` | `POST /api/exchange?n=2500&c=50`: a burst from one instance. Its latency numbers are the ones to quote; the limit is measured only by a fan-out. |
 | `api/chain.ts` | `POST /api/chain`: exchanges for `https://example.invalid`, then exchanges that token again; `vercelRefusedChain` is true only for a non-429 refusal (`chainedRateLimited` marks a 429). |
+| `lib/shared-token.ts` | Re-exports the client's shared-cache module; the deploy step replaces it with a copy of that module, which imports nothing. |
 | `lib/pass-rule.ts` | The run-3 pass rule `drive.ts` applies. |
 | `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline and budget scope), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. Shared mode salts each run with a fresh `run` id. |
 | `inspect-env-token.ts` | Pulls `VERCEL_OIDC_TOKEN` with `vercel env pull` per environment of the proof project, exchanges it for `https://sts-proof.invalid`, and prints for both tokens `environment`, `custom_environment_id`, whether `user_id` is present, the `act` shape and `scope`, plus the gate outcome. Never a token. |
@@ -147,7 +149,9 @@ project of the team is linked, pulled or changed.
 
 ```sh
 WORK=$(mktemp -d) && rsync -a --exclude node_modules --exclude .vercel \
-  services/sts/proof/vercel-exchange/ "$WORK/" && cd "$WORK"   # keep .vercel out of the repo
+  services/sts/proof/vercel-exchange/ "$WORK/" \
+  && cp packages/service-token-client/src/vercel/shared-token.ts "$WORK/lib/shared-token.ts" \
+  && cd "$WORK"   # keep .vercel out of the repo; the copy replaces the re-export
 PROJECT=sts-proof-vercel-exchange-$(date +%Y%m%d)
 TEAM=team_ItxRShuUkJaEd9GmXMEEgunb
 vercel project add "$PROJECT" --scope kilocode

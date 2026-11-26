@@ -1,0 +1,36 @@
+{
+  "name": "@kilocode/service-token-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vercel": "./src/vercel/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/service-token-client/src packages/service-token-client/test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kilocode/sts-contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "@vercel/oidc": ">=3.8.0"
+  },
+  "peerDependenciesMeta": {
+    "@vercel/oidc": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "@vercel/oidc": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:vitest5",
+    "wrangler": "catalog:"
+  }
+}

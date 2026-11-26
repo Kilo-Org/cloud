@@ -64,8 +64,9 @@ describe('bundle HTTP route', () => {
   });
 
   it('recognizes a Vercel team slug issuer that no policy names and refuses the team id form', async () => {
+    // `kilocode` is named by the web policy, so the slug here is one no policy names.
     for (const [team, status, reason] of [
-      ['kilocode', 403, 'unknown_workload'],
+      ['acme', 403, 'unknown_workload'],
       ['team_ItxRShuUkJaEd9GmXMEEgunb', 401, 'identity_rejected'],
     ] as const) {
       const response = await SELF.fetch(`${config.issuer}/v1/bundle`, {

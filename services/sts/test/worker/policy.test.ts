@@ -84,7 +84,7 @@ scopes: ['o11y:alerts.read']
     );
   });
 
-  it('checks shipped policies against the shipped registry, which lists no scope yet', () => {
+  it('checks shipped policies against the shipped registry, which lists only the pilot scopes', () => {
     expect(() =>
       loadPolicies({
         'app-one.yaml': withGrants(`audiences: [gateway]\nscopes: ['gateway:models.read']\n`),
@@ -194,6 +194,7 @@ secrets: [APP_ONE_SECRET]
       workload?: string;
       environments?: string;
       environment?: string | null;
+      repository?: string;
       identity?: string;
       workflows?: string;
       events?: string;
@@ -203,7 +204,7 @@ workload: ${options.workload ?? 'ci-release'}
 environments: ${options.environments ?? '[production]'}
 identity:
   kind: github-oidc
-  repository: acme/repo
+  repository: ${options.repository ?? 'acme/repo'}
   repositoryId: '123'
   repositoryOwnerId: '456'${options.environment === null ? '' : `\n  environment: ${options.environment ?? 'release'}`}
   jobWorkflowRefs: ${options.workflows ?? `[${RELEASE}]`}
@@ -305,6 +306,20 @@ ${options.extra ?? ''}`;
         },
         'runs on a ref that identity.refs does not list'
       );
+    });
+
+    it('bounds a workflow ref at 512 characters, the most a delivery-row attribute holds', () => {
+      const repository = `${'o'.repeat(39)}/${'r'.repeat(100)}`;
+      const branch = (length: number) => `refs/heads/${'b'.repeat(length)}`;
+      const policy = (length: number) =>
+        github({
+          environments: '[staging]',
+          repository,
+          workflows: `[${repository}/.github/workflows/${'w'.repeat(200)}.yml@${branch(length)}]`,
+          identity: `\n  refs: [${branch(length)}]`,
+        });
+      expect(() => loadPolicies({ 'ci-release.yaml': policy(137) })).not.toThrow();
+      expectThrow({ 'ci-release.yaml': policy(138) }, 'does not match the policy schema');
     });
 
     it.each(['pull_request', 'pull_request_target', 'issues', 'issue_comment', 'merge_group'])(

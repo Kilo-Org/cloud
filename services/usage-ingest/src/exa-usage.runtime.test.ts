@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaMessage, exaRecord } from './exa-usage.test-fixture';
 import { MAX_EXA_USAGE_BYTES } from './publish-exa-usage';
+import { stsStandIn } from './sts-stand-in.test-fixture';
 import { usage } from './usage.test-fixture';
 
 const publishSecret = 'local-exa-publisher';
@@ -43,6 +44,7 @@ it('carries an Exa record from /exa-usage through the queue and consumer to the 
             USAGE_WRITER_SECRET: writerSecret,
           },
         },
+        stsStandIn(),
       ],
     });
     harness = server;

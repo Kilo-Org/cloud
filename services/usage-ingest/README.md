@@ -375,22 +375,20 @@ each outcome/path/region; keep them separate from the slow-biased phase series.
 
 Worker logs are available in Cloudflare through `observability.enabled`. This
 service's configuration does not opt in to Workers Logpush or configure an
-OpenTelemetry export destination; external export can be configured separately.
+OpenTelemetry export destination: Logpush would ship every publish and consume
+invocation of this billing hot path to Axiom (about 14 million publish invocations
+a day at the Nov 12 rate below), so the STS canary's Axiom signal comes from the
+web side instead ([STS canary](#sts-canary)).
 Each selected persistence attempt adds one completion line; IDs remain log
 fields, not metric labels. Logs can be dropped, and are not durable accounting:
 reconcile against persisted usage rows when exact completeness matters.
 
-Both environments also persist [Workers traces](https://developers.cloudflare.com/workers/observability/traces/)
-for a 5% head sample of invocations (`observability.traces`, inherited by
-`env.staging`). Trace sampling is independent of Workers Logs, which keep their unsampled default.
-Sampled traces show the fetch and queue handler spans, `queue_send`, and the
-outbound writer `fetch` with timing and status. In the dashboard, filter by
-`$metadata.service` (`usage-ingest` or `usage-ingest-staging`) rather than
-`service.name`. Trace IDs are not propagated to the Vercel writer, spans do not
-show time a message waits in the queue before the consumer handler starts, and a
-5% sample cannot count rare events; use the logs above for those. No custom spans
-are added. See the [span attributes](https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/)
-and [known limitations](https://developers.cloudflare.com/workers/observability/traces/known-limitations/).
+[Workers traces](https://developers.cloudflare.com/workers/observability/traces/)
+are off in both environments (`observability.traces`, inherited by `env.staging`).
+The Worker used to persist a 5% head sample; the repo rule for Workers that bind
+STS (`services/sts/test/repo/worker-configs.test.ts`: a trace records outbound
+URLs) keeps them off since the STS canary binding was added, so there are no
+fetch, queue or `queue_send` spans and writer timing comes only from the logs above.
 
 ## Queue policy
 
@@ -765,6 +763,108 @@ Whoever triages #o11y-alerts, who hands it to the DLQ replay owner:
 `usage_ingest_final_attempt_failed` in Workers Logs for `usage-ingest`, reconcile
 by stable usage ID, and replay only as described under [Queue policy](#queue-policy),
 within the DLQ's retention.
+
+## STS canary
+
+usage-ingest and the web app are the STS pilot pair (decision D6c in the secrets and tokens
+design, section 4.4 "When STS is down"): each mints a service token for the other and verifies
+the other's token, every 5 minutes, in production and staging. It is a synthetic check on real
+deployments; no usage publish or consume code, queue or credential takes part in it.
+
+One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
+
+1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (default `"false"` in both
+   environments).
+2. Gets a `web:sts.canary` token from `@kilocode/service-token-client` over the `STS` service
+   binding (`SecretsBroker`, `props.caller: "usage-ingest"`; `sts` in production, `sts-staging` in
+   staging). The token lives 300 s and renews at 240 s, so a warm isolate mints at most about once
+   per run.
+3. Posts to `WEB_STS_CANARY_URL` with `Authorization: Bearer <token>` and `x-sts-canary-run:
+   <run id>`; staging adds `x-vercel-protection-bypass` from the optional
+   `USAGE_WRITER_PROTECTION_BYPASS` secret. The web route verifies the token (`web:sts.canary`),
+   mints `usage-ingest:sts.canary` with its Vercel identity, calls `POST /sts-canary/verify` here
+   (expect 204), presents the `web` token it received (expect 403 `insufficient_scope`), the same
+   claims signed by a key STS never held (expect 401) and, when the instance holds one, an earlier
+   token past `exp` plus 60 s (expect 401, else `skipped`), and answers a report
+   (`StsCanaryReportSchema` in `@kilocode/sts-contracts`; each `detail` at most 200 characters).
+   Every call that carries a token or the bypass secret uses `redirect: 'manual'`: a 3xx fails
+   the check (web side) or the run (`StsCanaryWebRefused` here), and is never followed.
+   usage-ingest waits 80 s for the answer: the route's slowest run is a 5 s key-set fetch, a
+   30 s mint attempt and four 10 s calls here, 75 s, and its `maxDuration` is 90 s.
+4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
+   `succeeded` only when every check passed, with `mint_result`, `web_status`, and
+   `<check>_result`/`_status`/`_detail` for `outbound`, `negative_wrong_audience`,
+   `negative_forged` and `negative_expired`. A failure carries `exception_name`:
+   `ServiceTokenError` (STS refused or failed the mint; `mint_detail` names the reason),
+   `StsCanaryWebRefused` (the web route answered other than 200), `StsCanaryReportInvalid`,
+   `StsCanaryCheckFailed` or `StsCanaryNotConfigured`. No token appears in any log line.
+
+`POST /sts-canary/verify` is matched before the publish routes and their 404 guard. It verifies
+the bearer token with `@kilocode/verify` (issuer `STS_URL`, audience `usage-ingest`, scope
+`usage-ingest:sts.canary`, key set from `STS_URL` over HTTPS) and answers 204 or the section 7
+refusal (401 `invalid_token`, 403 `insufficient_scope`, 503 `temporarily_unavailable`). Each
+outcome logs `sts_canary_verify_accepted` or `sts_canary_verify_refused` (status, error, reason,
+the run id), never the token. The route works whether or not the flag is on.
+
+| Var | Production | Staging |
+|---|---|---|
+| `STS_CANARY_ENABLED` | `"false"` | `"false"` |
+| `STS_URL` | `https://sts.kiloapps.io` | `https://sts-staging.kiloapps.io` |
+| `WEB_STS_CANARY_URL` | `https://app.kilo.ai/api/internal/sts-canary` | `https://staging-app.kilo.ai/api/internal/sts-canary` |
+
+Binding STS turns `observability.traces` off in every block (see [Observability](#observability));
+Workers Logs stay on and carry the `scheduled_job.completed` and `sts_canary_verify_*` lines.
+There is no Logpush: it is a setting of the whole Worker and would send every billing publish
+and consume invocation to Axiom.
+
+The Axiom signal is the web route's line instead. Every run the route answers logs one JSON line
+(`event` `sts_canary`, `step` `report`, `outcome` `succeeded` or `failed`, `run`, `caller`,
+`inbound`, `outbound` and `negatives` with each check's `result`, `status` and `detail`; never a
+token), and one with `step` `inbound` when it refuses the caller. The Vercel log drain carries
+them to the Axiom dataset `vercel` (`vercel.projectName` `kilocode-app`, `request.path`
+`/api/internal/sts-canary`, `request.host` `app.kilo.ai` or `staging-app.kilo.ai`; the line is
+in `message`). Page with two Axiom threshold monitors per environment, notifying the existing
+alert route:
+
+- no line with `outcome` `succeeded` in 15 minutes;
+- any line with `outcome` `failed`, or with `step` `inbound`, in 15 minutes.
+
+A run whose call never reaches the web route (usage-ingest down, usage-ingest's own mint denied
+or failed, a network failure, a redirect) writes no web line, so it shows as a missing success.
+
+### Cost
+
+A token lives 300 s and renews at 240 s, and a held token stops being served 30 s before `exp`,
+so with a run every 300 s each side mints once per run, warm or cold. Per run and environment:
+
+| Item | Per run | Per day (288 runs) |
+|---|---|---|
+| usage-ingest invocations | 1 scheduled + 3 verify-route calls (4 once the web instance holds a token past `exp` + 60 s) | 288 + 864 to 1,152 |
+| Web function invocations | 1 | 288 |
+| STS mint calls | 2: one RPC over the binding (usage-ingest), one `POST /v1/token` (web); each one signer Durable Object request | 576 |
+| STS audit rows | 2 `token.issued` (a denial adds one `token.denied`) | 576 |
+| Audit queue messages | at most 2; the signer relays up to 500 events per message, so usually they share one with other rows | at most 576 |
+| STS key-set fetches | one per verifier isolate per 5 minutes: each usage-ingest isolate that serves a verify-route call and each web instance that serves the route fetches once when its copy is older than 5 minutes. The 3 or 4 verify calls and the scheduled run can land on different isolates, so a run can cost several. The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | at most (usage-ingest isolates + web instances) x 288 |
+| Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt. When STS refuses that fresh token too, the client writes a refusal marker for the deployment and audience that lives 60 s (`DENIED_RECHECK_MS`): until it expires no instance of the deployment drops a cached token or exchanges, each answers from its denied state. A deployment STS keeps refusing (a `web.yaml` naming the wrong project or environment) so costs at most 1 exchange per 60 s per audience and region, however many instances it runs; 17 such deployments spend about 17 of the project's roughly 100 exchanges a minute, a limit previews share with production, where without the marker each could spend about 6 | at most 288; in practice one per base-token renewal or new deployment |
+| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal | at most about 1,700 operations |
+| Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
+
+Both environments together double each daily figure.
+
+The client's cost on a real caller does not grow with its request rate. A request that finds a
+usable token reads an in-memory entry and makes no network call. Each caller instance makes one
+STS call per 240 s for up to 8 audiences it actually calls (one more call per further 8), and
+each verifier isolate fetches the key set once per 5 minutes. At one audience per caller:
+
+| Caller instances | STS mint calls (= signer requests = audit rows) | Audit queue messages at 500 events each |
+|---|---|---|
+| 10,000 | about 42 per second | about 0.1 per second |
+| 50,000 | about 208 per second | about 0.4 per second |
+| 200,000 | about 833 per second (843 with the 2,200 Vercel instances of design section 6.1) | about 1.7 per second |
+
+A Vercel caller adds one exchange per deployment, audience and base-token renewal, shared through
+the Runtime Cache, and one cache read per new instance. A deployment STS refuses adds at most one
+exchange per minute per audience and region, through the refusal marker.
 
 ## Deploy
 

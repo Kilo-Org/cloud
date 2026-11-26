@@ -11,6 +11,7 @@ import {
 import { z } from 'zod';
 import { PROVIDER_FETCH_TIMEOUT_MS } from '../constants';
 import {
+  JobWorkflowRefSchema,
   VERCEL_ISSUER_PREFIX,
   githubSubject,
   vercelStsEnvironments,
@@ -38,9 +39,6 @@ export type VerifiedSubject = {
   actor: string;
   claims: Record<string, string>;
 };
-
-/** The run a verified GitHub token came from; bounded flat strings for the delivery row. */
-export type GithubRun = { jobWorkflowRef: string; runId: string; runAttempt?: string };
 
 export type VerifyOutcome =
   | {
@@ -94,11 +92,23 @@ function claim(payload: JWTPayload, name: string): string | null {
 /** GitHub's run ids are decimal; anything else (or longer than 20 digits) is left out. */
 const RUN_NUMBER = /^[0-9]{1,20}$/;
 
+/**
+ * The run a verified GitHub token came from; bounded flat strings for the delivery row.
+ * `BundleDO.getBundle` parses it, because RPC hands over whatever its caller sent.
+ */
+export const GithubRunSchema = z.strictObject({
+  jobWorkflowRef: JobWorkflowRefSchema,
+  runId: z.string().regex(RUN_NUMBER),
+  runAttempt: z.string().regex(RUN_NUMBER).optional(),
+});
+export type GithubRun = z.infer<typeof GithubRunSchema>;
+
+/** Runs once `job_workflow_ref` equals a listed entry, which the policy schema bounds. */
 function githubRun(payload: JWTPayload): GithubRun | null {
   const jobWorkflowRef = claim(payload, 'job_workflow_ref');
   const runId = claim(payload, 'run_id');
   if (jobWorkflowRef === null || runId === null || !RUN_NUMBER.test(runId)) return null;
-  const run = { jobWorkflowRef: jobWorkflowRef.slice(0, 200), runId };
+  const run = { jobWorkflowRef, runId };
   const runAttempt = claim(payload, 'run_attempt');
   return runAttempt !== null && RUN_NUMBER.test(runAttempt) ? { ...run, runAttempt } : run;
 }

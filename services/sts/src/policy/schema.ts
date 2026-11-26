@@ -24,8 +24,13 @@ const RefSchema = z.string().regex(/^refs\/[A-Za-z0-9._/-]{1,200}$/);
 const GithubRepositorySchema = z.string().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/);
 /** Plain names only, so the token's `sub` carries the name as written, with nothing escaped. */
 const GithubEnvironmentSchema = z.string().regex(/^[A-Za-z0-9._-]{1,255}$/);
-const JobWorkflowRefSchema = z
+/**
+ * At most 512 characters: the delivery row records a verified token's `job_workflow_ref`, which
+ * equals one of these, as one audit attribute, and an attribute string holds at most 512.
+ */
+export const JobWorkflowRefSchema = z
   .string()
+  .max(512)
   .regex(
     /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}\/\.github\/workflows\/[A-Za-z0-9._-]{1,200}\.ya?ml@refs\/[A-Za-z0-9._/-]{1,200}$/
   );

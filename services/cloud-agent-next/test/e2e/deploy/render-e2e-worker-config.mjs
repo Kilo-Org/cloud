@@ -196,6 +196,8 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
   };
+  // Q9 admission observation is production-only; the e2e Worker never inherits it.
+  delete config.vars.KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED;
 
   config.secrets_store_secrets = config.secrets_store_secrets ?? [];
   if (!config.secrets_store_secrets.some(secret => secret.binding === 'NEXTAUTH_SECRET')) {

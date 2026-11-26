@@ -54,6 +54,9 @@ for (const cachingDisabled of [undefined, false, true]) {
           readFileSync(join(directory, '.wrangler/wrangler.staging.json'), 'utf8')
         );
         assert.deepEqual(config.hyperdrive, [{ binding: 'HYPERDRIVE', id: manifest.hyperdriveID }]);
+        assert.equal(config.vars.ENVIRONMENT, 'staging');
+        assert.equal(config.vars.USER_TENANT_SESSIONS, '10000');
+        assert.equal(Object.hasOwn(config.vars, 'KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED'), false);
         assert.equal(
           config.ratelimits.find(binding => binding.name === 'USER_DATA_BLOCK_LIMITER').simple
             .limit,

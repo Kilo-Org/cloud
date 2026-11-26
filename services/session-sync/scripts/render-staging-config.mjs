@@ -82,6 +82,9 @@ try {
       !source.durable_objects.bindings[4].environment,
     'Review the staging renderer when the entrypoint or Durable Object bindings change'
   );
+  const vars = { ...source.vars, ENVIRONMENT: 'staging' };
+  // Q9 admission observation is production-only; staging never inherits it.
+  delete vars.KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED;
   // Select only service code/runtime settings. Never inherit local credentials,
   // resource bindings, routes, environments, or a future production service binding.
   const config = {
@@ -95,7 +98,7 @@ try {
     observability: source.observability,
     workers_dev: true,
     preview_urls: false,
-    vars: { ...source.vars, ENVIRONMENT: 'staging' },
+    vars,
     ratelimits: source.ratelimits.map((binding, index) => ({
       ...binding,
       namespace_id: String(1028 + index),

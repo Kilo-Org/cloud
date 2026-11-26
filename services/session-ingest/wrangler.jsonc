@@ -24,6 +24,7 @@
     "DIRECT_INGEST_PERCENT": "100",
     "DIRECT_INGEST_MAX_BYTES": "4194304",
     "SESSION_SHARE_TOKEN_MIN_IAT": "0",
+    "KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED": "true",
   },
   "observability": {
     "enabled": true,

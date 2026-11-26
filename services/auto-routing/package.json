@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --var KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED:false",
     "replay": "tsx scripts/decide-replay.ts",
     "types": "wrangler types --include-runtime=false",
     "typecheck": "tsgo --noEmit",

@@ -34,6 +34,7 @@
     "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
     "KILO_AI_GATEWAY_BASE_URL": "https://ai-gateway.kilo.ai",
+    "KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED": "true",
   },
   "durable_objects": {
     "bindings": [

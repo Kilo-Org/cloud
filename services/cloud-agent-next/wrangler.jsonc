@@ -87,6 +87,7 @@
     "VERCEL_SANDBOX_RUNTIME": "node24",
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
+    "KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED": "true",
   },
   "placement": { "mode": "smart" },
   "ai": { "binding": "AI" },

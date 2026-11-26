@@ -179,7 +179,12 @@ export async function createSignInMethodChangeCode(
   });
 }
 
-export type ConsumeSignInMethodChangeCodeResult = 'ok' | 'invalid' | 'locked';
+/**
+ * `locked_now`: this wrong code reached the attempt limit and locked the
+ * account. `locked`: an earlier one keeps it locked. Both refuse the change;
+ * the audit stores only `locked_now`.
+ */
+export type ConsumeSignInMethodChangeCodeResult = 'ok' | 'invalid' | 'locked' | 'locked_now';
 
 /**
  * Checks the code and uses it. A correct code is used once only. A wrong code,
@@ -226,7 +231,7 @@ export async function consumeSignInMethodChangeCode(
         .update(magic_link_tokens)
         .set({ expires_at: sql`NOW()` })
         .where(attemptWindowFilter(normalizedEmail));
-      return 'locked';
+      return 'locked_now';
     }
 
     await tx

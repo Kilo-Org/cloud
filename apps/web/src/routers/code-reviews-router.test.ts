@@ -97,6 +97,7 @@ import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { createOrEnableAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -1399,6 +1400,43 @@ describe('review agent config REVIEW.md setting', () => {
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockFetchBitbucketPullRequest).not.toHaveBeenCalled();
+  });
+
+  it('refuses a platform admin off the admin network before starting a Bitbucket review', async () => {
+    await insertBitbucketIntegration();
+    await insertBitbucketConfig({ enabled: true });
+    const env: Record<string, string | undefined> = process.env;
+    const original = { VERCEL: env.VERCEL, ADMIN_ALLOWED_NETWORKS: env.ADMIN_ALLOWED_NETWORKS };
+    env.VERCEL = '1';
+    env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
+    resetAdminNetworkConfigForTest();
+    try {
+      const offNetwork = await createCallerForUser(adminUser.id, {
+        headers: { 'x-vercel-forwarded-for': '198.51.100.1' },
+      });
+
+      await expect(
+        offNetwork.organizations.reviewAgent.triggerBitbucketCodeReview({
+          organizationId: organization.id,
+          pullRequestUrl: 'https://bitbucket.org/acme/api/pull-requests/42',
+        })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: expect.stringContaining('Cloudflare WARP'),
+      });
+      expect(mockFetchBitbucketPullRequest).not.toHaveBeenCalled();
+      const reviews = await db
+        .select()
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id));
+      expect(reviews).toEqual([]);
+    } finally {
+      for (const [key, value] of Object.entries(original)) {
+        if (value === undefined) delete env[key];
+        else env[key] = value;
+      }
+      resetAdminNetworkConfigForTest();
+    }
   });
 
   it('saves a new Bitbucket config disabled without hook work and round-trips UUIDs', async () => {

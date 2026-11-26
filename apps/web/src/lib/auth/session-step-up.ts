@@ -33,7 +33,7 @@ import {
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import { recordAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { advancePasskeyCounter, getWebRelyingParty } from '@/lib/auth/passkey';
 
 export type StepUpErrorCode =

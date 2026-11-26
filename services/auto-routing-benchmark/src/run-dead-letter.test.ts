@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type * as DbModule from './db';
 import type * as SchedulerModule from './scheduler';
 import { DECIDER_CASES } from './datasets/decider-cases';
@@ -234,7 +235,11 @@ describe('processDeadLetter — legacy migration', () => {
         if (typeof init?.body !== 'string') throw new Error('Expected a JSON token request.');
         expect(init?.method).toBe('POST');
         expect(headers.get('authorization')).toBe(`Bearer ${'mint-test-secret'}`);
-        expect(JSON.parse(init.body)).toEqual({ userId: 'user-1', organizationId });
+        expect(JSON.parse(init.body)).toEqual({
+          userId: 'user-1',
+          organizationId,
+          audience: KILO_API_AUDIENCE,
+        });
         return Response.json({
           token: 'dead-letter-test-token',
           expiresAt: '2026-10-18T13:00:00.000Z',

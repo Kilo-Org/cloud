@@ -167,4 +167,32 @@ describe('beforeSendScrubbedEvent', () => {
       expect(result?.extra.token).toBe('[redacted]');
     });
   });
+
+  it('scrubs native breadcrumbs that the SDK merged into the event', () => {
+    const fakeSignature = 'fake-signed-query-0000';
+    const event = {
+      exception: { values: [{ type: 'Error', value: 'native request failed' }] },
+      breadcrumbs: [
+        {
+          type: 'http',
+          category: 'http',
+          data: {
+            url: `https://api.kilo.ai/api/export?sig=${fakeSignature}`,
+            method: 'GET',
+            status_code: 200,
+            'http.query': `sig=${fakeSignature}`,
+            'http.fragment': fakeSignature,
+          },
+        },
+        { category: 'console', message: `retry with ${fakeSignature}` },
+      ],
+    };
+
+    const result = beforeSendScrubbedEvent(event);
+
+    expect(result?.breadcrumbs).toHaveLength(1);
+    expect(result?.breadcrumbs[0]?.data).not.toHaveProperty('http.query');
+    expect(result?.breadcrumbs[0]?.data).not.toHaveProperty('http.fragment');
+    expect(JSON.stringify(result)).not.toContain(fakeSignature);
+  });
 });

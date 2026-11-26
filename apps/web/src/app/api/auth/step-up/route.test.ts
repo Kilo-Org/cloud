@@ -110,6 +110,24 @@ describe('POST /api/auth/step-up', () => {
     expect(response.status).toBe(403);
   });
 
+  it.each([
+    ['outside-allowlist', 'ADMIN_NETWORK_DENIED'],
+    ['no-client-address', 'ADMIN_NETWORK_DENIED'],
+    ['not-configured', 'ADMIN_NETWORK_NOT_CONFIGURED'],
+  ])('refuses an admin network denial (%s) with %s', async (reason, code) => {
+    mockGetSession.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json({ error: 'raw message' }, { status: 403 }),
+      adminNetworkDenial: reason,
+    } as never);
+
+    const response = await POST(createRequest({ action: 'options' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: code });
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+  });
+
   it('tells a legacy session to sign in again', async () => {
     mockGetSession.mockResolvedValue(session({ webSessionId: undefined }));
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 
 // The procedures read the browser session from the request cookies and the
@@ -39,6 +39,7 @@ import { encode, type JWT } from 'next-auth/jwt';
 import { and, eq, sql } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
+  auth_audit_logs,
   device_sessions,
   magic_link_tokens,
   organization_audit_logs,
@@ -54,7 +55,10 @@ import {
   sendSignInMethodChangeCodeEmail,
   sendSignInMethodRemovedEmail,
 } from '@kilocode/web-shared/lib/email';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   createCallerForUser,
@@ -67,7 +71,11 @@ import { linkAccountToExistingUser } from '@/lib/user';
 import { SIGN_IN_METHOD_CHANGE_REFUSAL_CODES } from '@/lib/auth/sign-in-method-change-codes';
 import { SIGN_IN_METHOD_REFUSAL_CODES } from '@kilocode/app-shared/auth';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import { setAdminActionSinkForTest, type AdminActionEvent } from '@/lib/admin/admin-action-audit';
+import {
+  setAdminActionSinkForTest,
+  type AdminActionEvent,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 
 const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
 const mockSendCode = jest.mocked(sendSignInMethodChangeCodeEmail);
@@ -75,7 +83,8 @@ const mockSendRemoved = jest.mocked(sendSignInMethodRemovedEmail);
 const mockSendAdded = jest.mocked(sendNewSignInMethodEmail);
 
 const EXPECTED_DETAILS = {
-  changedAt: expect.any(Date),
+  actor: 'owner' as const,
+  occurredAt: expect.any(Date),
   ip: '203.0.113.7',
   location: 'San Francisco, US',
   device: 'Chrome on macOS',
@@ -101,9 +110,20 @@ async function setSessionCookie(user: User, claims: Partial<JWT> = {}) {
   });
 }
 
+const createdUserIds: string[] = [];
+
 async function insertUser(fields: Partial<User> = {}) {
-  return insertTestUser({ web_session_pepper: randomUUID(), ...fields });
+  const user = await insertTestUser({ web_session_pepper: randomUUID(), ...fields });
+  createdUserIds.push(user.id);
+  return user;
 }
+
+// The notices this suite sends leave outbox rows that reference its users; a
+// later suite in the same worker that deletes every user would hit them. The
+// rows go after each test, while the database connection is still open.
+afterEach(async () => {
+  await deleteTransactionalEmailLogForUsers(createdUserIds.splice(0));
+});
 
 /** A user whose email domain an organization claims for SSO. */
 async function insertSsoMember(fields: Partial<User> = {}) {
@@ -595,12 +615,14 @@ describe('user.unlinkAuthProvider', () => {
       caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
     ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod));
     expect(await providersOf(user.id)).toEqual(['github']);
+    expect(mockSendRemoved).not.toHaveBeenCalled();
 
     await addProvider(user.id, 'google');
     await expect(
       caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
     ).resolves.toEqual({ success: true });
     expect(await providersOf(user.id)).toEqual(['google']);
+    expect(mockSendRemoved).toHaveBeenCalledTimes(1);
   });
 
   it('unlinks with the code, writes the admin audit row and sends the notice', async () => {
@@ -752,6 +774,7 @@ describe('linkAccountToExistingUser', () => {
       user.google_user_email,
       'GitHub',
       { email: 'notice@example.net', displayName: null },
+      { kind: 'added' },
       EXPECTED_DETAILS
     );
   });
@@ -764,5 +787,137 @@ describe('linkAccountToExistingUser', () => {
 
     expect(result.success).toBe(true);
     expect(await providersOf(user.id)).toContain('github');
+  });
+});
+
+describe('sign-in method audit rows', () => {
+  async function authRowsFor(userId: string) {
+    return db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
+  }
+
+  it('records a refused link start with its refusal code', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.user.linkAuthProvider({ provider: 'openai' })).rejects.toEqual(
+      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.browserSessionRequired)
+    );
+
+    expect(await authRowsFor(user.id)).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.link',
+        outcome: 'failure',
+        user_id: user.id,
+        method: 'openai',
+        failure_reason: SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.browserSessionRequired,
+        subject_email_hash: authAuditEmailHash(user.google_user_email),
+      }),
+    ]);
+  });
+
+  it('records a refused unlink of the last sign-in method', async () => {
+    const user = await insertUser();
+    await addProvider(user.id, 'google');
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+
+    await expect(caller.user.unlinkAuthProvider({ provider: 'google' })).rejects.toEqual(
+      refusedWith(SIGN_IN_METHOD_REFUSAL_CODES.lastMethod)
+    );
+
+    expect(await providersOf(user.id)).toEqual(['google']);
+    expect(await authRowsFor(user.id)).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.unlink',
+        outcome: 'failure',
+        user_id: user.id,
+        method: 'google',
+        failure_reason: SIGN_IN_METHOD_REFUSAL_CODES.lastMethod,
+        subject_email_hash: authAuditEmailHash(user.google_user_email),
+      }),
+    ]);
+  });
+
+  it('records one success row for an unlink', async () => {
+    const user = await insertUser();
+    await addProvider(user.id, 'google');
+    await addProvider(user.id, 'github');
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const { code, challengeId } = await requestCode(caller, 'unlink', 'github');
+
+    await caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId });
+
+    expect(await authRowsFor(user.id)).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.unlink',
+        outcome: 'success',
+        user_id: user.id,
+        method: 'github',
+        failure_reason: null,
+        subject_email_hash: authAuditEmailHash(user.google_user_email),
+      }),
+    ]);
+  });
+
+  it('records a link for every account, not only admins and SSO members', async () => {
+    const user = await insertUser();
+
+    await linkAccountToExistingUser(user.id, {
+      google_user_email: 'linked-identity@example.net',
+      google_user_name: 'Linked',
+      google_user_image_url: '',
+      hosted_domain: '@@github@@',
+      provider: 'github',
+      provider_account_id: `github-${randomUUID()}`,
+      display_name: null,
+    });
+
+    const rows = await authRowsFor(user.id);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.link',
+        outcome: 'success',
+        user_id: user.id,
+        method: 'github',
+        failure_reason: null,
+      }),
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('linked-identity');
+    expect(JSON.stringify(rows)).not.toContain(user.google_user_email);
+  });
+
+  it('records a relink of the identity already attached as one no-op success row', async () => {
+    const user = await insertUser();
+    const relinked = {
+      google_user_email: 'relinked-identity@example.net',
+      google_user_name: 'Linked',
+      google_user_image_url: '',
+      hosted_domain: '@@github@@',
+      provider: 'github' as const,
+      provider_account_id: `github-${randomUUID()}`,
+      display_name: null,
+    };
+    await linkAccountToExistingUser(user.id, relinked);
+
+    const result = await linkAccountToExistingUser(user.id, relinked);
+
+    expect(result.success).toBe(true);
+    const rows = await authRowsFor(user.id);
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'auth.sign_in_method.link', metadata: null }),
+        expect.objectContaining({
+          action: 'auth.sign_in_method.link',
+          outcome: 'success',
+          method: 'github',
+          subject_email_hash: authAuditEmailHash(user.google_user_email),
+          metadata: { noop: true },
+        }),
+      ])
+    );
+    expect(mockSendAdded).toHaveBeenCalledTimes(1);
   });
 });

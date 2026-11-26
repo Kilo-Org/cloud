@@ -29,8 +29,8 @@ import {
 } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
-import type * as TokensModule from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
+import type * as TokensModule from '@/lib/auth/kilo-token-signing';
 import { getWorkOSOrganization } from '@/lib/user';
 
 jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
@@ -50,12 +50,12 @@ jest.mock('@/lib/user', () => ({
 
 // Token generation is the first step of minting a pair, so failing it proves a
 // mint failure rolls back the rows the transaction wrote before it.
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
-  ...(jest.requireActual('@kilocode/web-shared/lib/tokens') as object),
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
+  ...(jest.requireActual('@/lib/auth/kilo-token-signing') as object),
   generateApiToken: jest.fn(),
 }));
 
-const actualTokens = jest.requireActual<typeof TokensModule>('@kilocode/web-shared/lib/tokens');
+const actualTokens = jest.requireActual<typeof TokensModule>('@/lib/auth/kilo-token-signing');
 
 const mockIsEmailBlacklisted = jest.mocked(isEmailBlacklisted);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);

@@ -51,6 +51,10 @@ import { organizationsSettingsRouter } from '@/routers/organizations/organizatio
 import { organizationsUsageDetailsRouter } from '@/routers/organizations/organization-usage-details-router';
 import { organizationRequestLogsRouter } from '@/routers/organizations/organization-request-logs-router';
 import { TRPCError } from '@trpc/server';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import {
@@ -536,12 +540,20 @@ export const organizationsRouter = createTRPCRouter({
 
   // this is an admin only proceedure until we do https://github.com/Kilo-Org/kilocode-backend/issues/2846
   updatePlan: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.plan.set',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
     .input(
       OrganizationIdInputSchema.extend({
         plan: OrganizationPlanSchema,
       })
     )
     .mutation(async opts => {
+      addAdminAuditMetadata({ plan: opts.input.plan });
       await db.transaction(async tx => {
         await bumpOrganizationGroupPolicyRevision(tx, opts.input.organizationId, opts.ctx.user.id);
         await tx
@@ -557,19 +569,29 @@ export const organizationsRouter = createTRPCRouter({
       };
     }),
 
-  updateSeatsRequired: adminProcedure.input(OrganizationSeatsUpdateSchema).mutation(async opts => {
-    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
-    await db
-      .update(organizations)
-      .set({ require_seats: opts.input.seatsRequired })
-      .where(eq(organizations.id, opts.input.organizationId));
-    return {
-      organization: {
-        id: opts.input.organizationId,
-        require_seats: opts.input.seatsRequired,
+  updateSeatsRequired: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.seats_required.set',
+        target: inputFieldTarget('organization', 'organizationId'),
       },
-    };
-  }),
+    })
+    .input(OrganizationSeatsUpdateSchema)
+    .mutation(async opts => {
+      await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
+      addAdminAuditMetadata({ requireSeats: opts.input.seatsRequired });
+      await db
+        .update(organizations)
+        .set({ require_seats: opts.input.seatsRequired })
+        .where(eq(organizations.id, opts.input.organizationId));
+      return {
+        organization: {
+          id: opts.input.organizationId,
+          require_seats: opts.input.seatsRequired,
+        },
+      };
+    }),
 
   usageStats: organizationMemberProcedure.output(UsageStatsSchema).query(async opts => {
     // Fetch and return usage stats for the organization (last 30 days)

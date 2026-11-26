@@ -8,7 +8,8 @@
       "securityFinding": "Wiwa aabo nilo akiyesi",
       "securityUpdate": "Ayẹwo aabo ni imudojuiwọn",
       "agentBriefing": "Ìròyìn ìṣe aṣojú sọfitiwia rẹ ti ṣetán",
-      "activeAgentsGlanceable": "Awọn aṣoju to n ṣiṣẹ ni imudojuiwọn"
+      "activeAgentsGlanceable": "Awọn aṣoju to n ṣiṣẹ ni imudojuiwọn",
+      "accountSecurity": "Iṣẹ́ ààbò wáyé lórí àkọọ́lẹ̀ rẹ"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Irufin SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "A ṣàfikún passkey sí àkọọ́lẹ̀ rẹ"
+      },
+      "passkeyRemoved": {
+        "title": "A yọ passkey kúrò lórí àkọọ́lẹ̀ rẹ"
+      },
+      "signInMethodLinked": {
+        "title": "A ṣàfikún ọ̀nà ìwọlé sí àkọọ́lẹ̀ rẹ"
+      },
+      "signInMethodUnlinked": {
+        "title": "A yọ ọ̀nà ìwọlé kúrò lórí àkọọ́lẹ̀ rẹ"
+      },
+      "deviceSignInApproved": {
+        "title": "A fọwọ́ sí ìwọlé ẹ̀rọ"
+      },
+      "apiKeyReset": {
+        "title": "A tún àmì API ṣètò"
+      },
+      "browserSessionsRevoked": {
+        "title": "O ti jáde kúrò ní gbogbo aṣàwákiri"
+      },
+      "deviceSessionRevoked": {
+        "title": "A ti mú ẹ̀rọ kan jáde kúrò ní àkọọ́lẹ̀ rẹ"
+      },
+      "signInResetBySupport": {
+        "title": "Ìrànlọ́wọ́ Kilo tún ìwọlé ṣètò"
+      },
+      "newSignIn": {
+        "title": "Ìwọlé tuntun sí àkọọ́lẹ̀ rẹ"
+      },
+      "body": {
+        "deviceAndLocation": "Láti {{device}} nítòsí {{location}}. Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
+        "device": "Láti {{device}}. Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
+        "location": "Nítòsí {{location}}. Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
+        "unknown": "Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
+        "selfNamedDevice": "Láti ẹ̀rọ kan tí ó pe ara rẹ̀ ní \"{{name}}\". Kì í ṣe ìwọ? Ṣàyẹ̀wò ààbò àkọọ́lẹ̀ rẹ báyìí.",
+        "support": "Ìrànlọ́wọ́ Kilo ló ṣe èyí. Tí o kò bá béèrè fún un, kàn sí ìrànlọ́wọ́."
+      }
     }
   },
   "sessionReady": {

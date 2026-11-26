@@ -103,7 +103,7 @@ truth for which function regions actually run those deployments.
 `disable_openrouter` and `data_region` (`providers/organization-gateway-settings.ts`)
 apply only to enterprise organizations in the `gateway_settings` feature, and only to
 Kilo-paid routes. A region pins Kilo's Vercel route, refuses other routes, and implies
-OpenRouter off. BYOK, ChatGPT and Claude billing routes, FIM and edit are exempt.
+OpenRouter off. BYOK, ChatGPT and Claude billing routes and FIM are exempt.
 OpenRouter off also lifts the Vercel opt-out list.
 
 Deliberate limitations until users ask:
@@ -115,8 +115,8 @@ Deliberate limitations until users ask:
 
 ## Autocomplete routes
 
-The edit and FIM (autocomplete) handlers intentionally skip the account rate
-limit and Enkrypt guardrails: their small models are not attack targets in
+The FIM (autocomplete) handler intentionally skips the account rate
+limit and Enkrypt guardrails: its small models are not attack targets in
 practice, and the added latency makes no sense for autocomplete.
 
 ## Data collection versus ZDR

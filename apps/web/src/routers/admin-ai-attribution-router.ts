@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { code_indexing_manifest } from '@kilocode/db/schema';
 import { eq, and, ilike, desc, sql } from 'drizzle-orm';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const GetDebugDataSchema = z.object({
   organization_id: z.string(),
@@ -122,7 +123,16 @@ export const adminAIAttributionRouter = createTRPCRouter({
     return results.map(r => r.git_branch);
   }),
 
-  deleteAttribution: adminProcedure.input(DeleteAttributionSchema).mutation(async ({ input }) => {
-    return deleteAIAttribution(input);
-  }),
+  deleteAttribution: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'ai_attribution.attribution.delete',
+        target: inputFieldTarget('organization', 'organization_id'),
+      },
+    })
+    .input(DeleteAttributionSchema)
+    .mutation(async ({ input }) => {
+      return deleteAIAttribution(input);
+    }),
 });

@@ -8,7 +8,8 @@
       "securityFinding": "Uma descoberta de segurança requer atenção",
       "securityUpdate": "Uma verificação de segurança tem uma atualização",
       "agentBriefing": "O seu relatório do agente está pronto",
-      "activeAgentsGlanceable": "Os agentes ativos têm uma atualização"
+      "activeAgentsGlanceable": "Os agentes ativos têm uma atualização",
+      "accountSecurity": "Houve atividade de segurança na sua conta"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Incumprimento de SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Chave de acesso adicionada à sua conta"
+      },
+      "passkeyRemoved": {
+        "title": "Chave de acesso removida da sua conta"
+      },
+      "signInMethodLinked": {
+        "title": "Método de início de sessão adicionado à sua conta"
+      },
+      "signInMethodUnlinked": {
+        "title": "Método de início de sessão removido da sua conta"
+      },
+      "deviceSignInApproved": {
+        "title": "Início de sessão de dispositivo aprovado"
+      },
+      "apiKeyReset": {
+        "title": "Token de API reposto"
+      },
+      "browserSessionsRevoked": {
+        "title": "Sessão terminada em todos os navegadores"
+      },
+      "deviceSessionRevoked": {
+        "title": "Um dispositivo terminou sessão na sua conta"
+      },
+      "signInResetBySupport": {
+        "title": "Início de sessão reposto pelo suporte da Kilo"
+      },
+      "newSignIn": {
+        "title": "Novo início de sessão na sua conta"
+      },
+      "body": {
+        "deviceAndLocation": "A partir de {{device}} perto de {{location}}. Não foi você? Reveja agora a segurança da sua conta.",
+        "device": "A partir de {{device}}. Não foi você? Reveja agora a segurança da sua conta.",
+        "location": "Perto de {{location}}. Não foi você? Reveja agora a segurança da sua conta.",
+        "unknown": "Não foi você? Reveja agora a segurança da sua conta.",
+        "selfNamedDevice": "A partir de um dispositivo que se identificou como \"{{name}}\". Não foi você? Reveja agora a segurança da sua conta.",
+        "support": "Feito pelo suporte da Kilo. Se não pediu isto, contacte o suporte."
+      }
     }
   },
   "sessionReady": {

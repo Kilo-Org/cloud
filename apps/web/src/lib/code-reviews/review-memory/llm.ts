@@ -7,7 +7,7 @@ import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { User } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';

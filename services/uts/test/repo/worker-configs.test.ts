@@ -1,0 +1,328 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { experimental_readRawConfig } from 'wrangler';
+import {
+  FEED_CONFIG,
+  MINT_CONFIG,
+  MINT_DEV_CONFIG,
+  parseWorkerConfig,
+  repoRoot,
+  utsConfigProblems,
+  workerConfigPaths,
+  workerConfigProblems,
+  type WorkerConfig,
+} from './worker-configs';
+
+/**
+ * Reads a config with Wrangler's own JSON, JSONC and TOML parser, the one a deploy uses. It lives
+ * in this test file because wrangler's published types re-export from `@cloudflare/workers-utils`,
+ * which wrangler does not ship, so type-aware lint sees the function as `error` typed everywhere
+ * but `*.test.ts` (as in services/sts/test/repo).
+ */
+const readWorkerConfig = (path: string) =>
+  parseWorkerConfig(path, experimental_readRawConfig({ config: join(repoRoot, path) }).rawConfig);
+
+const repoConfigs = () => workerConfigPaths(repoRoot).map(readWorkerConfig);
+const configAt = (path: string) => readWorkerConfig(path);
+
+const NO_TRACES = { observability: { enabled: true, traces: { enabled: false } } };
+
+const consumer = (raw: Record<string, unknown>, path = 'services/consumer/wrangler.jsonc') =>
+  parseWorkerConfig(path, { name: 'consumer', ...NO_TRACES, ...raw });
+
+/** The repository's own UTS configs, with `edit` applied to the feed config. */
+function withFeed(edit: (raw: Record<string, unknown>) => Record<string, unknown>): WorkerConfig[] {
+  const feed = configAt(FEED_CONFIG);
+  return [
+    configAt(MINT_CONFIG),
+    parseWorkerConfig(FEED_CONFIG, edit(structuredClone(feed.config))),
+  ];
+}
+
+const mintBinding = (service: string, caller: string) => ({
+  binding: 'UTS_MINT',
+  service,
+  entrypoint: 'SignerKeys',
+  props: { caller },
+});
+
+describe('repository Worker configs', () => {
+  it('reach UTS only the way the rules allow', () => {
+    expect(workerConfigProblems(repoConfigs())).toEqual([]);
+  });
+
+  it('keep the two UTS Workers as configured: names, eu jurisdiction, placement, no traces', () => {
+    expect(utsConfigProblems(repoConfigs())).toEqual([]);
+  });
+});
+
+describe('UTS Durable Object classes', () => {
+  it('fail a config outside the mint Worker that names the signer or the key-set shard class', () => {
+    for (const className of ['UtsSignerDO', 'UtsKeySetDO']) {
+      const problems = workerConfigProblems([
+        consumer({ durable_objects: { bindings: [{ name: 'OBJECTS', class_name: className }] } }),
+      ]);
+      expect(problems).toEqual([
+        expect.stringContaining(`names UTS Durable Object class ${className}`),
+      ]);
+    }
+  });
+
+  it('fail a config that names the signer class in an env block or a preview', () => {
+    const objects = {
+      durable_objects: { bindings: [{ name: 'SIGNER', class_name: 'UtsSignerDO' }] },
+    };
+    expect(workerConfigProblems([consumer({ env: { staging: objects } })])).toHaveLength(1);
+    expect(workerConfigProblems([consumer({ previews: objects })])).toHaveLength(1);
+  });
+
+  it('fail the feed Worker binding the signer class', () => {
+    const problems = workerConfigProblems(
+      withFeed(raw => ({
+        ...raw,
+        durable_objects: {
+          bindings: [{ name: 'SIGNER', class_name: 'UtsSignerDO', script_name: 'uts' }],
+        },
+      }))
+    );
+    expect(problems).toEqual([expect.stringContaining('only services/uts/wrangler.jsonc')]);
+  });
+
+  it('fail any reference to a UTS script by name', () => {
+    const references = [
+      {
+        durable_objects: {
+          bindings: [{ name: 'X', class_name: 'Other', script_name: 'uts-staging' }],
+        },
+      },
+      { workflows: [{ binding: 'W', name: 'w', class_name: 'W', script_name: 'uts' }] },
+      { tail_consumers: [{ service: 'uts-feed' }] },
+      {
+        migrations: [
+          { tag: 'v1', transferred_classes: [{ from: 'A', from_script: 'uts', to: 'B' }] },
+        ],
+      },
+      { exports: { A: { transfer_from: 'uts' } } },
+    ];
+    for (const raw of references) {
+      expect(workerConfigProblems([consumer(raw)])).toEqual([
+        expect.stringContaining('UTS classes and handlers are internal'),
+      ]);
+    }
+  });
+});
+
+describe('the SignerKeys entrypoint', () => {
+  it('fails any other config that binds the mint Worker, at any entrypoint', () => {
+    for (const binding of [
+      mintBinding('uts', 'consumer'),
+      { binding: 'UTS', service: 'uts-staging' },
+      mintBinding('uts-local', 'uts-feed-local'),
+    ]) {
+      expect(workerConfigProblems([consumer({ services: [binding] })])).toEqual([
+        expect.stringContaining('only the feed Worker may'),
+      ]);
+    }
+  });
+
+  it('lets another config bind the feed Worker', () => {
+    expect(
+      workerConfigProblems([consumer({ services: [{ binding: 'FEED', service: 'uts-feed' }] })])
+    ).toEqual([]);
+  });
+
+  it('fails a feed block whose caller is not its own deployed name, or that carries no props', () => {
+    const problems = workerConfigProblems(
+      withFeed(raw => ({ ...raw, services: [mintBinding('uts', 'uts-feed-staging')] }))
+    );
+    expect(problems).toEqual([expect.stringContaining('sets props.caller "uts-feed-staging"')]);
+    const { props: _props, ...withoutProps } = mintBinding('uts', 'uts-feed');
+    const propless = workerConfigProblems(withFeed(raw => ({ ...raw, services: [withoutProps] })));
+    expect(propless).toEqual([expect.stringContaining('sets props.caller undefined')]);
+  });
+
+  it('fails a feed block that binds another environment of the mint Worker', () => {
+    const problems = workerConfigProblems(
+      withFeed(raw => ({ ...raw, services: [mintBinding('uts-staging', 'uts-feed')] }))
+    );
+    expect(problems).toEqual([expect.stringContaining('this block must bind uts')]);
+  });
+
+  it('fails a feed binding at the default or another entrypoint, or through a preview', () => {
+    const { entrypoint: _entrypoint, ...atDefault } = mintBinding('uts', 'uts-feed');
+    for (const [binding, entrypoint] of [
+      [atDefault, '(default)'],
+      [{ ...atDefault, entrypoint: 'Admin' }, 'Admin'],
+    ] as const) {
+      const problems = workerConfigProblems(withFeed(raw => ({ ...raw, services: [binding] })));
+      expect(problems).toEqual([expect.stringContaining(`binds entrypoint ${entrypoint}`)]);
+    }
+    const preview = workerConfigProblems(
+      withFeed(raw => ({ ...raw, previews: { services: [mintBinding('uts', 'uts-feed')] } }))
+    );
+    expect(preview).toEqual([expect.stringContaining('a preview runs unreviewed code')]);
+  });
+});
+
+describe('UTS names and hostnames', () => {
+  it('fail another config that deploys under a UTS name', () => {
+    expect(workerConfigProblems([consumer({ name: 'uts-staging' })])).toEqual([
+      expect.stringContaining('only the UTS configs deploy UTS names'),
+    ]);
+    expect(workerConfigProblems([consumer({ name: 'uts', env: {} })])).toHaveLength(1);
+  });
+
+  it('fail another config that routes a UTS hostname', () => {
+    for (const pattern of ['uts.kiloapps.io', 'uts-feed-staging.kiloapps.io/*', '*.kiloapps.io']) {
+      expect(
+        workerConfigProblems([consumer({ routes: [{ pattern, zone_name: 'kiloapps.io' }] })]).length
+      ).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('the UTS configs themselves', () => {
+  const configWith = (
+    path: string,
+    edit: (raw: Record<string, unknown>) => Record<string, unknown>
+  ) => [
+    ...repoConfigs().filter(worker => worker.path !== path),
+    parseWorkerConfig(path, edit(structuredClone(configAt(path).config))),
+  ];
+  const mintWith = (edit: (raw: Record<string, unknown>) => Record<string, unknown>) =>
+    configWith(MINT_CONFIG, edit);
+
+  it('fail traces enabled in any block', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({ ...raw, observability: { enabled: true, traces: { enabled: true } } }))
+    );
+    expect(problems.length).toBeGreaterThanOrEqual(2);
+    expect(problems.every(problem => problem.includes('traces.enabled resolves to true'))).toBe(
+      true
+    );
+  });
+
+  it('fail a deployed mint block without the eu jurisdiction or the Frankfurt placement', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({
+        ...raw,
+        vars: { UTS_ENVIRONMENT: 'production', DO_JURISDICTION: 'none' },
+        placement: { mode: 'smart' },
+      }))
+    );
+    expect(problems).toEqual([
+      expect.stringContaining('(top level): DO_JURISDICTION must be eu'),
+      expect.stringContaining('(top level): placement.region resolves to undefined'),
+    ]);
+  });
+
+  it('fail a deployed mint block that runs the development entry', () => {
+    const problems = utsConfigProblems(mintWith(raw => ({ ...raw, main: 'src/dev-index.ts' })));
+    expect(problems).toEqual([
+      expect.stringContaining('(top level): main resolves to src/dev-index.ts'),
+      expect.stringContaining('(env.staging): main resolves to src/dev-index.ts'),
+    ]);
+  });
+
+  it('fail a mint config whose deployments drift from the deployment list', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({ ...raw, vars: { UTS_ENVIRONMENT: 'staging', DO_JURISDICTION: 'eu' } }))
+    );
+    expect(problems).toEqual([expect.stringContaining('deploys uts-staging=staging, uts=staging')]);
+  });
+
+  it('fail the development entry in any config but the development config', () => {
+    const local = {
+      name: 'uts-local',
+      main: 'src/dev-index.ts',
+      vars: { UTS_ENVIRONMENT: 'development', DO_JURISDICTION: 'none' },
+    };
+    const withLocal = mintWith(raw => ({
+      ...raw,
+      env: { staging: configAt(MINT_CONFIG).config.env?.staging, local },
+    }));
+    expect(workerConfigProblems(withLocal)).toEqual([
+      expect.stringContaining(
+        '(env.local) runs services/uts/src/dev-index.ts; only services/uts/wrangler.dev.jsonc may'
+      ),
+    ]);
+    expect(utsConfigProblems(withLocal)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'deploys uts-local=development, uts-staging=staging, uts=production'
+        ),
+        expect.stringContaining('(env.local): main resolves to src/dev-index.ts'),
+      ])
+    );
+    const other = consumer({ main: 'src/dev-index.ts' }, 'services/uts/wrangler.other.jsonc');
+    expect(workerConfigProblems([other])).toEqual([
+      expect.stringContaining('runs services/uts/src/dev-index.ts'),
+    ]);
+  });
+
+  it('fail a development config that could deploy, route, or run another entry', () => {
+    const devWith = (edit: (raw: Record<string, unknown>) => Record<string, unknown>) =>
+      utsConfigProblems(configWith(MINT_DEV_CONFIG, edit));
+    expect(devWith(({ build: _build, ...raw }) => raw)).toEqual([
+      expect.stringContaining('build.command must be the command that fails'),
+    ]);
+    expect(devWith(raw => ({ ...raw, workers_dev: true }))).toEqual([
+      expect.stringContaining('workers_dev must be false'),
+    ]);
+    expect(devWith(raw => ({ ...raw, routes: [{ pattern: 'dev.example.com/*' }] }))).toEqual([
+      expect.stringContaining('the development config has no routes'),
+    ]);
+    expect(devWith(raw => ({ ...raw, main: 'src/index.ts' }))).toEqual([
+      expect.stringContaining('main is src/index.ts; expected src/dev-index.ts'),
+    ]);
+    expect(
+      devWith(raw => ({
+        ...raw,
+        env: { staging: { name: 'uts-staging', vars: { UTS_ENVIRONMENT: 'staging' } } },
+      }))
+    ).toEqual([expect.stringContaining('deploys uts-local=development, uts-staging=staging')]);
+  });
+
+  it('lets Wrangler bundle the deployed config, and refuse to deploy or upload the development config', () => {
+    const outdir = mkdtempSync(join(tmpdir(), 'uts-dry-run-'));
+    const wrangler = (args: string[]) =>
+      spawnSync(join(repoRoot, 'services/uts/node_modules/.bin/wrangler'), args, {
+        cwd: join(repoRoot, 'services/uts'),
+        encoding: 'utf8',
+        env: { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_COMMAND: '' },
+      });
+    try {
+      const deployed = wrangler(['deploy', '--dry-run', '--outdir', outdir]);
+      expect(deployed.status, deployed.stderr).toBe(0);
+      for (const command of [['deploy'], ['versions', 'upload']]) {
+        const refused = wrangler([
+          ...command,
+          '--dry-run',
+          '-c',
+          'wrangler.dev.jsonc',
+          '--outdir',
+          outdir,
+        ]);
+        expect(refused.status).not.toBe(0);
+        expect(`${refused.stdout}${refused.stderr}`).toContain(
+          'wrangler.dev.jsonc runs only under wrangler dev; deploy wrangler.jsonc'
+        );
+      }
+    } finally {
+      rmSync(outdir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it('fail placement on the feed Worker', () => {
+    const configs = repoConfigs().filter(worker => worker.path !== FEED_CONFIG);
+    const feed = configAt(FEED_CONFIG);
+    const placed = parseWorkerConfig(FEED_CONFIG, {
+      ...feed.config,
+      placement: { region: 'aws:eu-central-1' },
+    });
+    expect(utsConfigProblems([...configs, placed])).toHaveLength(3);
+  });
+});

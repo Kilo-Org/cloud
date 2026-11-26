@@ -1,4 +1,4 @@
-import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { MISTRAL_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
@@ -57,7 +57,6 @@ import {
 // must be routed to codestral.mistral.ai instead.
 const MISTRAL_LA_PLATEFORME_FIM_URL = 'https://api.mistral.ai/v1/fim/completions';
 const MISTRAL_CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
-const INCEPTION_FIM_URL = 'https://api.inceptionlabs.ai/v1/fim/completions';
 const FIM_MAX_TOKENS_LIMIT = 1000;
 
 function resolveFimProvider(model: string): {
@@ -72,18 +71,8 @@ function resolveFimProvider(model: string): {
   };
 }
 
-function resolveFimUpstreamUrl(provider: FimProvider, usingCodestralByok: boolean): string {
-  if (provider === 'inception') return INCEPTION_FIM_URL;
+function resolveFimUpstreamUrl(usingCodestralByok: boolean): string {
   return usingCodestralByok ? MISTRAL_CODESTRAL_FIM_URL : MISTRAL_LA_PLATEFORME_FIM_URL;
-}
-
-function getSystemApiKey(provider: FimProvider): string | null {
-  switch (provider) {
-    case 'mistral':
-      return MISTRAL_API_KEY || null;
-    case 'inception':
-      return INCEPTION_API_KEY || null;
-  }
 }
 
 const FIMRequestBody = z.object({
@@ -164,8 +153,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   // Extract properties for usage context
   const promptInfo = extractFimPromptInfo(requestBody);
 
-  const byokProviderKeys: UserByokProviderId[] =
-    fimProvider === 'mistral' ? ['codestral', 'mistral'] : ['inception'];
+  const byokProviderKeys: UserByokProviderId[] = ['codestral', 'mistral'];
 
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, byokProviderKeys)
@@ -223,9 +211,8 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   // (https://openrouter.ai/docs/guides/privacy/provider-logging). A new supported model must
   // carry the same classification.
 
-  const systemKey = getSystemApiKey(fimProvider);
-  const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
-  const upstreamUrl = resolveFimUpstreamUrl(fimProvider, userByokEntry?.providerId === 'codestral');
+  const apiKey = userByokEntry?.decryptedAPIKey ?? (MISTRAL_API_KEY || null);
+  const upstreamUrl = resolveFimUpstreamUrl(userByokEntry?.providerId === 'codestral');
 
   if (!apiKey) {
     return NextResponse.json(
@@ -260,7 +247,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const bodyForUpstream = {
     ...requestBody,
     model: upstreamModel,
-    // Inception reports usage in a stream only when asked. Mistral always does and accepts it.
+    // Mistral reports usage in a stream without being asked, and accepts the option.
     ...(requestBody.stream ? { stream_options: { include_usage: true } } : {}),
   };
 

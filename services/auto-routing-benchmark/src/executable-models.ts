@@ -1,18 +1,28 @@
 import type { BenchmarkIdentity } from '@kilocode/auto-routing-contracts';
+import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type * as z from 'zod';
 import { fetchBenchmarkUserToken } from './benchmark-token';
 import { BenchmarkModelCatalogSchema, catalogModelSupportsTools } from './platform-models';
 
+// The organization catalog verifies the `kilo-api` audience, so it gets only a `kilo-api`
+// token, never the gateway token the CLI container holds.
 export async function fetchExecutableBenchmarkModelCatalog(
   env: Env,
   identity: BenchmarkIdentity,
   fetchImpl: typeof fetch = fetch,
-  /** A token the caller already minted, so one queue message mints at most once. */
-  mintedToken?: string
+  /** A `kilo-api` token the caller already minted, so one queue message mints it once. */
+  mintedApiToken?: string
 ): Promise<z.infer<typeof BenchmarkModelCatalogSchema>> {
   const { benchmarkUserId, benchmarkOrgId } = identity;
   const token =
-    mintedToken ?? (await fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId, fetchImpl));
+    mintedApiToken ??
+    (await fetchBenchmarkUserToken(
+      env,
+      benchmarkUserId,
+      benchmarkOrgId,
+      KILO_API_AUDIENCE,
+      fetchImpl
+    ));
   const path = `/api/organizations/${encodeURIComponent(benchmarkOrgId)}/models`;
   const response = await fetchImpl(new URL(path, env.KILO_CLI_API_URL), {
     headers: {

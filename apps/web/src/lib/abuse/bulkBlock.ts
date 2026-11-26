@@ -8,10 +8,15 @@ export type BulkBlockResponse = CustomResult<
   { error: string; foundIds: string[] }
 >;
 
+/**
+ * `onBlocked` receives the ids this call actually blocked, once the update has
+ * committed, including when a concurrent block makes the call report failure.
+ */
 export async function bulkBlockUsers(
   kilo_user_emails_or_ids: string[],
   block_reason: string,
-  blockedByKiloUserId: string
+  blockedByKiloUserId: string,
+  onBlocked?: (userIds: string[]) => Promise<void>
 ): Promise<BulkBlockResponse> {
   const reason = block_reason.trim();
   const idsOrEmails = [...new Set(kilo_user_emails_or_ids.map(id => id.trim()).filter(Boolean))];
@@ -66,6 +71,7 @@ export async function bulkBlockUsers(
     // which `unblockBulkBlockedUsers` could later clear as the wrong group.
     .where(and(inArray(kilocode_users.id, valid), isNull(kilocode_users.blocked_reason)))
     .returning({ id: kilocode_users.id });
+  await onBlocked?.(updated.map(u => u.id));
 
   // A short update count means some of the selected users were concurrently
   // blocked between the read and the guarded update. Surface that as a

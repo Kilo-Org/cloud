@@ -1,8 +1,10 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { backoffDelayMs } from '../../src/dos/RefresherDO';
+import o11yPolicy from '../../policy/o11y.yaml';
+import { backoffDelayMs, type RefresherDO } from '../../src/dos/RefresherDO';
 import { getBundleStub, getRefresherStub, getSignerStub } from '../../src/dos/stubs';
+import { loadPolicies } from '../../src/policy/load';
 import { installManager, secret, stubOfflineNetwork, type MockSecret } from './manager';
 import { resetBundleObject, resetRefresherObject } from './reset';
 import { config, env } from './test-env';
@@ -10,7 +12,7 @@ import { config, env } from './test-env';
 beforeEach(async () => {
   stubOfflineNetwork();
   await resetRefresherObject(getRefresherStub(env, config));
-  for (const workload of ['o11y', 'audit-relay']) {
+  for (const workload of ['o11y', 'audit-relay', 'ci-release']) {
     await resetBundleObject(getBundleStub(env, config, workload));
   }
 });
@@ -282,6 +284,96 @@ describe('manager failures', () => {
     }
     expect(backoffDelayMs(1, 100_000)).toBe(100_000);
     expect(backoffDelayMs(1, 3_600_000)).toBe(240_000);
+  });
+});
+
+describe('the /ci folder', () => {
+  const ciPolicies = loadPolicies({
+    'o11y.yaml': o11yPolicy,
+    'ci-release.yaml': `
+workload: ci-release
+environments: [development]
+identity:
+  kind: github-oidc
+  repository: acme/repo
+  repositoryId: '123'
+  repositoryOwnerId: '456'
+  environment: release
+  jobWorkflowRefs: [acme/repo/.github/workflows/publish.yml@refs/heads/main]
+  events: [workflow_dispatch]
+secrets: [CI_RELEASE_KEY]
+`,
+  });
+  const CI_MANAGER: MockSecret[] = [
+    ...MANAGER,
+    secret('/ci/ci-release', 'CI_RELEASE_KEY', 'ci-key'),
+  ];
+
+  /** Runs on the refresher with a GitHub policy in force, so its reads include `/ci`. */
+  function withCiPolicy<R>(run: (refresher: RefresherDO) => Promise<R>): Promise<R> {
+    return runInDurableObject(getRefresherStub(env, config), async instance => {
+      Object.assign(instance, { policies: ciPolicies });
+      return await run(instance);
+    });
+  }
+
+  function ciBundleRow(): Promise<{ stale: number; fetched_at: string }> {
+    return runInDurableObject(getBundleStub(env, config, 'ci-release'), (_instance, state) =>
+      state.storage.sql
+        .exec<{ stale: number; fetched_at: string }>('SELECT stale, fetched_at FROM bundle')
+        .one()
+    );
+  }
+
+  it('keeps refreshing /workloads and /shared while /ci reads fail, and marks CI bundles stale', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    await withCiPolicy(refresher => refresher.refreshAll());
+    expect(manager.reads.map(read => read.folder).sort()).toEqual(['/ci', '/shared', '/workloads']);
+    const firstCopy = await ciBundleRow();
+    expect(firstCopy.stale).toBe(0);
+
+    manager.setFolderStatus('/ci', 403);
+    manager.setSecrets(
+      CI_MANAGER.map(entry =>
+        entry.name === 'O11Y_CF_AE_API_TOKEN' && entry.path === '/workloads/o11y'
+          ? secret(entry.path, entry.name, 'rotated-token', { version: 2 })
+          : entry
+      )
+    );
+    await withCiPolicy(refresher => refresher.refreshAll());
+
+    expect((await refresherState()).failures).toBe(0);
+    const o11y = await o11yBundle();
+    expect(o11y.stale).toBe(false);
+    expect(o11y.secrets.O11Y_CF_AE_API_TOKEN).toEqual({ value: 'rotated-token', version: 2 });
+    expect(await ciBundleRow()).toEqual({ stale: 1, fetched_at: firstCopy.fetched_at });
+    expect(warn).toHaveBeenCalledWith(
+      'sts: /ci read failed; CI bundles keep their last copy, marked stale',
+      expect.objectContaining({ environment: 'development' })
+    );
+  });
+
+  it('fills other bundles when /ci has never been read, and leaves CI bundles unavailable', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    manager.setFolderStatus('/ci', 403);
+    const ci = await withCiPolicy(async refresher => {
+      await refresher.refreshAll();
+      return await refresher.buildBundle('ci-release');
+    });
+
+    expect(ci).toEqual({ status: 'unavailable' });
+    expect((await refresherState()).failures).toBe(0);
+    const o11y = await o11yBundle();
+    expect(o11y.stale).toBe(false);
+    expect(o11y.secrets.O11Y_CF_AE_API_TOKEN?.value).toBe('ae-token');
+
+    manager.setFolderStatus('/ci', 200);
+    const filled = await withCiPolicy(refresher => refresher.buildBundle('ci-release'));
+    if (filled.status !== 'built') throw new Error(`expected a built bundle, got ${filled.status}`);
+    expect(filled.bundle.stale).toBe(false);
+    expect(filled.bundle.secrets.CI_RELEASE_KEY?.value).toBe('ci-key');
   });
 });
 

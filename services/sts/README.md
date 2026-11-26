@@ -211,7 +211,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
   in the bundle's `missing`.
 - **`/ci`.** The refresher reads `/ci` as a third folder, in the same read and with the same rules,
   only in an environment where at least one GitHub policy applies; elsewhere it makes no `/ci` call.
-  A `/ci` read that fails fails the whole read, like the other two folders.
+  A `/ci` read that fails holds back nothing else: `/workloads` and `/shared` are stored and every
+  other bundle is rebuilt as usual, while each CI bundle keeps the last `/ci` copy, marked stale, or
+  stays empty if `/ci` was never read. STS logs `sts: /ci read failed` and retries at the next
+  regular refresh, with no backoff.
 - **Missing folder.** Infisical answers a folder that does not exist with 404 and error
   `SecretPathNotFound`; STS reads that as an empty folder, not an outage. Only a transport error, a
   timeout, 429, 5xx, a refused login or a malformed response counts as unreachable.
@@ -222,10 +225,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 - **Cadence.** Every 4 minutes. A signed `secrets.modified` webhook opens a 30-second merge window;
   the refresh runs at the window's end and never sooner than 30 seconds after the last refresh. A
   policy change after a deploy refreshes within about 5 seconds.
-- **Backoff.** After a failed read the next attempt waits 15 s, 30 s, 60 s, 120 s, then 240 s
-  (each jittered over its upper half; a 429's `Retry-After` raises it, capped at 4 minutes).
-  Webhooks do not shorten a running backoff. Bundle objects keep serving their copies, marked
-  stale, and an empty object is filled stale from the refresher's last copy.
+- **Backoff.** After a failed read of `/workloads` or `/shared` the next attempt waits 15 s, 30 s,
+  60 s, 120 s, then 240 s (each jittered over its upper half; a 429's `Retry-After` raises it,
+  capped at 4 minutes). Webhooks do not shorten a running backoff. Bundle objects keep serving their
+  copies, marked stale, and an empty object is filled stale from the refresher's last copy.
 - **Token.** The Infisical access token is cached until 60 seconds before it expires; concurrent
   logins merge into one.
 - **Starting the loop.** A cron trigger (`*/5 * * * *` in production and staging, none locally)

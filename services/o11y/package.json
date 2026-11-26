@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev --local",
-    "start": "wrangler dev --local",
+    "dev": "wrangler dev --local --var SECRETS_SOURCE:secrets-store",
+    "start": "wrangler dev --local --var SECRETS_SOURCE:secrets-store",
     "test": "vitest run",
     "test:watch": "vitest",
     "cf-typegen": "wrangler types",
@@ -22,6 +22,9 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

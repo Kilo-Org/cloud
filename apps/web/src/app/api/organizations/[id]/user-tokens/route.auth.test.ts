@@ -22,7 +22,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   canIssueLegacyOrganizationToken,

@@ -3,10 +3,8 @@ import { userHasOrganizations } from '@kilocode/web-shared/lib/organizations/org
 import { hasPaymentMethodInStripe } from '@kilocode/web-shared/lib/stripe-client';
 import { hasReceivedAnyFreeWelcomeCredits } from '@kilocode/web-shared/lib/welcomeCredits';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { getCustomerInfo } from './customerInfo';
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({ generateApiToken: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   hasPaymentMethodInStripe: jest.fn(),
 }));
@@ -23,7 +21,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { query: { payment_methods: { findFirst: jest.fn() } } },
 }));
 
-const mockGenerateApiToken = jest.mocked(generateApiToken);
 const mockHasPaymentMethodInStripe = jest.mocked(hasPaymentMethodInStripe);
 const mockSummarizeUserPayments = jest.mocked(summarizeUserPayments);
 const mockUserHasOrganizations = jest.mocked(userHasOrganizations);
@@ -49,7 +46,6 @@ describe('getCustomerInfo', () => {
     const customerInfo = await getCustomerInfo(testUser as never, {});
 
     expect(customerInfo).not.toHaveProperty('kiloToken');
-    expect(mockGenerateApiToken).not.toHaveBeenCalled();
   });
 
   it('reports the payment-method answers of every read', async () => {

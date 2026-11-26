@@ -8,7 +8,7 @@ import { DevNukeAccountButton } from '@/components/dev/DevNukeAccountButton';
 import { DevConsumeCreditsButton } from '@/components/dev/DevConsumeCreditsButton';
 import { DevAddCreditsButton } from '@/components/dev/DevAddCreditsButton';
 import { getUserFromSessionForCredentialIssuanceOrRedirect } from '@kilocode/web-shared/lib/user/server';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { getOAuthDisplayNames } from '@/lib/user';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
 import { cookies } from 'next/headers';

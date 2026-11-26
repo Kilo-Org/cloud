@@ -64,10 +64,9 @@ import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organization
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import {
-  generateApiToken,
-  generateInternalServiceToken,
-  TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+  signTestApiToken,
+  signTestInternalServiceToken,
+} from '@kilocode/web-shared/tests/helpers/api-token.helper';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -76,7 +75,11 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { KILO_TOKEN_VERSION, signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import {
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
+  KILO_TOKEN_VERSION,
+  signKiloToken,
+} from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -449,7 +452,7 @@ describe('getUserFromAuth', () => {
       });
       mockHeaders.mockResolvedValue(
         new Headers({
-          authorization: `${scheme} ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          authorization: `${scheme} ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         })
       );
 
@@ -467,7 +470,7 @@ describe('getUserFromAuth', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        authorization: `Bearer  ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        authorization: `Bearer  ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -676,7 +679,7 @@ describe('getUserFromAuth', () => {
       user.id,
       0
     );
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -699,7 +702,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -730,7 +733,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -760,7 +763,7 @@ describe('getUserFromAuth', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -795,7 +798,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -827,7 +830,7 @@ describe('getUserFromAuth', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -851,7 +854,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -873,7 +876,7 @@ describe('getUserFromAuth', () => {
       0
     );
     await markOrganizationAsDeleted(organization.id);
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -897,7 +900,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -923,7 +926,7 @@ describe('getUserFromAuth', () => {
           .values({ organization_id: parent.id, kilo_user_id: user.id, role });
         mockHeaders.mockResolvedValue(
           new Headers({
-            Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+            Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
             [ORGANIZATION_ID_HEADER]: child.id,
           })
         );
@@ -947,7 +950,7 @@ describe('getUserFromAuth', () => {
         .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'member' });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -976,7 +979,7 @@ describe('getUserFromAuth', () => {
       await markOrganizationAsDeleted(parent.id);
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -1001,7 +1004,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -1029,7 +1032,7 @@ describe('getUserFromAuth', () => {
       .set({ sso_domain: ssoDomain })
       .where(eq(organizations.id, organization.id));
 
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1047,10 +1050,10 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId: session!.id },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1074,10 +1077,10 @@ describe('getUserFromAuth', () => {
         revoked_reason: 'logout',
       })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId: session!.id },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1097,10 +1100,10 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId: session!.id },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1148,7 +1151,7 @@ describe('getUserFromAuth', () => {
 
   test('rejects a short-lived internal assertion without a pepper claim for an account with a pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: 'claimless-peppered-pepper' });
-    const token = generateInternalServiceToken(user.id, { expiresIn: 300 });
+    const token = signTestInternalServiceToken(user.id, { expiresIn: 300 });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1160,7 +1163,7 @@ describe('getUserFromAuth', () => {
 
   test('rejects an audience-less internal assertion without a pepper claim for an account without a pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const token = generateInternalServiceToken(user.id);
+    const token = signTestInternalServiceToken(user.id);
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1172,7 +1175,7 @@ describe('getUserFromAuth', () => {
 
   test('revokes a user token when the pepper rotates from null to a value', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
     expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
 
@@ -1193,10 +1196,10 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'pre-rotation-pepper',
     });
     const deviceSessionId = crypto.randomUUID();
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1296,7 +1299,7 @@ describe('browser sessions by deployment', () => {
       const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         })
       );
 
@@ -1360,7 +1363,7 @@ describe('credential issuance authentication guards', () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -1424,7 +1427,7 @@ describe('credential issuance authentication guards', () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -1559,9 +1562,9 @@ describe('credential exchange bearer authentication guard', () => {
     }
   );
 
-  test('authorizes a 30-day token minted by generateApiToken', async () => {
+  test('authorizes a 30-day token in the generateApiToken shape', async () => {
     const user = await insertTestUser({ api_token_pepper: 'thirty-day-api-pepper' });
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
 
     const result = await getUserFromBearerForCredentialExchange(
       new Headers({ authorization: `Bearer ${token}` }),
@@ -2067,7 +2070,7 @@ describe('binary step-up enforcement (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(admin, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         'x-pathname': '/admin/api/private-users',
       })
     );
@@ -2427,7 +2430,7 @@ describe('step-up refusal telemetry (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(admin, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         'x-pathname': pathname,
         'x-forwarded-for': '203.0.113.9, 10.0.0.1',
       })
@@ -2716,7 +2719,9 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_super_admin: true,
       api_token_pepper: 'rest-admin-pepper',
     });
-    const token = generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(admin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -2766,7 +2771,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, extra, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, extra, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         })
       );
 
@@ -2787,7 +2792,9 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: false,
       api_token_pepper: 'rest-nonadmin-pepper',
     });
-    const token = generateApiToken(nonAdmin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(nonAdmin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: true });
@@ -2808,7 +2815,9 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: true,
       api_token_pepper: 'rest-admin-noemit-pepper',
     });
-    const token = generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(admin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });

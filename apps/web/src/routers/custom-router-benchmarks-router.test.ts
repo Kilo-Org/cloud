@@ -24,7 +24,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, sql } from 'drizzle-orm';
 import { createCallerFactory, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { customRouterBenchmarksRouter } from './custom-router-benchmarks-router';
 import { lockOwner } from '@/lib/auto-routing-custom-routers';
 

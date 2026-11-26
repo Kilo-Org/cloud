@@ -62,7 +62,7 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
       return c.json({ success: false, error: 'model is required' }, 400);
     }
 
-    const baseline = await queryErrorRateBaseline(model, c.env);
+    const baseline = await queryErrorRateBaseline(model, c.env, c.executionCtx);
     if (!baseline) {
       return c.json({ success: true, baseline: null });
     }
@@ -124,7 +124,7 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
       return c.json({ success: false, error: 'model is required' }, 400);
     }
 
-    const baseline = await queryTtfbBaseline(model, c.env);
+    const baseline = await queryTtfbBaseline(model, c.env, c.executionCtx);
 
     if (baseline.weighted_total_3d === 0) {
       return c.json({ success: true, baseline: null });

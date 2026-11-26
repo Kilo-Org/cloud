@@ -1,5 +1,7 @@
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
 import { MONITORED_QUEUE_ID, type QueueBacklogMetrics } from './queue-backlog';
+import { readO11ySecret } from '../secrets';
 
 type QueryEnv = {
   O11Y_CF_ACCOUNT_ID: string;
@@ -28,12 +30,10 @@ const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 export async function queryQueueBacklog(
   env: QueryEnv,
   fetchFn: FetchFn = fetch,
-  queueId: string = MONITORED_QUEUE_ID
+  queueId: string = MONITORED_QUEUE_ID,
+  ctx?: SecretsExecutionContext
 ): Promise<QueueBacklogMetrics> {
-  const token = await env.O11Y_CF_CONTAINERS_API_TOKEN.get();
-  if (!token) {
-    throw new Error('O11Y_CF_CONTAINERS_API_TOKEN secret is not configured');
-  }
+  const token = await readO11ySecret(env, 'O11Y_CF_CONTAINERS_API_TOKEN', ctx);
 
   const response = await fetchFn(
     `${CF_API_BASE}/accounts/${env.O11Y_CF_ACCOUNT_ID}/queues/${queueId}/metrics`,

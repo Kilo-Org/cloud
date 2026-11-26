@@ -9,7 +9,7 @@ import {
   generateCloudAgentWorkflowToken,
   generateWorkflowGatewayToken,
   TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+} from '@/lib/auth/kilo-token-signing';
 import { getSecurityFindingById } from '../db/security-findings';
 import {
   updateAnalysisStatus,

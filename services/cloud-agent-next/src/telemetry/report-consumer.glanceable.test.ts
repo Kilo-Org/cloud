@@ -23,7 +23,7 @@ vi.mock('../db/pg.js', () => ({ getPgDb: () => database.current }));
 vi.mock('../../../../apps/web/node_modules/server-only/index.js', () => ({}));
 vi.mock('@kilocode/web-shared/lib/config.server', () => ({ SESSION_INGEST_WORKER_URL: undefined }));
 vi.mock('@/lib/bounded-service-fetch', () => ({ fetchWithinBudget: vi.fn() }));
-vi.mock('@kilocode/web-shared/lib/tokens', () => ({ generateInternalServiceToken: vi.fn() }));
+vi.mock('@/lib/auth/kilo-token-signing', () => ({ generateInternalServiceToken: vi.fn() }));
 vi.mock('@kilocode/web-shared/lib/drizzle', () => ({
   get db() {
     return database.current;

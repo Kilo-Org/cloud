@@ -44,6 +44,13 @@ import {
   type StaffAuthorization,
   type StaffProof,
 } from '@kilocode/web-shared/lib/admin/admin-guard';
+import {
+  isAdminAuditInputRejection,
+  noteAdminAuditInputParsing,
+  reportAdminAuditGap,
+  runAdminAuditScope,
+  type AdminAuditSpec,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { stepUpDecisionCovers } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
@@ -289,11 +296,19 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
   };
 };
 
+/**
+ * Procedure meta. `adminAudit` declares how an admin mutation is audited; the
+ * admin audit middleware on `adminProcedure` enforces it.
+ */
+export type TRPCMeta = {
+  adminAudit?: AdminAuditSpec;
+};
+
 // Avoid exporting the entire t-object
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-const t = initTRPC.context<TRPCContext>().create({
+const t = initTRPC.context<TRPCContext>().meta<TRPCMeta>().create({
   errorFormatter: trpcErrorFormatter,
 });
 
@@ -604,6 +619,8 @@ function adminProcedureProof(params: {
   actionClass: PrivilegedActionClass;
   targetKind: PrivilegedTargetKind;
   getRawInput: () => Promise<unknown>;
+  /** Runs once the caller is a current staff session, before the proof. */
+  authorize: StaffAuthorization;
 }): StaffProof {
   if (params.path === STEP_UP_STATUS_PROCEDURE) return { kind: 'bootstrap' };
   // Each listed resolver binds the proof to the organization it resolves; the
@@ -616,6 +633,7 @@ function adminProcedureProof(params: {
   // and session checks, so the input is never read for a refused caller.
   return {
     kind: 'request',
+    authorize: params.authorize,
     target: async () => {
       const unbound: PrivilegedTarget = { kind: params.targetKind, id: null };
       if (!isAdminStepUpEnabled() || !isOperationStepUpClass(params.actionClass)) return unbound;
@@ -632,9 +650,23 @@ function adminProcedureProof(params: {
 // admin.* tRPC surface with a single event. Specialized guards chained on it
 // reuse `adminAdmission` and check `adminStepUpDecision` before trusting it
 // for their own request.
+//
+// It also audits every admin mutation, including those of the specialized
+// procedures chained on it, from its `adminAudit` meta. The audit scope wraps
+// the one staff admission, but it names an admin only once the admission found
+// a current staff session: the transport row is an admin, the network is
+// allowed, the credential is a browser session, the primary row is still an
+// unblocked admin and the session pepper is current. Before that point a
+// refusal records nothing, so an untrusted credential or a revoked session is
+// never named as an acting admin. From that point the recorded actor is the
+// primary row, and every refusal is a failure row: a missing or spent proof,
+// a narrower guard chained later, and the resolver's own failure. The proof is
+// checked once, inside the admission. A success row is written only after the
+// resolver returned. A failure keeps its spec target only when the input
+// parsed (see `adminAuditInputParsingMiddleware`).
 type AdminGuardFn = Parameters<typeof t.middleware>[0];
 const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(
-  async ({ ctx, path, type, getRawInput, next }) => {
+  async ({ ctx, meta, path, type, getRawInput, next }) => {
     const attribution = resolveAdminAttribution(ctx, path, type);
     const isBearer = attribution.credential !== 'session';
     const emitDenied = (ip: string | null = ctx.ip ?? null) =>
@@ -654,56 +686,69 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(
         ip,
       });
 
-    const proof = adminProcedureProof({
-      path,
-      actionClass: attribution.actionClass,
-      targetKind: attribution.targetKind,
-      getRawInput,
-    });
-    const result = await admitStaff({
-      user: ctx.user,
-      credential: ctx.credential,
-      webSessionId: ctx.webSessionId,
-      webSessionPepper: ctx.webSessionPepper,
-      headers: ctx.headersList ?? new Headers(),
-      surface: 'trpc',
-      route: path,
-      method: type,
-      actionClass: attribution.actionClass,
-      proof,
-    });
+    // The admin the audit scope records: null until the admission found a
+    // current staff session, then that session's primary row.
+    let auditContext: TRPCContext | null = null;
 
-    if (!result.ok && result.refusal.kind === 'not_staff') {
-      if (isBearer) emitDenied();
-      throw staffRefusalTrpcError(result.refusal);
-    }
-    if (!result.ok && result.refusal.kind === 'network') {
-      // The network decision's address, never `ctx.ip`: that falls back to the
-      // client-settable `x-forwarded-for` when the trusted header is missing.
-      if (isBearer) emitDenied(result.refusal.denial.clientAddress);
-      throw staffRefusalTrpcError(result.refusal);
-    }
-    emitAdminAccessEvent({
-      surface: 'trpc',
-      kind: 'admin_guard',
-      user: ctx.user,
-      authViaToken: ctx.authViaToken ?? false,
-      tokenSource: ctx.tokenSource ?? null,
-      credential: attribution.credential,
-      wouldBlock: isBearer,
-      userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
-      route: path,
-      method: type,
-      ip: ctx.ip ?? null,
-    });
-    if (!result.ok) {
-      if (isBearer) emitDenied();
-      throw staffRefusalTrpcError(result.refusal);
-    }
+    const admitAndContinue = async (onStaffSession?: () => void) => {
+      const markStaffSession = (current: User) => {
+        if (auditContext !== null) return;
+        auditContext = { ...ctx, user: current };
+        onStaffSession?.();
+      };
+      const proof = adminProcedureProof({
+        path,
+        actionClass: attribution.actionClass,
+        targetKind: attribution.targetKind,
+        getRawInput,
+        authorize: async current => markStaffSession(current),
+      });
+      const result = await admitStaff({
+        user: ctx.user,
+        credential: ctx.credential,
+        webSessionId: ctx.webSessionId,
+        webSessionPepper: ctx.webSessionPepper,
+        headers: ctx.headersList ?? new Headers(),
+        surface: 'trpc',
+        route: path,
+        method: type,
+        actionClass: attribution.actionClass,
+        proof,
+      });
 
-    const { admission } = result;
-    return next({
-      ctx: {
+      if (!result.ok && result.refusal.kind === 'not_staff') {
+        if (isBearer) emitDenied();
+        throw staffRefusalTrpcError(result.refusal);
+      }
+      if (!result.ok && result.refusal.kind === 'network') {
+        // The network decision's address, never `ctx.ip`: that falls back to the
+        // client-settable `x-forwarded-for` when the trusted header is missing.
+        if (isBearer) emitDenied(result.refusal.denial.clientAddress);
+        throw staffRefusalTrpcError(result.refusal);
+      }
+      emitAdminAccessEvent({
+        surface: 'trpc',
+        kind: 'admin_guard',
+        user: ctx.user,
+        authViaToken: ctx.authViaToken ?? false,
+        tokenSource: ctx.tokenSource ?? null,
+        credential: attribution.credential,
+        wouldBlock: isBearer,
+        userAgentProduct: userAgentProductFromHeaders(ctx.headersList ?? new Headers()),
+        route: path,
+        method: type,
+        ip: ctx.ip ?? null,
+      });
+      if (!result.ok) {
+        if (isBearer) emitDenied();
+        throw staffRefusalTrpcError(result.refusal);
+      }
+
+      const { admission } = result;
+      // A `bootstrap` or `resolver` proof runs no `authorize`; its admission
+      // passed the same session checks.
+      markStaffSession(admission.user);
+      const admitted = {
         user: admission.user,
         adminAttribution: attribution,
         adminAdmission: admission,
@@ -711,10 +756,51 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(
           adminStepUpState: admission.stepUp,
           adminStepUpDecision: admission.decision,
         }),
-      },
+      };
+      auditContext = { ...ctx, ...admitted };
+      return next({ ctx: admitted });
+    };
+
+    if (type !== 'mutation') return admitAndContinue();
+    const spec = meta?.adminAudit;
+    if (spec === undefined) {
+      return admitAndContinue(() => reportAdminAuditGap(`${path} declares no adminAudit meta`));
+    }
+    return runAdminAuditScope({
+      spec,
+      route: path,
+      context: () => auditContext,
+      input: getRawInput,
+      reportsInputParsing: true,
+      run: () => admitAndContinue(),
+      outcomeOf: result =>
+        result.ok
+          ? { outcome: 'success' }
+          : {
+              outcome: 'failure',
+              errorCode: result.error.code,
+              inputRejected: isAdminAuditInputRejection(result.error),
+            },
     });
   },
   'admin'
 );
 
-export const adminProcedure = baseProcedure.use(t.middleware(adminGuardFn));
+// tRPC runs a procedure's `.input()` parser as a middleware after every `.use()`
+// chained before it, so the guards a refusal can come from (the admission
+// above, and the narrower guards chained on `adminProcedure`) run before it,
+// and none of them reads the raw input after this point. The first read of the
+// reader handed on here is therefore the parser's: it tells the audit scope
+// that a later failure came after parsing began.
+const adminAuditInputParsingMiddleware = t.middleware(({ getRawInput, next }) =>
+  next({
+    getRawInput: () => {
+      noteAdminAuditInputParsing();
+      return getRawInput();
+    },
+  })
+);
+
+export const adminProcedure = baseProcedure
+  .use(t.middleware(adminGuardFn))
+  .use(adminAuditInputParsingMiddleware);

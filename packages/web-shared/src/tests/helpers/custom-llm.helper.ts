@@ -1,9 +1,11 @@
 import { custom_llm2 } from '@kilocode/db/schema';
 import type {
+  CustomLlmCredentials,
+  CustomLlmCredentialsEnvelope,
   CustomLlmDefinition,
   CustomPricingTiers,
-  EncryptedData,
 } from '@kilocode/db/schema-types';
+import { testByokEnvelope } from './byok-kms.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { eq } from 'drizzle-orm';
@@ -65,10 +67,21 @@ export function partnerCustomLlmDefinition(
   };
 }
 
+/**
+ * Credentials encrypted with `TEST_BYOK_DATA_KEY`, so they decrypt under `useFakeByokKms`.
+ * Pass a string to store a payload that is not credentials JSON.
+ */
+export function testCustomLlmCredentialsEnvelope(
+  credentials: CustomLlmCredentials | string
+): CustomLlmCredentialsEnvelope {
+  const plaintext = typeof credentials === 'string' ? credentials : JSON.stringify(credentials);
+  return { ...testByokEnvelope(plaintext), key_id: crypto.randomUUID() };
+}
+
 export async function insertCustomLlmForTest(
   publicId: string,
   definition: CustomLlmDefinition = customLlmDefinition(),
-  encryptedApiKey: EncryptedData | null = null
+  encryptedApiKey: CustomLlmCredentialsEnvelope | null = null
 ) {
   await db
     .insert(custom_llm2)

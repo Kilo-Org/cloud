@@ -31,6 +31,7 @@ import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
+  admin_action_audit_logs,
   kilocode_users,
   organization_memberships,
   organizations,
@@ -40,6 +41,7 @@ import {
   support_access_grants,
   type User,
 } from '@kilocode/db/schema';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { and, eq } from 'drizzle-orm';
 
@@ -1416,7 +1418,9 @@ describe('binary support organization access', () => {
   test('an explicit admin procedure admits a non-member staff write on one proof', async () => {
     // The admin procedure binds its operation proof to the organization its
     // input names, and the organization helper reuses that covering admission
-    // instead of asking for a second proof.
+    // instead of asking for a second proof. The admin audit scope wraps that
+    // one admission: it records the success, and the later step-up refusal as
+    // a failure, without a second proof check.
     const { organization, admin } = await orgAndAdmin();
     const route = 'organizations.sso.updateSsoDomain';
     await insertStepUpProof(admin.id, await enroll(admin.id), undefined, undefined, {
@@ -1427,6 +1431,13 @@ describe('binary support organization access', () => {
       organizations: createTRPCRouter({
         sso: createTRPCRouter({
           updateSsoDomain: adminProcedure
+            .meta({
+              adminAudit: {
+                kind: 'declarative',
+                action: 'organization.sso.config.create',
+                target: inputFieldTarget('organization', 'organizationId'),
+              },
+            })
             .input(OrganizationIdInputSchema)
             .mutation(({ ctx, input }) =>
               ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES)
@@ -1458,6 +1469,20 @@ describe('binary support organization access', () => {
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
     });
+
+    const auditRows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    expect(
+      auditRows
+        .sort((a, b) => a.outcome.localeCompare(b.outcome))
+        .map(row => [row.outcome, row.target_id, row.metadata])
+    ).toEqual([
+      // The refusal came before the input parsed, so it names no target.
+      ['failure', null, { errorCode: 'FORBIDDEN' }],
+      ['success', organization.id, null],
+    ]);
   });
 
   test('ON denies expired and revoked grants with specific codes', async () => {

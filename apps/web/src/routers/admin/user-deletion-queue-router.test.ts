@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
+  admin_action_audit_logs,
   kilocode_users,
   kiloclaw_subscriptions,
   user_deletion_audit_events,
@@ -23,6 +24,7 @@ import {
   USER_DELETION_ID_ONLY_CATALOG_VERSION,
 } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
+import { encryptDeletionCredential } from '@/lib/user/deletion-queue/deletion-crypto';
 import { scrubControlPlanePii } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { inferRouterInputs } from '@trpc/server';
 import { createSessionCallerForUser } from '@/routers/test-utils';
@@ -150,6 +152,70 @@ describe('adminUserDeletionQueueRouter', () => {
       .where(eq(user_deletion_steps.request_id, result.requestId));
     expect(steps.map(step => step.stepKey).sort()).toEqual([...CATALOG_KEYS].sort());
     expect(steps).toHaveLength(CATALOG_KEYS.length);
+  });
+
+  it('submit records the queued deletion against the target user', async () => {
+    const caller = await createSessionCallerForUser(admin.id);
+    const [result] = await caller.admin.userDeletionQueue.submit({
+      entries: [{ email: targetUser.google_user_email }],
+    });
+    if (result?.status !== 'enqueued') throw new Error('expected enqueued');
+    requestIds.push(result.requestId);
+
+    const rows = await db
+      .select({
+        action: admin_action_audit_logs.action,
+        outcome: admin_action_audit_logs.outcome,
+        actor_id: admin_action_audit_logs.actor_id,
+        target_type: admin_action_audit_logs.target_type,
+        target_id: admin_action_audit_logs.target_id,
+        metadata: admin_action_audit_logs.metadata,
+      })
+      .from(admin_action_audit_logs)
+      .where(sql`${admin_action_audit_logs.metadata}->>'requestId' = ${result.requestId}`);
+    expect(rows).toEqual([
+      {
+        action: 'user_deletion.request.create',
+        outcome: 'success',
+        actor_id: admin.id,
+        target_type: 'user',
+        target_id: targetUser.id,
+        metadata: { requestId: result.requestId },
+      },
+    ]);
+  });
+
+  it('submit still succeeds and records the request id when the subject lookup fails', async () => {
+    const select = db.select.bind(db);
+    jest.spyOn(db, 'select').mockImplementation(((fields?: Record<string, unknown>) => {
+      if (
+        fields?.id === user_deletion_requests.id &&
+        fields?.userId === user_deletion_requests.user_id
+      ) {
+        throw new Error('database unavailable');
+      }
+      return fields ? select(fields as never) : select();
+    }) as typeof db.select);
+
+    const caller = await createSessionCallerForUser(admin.id);
+    const [result] = await caller.admin.userDeletionQueue.submit({
+      entries: [{ email: targetUser.google_user_email }],
+    });
+    if (result?.status !== 'enqueued') throw new Error('expected enqueued');
+    requestIds.push(result.requestId);
+    jest.restoreAllMocks();
+
+    const rows = await db
+      .select({
+        outcome: admin_action_audit_logs.outcome,
+        target_type: admin_action_audit_logs.target_type,
+        target_id: admin_action_audit_logs.target_id,
+      })
+      .from(admin_action_audit_logs)
+      .where(sql`${admin_action_audit_logs.metadata}->>'requestId' = ${result.requestId}`);
+    expect(rows).toEqual([
+      { outcome: 'success', target_type: 'other', target_id: result.requestId },
+    ]);
   });
 
   it('submit returns already_active for a duplicate target', async () => {
@@ -660,6 +726,40 @@ describe('adminUserDeletionQueueRouter', () => {
         .catch(caught => caught);
       expect(error?.code).toBe('BAD_REQUEST');
       expect(String(error?.message)).not.toContain('super-secret-bad');
+    });
+
+    it('records a stored-credential test that resolves with an error as a failure, by code', async () => {
+      await db.insert(user_deletion_provider_credentials).values({
+        provider_scope: UserDeletionProviderScope.Substack,
+        encrypted_material: encryptDeletionCredential('{"cookie":5}'),
+      });
+      const caller = await createSessionCallerForUser(admin.id);
+
+      const outcome = await caller.admin.userDeletionQueue.testSubstackCredential({});
+      expect(outcome.result).toEqual({ status: 'error', errorCode: 'credential_invalid' });
+
+      const rows = await db
+        .select({
+          outcome: admin_action_audit_logs.outcome,
+          target_id: admin_action_audit_logs.target_id,
+          message: admin_action_audit_logs.message,
+          metadata: admin_action_audit_logs.metadata,
+        })
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.actor_id, admin.id),
+            eq(admin_action_audit_logs.action, 'user_deletion.substack_credential.test')
+          )
+        );
+      expect(rows).toEqual([
+        {
+          outcome: 'failure',
+          target_id: null,
+          message: 'Substack credential test failed',
+          metadata: { source: 'stored', errorCode: 'credential_invalid' },
+        },
+      ]);
     });
   });
 });

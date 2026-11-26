@@ -32,6 +32,14 @@ import {
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import { eq } from 'drizzle-orm';
+import { auth_audit_logs } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  authAuditEmailHash,
+  setAuthActionSinkForTest,
+  type AuthActionEvent,
+} from '@/lib/auth/auth-audit';
 
 const mockReadSecret = jest.mocked(readPendingLinkSecret);
 const mockGetPending = jest.mocked(getPendingLinkBySecret);
@@ -127,5 +135,86 @@ describe('POST /api/auth/pending-link/verify', () => {
     expect(await response.json()).toEqual({ error: 'INVALID_ORIGIN' });
     expect(mockReadSecret).not.toHaveBeenCalled();
     expect(mockReserve).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/auth/pending-link/verify audit', () => {
+  const userId = `pending-link-verify-${crypto.randomUUID()}`;
+  let events: AuthActionEvent[];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    events = [];
+    setAuthActionSinkForTest(event => events.push(event));
+    mockReadSecret.mockResolvedValue('secret-1');
+    mockGetPending.mockResolvedValue({
+      ...(pendingRow(crypto.randomUUID()) as object),
+      kilo_user_id: userId,
+    } as never);
+    mockFindUser.mockResolvedValue({
+      id: userId,
+      google_user_email: 'account@example.com',
+      blocked_reason: null,
+    } as never);
+    mockEligibility.mockResolvedValue({ ok: true, existingUser: true } as never);
+  });
+
+  afterEach(async () => {
+    setAuthActionSinkForTest(null);
+    await db.delete(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
+  });
+
+  async function rows() {
+    return db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
+  }
+
+  it('stores a wrong code under the target account and its email hash', async () => {
+    mockReserve.mockResolvedValue('invalid');
+
+    expect((await POST(verifyRequest())).status).toBe(401);
+
+    expect(await rows()).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.link',
+        outcome: 'failure',
+        method: 'github',
+        failure_reason: 'invalid_code',
+        subject_email_hash: authAuditEmailHash('account@example.com'),
+      }),
+    ]);
+    expect(JSON.stringify(events)).not.toContain('123456');
+  });
+
+  it('logs a locked-out code without a row', async () => {
+    mockReserve.mockResolvedValue('too_many_attempts');
+
+    expect((await POST(verifyRequest())).status).toBe(429);
+
+    expect(await rows()).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({ userId, failureReason: 'too_many_attempts', stored: false }),
+    ]);
+  });
+
+  it('logs a missing pending link without a row', async () => {
+    mockGetPending.mockResolvedValue(null as never);
+
+    expect((await POST(verifyRequest())).status).toBe(404);
+
+    expect(events).toEqual([
+      expect.objectContaining({ userId: null, failureReason: 'expired', stored: false }),
+    ]);
+  });
+
+  it('writes no row for a verified code, which the link records', async () => {
+    mockReserve.mockResolvedValue('ok');
+    mockComplete.mockResolvedValue({ status: 'linked', provider: 'github' });
+    mockCommit.mockResolvedValue(true);
+    mockMagic.mockResolvedValue({ plaintext_token: 'magic-1' } as never);
+
+    expect((await POST(verifyRequest())).status).toBe(200);
+
+    expect(await rows()).toEqual([]);
+    expect(events).toEqual([]);
   });
 });

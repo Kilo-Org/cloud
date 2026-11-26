@@ -4,6 +4,7 @@ import {
   type AutoRoutingModeResponse,
 } from '@kilocode/auto-routing-contracts';
 import {
+  admin_action_audit_logs,
   auto_routing_custom_routers,
   organization_memberships,
   type User,
@@ -245,9 +246,10 @@ describe('/api/auto-routing/mode', () => {
       });
       expect(mockedUpdateMode).not.toHaveBeenCalled();
       expect(mockedRequireActiveSubscription).not.toHaveBeenCalled();
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
     });
 
-    test('an admitted staff member reads and writes the organization mode', async () => {
+    test('an admitted staff member reads and writes the organization mode, and the write is recorded', async () => {
       mockedStaffAuthority.mockImplementation(async auth => ({ ...auth, user: staff }));
 
       expect((await GET(request(query))).status).toBe(200);
@@ -257,6 +259,17 @@ describe('/api/auto-routing/mode', () => {
         ownerId: organizationId,
         mode: 'best_accuracy',
       });
+      expect(mockedStaffAuthority).toHaveBeenCalledTimes(2);
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([
+        expect.objectContaining({
+          actor_id: staff.id,
+          action: 'organization.auto_routing_mode.set',
+          outcome: 'success',
+          target_type: 'organization',
+          target_id: organizationId,
+          metadata: { mode: 'best_accuracy', heldRoles: [] },
+        }),
+      ]);
     });
 
     test('staff who hold a real billing role never reach the staff guard', async () => {
@@ -265,6 +278,7 @@ describe('/api/auto-routing/mode', () => {
       expect((await GET(request(query))).status).toBe(200);
       expect((await PUT(request(query, { mode: 'cheapest' }))).status).toBe(200);
       expect(mockedStaffAuthority).not.toHaveBeenCalled();
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
     });
   });
 

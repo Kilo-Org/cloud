@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { eq } from 'drizzle-orm';
+import { admin_action_audit_logs, kilocode_users } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
@@ -610,5 +614,78 @@ describe('handleDiscordOAuthCallback', () => {
 
     expectRedirectLocation(response, '/integrations/discord?error=installation_failed');
     expectRedactedDiagnostic(state, 'authorization-code');
+  });
+
+  test('refuses an organization install by a Kilo admin without an organization role and records no staff elevation', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null } as never);
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      })
+    );
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, admin.id, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    try {
+      const response = await callDiscordCallback(makeRequest(state));
+
+      expectRedirectLocation(
+        response,
+        `/organizations/${ORGANIZATION_ID}/integrations/discord?error=organization_access_required`
+      );
+      expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ id: admin.id }),
+        ORGANIZATION_ID,
+        ORGANIZATION_BILLING_ROLES
+      );
+      expect(mockedConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+      expect(mockedUpsertDiscordInstallation).not.toHaveBeenCalled();
+      expect(
+        await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(eq(admin_action_audit_logs.actor_id, admin.id))
+      ).toEqual([]);
+    } finally {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    }
+  });
+
+  test('completes an organization install by a Kilo admin holding the role as an ordinary member write', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null } as never);
+    mockedConsumeProviderOAuthAttempt.mockResolvedValue(true);
+    const returnTo = `/organizations/${ORGANIZATION_ID}/integrations/discord?error=access_denied`;
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, admin.id, returnTo, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    try {
+      const response = await callDiscordCallback(makeRequest(state));
+
+      const location = new URL(response.headers.get('location') ?? '');
+      expect(location.searchParams.get('error')).toBe('access_denied');
+      expect(location.searchParams.get('success')).toBe('discord_installed');
+      expect(mockedUpsertDiscordInstallation).toHaveBeenCalledTimes(1);
+      expect(
+        await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(eq(admin_action_audit_logs.actor_id, admin.id))
+      ).toEqual([]);
+    } finally {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    }
   });
 });

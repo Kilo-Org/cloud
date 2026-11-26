@@ -939,7 +939,7 @@ describe('admin role change audit logging', () => {
     });
   });
 
-  test('no-op role changes are not recorded', async () => {
+  test('no-op role changes are recorded as unchanged', async () => {
     const superadmin = await insertQualifyingAdmin();
     const admin = await insertQualifyingAdmin({ is_super_admin: false });
     const caller = await createSessionCallerForUser(superadmin.id);
@@ -950,7 +950,11 @@ describe('admin role change audit logging', () => {
       permissions: { isSuperadmin: false },
     });
 
-    expect(await getRoleAudits(admin.id)).toHaveLength(0);
+    const audits = await getRoleAudits(admin.id);
+    expect(audits.map(audit => audit.message).sort()).toEqual([
+      'Admin permissions unchanged',
+      'Platform admin access already as requested',
+    ]);
   });
 
   test('role and permission changes revoke step-up proofs', async () => {

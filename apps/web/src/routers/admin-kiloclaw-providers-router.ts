@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { addAdminAuditMetadata } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -27,19 +28,23 @@ export const adminKiloclawProvidersRouter = createTRPCRouter({
     return client.getProviderRollout();
   }),
 
-  updateRollout: adminProcedure.input(ProviderRolloutSchema).mutation(async ({ input }) => {
-    const client = new KiloClawInternalClient();
-    try {
-      return await client.updateProviderRollout(input);
-    } catch (err) {
-      if (err instanceof KiloClawApiError && err.statusCode === 400) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: extractProviderRolloutErrorMessage(err),
-          cause: err,
-        });
+  updateRollout: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'kiloclaw.provider.set' } })
+    .input(ProviderRolloutSchema)
+    .mutation(async ({ input }) => {
+      addAdminAuditMetadata({ northflank: input.northflank });
+      const client = new KiloClawInternalClient();
+      try {
+        return await client.updateProviderRollout(input);
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 400) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: extractProviderRolloutErrorMessage(err),
+            cause: err,
+          });
+        }
+        throw err;
       }
-      throw err;
-    }
-  }),
+    }),
 });

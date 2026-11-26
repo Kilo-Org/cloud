@@ -1,8 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { createSessionCallerForUser as createCallerForUserType } from '@/routers/test-utils';
-import type { User } from '@kilocode/db/schema';
+import { admin_action_audit_logs, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 type KiloClawClientMock = {
   KiloClawInternalClient: jest.Mock;
@@ -80,6 +81,23 @@ describe('admin KiloClaw provider rollout router', () => {
     await caller.admin.kiloclawProviders.updateRollout(input);
 
     expect(kiloclawClientMock.__updateProviderRolloutMock).toHaveBeenCalledWith(input);
+    const rows = await db
+      .select({
+        action: admin_action_audit_logs.action,
+        outcome: admin_action_audit_logs.outcome,
+        target_type: admin_action_audit_logs.target_type,
+        metadata: admin_action_audit_logs.metadata,
+      })
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+    expect(rows).toEqual([
+      {
+        action: 'kiloclaw.provider.set',
+        outcome: 'success',
+        target_type: null,
+        metadata: input,
+      },
+    ]);
   });
 
   it('rejects invalid traffic percentages', async () => {

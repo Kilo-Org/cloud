@@ -1,3 +1,4 @@
+import type { AdminActionAuditAction } from '@kilocode/db/schema-types';
 import type {
   PrivilegedActionClass,
   PrivilegedTargetKind,
@@ -770,7 +771,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
   },
   {
     id: 'internal.admin.actionAudit',
-    file: 'apps/web/src/lib/admin/admin-action-audit.ts',
+    file: 'packages/web-shared/src/lib/admin/admin-action-audit.ts',
     actionClass: 'platform_read',
     surface: 'rest',
     reads: [{ snippet: 'if(!ctx.user.is_admin)', use: 'audit_metadata' }],
@@ -976,6 +977,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
         use: 'target_metadata',
       },
       { snippet: 'isAdmin:input.isAdmin', use: 'target_metadata' },
+      { snippet: 'isAdmin:input.isAdmin', use: 'target_metadata' },
       { snippet: 'if(!target.is_admin)', use: 'target_metadata' },
     ],
   },
@@ -1043,11 +1045,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
           call: 'ensureOrganizationAccess',
           file: 'packages/web-shared/src/routers/organizations/utils.ts',
         },
-      },
-      {
-        snippet:
-          "user.is_admin&&memberId===user.id?await getOrganizationMembershipRoles(user.id,organizationId,'direct_or_inherited'):undefined",
-        use: 'audit_metadata',
       },
     ],
   },
@@ -1164,6 +1161,201 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'platform_read',
     surface: 'worker',
     reads: [{ snippet: 'return(data as{isAdmin?:unknown}|null)?.isAdmin===true;', use: 'claim' }],
+  },
+];
+
+/** Admin console GET handlers that write, and so must be audited like a write. */
+export const ADMIN_REST_WRITING_GET_ROUTES: readonly string[] = [
+  '/admin/api/api-request-log/download',
+  '/admin/api/provider-metadata/download',
+];
+
+export type OrganizationElevationAudit =
+  | { kind: 'recorded'; actions: readonly [AdminActionAuditAction, ...AdminActionAuditAction[]] }
+  | { kind: 'skipped'; reason: string };
+
+/**
+ * Route handlers that can write to an organization through the admin bypass of
+ * getAuthorizedOrgContext / ensureOrganizationAccess, directly or through a
+ * helper, with how a Kilo admin's elevated write is audited: the actions the
+ * handler records through runElevatedOrganizationWrite, or why it records
+ * nothing. Every GET handler behind such a guard is listed too, since a GET
+ * can write (an OAuth callback); one that only reads is skipped with that
+ * reason. A handler whose guard admits only real members (credential issue,
+ * OAuth connections, payments, workspace exports and session tickets) has no
+ * bypass, so it has no elevated write to record; route discovery cannot tell
+ * it from a bypassing guard, so it is listed as skipped with that reason.
+ * `route` is the App Router path, as in the REST inventory.
+ */
+export type OrganizationElevationWriteSite = {
+  route: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  audit: OrganizationElevationAudit;
+};
+
+const MEMBERSHIP_ONLY =
+  'membership-only guard (ensureMemberOrganizationAccess) with no admin bypass';
+
+const MEMBERSHIP_ONLY_ORG_CONTEXT =
+  'membership-only guard (getAuthorizedOrgContext with membershipOnly) with no admin bypass';
+
+const READ_ONLY_GET = 'reads organization data only; writes nothing';
+
+export const organizationElevationWriteSites: readonly OrganizationElevationWriteSite[] = [
+  {
+    route: '/api/organizations/[id]/guardrails/mcp-connections',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.mcp_connections.report'] },
+  },
+  {
+    route: '/api/auto-routing/mode',
+    method: 'PUT',
+    audit: { kind: 'recorded', actions: ['organization.auto_routing_mode.set'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.create'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]',
+    method: 'PATCH',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.update'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]',
+    method: 'DELETE',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.delete'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]/client-entries',
+    method: 'POST',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.client_entry.register'] },
+  },
+  {
+    route: '/api/auto-routing/custom-routers/[scope]/[slug]/client-entries',
+    method: 'DELETE',
+    audit: { kind: 'recorded', actions: ['organization.custom_router.client_entry.remove'] },
+  },
+  {
+    route: '/api/organizations/[id]/user-tokens',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY_ORG_CONTEXT },
+  },
+  {
+    route: '/payments/topup',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY_ORG_CONTEXT },
+  },
+  {
+    route: '/api/integrations/github/callback',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/integrations/github/connection/callback',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/integrations/google/connect',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/integrations/google/callback',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/integrations/google/disconnect',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/integrations/[platform]/connect',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/integrations/[platform]/connect',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/integrations/[platform]/callback',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/app-shell/connect/[platform]',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/app-shell/connect/[platform]',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/claw/openclaw-export',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/cloud-agent/sessions/stream-ticket',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/api/internal/glanceable-agents-snapshot',
+    method: 'POST',
+    audit: { kind: 'skipped', reason: MEMBERSHIP_ONLY },
+  },
+  {
+    route: '/organizations/[id]/integrations/linear/reinstall',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: 'redirects to the connect flow; writes nothing' },
+  },
+  {
+    route: '/organizations/[id]/integrations/slack/reinstall',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: 'redirects to the connect flow; writes nothing' },
+  },
+  {
+    route: '/api/auto-routing/mode',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/code-indexing/enabled',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/integrations/google/disconnect',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: 'redirects with method_not_allowed; writes nothing' },
+  },
+  {
+    route: '/api/organizations/[id]/browser-policy',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/organizations/[id]/defaults',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/organizations/[id]/guardrails',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/organizations/[id]/modes',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
   },
 ];
 

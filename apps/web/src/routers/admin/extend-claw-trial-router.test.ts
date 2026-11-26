@@ -1,7 +1,11 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { CURRENT_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
-import { kiloclaw_subscription_change_log, kiloclaw_subscriptions } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  kiloclaw_subscription_change_log,
+  kiloclaw_subscriptions,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createSessionCallerForUser } from '@/routers/test-utils';
@@ -216,5 +220,74 @@ describe('extendTrials — normal extension', () => {
         reason: 'bulk_restart_trial',
       })
     );
+  });
+});
+
+describe('extendTrials — admin audit', () => {
+  it('records a failure row per user whose trial did not change, without the address', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: target.id,
+      payment_source: 'credits',
+      plan: 'standard',
+      status: 'active',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
+    const missingEmail = `missing-${Math.random()}@example.com`;
+
+    const caller = await createSessionCallerForUser(admin.id);
+    const results = await caller.admin.extendClawTrial.extendTrials({
+      emails: [target.google_user_email, missingEmail],
+      trialDays: 7,
+    });
+    expect(results.every(result => !result.success)).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'kiloclaw.subscription.bulk_trial_grant',
+          outcome: 'failure',
+          target_type: 'user',
+          target_id: target.id,
+          metadata: expect.objectContaining({
+            trialDays: 7,
+            errorCode: 'subscription_not_trial_or_canceled',
+          }),
+        }),
+        expect.objectContaining({
+          action: 'kiloclaw.subscription.bulk_trial_grant',
+          outcome: 'failure',
+          target_id: null,
+          metadata: expect.objectContaining({ trialDays: 7, errorCode: 'user_not_found' }),
+        }),
+      ])
+    );
+    const stored = JSON.stringify(rows.map(row => [row.target_id, row.message, row.metadata]));
+    expect(stored).not.toContain(target.google_user_email);
+    expect(stored).not.toContain(missingEmail);
+  });
+
+  it('records one summary row for an empty request', async () => {
+    const caller = await createSessionCallerForUser(admin.id);
+    await expect(
+      caller.admin.extendClawTrial.extendTrials({ emails: [], trialDays: 7 })
+    ).resolves.toEqual([]);
+
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'kiloclaw.subscription.bulk_trial_grant',
+        outcome: 'success',
+        target_id: null,
+        metadata: { trialDays: 7, requestedCount: 0 },
+      }),
+    ]);
   });
 });

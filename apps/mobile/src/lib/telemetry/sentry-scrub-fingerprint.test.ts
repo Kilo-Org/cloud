@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { FINGERPRINT_MESSAGE_LIMIT, scrubEvent } from './sentry-scrub';
+import { FINGERPRINT_MESSAGE_LIMIT } from './sentry-scrub';
+import { scrubEvent } from './sentry-scrub.test-helpers';
 
 // An event shape as the SDK builds it for one captured exception: the
 // exception class and message plus the capture options the sink passes.

@@ -81,7 +81,8 @@ export async function POST(request: Request) {
     const { cloudAgentSessionId, organizationId } = validation.data;
 
     // A stream ticket is a credential, so it is on the support never-list: only
-    // a real (direct or inherited) membership grants organization scope here.
+    // a real (direct or inherited) membership grants organization scope here,
+    // so no Kilo admin bypass exists to audit.
     const sessionAccess = organizationId
       ? {
           verify: async () => {

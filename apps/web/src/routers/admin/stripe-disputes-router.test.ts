@@ -1,11 +1,13 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
-import { StripeDisputeCaseActionError } from '@/lib/stripe/disputes';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as StripeDisputesModule from '@/lib/stripe/disputes';
+import type * as StripeDisputesRouterModule from '@/routers/admin/stripe-disputes-router';
+import type * as TestUtilsModule from '@/routers/test-utils';
+import type * as WebSessionRevocationModule from '@kilocode/web-shared/lib/web-session-revocation';
 
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { disputeAcceptTRPCError } from '@/routers/admin/stripe-disputes-router';
-import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
+  admin_action_audit_logs,
   organizations,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -17,6 +19,49 @@ import {
   StripeDisputeCaseStatus,
   StripeDisputeOwnerClassification,
 } from '@kilocode/db/schema-types';
+import { eq } from 'drizzle-orm';
+
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
+  client: {
+    disputes: { close: jest.fn(), retrieve: jest.fn() },
+    invoices: { list: jest.fn() },
+    invoicePayments: { list: jest.fn() },
+    refunds: { create: jest.fn() },
+    subscriptions: { cancel: jest.fn(), retrieve: jest.fn() },
+    subscriptionSchedules: { release: jest.fn(), retrieve: jest.fn() },
+    errors: { StripeInvalidRequestError: class StripeInvalidRequestError extends Error {} },
+  },
+}));
+
+jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({
+  ...jest.requireActual<typeof WebSessionRevocationModule>(
+    '@kilocode/web-shared/lib/web-session-revocation'
+  ),
+  revokeWebSessions: jest.fn(async () => undefined),
+}));
+
+async function adminAuditRows(actorId: string) {
+  return db
+    .select({
+      action: admin_action_audit_logs.action,
+      outcome: admin_action_audit_logs.outcome,
+      target_type: admin_action_audit_logs.target_type,
+      target_id: admin_action_audit_logs.target_id,
+      metadata: admin_action_audit_logs.metadata,
+    })
+    .from(admin_action_audit_logs)
+    .where(eq(admin_action_audit_logs.actor_id, actorId));
+}
+
+let StripeDisputeCaseActionError: typeof StripeDisputesModule.StripeDisputeCaseActionError;
+let disputeAcceptTRPCError: typeof StripeDisputesRouterModule.disputeAcceptTRPCError;
+let createSessionCallerForUser: typeof TestUtilsModule.createSessionCallerForUser;
+
+beforeAll(async () => {
+  ({ StripeDisputeCaseActionError } = await import('@/lib/stripe/disputes'));
+  ({ disputeAcceptTRPCError } = await import('@/routers/admin/stripe-disputes-router'));
+  ({ createSessionCallerForUser } = await import('@/routers/test-utils'));
+});
 
 let admin: User;
 let nonAdmin: User;
@@ -157,5 +202,64 @@ describe('admin disputes router', () => {
         user: null,
       })
     );
+  });
+
+  it('records the accepting admin and the dispute case in the admin audit log', async () => {
+    const [caseRow] = await db
+      .insert(stripe_dispute_cases)
+      .values({
+        stripe_dispute_id: 'dp_accept_audit',
+        stripe_event_id: 'evt_accept_audit',
+        stripe_charge_id: 'ch_accept_audit',
+        stripe_customer_id: personalOwner.stripe_customer_id,
+        amount_minor_units: 2900,
+        currency: 'usd',
+        dispute_reason: 'fraudulent',
+        stripe_status: 'needs_response',
+        owner_classification: StripeDisputeOwnerClassification.Personal,
+        kilo_user_id: personalOwner.id,
+        status: StripeDisputeCaseStatus.NeedsAction,
+        status_reason: 'Canonical personal owner matched; admin action required',
+      })
+      .returning({ id: stripe_dispute_cases.id });
+    const { client } = jest.requireMock('@kilocode/web-shared/lib/stripe-client') as {
+      client: { disputes: { close: jest.Mock<() => Promise<unknown>> } };
+    };
+    client.disputes.close.mockResolvedValue({ id: 'dp_accept_audit', status: 'lost' });
+    const caller = await createSessionCallerForUser(admin.id);
+
+    await expect(caller.admin.disputes.accept({ caseId: caseRow.id })).resolves.toEqual({
+      status: 'accepted',
+      failures: [],
+    });
+
+    expect(await adminAuditRows(admin.id)).toEqual([
+      {
+        action: 'stripe_dispute.accept',
+        outcome: 'success',
+        target_type: 'stripe_dispute',
+        target_id: caseRow.id,
+        metadata: { status: 'accepted', failureCount: 0 },
+      },
+    ]);
+  });
+
+  it('records a failure row when the dispute case cannot be accepted', async () => {
+    const caseId = crypto.randomUUID();
+    const caller = await createSessionCallerForUser(admin.id);
+
+    await expect(caller.admin.disputes.accept({ caseId })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+
+    expect(await adminAuditRows(admin.id)).toEqual([
+      {
+        action: 'stripe_dispute.accept',
+        outcome: 'failure',
+        target_type: 'stripe_dispute',
+        target_id: caseId,
+        metadata: { errorCode: 'BAD_REQUEST' },
+      },
+    ]);
   });
 });

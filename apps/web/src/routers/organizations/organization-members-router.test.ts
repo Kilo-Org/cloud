@@ -363,7 +363,24 @@ describe('organizations members trpc router', () => {
         ),
       });
       expect(membership?.role).toBe('member');
-      expect(await elevatedAudits(kiloAdmin.id, organization.id)).toEqual([]);
+      // The refused change is still an admin-bypass attempt, so it records one
+      // failure row naming the admin role the actor really holds.
+      expect(await elevatedAudits(kiloAdmin.id, organization.id)).toEqual([
+        expect.objectContaining({
+          action: 'organization.member.role.update',
+          outcome: 'failure',
+          actor_id: kiloAdmin.id,
+          target_type: 'organization',
+          target_id: organization.id,
+          metadata: expect.objectContaining({
+            memberKiloUserId: member.id,
+            previousRole: 'member',
+            role: 'owner',
+            heldRoles: ['admin'],
+            errorCode: 'FORBIDDEN',
+          }),
+        }),
+      ]);
     });
 
     it('records Kilo admin self-removal with the roles held before removal', async () => {
@@ -1465,51 +1482,72 @@ describe('organizations members trpc router', () => {
       }
     );
 
+    // The refused change is still an admin-bypass write for a Kilo admin, so it
+    // records a failure row; the parent owner acts within their own role.
     it.each([
-      ['parent owner', () => regularUser.id],
-      ['Kilo admin', () => adminUser.id],
-    ])('rejects an omitted elevated membership for a %s', async (_label, getActorId) => {
-      const childOwner = await insertTestUser({ is_admin: false });
-      const child = await createChildOrganization('Protected Child', childOwner.id);
-      await addUserToOrganization(child.id, memberUser.id, 'owner');
-      const caller = await createCallerForUser(getActorId());
-      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
-      const readActorAudits = () =>
-        db
-          .select({ id: admin_action_audit_logs.id })
-          .from(admin_action_audit_logs)
-          .where(
-            and(
-              eq(admin_action_audit_logs.actor_id, getActorId()),
-              eq(admin_action_audit_logs.target_id, testOrganization.id),
-              eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+      ['parent owner', () => regularUser.id, []],
+      ['Kilo admin', () => adminUser.id, ['FORBIDDEN']],
+    ])(
+      'rejects an omitted elevated membership for a %s',
+      async (_label, getActorId, expectedFailureCodes) => {
+        const childOwner = await insertTestUser({ is_admin: false });
+        const child = await createChildOrganization('Protected Child', childOwner.id);
+        await addUserToOrganization(child.id, memberUser.id, 'owner');
+        const caller = await createSessionCallerForUser(getActorId());
+        jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+        const readActorAudits = () =>
+          db
+            .select({
+              id: admin_action_audit_logs.id,
+              outcome: admin_action_audit_logs.outcome,
+              metadata: admin_action_audit_logs.metadata,
+            })
+            .from(admin_action_audit_logs)
+            .where(
+              and(
+                eq(admin_action_audit_logs.actor_id, getActorId()),
+                eq(admin_action_audit_logs.target_id, testOrganization.id),
+                eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+              )
             )
-          )
-          .orderBy(admin_action_audit_logs.id);
+            .orderBy(admin_action_audit_logs.id);
 
-      try {
-        const auditsBefore = await readActorAudits();
-        await expect(
-          caller.organizations.members.setChildMemberships({
-            organizationId: testOrganization.id,
-            memberId: memberUser.id,
-            childOrganizationIds: [],
-          })
-        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        try {
+          const auditsBefore = await readActorAudits();
+          await expect(
+            caller.organizations.members.setChildMemberships({
+              organizationId: testOrganization.id,
+              memberId: memberUser.id,
+              childOrganizationIds: [],
+            })
+          ).rejects.toMatchObject({
+            code: 'FORBIDDEN',
+            message: 'Elevated child team memberships must be managed in the child team',
+          });
 
-        const membership = await db.query.organization_memberships.findFirst({
-          where: and(
-            eq(organization_memberships.organization_id, child.id),
-            eq(organization_memberships.kilo_user_id, memberUser.id)
-          ),
-        });
-        expect(membership?.role).toBe('owner');
-        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
-        expect(await readActorAudits()).toEqual(auditsBefore);
-      } finally {
-        await cleanupChildOrganizations([child.id]);
+          const membership = await db.query.organization_memberships.findFirst({
+            where: and(
+              eq(organization_memberships.organization_id, child.id),
+              eq(organization_memberships.kilo_user_id, memberUser.id)
+            ),
+          });
+          expect(membership?.role).toBe('owner');
+          expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+          const beforeIds = new Set(auditsBefore.map(audit => audit.id));
+          const newAudits = (await readActorAudits()).filter(audit => !beforeIds.has(audit.id));
+          expect(newAudits).toEqual(
+            expectedFailureCodes.map(errorCode =>
+              expect.objectContaining({
+                outcome: 'failure',
+                metadata: expect.objectContaining({ errorCode }),
+              })
+            )
+          );
+        } finally {
+          await cleanupChildOrganizations([child.id]);
+        }
       }
-    });
+    );
 
     it('removes a member while retaining a selected elevated child membership', async () => {
       const childOwner = await insertTestUser({ is_admin: false });

@@ -75,7 +75,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     if (organizationId) {
       // A workspace export is on the support never-list: only a real (direct or
-      // inherited) membership grants organization scope here.
+      // inherited) membership grants organization scope here, so no Kilo admin
+      // bypass exists to audit.
       await ensureMemberOrganizationAccess(user, organizationId);
       await requireActiveSubscriptionOrTrial(organizationId);
       instance = await getActiveOrgInstance(user.id, organizationId);

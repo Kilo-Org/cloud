@@ -56,10 +56,15 @@ export type CreatePasskeyEnrollmentCodeResult =
   | { status: 'hourly_limit'; retryAfterSeconds: number }
   | { status: 'locked'; retryAfterSeconds: number };
 
+/**
+ * A refused code. `locked.lockedByThisAttempt` is true for the wrong code that
+ * reached the attempt limit, and false while an earlier one keeps the account
+ * locked; the audit stores only the first.
+ */
 export type PasskeyEnrollmentCodeRefusal =
   | { status: 'invalid'; attemptsLeft: number }
   | { status: 'expired' }
-  | { status: 'locked'; retryAfterSeconds: number };
+  | { status: 'locked'; retryAfterSeconds: number; lockedByThisAttempt: boolean };
 
 export type PasskeyEnrollmentCodeCheck = { status: 'ok' } | PasskeyEnrollmentCodeRefusal;
 
@@ -247,6 +252,7 @@ async function checkCode(
     return {
       status: 'locked',
       retryAfterSeconds: await lockoutRemainingSeconds(tx, binding.email),
+      lockedByThisAttempt: false,
     };
   }
 
@@ -279,7 +285,7 @@ async function checkCode(
       .update(magic_link_tokens)
       .set({ expires_at: sql`NOW()` })
       .where(attemptWindowFilter(binding.email));
-    return { status: 'locked', retryAfterSeconds: LOCKOUT_MINUTES * 60 };
+    return { status: 'locked', retryAfterSeconds: LOCKOUT_MINUTES * 60, lockedByThisAttempt: true };
   }
 
   return { status: 'ok' };

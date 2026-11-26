@@ -12,12 +12,12 @@ import type { CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import {
   effectiveMembershipRole,
-  loadEffectiveMembershipRowsWithOrganization,
   organizationRestAccessContext,
   resolveOrganizationAccessAndFetchOrg,
   StaffRequestRefusal,
   type OrganizationAccessWithOrganization,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import { loadEffectiveMembershipRowsWithOrganization } from '@kilocode/web-shared/lib/organizations/effective-membership';
 import {
   findSupportAllowEntry,
   isSupportAccessReason,

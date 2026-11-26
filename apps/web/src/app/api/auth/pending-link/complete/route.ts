@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
+import { captureException } from '@sentry/nextjs';
 import type { PendingAuthLink, User } from '@kilocode/db/schema';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
@@ -20,6 +21,12 @@ import {
   type SignInMethodChangeRefusal,
 } from '@/lib/auth/sign-in-method-change-codes';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const codeProofSchema = z.object({
   code: z.string().regex(new RegExp(`^\\d{${SIGN_IN_METHOD_CHANGE_CODE_LENGTH}}$`)),
@@ -45,7 +52,8 @@ async function refuseUnprovenExistingAccountLink(
   request: Request,
   row: PendingAuthLink,
   sessionUser: User,
-  webSessionId: string | undefined
+  webSessionId: string | undefined,
+  attempt: AuthAuditAttempt
 ): Promise<NextResponse | null> {
   if (sessionUser.id !== row.kilo_user_id) {
     return NextResponse.json({ error: 'WRONG_ACCOUNT' }, { status: 403 });
@@ -68,7 +76,8 @@ async function refuseUnprovenExistingAccountLink(
     proof.data.challengeId
   );
   if (result === 'invalid') return refused('codeInvalid', 400);
-  if (result === 'locked') return refused('codeLocked', 429);
+  if (result === 'locked_now') attempt.lockout = true;
+  if (result === 'locked' || result === 'locked_now') return refused('codeLocked', 429);
   return null;
 }
 
@@ -117,6 +126,17 @@ export const GET = withRestTiming('/api/auth/pending-link/complete', async () =>
 });
 
 export const POST = withRestTiming('/api/auth/pending-link/complete', async (request: Request) => {
+  // A refusal is recorded here; the link itself is recorded by
+  // recordSignInMethodChange when completePendingLink attaches it.
+  const attempt: AuthAuditAttempt = { action: 'auth.sign_in_method.link' };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/auth/pending-link/complete'),
+    attempt,
+    () => attachPendingLink(request, attempt)
+  );
+});
+
+async function attachPendingLink(request: Request, attempt: AuthAuditAttempt): Promise<Response> {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: 'INVALID_ORIGIN' }, { status: 403 });
   }
@@ -127,9 +147,23 @@ export const POST = withRestTiming('/api/auth/pending-link/complete', async (req
     await clearPendingLinkCookie();
     return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
   }
+  attempt.userId = row.kilo_user_id;
+  attempt.method = row.provider;
 
   const session = await getUserFromSessionForCredentialIssuance();
   const sessionUser = session.user;
+  // A refusal row hashes the email of the account the link names; the session
+  // already holds it when it is that account. A failed read leaves the hash
+  // out; the refusal is answered unchanged.
+  if (sessionUser?.id === row.kilo_user_id) {
+    attempt.email = sessionUser.google_user_email;
+  } else {
+    try {
+      attempt.email = (await findUserById(row.kilo_user_id))?.google_user_email ?? null;
+    } catch (error) {
+      captureException(error, { tags: { operation: 'pending_link_audit_email' } });
+    }
+  }
   if (!sessionUser) {
     return NextResponse.json({ error: 'SESSION_REQUIRED' }, { status: 401 });
   }
@@ -139,7 +173,8 @@ export const POST = withRestTiming('/api/auth/pending-link/complete', async (req
       request,
       row,
       sessionUser,
-      session.webSessionId
+      session.webSessionId,
+      attempt
     );
     if (refusal) return refusal;
   }
@@ -156,7 +191,8 @@ export const POST = withRestTiming('/api/auth/pending-link/complete', async (req
   }
 
   await clearPendingLinkCookie();
+  attempt.skipSuccessRow = true;
   return NextResponse.json({
     redirectTo: redirectTargetFor(row.kind, completed.provider, row.callback_path),
   });
-});
+}

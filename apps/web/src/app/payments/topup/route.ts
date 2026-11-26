@@ -79,7 +79,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
   let accountUsedMicrodollars = currentUser.microdollars_used;
   if (organizationId) {
     // Payments are on the support never-list: only a real (direct or inherited)
-    // billing role may start a checkout for an organization.
+    // billing role may start a checkout for an organization, so no Kilo admin
+    // bypass exists to audit.
     const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES, {
       requestMethod: request.method,
       membershipOnly: true,

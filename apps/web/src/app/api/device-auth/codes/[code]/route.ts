@@ -13,55 +13,75 @@ import crypto from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 type RouteContext = {
   params: Promise<{ code: string }>;
 };
 
+const ROUTE = '/api/device-auth/codes/[code]';
+
 // ──────────────── legacy poll ────────────────
 // @ponytail: remove this GET after all shipped clients migrate to POST /api/device-auth/token
 
-export const GET = withRestTiming(
-  '/api/device-auth/codes/[code]',
-  async (_request: Request, context?: RouteContext) => {
-    const code = (await context?.params)?.code;
+export const GET = withRestTiming(ROUTE, async (request: Request, context?: RouteContext) => {
+  // A poll that redeems or is refused is a redemption attempt; a pending poll
+  // records nothing.
+  const attempt: AuthAuditAttempt = { action: 'auth.device_auth.redeem', method: 'legacy_poll' };
+  return auditAuthRoute(authAuditRequestFromHeaders(request.headers, ROUTE), attempt, () =>
+    pollLegacy(attempt, context)
+  );
+});
 
-    if (!code) {
-      return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
-    }
+async function pollLegacy(attempt: AuthAuditAttempt, context?: RouteContext): Promise<Response> {
+  const code = (await context?.params)?.code;
 
-    const result = await pollDeviceAuthRequest(code);
-
-    // Return appropriate status codes based on the result
-    switch (result.status) {
-      case 'pending':
-        return NextResponse.json({ status: 'pending' }, { status: 202 });
-
-      case 'approved':
-        return NextResponse.json(
-          {
-            status: 'approved',
-            token: result.token,
-            userId: result.userId,
-            userEmail: result.userEmail,
-            requestingClient: result.requestingClient ?? null,
-            clientConfirmed: result.clientConfirmed === true,
-            ...(result.pendingLink ? { pendingLink: result.pendingLink } : {}),
-          },
-          { status: 200 }
-        );
-
-      case 'denied':
-        return NextResponse.json({ status: 'denied' }, { status: 403 });
-
-      case 'expired':
-        return NextResponse.json({ status: 'expired' }, { status: 410 });
-
-      default:
-        return NextResponse.json({ error: 'Unknown status' }, { status: 500 });
-    }
+  if (!code) {
+    attempt.failureReason = 'invalid_request';
+    return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
   }
-);
+
+  const result = await pollDeviceAuthRequest(code);
+  attempt.userId = result.userId ?? null;
+  if (result.requestId) attempt.metadata = { deviceAuthRequestId: result.requestId };
+
+  // Return appropriate status codes based on the result
+  switch (result.status) {
+    case 'pending':
+      attempt.skipSuccessRow = true;
+      return NextResponse.json({ status: 'pending' }, { status: 202 });
+
+    case 'approved':
+      return NextResponse.json(
+        {
+          status: 'approved',
+          token: result.token,
+          userId: result.userId,
+          userEmail: result.userEmail,
+          requestingClient: result.requestingClient ?? null,
+          clientConfirmed: result.clientConfirmed === true,
+          ...(result.pendingLink ? { pendingLink: result.pendingLink } : {}),
+        },
+        { status: 200 }
+      );
+
+    case 'denied':
+      attempt.failureReason = 'denied';
+      return NextResponse.json({ status: 'denied' }, { status: 403 });
+
+    case 'expired':
+      attempt.failureReason = 'expired';
+      return NextResponse.json({ status: 'expired' }, { status: 410 });
+
+    default:
+      attempt.failureReason = 'unknown_status';
+      return NextResponse.json({ error: 'Unknown status' }, { status: 500 });
+  }
+}
 
 // ──────────────── deny with viewer token ────────────────
 
@@ -80,8 +100,13 @@ function getDeviceCancelRateLimitKey(code: string): string {
  * The refusal code decides the status, so copy edits cannot change it. A refusal
  * this route does not answer with is a bug: it is reported and answered as 500.
  */
-function deviceAuthFailureResponse(error: unknown, notPendingMessage: string): Response {
+function deviceAuthFailureResponse(
+  error: unknown,
+  notPendingMessage: string,
+  attempt: AuthAuditAttempt
+): Response {
   if (error instanceof DeviceAuthRefusalError) {
+    if (error.requestId) attempt.metadata = { deviceAuthRequestId: error.requestId };
     if (error.code === DEVICE_AUTH_REFUSAL_CODES.requestNotFound) {
       return NextResponse.json({ error: error.code, message: 'Not found' }, { status: 404 });
     }
@@ -91,16 +116,22 @@ function deviceAuthFailureResponse(error: unknown, notPendingMessage: string): R
   }
   const message = error instanceof Error ? error.message : String(error);
   Sentry.captureException(error instanceof Error ? error : new Error(message));
+  attempt.failureReason = 'internal_error';
   return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 }
 
-async function cancelFromDevice(code: string, request: Request): Promise<Response> {
+async function cancelFromDevice(
+  code: string,
+  request: Request,
+  attempt: AuthAuditAttempt
+): Promise<Response> {
   const { rateLimited } = await checkRateLimit(DEVICE_AUTH_DENY_RATE_LIMIT_ID, {
     request,
     rateLimitKey: getDeviceCancelRateLimitKey(code),
   });
 
   if (rateLimited) {
+    attempt.failureReason = 'rate_limited';
     return NextResponse.json(
       { error: 'Rate limit exceeded. Please try again later.' },
       { status: 429 }
@@ -108,78 +139,100 @@ async function cancelFromDevice(code: string, request: Request): Promise<Respons
   }
 
   try {
-    await cancelDeviceAuthRequest(code);
+    const cancelled = await cancelDeviceAuthRequest(code);
+    attempt.metadata = { deviceAuthRequestId: cancelled.requestId };
+    // A repeated cancel changes nothing, so it records nothing. A cancel that
+    // did change the request names no account (no one approved it), so it is
+    // the log line only.
+    if (!cancelled.changed) attempt.skipSuccessRow = true;
   } catch (error) {
     return deviceAuthFailureResponse(
       error,
-      'Device authorization request can no longer be cancelled'
+      'Device authorization request can no longer be cancelled',
+      attempt
     );
   }
 
   return NextResponse.json({ success: true });
 }
 
-export const DELETE = withRestTiming(
-  '/api/device-auth/codes/[code]',
-  async (request: Request, context?: RouteContext) => {
+async function denyFromViewer(
+  code: string,
+  viewerToken: string,
+  request: Request,
+  attempt: AuthAuditAttempt
+): Promise<Response> {
+  // Authenticate the user
+  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+
+  if (authFailedResponse) {
+    return authFailedResponse;
+  }
+  attempt.userId = user.id;
+
+  // Rate limit deny attempts
+  const { rateLimited } = await checkRateLimit(DEVICE_AUTH_DENY_RATE_LIMIT_ID, {
+    request,
+    rateLimitKey: getDenyRateLimitKey(user.id),
+  });
+
+  if (rateLimited) {
+    attempt.failureReason = 'rate_limited';
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429 }
+    );
+  }
+
+  // Verify viewer token
+  const verified = verifyDeviceAuthViewerToken(viewerToken);
+
+  if (!verified) {
+    attempt.failureReason = 'invalid_viewer_token';
+    return NextResponse.json({ error: 'Invalid or expired viewer token' }, { status: 403 });
+  }
+
+  if (verified.code !== code) {
+    attempt.failureReason = 'viewer_token_code_mismatch';
+    return NextResponse.json({ error: 'Viewer token code mismatch' }, { status: 403 });
+  }
+
+  if (verified.userId !== user.id) {
+    attempt.failureReason = 'viewer_token_user_mismatch';
+    return NextResponse.json({ error: 'Viewer token user mismatch' }, { status: 403 });
+  }
+
+  try {
+    const denied = await denyDeviceAuthRequest(code);
+    attempt.metadata = { deviceAuthRequestId: denied.requestId };
+  } catch (error) {
+    return deviceAuthFailureResponse(
+      error,
+      'Device authorization request can no longer be denied',
+      attempt
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+export const DELETE = withRestTiming(ROUTE, async (request: Request, context?: RouteContext) => {
+  const viewerToken = request.headers.get('x-device-auth-viewer-token');
+  // Without a viewer token the caller is the device itself, presenting the
+  // poll secret that the poll GET accepts as `code`.
+  const attempt: AuthAuditAttempt = {
+    action: viewerToken === null ? 'auth.device_auth.cancel' : 'auth.device_auth.deny',
+  };
+  return auditAuthRoute(authAuditRequestFromHeaders(request.headers, ROUTE), attempt, async () => {
     const code = (await context?.params)?.code;
 
     if (!code) {
+      attempt.failureReason = 'invalid_request';
       return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
     }
 
-    const viewerToken = request.headers.get('x-device-auth-viewer-token');
-
-    // Without a viewer token the caller is the device itself, presenting the
-    // poll secret that the poll GET accepts as `code`.
-    if (viewerToken === null) {
-      return cancelFromDevice(code, request);
-    }
-
-    // Authenticate the user
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-
-    if (authFailedResponse) {
-      return authFailedResponse;
-    }
-
-    // Rate limit deny attempts
-    const { rateLimited } = await checkRateLimit(DEVICE_AUTH_DENY_RATE_LIMIT_ID, {
-      request,
-      rateLimitKey: getDenyRateLimitKey(user.id),
-    });
-
-    if (rateLimited) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
-        { status: 429 }
-      );
-    }
-
-    // Verify viewer token
-    const verified = verifyDeviceAuthViewerToken(viewerToken);
-
-    if (!verified) {
-      return NextResponse.json({ error: 'Invalid or expired viewer token' }, { status: 403 });
-    }
-
-    if (verified.code !== code) {
-      return NextResponse.json({ error: 'Viewer token code mismatch' }, { status: 403 });
-    }
-
-    if (verified.userId !== user.id) {
-      return NextResponse.json({ error: 'Viewer token user mismatch' }, { status: 403 });
-    }
-
-    try {
-      await denyDeviceAuthRequest(code);
-    } catch (error) {
-      return deviceAuthFailureResponse(
-        error,
-        'Device authorization request can no longer be denied'
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  }
-);
+    return viewerToken === null
+      ? cancelFromDevice(code, request, attempt)
+      : denyFromViewer(code, viewerToken, request, attempt);
+  });
+});

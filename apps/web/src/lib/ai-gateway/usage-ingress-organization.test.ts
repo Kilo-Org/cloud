@@ -209,7 +209,7 @@ test.each([undefined, organizationId])(
         kilo_user_id: user.id,
         cost: 123,
       },
-      metadata: { user_prompt_prefix: header ? null : 'synthetic' },
+      metadata: { user_prompt_prefix: null, system_prompt_prefix: null },
     });
     if (header)
       expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {

@@ -215,8 +215,8 @@ export const PolicySnapshotEntrySchema = z.strictObject({
   // A snapshot stored before token grants existed has none.
   audiences: z.array(z.string()).default([]),
   scopes: z.array(z.string()).default([]),
-  // A snapshot stored before leases existed has none.
-  dynamic: z.array(z.string()).default([]),
+  // Written only for a policy with lease grants, so a reader from before leases parses the rest.
+  dynamic: z.array(z.string()).optional(),
 });
 
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);

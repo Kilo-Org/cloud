@@ -16,8 +16,12 @@ export type PolicySnapshotEntry = {
   secrets: string[];
   audiences: string[];
   scopes: string[];
-  /** One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant. */
-  dynamic: string[];
+  /**
+   * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant; absent when the
+   * policy has none, so the snapshot and its hash stay what a reader without leases expects (a
+   * rollback to it then parses the stored snapshot).
+   */
+  dynamic?: string[];
 };
 
 function dynamicKey(entry: DynamicGrant): string {
@@ -128,7 +132,7 @@ export function loadPolicies(
     secrets: [...policy.secrets].sort(),
     audiences: [...policy.audiences].sort(),
     scopes: [...policy.scopes].sort(),
-    dynamic: policy.dynamic.map(dynamicKey).sort(),
+    ...(policy.dynamic.length > 0 ? { dynamic: policy.dynamic.map(dynamicKey).sort() } : {}),
   }));
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 

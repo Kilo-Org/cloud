@@ -156,7 +156,7 @@ function grantKeys(
   grant: 'secrets' | 'audiences' | 'scopes' | 'dynamic'
 ): Set<string> {
   return new Set(
-    snapshot.flatMap(entry => entry[grant].map(value => `${entry.workload}:${value}`))
+    snapshot.flatMap(entry => (entry[grant] ?? []).map(value => `${entry.workload}:${value}`))
   );
 }
 

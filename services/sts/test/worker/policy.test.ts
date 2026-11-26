@@ -3,7 +3,7 @@ import { policyChangedEvent } from '../../src/audit/events';
 import { resolveWorkloadSecrets } from '../../src/bundle/resolve';
 import { loadPolicies } from '../../src/policy/load';
 import { policyFor, policyIndex } from '../../src/policy';
-import { bundleFolder } from '../../src/policy/schema';
+import { PolicySnapshotSchema, bundleFolder } from '../../src/policy/schema';
 
 const REGISTRY = {
   gateway: { scopes: ['gateway:models.read', 'gateway:usage.write'] },
@@ -756,5 +756,18 @@ ${dynamic}`;
       removedDynamic: ['app-one:replica-read:3600:3600:1'],
       dynamicTruncated: false,
     });
+  });
+
+  it('writes no dynamic field for a policy without lease grants, so a reader from before leases parses the snapshot', () => {
+    const plain = loadPolicies({ 'app-one.yaml': valid });
+    expect(plain.snapshot()[0]).not.toHaveProperty('dynamic');
+    // The strict snapshot reader of the stacked base: the same schema without `dynamic`.
+    const baseReader = PolicySnapshotSchema.element.omit({ dynamic: true }).array();
+    expect(baseReader.safeParse(JSON.parse(JSON.stringify(plain.snapshot()))).success).toBe(true);
+    const leasing = loadPolicies({ 'app-one.yaml': worker(grant('replica-read', 3600, 3600, 1)) });
+    expect(baseReader.safeParse(leasing.snapshot()).success).toBe(false);
+    expect(PolicySnapshotSchema.parse(JSON.parse(JSON.stringify(plain.snapshot())))).toEqual(
+      plain.snapshot()
+    );
   });
 });

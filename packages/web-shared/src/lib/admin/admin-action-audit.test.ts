@@ -171,6 +171,7 @@ describe('recordAdminAction', () => {
       metadata: null,
     });
     expect(events[1]).toMatchObject({ entryCount: 1, targetIds: [userIds[1_000]] });
+    expect(events.every(event => 'errorCodes' in event && event.errorCodes === null)).toBe(true);
     const loggedIds = events.flatMap(event => ('auditLogIds' in event ? event.auditLogIds : []));
     expect([...loggedIds].sort()).toEqual(rows.map(row => row.id).sort());
     expect(Math.max(...events.map(event => JSON.stringify(event).length))).toBeLessThan(128_000);
@@ -187,6 +188,13 @@ describe('recordAdminAction', () => {
         message: 'Unblock failed',
       },
       { action: 'user.unblock', target: organizationActionTarget('org-3'), message: 'Unblocked' },
+      {
+        action: 'user.unblock',
+        outcome: 'failure',
+        errorCode: 'NOT_FOUND',
+        target: userActionTarget('user-4'),
+        message: 'Unblock failed',
+      },
     ]);
 
     expect(events).toEqual([
@@ -195,16 +203,69 @@ describe('recordAdminAction', () => {
         entryCount: 2,
         targetType: null,
         targetIds: ['user-1', 'org-3'],
+        errorCodes: null,
         message: 'Unblocked',
       }),
       expect.objectContaining({
         outcome: 'failure',
-        entryCount: 1,
+        entryCount: 2,
         targetType: 'user',
-        targetIds: ['user-2'],
-        metadata: { errorCode: 'Error' },
+        targetIds: ['user-2', 'user-4'],
+        errorCodes: ['Error', 'NOT_FOUND'],
+        // The entries' codes differ, so no metadata is shared.
+        metadata: null,
       }),
     ]);
+  });
+
+  test('logs each entry of a chunk that was not stored on its own line', async () => {
+    const userIds = Array.from({ length: 1_002 }, (_, index) => `bulk-user-${index}`);
+    const insertRows = db.insert.bind(db);
+    let inserts = 0;
+    const insert = jest.spyOn(db, 'insert').mockImplementation(((table: never) => {
+      inserts += 1;
+      if (inserts === 2) throw new Error('database unavailable');
+      return insertRows(table);
+    }) as never);
+
+    try {
+      await recordAdminActions(
+        ctxFor(),
+        userIds.map(userId => ({
+          action: 'user.unblock' as const,
+          outcome: 'failure' as const,
+          errorCode: 'Error',
+          target: userActionTarget(userId),
+          message: `Unblock of ${userId} failed`,
+          metadata: { userId },
+        }))
+      );
+    } finally {
+      insert.mockRestore();
+    }
+
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(1_000);
+    expect(events).toHaveLength(3);
+    expect(events[0]).toMatchObject({
+      entryCount: 1_000,
+      persisted: true,
+      targetIds: userIds.slice(0, 1_000),
+      errorCodes: Array.from({ length: 1_000 }, () => 'Error'),
+    });
+    expect(events.slice(1)).toEqual(
+      userIds.slice(1_000).map(userId =>
+        expect.objectContaining({
+          action: 'user.unblock',
+          outcome: 'failure',
+          auditLogId: null,
+          persisted: false,
+          targetType: 'user',
+          targetId: userId,
+          message: `Unblock of ${userId} failed`,
+          metadata: { userId, errorCode: 'Error' },
+        })
+      )
+    );
   });
 
   test('does nothing for an empty batch', async () => {

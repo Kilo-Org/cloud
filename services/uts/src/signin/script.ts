@@ -10,6 +10,18 @@ import {
  * and responses between JSON and the browser's binary form, and posts JSON to the passkey and
  * device endpoints with the session cookie. It runs in every browser that supports passkeys, so
  * it uses no newer JSON helpers of the WebAuthn API.
+ *
+ * The relying-party id (`data-rp-id`) is the app host. On another host a ceremony needs the
+ * browser's related-origin support (WebAuthn Level 3, section 5.11; design 5.14). The script asks
+ * `PublicKeyCredential.getClientCapabilities()` first (section 5.1.7): `relatedOrigins: false`, or
+ * no WebAuthn at all, hides every `data-passkey` element and shows the page's
+ * `passkey-unavailable` notice before any challenge is asked for. A missing key means "not known",
+ * and older browsers lack the method; such a browser finds out at the ceremony: when rp.id is not
+ * the page's host, `SecurityError` means that the browser has no related-origin support or the
+ * related-origin check failed (sections 5.1.3.1 and 5.1.4.3), and the page then shows the same
+ * notice. `NotAllowedError` stays an ordinary failure the user can retry, because the
+ * specification also uses it for a cancelled ceremony. So a passkey sign-in or registration on
+ * such a browser never fails without saying why.
  */
 const SCRIPT = `'use strict';
 (() => {
@@ -30,6 +42,53 @@ const SCRIPT = `'use strict';
   const status = message => {
     const element = document.getElementById('status');
     if (element) element.textContent = message;
+  };
+
+  const RP_ID = document.body.dataset.rpId;
+  const HOST = window.location.hostname;
+  const RELATED = typeof RP_ID === 'string' && HOST !== RP_ID && !HOST.endsWith('.' + RP_ID);
+  const UNAVAILABLE = 'passkey_unavailable';
+
+  // 'available', 'unavailable', or 'unknown' when only a ceremony can tell.
+  const support = (async () => {
+    if (typeof PublicKeyCredential === 'undefined' || !navigator.credentials) return 'unavailable';
+    if (!RELATED) return 'available';
+    if (typeof PublicKeyCredential.getClientCapabilities !== 'function') return 'unknown';
+    try {
+      const capabilities = await PublicKeyCredential.getClientCapabilities();
+      if (capabilities.relatedOrigins === true) return 'available';
+      if (capabilities.relatedOrigins === false) return 'unavailable';
+      return 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  })();
+
+  const showUnavailable = () => {
+    for (const element of document.querySelectorAll('[data-passkey]')) element.hidden = true;
+    const notice = document.getElementById('passkey-unavailable');
+    if (notice) notice.hidden = false;
+    status('');
+  };
+  if (RP_ID !== undefined) {
+    support.then(state => {
+      if (state === 'unavailable') showUnavailable();
+    });
+  }
+
+  // Before a challenge is asked for: refuses at once where the browser said it cannot.
+  const requireSupport = async () => {
+    if ((await support) === 'unavailable') throw new Error(UNAVAILABLE);
+  };
+  // One WebAuthn call: a SecurityError on another host than the relying party means the browser
+  // cannot use its passkeys here.
+  const webauthn = async call => {
+    try {
+      return await call();
+    } catch (error) {
+      if (RELATED && error && error.name === 'SecurityError') throw new Error(UNAVAILABLE);
+      throw error;
+    }
   };
 
   const post = async (path, body) => {
@@ -72,33 +131,35 @@ const SCRIPT = `'use strict';
   });
 
   const assertion = async ceremony => {
+    await requireSupport();
     const options = await post(OPTIONS, { ceremony });
     if (!options.ok) throw failure(options.data);
     const publicKey = options.data.options;
-    const credential = await navigator.credentials.get({
+    const credential = await webauthn(() => navigator.credentials.get({
       publicKey: {
         ...publicKey,
         challenge: toBytes(publicKey.challenge),
         allowCredentials: (publicKey.allowCredentials || []).map(item => ({ ...item, id: toBytes(item.id) })),
       },
-    });
+    }));
     const verified = await post(VERIFY, { ceremony, response: assertionJson(credential) });
     if (!verified.ok) throw failure(verified.data);
     return verified.data;
   };
 
   const register = async name => {
+    await requireSupport();
     const options = await post(OPTIONS, { ceremony: 'registration' });
     if (!options.ok) throw failure(options.data);
     const publicKey = options.data.options;
-    const credential = await navigator.credentials.create({
+    const credential = await webauthn(() => navigator.credentials.create({
       publicKey: {
         ...publicKey,
         challenge: toBytes(publicKey.challenge),
         user: { ...publicKey.user, id: toBytes(publicKey.user.id) },
         excludeCredentials: (publicKey.excludeCredentials || []).map(item => ({ ...item, id: toBytes(item.id) })),
       },
-    });
+    }));
     const verified = await post(VERIFY, { ceremony: 'registration', response: attestationJson(credential), name });
     if (!verified.ok) throw failure(verified.data);
     return verified.data;
@@ -125,6 +186,10 @@ const SCRIPT = `'use strict';
       try {
         await handler();
       } catch (error) {
+        if (error instanceof Error && error.message === UNAVAILABLE) {
+          showUnavailable();
+          return;
+        }
         status('That did not work: ' + (error instanceof Error ? error.message : 'failed'));
         element.disabled = false;
       }

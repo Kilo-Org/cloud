@@ -202,6 +202,15 @@ provider, SSO or email sign-in ends in a browser session (`__Host-uts_session`, 
 returns to the page that offered it, so an authorization request then issues its code
 (`src/signin/handoff.ts`).
 
+The passkey's relying-party id is the app host (`WEBAUTHN_RP_ID`), so on the issuer host a passkey
+ceremony needs the browser's WebAuthn related-origin support (design 5.14). The page script
+(`src/signin/script.ts`) asks `PublicKeyCredential.getClientCapabilities()`, and treats a
+`SecurityError` from the ceremony the same way: without support, the passkey controls are hidden
+and the page says why and points to the other methods. The add-a-passkey page refuses in the same
+way, before it asks for a challenge when the browser has already answered. The passkey pages'
+`connect-src` names `https://<WEBAUTHN_RP_ID>/.well-known/webauthn`, the URL the browser fetches
+for the related-origin check.
+
 | Route | Behaviour | SQL |
 |---|---|---|
 | `GET /signin/oauth/<provider>/start` | Stores the flow (`state` hash, binder hash, return path) and redirects to the provider; `intent=link&gate_pass=<id>` adds the method to the signed-in account instead | `uts.start_sign_in_flow` |
@@ -338,7 +347,9 @@ that no audit row names a token, a code or an address.
   held keys of a failed signer), metadata, DPoP proofs, the signer's batch signing, and every OAuth
   endpoint against a recording grant store.
 - `pnpm test:repo`: the repository config check (`test/repo`), with no database.
-- `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
+- `pnpm test:script`: the sign-in pages' browser script (`test/script`), run against the rendered
+  pages in a fresh `node:vm` context with stand-ins for the DOM, `fetch` and WebAuthn.
+- `pnpm test` runs all three; none needs Postgres. `pnpm test:postgres` runs the identity store
   tests (`test/db`, see "Local database and tests"), the OAuth grant functions and the DPoP `jti`
   check included.
 

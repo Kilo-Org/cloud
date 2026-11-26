@@ -44,9 +44,10 @@ const PROVIDER_NAMES: Readonly<Record<UtsOAuthProvider, string>> = {
 
 /** What the sign-in page offers: every configured method, returning to `returnTo`. */
 export function signInChoices(methods: SignInMethods, returnTo: string): SignInChoices {
-  const { settings } = methods;
+  const { settings, config } = methods;
   return {
     returnTo,
+    rpId: config.relyingParty.rpId,
     providers: UTS_OAUTH_PROVIDERS.filter(
       provider => settings.providers[provider].status === 'on'
     ).map(provider => ({ provider, name: PROVIDER_NAMES[provider] })),

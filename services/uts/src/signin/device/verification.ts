@@ -97,7 +97,13 @@ async function lookUpCode(request: Request, deps: DeviceDeps): Promise<Response>
       case 'pending': {
         const client = identifyClient(read.clientId);
         const name = client.kind === 'first_party' ? client.client.name : read.clientId;
-        return deviceApprovalPage(formatUserCode(normalized), source, name, read);
+        return deviceApprovalPage(
+          formatUserCode(normalized),
+          source,
+          name,
+          read,
+          deps.config.relyingParty.rpId
+        );
       }
       case 'no_session':
         return Response.redirect(entryPage, 303);

@@ -327,6 +327,7 @@ describe('sign-in page', () => {
   it('lists the configured methods, and its form-action stays on the issuer', async () => {
     const response = signInPage({
       returnTo: '/authorize?client_id=kilo-cli&state=a"b',
+      rpId: 'app.kilo.ai',
       providers: [{ provider: 'google', name: 'Google' }],
       email: true,
       sso: true,

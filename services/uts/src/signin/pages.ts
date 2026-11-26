@@ -17,21 +17,37 @@ import type { PendingDevice, UserCodeSource } from './store';
 /**
  * `form-action` also governs where a form submission redirects, so a page whose form ends in an
  * app's redirect names that URI's scheme beside `'self'`.
+ *
+ * A page that runs a passkey ceremony also names `https://<rpId>/.well-known/webauthn` in
+ * `connect-src`. The relying-party id is the app host, not the page's host, so the browser fetches
+ * that URL itself to check that the page's origin is a related origin (WebAuthn Level 3, section
+ * 5.11.1). The specification does not say whether the page's policy governs that fetch (w3c/webauthn
+ * issue 2408). Chromium checks the URL and every redirect against the page's enforced `connect-src`
+ * (components/webauthn/core/browser/remote_validation.cc) and today only counts a refusal; a page
+ * that names the URL keeps working when a browser enforces the check. In development the
+ * relying-party id is the page's own host, the browser fetches nothing, and the entry is inert.
+ *
+ * No `Permissions-Policy` is needed: the default allowlist of `publickey-credentials-get` and
+ * `publickey-credentials-create` is `'self'`, which allows a top-level page. The allowlist names
+ * the origins of frames, not relying parties, and the pages refuse every frame.
  */
-function contentSecurityPolicy(formAction: string): string {
-  return `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self'; style-src 'self'; form-action ${formAction}; base-uri 'none'; frame-ancestors 'none'`;
+function contentSecurityPolicy(formAction: string, rpId: string | null): string {
+  const connect = rpId === null ? "'self'" : `'self' https://${rpId}/.well-known/webauthn`;
+  return `default-src 'none'; script-src 'self'; connect-src ${connect}; img-src 'self'; style-src 'self'; form-action ${formAction}; base-uri 'none'; frame-ancestors 'none'`;
 }
 
-const SECURITY_HEADERS = {
-  'Content-Type': 'text/html; charset=utf-8',
-  'Cache-Control': 'no-store',
-  'Content-Security-Policy': contentSecurityPolicy("'self'"),
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  // No referrer leaves for another origin. `no-referrer` would also make a browser send
-  // `Origin: null` with the pages' own form posts, which `isSameOriginPost` then refuses.
-  'Referrer-Policy': 'same-origin',
-} as const;
+function securityHeaders(rpId: string | null) {
+  return {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': contentSecurityPolicy("'self'", rpId),
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    // No referrer leaves for another origin. `no-referrer` would also make a browser send
+    // `Origin: null` with the pages' own form posts, which `isSameOriginPost` then refuses.
+    'Referrer-Policy': 'same-origin',
+  };
+}
 
 const ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -45,8 +61,25 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ESCAPES[character] ?? character);
 }
 
-/** One page: `page` names what the script wires up (`data-page`). */
-export function page(title: string, pageName: string, body: string, status = 200): Response {
+/**
+ * What a page that runs a passkey ceremony adds: the relying-party id, for its `connect-src` and
+ * for the script, and the notice the script shows in place of every `data-passkey` element when
+ * the browser cannot use the relying party's passkeys on this origin (design 5.14).
+ */
+type PasskeyUse = { rpId: string; unavailable: string };
+
+function render(
+  title: string,
+  pageName: string,
+  body: string,
+  status: number,
+  passkey: PasskeyUse | null
+): Response {
+  const rpId = passkey === null ? '' : ` data-rp-id="${escapeHtml(passkey.rpId)}"`;
+  const notice =
+    passkey === null
+      ? ''
+      : `<p id="passkey-unavailable" role="alert" hidden>${escapeHtml(passkey.unavailable)}</p>\n`;
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -55,23 +88,30 @@ export function page(title: string, pageName: string, body: string, status = 200
 <title>${escapeHtml(title)}</title>
 <script src="${UTS_SIGNIN_SCRIPT_PATH}" defer></script>
 </head>
-<body data-page="${escapeHtml(pageName)}">
+<body data-page="${escapeHtml(pageName)}"${rpId}>
 <main>
 <h1>${escapeHtml(title)}</h1>
-${body}
+${notice}${body}
 <p id="status" role="status" aria-live="polite"></p>
 <noscript><p>Sign-in needs JavaScript and a browser with passkey support.</p></noscript>
 </main>
 </body>
 </html>
 `;
-  return new Response(html, { status, headers: SECURITY_HEADERS });
+  return new Response(html, { status, headers: securityHeaders(passkey?.rpId ?? null) });
+}
+
+/** One page: `page` names what the script wires up (`data-page`). */
+export function page(title: string, pageName: string, body: string, status = 200): Response {
+  return render(title, pageName, body, status, null);
 }
 
 /** The sign-in methods the page offers besides the passkey (`signInChoices`, src/signin/flows.ts). */
 export type SignInChoices = {
   /** The path the sign-in returns to: the authorization URL that showed the page, or another. */
   returnTo: string;
+  /** The relying-party id of the passkey sign-in (`WEBAUTHN_RP_ID`). */
+  rpId: string;
   providers: readonly { provider: UtsOAuthProvider; name: string }[];
   email: boolean;
   /** Whether the page offers SSO, which starts with the user's work address. */
@@ -80,13 +120,14 @@ export type SignInChoices = {
 
 /**
  * The sign-in page an interaction shows. After a passkey sign-in the script reloads the same URL;
- * a provider, SSO or email sign-in returns to `returnTo`.
+ * a provider, SSO or email sign-in returns to `returnTo`. A browser that cannot use the relying
+ * party's passkeys here sees the other methods only (design 5.14).
  */
 export function signInPage(choices: SignInChoices): Response {
   const returnTo = escapeHtml(choices.returnTo);
   const returnQuery = escapeHtml(new URLSearchParams({ return_to: choices.returnTo }).toString());
   const parts = [
-    '<p>Use a passkey saved for your Kilo account.</p>\n<button type="button" id="passkey-sign-in">Sign in with a passkey</button>',
+    '<div data-passkey>\n<p>Use a passkey saved for your Kilo account.</p>\n<button type="button" id="passkey-sign-in">Sign in with a passkey</button>\n</div>',
   ];
   if (choices.providers.length > 0) {
     parts.push(
@@ -114,7 +155,13 @@ export function signInPage(choices: SignInChoices): Response {
 <button type="submit">Sign in with SSO</button>
 </form>`);
   }
-  return page('Sign in to Kilo', 'sign-in', parts.join('\n'));
+  const otherMethods = choices.providers.length > 0 || choices.email || choices.sso;
+  return render('Sign in to Kilo', 'sign-in', parts.join('\n'), 200, {
+    rpId: choices.rpId,
+    unavailable: otherMethods
+      ? 'This browser cannot use a Kilo passkey on this page. Sign in another way below.'
+      : 'This browser cannot use a Kilo passkey on this page. Update the browser or use another one.',
+  });
 }
 
 /**
@@ -145,15 +192,27 @@ export function messagePage(
   return page(title, 'message', `<p>${escapeHtml(message)}</p>${link}`, status);
 }
 
-/** The page where a signed-in user adds a passkey (a tier A action, design 5.11). */
-export function passkeysPage(): Response {
-  return page(
+/**
+ * The page where a signed-in user adds a passkey (a tier A action, design 5.11). A browser that
+ * cannot use the relying party's passkeys here cannot add one either: the page says so and asks
+ * for no challenge (design 5.14).
+ */
+export function passkeysPage(rpId: string): Response {
+  return render(
     'Add a passkey',
     'passkeys',
     `<p>A passkey lets you sign in without a password.</p>
+<div data-passkey>
 <label for="passkey-name">Passkey name</label>
 <input id="passkey-name" name="name" maxlength="100" autocomplete="off" required>
-<button type="button" id="passkey-register">Add a passkey</button>`
+<button type="button" id="passkey-register">Add a passkey</button>
+</div>`,
+    200,
+    {
+      rpId,
+      unavailable:
+        'This browser cannot add a passkey for your Kilo account on this page. Update the browser or use another one to add a passkey. Your other sign-in methods keep working.',
+    }
   );
 }
 
@@ -183,13 +242,16 @@ ${prefill}<label for="user-code">Code shown on your device</label>
 /**
  * A device sign-in waiting for the user (RFC 8628 section 5.4): what asks, from where. `source`
  * goes back with the decision: a code from a link needs a passkey check to approve, so the page
- * tells a user without a passkey to type the code on the plain device page instead.
+ * tells a user without a passkey to type the code on the plain device page instead, and a browser
+ * that cannot use the relying party's passkeys here does not offer to approve it (design 5.14).
+ * A typed code needs a passkey check only when the sign-in is older than 10 minutes.
  */
 export function deviceApprovalPage(
   userCode: string,
   source: UserCodeSource,
   clientName: string,
-  device: PendingDevice
+  device: PendingDevice,
+  rpId: string
 ): Response {
   const place = [device.city, device.country].filter(part => part !== null).join(', ');
   const scopes = device.scopes.map(scope => `<li><code>${escapeHtml(scope)}</code></li>`).join('');
@@ -197,7 +259,8 @@ export function deviceApprovalPage(
     source === 'link'
       ? `\n<p>This code came in a link, so approving asks for your passkey. No passkey? <a id="type-code" href="${UTS_DEVICE_VERIFICATION_PATH}">Type the code from your device</a> instead.</p>`
       : '';
-  return page(
+  const approve = `<button type="button" id="device-approve"${source === 'link' ? ' data-passkey' : ''}>Approve</button>`;
+  return render(
     'Approve a device sign-in',
     'device-approval',
     `<p>Only approve this if you started the sign-in yourself and the code matches your device.</p>${linkNotice}
@@ -209,8 +272,16 @@ export function deviceApprovalPage(
 <dt>Device</dt><dd>${escapeHtml(device.userAgent ?? 'unknown')}</dd>
 <dt>Access</dt><dd><ul>${scopes}</ul></dd>
 </dl>
-<button type="button" id="device-approve">Approve</button>
-<button type="button" id="device-deny">Deny</button>`
+${approve}
+<button type="button" id="device-deny">Deny</button>`,
+    200,
+    {
+      rpId,
+      unavailable:
+        source === 'link'
+          ? 'This browser cannot use your passkey on this page, so it cannot approve a code that came in a link. Type the code from your device instead.'
+          : 'This browser cannot use your passkey on this page, and a typed code needs one when you signed in more than 10 minutes ago. Sign in again in a private window, then type the code from your device.',
+    }
   );
 }
 
@@ -235,7 +306,7 @@ export function confirmAppPage(appName: string, redirectUri: string): Response {
   );
   response.headers.set(
     'Content-Security-Policy',
-    contentSecurityPolicy(`'self' ${new URL(redirectUri).protocol}`)
+    contentSecurityPolicy(`'self' ${new URL(redirectUri).protocol}`, null)
   );
   return response;
 }

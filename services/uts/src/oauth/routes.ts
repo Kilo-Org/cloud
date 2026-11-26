@@ -122,7 +122,7 @@ async function handlePasskeysPage(request: Request, deps: SignInDeps): Promise<R
   try {
     return (await requestSession(request, deps)) === null
       ? signInPage(signInChoices(deps.methods, UTS_PASSKEYS_PAGE_PATH))
-      : passkeysPage();
+      : passkeysPage(deps.config.relyingParty.rpId);
   } catch (error) {
     return unavailablePage(classifyFailure(error, 'passkeys_page') === 'retryable');
   }

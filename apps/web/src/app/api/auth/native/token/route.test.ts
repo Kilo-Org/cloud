@@ -19,7 +19,7 @@ import {
   findUserBySignInCodeEmail,
   findUserIdByAuthProvider,
 } from '@/lib/user';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import type { User } from '@kilocode/db/schema';
 
@@ -39,7 +39,7 @@ jest.mock('@/lib/auth/passkey', () => ({
 jest.mock('@/lib/user');
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-jest.mock('@kilocode/web-shared/lib/tokens');
+jest.mock('@/lib/auth/kilo-token-signing');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),

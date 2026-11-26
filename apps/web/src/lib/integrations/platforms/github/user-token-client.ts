@@ -2,7 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
-import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { GITHUB_USER_ACCESS_TOKEN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 export const GitHubUserAccessTokenOpSchema = z.discriminatedUnion('op', [

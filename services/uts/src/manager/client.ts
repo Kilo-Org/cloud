@@ -74,7 +74,9 @@ export class ManagerClient {
   constructor(
     private readonly config: ManagerConfig,
     private readonly signLoginJwt: () => Promise<ManagerLoginJwtResult>,
-    private readonly fetcher: typeof fetch = fetch
+    // Called as a method, the platform `fetch` would receive this instance as `this`, which
+    // workerd refuses ("Illegal invocation"); the arrow keeps the global receiver.
+    private readonly fetcher: typeof fetch = (input, init) => fetch(input, init)
   ) {}
 
   /** Creates `name` in `/admin/identity-store`; under the folder's change policy it waits for approval. */

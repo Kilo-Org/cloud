@@ -433,13 +433,22 @@ development entry only):
 
 Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`, or an origin of
 the environment's table in `UTS_RESOURCE_ORIGINS` (`@kilocode/uts-contracts`), which maps each
-origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`), the
-`*.kiloapps.io` origins of ai-attribution, session-sync, notifications, events and chat, and the
-`*.kilosessions.ai` origins of session ingest, data export, the git token service and the cloud
-agent; staging lists only `https://staging-app.kilo.ai` and its issuer; development lists loopback
-origins only. An origin in the table does not activate a service: the service proves its caller
-first. `protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table.
-Another environment's origin, a path, a trailing slash or a query answers `invalid_target`.
+origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`), the AI
+gateway (`https://ai-gateway.kilo.ai`, `kilo-gateway`), the `*.kiloapps.io` origins of
+ai-attribution, session-sync, notifications, events and chat, and the `*.kilosessions.ai` origins
+of session ingest, data export, the git token service and the cloud agent; staging lists only
+`https://staging-app.kilo.ai`, `https://staging-ai-gateway.kilo.ai` and its issuer; development
+lists loopback origins only (the AI gateway on `http://localhost:3010`). The gateway's origin is
+the one its deploy targets and the web app's rewrites name; a request that reaches it through
+`/api/gateway` on the web app still names that origin, never one read from `Host`. An origin in
+the table does not activate a service: the service proves its caller first.
+`protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table. Another
+environment's origin, a path, a trailing slash or a query answers `invalid_target`.
+
+`kilo-gateway:inference` is the gateway's one scope: inference and the authenticated model catalog
+and validation reads, for the CLI and the mobile app, 10 minutes, no step-up, no session, no
+organization claim, no actor. A PAT or an org bot key may carry it. The gateway checks the
+organization a request names against the subject itself.
 
 | Route | Scope | Behaviour | SQL |
 |---|---|---|---|

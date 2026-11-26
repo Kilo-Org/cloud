@@ -1,6 +1,7 @@
 import {
   KILO_API_MCP_READ_SCOPE,
   KILO_API_PROFILE_READ_SCOPE,
+  KILO_GATEWAY_INFERENCE_SCOPE,
   KILO_MCP_CATALOG_READ_SCOPE,
   PAGES_DEV_TOOLS_USE_SCOPE,
   KILO_WEB_CALLBACK_PATH,
@@ -98,6 +99,56 @@ describe('the UTS scope registry', () => {
     });
     expect(scopeRegistryProblems({ [KILO_API_PROFILE_READ_SCOPE]: entry ?? base })).toEqual([]);
     expect(credentialScopeCheck(KILO_API_PROFILE_READ_SCOPE, null)).toEqual({ status: 'allowed' });
+  });
+
+  it('lists the one AI gateway scope for the CLI and the mobile app, 10 minutes, PAT-eligible', () => {
+    expect(KILO_GATEWAY_INFERENCE_SCOPE).toBe('kilo-gateway:inference');
+    const entry = utsScopeEntry(KILO_GATEWAY_INFERENCE_SCOPE);
+    expect(entry).toEqual({
+      audience: 'kilo-gateway',
+      maxLifetimeSeconds: 600,
+      allowedClients: ['kilo-cli', 'kilo-mobile'],
+      subjects: { kind: 'any_user' },
+      thirdPartySafe: false,
+      stepUp: false,
+      patEligible: true,
+      privileged: false,
+      requiresSession: false,
+      requiresOrgClaim: false,
+      delegable: false,
+      issuance: 'grant',
+      delegatesTo: [],
+      consentText: null,
+    });
+    expect(
+      Object.entries(UTS_SCOPE_REGISTRY)
+        .filter(([, scopeEntry]) => scopeEntry.audience === 'kilo-gateway')
+        .map(([scope]) => scope)
+    ).toEqual([KILO_GATEWAY_INFERENCE_SCOPE]);
+    for (const clientId of ['kilo-cli', 'kilo-mobile']) {
+      expect(
+        clientScopeRefusal(
+          [KILO_GATEWAY_INFERENCE_SCOPE],
+          { kind: 'first_party', clientId },
+          utsScopeEntry
+        )
+      ).toBeNull();
+    }
+    for (const client of [
+      { kind: 'first_party', clientId: 'kilo-web' },
+      { kind: 'third_party', clientId: 'https://client.example.com/oauth/client.json' },
+    ] as const) {
+      expect(clientScopeRefusal([KILO_GATEWAY_INFERENCE_SCOPE], client, utsScopeEntry)).toBe(
+        KILO_GATEWAY_INFERENCE_SCOPE
+      );
+    }
+    // No organization is needed or added: a personal grant and an org-bound one both mint it, and
+    // a PAT or an org bot key may carry it.
+    expect(orgScopeRefusal([KILO_GATEWAY_INFERENCE_SCOPE], null, null, utsScopeEntry)).toBeNull();
+    expect(credentialScopeCheck(KILO_GATEWAY_INFERENCE_SCOPE, null)).toEqual({ status: 'allowed' });
+    expect(credentialScopeCheck(KILO_GATEWAY_INFERENCE_SCOPE, 'org-1')).toEqual({
+      status: 'allowed',
+    });
   });
 
   it('knows no scope it does not list, including object property names', () => {

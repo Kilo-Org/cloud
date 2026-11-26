@@ -59,6 +59,8 @@ import {
   type FeedKeysEntry,
   type SignerKeysEntry,
 } from './signer-keys';
+import { audienceOfResource, resourceOriginOf } from './oauth';
+import { KILO_GATEWAY_AUDIENCE, KILO_GATEWAY_INFERENCE_SCOPE, utsScopeEntry } from './scopes';
 
 const THUMBPRINT = 'A'.repeat(43);
 
@@ -91,6 +93,29 @@ describe('UTS endpoints', () => {
     expect(UTS_JWKS_MAX_AGE_SECONDS).toBe(300);
     expect(UTS_JWKS_STALE_IF_ERROR_SECONDS).toBe(86400);
     expect(UTS_JWKS_OLDEST_AGE_HEADER).toBe('Kilo-Key-Set-Oldest-Age');
+  });
+});
+
+describe('the AI gateway resource', () => {
+  it('has one fixed origin per environment, naming kilo-gateway and its one scope', () => {
+    const origins = {
+      production: 'https://ai-gateway.kilo.ai',
+      staging: 'https://staging-ai-gateway.kilo.ai',
+      development: 'http://localhost:3010',
+    } as const;
+    for (const environment of ['production', 'staging', 'development'] as const) {
+      expect(resourceOriginOf(environment, KILO_GATEWAY_AUDIENCE)).toBe(origins[environment]);
+      expect(audienceOfResource(origins[environment], environment)).toBe('kilo-gateway');
+      expect(audienceOfResource('urn:kilo:service:kilo-gateway', environment)).toBe(
+        'kilo-gateway'
+      );
+      for (const other of ['production', 'staging', 'development'] as const) {
+        if (other !== environment) {
+          expect(audienceOfResource(origins[other], environment)).toBeNull();
+        }
+      }
+    }
+    expect(utsScopeEntry(KILO_GATEWAY_INFERENCE_SCOPE)?.audience).toBe('kilo-gateway');
   });
 });
 

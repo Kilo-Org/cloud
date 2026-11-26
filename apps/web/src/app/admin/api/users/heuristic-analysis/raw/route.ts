@@ -3,19 +3,10 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { microdollar_usage_view } from '@kilocode/db/schema';
-import { eq, desc, and, gt, gte, sql, getViewSelectedFields } from 'drizzle-orm';
+import { eq, desc, and, gt, gte, sql } from 'drizzle-orm';
 import type { HeuristicAnalysisResponse } from '../types';
 import { ABUSE_CLASSIFICATION } from '@kilocode/usage-contracts';
 import { parseTimeWindow, timeWindowToInterval } from '../timeWindow';
-
-// The next migration drops these view columns, so this route must not select them.
-const {
-  user_prompt_prefix: _userPromptPrefix,
-  system_prompt_prefix: _systemPromptPrefix,
-  abuse_delay: _abuseDelay,
-  abuse_downgraded_from: _abuseDowngradedFrom,
-  ...selectedUsageColumns
-} = getViewSelectedFields(microdollar_usage_view);
 
 export async function GET(request: NextRequest): Promise<NextResponse<HeuristicAnalysisResponse>> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
@@ -49,7 +40,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HeuristicA
   // Fetch limit + 1 to detect whether another page exists, avoiding an
   // unbounded COUNT(*) over the user's full history.
   const rawData = await db
-    .select(selectedUsageColumns)
+    .select()
     .from(microdollar_usage_view)
     .where(whereCondition)
     .orderBy(desc(microdollar_usage_view.created_at))

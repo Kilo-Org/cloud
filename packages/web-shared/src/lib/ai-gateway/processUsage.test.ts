@@ -1985,34 +1985,6 @@ describe('logMicrodollarUsage', () => {
     });
   });
 
-  // Remove with the follow-up that drops these columns from microdollar_usage_metadata.
-  test('legacy sender prompt prefix and abuse values are accepted but not persisted', async () => {
-    const user = await insertTestUser({
-      id: 'test-legacy-metadata-user',
-      google_user_email: 'legacy-metadata@example.com',
-    });
-    const { core, metadata } = await defineMicrodollarUsage();
-    const legacyMetadata = {
-      ...metadata,
-      user_prompt_prefix: 'legacy-user-prompt',
-      system_prompt_prefix: 'legacy-system-prompt',
-      abuse_delay: 5,
-      abuse_downgraded_from: 'legacy-model',
-    };
-
-    await insertUsageRecord({ ...core, kilo_user_id: user.id }, legacyMetadata);
-
-    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
-      where: eq(microdollar_usage_metadata.id, core.id),
-    });
-    expect(metadataRecord).toMatchObject({
-      user_prompt_prefix: null,
-      system_prompt_prefix_id: null,
-      abuse_delay: null,
-      abuse_downgraded_from: null,
-    });
-  });
-
   test('insertUsageRecord updates user balance atomically via insertUsageWithOverrides', async () => {
     const user = await insertTestUser({
       id: 'test-insert-balance-user',

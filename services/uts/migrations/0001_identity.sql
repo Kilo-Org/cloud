@@ -67,7 +67,7 @@ CREATE TYPE uts.client_class AS ENUM ('desktop', 'mobile');
 CREATE TYPE uts.client_kind AS ENUM ('first_party', 'third_party');
 CREATE TYPE uts.revoke_reason AS ENUM (
   'sign_out', 'user_revoke', 'admin_revoke', 'org_admin_revoke', 'account_blocked',
-  'member_removed', 'credential_change', 'reuse_detected', 'session_ended'
+  'member_removed', 'credential_change', 'reuse_detected', 'session_ended', 'client_blocked'
 );
 CREATE TYPE uts.session_status AS ENUM ('active', 'revoked');
 CREATE TYPE uts.grant_status AS ENUM ('active', 'revoked');

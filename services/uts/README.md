@@ -193,6 +193,13 @@ grant. The audit row of a mint lists the `jti` of each token the call is about t
 failed signing no token carries those ids, and the retry's row (`token.issued`, `rotation`
 `code_retry`) lists the ids of the tokens it signs.
 
+A blocked third-party client (`uts.third_party_clients.status`) gets nothing more: the code
+exchange, the refresh read and the introspection read each check the client's status, and the
+trigger `third_party_clients_end_families` revokes every live family of the client when it is
+blocked, with one feed entry each (`revoke_reason` `client_blocked`), so its live access tokens
+stop at the verifiers too and an unblock brings no family back. The trigger writes no audit row;
+the operator action that blocks the client writes it.
+
 ## Tests
 
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
@@ -500,7 +507,7 @@ primary-key probes for the rows that hang off it (`test/db/index-probes.test.ts`
 | Read | Indexes |
 |---|---|
 | Mint and first-party refresh (`uts.read_refresh_grant`) | `refresh_grants_token_hash_key`, then `device_sessions_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
-| Third-party refresh (`uts.read_third_party_refresh_token`) | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey`, `third_party_consents_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
+| Third-party refresh (`uts.read_third_party_refresh_token`) | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey`, `third_party_clients_pkey`, `third_party_consents_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
 | PAT lookup (`uts.lookup_pat`) | `personal_access_tokens_token_hash_key`, then `accounts_pkey` |
 | Org bot key lookup (`uts.lookup_bot_key`) | `org_bot_keys_token_hash_key` |
 | Web session check | `browser_sessions_token_hash_key` |

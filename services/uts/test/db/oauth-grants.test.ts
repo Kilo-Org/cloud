@@ -196,7 +196,7 @@ async function thirdPartyFamily(accountId: string) {
     resources: null,
   };
   expect((await grants.exchangeCode(exchange)).outcome).toBe('issued');
-  return { clientId, familyId, refreshToken, exchange };
+  return { clientId, consentId, familyId, refreshToken, exchange };
 }
 
 function refreshThirdParty(clientId: string, presented: string, next = token()) {
@@ -1173,6 +1173,81 @@ describe('introspection', () => {
     expect(await grants.introspect(input)).toMatchObject({ outcome: 'active' });
     expect(await grants.introspect(input)).toEqual({ outcome: 'dpop_replay' });
     expect(await auditRows(accountId)).toHaveLength(before);
+  });
+});
+
+describe('a blocked third-party client', () => {
+  it('ends every family of the client with a feed entry, and stops its refresh, introspection and code exchange', async () => {
+    const accountId = await insertAccount(owner);
+    const family = await thirdPartyFamily(accountId);
+    const other = await thirdPartyFamily(accountId);
+    // A code of the same client, issued before the block and not yet exchanged.
+    const code = token();
+    const challenge = sha256(token()).toString('base64url');
+    expect(
+      await grants.issueCode({
+        environment,
+        codeHash: sha256(code),
+        client: { kind: 'third_party', clientId: family.clientId, consentId: family.consentId },
+        accountId,
+        browserSessionId: null,
+        redirectUri: 'https://client.example.com/callback',
+        audiences: ['mcp'],
+        scopes: ['mcp:tools.read'],
+        orgId: null,
+        codeChallenge: challenge,
+        authTime: new Date(),
+        amr: ['oauth'],
+      })
+    ).toBe('issued');
+
+    // The app login blocks the client; the trigger ends its families.
+    await app.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [
+      family.clientId,
+    ]);
+    const families = await owner.query(
+      'SELECT id, status, revoke_reason FROM uts.third_party_grant_families WHERE account_id = $1',
+      [accountId]
+    );
+    expect(families.rows).toEqual(
+      expect.arrayContaining([
+        { id: family.familyId, status: 'revoked', revoke_reason: 'client_blocked' },
+        { id: other.familyId, status: 'active', revoke_reason: null },
+      ])
+    );
+    const feed = await owner.query('SELECT kind FROM uts.revocations WHERE subject_id = $1', [
+      family.familyId,
+    ]);
+    expect(feed.rows).toEqual([{ kind: 'third_party_family' }]);
+
+    // A family that is active again stays refused while its client is blocked.
+    await owner.query(
+      `UPDATE uts.third_party_grant_families
+       SET status = 'active', revoked_at = NULL, revoke_reason = NULL WHERE id = $1`,
+      [family.familyId]
+    );
+    expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
+      outcome: 'invalid_grant',
+    });
+    expect(
+      await grants.introspect({
+        tokenHash: sha256(family.refreshToken),
+        clientId: family.clientId,
+        proof: null,
+      })
+    ).toEqual({ outcome: 'inactive' });
+    expect(
+      await grants.exchangeCode({
+        ...family.exchange,
+        codeHash: sha256(code),
+        codeChallenge: challenge,
+        grantId: randomUUID(),
+        refreshTokenHash: sha256(token()),
+      })
+    ).toEqual({ outcome: 'invalid_grant' });
+    expect((await refreshThirdParty(other.clientId, other.refreshToken).result).outcome).toBe(
+      'issued'
+    );
   });
 });
 

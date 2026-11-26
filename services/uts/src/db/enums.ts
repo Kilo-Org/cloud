@@ -39,6 +39,7 @@ export const REVOKE_REASONS = [
   'credential_change',
   'reuse_detected',
   'session_ended',
+  'client_blocked',
 ] as const;
 export const SESSION_STATUSES = ['active', 'revoked'] as const;
 export const GRANT_STATUSES = ['active', 'revoked'] as const;

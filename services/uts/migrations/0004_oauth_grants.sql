@@ -259,6 +259,7 @@ RETURNS TABLE (
   amr uts.auth_method[],
   family_expires_at timestamptz,
   family_status uts.grant_status,
+  client_status uts.client_status,
   consent_status uts.credential_status,
   account_status uts.account_status,
   membership_status uts.membership_status,
@@ -268,11 +269,15 @@ LANGUAGE sql
 VOLATILE
 SET search_path = pg_catalog, pg_temp
 AS $$
-  -- The membership and the policy are scalar subqueries, so each is one primary-key probe with
-  -- both keys known; as outer joins beside the locked rows the planner may pick another index.
+  -- The client, the membership and the policy are scalar subqueries, so each is one primary-key
+  -- probe with its keys known; as outer joins beside the locked rows the planner may pick another
+  -- index.
   SELECT token.id, token.status, token.idle_expires_at, token.grace_until, family.id,
     family.account_id, family.client_id, family.scopes, family.org_id, family.auth_time,
-    family.amr, family.expires_at, family.status, consent.status, account.status,
+    family.amr, family.expires_at, family.status,
+    (SELECT client.status FROM uts.third_party_clients AS client
+     WHERE client.client_id = family.client_id),
+    consent.status, account.status,
     (SELECT membership.status FROM uts.org_memberships AS membership
      WHERE membership.org_id = family.org_id AND membership.account_id = family.account_id),
     (SELECT policy.enforcement FROM uts.org_sso_policies AS policy
@@ -333,6 +338,31 @@ BEGIN
   RETURN revoked_account;
 END
 $$;
+
+-- Blocking a third-party client (design 5.9) ends every family it holds, each with its feed
+-- entry, so the client's live access tokens stop at the verifiers too and unblocking it brings no
+-- family back. Every statement that reads a family also checks its client, so refresh, code
+-- exchange and introspection stop at once even before this runs. Like
+-- `uts.flag_bot_keys_of_deleted_account`, the trigger writes no audit row: the statement that
+-- blocks the client writes it, with the operator as the actor (design 8.1).
+CREATE INDEX third_party_grant_families_client_idx ON uts.third_party_grant_families (client_id)
+  WHERE status = 'active';
+CREATE FUNCTION uts.end_families_of_blocked_client() RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  PERFORM uts.end_grant('third_party', family.id, 'client_blocked')
+  FROM uts.third_party_grant_families AS family
+  WHERE family.client_id = NEW.client_id AND family.status = 'active';
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER third_party_clients_end_families
+  AFTER UPDATE OF status ON uts.third_party_clients
+  FOR EACH ROW WHEN (OLD.status = 'active' AND NEW.status = 'blocked')
+  EXECUTE FUNCTION uts.end_families_of_blocked_client();
 
 -- Whether a refused attempt on a grant writes its denied audit row: true for the first refusal in
 -- a minute, which claims that minute; false while the grant's last denied row is under a minute
@@ -597,7 +627,9 @@ BEGIN
     OR NOT uts.org_requirement_met(code.org_id, membership_state, enforcement, code.amr)
     OR (code.client_kind = 'third_party' AND NOT EXISTS (
       SELECT 1 FROM uts.third_party_consents AS consent
+      JOIN uts.third_party_clients AS client ON client.client_id = consent.client_id
       WHERE consent.id = code.consent_id AND consent.status = 'active' AND consent.scopes @> code.scopes
+        AND client.status = 'active'
     ))
   THEN
     outcome := 'invalid_grant';
@@ -870,6 +902,7 @@ BEGIN
     OR presented.client_id IS DISTINCT FROM p_client_id
     OR presented.family_status IS DISTINCT FROM 'active'
     OR presented.family_expires_at <= now()
+    OR presented.client_status IS DISTINCT FROM 'active'
     OR presented.consent_status IS DISTINCT FROM 'active'
     OR presented.account_status IS DISTINCT FROM 'active'
   THEN
@@ -1113,6 +1146,7 @@ BEGIN
   INTO grant_kind, grant_id, subject_id, granted_scopes, issued_at, expires_at
   FROM uts.third_party_refresh_tokens AS token
   JOIN uts.third_party_grant_families AS family ON family.id = token.family_id
+  JOIN uts.third_party_clients AS client ON client.client_id = family.client_id
   JOIN uts.third_party_consents AS consent ON consent.id = family.consent_id
   JOIN uts.accounts AS account ON account.id = family.account_id
   LEFT JOIN uts.org_memberships AS membership
@@ -1124,6 +1158,7 @@ BEGIN
     AND token.idle_expires_at > now()
     AND family.status = 'active'
     AND family.expires_at > now()
+    AND client.status = 'active'
     AND consent.status = 'active'
     AND account.status = 'active'
     AND uts.org_requirement_met(family.org_id, membership.status, policy.enforcement, family.amr);

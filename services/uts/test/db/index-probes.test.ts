@@ -51,8 +51,12 @@ const SEED = `
 
   INSERT INTO uts.third_party_clients
     (client_id, client_name, redirect_uris, document, fetched_at, cache_expires_at)
-  VALUES ('https://client.example.com/metadata', 'Example', '{https://client.example.com/callback}',
-          '{}', now(), now() + interval '1 hour');
+  SELECT 'https://client' || n || '.example.com/metadata', 'Example', '{https://client.example.com/callback}',
+         '{}', now(), now() + interval '1 hour'
+  FROM generate_series(1, 2000) AS n
+  UNION ALL
+  SELECT 'https://client.example.com/metadata', 'Example', '{https://client.example.com/callback}',
+         '{}', now(), now() + interval '1 hour';
 
   INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
   SELECT account_id, 'https://client.example.com/metadata', '{mcp:tools.read}', id
@@ -83,9 +87,9 @@ const SEED = `
   FROM uts.gate_passes WHERE action = 'bot_key_create';
 
   ANALYZE uts.accounts, uts.org_sso_policies, uts.org_memberships, uts.device_sessions,
-    uts.refresh_grants, uts.browser_sessions, uts.third_party_grant_families,
-    uts.third_party_refresh_tokens, uts.third_party_consents, uts.personal_access_tokens,
-    uts.org_bot_keys;
+    uts.refresh_grants, uts.browser_sessions, uts.third_party_clients,
+    uts.third_party_grant_families, uts.third_party_refresh_tokens, uts.third_party_consents,
+    uts.personal_access_tokens, uts.org_bot_keys;
 `;
 
 beforeAll(async () => {
@@ -153,6 +157,7 @@ const CASES: [string, () => Promise<string>, Record<string, string>][] = [
       third_party_grant_families: 'third_party_grant_families_pkey',
       third_party_consents: 'third_party_consents_pkey',
       accounts: 'accounts_pkey',
+      third_party_clients: 'third_party_clients_pkey',
       org_memberships: 'org_memberships_pkey',
       org_sso_policies: 'org_sso_policies_pkey',
     },

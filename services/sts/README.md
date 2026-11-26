@@ -214,7 +214,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
   A `/ci` read that fails holds back nothing else: `/workloads` and `/shared` are stored and every
   other bundle is rebuilt as usual, while each CI bundle keeps the last `/ci` copy, marked stale, or
   stays empty if `/ci` was never read. STS logs `sts: /ci read failed` and retries at the next
-  regular refresh, with no backoff.
+  regular refresh, with no backoff. The refresher records the failure
+  (`refresher_state.ci_failed_at`), so until then a fill of an empty CI bundle object makes no
+  manager read while `/workloads` and `/shared` are current: a refused `/ci` costs at most one read
+  per refresh interval, not one per CI request.
 - **Missing folder.** Infisical answers a folder that does not exist with 404 and error
   `SecretPathNotFound`; STS reads that as an empty folder, not an outage. Only a transport error, a
   timeout, 429, 5xx, a refused login or a malformed response counts as unreachable.

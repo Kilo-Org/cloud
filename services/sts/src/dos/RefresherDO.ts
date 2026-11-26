@@ -183,8 +183,9 @@ export class RefresherDO extends DurableObject<Env> {
 
   /**
    * Builds one bundle for an empty bundle object. A manager copy from the current cadence is used
-   * as is; otherwise this reads the manager, unless a backoff is running. With no new read, the
-   * last copy is served stale.
+   * as is; otherwise this reads the manager, unless a backoff is running or, for a CI bundle, the
+   * other folders are current and `/ci` failed within the last refresh interval: a refused `/ci`
+   * must not cost a manager read per CI request. With no new read, the last copy is served stale.
    */
   async buildBundle(workload: string): Promise<FillResult> {
     const policy = this.policies.get(this.config.environment, WorkloadNameSchema.parse(workload));
@@ -192,6 +193,7 @@ export class RefresherDO extends DurableObject<Env> {
     const now = Date.now();
     const stored = await this.storedView();
     const state = this.state(now);
+    const current = stored !== null && now - stored.fetchedAt <= SNAPSHOT_FILL_MAX_AGE_MS;
     if (stored !== null && state.failures === 0) {
       const own = ownFolder(policy, stored);
       if (own !== null && now - own.fetchedAt <= SNAPSHOT_FILL_MAX_AGE_MS) {
@@ -199,7 +201,12 @@ export class RefresherDO extends DurableObject<Env> {
       }
     }
 
-    if (state.failures === 0 || now >= state.nextRefreshAt) {
+    const ciHeldBack =
+      bundleFolder(policy).root === '/ci' &&
+      current &&
+      state.ciFailedAt !== null &&
+      now - state.ciFailedAt < REFRESH_INTERVAL_MS;
+    if (!ciHeldBack && (state.failures === 0 || now >= state.nextRefreshAt)) {
       const read = await this.readManager();
       if (read.status === 'ok') return await this.fillResult(policy, read.view, false);
       await this.scheduleAlarm(Date.now(), false);
@@ -325,6 +332,13 @@ export class RefresherDO extends DurableObject<Env> {
       });
       const last = stored.get('/ci');
       if (last?.copy) ci = { copy: last.copy, fetchedAt: last.fetchedAt, stale: true };
+    }
+    if (ciFailure !== null || ciCopy !== undefined) {
+      this.db
+        .update(schema.refresherState)
+        .set({ ciFailedAt: ciFailure === null ? null : startedAt })
+        .where(eq(schema.refresherState.id, 1))
+        .run();
     }
     return {
       status: 'ok',
@@ -555,11 +569,13 @@ export class RefresherDO extends DurableObject<Env> {
     const shared = stored.get('/shared');
     if (!workloads?.copy || !shared?.copy) return null;
     const ci = this.managerFolders().includes('/ci') ? stored.get('/ci') : undefined;
+    // A copy whose last `/ci` read failed is stale, as in the read that kept it.
+    const ciStale = this.state(Date.now()).ciFailedAt !== null;
     return {
       workloads: workloads.copy,
       shared: shared.copy,
       fetchedAt: Math.min(workloads.fetchedAt, shared.fetchedAt),
-      ci: ci?.copy ? { copy: ci.copy, fetchedAt: ci.fetchedAt, stale: false } : null,
+      ci: ci?.copy ? { copy: ci.copy, fetchedAt: ci.fetchedAt, stale: ciStale } : null,
     };
   }
 
@@ -610,6 +626,7 @@ export class RefresherDO extends DurableObject<Env> {
       failures: 0,
       webhookRefreshAt: null,
       lastRefreshAt: null,
+      ciFailedAt: null,
     };
     this.db.insert(schema.refresherState).values(initial).run();
     return initial;

@@ -5,6 +5,7 @@ import o11yPolicy from '../../policy/o11y.yaml';
 import { backoffDelayMs, type RefresherDO } from '../../src/dos/RefresherDO';
 import { getBundleStub, getRefresherStub, getSignerStub } from '../../src/dos/stubs';
 import { loadPolicies } from '../../src/policy/load';
+import type { FillResult } from '../../src/types';
 import { installManager, secret, stubOfflineNetwork, type MockSecret } from './manager';
 import { resetBundleObject, resetRefresherObject } from './reset';
 import { config, env } from './test-env';
@@ -369,10 +370,55 @@ secrets: [CI_RELEASE_KEY]
     expect(o11y.stale).toBe(false);
     expect(o11y.secrets.O11Y_CF_AE_API_TOKEN?.value).toBe('ae-token');
 
+    // The next refresh reads /ci again; a fill after it uses that copy.
     manager.setFolderStatus('/ci', 200);
-    const filled = await withCiPolicy(refresher => refresher.buildBundle('ci-release'));
+    const filled = await withCiPolicy(async refresher => {
+      await refresher.refreshAll();
+      return await refresher.buildBundle('ci-release');
+    });
     if (filled.status !== 'built') throw new Error(`expected a built bundle, got ${filled.status}`);
     expect(filled.bundle.stale).toBe(false);
+    expect(filled.bundle.secrets.CI_RELEASE_KEY?.value).toBe('ci-key');
+  });
+
+  it('makes one manager read for repeated CI fills while /ci is refused, and retries after a refresh interval', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    manager.setFolderStatus('/ci', 403);
+
+    const fills = await withCiPolicy(async refresher => {
+      const results: FillResult[] = [];
+      for (let request = 0; request < 5; request += 1) {
+        results.push(await refresher.buildBundle('ci-release'));
+      }
+      return results;
+    });
+    expect(fills).toEqual(Array.from({ length: 5 }, () => ({ status: 'unavailable' })));
+    // One read round: /workloads, /shared and /ci once each.
+    expect(manager.reads.map(read => read.folder).sort()).toEqual(['/ci', '/shared', '/workloads']);
+
+    // Once the last /ci failure is a refresh interval old, a fill may try again.
+    await runInDurableObject(getRefresherStub(env, config), (_instance, state) => {
+      state.storage.sql.exec(
+        'UPDATE refresher_state SET ci_failed_at = ?',
+        Date.now() - 4 * 60 * 1000 - 1
+      );
+    });
+    await withCiPolicy(refresher => refresher.buildBundle('ci-release'));
+    expect(manager.reads.filter(read => read.folder === '/ci')).toHaveLength(2);
+  });
+
+  it('fills a CI bundle stale from the stored /ci copy after a failed /ci read', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    await withCiPolicy(refresher => refresher.refreshAll());
+    manager.setFolderStatus('/ci', 403);
+    const filled = await withCiPolicy(async refresher => {
+      await refresher.refreshAll();
+      return await refresher.buildBundle('ci-release');
+    });
+    if (filled.status !== 'built') throw new Error(`expected a built bundle, got ${filled.status}`);
+    expect(filled.bundle.stale).toBe(true);
     expect(filled.bundle.secrets.CI_RELEASE_KEY?.value).toBe('ci-key');
   });
 });

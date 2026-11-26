@@ -8,14 +8,14 @@ import {
 } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { getSignerStub } from '../dos/stubs';
-import type { SignResult } from '../dos/UtsSignerDO';
+import type { SignManyResult } from '../dos/UtsSignerDO';
 import type { Env, UtsConfig } from '../env';
 import type { Minted } from '../grants/store';
 import { signerForGrant } from '../keys/signer-choice';
 
 /**
  * Access tokens for one mint statement: one token per scope, each with one audience and one
- * scope (design 5.3), all signed by the signer object the grant id picks (design 5.7).
+ * scope (design 5.3), all signed in one call to the signer object the grant id picks (design 5.7).
  */
 
 /**
@@ -63,43 +63,31 @@ export type SignerAccess = (
 ) => Promise<SignOutcome>;
 
 /**
- * Signs every claim set in the grant's signer object, in parallel on one stub. `sign` is
- * idempotent, so each call keeps the shared Durable Object retry.
+ * Signs every claim set of one mint in one `signMany` call to the grant's signer object, which
+ * signs all of them or none. `signMany` is idempotent, so the call keeps the shared Durable
+ * Object retry.
  */
 export function signerAccess(env: Env, config: UtsConfig): SignerAccess {
   return async (grantId, claims) => {
     const signer = await signerForGrant(grantId);
-    const answers = await Promise.allSettled(
-      claims.map(claimSet =>
-        withDORetry(
-          () => getSignerStub(env, config, signer),
-          async (stub): Promise<SignResult> => await stub.sign(claimSet),
-          'uts.signer.sign'
-        )
-      )
-    );
-    const tokens: string[] = [];
-    let outcome: SignOutcome['status'] = 'signed';
-    for (const answer of answers) {
-      if (answer.status === 'rejected') {
-        console.error(
-          JSON.stringify({ event: 'uts.mint.sign_failed', signer, error: String(answer.reason) })
-        );
-        if (outcome === 'signed') outcome = 'unavailable';
-      } else if (answer.value.status === 'signed') {
-        tokens.push(answer.value.token);
-      } else {
-        console.error(
-          JSON.stringify({
-            event: 'uts.mint.sign_refused',
-            signer,
-            reason: answer.value.reason,
-          })
-        );
-        outcome = 'misconfigured';
-      }
+    let result: SignManyResult;
+    try {
+      result = await withDORetry(
+        () => getSignerStub(env, config, signer),
+        async (stub): Promise<SignManyResult> => await stub.signMany(claims),
+        'uts.signer.sign_many'
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify({ event: 'uts.mint.sign_failed', signer, error: String(error) })
+      );
+      return { status: 'unavailable' };
     }
-    return outcome === 'signed' ? { status: 'signed', tokens } : { status: outcome };
+    if (result.status === 'signed') return { status: 'signed', tokens: result.tokens };
+    console.error(
+      JSON.stringify({ event: 'uts.mint.sign_refused', signer, reason: result.reason })
+    );
+    return { status: 'misconfigured' };
   };
 }
 

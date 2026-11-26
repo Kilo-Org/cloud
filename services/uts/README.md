@@ -43,10 +43,10 @@ Each object:
 
 - generates its own Ed25519 keys and keeps them in its KV storage, one record, never in SQL rows
   (a trace would record bound SQL values);
-- exposes only its RPC methods `publicKeys`, `sign` and `removeKid` and the platform's `alarm`.
-  Workers RPC serves every public method of the class, so every other member is `#`-private, and
-  no RPC method returns or accepts a private key (`test/runtime/signer.test.ts` calls the other
-  members through a stub and expects each call to fail);
+- exposes only its RPC methods `publicKeys`, `sign`, `signMany` and `removeKid` and the platform's
+  `alarm`. Workers RPC serves every public method of the class, so every other member is
+  `#`-private, and no RPC method returns or accepts a private key (`test/runtime/signer.test.ts`
+  calls the other members through a stub and expects each call to fail);
 - refuses to create keys under any other name or in any other jurisdiction than its environment's,
   and then answers every call with `misconfigured`, a deploy error that no retry fixes;
 - publishes the public halves under `uts-token-<signer>-<RFC 7638 thumbprint>`;
@@ -54,14 +54,16 @@ Each object:
   a claim set with another issuer or environment, an `iat` more than 60 seconds from now, or an
   `exp` more than 1 hour ahead, the longest UTS token lifetime. `src/keys/claims.ts` is the
   signer's admission check; the published claim contract is phase 2's `AccessTokenClaimsSchema`
-  (`@kilocode/sts-contracts`), and every claim set the signer accepts also passes it;
+  (`@kilocode/sts-contracts`), and every claim set the signer accepts also passes it. A mint signs
+  its 1 to 8 tokens in one `signMany(claims[])` call: each claim set passes the same check, one
+  refused set refuses the batch, and all tokens carry the same `kid`;
 - rotates by alarm: a key signs for 30 days. Each rotation creates the next key at once, to sign
   30 days later, so every signer always publishes a current and a next key, and the next key is
   published at least 7 days before it signs (a new object publishes its first two keys at once, the
   second 30 days ahead). A retired key stays published for 1 hour and 10 minutes, until the last
   token it signed has been expired for 10 minutes. That is two alarms per 30-day cycle. A change
-  whose alarm never ran (its retries ran out) is applied by the next `publicKeys` or `sign` call,
-  and `publicKeys` also sets a lost alarm again;
+  whose alarm never ran (its retries ran out) is applied by the next `publicKeys`, `sign` or
+  `signMany` call, and `publicKeys` also sets a lost alarm again;
 - removes a key at once with `removeKid(kid)`, a direct call, not an alarm. A removed current key
   is replaced by the published next key, which verifiers already hold, and a new next key is
   created to sign 30 days later; a removed next key is replaced by a new one published at least 7

@@ -1,5 +1,6 @@
 export {
   MAX_AUTHORIZATION_LENGTH,
+  RECORD_FUTURE_SKEW_SECONDS,
   createVerifier,
   type AcceptsPats,
   type BrowserSessionRecord,

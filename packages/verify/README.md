@@ -110,17 +110,20 @@ about the record. Both take `ctx = { waitUntil }`, under which a background feed
 | `checkBrowserSession(record, ctx)` | `{ sub, sid, issuedAt }` from the UTS `kilo-web` reply (`read` or the code exchange): `sid` = `session_id`, `issuedAt` = `issued_at`. No `kid`, so `revoked_kids` does not apply | 401 `invalid_session_record`, `revoked_session`, `account_blocked` |
 | `checkUtsTokenRecord(record, ctx)` | `{ sub, sid, issuedAt, kid }` of a UTS access token the caller verified and kept in a capability it authenticates itself: `issuedAt` = the token's `iat`, `kid` = its header `kid`. Never a value read from a URL | 401 `invalid_record`, `revoked_key`, `revoked_session`, `account_blocked` |
 
-Both answer `RecordCheckResult`: `{ ok: true }` or `{ ok: false, status: 401 | 503, reason }`, in
-this order:
+Both answer `RecordCheckResult`: `{ ok: true }`, `{ ok: false, status: 401, reason }`, or
+`{ ok: false, status: 503, reason: 'revocation_unavailable', retryAfterSeconds? }`, where
+`retryAfterSeconds` is the retry time the key set, bootstrap or feed reported (the caller's
+`Retry-After`). The checks run in this order:
 
 1. Validation, before any fetch: `sub` 1 to 255 characters; `sid` a lowercase UUID; `issuedAt`
-   integer Unix seconds, positive and at most 60 s in the future; for a token record, `kid` under
-   `uts-token-`. Anything else is 401 `invalid_session_record` (session) or `invalid_record`
-   (token).
+   integer Unix seconds, positive and at most `RECORD_FUTURE_SKEW_SECONDS` (60) in the future; for
+   a token record, `kid` under `uts-token-` and at most 255 characters. Anything else is 401
+   `invalid_session_record` (session) or `invalid_record` (token).
 2. The feed: unavailable (cold and unreachable, or the held head over 60 s old) is 503
    `revocation_unavailable`.
 3. Token record only: `kid` in `revoked_kids` is 401 `revoked_key`.
-4. `sid` in `revoked_sids`, or `revoked_before[sub] >= issuedAt`, is 401 `revoked_session`.
+4. `sid` in `revoked_sids`, or `revoked_before[sub] >= issuedAt`, is 401 `revoked_session`, even
+   for a blocked account.
 5. `sub` in `blocked_accounts` is 401 `account_blocked`.
 
 They reject only when the config has no `uts` (a programming error). Step-up strength

@@ -39,9 +39,9 @@ import {
   FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS,
   createRevocationFeed,
   maxHeadAgeForLifetime,
+  type FeedRead,
   type RevocationFeed,
   type RevocationFeedSource,
-  type RevocationList,
 } from './revocation';
 
 export type IssuerKind = 'sts' | 'uts';
@@ -178,7 +178,7 @@ export type RecordCheckResult =
         | 'revoked_key'
         | 'account_blocked';
     }
-  | { ok: false; status: 503; reason: 'revocation_unavailable' };
+  | { ok: false; status: 503; reason: 'revocation_unavailable'; retryAfterSeconds?: number };
 
 export type Verifier<RequireAddress extends boolean = true> = {
   /**
@@ -242,7 +242,10 @@ const BEARER = /^Bearer +([^\s]+) *$/i;
 
 const LOWERCASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** `issuedAt`: positive integer seconds, at most 60 s in the future. */
+/** How far in the future a record's `issuedAt` may be. */
+export const RECORD_FUTURE_SKEW_SECONDS = 60;
+
+/** `issuedAt`: positive integer seconds, at most `RECORD_FUTURE_SKEW_SECONDS` in the future. */
 const BrowserSessionRecordSchema = z.object({
   sub: z.string().min(1).max(255),
   sid: z.string().regex(LOWERCASE_UUID),
@@ -250,11 +253,11 @@ const BrowserSessionRecordSchema = z.object({
     .number()
     .int()
     .positive()
-    .refine(issuedAt => issuedAt <= Date.now() / 1000 + TOKEN_CLOCK_SKEW_SECONDS),
+    .refine(issuedAt => issuedAt <= Date.now() / 1000 + RECORD_FUTURE_SKEW_SECONDS),
 });
 
 const UtsTokenRecordSchema = BrowserSessionRecordSchema.extend({
-  kid: z.string().startsWith(UTS_TOKEN_KID_PREFIX),
+  kid: z.string().max(255).startsWith(UTS_TOKEN_KID_PREFIX),
 });
 
 type RecordRefusal = Extract<RecordCheckResult, { status: 401 }>['reason'];
@@ -627,13 +630,18 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
 
   /**
    * The held feed list, loaded as on the PAT path (bootstrap when cold, then the key set its head
-   * verifies under), with the 60 s head-age limit; null when it is unavailable.
+   * verifies under), with the 60 s head-age limit.
    */
-  async function recordFeed(issuer: UtsIssuer, scope: CallScope): Promise<RevocationList | null> {
-    if ((await utsLoaded(issuer, scope)) !== null) return null;
-    if ((await issuer.keySet.ready(scope)).status === 'unavailable') return null;
-    const read = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
-    return read.status === 'ok' ? read.list : null;
+  async function recordFeed(issuer: UtsIssuer, scope: CallScope): Promise<FeedRead> {
+    if (issuer.bootstrap !== null) {
+      const loaded = await issuer.bootstrap.load(scope);
+      if (loaded.status !== 'ready') {
+        return { status: 'unavailable', retryAfterSeconds: loaded.retryAfterSeconds };
+      }
+    }
+    const keys = await issuer.keySet.ready(scope);
+    if (keys.status === 'unavailable') return keys;
+    return await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
   }
 
   /** A validated record against the feed: its key when it has one, then the session rule. */
@@ -645,8 +653,16 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
   ): Promise<RecordCheckResult> {
     const scope = newCallScope();
     try {
-      const list = await recordFeed(issuer, scope);
-      if (list === null) return { ok: false, status: 503, reason: 'revocation_unavailable' };
+      const read = await recordFeed(issuer, scope);
+      if (read.status === 'unavailable') {
+        return {
+          ok: false,
+          status: 503,
+          reason: 'revocation_unavailable',
+          retryAfterSeconds: read.retryAfterSeconds,
+        };
+      }
+      const list = read.list;
       if (kid !== null && list.revokedKids.has(kid)) return refused('revoked_key');
       if (list.revokedSids.has(record.sid)) return refused('revoked_session');
       const revokedBefore = list.revokedBefore.get(record.sub);

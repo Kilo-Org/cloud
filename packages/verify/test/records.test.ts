@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS,
+  FEED_RETRY_MS,
   FEED_WAIT_AFTER_MS,
   createVerifier,
   type BrowserSessionRecord,
@@ -137,6 +138,11 @@ const sessionRule: Case[] = [
     setup: h => list(h, { blockedAccounts: new Set(['user-2']) }),
     expected: 'ok',
   },
+  {
+    name: 'a revoked session of a blocked account answers revoked_session',
+    setup: h => list(h, { revokedSids: new Set([SID]), blockedAccounts: new Set([SUB]) }),
+    expected: 'revoked_session',
+  },
 ];
 
 const validation: Case[] = [
@@ -247,6 +253,16 @@ describe('checkUtsTokenRecord', () => {
       },
       { name: 'a missing kid is refused', change: () => ({ kid: undefined }), expected: 'invalid' },
       {
+        name: 'a 255-character kid is accepted',
+        change: () => ({ kid: 'uts-token-'.padEnd(255, 'a') }),
+        expected: 'ok',
+      },
+      {
+        name: 'a 256-character kid is refused',
+        change: () => ({ kid: 'uts-token-'.padEnd(256, 'a') }),
+        expected: 'invalid',
+      },
+      {
         name: 'a kid in revoked_kids is refused',
         setup: (h, r) => list(h, { revokedKids: new Set([String(r.kid)]) }),
         expected: 'revoked_key',
@@ -265,7 +281,13 @@ describe('checkUtsTokenRecord', () => {
     ]));
 });
 
-const UNAVAILABLE = { ok: false, status: 503, reason: 'revocation_unavailable' };
+/** A 503 carries the retry time the key set, bootstrap or feed reported. */
+const UNAVAILABLE = {
+  ok: false,
+  status: 503,
+  reason: 'revocation_unavailable',
+  retryAfterSeconds: expect.any(Number),
+};
 
 describe.each([browser, utsToken])('$name fails closed', method => {
   afterEach(() => {
@@ -274,7 +296,10 @@ describe.each([browser, utsToken])('$name fails closed', method => {
 
   it('refuses with 503 while a cold verifier cannot fetch the feed', async () => {
     h.feed.mode = 'fail';
-    expect(await method.check(h, method.record(h))).toEqual(UNAVAILABLE);
+    expect(await method.check(h, method.record(h))).toEqual({
+      ...UNAVAILABLE,
+      retryAfterSeconds: FEED_RETRY_MS / 1000,
+    });
   });
 
   it('refuses with 503 while a cold verifier cannot fetch the key set the head verifies under', async () => {

@@ -1,6 +1,7 @@
 /**
  * Local end-to-end run of the OAuth endpoints against `wrangler dev --env local` and the local
- * identity store (README, "Local development"): code, token, refresh, third-party rotation,
+ * identity store (README, "Local development"): code, token, refresh, a replayed DPoP proof, a code
+ * exchange whose signing fails and its retry, a second use of that code, third-party rotation,
  * reuse (the family is revoked), revoke and introspect, then the audit rows from the database
  * and a timing of the mint path. Synthetic data only; it prints token ids (`jti`), never a token.
  *
@@ -73,11 +74,16 @@ async function dpop() {
   };
 }
 
-async function post(path: string, fields: Record<string, string>, proof?: string) {
+async function post(
+  path: string,
+  fields: Record<string, string>,
+  proof?: string,
+  headers: Record<string, string> = {}
+) {
   const response = await fetch(`${base}${path.slice(1)}`, {
     method: 'POST',
     body: new URLSearchParams(fields),
-    headers: proof === undefined ? {} : { DPoP: proof },
+    headers: proof === undefined ? headers : { ...headers, DPoP: proof },
   });
   const text = await response.text();
   return { status: response.status, body: text === '' ? null : (JSON.parse(text) as unknown) };
@@ -197,6 +203,83 @@ async function main() {
     await otherKey.proof('/token')
   );
   log('refresh with another device key', { status: stolen.status, body: stolen.body });
+
+  // A replayed DPoP proof: the grant statement finds its jti recorded.
+  const once = await device.proof('/token');
+  const refreshOnce = {
+    grant_type: 'refresh_token',
+    refresh_token: grant,
+    client_id: 'kilo-cli',
+    scope: 'gateway:models.read',
+  };
+  const firstUse = await post('/token', refreshOnce, once);
+  const replayed = await post('/token', refreshOnce, once);
+  log('refresh, then the same proof again', {
+    first: firstUse.status,
+    replayed: replayed.status,
+    body: replayed.body,
+  });
+
+  // The signing fails after the code exchange committed; the retry gets the same grant.
+  const retryCode = await authorize({
+    response_type: 'code',
+    client_id: 'kilo-cli',
+    redirect_uri: CALLBACK,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    scope: 'gateway:models.read',
+    state: 'e2e-retry',
+    dpop_jkt: device.jkt,
+  });
+  secrets.push(retryCode);
+  const exchange = {
+    grant_type: 'authorization_code',
+    code: retryCode,
+    redirect_uri: CALLBACK,
+    client_id: 'kilo-cli',
+    code_verifier: verifier,
+  };
+  const unsigned = await post('/token', exchange, await device.proof('/token'), {
+    'Kilo-Dev-Signing': 'unavailable',
+  });
+  const retried = await post('/token', exchange, await device.proof('/token'));
+  const retriedGrant = z.string().parse(TokenSchema.parse(retried.body).refresh_token);
+  secrets.push(retriedGrant);
+  const grantOfCode = (
+    await admin.query<{ grant_id: string; status: string; grants: number }>(
+      `SELECT code.grant_id, grant_row.status,
+              (SELECT count(*)::int FROM uts.refresh_grants AS other WHERE other.id = code.grant_id) AS grants
+       FROM uts.authorization_codes AS code
+       JOIN uts.refresh_grants AS grant_row ON grant_row.id = code.grant_id
+       WHERE code.code_hash = $1`,
+      [sha256(retryCode)]
+    )
+  ).rows[0];
+  const namedGrant = Buffer.from(retriedGrant.slice(8, 30), 'base64url').toString('hex');
+  log('code exchange, signer unavailable', { status: unsigned.status, body: unsigned.body });
+  log('the same exchange again', {
+    status: retried.status,
+    sameGrant: namedGrant === grantOfCode.grant_id.replaceAll('-', ''),
+    grantStatus: grantOfCode.status,
+    grantsForCode: grantOfCode.grants,
+  });
+
+  // A second use of that code with another verifier still revokes the grant.
+  const reused = await post(
+    '/token',
+    { ...exchange, code_verifier: randomBytes(32).toString('base64url') },
+    await device.proof('/token')
+  );
+  const afterCodeReuse = await post(
+    '/token',
+    { grant_type: 'refresh_token', refresh_token: retriedGrant, client_id: 'kilo-cli' },
+    await device.proof('/token')
+  );
+  log('the code with another verifier', { status: reused.status, body: reused.body });
+  log('refresh of that grant afterwards', {
+    status: afterCodeReuse.status,
+    body: afterCodeReuse.body,
+  });
 
   // Third party: code, token, rotation, reuse after the 60-second grace.
   const thirdCode = await authorize({

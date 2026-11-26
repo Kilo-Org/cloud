@@ -27,11 +27,16 @@ export type OAuthDeps = {
 /** The OAuth endpoints are served only where the identity store is bound. */
 export type OAuthService = { kind: 'unprovisioned' } | { kind: 'ready'; deps: OAuthDeps };
 
+/**
+ * `sign` null uses the grant's signer object; only the development entry passes another one, to
+ * show a signing failure in the local end-to-end run (src/dev.ts).
+ */
 export function oauthService(
   env: Env,
   ctx: ExecutionContext,
   config: UtsConfig,
-  handoff: AuthorizationHandoff | null
+  handoff: AuthorizationHandoff | null,
+  sign: SignerAccess | null
 ): OAuthService {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return binding;
@@ -40,7 +45,7 @@ export function oauthService(
     deps: {
       config,
       grants: grantsAccess(binding.connectionString, ctx),
-      sign: signerAccess(env, config),
+      sign: sign ?? signerAccess(env, config),
       handoff,
       deviceCodeGrant: null,
     },

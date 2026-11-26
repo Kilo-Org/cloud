@@ -8,11 +8,18 @@ import type { AuthorizationHandoff } from './oauth/authorize';
 import { handleOAuthRequest, oauthService } from './oauth/routes';
 import { jsonResponse } from './responses';
 import { signerKeysResponse } from './signer-keys';
+import type { SignerAccess } from './token/mint';
 
-/** What only the development entry adds: the development sign-in hand-off (src/dev.ts). */
-export type MintOptions = { authorizationHandoff: AuthorizationHandoff | null };
+/**
+ * What only the development entry adds: the development sign-in hand-off and a failing signer for
+ * the local end-to-end run (src/dev.ts). Null is the deployed behaviour.
+ */
+export type MintOptions = {
+  authorizationHandoff: AuthorizationHandoff | null;
+  signer: SignerAccess | null;
+};
 
-const DEPLOYED: MintOptions = { authorizationHandoff: null };
+const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null };
 
 /**
  * The mint Worker's fetch handler. Placement runs it next to the identity store's primary, which
@@ -31,7 +38,7 @@ export async function handleRequest(
   if (pathname === UTS_SIGNER_KEYS_PATH) {
     return await signerKeysResponse(request, env, config, ctx.props);
   }
-  const oauth = oauthService(env, ctx, config, options.authorizationHandoff);
+  const oauth = oauthService(env, ctx, config, options.authorizationHandoff, options.signer);
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });

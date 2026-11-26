@@ -1195,15 +1195,17 @@ describe('OAuth row maintenance', () => {
     if (grant.binding.kind !== 'first_party') throw new Error('first-party binding expected');
     expect(await exists(proof, [grant.grantId, grant.binding.proof.jti])).toBe(true);
     expect(
-      (await grants.refreshFirstParty({
-        environment,
-        tokenHash: sha256(grant.refreshToken),
-        grantId: grant.grantId,
-        clientId: 'kilo-cli',
-        proof: proofOf(grant.jkt),
-        scopes: null,
-        resources: null,
-      })).outcome
+      (
+        await grants.refreshFirstParty({
+          environment,
+          tokenHash: sha256(grant.refreshToken),
+          grantId: grant.grantId,
+          clientId: 'kilo-cli',
+          proof: proofOf(grant.jkt),
+          scopes: null,
+          resources: null,
+        })
+      ).outcome
     ).toBe('issued');
   });
 });

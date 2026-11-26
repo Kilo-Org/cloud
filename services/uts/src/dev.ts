@@ -7,6 +7,7 @@ import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
 import type { AuthorizationHandoff } from './oauth/authorize';
 import { jsonResponse } from './responses';
+import type { SignerAccess } from './token/mint';
 
 /**
  * Development-only routes and hooks, for the local end-to-end checks. Only `src/dev-index.ts`
@@ -60,7 +61,17 @@ export async function handleDevRequest(
   const config = readConfig(env);
   if (config.environment !== 'development') return await handleRequest(request, env, ctx);
   if (new URL(request.url).pathname !== DEV_SIGN_PATH) {
-    return await handleRequest(request, env, ctx, { authorizationHandoff: developmentHandoff });
+    // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant
+    // statement, as a signer object that does not answer would, for the retry check of the local
+    // end-to-end run.
+    const signer: SignerAccess | null =
+      request.headers.get('Kilo-Dev-Signing') === 'unavailable'
+        ? async () => ({ status: 'unavailable' })
+        : null;
+    return await handleRequest(request, env, ctx, {
+      authorizationHandoff: developmentHandoff,
+      signer,
+    });
   }
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });

@@ -4,6 +4,7 @@ import { createTestHarness } from 'wrangler';
 import { expect, it, vi } from 'vitest';
 import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
 import { MAX_ENKRYPT_USAGE_BYTES } from './publish-enkrypt-usage';
+import { stsStandIn } from './sts-stand-in.test-fixture';
 import { usage } from './usage.test-fixture';
 
 const publishSecret = 'local-enkrypt-publisher';
@@ -42,6 +43,7 @@ it('carries an Enkrypt record from /enkrypt-usage through the queue and consumer
             USAGE_WRITER_SECRET: writerSecret,
           },
         },
+        stsStandIn(),
       ],
     });
     harness = server;

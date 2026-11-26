@@ -342,6 +342,8 @@ describe('policy audit stream', () => {
       'audit-relay',
       'bouncer-watch',
       'o11y',
+      'usage-ingest',
+      'web',
     ]);
     expect(event.data.attributes.removedWorkloads).toEqual([]);
   });

@@ -8,11 +8,24 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
-  // env.staging inherits this block. Trace sampling is independent of Workers Logs.
+  // env.staging inherits this block. Traces stay off: a config that binds STS may not record
+  // traces (services/sts README, "Policy"), since a trace records outbound URLs. Workers Logs
+  // stay on. No Logpush: it would ship every billing publish and consume invocation to Axiom; the
+  // STS canary's Axiom signal is the web route's log line (README, "STS canary").
   "observability": {
     "enabled": true,
-    "traces": { "enabled": true, "head_sampling_rate": 0.05 },
+    "traces": { "enabled": false },
   },
+  // The STS canary (services/usage-ingest README, "STS canary"); env.staging sets its own copy.
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "usage-ingest" },
+    },
+  ],
   // Production merge/deployment prerequisites: eu-queues.md.
   "vars": {
     "USAGE_INGEST_PARALLELISM": "2",
@@ -23,6 +36,12 @@
     "USAGE_INGEST_HEDGE_PERCENT": "100",
     // Tagged cutover switch: README.md#cutover-switch. Must not also exist as a Worker secret.
     "USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED": "true",
+    // STS canary switch: exactly "true" runs the 5-minute canary; anything else skips it.
+    "STS_CANARY_ENABLED": "false",
+    "STS_URL": "https://sts.kiloapps.io",
+    // The one `env` claim the STS canary verify route accepts; matches STS_URL's environment.
+    "STS_ENVIRONMENT": "production",
+    "WEB_STS_CANARY_URL": "https://app.kilo.ai/api/internal/sts-canary",
   },
   "queues": {
     "producers": [
@@ -82,7 +101,20 @@
         "USAGE_INGEST_HEDGE_DELAY_MS": "1000",
         "USAGE_INGEST_HEDGE_PERCENT": "100",
         "USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED": "true",
+        "STS_CANARY_ENABLED": "false",
+        "STS_URL": "https://sts-staging.kiloapps.io",
+        "STS_ENVIRONMENT": "staging",
+        "WEB_STS_CANARY_URL": "https://staging-app.kilo.ai/api/internal/sts-canary",
       },
+      "triggers": { "crons": ["*/5 * * * *"] },
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-staging",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "usage-ingest" },
+        },
+      ],
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging-eu" },

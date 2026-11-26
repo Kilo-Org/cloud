@@ -62,12 +62,13 @@ token through the Vercel Runtime Cache.
   token: STS cannot tell them apart, and build code is trusted like the deployment's own code
   (design 6.2).
 
-`lib/shared-token.ts` implements the algorithm, the one the slice-4 Vercel client copies or imports;
-`test/proof/shared-token.test.ts` checks its logic against stand-ins, and
+The algorithm lives in the Vercel client, `packages/service-token-client/src/vercel/shared-token.ts`
+(its one source; `vercelIdentity` uses it and `lib/shared-token.ts` here re-exports it);
+`packages/service-token-client/test/shared-token.test.ts` checks its logic against stand-ins, and
 `test/proof/pass-rule.test.ts` checks the pass rule. **Proof run 3 was the merge gate for the first
 Vercel workload, and it passed.**
 
-## The shared-cache algorithm (`lib/shared-token.ts`)
+## The shared-cache algorithm (`packages/service-token-client/src/vercel/shared-token.ts`)
 
 1. Key: SHA-256 of a per-run salt (`?run=`, empty in production), the base token's `owner_id`,
    `project_id`, `environment`, `custom_environment_id` and `deployment_id` (decoded, not
@@ -75,8 +76,10 @@ Vercel workload, and it passed.**
    instances of a deployment share one key per region and audience. A base token missing one of
    them fails the request.
 2. A cached entry is used only if its token decodes to the same five claims, `aud` equal to the
-   audience and `exp` equal to the entry's, until `exp` minus 60 s, whichever base token the reader
-   holds. A forged entry with matching claims can only make the caller's STS call fail (STS checks
+   audience, `exp` equal to the entry's, the team slug issuer of its `owner` and an `act` naming that
+   team's default audience with nothing nested (as STS requires), until `exp` minus 60 s, whichever
+   base token the reader holds. An exchanged token that fails the same check is never stored nor
+   served. A forged entry with matching claims can only make the caller's STS call fail (STS checks
    the signature). The key is not secret and the entry holds the whole exchanged token: code that
    can use the same Runtime Cache partition (other deployments of the project in the same
    environment) can read and present that token, and can stall a deployment's exchanges. Within one
@@ -84,8 +87,8 @@ Vercel workload, and it passed.**
    no deployment claim). Vercel documents separate partitions for `preview` and `production` only,
    so a custom environment such as `staging` may share the preview partition, and any preview
    deployment could then read the staging token. The proof audience is not an STS issuer, so this
-   harness exposes nothing STS accepts; the phase 2 slice-4 client encrypts every
-   custom-environment entry (below).
+   harness exposes nothing STS accepts; the slice-4 client keeps a custom environment's token in
+   instance memory only (below).
 3. Instance memory, then the Runtime Cache: a hit is used. On a miss, a base token with under 60 s
    left fails the request at once: no exchange, no waiting.
 4. Miss: wait a random 0 to 500 ms, read again.
@@ -110,11 +113,15 @@ once instead of polling a cache that cannot bring a token. Cost: about 100 reque
 token, the rest of a cold wave fail fast (no 20 s of function time each), and their STS calls fail
 until the cache is back.
 
-**Carried into the phase 2 slice-4 client.** It encrypts every custom-environment entry,
-whether or not that environment shares the preview partition: AES-GCM under a key only that
-environment holds, with the cache key as associated data, so an entry decrypts only under the key
-it was written for. Its fetches to `oidc.vercel.com` use `redirect: 'error'`, so the base token in
-the request body never follows a redirect.
+**Custom environments and redirects in the slice-4 client.** A custom environment's token (a base
+token with `custom_environment_id`, or an `environment` other than `preview` and `production`)
+stays in instance memory only and never touches the Runtime Cache, whether or not that environment
+shares the preview partition: on a miss the request exchanges at once and a 429 fails it, so a
+custom environment costs one exchange per instance per base-token renewal. Encrypting its entries
+(AES-GCM under a key only that environment holds, the cache key as associated data, so an entry
+decrypts only under the key it was written for) is the way to share them through the cache again
+later. The client refuses redirects on `oidc.vercel.com` (a 3xx fails the exchange), so the base
+token in the request body never follows one.
 
 **Cache cost.** A memory hit reads nothing. A cache hit is 1 read. A miss that reaches the claim is
 4 reads (read, read after the random wait, claim check, read-back) and 1 write (2 for the
@@ -139,6 +146,7 @@ it at deploy. `pnpm typecheck` and `pnpm lint` in `services/sts` check this dire
 | `api/cold.ts` | `POST /api/cold`: one exchange per invocation, no cache (run 1's mode), plus the base token's `iat`/`exp`, the clock, the exchanged `exp` and the rate-limit headers. |
 | `api/exchange.ts` | `POST /api/exchange?n=2500&c=50`: a burst from one instance. Its latency numbers are the ones to quote; the limit is measured only by a fan-out. |
 | `api/chain.ts` | `POST /api/chain`: exchanges for `https://example.invalid`, then exchanges that token again; `vercelRefusedChain` is true only for a definitive refusal (a 4xx other than 408 and 429); `chainInconclusive` marks a 429, a 5xx, a timeout, a network error or an unreadable body, and `chainedRateLimited` a 429. |
+| `lib/shared-token.ts` | Re-exports the client's shared-cache module; the deploy step replaces it with a copy of that module, which imports nothing. |
 | `lib/pass-rule.ts` | The run-3 pass rule `drive.ts` applies, the person-token gate and what counts as a refusal. |
 | `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline and budget scope), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. Shared mode salts each run with a fresh `run` id. It takes only an `https` `--url` and follows no redirect, since every request carries the proof key. |
 | `inspect-env-token.ts` | Pulls `VERCEL_OIDC_TOKEN` with `vercel env pull` per environment of the proof project, exchanges it for `https://sts-proof.invalid`, and prints for both tokens `environment`, `custom_environment_id`, whether `user_id` is present, the `act` shape and `scope`, plus the gate outcome. Never a token. |
@@ -162,7 +170,9 @@ project of the team is linked, pulled or changed.
 
 ```sh
 WORK=$(mktemp -d) && rsync -a --exclude node_modules --exclude .vercel \
-  services/sts/proof/vercel-exchange/ "$WORK/" && cd "$WORK"   # keep .vercel out of the repo
+  services/sts/proof/vercel-exchange/ "$WORK/" \
+  && cp packages/service-token-client/src/vercel/shared-token.ts "$WORK/lib/shared-token.ts" \
+  && cd "$WORK"   # keep .vercel out of the repo; the copy replaces the re-export
 KEYS=$(mktemp -d)   # 0700 and outside the deploy root: nothing in it is uploaded
 PROJECT=sts-proof-vercel-exchange-$(date +%Y%m%d)
 TEAM=team_ItxRShuUkJaEd9GmXMEEgunb

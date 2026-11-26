@@ -1,6 +1,8 @@
 import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
 import o11yPolicy from '../../policy/o11y.yaml';
+import usageIngestPolicy from '../../policy/usage-ingest.yaml';
+import webPolicy from '../../policy/web.yaml';
 import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { loadPolicies, type PolicyIndex, type PolicySnapshotEntry } from './load';
 import { POLICY_FILES, type PolicyFile } from './registry';
@@ -10,6 +12,8 @@ const sources: Record<PolicyFile, string> = {
   'audit-relay.yaml': auditRelayPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
   'o11y.yaml': o11yPolicy,
+  'usage-ingest.yaml': usageIngestPolicy,
+  'web.yaml': webPolicy,
 };
 
 /** Parsed and validated once per isolate; an invalid policy file fails every entry here. */

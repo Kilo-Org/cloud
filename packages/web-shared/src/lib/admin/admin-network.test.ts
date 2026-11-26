@@ -27,6 +27,14 @@ function fromAddress(address: string, extra: Record<string, string> = {}): Heade
   return new Headers({ 'x-vercel-forwarded-for': address, ...extra });
 }
 
+function deniedWithoutAddress(reason: string) {
+  return { kind: 'denied', reason, clientAddress: null };
+}
+
+function outsideAllowlist(clientAddress: string) {
+  return { kind: 'denied', reason: 'outside-allowlist', clientAddress };
+}
+
 const request = { route: '/admin', kiloUserId: 'user-1' };
 const mockCaptureMessage = jest.mocked(captureMessage);
 
@@ -62,28 +70,59 @@ describe('adminNetworkDecision', () => {
   test.each([
     ['VERCEL_ENV is set', 'VERCEL_ENV', 'preview'],
     ['NODE_ENV is production', 'NODE_ENV', 'production'],
-  ] as const)('enforces without VERCEL when %s, and reports it once', (_label, key, value) => {
-    setEnv(key, value);
-    setEnv('ADMIN_ALLOWED_NETWORKS', '203.0.113.7');
+  ] as const)(
+    'refuses without VERCEL when %s, even for an allowed address, and reports it once',
+    (_label, key, value) => {
+      setEnv(key, value);
+      setEnv('ADMIN_ALLOWED_NETWORKS', '203.0.113.7');
 
-    expect(adminNetworkDecision(new Headers())).toEqual({
-      kind: 'denied',
-      reason: 'no-client-address',
-    });
-    expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual({ kind: 'allowed' });
-    expect(reportedMessages()).toEqual([expect.stringContaining('outside-vercel')]);
-  });
+      expect(adminNetworkDecision(new Headers())).toEqual(
+        deniedWithoutAddress('untrusted-ingress')
+      );
+      expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual(
+        deniedWithoutAddress('untrusted-ingress')
+      );
+      expect(reportedMessages()).toEqual([expect.stringContaining('outside-vercel')]);
+    }
+  );
 
   test.each([
     ['203.0.113.7', '203.0.113.7'],
     ['198.51.100.0/24', '198.51.100.200'],
     ['2001:db8::/32', '2001:db8:abcd::1'],
     ['198.51.100.0/24', '::ffff:198.51.100.9'],
+    ['::ffff:198.51.100.0/120', '198.51.100.9'],
     ['0.0.0.0/0,::/0', '192.0.2.1'],
   ])('allows a client inside %s (%s)', (networks, address) => {
     onVercel(networks);
 
     expect(adminNetworkDecision(fromAddress(address))).toEqual({ kind: 'allowed' });
+  });
+
+  test.each([
+    ['::/0', '192.0.2.1'],
+    ['2001:db8::/32,::/64', '192.0.2.1'],
+    ['2001:db8::/32,::/80', '203.0.113.7'],
+    ['2001:db8::/32,::/80', '::ffff:203.0.113.7'],
+    ['2001:db8::/32,::/80', '::ffff:cb00:7107'],
+  ])(
+    'refuses an IPv4 client against IPv6-only list %s, whose ranges contain mapped space (%s)',
+    (networks, address) => {
+      onVercel(networks);
+
+      expect(adminNetworkDecision(fromAddress(address))).toMatchObject({
+        kind: 'denied',
+        reason: 'outside-allowlist',
+      });
+    }
+  );
+
+  test('refuses an IPv6 client against an IPv4-only list', () => {
+    onVercel('0.0.0.0/0');
+
+    expect(adminNetworkDecision(fromAddress('2001:db8::1'))).toEqual(
+      outsideAllowlist('2001:db8::1')
+    );
   });
 
   test('reads only the first hop of x-vercel-forwarded-for', () => {
@@ -92,23 +131,23 @@ describe('adminNetworkDecision', () => {
     expect(adminNetworkDecision(fromAddress('203.0.113.7, 192.0.2.1'))).toEqual({
       kind: 'allowed',
     });
-    expect(adminNetworkDecision(fromAddress('192.0.2.1, 203.0.113.7'))).toEqual({
-      kind: 'denied',
-      reason: 'outside-allowlist',
-    });
+    expect(adminNetworkDecision(fromAddress('192.0.2.1, 203.0.113.7'))).toEqual(
+      outsideAllowlist('192.0.2.1')
+    );
   });
 
-  test('denies a client outside the list', () => {
+  test('denies a client outside the list and names the validated address', () => {
     onVercel('203.0.113.0/24,2001:db8::/32');
 
-    expect(adminNetworkDecision(fromAddress('198.51.100.1'))).toEqual({
-      kind: 'denied',
-      reason: 'outside-allowlist',
-    });
-    expect(adminNetworkDecision(fromAddress('2001:db9::1'))).toEqual({
-      kind: 'denied',
-      reason: 'outside-allowlist',
-    });
+    expect(adminNetworkDecision(fromAddress('198.51.100.1'))).toEqual(
+      outsideAllowlist('198.51.100.1')
+    );
+    expect(adminNetworkDecision(fromAddress('2001:db9::1'))).toEqual(
+      outsideAllowlist('2001:db9::1')
+    );
+    expect(adminNetworkDecision(fromAddress('::ffff:198.51.100.1'))).toEqual(
+      outsideAllowlist('198.51.100.1')
+    );
   });
 
   test('ignores client-settable forwarding headers that name an allowed address', () => {
@@ -119,38 +158,33 @@ describe('adminNetworkDecision', () => {
       'x-real-ip': '203.0.113.7',
     });
 
-    expect(adminNetworkDecision(spoofed)).toEqual({ kind: 'denied', reason: 'outside-allowlist' });
+    expect(adminNetworkDecision(spoofed)).toEqual(outsideAllowlist('198.51.100.1'));
   });
 
   test.each([
     ['missing', new Headers({ 'x-forwarded-for': '203.0.113.7', 'x-real-ip': '203.0.113.7' })],
     ['empty', fromAddress('')],
     ['unparseable', fromAddress('unknown')],
-  ])('denies when x-vercel-forwarded-for is %s', (_label, headersList) => {
+  ])('denies with no address when x-vercel-forwarded-for is %s', (_label, headersList) => {
     onVercel('203.0.113.7');
 
-    expect(adminNetworkDecision(headersList)).toEqual({
-      kind: 'denied',
-      reason: 'no-client-address',
-    });
+    expect(adminNetworkDecision(headersList)).toEqual(deniedWithoutAddress('no-client-address'));
   });
 
   test.each([undefined, '', ' '])('fails closed when the list is %j', networks => {
     onVercel(networks);
 
-    expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual({
-      kind: 'denied',
-      reason: 'not-configured',
-    });
+    expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual(
+      deniedWithoutAddress('not-configured')
+    );
   });
 
   test('fails closed on an invalid list instead of dropping the bad entry', () => {
     onVercel('203.0.113.7,203.0.113.0/40');
 
-    expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual({
-      kind: 'denied',
-      reason: 'invalid-config',
-    });
+    expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual(
+      deniedWithoutAddress('invalid-config')
+    );
   });
 
   test('parses the list once per process until reset', () => {
@@ -161,10 +195,9 @@ describe('adminNetworkDecision', () => {
     expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual({ kind: 'allowed' });
 
     resetAdminNetworkConfigForTest();
-    expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual({
-      kind: 'denied',
-      reason: 'outside-allowlist',
-    });
+    expect(adminNetworkDecision(fromAddress('203.0.113.7'))).toEqual(
+      outsideAllowlist('203.0.113.7')
+    );
   });
 
   test.each([
@@ -214,14 +247,25 @@ describe('adminNetworkRefusal', () => {
     expect(adminNetworkRefusal(fromAddress('203.0.113.7'), request)).toBeNull();
   });
 
-  test('tells an off-network admin to connect to WARP and retry', () => {
+  test('tells an off-network admin to connect to WARP and retry, with the validated address', () => {
     onVercel('203.0.113.7');
 
-    expect(adminNetworkRefusal(fromAddress('198.51.100.1'), request)).toEqual({
+    expect(
+      adminNetworkRefusal(fromAddress('198.51.100.1', { 'x-forwarded-for': '192.0.2.9' }), request)
+    ).toEqual({
       reason: 'outside-allowlist',
       code: 'ADMIN_NETWORK_DENIED',
       message: expect.stringContaining('Cloudflare WARP'),
+      clientAddress: '198.51.100.1',
     });
+  });
+
+  test('carries no address when the trusted header is missing, whatever x-forwarded-for says', () => {
+    onVercel('203.0.113.7');
+
+    expect(
+      adminNetworkRefusal(new Headers({ 'x-forwarded-for': '192.0.2.9' }), request)
+    ).toMatchObject({ reason: 'no-client-address', clientAddress: null });
   });
 
   test('reports a missing list as not configured, once per process', () => {
@@ -233,9 +277,22 @@ describe('adminNetworkRefusal', () => {
     expect(first).toEqual({
       reason: 'not-configured',
       code: 'ADMIN_NETWORK_NOT_CONFIGURED',
-      message: expect.stringContaining('allowlist is not configured'),
+      message: expect.stringContaining('not configured for this deployment'),
+      clientAddress: null,
     });
     expect(reportedMessages()).toEqual([expect.stringContaining('not-configured')]);
+  });
+
+  test('refuses outside Vercel as a deployment problem, not a network the admin can fix', () => {
+    setEnv('NODE_ENV', 'production');
+    setEnv('ADMIN_ALLOWED_NETWORKS', '203.0.113.7');
+
+    expect(adminNetworkRefusal(fromAddress('203.0.113.7'), request)).toEqual({
+      reason: 'untrusted-ingress',
+      code: 'ADMIN_NETWORK_NOT_CONFIGURED',
+      message: expect.stringContaining('not configured for this deployment'),
+      clientAddress: null,
+    });
   });
 
   test('reports an invalid list by entry position only', () => {

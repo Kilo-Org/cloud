@@ -57,8 +57,8 @@ function rateLimitKey(action: 'options' | 'verify', userId: string): string {
  * Error contract: 400 invalid request, 401 `{ error }` with a stable
  * `StepUpVerificationError` code (including `SESSION_UNBOUND`), 403 missing or
  * foreign Origin, 403 `ADMIN_NETWORK_DENIED` (off the corporate network,
- * retryable) or `ADMIN_NETWORK_NOT_CONFIGURED` (no allowlist), 429 rate
- * limited, 503 rate limiter unavailable.
+ * retryable) or `ADMIN_NETWORK_NOT_CONFIGURED` (no usable allowlist, or not
+ * running on Vercel), 429 rate limited, 503 rate limiter unavailable.
  */
 export async function POST(request: NextRequest) {
   if (request.headers.has('authorization')) {

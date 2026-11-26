@@ -719,13 +719,16 @@ describe('admin.cancelAndRefundKiloPass', () => {
 });
 
 describe('admin.syncProviders manual sync', () => {
-  // Setting VERCEL_ENV makes the admin network check enforce, so these callers
-  // come from an allowed address.
+  // Setting VERCEL_ENV makes the admin network check enforce, which refuses
+  // every admin outside Vercel, so these callers act as Vercel requests from an
+  // allowed address.
+  const originalVercel = process.env.VERCEL;
   const originalVercelEnv = process.env.VERCEL_ENV;
   const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
   const allowedAddress = { 'x-vercel-forwarded-for': '203.0.113.7' };
 
   beforeEach(() => {
+    process.env.VERCEL = '1';
     process.env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
     resetAdminNetworkConfigForTest();
   });
@@ -733,6 +736,7 @@ describe('admin.syncProviders manual sync', () => {
   afterEach(() => {
     const env: Record<string, string | undefined> = process.env;
     for (const [key, value] of [
+      ['VERCEL', originalVercel],
       ['VERCEL_ENV', originalVercelEnv],
       ['ADMIN_ALLOWED_NETWORKS', originalNetworks],
     ] as const) {

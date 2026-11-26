@@ -795,21 +795,30 @@ describe('adminCustomLlmRouter', () => {
       base_url: 'http://upstream.example.com/v1',
     };
     const originalNodeEnv = process.env.NODE_ENV;
+    const originalVercel = process.env.VERCEL;
     const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
     const allowedAddress = { 'x-vercel-forwarded-for': '203.0.113.7' };
-    const setEnv = (key: 'NODE_ENV' | 'ADMIN_ALLOWED_NETWORKS', value: string | undefined) => {
+    const setEnv = (
+      key: 'NODE_ENV' | 'VERCEL' | 'ADMIN_ALLOWED_NETWORKS',
+      value: string | undefined
+    ) => {
       const env: Record<string, string | undefined> = process.env;
       if (value === undefined) delete env[key];
       else env[key] = value;
     };
 
+    // Production mode enforces the admin network check, which refuses every
+    // admin outside Vercel; these callers act as Vercel requests from an
+    // allowed address.
     beforeEach(() => {
+      setEnv('VERCEL', '1');
       setEnv('ADMIN_ALLOWED_NETWORKS', '203.0.113.7');
       resetAdminNetworkConfigForTest();
     });
 
     afterEach(() => {
       setEnv('NODE_ENV', originalNodeEnv);
+      setEnv('VERCEL', originalVercel);
       setEnv('ADMIN_ALLOWED_NETWORKS', originalNetworks);
       resetAdminNetworkConfigForTest();
     });

@@ -232,14 +232,39 @@ describe('adminProcedure admin network allowlist', () => {
       ctxFor({
         user: defineTestUser({ is_admin: true }),
         authViaToken: true,
-        headersList: new Headers({ 'x-vercel-forwarded-for': '198.51.100.1' }),
+        ip: '192.0.2.9',
+        headersList: new Headers({
+          'x-vercel-forwarded-for': '198.51.100.1',
+          'x-forwarded-for': '192.0.2.9',
+        }),
       })
     );
 
     await expect(caller.ping()).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ kind: 'privileged_access', outcome: 'denied' });
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      outcome: 'denied',
+      ip: '198.51.100.1',
+    });
+  });
+
+  test('records a null address, not ctx.ip, when the trusted header is missing', async () => {
+    // `ctx.ip` falls back to the client-settable x-forwarded-for.
+    const caller = createCaller(
+      ctxFor({
+        user: defineTestUser({ is_admin: true }),
+        authViaToken: true,
+        ip: '203.0.113.7',
+        headersList: new Headers({ 'x-forwarded-for': '203.0.113.7' }),
+      })
+    );
+
+    await expect(caller.ping()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: 'privileged_access', outcome: 'denied', ip: null });
   });
 
   test('keeps the non-admin refusal for a non-admin outside the allowlist', async () => {

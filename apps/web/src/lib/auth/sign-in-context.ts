@@ -239,7 +239,9 @@ export async function recordSignInContext(params: {
           AND NOT (kind = 'device' AND key_hash IS NOT DISTINCT FROM ${deviceKeyHash}::text)
           AND NOT (kind = 'network' AND key_hash IS NOT DISTINCT FROM ${networkKeyHash}::text)
           AND NOT (kind = 'notice' AND (SELECT is_candidate FROM candidate))
-          AND (SELECT count(*) FROM seen) >= 0
+          AND (SELECT count(*) FROM seen) >= 0 -- Ordering barrier: the upserts in seen finish before the prune
+          -- takes any lock. With SKIP LOCKED and the fixed lock order this prevents the deadlock;
+          -- removing this line brings the deadlock back.
         FOR UPDATE SKIP LOCKED
       )
     )

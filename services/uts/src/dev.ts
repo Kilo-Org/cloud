@@ -1,6 +1,7 @@
 import { UtsFeedIndexSchema } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { handleDevNoticeRequest } from './dev-notices';
 import type { DevUtsFeedDO } from './dev-feed';
 import { getFeedStub, getSignerStub } from './dos/stubs';
 import type { SignResult } from './dos/UtsSignerDO';
@@ -40,6 +41,8 @@ import type { SignerAccess } from './token/mint';
  * * The email sign-in's mail port records each message in the isolate instead of sending it, and
  *   `GET /__dev/mail?to=<address>` answers the newest message for that address (its link and code
  *   are synthetic local values), for the email end-to-end run.
+ * * The notice routes under `/__dev/notices/` and the security view with a development caller
+ *   check (`src/dev-notices.ts`).
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 export const DEV_FEED_STOP_PATH = '/__dev/feed/stop';
@@ -137,6 +140,8 @@ export async function handleDevRequest(
   const config = readConfig(env);
   if (config.environment !== 'development') return await handleRequest(request, env, ctx);
   const { pathname, searchParams } = new URL(request.url);
+  const notices = await handleDevNoticeRequest(request, pathname, env, ctx);
+  if (notices !== null) return notices;
   if (pathname === DEV_FEED_STOP_PATH && request.method === 'POST') {
     return await stopFeedObject(request, env, config);
   }

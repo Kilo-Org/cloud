@@ -3,6 +3,17 @@ import { z } from 'zod';
 export const UtsEnvironmentSchema = z.enum(['production', 'staging', 'development']);
 export type UtsEnvironment = z.infer<typeof UtsEnvironmentSchema>;
 
+/**
+ * The mint Worker's deployed name in each environment: the `props.caller` its service bindings
+ * carry to other Workers' named entrypoints, such as the Notifications Worker's `SecurityNotices`.
+ * `services/uts/test/repo` fails when the mint Worker's wrangler config deploys other names.
+ */
+export const UTS_MINT_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {
+  production: 'uts',
+  staging: 'uts-staging',
+  development: 'uts-local',
+};
+
 /** Path of the UTS key set on the feed Worker's origin. */
 export const UTS_JWKS_PATH = '/.well-known/jwks.json';
 

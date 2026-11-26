@@ -8,5 +8,6 @@ export * from './revocation';
 export * from './scopes';
 export * from './signin';
 export * from './signin-methods';
+export * from './security';
 export * from './signer-keys';
 export * from './token';

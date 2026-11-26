@@ -110,7 +110,15 @@ export const NOTICE_KINDS = [
   'bot_key_flagged',
 ] as const;
 export const NOTICE_CHANNELS = ['push', 'email', 'in_app'] as const;
-export const NOTICE_DELIVERIES = ['pending', 'delivered', 'failed'] as const;
+export const NOTICE_DELIVERIES = ['pending', 'sending', 'delivered', 'failed'] as const;
+export const NOTICE_ATTEMPT_OUTCOMES = [
+  'sent',
+  'no_target',
+  'not_configured',
+  'retryable_failure',
+  'permanent_failure',
+] as const;
+export const SIGN_IN_SESSION_KINDS = ['browser', 'device'] as const;
 export const SIGN_IN_INTENTS = ['sign_in', 'link'] as const;
 export const WEBAUTHN_CEREMONIES = ['registration', 'sign_in', 'step_up'] as const;
 
@@ -151,4 +159,6 @@ export const IDENTITY_STORE_ENUMS = {
   notice_delivery: NOTICE_DELIVERIES,
   webauthn_ceremony: WEBAUTHN_CEREMONIES,
   sign_in_intent: SIGN_IN_INTENTS,
+  notice_attempt_outcome: NOTICE_ATTEMPT_OUTCOMES,
+  sign_in_session_kind: SIGN_IN_SESSION_KINDS,
 } as const;

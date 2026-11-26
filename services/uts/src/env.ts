@@ -108,6 +108,12 @@ export type Env = {
    * `patStoreBinding` (src/pat/lookup.ts) is the only reader.
    */
   IDENTITY_STORE_PAT?: Hyperdrive;
+  /**
+   * The identity store's read-replica Hyperdrive config (login `uts_reader`, views in `uts_read`),
+   * bound once the environment's identity store is provisioned; it serves read-only account views
+   * such as the security view (design 5.2).
+   */
+  IDENTITY_STORE_REPLICA?: Hyperdrive;
   WEBAUTHN_RP_ID: string;
   WEBAUTHN_ORIGINS: string;
   /**
@@ -116,13 +122,6 @@ export type Env = {
    */
   DEVICE_USER_CODE_KEY?: string;
 } & SignInEnv;
-
-/** The mint Worker's deployed name in each environment. */
-export const MINT_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {
-  production: 'uts',
-  staging: 'uts-staging',
-  development: 'uts-local',
-};
 
 /**
  * The feed Worker's deployed name in each environment. It is the only caller the `SignerKeys`

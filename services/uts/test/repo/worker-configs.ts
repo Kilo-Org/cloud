@@ -6,11 +6,12 @@ import {
   UTS_ENDPOINTS,
   UTS_FEED_READER_ENTRYPOINT,
   UTS_FEED_READS_ENTRYPOINT,
+  UTS_MINT_DEPLOYMENTS,
   UTS_SIGNER_KEYS_ENTRYPOINT,
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
-import { FEED_DEPLOYMENTS, MINT_DEPLOYMENTS } from '../../src/env';
+import { FEED_DEPLOYMENTS } from '../../src/env';
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
@@ -544,7 +545,7 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   }
   const mint = byPath.get(MINT_CONFIG);
   if (mint !== undefined) {
-    const expected = expectedDeployments(MINT_DEPLOYMENTS, ['production', 'staging']);
+    const expected = expectedDeployments(UTS_MINT_DEPLOYMENTS, ['production', 'staging']);
     if (deployments(mint) !== expected)
       problems.push(`${MINT_CONFIG} deploys ${deployments(mint)}; expected ${expected}`);
     for (const block of blocksOf(mint)) {

@@ -19,8 +19,8 @@ const INSUFFICIENT_PRIVILEGE = '42501';
 
 /**
  * Tables the app login writes only through security-definer functions: the OAuth grant functions
- * (migration 0004), the account functions (migration 0005) and the sign-in functions (migration
- * 0008).
+ * (migration 0004), the account functions (migration 0005), the sign-in functions (migration
+ * 0008) and the notice and sign-in functions and triggers (migration 0010).
  */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
@@ -45,6 +45,10 @@ const FUNCTION_WRITTEN_TABLES = [
   'email_code_limits',
   'account_user_code_failures',
   'network_user_code_failures',
+  'notice_attempts',
+  'known_devices',
+  'known_networks',
+  'sign_ins',
 ];
 
 /** Tables the app login cannot even read: only the sign-in functions reach them. */
@@ -62,6 +66,10 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   email_code_limits: 'sent_in_hour',
   account_user_code_failures: 'failures',
   network_user_code_failures: 'failures',
+  notice_attempts: 'outcome',
+  known_devices: 'last_seen_at',
+  known_networks: 'last_seen_at',
+  sign_ins: 'new_device',
 };
 
 let db: TestDatabase;
@@ -680,6 +688,9 @@ describe('functions', () => {
     );
     expect(result.rows).toEqual([
       { routine: 'advance_audit_watermark', grantee: 'uts_app' },
+      { routine: 'claim_credential_notice', grantee: 'uts_app' },
+      { routine: 'claim_due_notices', grantee: 'uts_app' },
+      { routine: 'claim_notice', grantee: 'uts_app' },
       { routine: 'complete_email_link', grantee: 'uts_app' },
       { routine: 'complete_passkey_sign_in', grantee: 'uts_app' },
       { routine: 'complete_passkey_step_up', grantee: 'uts_app' },
@@ -693,6 +704,7 @@ describe('functions', () => {
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
       { routine: 'exchange_device_code', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
+      { routine: 'finish_notice', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
@@ -705,6 +717,7 @@ describe('functions', () => {
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
+      { routine: 'maintain_notice_rows', grantee: 'uts_app' },
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
       { routine: 'maintain_provider_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },

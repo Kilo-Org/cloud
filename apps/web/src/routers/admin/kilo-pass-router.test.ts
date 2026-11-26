@@ -60,10 +60,10 @@ function getStripeMock(): StripeMock {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let createCallerForUser: (userId: string) => Promise<any>;
+let createSessionCallerForUser: (userId: string) => Promise<any>;
 
 beforeAll(async () => {
-  ({ createCallerForUser } = await import('@/routers/test-utils'));
+  ({ createSessionCallerForUser } = await import('@/routers/test-utils'));
 });
 
 async function insertActiveKiloPass(kiloUserId: string, stripeSubscriptionId: string) {
@@ -162,7 +162,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     const target = await insertTestUser({ google_user_email: 'bulk-refused@example.com' });
     await insertActiveKiloPass(target.id, 'sub_refused');
 
-    const caller = await createCallerForUser(platformAdmin.id);
+    const caller = await createSessionCallerForUser(platformAdmin.id);
     await expect(
       caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
         emails: ['bulk-refused@example.com'],
@@ -192,7 +192,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     await insertActiveKiloPass(refunded.id, 'sub_audit_refunded');
     await insertTestUser({ google_user_email: 'bulk-audit-no-sub@example.com' });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-audit-refunded@example.com', 'bulk-audit-no-sub@example.com'],
       reason: 'chargeback',
@@ -240,7 +240,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     await insertActiveKiloPass(second.id, 'sub_batch_2');
     await insertActiveKiloPass(third.id, 'sub_batch_3');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const reason = 'chargeback reported by victim@example.com';
     await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-batch-1@example.com', 'bulk-batch-2@example.com'],
@@ -305,7 +305,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     await insertActiveKiloPass(target.id, 'sub_unknown_mix');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-target-unknown-mix@example.com', 'does-not-exist@example.com'],
       reason: 'abuse',
@@ -334,7 +334,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
 
     const target = await insertTestUser({ google_user_email: 'bulk-no-sub@example.com' });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-no-sub@example.com'],
       reason: 'abuse',
@@ -356,7 +356,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     await insertCanceledKiloPass(target.id, 'sub_already_canceled');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-already-canceled@example.com'],
       reason: 'abuse',
@@ -386,7 +386,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     await insertActiveKiloPass(target.id, 'sub_already_refunded');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-already-refunded@example.com'],
       reason: 'chargeback',
@@ -419,7 +419,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     await insertActiveKiloPass(target.id, 'sub_happy_path');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-happy-path@example.com'],
       reason: 'fraud-ring',
@@ -485,7 +485,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     await insertActiveKiloPass(target.id, 'sub_no_refund');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-no-refund@example.com'],
       reason: 'policy',
@@ -545,7 +545,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     const target = await insertTestUser({ google_user_email: 'bulk-no-invoice@example.com' });
     await insertActiveKiloPass(target.id, 'sub_no_invoice');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-no-invoice@example.com'],
       reason: 'policy',
@@ -582,7 +582,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     await insertActiveKiloPass(u2.id, 'sub_seq_2');
     await insertActiveKiloPass(u3.id, 'sub_seq_3');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-seq-1@example.com', 'bulk-seq-2@example.com', 'bulk-seq-3@example.com'],
       reason: 'mixed-batch',
@@ -655,7 +655,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     const target = await insertTestUser({ google_user_email: 'bulk-dedupe@example.com' });
     await insertActiveKiloPass(target.id, 'sub_dedupe');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-dedupe@example.com', 'BULK-DEDUPE@example.com', 'bulk-dedupe@example.com'],
       reason: 'dedupe',
@@ -677,7 +677,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     await insertActiveKiloPass(target.id, 'sub_already_blocked');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-already-blocked@example.com'],
       reason: 'new-reason',
@@ -701,7 +701,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     await insertActiveKiloPass(target.id, 'sub_mixed_case');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['bulk-mixedcase@example.com'],
       reason: 'case-insensitive',
@@ -721,7 +721,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     await insertActiveKiloPass(u1.id, 'sub_ambig_1');
     await insertActiveKiloPass(u2.id, 'sub_ambig_2');
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
       emails: ['ambiguous@example.com'],
       reason: 'ambiguity',
@@ -752,7 +752,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
   it('rejects a reason longer than the bounded length', async () => {
     const stripeMock = getStripeMock();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
         emails: ['bulk-length-bound@example.com'],

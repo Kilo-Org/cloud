@@ -39,7 +39,12 @@ describe('automation issuer to runtime compatibility', () => {
           organizationDeletedAt: null,
         }),
       };
-      const common = { secret, connectionString: 'unused', adapters };
+      const common = {
+        secret,
+        connectionString: 'unused',
+        adapters,
+        audienceMode: 'per-destination' as const,
+      };
       const runtime = await createRuntimeAuthorization({
         ...common,
         token: control,
@@ -58,8 +63,9 @@ describe('automation issuer to runtime compatibility', () => {
         });
       await expect(authenticate(legacy.token, 'kilo-api')).resolves.toEqual({ userId: user.id });
       await expect(authenticate(control, 'cloud-agent-next')).resolves.toEqual({ userId: user.id });
-      for (const audience of ['kilo-api', 'kilo-gateway', 'session-ingest']) {
-        const auth = await verifyKiloTokenForPolicy(runtime.token, secret, {
+      const destinations = ['kilo-api', 'kilo-gateway', 'session-ingest'] as const;
+      for (const audience of destinations) {
+        const auth = await verifyKiloTokenForPolicy(runtime.tokens[audience], secret, {
           audience,
           mode: 'required',
         });
@@ -70,17 +76,21 @@ describe('automation issuer to runtime compatibility', () => {
           credentialExchange: false,
         });
         await expect(authenticate(control, audience)).resolves.toBeNull();
+        for (const other of [...destinations, 'cloud-agent-next'].filter(
+          value => value !== audience
+        )) {
+          await expect(
+            verifyKiloTokenForPolicy(runtime.tokens[audience], secret, {
+              audience: other,
+              mode: 'required',
+            })
+          ).rejects.toThrow();
+        }
       }
-      await expect(
-        verifyKiloTokenForPolicy(runtime.token, secret, {
-          audience: 'cloud-agent-next',
-          mode: 'required',
-        })
-      ).rejects.toThrow();
       const now = new Date(Date.now() + 61 * 60_000);
       await expect(
         renewRuntimeAuthorization({ ...common, authorization: runtime.authorization, now })
-      ).resolves.toHaveProperty('token');
+      ).resolves.toHaveProperty('tokens');
       await expect(
         renewRuntimeAuthorization({
           ...common,

@@ -1,13 +1,30 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { code_indexing_manifest } from '@kilocode/db/schema';
+import { code_indexing_manifest, kilocode_users } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import type { Organization, User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { createCallerForUser } from '@/routers/test-utils';
+import {
+  setAdminAccessSinkForTest,
+  type AdminAccessEvent,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
+import {
+  ALLOWED_ADMIN_ADDRESS,
+  OFF_NETWORK_ADDRESS,
+  withEnforcedAdminNetwork,
+} from '@/tests/helpers/admin-network.helper';
+
+/** The one account the configured list enables; see the config mock below. */
+const ALLOWLISTED_USER_ID = '0b6f5c1e-7d1a-4c55-9a43-2f1b2b6d9e01';
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/config.server'),
+  CODE_INDEXING_ENABLED_USER_IDS: '0b6f5c1e-7d1a-4c55-9a43-2f1b2b6d9e01',
+}));
 
 jest.mock('@/lib/code-indexing/availability.server', () => ({
   CODE_INDEXING_GONE_MESSAGE: 'Managed code indexing is no longer available.',
@@ -190,16 +207,21 @@ describe('codeIndexing.deleteBeforeDate authorization', () => {
       createdAt: OLD,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    await withEnforcedAdminNetwork(async () => {
+      const caller = await createSessionCallerForUser(admin.id, { headers: ALLOWED_ADMIN_ADDRESS });
 
-    await expect(
-      caller.codeIndexing.deleteBeforeDate({ organizationId: organization.id, beforeDate: CUTOFF })
-    ).resolves.toEqual({ success: true });
+      await expect(
+        caller.codeIndexing.deleteBeforeDate({
+          organizationId: organization.id,
+          beforeDate: CUTOFF,
+        })
+      ).resolves.toEqual({ success: true });
+    });
 
     expect(await manifestFiles(organization.id)).toEqual([]);
   });
 
-  test('keeps personal cleanup available to an entitled account without an organization', async () => {
+  test('keeps personal cleanup available to an admitted staff browser session', async () => {
     await insertManifestRow({
       organizationId: admin.id,
       kiloUserId: admin.id,
@@ -215,14 +237,92 @@ describe('codeIndexing.deleteBeforeDate authorization', () => {
       createdAt: OLD,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    await withEnforcedAdminNetwork(async () => {
+      const caller = await createSessionCallerForUser(admin.id, { headers: ALLOWED_ADMIN_ADDRESS });
 
-    await expect(caller.codeIndexing.deleteBeforeDate({ beforeDate: CUTOFF })).resolves.toEqual({
-      success: true,
+      await expect(caller.codeIndexing.deleteBeforeDate({ beforeDate: CUTOFF })).resolves.toEqual({
+        success: true,
+      });
     });
 
     expect(await manifestFiles(admin.id)).toEqual([]);
     expect(await manifestFiles(organization.id)).toEqual(['src/org.ts']);
+  });
+
+  test('gives a staff bearer caller the ordinary personal refusal', async () => {
+    await insertManifestRow({
+      organizationId: admin.id,
+      kiloUserId: admin.id,
+      projectId: 'me/local',
+      filePath: 'src/old.ts',
+      createdAt: OLD,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.codeIndexing.deleteBeforeDate({ beforeDate: CUTOFF })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Code indexing is not enabled for this account',
+    });
+    expect(await manifestFiles(admin.id)).toEqual(['src/old.ts']);
+    expect(milvusDeletes()).toHaveLength(0);
+  });
+
+  test('refuses an off-network staff browser session before any personal index change', async () => {
+    await insertManifestRow({
+      organizationId: admin.id,
+      kiloUserId: admin.id,
+      projectId: 'me/local',
+      filePath: 'src/old.ts',
+      createdAt: OLD,
+    });
+
+    await withEnforcedAdminNetwork(async () => {
+      const caller = await createSessionCallerForUser(admin.id, { headers: OFF_NETWORK_ADDRESS });
+      const refusal = { code: 'FORBIDDEN', message: expect.stringContaining('Cloudflare WARP') };
+
+      await expect(
+        caller.codeIndexing.deleteBeforeDate({ beforeDate: CUTOFF })
+      ).rejects.toMatchObject(refusal);
+      // The per-file delete turns ordinary failures into `{ success: false }`,
+      // but passes the typed staff refusal through.
+      await expect(
+        caller.codeIndexing.delete({ projectId: 'me/local', filePaths: ['src/old.ts'] })
+      ).rejects.toMatchObject(refusal);
+    });
+
+    expect(await manifestFiles(admin.id)).toEqual(['src/old.ts']);
+    expect(milvusDeletes()).toHaveLength(0);
+  });
+
+  test('keeps the configured list working for a bearer caller without staff authority', async () => {
+    await insertTestUser({
+      id: ALLOWLISTED_USER_ID,
+      google_user_email: `code-index-allowlisted-${randomUUID().slice(0, 8)}@example.com`,
+    });
+    await insertManifestRow({
+      organizationId: ALLOWLISTED_USER_ID,
+      kiloUserId: ALLOWLISTED_USER_ID,
+      projectId: 'me/local',
+      filePath: 'src/old.ts',
+      createdAt: OLD,
+    });
+
+    try {
+      await withEnforcedAdminNetwork(async () => {
+        const caller = await createCallerForUser(ALLOWLISTED_USER_ID, {
+          headers: OFF_NETWORK_ADDRESS,
+        });
+        await expect(caller.codeIndexing.deleteBeforeDate({ beforeDate: CUTOFF })).resolves.toEqual(
+          { success: true }
+        );
+      });
+      expect(await manifestFiles(ALLOWLISTED_USER_ID)).toEqual([]);
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, ALLOWLISTED_USER_ID));
+    }
   });
 
   test('refuses the personal scope for an account without the entitlement', async () => {
@@ -273,5 +373,140 @@ describe('codeIndexing.deleteBeforeDate authorization', () => {
     ).resolves.toEqual({ success: true, deletedFiles: 1 });
 
     expect(await manifestFiles(organization.id)).toEqual([]);
+  });
+});
+
+describe('codeIndexing overrideUser staff reads', () => {
+  let owner: User;
+  let member: User;
+  let admin: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    const suffix = randomUUID().slice(0, 8);
+    owner = await insertTestUser({
+      id: randomUUID(),
+      google_user_email: `code-index-override-owner-${suffix}@example.com`,
+    });
+    member = await insertTestUser({
+      id: randomUUID(),
+      google_user_email: `code-index-override-member-${suffix}@example.com`,
+    });
+    admin = await insertTestUser({
+      id: randomUUID(),
+      google_user_email: `code-index-override-admin-${suffix}@example.com`,
+      is_admin: true,
+    });
+    organization = await createTestOrganization(`Code Index Override ${suffix}`, owner.id, 0);
+    await insertManifestRow({
+      organizationId: organization.id,
+      kiloUserId: owner.id,
+      projectId: 'acme/app',
+      filePath: 'src/org.ts',
+      createdAt: RECENT,
+    });
+    await insertManifestRow({
+      organizationId: member.id,
+      kiloUserId: member.id,
+      projectId: 'me/local',
+      filePath: 'src/personal.ts',
+      createdAt: RECENT,
+    });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(code_indexing_manifest)
+      .where(inArray(code_indexing_manifest.organization_id, [organization.id, member.id]));
+  });
+
+  test('refuses a caller without the platform admin flag', async () => {
+    const caller = await createSessionCallerForUser(member.id);
+
+    await expect(
+      caller.codeIndexing.getOrganizationStats({ overrideUser: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Only admins can use overrideUser parameter',
+    });
+  });
+
+  test('refuses a staff bearer caller with the typed browser-session refusal', async () => {
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.codeIndexing.getOrganizationStats({ overrideUser: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED', actionClass: 'support_read' }),
+    });
+  });
+
+  test('refuses an off-network staff session before any override lookup or record', async () => {
+    const events: AdminAccessEvent[] = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+    try {
+      await withEnforcedAdminNetwork(async () => {
+        const caller = await createSessionCallerForUser(admin.id, { headers: OFF_NETWORK_ADDRESS });
+        const refusal = { code: 'FORBIDDEN', message: expect.stringContaining('Cloudflare WARP') };
+
+        await expect(
+          caller.codeIndexing.getOrganizationStats({ overrideUser: organization.id })
+        ).rejects.toMatchObject(refusal);
+        await expect(
+          caller.codeIndexing.getOrganizationStats({ overrideUser: 'nobody@example.com' })
+        ).rejects.toMatchObject(refusal);
+        await expect(
+          caller.codeIndexing.getOrganizationStats({ overrideUser: randomUUID() })
+        ).rejects.toMatchObject(refusal);
+      });
+    } finally {
+      setAdminAccessSinkForTest(null);
+    }
+    expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toEqual([]);
+  });
+
+  test('reads the named index for an admitted staff session and records its target', async () => {
+    const events: AdminAccessEvent[] = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+    try {
+      await withEnforcedAdminNetwork(async () => {
+        const caller = await createSessionCallerForUser(admin.id, {
+          headers: ALLOWED_ADMIN_ADDRESS,
+        });
+
+        const organizationStats = await caller.codeIndexing.getOrganizationStats({
+          overrideUser: organization.id,
+        });
+        expect(organizationStats.map(project => project.project_id)).toEqual(['acme/app']);
+
+        const userStats = await caller.codeIndexing.getOrganizationStats({
+          overrideUser: member.google_user_email,
+        });
+        expect(userStats.map(project => project.project_id)).toEqual(['me/local']);
+
+        // A UUID names the index namespace as given, as before.
+        const files = await caller.codeIndexing.getProjectFiles({
+          overrideUser: member.id,
+          projectId: 'me/local',
+        });
+        expect(files.files.map(file => file.file_path)).toEqual(['src/personal.ts']);
+
+        await expect(
+          caller.codeIndexing.getOrganizationStats({ overrideUser: 'nobody@example.com' })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      });
+    } finally {
+      setAdminAccessSinkForTest(null);
+    }
+    expect(
+      events.flatMap(event =>
+        event.kind === 'kilo_admin_elevation' ? [[event.reason, event.target]] : []
+      )
+    ).toEqual([
+      ['code_index_user_override', `organization:${organization.id}`],
+      ['code_index_user_override', `user:${member.id}`],
+      ['code_index_user_override', `user:${member.id}`],
+    ]);
   });
 });

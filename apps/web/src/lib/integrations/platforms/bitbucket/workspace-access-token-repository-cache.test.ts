@@ -402,6 +402,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id.toUpperCase(),
         kiloUserId: user.id,
         expectedIntegrationId: integration.id.toUpperCase(),
+        authority: 'member',
       })
     ).resolves.toMatchObject({
       status: 'available',
@@ -510,6 +511,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).resolves.toMatchObject({
       status: 'available',
@@ -544,6 +546,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).resolves.toEqual({ status: 'invalid_request' });
 
@@ -572,6 +575,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).resolves.toEqual({ status });
 
@@ -622,6 +626,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).resolves.toEqual({
       status: 'available',
@@ -680,6 +685,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
           organizationId: organization.id,
           kiloUserId: user.id,
           expectedIntegrationId: integration.id,
+          authority: 'member',
         })
       ).resolves.toEqual({
         status: 'available',
@@ -731,6 +737,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).resolves.toEqual({
       status: 'available',
@@ -749,6 +756,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
       organizationId: organization.id,
       kiloUserId: user.id,
       expectedIntegrationId: integration.id,
+      authority: 'member',
     });
 
     await expect(getBitbucketWorkspaceAccessTokenStatus(organization.id)).resolves.toMatchObject({
@@ -796,6 +804,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: manager.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).rejects.toMatchObject({
       name: 'BitbucketWorkspaceAccessTokenRepositoryCacheAuthorizationError',
@@ -828,6 +837,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).resolves.toEqual({
       status: 'available',
@@ -869,6 +879,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         organizationId: organization.id,
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
+        authority: 'member',
       })
     ).resolves.toEqual({ status: 'reconnect_required' });
 

@@ -5,12 +5,17 @@ import { type IndexColumn } from 'drizzle-orm/pg-core';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import {
-  decryptApiKey,
-  encryptApiKey,
-  type EncryptedData,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
-import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
+  createOpenAiChatGptSealingKey,
+  OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR,
+  openAiChatGptKmsOwnerFor,
+  openOpenAiChatGptConnection,
+  openOpenAiChatGptConnectionForComparison,
+  sealOpenAiChatGptConnection,
+  type OpenAiChatGptEncryptedConnectionColumns,
+  type OpenAiChatGptKmsOwner,
+  type OpenAiChatGptSealingKey,
+} from './connection-encryption';
+import type { OpenAiChatGptConnection } from './types';
 import { isChatGptUsageLimitCurrent, type ChatGptUsageLimit } from './usage-limit';
 
 /**
@@ -157,6 +162,33 @@ function openAiChatGptOwnerShape(owner: OpenAiChatGptOwner): OpenAiChatGptOwnerS
   };
 }
 
+/**
+ * The KMS owner of the owner's row: the organization for its shared-services connection,
+ * otherwise the connecting person. `openAiChatGptKmsOwnerOfRow` derives the same owner
+ * from the row's columns.
+ */
+export function openAiChatGptKmsOwner(owner: OpenAiChatGptOwner): OpenAiChatGptKmsOwner {
+  return owner.scope === 'shared_services'
+    ? openAiChatGptKmsOwnerFor({ kind: 'shared_services', organizationId: owner.organizationId })
+    : openAiChatGptKmsOwnerFor({
+        kind: 'member',
+        kiloUserId: owner.kiloUserId,
+        organizationId: owner.organizationId,
+      });
+}
+
+/**
+ * A data key for one write of the owner's connection. It carries no plaintext, so a writer
+ * creates it before taking the row lock, and a KMS failure stops the write before anything
+ * is sent upstream.
+ */
+export async function createOpenAiChatGptConnectionSealingKey(
+  owner: OpenAiChatGptOwner,
+  actorUserId: string
+): Promise<OpenAiChatGptSealingKey> {
+  return await createOpenAiChatGptSealingKey(openAiChatGptKmsOwner(owner), actorUserId);
+}
+
 /** Matches the owner's row for reads, updates and deletes. */
 export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL {
   return openAiChatGptOwnerShape(owner).row;
@@ -182,6 +214,10 @@ export async function readOpenAiChatGptConnectionRow(
   const query = fromDb
     .select({
       encrypted_connection: openai_chatgpt_connections.encrypted_connection,
+      encrypted_connection_envelope: openai_chatgpt_connections.encrypted_connection_envelope,
+      kilo_user_id: openai_chatgpt_connections.kilo_user_id,
+      organization_id: openai_chatgpt_connections.organization_id,
+      is_shared_services: openai_chatgpt_connections.is_shared_services,
       is_enabled: openai_chatgpt_connections.is_enabled,
       created_by: openai_chatgpt_connections.created_by,
     })
@@ -200,21 +236,15 @@ export async function readOpenAiChatGptConnectionRow(
 }
 
 /**
- * Decrypts and parses a stored payload. A row encrypted with a rotated key, a
- * truncated blob or a payload written by an older shape returns null instead of
- * throwing, so a corrupt row can never take down the sign-in or a request.
+ * Decrypts and parses a stored payload, preferring its KMS envelope. A static-key
+ * payload encrypted with a rotated key, a truncated blob or a payload written by an
+ * older shape returns null instead of throwing, so a corrupt row can never take down the
+ * sign-in or a request. A KMS failure throws; `openOpenAiChatGptConnection` explains why.
  */
-export function decryptOpenAiChatGptConnection(
-  encrypted: EncryptedData
-): OpenAiChatGptConnection | null {
-  try {
-    const parsed = OpenAiChatGptConnectionSchema.safeParse(
-      JSON.parse(decryptApiKey(encrypted, BYOK_ENCRYPTION_KEY))
-    );
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
+export async function decryptOpenAiChatGptConnection(
+  row: OpenAiChatGptEncryptedConnectionColumns
+): Promise<OpenAiChatGptConnection | null> {
+  return await openOpenAiChatGptConnection(row);
 }
 
 /**
@@ -227,23 +257,17 @@ export function healthyOpenAiChatGptConnection(
   return { ...connection, status: 'connected', error_message: undefined, error_at: undefined };
 }
 
-/** The stored form of a connection payload. */
-export function serializeOpenAiChatGptConnection(
-  connection: OpenAiChatGptConnection
-): EncryptedData {
-  return encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY);
-}
-
 /**
  * The payload columns a write of the owner's connection sets: the healthy
- * payload, encrypted, on an enabled row. One definition so a reconnect and a
- * token rotation cannot drift apart in which columns they leave alone.
+ * payload, encrypted in both stored forms, on an enabled row. One definition so a
+ * reconnect and a token rotation cannot drift apart in which columns they leave alone.
  */
-function connectionWriteColumns(connection: OpenAiChatGptConnection) {
+function connectionWriteColumns(
+  connection: OpenAiChatGptConnection,
+  sealingKey: OpenAiChatGptSealingKey
+) {
   return {
-    encrypted_connection: serializeOpenAiChatGptConnection(
-      healthyOpenAiChatGptConnection(connection)
-    ),
+    ...sealOpenAiChatGptConnection(healthyOpenAiChatGptConnection(connection), sealingKey),
     is_enabled: true,
   };
 }
@@ -317,7 +341,7 @@ async function getStoredConnection(
 ): Promise<OpenAiChatGptStoredConnection | null> {
   const row = await readOpenAiChatGptConnectionRow(fromDb, owner);
   if (!row) return null;
-  const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
+  const connection = await decryptOpenAiChatGptConnection(row);
   return connection ? { connection, isEnabled: row.is_enabled, createdBy: row.created_by } : null;
 }
 
@@ -327,16 +351,17 @@ async function getStoredConnection(
  * that already holds the `SELECT ... FOR UPDATE` row lock. The write touches
  * only the payload and `is_enabled`: the usage-limit columns and `created_by`
  * are left alone, so a reconnect's connector and recorded limit survive a token
- * rotation.
+ * rotation. `sealingKey` is created before the lock is taken.
  */
 export async function writeOpenAiChatGptConnection(
   fromDb: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
-  connection: OpenAiChatGptConnection
+  connection: OpenAiChatGptConnection,
+  sealingKey: OpenAiChatGptSealingKey
 ): Promise<void> {
   await fromDb
     .update(openai_chatgpt_connections)
-    .set(connectionWriteColumns(connection))
+    .set(connectionWriteColumns(connection, sealingKey))
     .where(openAiChatGptOwnerWhere(owner));
 }
 
@@ -351,7 +376,10 @@ export async function saveOpenAiChatGptConnection(
   connection: OpenAiChatGptConnection,
   createdBy: string
 ): Promise<void> {
-  const columns = connectionWriteColumns(connection);
+  const columns = connectionWriteColumns(
+    connection,
+    await createOpenAiChatGptConnectionSealingKey(owner, createdBy)
+  );
   const shape = openAiChatGptOwnerShape(owner);
   // The shared-services row records the connecting person in `created_by`; its
   // reads never match on `kilo_user_id`.
@@ -377,6 +405,7 @@ export async function saveOpenAiChatGptConnection(
         kilo_user_id: values.kilo_user_id,
         created_by: values.created_by,
         encrypted_connection: columns.encrypted_connection,
+        encrypted_connection_envelope: columns.encrypted_connection_envelope,
         is_enabled: true,
         ...NO_USAGE_LIMIT,
       },
@@ -454,7 +483,11 @@ async function withConnectionHoldingToken(
       onlyWithUsageLimit: options.onlyWithUsageLimit,
     });
     if (!row) return;
-    const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
+    // Decrypting may wait on the KMS service while the lock is held; the data key cache
+    // usually answers, since the request that produced this report read the same row.
+    // The payload is only compared with the token the caller holds, so a KMS outage falls
+    // back to the static-key copy written with the envelope.
+    const connection = await openOpenAiChatGptConnectionForComparison(row);
     if (!connection || connection.access_token !== accessToken) return;
     await write(tx, connection);
   });
@@ -549,12 +582,16 @@ export async function clearOpenAiChatGptUsageLimit(
  * through. The refresh path calls this inside the transaction that holds the
  * `SELECT ... FOR UPDATE` row lock, so a reconnect that lands between the
  * rejected token exchange and this write cannot be erased by a stale failure.
+ * `sealingKey` is created before that lock is taken. Null only when the KMS service could
+ * not create one: the errored payload carries no tokens, so it is then stored as a
+ * static-key copy alone, and the backfill adds its envelope later.
  */
 export async function markOpenAiChatGptConnectionErrored(
   fromDb: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
   connection: OpenAiChatGptConnection,
-  message: string
+  message: string,
+  sealingKey: OpenAiChatGptSealingKey | null
 ): Promise<void> {
   const { refresh_token: _refreshToken, ...withoutTokens } = connection;
   const errored: OpenAiChatGptConnection = {
@@ -568,7 +605,7 @@ export async function markOpenAiChatGptConnectionErrored(
 
   await fromDb
     .update(openai_chatgpt_connections)
-    .set({ encrypted_connection: serializeOpenAiChatGptConnection(errored), is_enabled: false })
+    .set({ ...sealOpenAiChatGptConnection(errored, sealingKey), is_enabled: false })
     .where(openAiChatGptOwnerWhere(owner));
 }
 
@@ -583,7 +620,20 @@ export async function markOpenAiChatGptNotEligible(
   refusedAccessToken: string,
   message: string
 ): Promise<void> {
+  const sealingKey = await createOpenAiChatGptConnectionSealingKey(
+    owner,
+    OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR
+  ).catch((error: unknown) => {
+    console.error(
+      '[openai-chatgpt] no data key for the refusal; recording it without an envelope: %s (%s)',
+      error instanceof Error ? error.name : 'UnknownError',
+      openAiChatGptOwnerKey(owner)
+    );
+    return null;
+  });
+  // A KMS outage must not keep a refused account serving requests: the refusal is then
+  // recorded without an envelope, which the errored payload's cleared tokens allow.
   await withConnectionHoldingToken(owner, refusedAccessToken, (tx, connection) =>
-    markOpenAiChatGptConnectionErrored(tx, owner, connection, message)
+    markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey)
   );
 }

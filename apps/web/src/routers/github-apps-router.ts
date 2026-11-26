@@ -34,7 +34,11 @@ import {
   resolveAuthorizedOwner,
   optionalOrgInput,
 } from '@/lib/integrations/resolve-owner';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+  requireOrganizationStaffAuthority,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
@@ -144,11 +148,13 @@ export const githubAppsRouter = createTRPCRouter({
           code: 'FORBIDDEN',
           message: 'GitHub connection management is not available yet',
         });
-      const owner = await resolveAuthorizedOwner(
-        ctx,
+      // OAuth connections never take a staff or support grant.
+      await ensureMemberOrganizationAccess(
+        ctx.user,
         input.organizationId,
         ORGANIZATION_MANAGE_ROLES
       );
+      const owner = resolveOwner(ctx, input.organizationId);
       const githubAppType = await getGitHubAppTypeForOrganization(owner.id);
       const attemptId = await createGitHubConnectionAttempt({
         kiloUserId: ctx.user.id,
@@ -639,14 +645,17 @@ export const githubAppsRouter = createTRPCRouter({
       if (!integration) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
       }
-      const canCancel =
+      const ordinaryCanCancel =
         !input.organizationId ||
-        (ctx.user.is_admin && !isSupportAccessEnabled()) ||
         role === 'owner' ||
         role === 'admin' ||
         integration.kilo_requester_user_id === ctx.user.id;
-      if (!canCancel) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
+      if (!ordinaryCanCancel) {
+        if (!input.organizationId || !ctx.user.is_admin || isSupportAccessEnabled()) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
+        }
+        // Staff cancelling another requester's install needs a verified grant.
+        await requireOrganizationStaffAuthority(ctx, input.organizationId);
       }
       const result = await githubAppsService.cancelPendingInstallation(owner, input.integrationId);
 

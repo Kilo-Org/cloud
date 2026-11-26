@@ -479,6 +479,7 @@ describe('policy audit stream', () => {
     expect([...event.data.attributes.addedWorkloads].sort()).toEqual([
       'audit-relay',
       'bouncer-watch',
+      'notifications',
       'o11y',
       'usage-ingest',
       'web',

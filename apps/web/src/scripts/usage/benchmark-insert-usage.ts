@@ -212,6 +212,7 @@ function generateRandomRecord(
     is_free: Math.random() < 0.1,
     abuse_delay: null,
     abuse_downgraded_from: null,
+    system_prompt_kind: null,
   };
 
   return { core, metadata };

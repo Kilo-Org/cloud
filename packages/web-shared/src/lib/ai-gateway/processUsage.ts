@@ -121,6 +121,7 @@ import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/di
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import { classifySystemPrompt } from '@kilocode/web-shared/lib/ai-gateway/system-prompt-kind';
 
 const posthogClient = PostHogClient();
 
@@ -144,14 +145,18 @@ export function extractSystemPromptText(body: OpenRouterChatCompletionRequest): 
 
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {
   try {
-    return { system_prompt_length: extractSystemPromptText(body).length };
+    const systemPrompt = extractSystemPromptText(body);
+    return {
+      system_prompt_length: systemPrompt.length,
+      system_prompt_kind: classifySystemPrompt(systemPrompt),
+    };
   } catch (e) {
     captureException(e, {
       level: 'warning',
       tags: { source: 'prompt_extraction' },
       extra: promptExtractionReportFields(body),
     });
-    return { system_prompt_length: -1 };
+    return { system_prompt_length: -1, system_prompt_kind: null };
   }
 }
 
@@ -1112,6 +1117,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
           , ${createUpsertCTE(sql`reasoning_setting`, metadataFields.reasoning_setting)}
           , ${createUpsertCTE(sql`inference_region`, metadataFields.inference_region)}
+          , ${createUpsertCTE(sql`system_prompt_kind`, metadataFields.system_prompt_kind)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -1152,7 +1158,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               mode_id,
               auto_model_id,
               reasoning_setting_id,
-              inference_region_id
+              inference_region_id,
+              system_prompt_kind_id
             )
             SELECT
               ${metadataFields.id},
@@ -1193,7 +1200,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte),
               (SELECT reasoning_setting_id FROM reasoning_setting_cte),
-              (SELECT inference_region_id FROM inference_region_cte)
+              (SELECT inference_region_id FROM inference_region_cte),
+              (SELECT system_prompt_kind_id FROM system_prompt_kind_cte)
           )
           , balance_update AS (
             UPDATE kilocode_users

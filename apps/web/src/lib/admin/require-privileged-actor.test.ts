@@ -177,15 +177,30 @@ describe('requirePrivilegedActor', () => {
       expect(actor.assurance.stepUp).toEqual({ status: 'absent' });
     });
 
-    it('does not deny a bearer credential', async () => {
+    it('denies a bearer credential even with the switch off', async () => {
       const { user } = await setup();
 
-      const actor = await requirePrivilegedActor(
-        { permission: 'admin', actionClass: 'platform_read' },
-        { ...contextFor(user), credential: 'human_bearer', authViaToken: true }
+      const cause = await refusal(
+        requirePrivilegedActor(
+          { permission: 'admin', actionClass: 'platform_read' },
+          { ...contextFor(user), credential: 'human_bearer' }
+        )
       );
 
-      expect(actor.assurance.stepUp).toEqual({ status: 'absent' });
+      expect(cause?.code).toBe('BEARER_NOT_ALLOWED');
+    });
+
+    it('denies a context that never established a credential', async () => {
+      const { user } = await setup();
+
+      const cause = await refusal(
+        requirePrivilegedActor(
+          { permission: 'admin', actionClass: 'platform_read' },
+          { ...contextFor(user), credential: undefined }
+        )
+      );
+
+      expect(cause?.code).toBe('BEARER_NOT_ALLOWED');
     });
 
     it('leaves an admin procedure working without a proof or evaluation', async () => {
@@ -298,7 +313,7 @@ describe('requirePrivilegedActor', () => {
       const cause = await refusal(
         requirePrivilegedActor(
           { permission: 'admin', actionClass: 'platform_read' },
-          { ...contextFor(user), credential: 'human_bearer', authViaToken: true }
+          { ...contextFor(user), credential: 'human_bearer' }
         )
       );
 
@@ -411,10 +426,10 @@ describe('requirePrivilegedActor', () => {
         { permission: 'admin', actionClass: 'platform_read' },
         {
           ...contextFor(user),
-          adminStepUpState: freshUpstreamState(),
-          adminStepUpDecision: {
-            actionClass: 'platform_read',
-            target: { kind: 'none', id: null },
+          adminAdmission: {
+            user,
+            stepUp: freshUpstreamState(),
+            decision: { actionClass: 'platform_read', target: { kind: 'none', id: null } },
           },
         }
       );
@@ -437,10 +452,13 @@ describe('requirePrivilegedActor', () => {
         },
         {
           ...contextFor(user),
-          adminStepUpState: freshUpstreamState(),
-          adminStepUpDecision: {
-            actionClass: 'sensitive_write',
-            target: { kind: 'user', id: 'target-user' },
+          adminAdmission: {
+            user,
+            stepUp: freshUpstreamState(),
+            decision: {
+              actionClass: 'sensitive_write',
+              target: { kind: 'user', id: 'target-user' },
+            },
           },
         }
       );
@@ -460,10 +478,10 @@ describe('requirePrivilegedActor', () => {
         { permission: 'admin', actionClass: 'sensitive_write' },
         {
           ...contextFor(user),
-          adminStepUpState: freshUpstreamState(),
-          adminStepUpDecision: {
-            actionClass: 'sensitive_write',
-            target: { kind: 'none', id: null },
+          adminAdmission: {
+            user,
+            stepUp: freshUpstreamState(),
+            decision: { actionClass: 'sensitive_write', target: { kind: 'none', id: null } },
           },
         }
       );
@@ -479,10 +497,13 @@ describe('requirePrivilegedActor', () => {
         { permission: 'admin', actionClass: 'sensitive_write' },
         {
           ...contextFor(user),
-          adminStepUpState: freshUpstreamState(),
-          adminStepUpDecision: {
-            actionClass: 'sensitive_write',
-            target: { kind: 'user', id: 'target-user' },
+          adminAdmission: {
+            user,
+            stepUp: freshUpstreamState(),
+            decision: {
+              actionClass: 'sensitive_write',
+              target: { kind: 'user', id: 'target-user' },
+            },
           },
         }
       );
@@ -504,10 +525,10 @@ describe('requirePrivilegedActor', () => {
           },
           {
             ...contextFor(user),
-            adminStepUpState: freshUpstreamState(),
-            adminStepUpDecision: {
-              actionClass: 'sensitive_write',
-              target: { kind: 'user', id: null },
+            adminAdmission: {
+              user,
+              stepUp: freshUpstreamState(),
+              decision: { actionClass: 'sensitive_write', target: { kind: 'user', id: null } },
             },
           }
         )
@@ -602,26 +623,36 @@ describe('requirePrivilegedActor', () => {
     });
   });
 
-  it('re-reads the permission on the primary and keeps the existing messages', async () => {
+  it('checks each permission on the current row and keeps the existing messages', async () => {
     const user = await insertTestUser({ is_admin: false });
     createdUserIds.push(user.id);
 
-    await expect(assertPrivilegedPermission('admin', { user })).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'Admin access required',
-    });
-    await expect(assertPrivilegedPermission('credit_manager', { user })).rejects.toMatchObject({
-      message: 'Credit management access required',
-    });
-    await expect(assertPrivilegedPermission('session_viewer', { user })).rejects.toMatchObject({
-      message: 'Session viewing access required',
-    });
-    await expect(assertPrivilegedPermission('superadmin', { user })).rejects.toMatchObject({
-      message: 'Superadmin access required',
-    });
+    expect(() => assertPrivilegedPermission('admin', user)).toThrow('Admin access required');
+    expect(() => assertPrivilegedPermission('credit_manager', user)).toThrow(
+      'Credit management access required'
+    );
+    expect(() => assertPrivilegedPermission('session_viewer', user)).toThrow(
+      'Session viewing access required'
+    );
+    expect(() => assertPrivilegedPermission('superadmin', user)).toThrow(
+      'Superadmin access required'
+    );
+    expect(() => assertPrivilegedPermission('api_request_log_exporter', user)).toThrow(
+      'API request log export access required'
+    );
+  });
+
+  it('refuses an actor whose primary row lost the permission', async () => {
+    const user = await adminUser();
+    createdUserIds.push(user.id);
+    await db.update(kilocode_users).set({ is_admin: false }).where(eq(kilocode_users.id, user.id));
+
     await expect(
-      assertPrivilegedPermission('api_request_log_exporter', { user })
-    ).rejects.toMatchObject({ message: 'API request log export access required' });
+      requirePrivilegedActor(
+        { permission: 'admin', actionClass: 'platform_read' },
+        contextFor(user)
+      )
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Admin access required' });
   });
 
   it('refuses an actor whose block timestamp is set', async () => {
@@ -632,10 +663,6 @@ describe('requirePrivilegedActor', () => {
       .set({ blocked_at: '2026-01-15T12:00:00.000Z' })
       .where(eq(kilocode_users.id, user.id));
 
-    await expect(assertPrivilegedPermission('admin', { user })).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'Admin access required',
-    });
     await expect(
       requirePrivilegedActor(
         { permission: 'admin', actionClass: 'platform_read' },

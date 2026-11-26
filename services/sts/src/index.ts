@@ -1,6 +1,8 @@
 export { SecretsBroker } from './broker';
 export { BundleDO } from './dos/BundleDO';
 export { DenialDO } from './dos/DenialDO';
+export { DeployTokenDO } from './dos/DeployTokenDO';
+export { LeaseDO } from './dos/LeaseDO';
 export { RefresherDO } from './dos/RefresherDO';
 export { SignerDO } from './dos/SignerDO';
 export { TokenSignerDO } from './dos/TokenSignerDO';

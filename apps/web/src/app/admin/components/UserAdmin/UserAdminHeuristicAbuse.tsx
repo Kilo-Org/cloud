@@ -155,6 +155,12 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
     visible: true,
   },
   {
+    key: 'system_prompt_kind',
+    title: 'Guessed Client',
+    render: row => row.system_prompt_kind ?? 'N/A',
+    visible: false,
+  },
+  {
     key: 'cache_write_tokens',
     title: 'Cache Write Tokens',
     render: row => (row.cache_write_tokens ?? 0).toLocaleString(),

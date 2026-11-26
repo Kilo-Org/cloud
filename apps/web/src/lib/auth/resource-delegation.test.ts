@@ -833,7 +833,9 @@ describe('explicit delegated organization authority', () => {
           organizationRole: state === 'different-role' ? 'owner' : 'member',
         })
       ).rejects.toMatchObject({ status: 403, delegationCode: 'FORBIDDEN' });
-      expect(getAuthorizedOrgContext).toHaveBeenCalledWith(organization.id);
+      expect(getAuthorizedOrgContext).toHaveBeenCalledWith(organization.id, undefined, {
+        membershipOnly: true,
+      });
     }
   );
 });

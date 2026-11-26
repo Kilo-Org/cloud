@@ -133,6 +133,8 @@ async function sealedRuntimeAuthorization(
   const token = jwt.sign(
     {
       runtimeAuthorization: { id: authorizationId },
+      // The combined audience the test Worker's default issuer mode reuses.
+      aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
       exp: Math.floor((now + tokenExpMs) / 1000),
     },
     SECRET

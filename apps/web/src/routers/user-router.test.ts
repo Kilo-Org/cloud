@@ -165,7 +165,7 @@ let skipTestUser: User;
 describe('user router - getMe', () => {
   it('getMe returns isAdmin: true for an admin user', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.user.getMe()).resolves.toEqual({
       success: true,
@@ -633,7 +633,7 @@ describe('session and API token reset mutations', () => {
       api_token_pepper: 'api-pepper-before',
       web_session_pepper: 'web-session-pepper-before',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.resetAPIKey({ userId: target.id });
 
@@ -656,7 +656,7 @@ describe('session and API token reset mutations', () => {
 
   it('sends no notice when the admin resets the API key of a user that does not exist', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.resetAPIKey({ userId: `missing-${crypto.randomUUID()}` });
 
@@ -674,7 +674,7 @@ describe('session and API token reset mutations', () => {
       userId: target.id,
       targetPath: '/app-shell/connected-accounts',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.signOutBrowserSessions({ userId: target.id });
 
@@ -699,7 +699,7 @@ describe('session and API token reset mutations', () => {
   it('sends one notice per admin API token reset, even two in a row from one session', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const target = await insertNoticeRecipient();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.resetAPIKey({ userId: target.id });
     await caller.admin.users.resetAPIKey({ userId: target.id });
@@ -725,7 +725,7 @@ describe('session and API token reset mutations', () => {
   it('keeps an admin browser sign-out successful, noticed and audited when a lookup of the user would fail', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const target = await insertNoticeRecipient();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const actual = jest.requireActual<typeof FindUserByIdModule>(
       '@kilocode/web-shared/lib/user/find-user-by-id'
     );

@@ -7,7 +7,7 @@ import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   buildGitLabOAuthUrl: jest.fn(),

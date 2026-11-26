@@ -375,7 +375,7 @@ describe('Bitbucket OAuth credential storage', () => {
     ).resolves.toEqual([{ id: existing.integrationId }]);
   });
 
-  it('rechecks current platform-admin access inside the storage transaction', async () => {
+  it('refuses a platform admin without an owner or billing membership', async () => {
     const admin = await insertTestUser();
     const organizationOwner = await insertTestUser();
     const organization = await createTestOrganization(
@@ -386,20 +386,15 @@ describe('Bitbucket OAuth credential storage', () => {
     const owner = { type: 'org', id: organization.id } as const;
     await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, admin.id));
 
-    const existing = await storeBitbucketIntegration(
-      integrationInput(owner, admin.id, 'admin-existing')
-    );
-    await db.update(kilocode_users).set({ is_admin: false }).where(eq(kilocode_users.id, admin.id));
-
     await expect(
-      storeBitbucketIntegration(integrationInput(owner, admin.id, 'admin-replacement'))
+      storeBitbucketIntegration(integrationInput(owner, admin.id, 'admin-connect'))
     ).rejects.toThrow('no longer authorized');
     await expect(
       db
         .select({ id: platform_integrations.id })
         .from(platform_integrations)
         .where(eq(platform_integrations.owned_by_organization_id, organization.id))
-    ).resolves.toEqual([{ id: existing.integrationId }]);
+    ).resolves.toEqual([]);
   });
 
   it('allows one Bitbucket identity to authorize personal and organization integrations', async () => {

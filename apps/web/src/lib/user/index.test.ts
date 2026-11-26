@@ -8328,17 +8328,16 @@ describe('User', () => {
     });
 
     it('should terminate managed Coding Plan access and anonymize inventory on soft delete', async () => {
-      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
+      const { dualWrittenInventoryColumns } =
+        await import('@/tests/helpers/coding-plan-inventory.helper');
       const user = await insertTestUser();
-      const encrypted = encryptApiKey('test-key-for-gdpr', BYOK_ENCRYPTION_KEY);
       const [inventoryKey] = await db
         .insert(coding_plan_key_inventory)
         .values({
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
           upstream_plan_id: 'minimax-gdpr-plan',
-          encrypted_api_key: encrypted,
+          ...dualWrittenInventoryColumns('test-key-for-gdpr'),
           credential_fingerprint: `gdpr-${randomUUID()}`,
           status: 'assigned',
           assigned_to_user_id: user.id,
@@ -8388,6 +8387,7 @@ describe('User', () => {
       expect(retainedInventory.status).toBe('revocation_pending');
       expect(retainedInventory.upstream_plan_id).toBe('minimax-gdpr-plan');
       expect(retainedInventory.encrypted_api_key).toBeNull();
+      expect(retainedInventory.encrypted_api_key_envelope).toBeNull();
       expect(retainedInventory.assigned_to_user_id).toBeNull();
       expect(retainedInventory.revocation_requested_at).not.toBeNull();
 

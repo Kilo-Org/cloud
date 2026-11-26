@@ -196,7 +196,7 @@ describe('model preflight for stored sessions', () => {
 });
 
 describe('modern preflight token renewal', () => {
-  const getRuntimeToken = vi.fn<() => Promise<string | null>>();
+  const getRuntimeToken = vi.fn<(destination?: string) => Promise<string | null>>();
   const expiredToken = jwt.sign(
     { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' }, exp: 1 },
     'test-secret'
@@ -228,11 +228,31 @@ describe('modern preflight token renewal', () => {
         metadata.identity.sessionId
       );
       expect(getRuntimeToken).toHaveBeenCalledTimes(1);
+      expect(getRuntimeToken).toHaveBeenCalledWith('kilo-api');
       expect(assertKiloModelAvailable).toHaveBeenCalledWith(
         expect.objectContaining({ originalToken: 'renewed-token' })
       );
     }
   );
+
+  it('asks a personal session for its gateway token', async () => {
+    getRuntimeToken.mockResolvedValue('renewed-gateway-token');
+    vi.mocked(fetchSessionMetadata).mockResolvedValue({
+      ...metadata,
+      identity: { ...metadata.identity, orgId: undefined },
+      auth: { kilocodeToken: expiredToken },
+    });
+    await preflightExistingPromptModel({
+      env,
+      userId: 'user-1',
+      cloudAgentSessionId: metadata.identity.sessionId,
+      procedure: 'send',
+    });
+    expect(getRuntimeToken).toHaveBeenCalledWith('kilo-gateway');
+    expect(assertKiloModelAvailable).toHaveBeenCalledWith(
+      expect.objectContaining({ originalToken: 'renewed-gateway-token' })
+    );
+  });
 
   it.each(['revoked', 'expired'])('fails closed when delegation is %s', async reason => {
     getRuntimeToken.mockRejectedValue(new Error(reason));

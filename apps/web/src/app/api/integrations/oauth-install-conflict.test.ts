@@ -33,7 +33,7 @@ const mockConsumeProviderOAuthAttempt = jest.fn(async (_input: unknown) => true)
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),

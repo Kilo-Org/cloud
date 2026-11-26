@@ -96,7 +96,7 @@ import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { createOrEnableAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
@@ -1335,7 +1335,7 @@ describe('review agent config REVIEW.md setting', () => {
       notDispatched: 0,
       activeCount: 1,
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.organizations.reviewAgent.triggerBitbucketCodeReview({
       organizationId: organization.id,
@@ -1411,7 +1411,8 @@ describe('review agent config REVIEW.md setting', () => {
     env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
     resetAdminNetworkConfigForTest();
     try {
-      const offNetwork = await createCallerForUser(adminUser.id, {
+      // A staff browser session, so the network check is the only refusal.
+      const offNetwork = await createSessionCallerForUser(adminUser.id, {
         headers: { 'x-vercel-forwarded-for': '198.51.100.1' },
       });
 

@@ -3,18 +3,32 @@ import {
   BundleRequestSchema,
   JWKS_PATH,
   STS_BUNDLE_HTTP_PATH,
+  STS_CLOUDFLARE_DEPLOY_TOKEN_HTTP_PATH,
+  STS_CLOUDFLARE_DEPLOY_TOKEN_REVOKE_HTTP_PATH,
   STS_FETCHED_AT_HEADER,
+  STS_LEASE_HTTP_PATH,
+  STS_LEASE_REVOKE_HTTP_PATH,
   STS_STALE_HEADER,
   bundleResultHttpStatus,
+  cloudflareDeployTokenResultHttpStatus,
+  cloudflareDeployTokenRevokeResultHttpStatus,
+  leaseResultHttpStatus,
+  leaseRevokeResultHttpStatus,
   mintResultHttpStatus,
   type BundleRequest,
   type BundleResult,
+  type CloudflareDeployTokenResult,
+  type CloudflareDeployTokenRevokeResult,
+  type LeaseResult,
+  type LeaseRevokeResult,
   type MintResult,
 } from '@kilocode/sts-contracts';
 import { recordDenial } from './audit/denials';
 import { serveBundle } from './broker';
 import {
   BUNDLE_REQUEST_MAX_BODY_BYTES,
+  DEPLOY_TOKEN_REQUEST_MAX_BODY_BYTES,
+  LEASE_REQUEST_MAX_BODY_BYTES,
   TOKEN_JWKS_CACHE_MS,
   TOKEN_REQUEST_MAX_BODY_BYTES,
   TOKEN_SIGNER_DEADLINE_MS,
@@ -22,12 +36,23 @@ import {
   VERIFIER_RETRY_AFTER_SECONDS,
   WEBHOOK_MAX_BODY_BYTES,
 } from './constants';
+import {
+  recordDeployTokenDenial,
+  serveDeployToken,
+  serveDeployTokenRevoke,
+} from './deploy-tokens/serve';
 import { getRefresherStub, getSignerStub, getTokenSignerStub } from './dos/stubs';
 import type { ManagerJwks } from './dos/SignerDO';
 import type { TokenJwks } from './dos/TokenSignerDO';
 import { MANAGER_JWKS_PATH, readConfig, type Env, type StsConfig } from './env';
-import { IdentityVerifier } from './identity/verify';
+import {
+  IdentityVerifier,
+  type DeniedReason,
+  type GithubRun,
+  type IdentityProvider,
+} from './identity/verify';
 import { WebhookGate, type WebhookOutcome } from './infisical/webhook';
+import { recordLeaseDenial, serveLease, serveLeaseRevoke, type LeaseCaller } from './leases/serve';
 import type { PolicyIndex } from './policy/load';
 import { callWithDeadline } from './rpc';
 import {
@@ -389,6 +414,135 @@ async function bundleRequest(
   );
 }
 
+/** Maps a lease answer to its HTTP response; exported for the response-shape tests. */
+export function leaseResponse(result: LeaseResult): Response {
+  return noStoreJson(result, leaseResultHttpStatus(result));
+}
+
+/** Maps a revoke answer to its HTTP response; exported for the response-shape tests. */
+export function leaseRevokeResponse(result: LeaseRevokeResult): Response {
+  return noStoreJson(result, leaseRevokeResultHttpStatus(result));
+}
+
+/** Maps a deploy-token answer to its HTTP response; exported for the response-shape tests. */
+export function deployTokenResponse(result: CloudflareDeployTokenResult): Response {
+  return noStoreJson(result, cloudflareDeployTokenResultHttpStatus(result));
+}
+
+/** Maps a deploy-token revoke answer to its HTTP response. */
+export function deployTokenRevokeResponse(result: CloudflareDeployTokenRevokeResult): Response {
+  return noStoreJson(result, cloudflareDeployTokenRevokeResultHttpStatus(result));
+}
+
+function noStoreJson(result: object, status: number): Response {
+  const headers = new Headers({ 'cache-control': 'no-store', 'content-type': 'application/json' });
+  if ('retryAfterSeconds' in result) headers.set('retry-after', String(result.retryAfterSeconds));
+  return new Response(JSON.stringify(result), { status, headers });
+}
+
+/** The answers the lease and deploy-token routes give before their own logic runs. */
+type CallerRefusal =
+  | { status: 'denied'; reason: DeniedReason }
+  | { status: 'unavailable'; retryAfterSeconds: number }
+  | { status: 'invalid_request' };
+
+/** A caller whose provider token verified and named a policy. */
+type VerifiedHttpCaller = {
+  workload: string;
+  provider: IdentityProvider;
+  run: GithubRun | null;
+  claims: Record<string, string>;
+};
+
+function leaseCaller(caller: VerifiedHttpCaller): LeaseCaller {
+  return {
+    workload: caller.workload,
+    identity: caller.provider,
+    channel: 'http',
+    run: caller.run,
+    claims: caller.claims,
+  };
+}
+
+/**
+ * `POST /v1/lease`, `/v1/lease/revoke`, `/v1/ci/cloudflare-deploy-token` and its `/revoke`: a
+ * provider OIDC token in `Authorization` (a GitHub job for `ci-migration` and deploy tokens), a
+ * JSON body. As on `/v1/token`, a token that did not verify is refused and only logged, a verified
+ * identity the verifier refused is audited as a denial of the route's kind with the verifier's
+ * reason, and the body (at most `maxBodyBytes`) is read only after the token verified. The
+ * deploy-token mint takes an empty body as `{}`.
+ */
+async function oidcRoute<Result>(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  config: StsConfig,
+  policies: PolicyIndex,
+  route: {
+    route: string;
+    maxBodyBytes: number;
+    emptyBodyIsObject: boolean;
+    denyIdentity: (
+      subject: { workload: string; claims: Record<string, string> },
+      reason: DeniedReason,
+      waitUntil: (promise: Promise<unknown>) => void
+    ) => void;
+    serve: (
+      caller: VerifiedHttpCaller,
+      body: unknown,
+      waitUntil: (promise: Promise<unknown>) => void
+    ) => Promise<Result>;
+    respond: (result: Result | CallerRefusal) => Response;
+  }
+): Promise<Response> {
+  const waitUntil = (promise: Promise<unknown>) => ctx.waitUntil(promise);
+  const { respond } = route;
+  const token = bearerToken(request);
+  if (token.length === 0) return respond({ status: 'denied', reason: 'identity_rejected' });
+
+  const outcome = await identityVerifier(config, policies).verify(token);
+  if (outcome.status === 'unavailable') {
+    return respond({ status: 'unavailable', retryAfterSeconds: VERIFIER_RETRY_AFTER_SECONDS });
+  }
+  if (outcome.status === 'denied') {
+    const { subject } = outcome;
+    if (subject === undefined) {
+      console.warn(`sts: ${route.route} request refused: token not verified`, {
+        environment: config.environment,
+        reason: outcome.reason,
+      });
+    } else {
+      route.denyIdentity(
+        { workload: subject.actor, claims: { provider: subject.provider, ...subject.claims } },
+        outcome.reason,
+        waitUntil
+      );
+    }
+    return respond({ status: 'denied', reason: outcome.reason });
+  }
+  const caller: VerifiedHttpCaller = {
+    workload: outcome.workload,
+    provider: outcome.provider,
+    run: outcome.run,
+    claims: { provider: outcome.provider },
+  };
+
+  const text = await readCappedText(request, route.maxBodyBytes);
+  if (text === null) {
+    return new Response(JSON.stringify({ status: 'invalid_request' }), {
+      status: 413,
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  }
+  let body: unknown;
+  try {
+    body = text === '' && route.emptyBodyIsObject ? {} : JSON.parse(text);
+  } catch {
+    return respond({ status: 'invalid_request' });
+  }
+  return respond(await route.serve(caller, body, waitUntil));
+}
+
 function webhookGate(env: Env, config: StsConfig): WebhookGate {
   const cached = gateCache;
   if (cached !== null && cached.environment === config.environment) return cached.gate;
@@ -484,6 +638,77 @@ export async function handleRequest(
   }
   if (request.method === 'POST' && pathname === STS_BUNDLE_HTTP_PATH) {
     return await bundleRequest(request, env, ctx, config, authority);
+  }
+  if (request.method === 'POST' && pathname === STS_LEASE_HTTP_PATH) {
+    const { policies } = authority;
+    return await oidcRoute<LeaseResult>(request, env, ctx, config, policies, {
+      route: 'lease',
+      maxBodyBytes: LEASE_REQUEST_MAX_BODY_BYTES,
+      emptyBodyIsObject: false,
+      denyIdentity: (subject, reason, waitUntil) =>
+        recordLeaseDenial(env, config, { channel: 'http', ...subject }, waitUntil, reason),
+      serve: (caller, body, waitUntil) =>
+        serveLease(env, config, {
+          caller: leaseCaller(caller),
+          request: body,
+          policies,
+          waitUntil,
+        }),
+      respond: leaseResponse,
+    });
+  }
+  if (request.method === 'POST' && pathname === STS_LEASE_REVOKE_HTTP_PATH) {
+    return await oidcRoute<LeaseRevokeResult>(request, env, ctx, config, authority.policies, {
+      route: 'lease revoke',
+      maxBodyBytes: LEASE_REQUEST_MAX_BODY_BYTES,
+      emptyBodyIsObject: false,
+      denyIdentity: (subject, reason, waitUntil) =>
+        recordLeaseDenial(env, config, { channel: 'http', ...subject }, waitUntil, reason),
+      serve: (caller, body, waitUntil) =>
+        serveLeaseRevoke(env, config, { caller: leaseCaller(caller), request: body, waitUntil }),
+      respond: leaseRevokeResponse,
+    });
+  }
+  if (request.method === 'POST' && pathname === STS_CLOUDFLARE_DEPLOY_TOKEN_HTTP_PATH) {
+    const { policies } = authority;
+    return await oidcRoute<CloudflareDeployTokenResult>(request, env, ctx, config, policies, {
+      route: 'deploy token',
+      maxBodyBytes: DEPLOY_TOKEN_REQUEST_MAX_BODY_BYTES,
+      emptyBodyIsObject: true,
+      denyIdentity: (subject, reason, waitUntil) =>
+        recordDeployTokenDenial(env, config, subject, waitUntil, reason),
+      serve: (caller, body, waitUntil) =>
+        serveDeployToken(env, config, {
+          caller: { ...caller, identity: caller.provider },
+          request: body,
+          policies,
+          waitUntil,
+        }),
+      respond: deployTokenResponse,
+    });
+  }
+  if (request.method === 'POST' && pathname === STS_CLOUDFLARE_DEPLOY_TOKEN_REVOKE_HTTP_PATH) {
+    return await oidcRoute<CloudflareDeployTokenRevokeResult>(
+      request,
+      env,
+      ctx,
+      config,
+      authority.policies,
+      {
+        route: 'deploy token revoke',
+        maxBodyBytes: DEPLOY_TOKEN_REQUEST_MAX_BODY_BYTES,
+        emptyBodyIsObject: false,
+        denyIdentity: (subject, reason, waitUntil) =>
+          recordDeployTokenDenial(env, config, subject, waitUntil, reason),
+        serve: (caller, body, waitUntil) =>
+          serveDeployTokenRevoke(env, config, {
+            caller: { ...caller, identity: caller.provider },
+            request: body,
+            waitUntil,
+          }),
+        respond: deployTokenRevokeResponse,
+      }
+    );
   }
   if (request.method === 'POST' && pathname === MANAGER_WEBHOOK_PATH) {
     return await managerWebhook(request, env, config);

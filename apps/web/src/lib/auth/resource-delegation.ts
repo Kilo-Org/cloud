@@ -511,9 +511,12 @@ export async function createDelegatedResourceToken(
   }
   let organizationRole = options?.organizationRole;
   if (options?.organizationId) {
-    // Explicit delegation follows REST organization access, including inherited and global-admin access.
+    // Explicit delegation follows real organization membership, direct or inherited; a platform-admin
+    // or support grant never stands in for the role a credential carries.
     // Control-token callers retain the direct-membership check in getResourceDelegationAuthority.
-    const context = await getAuthorizedOrgContext(options.organizationId);
+    const context = await getAuthorizedOrgContext(options.organizationId, undefined, {
+      membershipOnly: true,
+    });
     if (!context.success || context.data.user.id !== authority.user.id) {
       forbidden('Unauthorized organization resource delegation request');
     }

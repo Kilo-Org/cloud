@@ -11,6 +11,7 @@ import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import { runtimeAuthorizationLifetime } from './runtime-authorization-lifetime.js';
+import { runtimeTokenAudienceMode } from './runtime-authorization-persistence.js';
 
 /**
  * Whether a send carries the owner's own user credential. Delegated runtime
@@ -63,6 +64,7 @@ export async function renewWorkspaceAuthorityForUserSend(input: {
       resourceId: workspaceSessionId,
       environment: resolveRuntimeEnvironment(env.ENVIRONMENT),
       ...runtimeAuthorizationLifetime(env),
+      audienceMode: runtimeTokenAudienceMode(env),
       ...(status.organizationId === null ? {} : { organizationId: status.organizationId }),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(workspaceSessionId, 'admission', reason),

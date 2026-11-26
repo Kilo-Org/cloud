@@ -1,6 +1,8 @@
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import { isKiloResourceAudienceAllowed } from '@kilocode/worker-utils/kilo-token-policy';
+import { isKiloTokenAdmissionObservationEnabled } from '@kilocode/worker-utils/kilo-token-admission-observation';
+import { observeWebBearerAdmission } from '@kilocode/web-shared/lib/kilo-token-admission';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import {
   isCloudAgentAuthorityHttpPathAllowed,
@@ -111,14 +113,22 @@ export function isRejectedCredentialReason(reason: string | undefined): boolean 
   return reason !== ANONYMOUS_FALL_THROUGH_REASON;
 }
 
+type AuthorizationHeaderOptions = {
+  expectedAudience?: string;
+  runtimeProxyAttestationVerified?: boolean;
+  // Derive from an actual Request URL or fixed route path, never a request header.
+  requestPathname?: string;
+  /**
+   * Set only by the request's admission point (`getUserFromAuth`), so a
+   * second read of the same header, such as the gateway rate-limit key,
+   * does not report the decision twice.
+   */
+  observeAdmission?: boolean;
+};
+
 export function validateAuthorizationHeader(
   headers: Headers,
-  options?: {
-    expectedAudience?: string;
-    runtimeProxyAttestationVerified?: boolean;
-    // Derive from an actual Request URL or fixed route path, never a request header.
-    requestPathname?: string;
-  }
+  options?: AuthorizationHeaderOptions
 ) {
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
@@ -149,11 +159,22 @@ export function validateAuthorizationHeader(
     };
   }
 
+  const policyAudience = options?.expectedAudience ?? KILO_API_AUDIENCE;
+  const result = admitVerifiedToken(payload, policyAudience, options);
+  if (options?.observeAdmission === true && isKiloTokenAdmissionObservationEnabled()) {
+    observeWebBearerAdmission(headers, payload, policyAudience, result.reason ?? 'admitted');
+  }
+  return result;
+}
+
+/** Every check after the signature; the result is the caller's verdict. */
+function admitVerifiedToken(
+  payload: JWTTokenPayload,
+  policyAudience: string,
+  options: AuthorizationHeaderOptions | undefined
+) {
   if (
-    !isKiloResourceAudienceAllowed(payload.aud, {
-      audience: options?.expectedAudience ?? KILO_API_AUDIENCE,
-      mode: 'allow-legacy',
-    })
+    !isKiloResourceAudienceAllowed(payload.aud, { audience: policyAudience, mode: 'allow-legacy' })
   ) {
     const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);

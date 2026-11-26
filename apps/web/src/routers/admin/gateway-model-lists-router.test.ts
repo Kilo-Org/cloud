@@ -7,7 +7,7 @@ import {
   type GatewayModelListConfig,
 } from '@kilocode/db/schema-types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import type { GatewayModelList } from '@/routers/admin/gateway-model-lists-router';
 
 let admin: User;
@@ -60,7 +60,7 @@ describe('GatewayModelListConfigSchema', () => {
 
 describe('adminGatewayModelListsRouter', () => {
   it('rejects a non-admin caller', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
     await expect(
       caller.admin.gatewayModelLists.get({ list: 'preferred_models' })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -70,7 +70,7 @@ describe('adminGatewayModelListsRouter', () => {
   });
 
   it.each(lists)('returns no stored config for %s when unset', async list => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(caller.admin.gatewayModelLists.get({ list })).resolves.toEqual({ config: null });
   });
 
@@ -83,7 +83,7 @@ describe('adminGatewayModelListsRouter', () => {
         .values({ config: { vercel_routing_opt_out_models: [] }, auto_free: autoFree });
       const otherList = lists.find(other => other !== list) ?? list;
       const otherConfig: GatewayModelListConfig = { models: ['provider/other-model'] };
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await caller.admin.gatewayModelLists.set({ list: otherList, config: otherConfig });
 
       await caller.admin.gatewayModelLists.set({ list, config });
@@ -106,7 +106,7 @@ describe('adminGatewayModelListsRouter', () => {
   );
 
   it('creates the singleton row when none exists', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.gatewayModelLists.set({ list: 'unavailable_models', config });
 
     const rows = await db.select().from(ai_gateway_config);
@@ -126,7 +126,7 @@ describe('adminGatewayModelListsRouter', () => {
   });
 
   it('rejects an invalid list without writing', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.gatewayModelLists.set({
         list: 'preferred_models',
@@ -137,7 +137,7 @@ describe('adminGatewayModelListsRouter', () => {
   });
 
   it('rejects an unknown list name', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.gatewayModelLists.set({
         // @ts-expect-error verifying runtime validation of the column name

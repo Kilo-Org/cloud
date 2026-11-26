@@ -3,7 +3,7 @@ import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BITBUCKET_CLIENT_ID: 'bitbucket-client-id',
@@ -11,14 +11,14 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const ORGANIZATION_ID = '7e3011af-e99d-444f-8171-54c2225b87dc';
 
@@ -41,7 +41,7 @@ describe('GET /api/integrations/bitbucket/connect', () => {
       user: { id: USER_ID },
       authFailedResponse: null,
     } as never);
-    mockedEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockedEnsureMemberOrganizationAccess.mockResolvedValue('owner');
   });
 
   test('dispatches the public OAuth route with organization ownership and required scopes', async () => {
@@ -66,8 +66,8 @@ describe('GET /api/integrations/bitbucket/connect', () => {
       returnTo: `/organizations/${ORGANIZATION_ID}/integrations/bitbucket`,
       issuedAt: expect.any(Number),
     });
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      { user: expect.objectContaining({ id: USER_ID }) },
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_BILLING_ROLES
     );

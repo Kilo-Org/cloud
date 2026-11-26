@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { admin_action_audit_logs } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 
 function minutesAgo(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString();
@@ -51,7 +51,7 @@ describe('admin.actionAuditLogs.list', () => {
 
   test('lists newest first and pages with a cursor', async () => {
     const admin = await seed();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const first = await caller.admin.actionAuditLogs.list({ limit: 2 });
     expect(first.rows.map(row => row.action)).toEqual(['organization.delete', 'user.unblock']);
@@ -67,7 +67,7 @@ describe('admin.actionAuditLogs.list', () => {
 
   test('filters by action, actor email (case-insensitive), target, and message', async () => {
     const admin = await seed();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const byAction = await caller.admin.actionAuditLogs.list({ action: 'user.unblock' });
     expect(byAction.rows.map(row => row.targetId)).toEqual(['user-b']);
@@ -89,7 +89,7 @@ describe('admin.actionAuditLogs.list', () => {
 
   test('treats LIKE wildcards in search terms literally', async () => {
     const admin = await seed();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.actionAuditLogs.list({ search: '%' });
     expect(result.rows).toHaveLength(0);
@@ -100,7 +100,7 @@ describe('admin.actionAuditLogs.list', () => {
     ['admin without superadmin', { is_admin: true, is_super_admin: false }],
   ])('rejects %s callers', async (_label, flags) => {
     const user = await insertTestUser(flags);
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
 
     await expect(caller.admin.actionAuditLogs.list({})).rejects.toMatchObject({
       code: 'FORBIDDEN',

@@ -1,5 +1,5 @@
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
@@ -68,7 +68,7 @@ afterAll(async () => {
 
 describe('admin.users.getKiloClawState', () => {
   it('returns an empty state when the user has no KiloClaw subscription', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result).toEqual({
@@ -102,7 +102,7 @@ describe('admin.users.getKiloClawState', () => {
       stripe_subscription_id: 'sub_admin_kiloclaw_active',
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscription?.status).toBe('active');
@@ -155,7 +155,7 @@ describe('admin.users.getKiloClawState', () => {
       transferred_to_subscription_id: activeSub.id,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscription?.status).toBe('active');
@@ -188,7 +188,7 @@ describe('admin.users.getKiloClawState', () => {
       trial_ends_at: futureTrialEnd,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscription?.status).toBe('trialing');
@@ -218,7 +218,7 @@ describe('admin.users.getKiloClawState', () => {
       trial_ends_at: expiredTrialEnd,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expectSameInstant(result.subscription?.trial_ends_at, expiredTrialEnd);
@@ -264,7 +264,7 @@ describe('admin.users.getKiloClawState', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.hasAccess).toBe(false);
@@ -319,7 +319,7 @@ describe('admin.users.getKiloClawState', () => {
       trial_ends_at: futureTrialEnd,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscription).toEqual(
@@ -348,7 +348,7 @@ describe('admin.users.getKiloClawState', () => {
       })
       .returning({ id: kiloclaw_instances.id });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.activeInstanceId).toBe(instance.id);
@@ -361,7 +361,7 @@ describe('admin.users.getKiloClawState', () => {
       destroyed_at: new Date().toISOString(),
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.activeInstanceId).toBeNull();
@@ -385,7 +385,7 @@ describe('admin.users.getKiloClawState', () => {
       payment_source: 'credits',
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscriptions).toHaveLength(1);
@@ -439,7 +439,7 @@ describe('admin.users.getKiloClawState', () => {
       transferred_to_subscription_id: currentSub.id,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscription?.id).toBe(currentSub.id);
@@ -481,7 +481,7 @@ describe('admin.users.getKiloClawState', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscriptions).toHaveLength(2);
@@ -507,7 +507,7 @@ describe('admin.users.getKiloClawState', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscription?.id).toBe(subscription.id);
@@ -536,7 +536,7 @@ describe('admin.users.getKiloClawState', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscriptions).toHaveLength(2);
@@ -592,7 +592,7 @@ describe('admin.users.getKiloClawState', () => {
       after: updatedSubscription,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscriptions).toHaveLength(1);
@@ -641,7 +641,7 @@ describe('admin.users.getKiloClawState', () => {
       after: updatedSubscription,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawSubscriptionChangeLogs({
       userId: targetUser.id,
       subscriptionId: subscription.id,
@@ -692,7 +692,7 @@ describe('admin.users.getKiloClawState', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.getKiloClawSubscriptionChangeLogs({
@@ -737,7 +737,7 @@ describe('admin.users.getKiloClawState', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expect(result.subscriptions).toHaveLength(2);
@@ -767,7 +767,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.updateKiloClawTrialEndAt({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -805,7 +805,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
   });
 
   it('rejects unknown users', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
@@ -817,7 +817,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
   });
 
   it('rejects users without a matching KiloClaw subscription row', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
@@ -839,7 +839,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
@@ -876,7 +876,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
@@ -928,7 +928,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
@@ -971,7 +971,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.updateKiloClawTrialEndAt({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1046,7 +1046,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.updateKiloClawTrialEndAt({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1098,7 +1098,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.updateKiloClawTrialEndAt({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1129,7 +1129,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1159,7 +1159,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1207,7 +1207,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1246,7 +1246,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.cancelKiloClawSubscription({
@@ -1287,7 +1287,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.cancelKiloClawSubscription({
@@ -1309,7 +1309,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1354,7 +1354,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
 
     jest.spyOn(stripeMock.subscriptions, 'retrieve').mockResolvedValue({ schedule: null } as never);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1420,7 +1420,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       return {} as never;
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.users.cancelKiloClawSubscription({
         userId: targetUser.id,
@@ -1468,7 +1468,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       return {} as never;
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.users.cancelKiloClawSubscription({
         userId: targetUser.id,
@@ -1506,7 +1506,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       return {} as never;
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1556,7 +1556,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       return {} as never;
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1599,7 +1599,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       return {} as never;
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.users.cancelKiloClawSubscription({
         userId: targetUser.id,
@@ -1643,7 +1643,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1672,7 +1672,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.cancelKiloClawSubscription({
@@ -1694,7 +1694,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.cancelKiloClawSubscription({
@@ -1718,7 +1718,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1750,7 +1750,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.users.cancelKiloClawSubscription({
       userId: targetUser.id,
       subscriptionId: sub.id,
@@ -1787,7 +1787,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.cancelKiloClawSubscription({

@@ -137,19 +137,6 @@ describe('redactSecretValues', () => {
     expect(redactSecretValues(input)).toBe(input);
   });
 
-  test.each([
-    ['repeated JWT starts', 'eyJ-'.repeat(50_000)],
-    ['repeated JWT starts after one dot', `eyJ.${'eyJ-'.repeat(50_000)}`],
-    ['a JWT start with one long segment', `eyJa.${'a'.repeat(200_000)}`],
-    ['a bearer prefix with long whitespace', `Bearer${' '.repeat(200_000)}`],
-    ['repeated key prefixes', 'sk-x '.repeat(40_000)],
-    ['a Sentry token prefix with no delimiter', `sntrys_eyJ${'a'.repeat(200_000)}`],
-  ])('redacts 200 KB of %s in linear time', (_name, input) => {
-    const started = performance.now();
-    redactSecretValues(input, input.length);
-    expect(performance.now() - started).toBeLessThan(100);
-  });
-
   test('keeps text up to the length limit unchanged', () => {
     const text = 'a '.repeat(MAX_REDACTED_TEXT_LENGTH / 2);
 
@@ -434,19 +421,59 @@ describe('redactSecretValues', () => {
     expect(redactSecretValues(input)).toBe(input);
   });
 
-  // About six times the length limit, built from near matches of each pattern.
-  // The length argument skips the cut, so the patterns run on all of it; a
-  // pattern that rescans its input takes seconds on this much text.
-  const nearMatches = (fragment: string) => fragment.repeat(Math.ceil(200_000 / fragment.length));
-  test.each([
+  // Each case is built from near matches of a pattern at two sizes. The length
+  // argument skips the cut, so the patterns run on all of the text. Each run
+  // times three spans one after the other:
+  // - SIZE_FACTOR redactions of the small text. Linear redaction of the large
+  //   text does the same work, so the growth ratio is about 1; a pattern that
+  //   rescans its input makes it about SIZE_FACTOR.
+  // - One redaction of the large text.
+  // - One redaction of plain prose of the same length. The cost ratio limits the
+  //   work per character, so a pattern that rescans a window of a few thousand
+  //   characters or backtracks a lot on each fragment fails too, although its
+  //   growth is linear.
+  // The spans are short and adjacent, so a slow or busy runner stretches them by
+  // about the same factor. The median of several runs leaves out a run in which
+  // pattern compilation, garbage collection or a change in load falls on one
+  // span only.
+  const LARGE_SIZE = 100_000;
+  const SIZE_FACTOR = 16;
+  const MAX_GROWTH_RATIO = 4;
+  const MAX_COST_RATIO = 16;
+  const RUNS = 5;
+  type Build = (size: number) => string;
+  const nearMatches =
+    (fragment: string, suffix = ''): Build =>
+    size =>
+      fragment.repeat(Math.ceil(size / fragment.length)) + suffix;
+  const longValue =
+    (prefix: string, unit = 'a'): Build =>
+    size =>
+      prefix + unit.repeat(Math.ceil(size / unit.length));
+  const redactionTime = (input: string, count: number) => {
+    const started = performance.now();
+    for (let run = 0; run < count; run++) {
+      redactSecretValues(input, input.length);
+    }
+    return performance.now() - started;
+  };
+  const median = (values: number[]) => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  const plain = nearMatches('The quick brown fox jumps over the lazy dog. ')(LARGE_SIZE);
+  test.each<[string, Build]>([
+    ['value: repeated JWT starts', nearMatches('eyJ-')],
+    ['value: repeated JWT starts after one dot', longValue('eyJ.', 'eyJ-')],
+    ['value: a JWT start with one long segment', longValue('eyJa.')],
+    ['value: a bearer prefix with long whitespace', longValue('Bearer', ' ')],
+    ['value: repeated key prefixes', nearMatches('sk-x ')],
+    ['value: a Sentry token prefix with no delimiter', longValue('sntrys_eyJ')],
     ['parameter: repeated plain pairs', nearMatches('?a=b')],
-    ['parameter: one long value', `?a=${'b'.repeat(200_000)}`],
-    ['parameter: one long percent-encoded value', `?a=${'%41'.repeat(70_000)}`],
+    ['parameter: one long value', longValue('?a=', 'b')],
+    ['parameter: one long percent-encoded value', longValue('?a=', '%41')],
     ['parameter: repeated sensitive pairs', nearMatches('&token=x')],
     ['parameter: repeated empty sensitive pairs', nearMatches('?token=')],
     ['parameter: repeated encoded separators', nearMatches('%3Fa%3D%')],
-    ['parameter: a long name', `&${'a'.repeat(200_000)}`],
-    ['parameter: repeated whitespace', ' '.repeat(200_000)],
+    ['parameter: a long name', longValue('&')],
+    ['parameter: repeated whitespace', nearMatches(' ')],
     ['private key: repeated begin fragments', nearMatches('-----BEGIN ')],
     ['private key: repeated headers', nearMatches(PRIVATE_KEY_HEADER)],
     ['private key: headers with short bodies', nearMatches(`${PRIVATE_KEY_HEADER}ZmFr-`)],
@@ -455,51 +482,55 @@ describe('redactSecretValues', () => {
     ['webhook: repeated Slack paths without a scheme', nearMatches('hooks.slack.com/services/')],
     ['webhook: repeated Slack URLs', nearMatches('https://hooks.slack.com/')],
     ['webhook: repeated Discord URLs', nearMatches('https://discord.com/api/webhooks/')],
-    ['webhook: a long Slack path', `https://hooks.slack.com/${'a'.repeat(200_000)}`],
+    ['webhook: a long Slack path', longValue('https://hooks.slack.com/')],
     ['capability path: repeated share prefixes', nearMatches('/s/')],
     ['capability path: repeated device-auth prefixes', nearMatches('/device-auth/codes/')],
     ['value: repeated Stripe prefixes', nearMatches('sk_live_')],
     ['JSON pair: repeated credential keys', nearMatches('"access_token":"')],
     ['JSON pair: repeated short pairs', nearMatches('"a":"')],
-    ['JSON pair: one unterminated value', `"access_token":"${'a'.repeat(200_000)}`],
+    ['JSON pair: one unterminated value', longValue('"access_token":"')],
     ['header line: repeated credential names', nearMatches('X-Api-Key: ')],
     ['header line: repeated values with =', nearMatches('a: bbbbbbbb=')],
-    ['header line: nested braces before a value', `${nearMatches('{a:')}=`],
-    ['header line: nested quotes before a value', `${nearMatches('"a:')}=`],
-    ['header line: nested commas before a value', `${nearMatches(',a:')}=`],
+    ['header line: nested braces before a value', nearMatches('{a:', '=')],
+    ['header line: nested quotes before a value', nearMatches('"a:', '=')],
+    ['header line: nested commas before a value', nearMatches(',a:', '=')],
     ['header line: repeated schemes', nearMatches('{token: Bearer ')],
     ['inspect pair: repeated credential keys', nearMatches("{ token: '")],
-    ['inspect pair: one unterminated value', `{ token: '${'a'.repeat(200_000)}`],
+    ['inspect pair: one unterminated value', longValue("{ token: '")],
     ['JSON pair: repeated number pairs', nearMatches('"otp":1,')],
     ['JSON pair: repeated plain pairs', nearMatches('"a":"b",')],
     ['header line: repeated authorization names', nearMatches('{authorization: ')],
     ['header line: repeated near authorization names', nearMatches('{authorizatio:')],
     ['header line: repeated quoted values', nearMatches('{a: "')],
-    ['header line: one unterminated quoted value', `{password: "${'a'.repeat(200_000)}`],
+    ['header line: one unterminated quoted value', longValue('{password: "')],
     ['header line: repeated snake-case names', nearMatches('{client_secret:')],
     ['header line: repeated dotted names', nearMatches('{a.b_c:')],
     ['inspect pair: repeated quoted names', nearMatches("{'a': '")],
-    [
-      'inspect pair: one unterminated value after a quoted name',
-      `{ 'token': '${'a'.repeat(200_000)}`,
-    ],
+    ['inspect pair: one unterminated value after a quoted name', longValue("{ 'token': '")],
     ['header line: repeated inline authorization fields', nearMatches(' authorization: a ')],
     ['header line: repeated line-start authorization fields', nearMatches('\nauthorization:')],
     ['header line: repeated inline cookie fields', nearMatches(' cookie: a=')],
     ['header line: repeated curl cookie lines', nearMatches('\n> cookie:')],
     ['header line: repeated indented marker starts', nearMatches('\n  < \t')],
-    [
-      'header line: one unterminated quoted authorization value',
-      ` authorization: "${'a'.repeat(200_000)}`,
-    ],
+    ['header line: one unterminated quoted authorization value', longValue(' authorization: "')],
     [
       'header line: one unterminated quoted value after a scheme',
-      ` authorization: Bearer "${'a'.repeat(200_000)}`,
+      longValue(' authorization: Bearer "'),
     ],
-  ])('redacts 200 KB of %s in linear time', (_name, input) => {
-    const started = performance.now();
-    redactSecretValues(input, input.length);
-    expect(performance.now() - started).toBeLessThan(100);
+  ])('redacts %s in linear time', (_name, build) => {
+    const small = build(LARGE_SIZE / SIZE_FACTOR);
+    const large = build(LARGE_SIZE);
+    const growth: number[] = [];
+    const cost: number[] = [];
+    for (let run = 0; run < RUNS; run++) {
+      const smallTime = redactionTime(small, SIZE_FACTOR);
+      const largeTime = redactionTime(large, 1);
+      const plainTime = redactionTime(plain, 1);
+      growth.push(largeTime / smallTime);
+      cost.push(largeTime / plainTime);
+    }
+    expect(median(growth)).toBeLessThan(MAX_GROWTH_RATIO);
+    expect(median(cost)).toBeLessThan(MAX_COST_RATIO);
   });
 });
 

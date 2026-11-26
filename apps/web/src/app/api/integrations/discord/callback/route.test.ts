@@ -8,7 +8,7 @@ import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import {
   DiscordGuildAlreadyConnectedError,
@@ -62,7 +62,7 @@ jest.mock('@/lib/bot', () => ({
   bot: { initialize: jest.fn(async () => undefined), getAdapter: jest.fn() },
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -70,7 +70,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedExchangeDiscordCode = jest.mocked(exchangeDiscordCode);
 const mockedUpsertDiscordInstallation = jest.mocked(upsertDiscordInstallation);
 const mockedReleasePreviousDiscordGuild = jest.mocked(releasePreviousDiscordGuild);
@@ -130,7 +130,7 @@ function expectRedactedDiagnostic(state: string, code?: string) {
 describe('handleDiscordOAuthCallback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedEnsureOrganizationAccess.mockResolvedValue('billing_manager');
+    mockedEnsureMemberOrganizationAccess.mockResolvedValue('billing_manager');
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: USER_ID },
       authFailedResponse: null,
@@ -177,11 +177,11 @@ describe('handleDiscordOAuthCallback', () => {
       GUILD_ID,
       expect.any(Function)
     );
-    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
   });
 
   test('refuses an organization install for a member without the integration role', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have the required organizational role to access this feature',
@@ -198,8 +198,8 @@ describe('handleDiscordOAuthCallback', () => {
       response,
       `/organizations/${ORGANIZATION_ID}/integrations/discord?error=permission_required`
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      { user: expect.objectContaining({ id: USER_ID }) },
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_BILLING_ROLES
     );
@@ -209,7 +209,7 @@ describe('handleDiscordOAuthCallback', () => {
   });
 
   test('refuses an organization install for a caller outside the organization', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have access to this organization',
@@ -616,7 +616,49 @@ describe('handleDiscordOAuthCallback', () => {
     expectRedactedDiagnostic(state, 'authorization-code');
   });
 
-  test('records a Kilo admin organization install as a success when the return path keeps an earlier error', async () => {
+  test('refuses an organization install by a Kilo admin without an organization role and records no staff elevation', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null } as never);
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      })
+    );
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, admin.id, undefined, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    try {
+      const response = await callDiscordCallback(makeRequest(state));
+
+      expectRedirectLocation(
+        response,
+        `/organizations/${ORGANIZATION_ID}/integrations/discord?error=organization_access_required`
+      );
+      expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ id: admin.id }),
+        ORGANIZATION_ID,
+        ORGANIZATION_BILLING_ROLES
+      );
+      expect(mockedConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+      expect(mockedUpsertDiscordInstallation).not.toHaveBeenCalled();
+      expect(
+        await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(eq(admin_action_audit_logs.actor_id, admin.id))
+      ).toEqual([]);
+    } finally {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    }
+  });
+
+  test('completes an organization install by a Kilo admin holding the role as an ordinary member write', async () => {
     const admin = await insertTestUser({ is_admin: true });
     mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null } as never);
     mockedConsumeProviderOAuthAttempt.mockResolvedValue(true);
@@ -638,15 +680,7 @@ describe('handleDiscordOAuthCallback', () => {
           .select()
           .from(admin_action_audit_logs)
           .where(eq(admin_action_audit_logs.actor_id, admin.id))
-      ).toEqual([
-        expect.objectContaining({
-          action: 'organization.discord.connect',
-          outcome: 'success',
-          target_type: 'organization',
-          target_id: ORGANIZATION_ID,
-          metadata: expect.objectContaining({ heldRoles: [] }),
-        }),
-      ]);
+      ).toEqual([]);
     } finally {
       await db
         .delete(admin_action_audit_logs)

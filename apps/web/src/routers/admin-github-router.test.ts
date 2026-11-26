@@ -1,4 +1,4 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -50,7 +50,7 @@ describe('admin.github.getKilocodeOpenPullRequestCounts', () => {
   });
 
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.github.getKilocodeOpenPullRequestCounts()).rejects.toThrow(
       'Admin access required'
@@ -70,7 +70,7 @@ describe('admin.github.lookupOrganizationInstallation', () => {
   });
 
   it('denies non-admin callers before a lookup', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(
       caller.admin.github.lookupOrganizationInstallation({ organization: 'acme' })
@@ -88,7 +88,7 @@ describe('admin.github.lookupOrganizationInstallation', () => {
     };
     (lookupGitHubOrganizationInstallation as jest.Mock).mockResolvedValue(response);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.github.lookupOrganizationInstallation({
         organization: 'https://github.com/acme/',
@@ -100,7 +100,7 @@ describe('admin.github.lookupOrganizationInstallation', () => {
   it('returns a generic error when the database lookup fails', async () => {
     const sentinel = 'SELECT secret FROM platform_integrations WHERE account = acme';
     (lookupGitHubOrganizationInstallation as jest.Mock).mockRejectedValue(new Error(sentinel));
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const error = await caller.admin.github
       .lookupOrganizationInstallation({ organization: 'acme' })
@@ -120,7 +120,7 @@ describe('admin.github.lookupOrganizationInstallation', () => {
     });
 
     try {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await caller.admin.github.lookupOrganizationInstallation({
         organization: 'private-lookup-target',
       });
@@ -140,7 +140,7 @@ describe('admin.github.lookupOrganizationInstallation', () => {
   });
 
   it('rejects invalid input without calling the lookup', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.github.lookupOrganizationInstallation({ organization: 'acme--tools' })
@@ -168,7 +168,7 @@ describe('admin.github.uninstallOrganizationInstallation', () => {
   });
 
   it('denies non-admin callers before local or upstream work', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.github.uninstallOrganizationInstallation(input)).rejects.toThrow(
       'Admin access required'
@@ -181,7 +181,7 @@ describe('admin.github.uninstallOrganizationInstallation', () => {
       status: 'uninstalled',
       localCleanup: 'complete',
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(caller.admin.github.uninstallOrganizationInstallation(input)).resolves.toEqual({
       status: 'uninstalled',
@@ -196,7 +196,7 @@ describe('admin.github.uninstallOrganizationInstallation', () => {
 
 describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.github.getKilocodeOpenPullRequestsSummary()).rejects.toThrow(
       'Admin access required'
@@ -214,7 +214,7 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
 
     (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.github.getKilocodeOpenPullRequestsSummary({
       repos: ['kilocode', 'cloud'],
       includeDrafts: true,
@@ -232,7 +232,7 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
 
 describe('admin.github.getKilocodeRecentlyMergedExternalPRs', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.github.getKilocodeRecentlyMergedExternalPRs()).rejects.toThrow(
       'Admin access required'
@@ -242,7 +242,7 @@ describe('admin.github.getKilocodeRecentlyMergedExternalPRs', () => {
 
 describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.github.getKilocodeRecentlyClosedExternalPRs()).rejects.toThrow(
       'Admin access required'
@@ -283,7 +283,7 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
 
     (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue(mockClosedPrs);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.github.getKilocodeRecentlyClosedExternalPRs({
       repos: ['cloud'],
     });

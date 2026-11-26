@@ -27,6 +27,7 @@ import { randomUUID } from 'crypto';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
@@ -423,6 +424,7 @@ describe('upstream model catalog validation', () => {
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;
+  const kms = useFakeByokKms();
 
   beforeEach(async () => {
     const user = await insertTestUser({
@@ -488,6 +490,25 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       status: 'error',
       error_message: OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
     });
+  });
+
+  it('passes the 403 on and still disables the connection when the KMS service cannot create a data key', async () => {
+    kms.fail('/data-key');
+
+    const result = await send(
+      jsonResponse(403, {
+        error: {
+          message: 'The ChatGPT user is not eligible for subscription sharing.',
+          code: 'subscription_sharing_user_not_eligible',
+        },
+      })
+    );
+
+    expect(result.type === 'success' && result.response.status).toBe(403);
+    const stored = await getOpenAiChatGptStoredConnection(owner);
+    expect(stored?.isEnabled).toBe(false);
+    // The refusal is recorded without an envelope, so the card explains it.
+    expect(stored?.connection).toMatchObject({ status: 'error', access_token: '' });
   });
 
   it('keeps the connection on another 403', async () => {

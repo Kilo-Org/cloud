@@ -57,7 +57,7 @@ import {
   verifyRegistration,
 } from '@/lib/auth/passkey';
 import { getPostgresErrorCode } from '@/lib/db-errors';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import {
   createPasskeyEnrollmentCode,
   type PasskeyEnrollmentEmailCode,
@@ -398,7 +398,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     const admin = await insertTestUser({ is_admin: true });
     const { user } = await insertHeldAccount();
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(caller.admin.users.resetToMagicLinkLogin({ userId: user.id })).resolves.toEqual({
       success: true,
     });
@@ -458,7 +458,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     const admin = await insertTestUser({ is_admin: true });
     const { user } = await insertHeldAccount();
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
     await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
 
@@ -477,7 +477,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
 
     const { ticket: pendingTicket } = await signInWithPasskey(authenticator, 1);
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
 
     await expect(consumeSignInTicket(pendingTicket)).resolves.toBeNull();
@@ -499,7 +499,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
       challenge: options.challenge,
       counter: 1,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const hold = await holdInserts('passkey_sign_in_tickets', user.id);
     try {
@@ -552,7 +552,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
     const attestation = buildRegistrationResponse(authenticator, {
       challenge: options.challenge,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const hold = await holdInserts('passkey_credentials', user.id);
     try {
@@ -601,7 +601,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
   test('a registration from a session that recovery revoked is refused', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser({ web_session_pepper: 'holder-session-pepper' });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.resetToMagicLinkLogin({ userId: user.id });
 
     // Recovery deletes open challenges, so the ceremony starts afterwards: only
@@ -652,7 +652,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
       const { user } = await insertHeldAccount();
       const before = await accountState(user.id);
 
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const error: unknown = await withFailingTicketDelete(user.id, sqlState, () =>
         caller.admin.users.resetToMagicLinkLogin({ userId: user.id }).then(
           () => null,
@@ -683,7 +683,7 @@ describe('admin.users.resetToMagicLinkLogin', () => {
 
   test('reports a missing user as not found', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.resetToMagicLinkLogin({ userId: 'missing-recovery-user' })

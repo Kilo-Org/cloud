@@ -441,7 +441,7 @@ export function billLegacyClassifierCost(
             ...usage,
             provider: 'openrouter',
             is_free: false,
-            promptInfo: { system_prompt_length: 0 },
+            promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
             isStreaming: false,
             // No posthog_distinct_id: this internal overhead row must not emit
             // the generic first_usage / first_microdollar_usage lifecycle

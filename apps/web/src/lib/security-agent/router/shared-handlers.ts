@@ -1,10 +1,9 @@
-import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+import type { OrganizationAccess } from '@kilocode/web-shared/lib/admin/support-access';
 import { createHash, randomUUID } from 'crypto';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationTarget,
   recordKiloAdminElevation,
-  userTarget,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
@@ -143,6 +142,7 @@ import {
   trackSecurityAgentRemediationAction,
 } from '@/lib/security-agent/posthog-tracking';
 import {
+  canCallerReadStaffAuditActors,
   createSecurityAuditLog,
   logSecurityAudit,
   SecurityAuditLogAction,
@@ -270,37 +270,27 @@ async function resolveAuditReportOwner(
 }
 
 /**
- * When support access is ON the platform-admin unmask is removed, even for a
- * real member admin; OFF preserves today's behavior.
+ * An audit report request. An organization report carries the access its
+ * procedure admitted; a personal report has none.
  */
-function platformAdminUnmaskEnabled(ctx: TRPCContext): boolean {
-  if (isSupportAccessEnabled()) return false;
-  return ctx.user.is_admin;
-}
+type AuditReportContext = TRPCContext & { organizationAccess?: OrganizationAccess };
 
 async function logPlatformAdminAuditReportAccess(params: {
   ctx: TRPCContext;
-  owner: SecurityAgentAuditReportOwner;
+  organizationId: string;
   periodStart: string;
   periodEndExclusive: string;
 }): Promise<void> {
-  if (!platformAdminUnmaskEnabled(params.ctx)) return;
-
-  const securityOwner =
-    params.owner.type === 'organization'
-      ? { organizationId: params.owner.id }
-      : { userId: params.owner.id };
-
   await createSecurityAuditLog({
-    owner: securityOwner,
+    owner: { organizationId: params.organizationId },
     actor_id: params.ctx.user.id,
     actor_email: params.ctx.user.google_user_email,
     actor_name: params.ctx.user.google_user_name,
     action: SecurityAuditLogAction.AuditReportGenerated,
     resource_type: 'security_agent_audit_report',
-    resource_id: `${params.owner.type}:${params.owner.id}`,
+    resource_id: `organization:${params.organizationId}`,
     metadata: {
-      owner_type: params.owner.type,
+      owner_type: 'organization',
       period_start: params.periodStart,
       period_end_exclusive: params.periodEndExclusive,
       report_version: 1,
@@ -309,7 +299,7 @@ async function logPlatformAdminAuditReportAccess(params: {
 }
 
 async function assembleAuditReportResponse<TExtra>(params: {
-  ctx: TRPCContext;
+  ctx: AuditReportContext;
   input: SecurityAgentAuditReportInput & TExtra;
   deps: SecurityAgentDeps<TExtra>;
 }): Promise<
@@ -321,14 +311,22 @@ async function assembleAuditReportResponse<TExtra>(params: {
     params.deps.resolveOwner(params.ctx, params.input)
   );
 
-  if (platformAdminUnmaskEnabled(params.ctx)) {
+  // Staff and unattributed actors show unmasked only on an organization report
+  // the procedure admitted through the legacy staff path; every other caller,
+  // a member or a support grant included, gets the masked report.
+  const unmaskActors =
+    owner.type === 'organization' &&
+    params.ctx.organizationAccess !== undefined &&
+    canCallerReadStaffAuditActors(params.ctx.organizationAccess);
+
+  if (unmaskActors) {
     // `isRequestingUserKiloAdmin` below unmasks Kilo-admin and unattributed
     // actors that a customer would see as "Kilo Admin"/"Masked user". Recorded
     // before the query so an over-budget or failed report still attributes the
     // attempt; the DB-backed security audit log is written on success only.
     await recordKiloAdminElevation(params.ctx, {
       reason: 'security_agent_audit_report',
-      target: owner.type === 'organization' ? organizationTarget(owner.id) : userTarget(owner.id),
+      target: organizationTarget(owner.id),
     });
   }
 
@@ -336,14 +334,16 @@ async function assembleAuditReportResponse<TExtra>(params: {
     const report = await getSecurityAgentAuditReport({
       owner,
       input: params.input,
-      isRequestingUserKiloAdmin: platformAdminUnmaskEnabled(params.ctx),
+      isRequestingUserKiloAdmin: unmaskActors,
     });
-    await logPlatformAdminAuditReportAccess({
-      ctx: params.ctx,
-      owner,
-      periodStart: report.period.start,
-      periodEndExclusive: report.period.endExclusive,
-    });
+    if (unmaskActors) {
+      await logPlatformAdminAuditReportAccess({
+        ctx: params.ctx,
+        organizationId: owner.id,
+        periodStart: report.period.start,
+        periodEndExclusive: report.period.endExclusive,
+      });
+    }
     return { status: 'ok', report };
   } catch (error) {
     if (error instanceof SecurityAgentAuditReportQueryError) {
@@ -2416,7 +2416,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuditReportContext;
         input: SecurityAgentAuditReportInput & TExtra;
       }) => {
         return assembleAuditReportResponse({

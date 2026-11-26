@@ -21,11 +21,13 @@
     "drizzle.signer/migrations.d.ts",
     "drizzle.denial/migrations.d.ts",
     "drizzle.token-signer/migrations.d.ts",
+    "drizzle.lease/migrations.d.ts",
     "drizzle.bundle.config.ts",
     "drizzle.refresher.config.ts",
     "drizzle.signer.config.ts",
     "drizzle.denial.config.ts",
     "drizzle.token-signer.config.ts",
+    "drizzle.lease.config.ts",
     "vitest.config.ts",
     "vitest.node.config.ts"
   ],

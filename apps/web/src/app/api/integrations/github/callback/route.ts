@@ -8,7 +8,7 @@ import {
 } from '@/lib/app-shell/shell-paths';
 import { loadAppShellUser } from '@/lib/app-shell/session';
 import { oauthCallbackRedirectPath } from '@/lib/integrations/oauth/common';
-import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
+import { platform_integrations, type GitHubInstallState } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import {
@@ -31,7 +31,7 @@ import {
   updateGitHubInstallationRepositories,
 } from '@/lib/integrations/db/github-installations';
 import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   createPendingIntegration,
   findGitHubBotLinkIntegrations,
@@ -60,12 +60,6 @@ import {
 } from '@/lib/integrations/github/install-state';
 import { verifyAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
-import {
-  addAdminAuditMetadata,
-  adminActionContextFromHeaders,
-  runElevatedOrganizationWrite,
-  setAdminAuditOutcome,
-} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { isGitHubSharedInstallationAdmissionEnabled } from '@/lib/integrations/github/multiple-installations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
@@ -318,7 +312,7 @@ export async function GET(request: NextRequest) {
 
 async function handleNewInstallFlow(
   request: NextRequest,
-  user: User,
+  user: { id: string; google_user_email: string; google_user_name: string },
   installRow: GitHubInstallState,
   installationId: string,
   setupAction: string | null
@@ -340,51 +334,31 @@ async function handleNewInstallFlow(
   });
 }
 
-type CoreInstallFlowParams = {
+/**
+ * Handles access checks, pending approval, and installation storage.
+ */
+async function handleCoreInstallFlow(params: {
   request: NextRequest;
-  user: User;
+  user: { id: string; google_user_email: string; google_user_name: string };
   owner: Owner;
   ownerId: string;
   returnTo: string | null;
   installationId: string;
   setupAction: string | null;
   githubAppType: GitHubAppType;
-};
+}): Promise<Response> {
+  const { user, owner, ownerId, returnTo, installationId, setupAction, githubAppType } = params;
+  const searchParams = params.request.nextUrl.searchParams;
 
-/**
- * Handles access checks, then the rest of the flow. An organization install a
- * Kilo admin completes through the admin bypass is recorded with its outcome.
- */
-async function handleCoreInstallFlow(params: CoreInstallFlowParams): Promise<Response> {
-  const { request, user, owner } = params;
-  if (owner.type !== 'org') {
+  // Storing an organization installation is membership-only: the install state
+  // and staff grants never stand in for a manage membership.
+  if (owner.type === 'org') {
+    await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_MANAGE_ROLES);
+  } else {
     if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/', APP_URL));
     }
-    return completeInstallFlow(params);
   }
-
-  await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_MANAGE_ROLES);
-  return runElevatedOrganizationWrite(
-    adminActionContextFromHeaders(user, request.headers),
-    {
-      organizationId: owner.id,
-      requiredRoles: ORGANIZATION_MANAGE_ROLES,
-      action: 'organization.github.connect',
-      message: 'GitHub: App installation callback',
-      metadata: { setupAction: params.setupAction, githubAppType: params.githubAppType },
-    },
-    () => completeInstallFlow(params)
-  );
-}
-
-/**
- * Handles pending approval and installation storage once the caller may change
- * the owner.
- */
-async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Response> {
-  const { user, owner, ownerId, returnTo, installationId, setupAction, githubAppType } = params;
-  const searchParams = params.request.nextUrl.searchParams;
 
   const integrationPath =
     owner.type === 'org'
@@ -402,24 +376,6 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
       owner.type === 'org' ? `&organizationId=${encodeURIComponent(ownerId)}` : '';
     return `/github-app?fromApp=1&${query}${organizationParam}`;
   };
-  // Every redirect below names the outcome an elevated organization write
-  // records: the redirect target cannot say it reliably, since `returnTo` may
-  // carry its own query or fragment.
-  const succeedWith = (path: string) => {
-    setAdminAuditOutcome({ outcome: 'success' });
-    return NextResponse.redirect(new URL(path, APP_URL));
-  };
-  const failWith = (error: string, detailQuery = '') => {
-    setAdminAuditOutcome({ outcome: 'failure', errorCode: error });
-    return NextResponse.redirect(
-      new URL(
-        isAppInitiated
-          ? appFallbackPath(`error=${error}`)
-          : appendQueryParam(redirectPath, `error=${error}${detailQuery}`),
-        APP_URL
-      )
-    );
-  };
 
   const credentials = getGitHubAppCredentials(githubAppType);
 
@@ -427,7 +383,9 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
   if (setupAction === 'delete' || setupAction === 'suspend') {
     console.log(`GitHub App ${setupAction} action detected, skipping installation fetch`);
 
-    return succeedWith(appendQueryParam(redirectPath, `github_action=${setupAction}`));
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, `github_action=${setupAction}`), APP_URL)
+    );
   }
 
   // Handle pending approval - store requester info for webhook matching
@@ -530,7 +488,6 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
             githubRequest,
             githubAppType,
           });
-          addAdminAuditMetadata({ githubAccountId: githubRequest.accountId });
         }
       }
 
@@ -545,12 +502,21 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
           : 'pending_approval=true';
 
       const pendingRedirectPath = isAppInitiated ? '/github-app' : redirectPath;
-      return succeedWith(appendQueryParam(pendingRedirectPath, queryParam));
+      return NextResponse.redirect(
+        new URL(appendQueryParam(pendingRedirectPath, queryParam), APP_URL)
+      );
     } catch (error) {
       console.error('Error creating pending installation:', error);
       captureException(error);
 
-      return failWith('pending_setup_failed');
+      if (isAppInitiated) {
+        return NextResponse.redirect(
+          new URL(appFallbackPath('error=pending_setup_failed'), APP_URL)
+        );
+      }
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, 'error=pending_setup_failed'), APP_URL)
+      );
     }
   }
 
@@ -566,7 +532,14 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
       },
     });
 
-    return failWith('missing_installation_id');
+    if (isAppInitiated) {
+      return NextResponse.redirect(
+        new URL(appFallbackPath('error=missing_installation_id'), APP_URL)
+      );
+    }
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, 'error=missing_installation_id'), APP_URL)
+    );
   }
 
   // Require proof that the OAuth-authorized GitHub user administers the
@@ -581,13 +554,22 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
   let exchangedGitHubUserId: string | null = null;
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
+    const rejectWithReason = (reason: string) =>
+      NextResponse.redirect(
+        new URL(
+          isAppInitiated
+            ? appFallbackPath(`error=${reason}`)
+            : appendQueryParam(redirectPath, `error=${reason}`),
+          APP_URL
+        )
+      );
 
     if (!code) {
       console.log('[github_admin_proof:code_absent]', {
         installation_id: installationId,
         setup_action: setupAction,
       });
-      return failWith('not_installation_admin');
+      return rejectWithReason('not_installation_admin');
     }
 
     try {
@@ -611,7 +593,7 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
           github_user_login: exchangeResult.login,
           installation_id: installationId,
         });
-        return failWith('not_installation_admin');
+        return rejectWithReason('not_installation_admin');
       }
       if (typeof authorization !== 'boolean') {
         verifiedGitHubUserId = authorization.identity.id;
@@ -636,9 +618,9 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
         extra: { installationId },
       });
       if (isInstallationAdministrationListingOverflow(error)) {
-        return failWith('installation_listing_too_large');
+        return rejectWithReason('installation_listing_too_large');
       }
-      return failWith('not_installation_admin');
+      return rejectWithReason('not_installation_admin');
     }
   }
 
@@ -680,10 +662,27 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
     });
 
     if (err.status === 404) {
-      return failWith('installation_not_found', `&id=${encodeURIComponent(installationId)}`);
+      const encodedInstallationId = encodeURIComponent(installationId);
+
+      if (isAppInitiated) {
+        return NextResponse.redirect(
+          new URL(appFallbackPath('error=installation_not_found'), APP_URL)
+        );
+      }
+      return NextResponse.redirect(
+        new URL(
+          appendQueryParam(
+            redirectPath,
+            `error=installation_not_found&id=${encodedInstallationId}`
+          ),
+          APP_URL
+        )
+      );
     }
 
-    if (isAppInitiated) return failWith('installation_failed');
+    if (isAppInitiated) {
+      return NextResponse.redirect(new URL(appFallbackPath('error=installation_failed'), APP_URL));
+    }
     throw error;
   }
 
@@ -700,7 +699,14 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
       tags: { endpoint: 'github/callback', source: 'github_app_installation' },
       extra: { installationId, suspendedAt: installation.suspended_at },
     });
-    return failWith('installation_unavailable');
+    if (isAppInitiated) {
+      return NextResponse.redirect(
+        new URL(appFallbackPath('error=installation_unavailable'), APP_URL)
+      );
+    }
+    return NextResponse.redirect(
+      new URL(appendQueryParam(redirectPath, 'error=installation_unavailable'), APP_URL)
+    );
   }
 
   // Get selected repositories
@@ -744,6 +750,14 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
       isGitHubConnectionManagementEnabled() && verifiedGitHubUserId && verifiedAccountType
         ? { githubUserId: verifiedGitHubUserId, accountType: verifiedAccountType }
         : null;
+    const redirectWithError = (error: string) => {
+      if (isAppInitiated) {
+        return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
+      }
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, `error=${error}`), APP_URL)
+      );
+    };
     const describeUpsertFailure = (reason: string) =>
       reason === 'multiple_installations_disabled'
         ? 'multiple_installations_disabled'
@@ -776,7 +790,7 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
         accountType: verifiedIdentity.accountType,
       });
       if (!verifiedResult.ok) {
-        return failWith(describeUpsertFailure(verifiedResult.reason));
+        return redirectWithError(describeUpsertFailure(verifiedResult.reason));
       }
       await observeGitHubInstallationLifecycle({
         installationId,
@@ -895,7 +909,7 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
         return { ok: true as const };
       });
       if (!legacyResult.ok) {
-        return failWith(describeUpsertFailure(legacyResult.reason));
+        return redirectWithError(describeUpsertFailure(legacyResult.reason));
       }
     }
 
@@ -906,13 +920,13 @@ async function completeInstallFlow(params: CoreInstallFlowParams): Promise<Respo
         repositoriesAdded: repositories,
       });
     }
-
-    addAdminAuditMetadata({ installationId });
   }
 
   // Redirect to success page
-  if (isAppInitiated) return succeedWith(appFallbackPath('github_install=success'));
+  if (isAppInitiated) {
+    return NextResponse.redirect(new URL(appFallbackPath('github_install=success'), APP_URL));
+  }
   const successQueryParam = returnTo ? 'github_install=success' : 'success=installed';
 
-  return succeedWith(appendQueryParam(redirectPath, successQueryParam));
+  return NextResponse.redirect(new URL(appendQueryParam(redirectPath, successQueryParam), APP_URL));
 }

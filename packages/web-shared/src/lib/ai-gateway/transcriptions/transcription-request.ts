@@ -25,5 +25,5 @@ export function buildUpstreamBody(body: TranscriptionRequest): Record<string, un
 }
 
 export function extractTranscriptionPromptInfo(): PromptInfo {
-  return { system_prompt_length: 0 };
+  return { system_prompt_length: 0, system_prompt_kind: null };
 }

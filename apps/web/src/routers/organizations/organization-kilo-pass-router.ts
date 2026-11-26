@@ -28,6 +28,7 @@ import {
 import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
+  organizationBillingMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 
 const TierSchema = z.enum(['tier_19', 'tier_49', 'tier_199']);
@@ -176,22 +177,35 @@ const RetryRunOutputSchema = z.object({
 });
 
 /** Billing access applies only to the parent agreement owner, never a child org. */
+async function requireParentOrganization(organizationId: string): Promise<void> {
+  const [organization] = await db
+    .select({ parentOrganizationId: organizations.parent_organization_id })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId));
+
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  if (organization.parentOrganizationId !== null) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Kilo Pass for Organizations can only be managed from the parent organization',
+    });
+  }
+}
+
 const organizationParentBillingProcedure = organizationBillingProcedure.use(
   async ({ input, next }) => {
-    const [organization] = await db
-      .select({ parentOrganizationId: organizations.parent_organization_id })
-      .from(organizations)
-      .where(eq(organizations.id, input.organizationId));
+    await requireParentOrganization(input.organizationId);
+    return next();
+  }
+);
 
-    if (!organization) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    if (organization.parentOrganizationId !== null) {
-      throw new TRPCError({
-        code: 'UNAUTHORIZED',
-        message: 'Kilo Pass for Organizations can only be managed from the parent organization',
-      });
-    }
+// Checkout and cancellation are payments on the support never-list: only a real
+// owner or billing_manager membership passes.
+const organizationParentBillingMemberProcedure = organizationBillingMemberProcedure.use(
+  async ({ input, next }) => {
+    await requireParentOrganization(input.organizationId);
     return next();
   }
 );
@@ -230,7 +244,7 @@ export const organizationKiloPassRouter = createTRPCRouter({
       organizationKiloPassService.getDetail({ organizationId: input.organizationId })
     ),
 
-  createCheckout: organizationParentBillingProcedure
+  createCheckout: organizationParentBillingMemberProcedure
     .input(
       OrganizationIdInputSchema.extend({
         tier: TierSchema,
@@ -345,7 +359,7 @@ export const organizationKiloPassRouter = createTRPCRouter({
       }
     }),
 
-  cancel: organizationParentBillingProcedure
+  cancel: organizationParentBillingMemberProcedure
     .output(CancelOutputSchema)
     .mutation(async ({ input, ctx }) => {
       try {

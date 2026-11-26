@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
-import { admin_action_audit_logs } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  passkey_credentials,
+  session_step_up_proofs,
+  type User,
+} from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import {
   adminMutationsMissingAuditSpec,
   inputFieldTarget,
@@ -121,20 +128,26 @@ const testRouter = createTRPCRouter({
 });
 const createCaller = createCallerFactory(testRouter);
 
-const admin = defineTestUser({ is_admin: true, is_super_admin: false });
+let admin: User;
 
+// The admission re-reads the primary row and requires a browser session, so
+// the admin exists in the database and the context names a session credential.
 function adminCaller(overrides: Partial<TRPCContext> = {}) {
   const ctx: TRPCContext = {
     user: admin,
     authViaToken: false,
     tokenSource: null,
+    credential: 'session',
     ip: '192.0.2.9',
     ...overrides,
   };
   return createCaller(ctx);
 }
 
-beforeEach(() => setAdminActionSinkForTest(() => {}));
+beforeEach(async () => {
+  setAdminActionSinkForTest(() => {});
+  admin = await insertTestUser({ is_admin: true, is_super_admin: false });
+});
 
 afterEach(async () => {
   setAdminActionSinkForTest(null);
@@ -211,6 +224,81 @@ describe('admin audit middleware', () => {
     );
   });
 
+  test('reports no audit gap for a non-admin, whom the admission refuses first', async () => {
+    const nonAdmin = defineTestUser({ is_admin: false, is_super_admin: false });
+    await expect(adminCaller({ user: nonAdmin }).undeclared()).rejects.toThrow(
+      'Admin access required'
+    );
+  });
+
+  test('records nothing for a revoked browser session', async () => {
+    // The session is not current, so the request never names an acting admin.
+    const pepperedAdmin = await insertTestUser({
+      is_admin: true,
+      is_super_admin: false,
+      web_session_pepper: 'current-pepper',
+    });
+    await expect(
+      adminCaller({ user: pepperedAdmin, webSessionPepper: 'revoked-pepper' }).block({
+        userId: 'user-1',
+      })
+    ).rejects.toThrow('Reauthentication required');
+
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  test('records nothing for a bearer credential', async () => {
+    // A bearer credential never gets staff authority, so it never names an
+    // acting admin either.
+    await expect(
+      adminCaller({ authViaToken: true, credential: 'human_bearer' }).block({ userId: 'user-1' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  test('reports no audit gap for a bearer credential, which the admission refuses first', async () => {
+    await expect(
+      adminCaller({ authViaToken: true, credential: 'human_bearer' }).undeclared()
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  test('records nothing when the primary row is no longer an admin', async () => {
+    const demoted = await insertTestUser({ is_admin: false, is_super_admin: false });
+    await expect(
+      adminCaller({ user: { ...demoted, is_admin: true } }).block({ userId: 'user-1' })
+    ).rejects.toThrow('Admin access required');
+
+    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  describe('with the admin network allowlist', () => {
+    const originalVercel = process.env.VERCEL;
+    const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+    beforeEach(() => {
+      process.env.VERCEL = '1';
+      process.env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
+      resetAdminNetworkConfigForTest();
+    });
+    afterEach(() => {
+      if (originalVercel === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = originalVercel;
+      if (originalNetworks === undefined) delete process.env.ADMIN_ALLOWED_NETWORKS;
+      else process.env.ADMIN_ALLOWED_NETWORKS = originalNetworks;
+      resetAdminNetworkConfigForTest();
+    });
+
+    test('records nothing when the network refuses an admin', async () => {
+      await expect(
+        adminCaller({
+          headersList: new Headers({ 'x-vercel-forwarded-for': '198.51.100.1' }),
+        }).block({ userId: 'user-1' })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+    });
+  });
+
   test('reports a handler mutation that recorded an empty list', async () => {
     await expect(adminCaller().bulkUnblock()).rejects.toThrow(
       'Admin audit gap: bulkUnblock succeeded without recording user.unblock'
@@ -277,11 +365,31 @@ describe('admin audit middleware', () => {
       process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
     });
 
-    test('records a step-up refusal as a failure row with no target, since input never parsed', async () => {
-      // A bearer credential can never complete step-up, so the guard refuses it.
-      const result = adminCaller({ authViaToken: true }).block({
-        userId: 'someone@customer.test',
+    const webSessionId = 'admin-audit-session';
+
+    async function insertSessionProof(userId: string) {
+      const [credential] = await db
+        .insert(passkey_credentials)
+        .values({
+          kilo_user_id: userId,
+          credential_id: `admin-audit-${crypto.randomUUID()}`,
+          public_key: 'unused-public-key',
+        })
+        .returning();
+      await db.insert(session_step_up_proofs).values({
+        kilo_user_id: userId,
+        session_id_hash: hashWebSessionId(webSessionId),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'session',
+        action_binding_hash: null,
+        verified_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
       });
+    }
+
+    test('records a current staff session refused for a missing proof as a failure row with no target, since input never parsed', async () => {
+      const result = adminCaller({ webSessionId }).block({ userId: 'someone@customer.test' });
       await expect(result).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
       const rows = await db.select().from(admin_action_audit_logs);
@@ -296,6 +404,43 @@ describe('admin audit middleware', () => {
         }),
       ]);
       expect(JSON.stringify(rows)).not.toContain('customer.test');
+    });
+
+    test('records one success row once the admission accepted the proof and the resolver returned', async () => {
+      await insertSessionProof(admin.id);
+
+      await expect(adminCaller({ webSessionId }).block({ userId: 'user-1' })).resolves.toBe(
+        'user-1'
+      );
+
+      const rows = await db.select().from(admin_action_audit_logs);
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'user.unblock',
+          outcome: 'success',
+          actor_id: admin.id,
+          target_type: 'user',
+          target_id: 'user-1',
+        }),
+      ]);
+    });
+
+    test('records a narrower guard refusal after an accepted proof as a failure row', async () => {
+      await insertSessionProof(admin.id);
+
+      await expect(
+        adminCaller({ webSessionId }).guardedBlock({ userId: 'user-1' })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      const rows = await db.select().from(admin_action_audit_logs);
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'user.unblock',
+          outcome: 'failure',
+          actor_id: admin.id,
+          metadata: { errorCode: 'FORBIDDEN' },
+        }),
+      ]);
     });
 
     test('records nothing when the admin guard refuses a non-admin', async () => {

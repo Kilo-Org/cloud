@@ -1,4 +1,4 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
@@ -194,7 +194,7 @@ describe('organizations trpc router', () => {
     });
 
     it('should return organization for admin user even if not a member', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.organizations.withMembers({
         organizationId: testOrganization.id,
       });
@@ -929,7 +929,7 @@ describe('organizations trpc router', () => {
     });
 
     it('should update organization name for admin user even if not owner', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const newName = 'Admin Updated Organization';
 
       const result = await caller.organizations.update({

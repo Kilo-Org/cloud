@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
@@ -9,11 +9,6 @@ import {
   upsertDoltHubInstallation,
 } from '@/lib/integrations/dolthub-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
-import {
-  adminActionContextFromHeaders,
-  runElevatedOrganizationWrite,
-  setAdminAuditOutcome,
-} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
@@ -119,43 +114,27 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
-    if (owner.type === 'user' && user.id !== owner.id) {
+    if (owner.type === 'org') {
+      // The organization row stores the shared DoltHub access token, so
+      // installing or replacing it needs the role that governs integrations,
+      // not just membership.
+      await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_BILLING_ROLES);
+    } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
 
-    const connect = async () => {
-      const tokens = await exchangeDoltHubOAuthCode(code);
+    const tokens = await exchangeDoltHubOAuthCode(code);
 
-      await upsertDoltHubInstallation({
-        owner,
-        tokens,
-      });
+    await upsertDoltHubInstallation({
+      owner,
+      tokens,
+    });
 
-      const successPath = verified.returnTo
-        ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=installed')
-        : buildIntegrationOAuthRedirectPath(PLATFORM.DOLTHUB, owner, 'success=installed');
+    const successPath = verified.returnTo
+      ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=installed')
+      : buildIntegrationOAuthRedirectPath(PLATFORM.DOLTHUB, owner, 'success=installed');
 
-      // A `returnTo` with its own query or fragment keeps the redirect target
-      // from saying how the write went, so the outcome is named here.
-      setAdminAuditOutcome({ outcome: 'success' });
-      return NextResponse.redirect(new URL(successPath, APP_URL));
-    };
-
-    if (owner.type !== 'org') return await connect();
-    // The organization row stores the shared DoltHub access token, so
-    // installing or replacing it needs the role that governs integrations,
-    // not just membership.
-    await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
-    return await runElevatedOrganizationWrite(
-      adminActionContextFromHeaders(user, request.headers),
-      {
-        organizationId: owner.id,
-        requiredRoles: ORGANIZATION_BILLING_ROLES,
-        action: 'organization.dolthub.connect',
-        message: 'DoltHub: OAuth connection stored',
-      },
-      connect
-    );
+    return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {
     console.error('Error handling DoltHub OAuth callback:', error);
 

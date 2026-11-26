@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { NextRequest } from 'next/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import {
   exchangeDoltHubOAuthCode,
@@ -14,7 +14,7 @@ import { handleDoltHubOAuthCallback } from '@/lib/integrations/oauth/platforms/d
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/dolthub-service', () => ({
   exchangeDoltHubOAuthCode: jest.fn(),
@@ -30,7 +30,7 @@ const mockedCaptureException = jest.mocked(captureException);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedExchangeDoltHubOAuthCode = jest.mocked(exchangeDoltHubOAuthCode);
 const mockedUpsertDoltHubInstallation = jest.mocked(upsertDoltHubInstallation);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 
 const USER_ID = 'e0c2bd2a-4d1e-4c33-9a2f-6f0f2f3a5b11';
 const ORGANIZATION_ID = 'org-fixture-for-connect-route-test';
@@ -153,8 +153,8 @@ describe('handleDoltHubOAuthCallback owner authorization', () => {
 
     const response = await handleDoltHubOAuthCallback(makeRequest(state));
 
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ user: expect.objectContaining({ id: USER_ID }) }),
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_BILLING_ROLES
     );
@@ -168,7 +168,7 @@ describe('handleDoltHubOAuthCallback owner authorization', () => {
   });
 
   test('a rejected organization role stops before the token exchange and the write', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValueOnce(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValueOnce(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have the required organizational role to access this feature',
@@ -195,7 +195,7 @@ describe('handleDoltHubOAuthCallback owner authorization', () => {
 
     const response = await handleDoltHubOAuthCallback(makeRequest(state));
 
-    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
     expect(mockedUpsertDoltHubInstallation).toHaveBeenCalledWith({
       owner: { type: 'user', id: USER_ID },
       tokens: TOKENS,

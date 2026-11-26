@@ -85,10 +85,20 @@ export async function unlinkKiloUser(
   await state.delete(botIdentityRedisKey(platform, teamId, userId));
 }
 
+/**
+ * Remove every Kilo-user link stored for a chat workspace, and return how many
+ * keys were deleted.
+ *
+ * With `signal`, the scan stops as soon as the signal aborts: the iteration ends
+ * at the next batch boundary and a batch that has not started yet is not sent, so
+ * the caller's budget bounds the work instead of the key space. The keys deleted
+ * before that point stay deleted, which is what the count reports.
+ */
 export async function unlinkTeamKiloUsers(
   state: StateAdapter,
   platform: string,
-  teamId: string
+  teamId: string,
+  { signal }: { signal?: AbortSignal } = {}
 ): Promise<number> {
   if (!hasRedisClient(state)) {
     return 0;
@@ -101,6 +111,7 @@ export async function unlinkTeamKiloUsers(
 
   async function deletePendingKeys(): Promise<void> {
     if (pendingKeys.length === 0) return;
+    if (signal?.aborted) return;
 
     const keysToDelete = pendingKeys;
     pendingKeys = [];
@@ -108,18 +119,26 @@ export async function unlinkTeamKiloUsers(
     await client.del(keysToDelete);
   }
 
-  for await (const scannedKeys of client.scanIterator({
-    MATCH: pattern,
-    COUNT: REDIS_SCAN_BATCH_SIZE,
-  })) {
-    if (Array.isArray(scannedKeys)) {
-      pendingKeys.push(...scannedKeys);
-    } else {
-      pendingKeys.push(scannedKeys);
-    }
+  // A signal that has already aborted sends no SCAN at all; one that aborts during
+  // the scan ends it at the next batch.
+  if (!signal?.aborted) {
+    for await (const scannedKeys of client.scanIterator({
+      MATCH: pattern,
+      COUNT: REDIS_SCAN_BATCH_SIZE,
+    })) {
+      if (signal?.aborted) {
+        break;
+      }
 
-    if (pendingKeys.length >= REDIS_DELETE_BATCH_SIZE) {
-      await deletePendingKeys();
+      if (Array.isArray(scannedKeys)) {
+        pendingKeys.push(...scannedKeys);
+      } else {
+        pendingKeys.push(scannedKeys);
+      }
+
+      if (pendingKeys.length >= REDIS_DELETE_BATCH_SIZE) {
+        await deletePendingKeys();
+      }
     }
   }
 

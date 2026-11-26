@@ -11,6 +11,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { bot } from '@/lib/bot';
+import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import {
   exchangeSlackOAuthCode,
   getConflictingSlackInstallation,
@@ -28,6 +29,9 @@ jest.mock('@/lib/bot', () => ({
     getAdapter: jest.fn(),
     getState: jest.fn(() => ({ kind: 'state' })),
   },
+}));
+jest.mock('@/lib/bot-identity', () => ({
+  unlinkTeamKiloUsers: jest.fn(async () => 0),
 }));
 jest.mock('@/lib/integrations/slack-service', () => {
   const actual = jest.requireActual('@/lib/integrations/slack-service');
@@ -65,6 +69,7 @@ const mockedBotGetAdapter = jest.mocked(bot.getAdapter);
 const mockedExchangeSlackOAuthCode = jest.mocked(exchangeSlackOAuthCode);
 const mockedGetConflictingSlackInstallation = jest.mocked(getConflictingSlackInstallation);
 const mockedUpsertSlackInstallation = jest.mocked(upsertSlackInstallation);
+const mockedUnlinkTeamKiloUsers = jest.mocked(unlinkTeamKiloUsers);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const TEAM_ID = 'T024BE7LD';
@@ -273,6 +278,37 @@ describe('GET /api/integrations/slack/callback', () => {
         .from(platform_integrations)
         .where(eq(platform_integrations.owned_by_user_id, USER_ID));
       expect(stored).toHaveLength(0);
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
+    }
+  });
+
+  test('clears the Chat SDK state of the workspace a rebind replaced', async () => {
+    await insertTestUser({ id: USER_ID });
+    try {
+      mockedUpsertSlackInstallation.mockResolvedValue({
+        integration: { id: 'integration-1' },
+        previousWorkspace: { teamId: 'T0PRIOR', botToken: null },
+      } as never);
+      const state = createProviderState();
+
+      const response = await callSlackCallback(
+        makeRequest(`/api/integrations/slack/callback?code=abc&state=${state}`)
+      );
+
+      expect(deleteInstallation).toHaveBeenCalledTimes(1);
+      expect(deleteInstallation).toHaveBeenCalledWith('T0PRIOR');
+      // The retirement hands the identity scan a signal that ends it at its budget.
+      expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledWith(
+        expect.anything(),
+        'slack',
+        'T0PRIOR',
+        {
+          signal: expect.any(AbortSignal),
+        }
+      );
+      expect(mockedUnlinkTeamKiloUsers.mock.calls[0]![0]).toEqual({ kind: 'state' });
+      expectRedirectLocation(response, '/integrations/slack?success=installed');
     } finally {
       await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
     }

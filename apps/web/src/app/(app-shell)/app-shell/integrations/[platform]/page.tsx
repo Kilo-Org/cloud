@@ -9,6 +9,7 @@ import {
 } from '@/lib/app-shell/shell-paths';
 import { AppShellIntegrationDetails } from '../../components/integration-detail';
 import { ShellOutcome } from '../../components/shell-outcome';
+import { getSlackConnectionErrorMessage } from '@/components/integrations/slack-connection-errors';
 
 export const metadata: Metadata = {
   title: 'Integration',
@@ -45,6 +46,11 @@ export default async function AppShellIntegrationPage({ params, searchParams }: 
   const label = APP_SHELL_PLATFORM_LABELS[platform];
 
   if (success || error) {
+    // Slack answers each outcome with its own copy; the card and this page read
+    // the same map, so a code names the step that applies.
+    const refusal =
+      !success && error && platform === 'slack' ? getSlackConnectionErrorMessage(error, '') : '';
+
     return (
       <ShellOutcome
         kind={success ? 'success' : 'failure'}
@@ -52,7 +58,8 @@ export default async function AppShellIntegrationPage({ params, searchParams }: 
         description={
           success
             ? `Kilo can now use your ${label} connection.`
-            : `The ${label} connection did not complete. Close this window and try again from the Kilo App.`
+            : refusal ||
+              `The ${label} connection did not complete. Close this window and try again from the Kilo App.`
         }
       />
     );

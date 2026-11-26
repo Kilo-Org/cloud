@@ -6,10 +6,14 @@ import type { Owner } from '@/lib/integrations/core/types';
 export const INSTALLATION_LOCK_WAIT_MS = 5_000;
 
 /**
- * Budget for one SQL statement a locked section may run. The release section
- * runs at most two lookups, so its worst case is
- * `2 statements x 1s + 2s removal = 4s < 5s wait`. A third statement in that
- * section needs this budget re-checked against the lock wait.
+ * Budget for one SQL statement a locked section may run. A section that makes an
+ * external call must keep its statements plus that call below the wait, so every
+ * such section carries its own budget: the Discord release section runs at most
+ * two lookups at this budget plus a 2s bot removal
+ * (`2 statements x 1s + 2s removal = 4s < 5s wait`), and the Slack retirement
+ * section runs one lookup plus a 3s settlement
+ * (`1 statement x 1s + 3s settlement = 4s < 5s wait`). A statement added to
+ * either section needs this budget re-checked against the lock wait.
  */
 export const INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS = 1_000;
 

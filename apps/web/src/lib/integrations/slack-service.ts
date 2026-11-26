@@ -7,6 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
+import { withInstallationServerLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
@@ -44,6 +45,29 @@ export class SlackWorkspaceRebindNotAllowedError extends Error {
   }
 }
 
+/**
+ * Why a rebind cannot settle the workspace it would replace.
+ * `read_failed` is a read that threw: a retry can produce a token to revoke.
+ * `credential_unreadable` is a handle this code can never revoke, so only the
+ * operator path can clear it.
+ */
+export type SlackWorkspaceRebindUnsettledReason = 'read_failed' | 'credential_unreadable';
+
+/**
+ * A rebind to a different Slack workspace would replace the only record of a
+ * bot token whose revocation could not be prepared. The previous binding is kept.
+ */
+export class SlackWorkspaceRebindUnsettledError extends Error {
+  constructor(readonly reason: SlackWorkspaceRebindUnsettledReason) {
+    super(
+      reason === 'read_failed'
+        ? 'Slack could not confirm the move away from the previous workspace. Try again.'
+        : 'Kilo could not read the Slack access saved for the previous workspace, so the connection was not moved. Contact support to finish disconnecting it.'
+    );
+    this.name = 'SlackWorkspaceRebindUnsettledError';
+  }
+}
+
 // Slack OAuth scopes for the integration
 // These should be kept in sync with the scopes requested in the Slack app configuration
 export const SLACK_SCOPES = [
@@ -73,8 +97,10 @@ export function getMissingSlackScopes(installedScopes: string[] | null): string[
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
 type SlackUninstallOptions = {
+  /** One Redis command that removes the workspace's Chat SDK installation. */
   deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
-  deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
+  /** Clears the workspace's identity cache and stops when `signal` aborts. */
+  deleteChatSdkIdentityCache?: (teamId: string, signal?: AbortSignal) => Promise<void>;
 };
 
 function getOwnershipConditions(owner: Owner) {
@@ -223,6 +249,33 @@ function getRevocationFailureReason(code: string | null): SlackTokenRevocationFa
   }
 }
 
+/**
+ * Whether a thrown value is a request the client cut short instead of one Slack
+ * answered. Axios reports a request timeout as `ECONNABORTED` and a cancelled
+ * request as `ERR_CANCELED`; the SDK wraps the first as a request error, whose code
+ * already maps to the transport reason, and keeps the axios error on `original`.
+ */
+function isAbortedRequest(error: unknown): boolean {
+  const candidates: unknown[] = [error];
+  if (typeof error === 'object' && error !== null && 'original' in error) {
+    candidates.push(error.original);
+  }
+
+  return candidates.some(candidate => {
+    if (typeof candidate !== 'object' || candidate === null) {
+      return false;
+    }
+    const code = 'code' in candidate ? candidate.code : undefined;
+    const name = 'name' in candidate ? candidate.name : undefined;
+    return (
+      code === 'ECONNABORTED' ||
+      code === 'ERR_CANCELED' ||
+      name === 'AbortError' ||
+      name === 'CanceledError'
+    );
+  });
+}
+
 function reportRevocationFailure(
   reason: SlackTokenRevocationFailureReason,
   slackError: string | null
@@ -240,15 +293,35 @@ function reportRevocationFailure(
  * Revoke Slack access token.
  * Never throws: a Slack refusal is reported in the result, because the caller has to tell
  * "Slack says the token is already dead" apart from "Slack did not answer".
+ *
+ * `timeoutMs` bounds the HTTP request itself: the client aborts the request at that
+ * budget and makes no further attempt, so the call resolves within it. A caller that
+ * needs the call inside a locked section passes its remaining budget; without the
+ * option the call keeps the one bounded retry described below.
  */
-export async function revokeSlackToken(accessToken: string): Promise<SlackTokenRevocation> {
+export async function revokeSlackToken(
+  accessToken: string,
+  { timeoutMs }: { timeoutMs?: number } = {}
+): Promise<SlackTokenRevocation> {
   // The SDK's default policy retries for about thirty minutes, well past the tRPC
   // route's 800 s budget; one bounded retry covers a single blip, and a 429 answers
   // at once as a rate-limit result instead of sleeping out the retry-after.
-  const client = new WebClient(accessToken, {
-    retryConfig: { retries: 1, minTimeout: 500, maxTimeout: 2_000 },
-    rejectRateLimitedCalls: true,
-  });
+  //
+  // A caller that hands a budget gets one attempt bounded by that budget instead:
+  // `timeout` is the request timeout, and `retries: 0` keeps the SDK from starting
+  // a second attempt after the first one was aborted. `timeout: 0` disables the
+  // timeout in the SDK, so an exhausted budget is clamped to the smallest one.
+  const client =
+    timeoutMs === undefined
+      ? new WebClient(accessToken, {
+          retryConfig: { retries: 1, minTimeout: 500, maxTimeout: 2_000 },
+          rejectRateLimitedCalls: true,
+        })
+      : new WebClient(accessToken, {
+          timeout: Math.max(1, Math.round(timeoutMs)),
+          retryConfig: { retries: 0 },
+          rejectRateLimitedCalls: true,
+        });
 
   try {
     const result = await client.auth.revoke();
@@ -266,6 +339,13 @@ export async function revokeSlackToken(accessToken: string): Promise<SlackTokenR
       SLACK_TOKEN_ALREADY_INVALID_ERRORS[slackError] === true
     ) {
       return { status: 'already_invalid', slackError };
+    }
+
+    // An expired budget ends the attempt as an aborted request. The SDK reports its
+    // axios timeout as `slack_webapi_request_error`, and a caller's own abort arrives
+    // as an `AbortError`; both are a transport failure, so they share its reason.
+    if (isAbortedRequest(error)) {
+      return reportRevocationFailure('network', slackError);
     }
 
     return reportRevocationFailure(getRevocationFailureReason(code), slackError);
@@ -497,12 +577,75 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
   return read.status === 'available' ? read.token : null;
 }
 
+export type PreviousSlackWorkspace = {
+  /** Slack team id the owner's connection was bound to before this install. */
+  teamId: string;
+  /**
+   * Bot token to revoke once the rebind has committed, or null when the store
+   * holds nothing live for the previous workspace.
+   */
+  botToken: string | null;
+};
+
+/**
+ * The token an item may keep in `metadata` from before the credential store.
+ * `metadata` is untyped, so only a non-empty string counts as a token.
+ */
+function readMetadataSlackToken(integration: PlatformIntegration): string | null {
+  const metadata = integration.metadata;
+  if (typeof metadata !== 'object' || metadata === null || !('access_token' in metadata)) {
+    return null;
+  }
+  const token = metadata.access_token;
+  return typeof token === 'string' && token.length > 0 ? token : null;
+}
+
+/**
+ * Read the bot token of the workspace a rebind replaces, before the write that
+ * records the new workspace. An `unavailable` read stops the install with the
+ * read's reason. An `absent` read falls back to a token the item keeps in
+ * `metadata.access_token`, and when there is none the install proceeds with
+ * nothing to revoke.
+ */
+async function readReplacedSlackWorkspace(
+  existing: PlatformIntegration,
+  teamId: string
+): Promise<PreviousSlackWorkspace> {
+  const read = await readSlackBotToken(existing);
+  if (read.status === 'unavailable') {
+    throw new SlackWorkspaceRebindUnsettledError(
+      read.reason === 'read_failed' ? 'read_failed' : 'credential_unreadable'
+    );
+  }
+  if (read.status === 'available') return { teamId, botToken: read.token };
+  // The install write drops `metadata.access_token`, so this read hands a token
+  // that predates the credential store to the revocation step.
+  return { teamId, botToken: readMetadataSlackToken(existing) };
+}
+
+export type UpsertSlackInstallationResult = {
+  integration: PlatformIntegration;
+  /**
+   * The workspace this install replaces, when the owner installs onto a different
+   * Slack workspace. The caller retires it after its transaction has committed;
+   * see `retirePreviousSlackWorkspace`.
+   */
+  previousWorkspace: PreviousSlackWorkspace | null;
+};
+
 /**
  * Create or update Slack installation from the Chat SDK OAuth callback result.
  *
  * An organization connection holds a shared bot token and model policy, so moving
  * it to another Slack workspace is refused unless the caller passes
  * `allowWorkspaceRebind` after verifying organization-management authority.
+ *
+ * A move to a different workspace replaces the only row that names the previous
+ * workspace's bot token, so the token is read here, before the write, and handed
+ * back for revocation once the rebind commits. An `unavailable` read stops the
+ * install with the read's reason and the previous binding stays; an `absent` read
+ * hands back the token the item keeps in `metadata.access_token`, or no token
+ * when there is none.
  */
 export async function upsertSlackInstallation(
   {
@@ -523,7 +666,7 @@ export async function upsertSlackInstallation(
     defaultModel?: string | null;
   },
   database: typeof db | DrizzleTransaction = db
-): Promise<PlatformIntegration> {
+): Promise<UpsertSlackInstallationResult> {
   const existing = await getInstallation(owner, database);
   const teamName = installation.teamName || 'Unknown Team';
   // Legacy rows can carry the workspace id only in `platform_account_id`.
@@ -543,6 +686,11 @@ export async function upsertSlackInstallation(
   ) {
     throw new SlackWorkspaceRebindNotAllowedError();
   }
+
+  const previousWorkspace =
+    existing && boundTeamId && boundTeamId !== teamId
+      ? await readReplacedSlackWorkspace(existing, boundTeamId)
+      : null;
 
   // For org integrations, get a model that respects org access policy. A null
   // result means the policy allows none of the candidates; the installation then
@@ -611,7 +759,7 @@ export async function upsertSlackInstallation(
           tx
         );
 
-        return updated;
+        return { integration: updated, previousWorkspace };
       });
     } catch (error) {
       if (isSlackWorkspaceUniqueViolation(error)) {
@@ -622,8 +770,8 @@ export async function upsertSlackInstallation(
   }
 
   try {
-    return await database.transaction(async tx => {
-      const [created] = await tx
+    const created = await database.transaction(async tx => {
+      const [inserted] = await tx
         .insert(platform_integrations)
         .values({
           owned_by_user_id: owner.type === 'user' ? owner.id : null,
@@ -642,7 +790,7 @@ export async function upsertSlackInstallation(
 
       await writeSlackCredential(
         {
-          integrationId: created.id,
+          integrationId: inserted.id,
           slackTeamId: teamId,
           owner,
           botToken: installation.botToken,
@@ -651,8 +799,10 @@ export async function upsertSlackInstallation(
         tx
       );
 
-      return created;
+      return inserted;
     });
+    // A new row has no earlier workspace to replace.
+    return { integration: created, previousWorkspace: null };
   } catch (error) {
     if (isSlackWorkspaceUniqueViolation(error)) {
       throw new SlackWorkspaceAlreadyConnectedError(teamName);
@@ -726,6 +876,194 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   return { success: true };
+}
+
+/**
+ * Budget for the settlement of a retirement section: the token revoke and the
+ * two Chat SDK removals. The section's `statement_timeout` bounds only its SQL,
+ * so the settlement carries this deadline: the revoke and the identity scan are
+ * cut off at it, and a step whose turn comes after it is skipped. The section
+ * runs one lookup at `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS`, so its
+ * normal worst case is `1 statement x 1s + 3s settlement = 4s < 5s wait`.
+ *
+ * One case is not bounded by this budget: the installation removal is one Redis
+ * command, and the Redis client has no command timeout, so a stalled transport
+ * holds the section past the budget until its own socket timeout ends it. A
+ * connection of the same workspace then waits on the workspace lock for that
+ * long; past `INSTALLATION_LOCK_WAIT_MS` it fails at the lock, so its callback
+ * answers with an error redirect and the connection can be retried.
+ */
+export const SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS = 3_000;
+
+/**
+ * What the retirement settled on, for the report that follows it: `released`
+ * when it revoked the previous workspace's token and removed its Chat SDK state,
+ * `recorded_by_another_row` when a row records that workspace so the token and
+ * state stay, `settlement_timed_out` when a step did not finish inside the
+ * settlement budget.
+ */
+type SlackWorkspaceRetirement = 'released' | 'recorded_by_another_row' | 'settlement_timed_out';
+
+/**
+ * Whether any row records `teamId`, from any owner. A row that records the
+ * workspace still serves it, so the retirement settles neither that workspace's
+ * token nor its Chat SDK state.
+ */
+async function anyRowRecordsSlackWorkspace(
+  tx: DrizzleTransaction,
+  teamId: string
+): Promise<boolean> {
+  const [recording] = await tx
+    .select({ id: platform_integrations.id })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.SLACK),
+        recordsSlackWorkspaceCondition(teamId)
+      )
+    )
+    .limit(1);
+  return recording !== undefined;
+}
+
+/**
+ * Report a retirement that left work unsettled. The new connection stands, so the
+ * team id is the only durable record of what stayed.
+ */
+function reportSlackRetirementOutcome(teamId: string, outcome: SlackWorkspaceRetirement) {
+  const message =
+    outcome === 'recorded_by_another_row'
+      ? 'A replaced Slack workspace is recorded by another row and was kept'
+      : 'A replaced Slack workspace settlement did not finish within its budget';
+  captureException(new Error(message), {
+    tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+    extra: { teamId, outcome },
+  });
+}
+
+/**
+ * Revoke the previous workspace's token and remove its Chat SDK installation and
+ * identity cache inside one settlement budget,
+ * {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}.
+ *
+ * Every step is awaited before the next one starts, and each step is cut off at
+ * the deadline where its call supports it:
+ *
+ * - the revoke hands the remaining budget to the Slack client as its request
+ *   timeout, and the client makes no second attempt, so the request aborts there;
+ * - the identity-cache removal gets a signal that fires at the deadline: it starts
+ *   no further SCAN round and no further delete batch after that, and the batch in
+ *   flight is awaited before the removal resolves;
+ * - the installation removal is one Redis command started only while the budget is
+ *   unspent. The command carries no deadline of its own, because the Redis client
+ *   has no command timeout; a transport that stalls holds the section past the
+ *   budget until its own socket timeout ends it, and the deadline then ends the
+ *   settlement with the remaining steps skipped.
+ *
+ * A step whose turn comes after the budget is spent is skipped. The revoke is
+ * skipped too when the previous workspace stored no token; a revoke Slack does
+ * not confirm is reported and the removals still run. A settlement whose steps
+ * did not all finish inside the budget reports `timed_out`; the steps that did
+ * finish stay done, and nothing the settlement started is still running when it
+ * returns.
+ */
+async function settleSlackWorkspace(
+  previous: PreviousSlackWorkspace,
+  options: SlackUninstallOptions
+): Promise<'settled' | 'timed_out'> {
+  const deadline = Date.now() + SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS;
+  // Aborts at the deadline, which stops the identity scan there; the timer is
+  // cleared when the section ends so a settlement leaves no timer behind.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS);
+  // Reads the clock as well as the signal, so the budget counts as spent from the
+  // instant the deadline passes, not from the timer's next callback.
+  const budgetSpent = () => controller.signal.aborted || Date.now() >= deadline;
+
+  try {
+    if (previous.botToken && !budgetSpent()) {
+      const revocation = await revokeSlackToken(previous.botToken, {
+        timeoutMs: deadline - Date.now(),
+      });
+      if (revocation.status === 'temporary_failure') {
+        captureException(new Error('Slack token revocation did not settle a replaced workspace'), {
+          tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+          extra: { teamId: previous.teamId, reason: revocation.reason },
+        });
+      }
+    }
+
+    if (!budgetSpent()) {
+      await options.deleteChatSdkInstallation?.(previous.teamId);
+    }
+
+    if (!budgetSpent()) {
+      await options.deleteChatSdkIdentityCache?.(previous.teamId, controller.signal);
+    }
+
+    return budgetSpent() ? 'timed_out' : 'settled';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Retire the workspace a successful install replaced. Call this only after the
+ * caller's transaction has committed: the connection row already names the new
+ * workspace, so the previous one's token and Chat SDK state are settled beside it.
+ *
+ * One locked section decides and settles. Holding the workspace lock, it asks
+ * whether any row records the previous workspace; if one does, that workspace is
+ * still served, so nothing is revoked or removed. Otherwise it revokes the
+ * previous token and removes the Chat SDK installation and identity cache before
+ * the section ends. The claim question, the revoke and the removals are
+ * therefore one decision: a concurrent connection of the same workspace either
+ * commits before the section, and is then kept, or waits for the section and
+ * records the workspace again only after it has been settled. That lock takes no
+ * owner key, so a retirement in flight never delays another connection of this
+ * owner.
+ *
+ * Every settlement step is awaited inside this section, and the steps that can be
+ * cut short are cut short at {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}: the
+ * revoke by the Slack client's request timeout, the identity scan by an abort
+ * signal. The installation removal is a single Redis command gated on the budget;
+ * the Redis client has no command timeout, so a stalled transport is the one case
+ * that holds the section past the budget, until its socket timeout ends the
+ * command and the deadline skips the remaining steps. A step that did not run
+ * inside the budget is skipped, and the retirement reports
+ * `settlement_timed_out` with the team id.
+ *
+ * A token Slack does not confirm as revoked, a workspace a row records, and a
+ * settlement past its budget are reported with the team id rather than thrown:
+ * the new connection stands.
+ */
+export async function retirePreviousSlackWorkspace(
+  previous: PreviousSlackWorkspace,
+  options: SlackUninstallOptions = {}
+): Promise<void> {
+  try {
+    const retirement = await withInstallationServerLock(
+      PLATFORM.SLACK,
+      previous.teamId,
+      async (tx): Promise<SlackWorkspaceRetirement> => {
+        if (await anyRowRecordsSlackWorkspace(tx, previous.teamId)) {
+          return 'recorded_by_another_row';
+        }
+        const settlement = await settleSlackWorkspace(previous, options);
+        return settlement === 'settled' ? 'released' : 'settlement_timed_out';
+      }
+    );
+
+    if (retirement !== 'released') {
+      reportSlackRetirementOutcome(previous.teamId, retirement);
+    }
+  } catch (error) {
+    // The new connection is already committed; this cleanup runs beside it.
+    captureException(error, {
+      tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+      extra: { teamId: previous.teamId },
+    });
+  }
 }
 
 /**

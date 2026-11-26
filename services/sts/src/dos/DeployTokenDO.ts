@@ -4,6 +4,7 @@ import {
   CloudflareTokenIdSchema,
   StsEnvironmentSchema,
   WorkloadNameSchema,
+  type AuditEvent,
   type DeployTokenLimitedReason,
 } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
@@ -17,6 +18,8 @@ import {
   deployTokenMintedEvent,
   deployTokenReapedEvent,
   deployTokenRevokedEvent,
+  deployTokenScriptCheckFailedEvent,
+  deployTokenUnexpectedRouteEvent,
   deployTokenUnexpectedScriptEvent,
   type DeployTokenAuditCaller,
   type DeployTokenDeleteCause,
@@ -27,23 +30,31 @@ import {
   CloudflareTokens,
   cloudflareTime,
   type CloudflareTokenPolicy,
+  type ListedRoute,
+  type ListedScript,
   type ListedToken,
   type ReturnedTokenPolicy,
 } from '../cloudflare/client';
 import {
   CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
   CLOUDFLARE_MINTING_TOKEN_SECRET,
+  DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_CAP_MS,
+  DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_MS,
   DEPLOY_TOKEN_DELETES_PER_ALARM,
   DEPLOY_TOKEN_DELETE_RETRY_CAP_MS,
   DEPLOY_TOKEN_DELETE_RETRY_MS,
   DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
   DEPLOY_TOKEN_MINT_BUDGET_MS,
   DEPLOY_TOKEN_RETRY_AFTER_SECONDS,
+  DEPLOY_TOKEN_ROUTE_ZONES_PER_CHECK,
   DEPLOY_TOKEN_ROW_RETENTION_MS,
   DEPLOY_TOKEN_SWEEP_INTERVAL_MS,
   DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM,
   DEPLOY_TOKEN_SWEEP_PAGE_SIZE,
+  DEPLOY_TOKEN_UNEXPECTED_ROUTE_EVENTS_PER_CHECK,
   DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK,
+  DEPLOY_TOKEN_WINDOW_CHECK_ATTEMPTS,
+  DEPLOY_TOKEN_WINDOW_CHECK_RETRY_MS,
   MINTING_CREDENTIAL_CACHE_MS,
   MINTING_FOLDER,
   RELAY_DELAY_MS,
@@ -89,6 +100,8 @@ export type DeployTokenMintResult =
   /** Handed to the caller; its `deploy_token.minted` row is committed. */
   | { status: 'minted'; token: string; tokenId: string; expiresAt: number; ttlSeconds: number }
   | { status: 'limited'; reason: DeployTokenLimitedReason; retryAfterSeconds: number }
+  /** Not retryable: this STS's setup is incomplete (setup step 3 did not pin the forbidden ids). */
+  | { status: 'refused'; reason: 'not_configured' }
   | { status: 'unavailable'; retryAfterSeconds: number };
 
 export type DeployTokenRevokeRequest = {
@@ -216,14 +229,43 @@ export function returnedGrantProblem(
 
 /**
  * A row the alarm may delete once it ended a day ago: no deletion owed, not a live token, and a
- * handed-over token only after the sweep compared its live window with the Worker scripts.
+ * handed-over token only after its window check ended.
  */
 const prunable = and(
   isNull(schema.deployToken.deleteCause),
   ne(schema.deployToken.state, 'active'),
   ne(schema.deployToken.state, 'pending'),
-  or(ne(schema.deployToken.state, 'deleted'), eq(schema.deployToken.scriptsChecked, true))
+  or(ne(schema.deployToken.state, 'deleted'), isNotNull(schema.deployToken.windowCheck))
 );
+
+/** A handed-over token's live window, widened by the clock tolerance on each side. */
+type LiveWindow = {
+  row: DeployTokenRow;
+  from: number;
+  to: number;
+  intended: string[];
+  zones: string[];
+};
+
+const StringListSchema = z.array(z.string());
+
+/** Who a window-check row names: every token live at the change, with their owners and intents. */
+function liveTokens(live: LiveWindow[]) {
+  return {
+    tokenIds: live.flatMap(window => (window.row.tokenId === null ? [] : [window.row.tokenId])),
+    workloads: [...new Set(live.map(window => window.row.workload))],
+    runIds: [...new Set(live.map(window => window.row.runId))],
+    intendedScripts: [...new Set(live.flatMap(window => window.intended))],
+  };
+}
+
+/** Why one window check failed; it counts against each checked window's attempts. */
+class WindowCheckFailure extends Error {
+  constructor(readonly detail: string) {
+    super(detail);
+    this.name = 'WindowCheckFailure';
+  }
+}
 
 /**
  * One object per environment (design 6.1 job 3, 4.4): it mints Cloudflare account API tokens for
@@ -237,9 +279,8 @@ const prunable = and(
  * object serves the environment.
  */
 export class DeployTokenDO extends DurableObject<Env> {
-  /** The permission groups no token may hold; a test's subclass sets its own. */
-  static readonly forbiddenPermissionGroupIds: readonly string[] =
-    CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS;
+  /** The permission groups no token may hold; a test sets its own. Empty: the object mints none. */
+  static forbiddenPermissionGroupIds: readonly string[] = CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS;
 
   private readonly config: StsConfig;
   private readonly db: DeployTokenDatabase;
@@ -255,8 +296,11 @@ export class DeployTokenDO extends DurableObject<Env> {
   private pendingCredential: Promise<CredentialRead> | null = null;
   /** No Cloudflare call before this time: Cloudflare answered 429 with `Retry-After`. */
   private cloudflareHoldUntil = 0;
-  /** The alarm running now; Cloudflare refused the minting credential during it. */
-  private alarmRun: { credentialRefused: boolean } | null = null;
+  /**
+   * The stored credential hold (`deploy_token_credential_hold`): after Cloudflare refused the
+   * minting credential, the alarm makes no Cloudflare call and reads no credential before `until`.
+   */
+  private credentialHold = { until: 0, holdMs: 0 };
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -274,6 +318,12 @@ export class DeployTokenDO extends DurableObject<Env> {
     );
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
+      const hold = this.db
+        .select()
+        .from(schema.deployTokenCredentialHold)
+        .where(eq(schema.deployTokenCredentialHold.id, 1))
+        .get();
+      if (hold !== undefined) this.credentialHold = { until: hold.until, holdMs: hold.holdMs };
     });
   }
 
@@ -291,6 +341,14 @@ export class DeployTokenDO extends DurableObject<Env> {
       console.warn('sts: deploy token refused: CF_DEPLOY_ACCOUNT_ID is empty in this environment');
       return UNAVAILABLE;
     }
+    const pinned = (this.constructor as typeof DeployTokenDO).forbiddenPermissionGroupIds;
+    if (pinned.length === 0) {
+      // Setup step 5 set the account before step 3 pinned the token-administering groups.
+      console.error(
+        'sts: deploy token refused: CF_DEPLOY_ACCOUNT_ID is set but CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS is empty'
+      );
+      return { status: 'refused', reason: 'not_configured' };
+    }
     const { caller, grant } = input;
     const callStartedAt = Date.now();
     // A Worker clock ahead of this one must not lengthen the budget.
@@ -307,7 +365,6 @@ export class DeployTokenDO extends DurableObject<Env> {
         retryAfterSeconds: retryAfterSeconds(this.cloudflareHoldUntil - callStartedAt),
       };
     }
-    const pinned = (this.constructor as typeof DeployTokenDO).forbiddenPermissionGroupIds;
     const forbidden = grant.permissionGroups
       .map(group => group.id)
       .filter(id => pinned.includes(id));
@@ -333,6 +390,7 @@ export class DeployTokenDO extends DurableObject<Env> {
         createdAt: callStartedAt,
         expiresAt: deadline,
         intendedScripts: JSON.stringify(grant.intendedScripts),
+        zones: JSON.stringify(grant.zones),
       })
       .returning({ slot: schema.deployToken.slot })
       .get();
@@ -394,6 +452,7 @@ export class DeployTokenDO extends DurableObject<Env> {
       await this.auditMintFailed(caller, grant.permissionSet, slot, 'unknown', null);
       return await this.failCreation(slot);
     }
+    this.endCredentialHold();
 
     const { token } = created;
     let cause: DeployTokenDeleteCause | null = null;
@@ -534,63 +593,58 @@ export class DeployTokenDO extends DurableObject<Env> {
 
   /**
    * Relays audit rows, marks expired tokens owed, ends creations an earlier instance of this object
-   * left `pending`, retries owed deletions (at most `DEPLOY_TOKEN_DELETES_PER_ALARM`, least
-   * recently tried first), runs the sweep when due with what is left of that budget, and prunes
-   * ended rows. Once Cloudflare answers 401 or 403 to the minting credential, the alarm makes no
-   * further Cloudflare call and reads no credential until its next run.
+   * left `pending`, runs the window check of tokens whose live window closed, retries owed
+   * deletions (at most `DEPLOY_TOKEN_DELETES_PER_ALARM`, least recently tried first), runs the
+   * sweep when due with what is left of that budget, and prunes ended rows. The window check runs
+   * before the deletions, so a hold the deletions keep renewing cannot starve it. While the
+   * credential hold runs (Cloudflare answered 401 or 403 to the minting credential), the alarm
+   * makes no Cloudflare call and reads no credential.
    */
   async alarm(): Promise<void> {
-    const run = { credentialRefused: false };
-    this.alarmRun = run;
+    let failed = false;
     try {
-      let failed = false;
-      try {
-        await this.audit.relay(this.stream);
-      } catch (error) {
-        failed = true;
-        console.warn('sts: deploy-token audit relay failed; rows stay for the next alarm', {
-          reason: errorName(error),
-        });
-      }
-      let now = Date.now();
-      this.db
-        .update(schema.deployToken)
-        .set({ deleteCause: 'expired' })
-        .where(
-          and(
-            eq(schema.deployToken.state, 'active'),
-            isNull(schema.deployToken.deleteCause),
-            lte(schema.deployToken.expiresAt, now)
-          )
-        )
-        .run();
-      await this.endInterruptedCreations(now);
-      const owed = this.owedDeletions(now, DEPLOY_TOKEN_DELETES_PER_ALARM);
-      for (const row of owed) {
-        if (run.credentialRefused) break;
-        if (row.tokenId !== null) await this.deleteOnce(row.tokenId);
-      }
-      if (!run.credentialRefused) {
-        await this.sweepIfDue(Date.now(), DEPLOY_TOKEN_DELETES_PER_ALARM - owed.length);
-      }
-      now = Date.now();
-      this.audit.pruneIfDue(now);
-      this.db
-        .delete(schema.deployToken)
-        .where(
-          and(
-            prunable,
-            lt(
-              sql`coalesce(${schema.deployToken.endedAt}, ${schema.deployToken.expiresAt})`,
-              now - DEPLOY_TOKEN_ROW_RETENTION_MS
-            )
-          )
-        )
-        .run();
-      await this.scheduleAlarm(Date.now(), failed, true);
-    } finally {
-      this.alarmRun = null;
+      await this.audit.relay(this.stream);
+    } catch (error) {
+      failed = true;
+      console.warn('sts: deploy-token audit relay failed; rows stay for the next alarm', {
+        reason: errorName(error),
+      });
     }
+    let now = Date.now();
+    this.db
+      .update(schema.deployToken)
+      .set({ deleteCause: 'expired' })
+      .where(
+        and(
+          eq(schema.deployToken.state, 'active'),
+          isNull(schema.deployToken.deleteCause),
+          lte(schema.deployToken.expiresAt, now)
+        )
+      )
+      .run();
+    await this.endInterruptedCreations(now);
+    await this.checkWindowsIfDue(now);
+    const owed = this.owedDeletions(Date.now(), DEPLOY_TOKEN_DELETES_PER_ALARM);
+    for (const row of owed) {
+      if (this.credentialHeld(Date.now())) break;
+      if (row.tokenId !== null) await this.deleteOnce(row.tokenId);
+    }
+    await this.sweepIfDue(Date.now(), DEPLOY_TOKEN_DELETES_PER_ALARM - owed.length);
+    now = Date.now();
+    this.audit.pruneIfDue(now);
+    this.db
+      .delete(schema.deployToken)
+      .where(
+        and(
+          prunable,
+          lt(
+            sql`coalesce(${schema.deployToken.endedAt}, ${schema.deployToken.expiresAt})`,
+            now - DEPLOY_TOKEN_ROW_RETENTION_MS
+          )
+        )
+      )
+      .run();
+    await this.scheduleAlarm(Date.now(), failed, true);
   }
 
   /**
@@ -740,13 +794,26 @@ export class DeployTokenDO extends DurableObject<Env> {
   }
 
   /**
-   * Drops a refused credential (and ends the running alarm's Cloudflare work, so it reads no new
-   * credential before its next run) and honours a `Retry-After`; logs nothing of the credential.
+   * Drops a refused credential and starts or doubles the stored credential hold, so the alarm
+   * reads no new credential and calls Cloudflare no more before it ends; honours a `Retry-After`.
+   * Logs nothing of the credential.
    */
   private noteFailure(failure: { credentialRefused: boolean; retryAfterMs: number | null }): void {
     if (failure.credentialRefused) {
       this.credential = null;
-      if (this.alarmRun !== null) this.alarmRun.credentialRefused = true;
+      const holdMs =
+        this.credentialHold.holdMs === 0
+          ? DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_MS
+          : Math.min(DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_CAP_MS, this.credentialHold.holdMs * 2);
+      this.credentialHold = { until: Date.now() + holdMs, holdMs };
+      this.db
+        .insert(schema.deployTokenCredentialHold)
+        .values({ id: 1, ...this.credentialHold })
+        .onConflictDoUpdate({
+          target: schema.deployTokenCredentialHold.id,
+          set: this.credentialHold,
+        })
+        .run();
     }
     if (failure.retryAfterMs !== null) {
       this.cloudflareHoldUntil = Math.max(
@@ -754,6 +821,23 @@ export class DeployTokenDO extends DurableObject<Env> {
         Date.now() + failure.retryAfterMs
       );
     }
+  }
+
+  /** Cloudflare accepted the minting credential: the next refusal starts a fresh hold. */
+  private endCredentialHold(): void {
+    if (this.credentialHold.holdMs === 0) return;
+    this.credentialHold = { until: 0, holdMs: 0 };
+    this.db.delete(schema.deployTokenCredentialHold).run();
+  }
+
+  /** The alarm makes no Cloudflare call now: the credential hold runs. */
+  private credentialHeld(now: number): boolean {
+    return now < this.credentialHold.until;
+  }
+
+  /** The earliest time the alarm may call Cloudflare again: after a 429's wait and the hold. */
+  private cloudflareResumeAt(): number {
+    return Math.max(this.cloudflareHoldUntil, this.credentialHold.until);
   }
 
   /** One deletion attempt of an owed token, shared with any attempt already in flight. */
@@ -879,9 +963,9 @@ export class DeployTokenDO extends DurableObject<Env> {
       return { detail: credential.detail, credentialRefused: false, retryAfterMs: null };
     }
     const deletion = await new CloudflareTokens(accountId).delete(credential.value, tokenId);
-    if (deletion.status === 'deleted') return null;
-    if (deletion.status === 'gone') return 'gone';
-    return deletion;
+    if (deletion.status === 'unreachable') return deletion;
+    this.endCredentialHold();
+    return deletion.status === 'deleted' ? null : 'gone';
   }
 
   /**
@@ -936,11 +1020,11 @@ export class DeployTokenDO extends DurableObject<Env> {
   }
 
   /**
-   * Starts a sweep with the Worker script check (`checkScripts`), then reads up to
-   * `DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM` pages of the account's token list and deletes, within
-   * `budget`, every expired token named for this environment that STS holds no row for. A page
-   * where it deleted something is read again (the list shifted); a page shorter than the page size
-   * ends the sweep, and the next one runs a day later.
+   * Reads up to `DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM` pages of the account's token list and deletes,
+   * within `budget`, every expired token named for this environment that STS holds no row for. A
+   * page where it deleted something is read again (the list shifted); a page shorter than the page
+   * size ends the sweep, and the next one runs a day later. While a 429's wait or the credential
+   * hold runs, the sweep waits until both ended.
    */
   private async sweepIfDue(now: number, budget: number): Promise<void> {
     const state = this.db
@@ -951,8 +1035,8 @@ export class DeployTokenDO extends DurableObject<Env> {
     const accountId = this.config.cloudflareDeployAccountId;
     if (state === undefined || state.nextSweepAt > now || accountId === null) return;
     const soon = now + DEPLOY_TOKEN_DELETE_RETRY_MS;
-    if (now < this.cloudflareHoldUntil) {
-      this.setSweep(this.cloudflareHoldUntil, state.page);
+    if (now < this.cloudflareResumeAt()) {
+      this.setSweep(this.cloudflareResumeAt(), state.page);
       return;
     }
     const credential = await this.mintingCredential();
@@ -964,10 +1048,6 @@ export class DeployTokenDO extends DurableObject<Env> {
       return;
     }
     const tokens = new CloudflareTokens(accountId);
-    if (state.page === null && !(await this.checkScripts(tokens, credential.value, now))) {
-      this.setSweep(Math.max(now + RELAY_RETRY_MS, this.cloudflareHoldUntil), null);
-      return;
-    }
     const prefix = deployTokenNamePrefix(this.config.environment);
     let page = state.page ?? 1;
     let left = budget;
@@ -976,9 +1056,10 @@ export class DeployTokenDO extends DurableObject<Env> {
       if (listed.status !== 'ok') {
         console.error('sts: deploy token sweep could not list tokens', { detail: listed.detail });
         this.noteFailure(listed);
-        this.setSweep(Math.max(now + RELAY_RETRY_MS, this.cloudflareHoldUntil), page);
+        this.setSweep(Math.max(now + RELAY_RETRY_MS, this.cloudflareResumeAt()), page);
         return;
       }
+      this.endCredentialHold();
       const orphans = listed.tokens.filter(
         token =>
           token.name.startsWith(prefix) &&
@@ -988,7 +1069,7 @@ export class DeployTokenDO extends DurableObject<Env> {
       );
       let deleted = 0;
       for (const orphan of orphans) {
-        if (left <= 0 || this.alarmRun?.credentialRefused === true) break;
+        if (left <= 0 || this.credentialHeld(Date.now())) break;
         left -= 1;
         if ((await this.sweepDelete(tokens, credential.value, orphan)) !== 'delete_failed') {
           deleted += 1;
@@ -1010,107 +1091,276 @@ export class DeployTokenDO extends DurableObject<Env> {
     this.setSweep(soon, page);
   }
 
-  /**
-   * The detective check behind design Q65: a deploy token can change any Worker of the account, so
-   * once a handed-over token's live window closed (it was deleted or it expired), one call lists
-   * the account's Worker scripts and every script whose `modified_on` falls inside a window not yet
-   * checked is compared with the `intendedScripts` of every token live at that time. Each script
-   * none of them names gets one `deploy_token.unexpected_script` row (at most
-   * `DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK`), and the windows are marked checked. Only a
-   * script's last change is visible, so a later change of the same script hides an earlier one.
-   * False when the sweep must stop: Cloudflare refused the credential or answered 429. Any other
-   * failure leaves the windows for the next sweep, and the token sweep goes on.
-   */
-  private async checkScripts(
-    tokens: CloudflareTokens,
-    credential: string,
-    now: number
-  ): Promise<boolean> {
-    const windows = this.db
+  /** Every handed-over token's live window, oldest first. */
+  private liveWindows(): LiveWindow[] {
+    return this.db
       .select()
       .from(schema.deployToken)
       .where(inArray(schema.deployToken.state, ['active', 'deleted']))
+      .orderBy(asc(schema.deployToken.slot))
       .all()
-      .map(row => {
-        const end = Math.min(row.endedAt ?? row.expiresAt, row.expiresAt);
-        return {
-          row,
-          closed: end <= now,
-          // The slack covers the clock difference between this object and Cloudflare.
-          from: row.createdAt - DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
-          to: end + DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
-          intended: z.array(z.string()).parse(JSON.parse(row.intendedScripts)),
-        };
-      });
-    const due = windows.filter(window => window.closed && !window.row.scriptsChecked);
-    if (due.length === 0) return true;
-    const listed = await tokens.listScripts(credential);
-    if (listed.status !== 'ok') {
-      console.error('sts: deploy token script check could not list Worker scripts', {
-        detail: listed.detail,
-      });
-      this.noteFailure(listed);
-      return !listed.credentialRefused && listed.retryAfterMs === null;
+      .map(row => ({
+        row,
+        // The slack covers the clock difference between this object and Cloudflare.
+        from: row.createdAt - DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
+        to:
+          Math.min(row.endedAt ?? row.expiresAt, row.expiresAt) + DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
+        intended: StringListSchema.parse(JSON.parse(row.intendedScripts)),
+        zones: StringListSchema.parse(JSON.parse(row.zones)),
+      }));
+  }
+
+  /**
+   * The detective check behind design Q65, run by the alarm once a handed-over token's live window
+   * closed: its deletion or expiry plus the 2-minute tolerance. A deploy token can change any
+   * Worker of the account and any route of its zones, so one call lists the account's Worker
+   * scripts and one call per zone lists its Workers routes (at most
+   * `DEPLOY_TOKEN_ROUTE_ZONES_PER_CHECK` zones; windows with further zones wait for the next
+   * alarm). It writes `deploy_token.unexpected_script` for each script whose `modified_on` falls
+   * in a checked window, not in a window checked before, and that no token live at that moment
+   * intends; and `deploy_token.unexpected_route` for each route added or changed since the zone's
+   * previous list that points at a script no token with that zone live since then intends. Then,
+   * in one write, it marks the windows checked and stores each zone's list for the next check. A
+   * failure counts against each window's attempts (`windowCheckFailed`).
+   */
+  private async checkWindowsIfDue(now: number): Promise<void> {
+    const accountId = this.config.cloudflareDeployAccountId;
+    if (accountId === null || now < this.cloudflareResumeAt()) return;
+    const windows = this.liveWindows();
+    const due = windows.filter(
+      window =>
+        window.row.windowCheck === null &&
+        window.to <= now &&
+        (window.row.windowCheckRetryAt ?? 0) <= now
+    );
+    const batch: LiveWindow[] = [];
+    const zones = new Set<string>();
+    for (const window of due) {
+      const added = window.zones.filter(zone => !zones.has(zone));
+      if (batch.length > 0 && zones.size + added.length > DEPLOY_TOKEN_ROUTE_ZONES_PER_CHECK) break;
+      for (const zone of added) zones.add(zone);
+      batch.push(window);
     }
-    const unexpected = listed.scripts
-      .filter(script =>
-        due.some(window => script.modifiedAt >= window.from && script.modifiedAt <= window.to)
+    if (batch.length === 0) return;
+    try {
+      const credential = await this.mintingCredential();
+      if (credential.status !== 'ok') throw new WindowCheckFailure(credential.detail);
+      const client = new CloudflareTokens(accountId);
+      const scripts = await client.listScripts(credential.value);
+      if (scripts.status !== 'ok') {
+        this.noteFailure(scripts);
+        throw new WindowCheckFailure(scripts.detail);
+      }
+      this.endCredentialHold();
+      if (scripts.dropped > 0) {
+        console.warn('sts: deploy token window check dropped unreadable scripts', {
+          dropped: scripts.dropped,
+        });
+      }
+      const routes = new Map<string, ListedRoute[]>();
+      for (const zone of zones) {
+        const listed = await client.listRoutes(credential.value, zone);
+        if (listed.status !== 'ok') {
+          this.noteFailure(listed);
+          throw new WindowCheckFailure(listed.detail);
+        }
+        routes.set(zone, listed.routes);
+      }
+      await this.auditUnexpectedScripts(scripts.scripts, batch, windows);
+      await this.auditUnexpectedRoutes(routes, windows);
+      // No await from here on: the storage writes below commit together.
+      for (const window of batch) {
+        this.db
+          .update(schema.deployToken)
+          .set({ windowCheck: 'checked', windowCheckRetryAt: null })
+          .where(eq(schema.deployToken.slot, window.row.slot))
+          .run();
+      }
+      for (const [zone, listed] of routes) {
+        this.db.delete(schema.deployTokenRoute).where(eq(schema.deployTokenRoute.zone, zone)).run();
+        for (const route of listed) {
+          this.db
+            .insert(schema.deployTokenRoute)
+            .values({ zone, routeId: route.id, pattern: route.pattern, script: route.script })
+            .onConflictDoNothing()
+            .run();
+        }
+        this.db
+          .insert(schema.deployTokenRouteZone)
+          .values({ zone, listedAt: now })
+          .onConflictDoUpdate({ target: schema.deployTokenRouteZone.zone, set: { listedAt: now } })
+          .run();
+      }
+    } catch (error) {
+      if (!(error instanceof WindowCheckFailure)) throw error;
+      await this.windowCheckFailed(batch, now, error.detail);
+    }
+  }
+
+  /** The `deploy_token.unexpected_script` rows of one check; throws `WindowCheckFailure`. */
+  private async auditUnexpectedScripts(
+    scripts: ListedScript[],
+    batch: LiveWindow[],
+    windows: LiveWindow[]
+  ): Promise<void> {
+    const inside = (window: LiveWindow, at: number) => at >= window.from && at <= window.to;
+    // A change inside a window checked before was compared then, against every token live then.
+    const checked = windows.filter(window => window.row.windowCheck === 'checked');
+    const unexpected = scripts
+      .filter(
+        script =>
+          batch.some(window => inside(window, script.modifiedAt)) &&
+          !checked.some(window => inside(window, script.modifiedAt))
       )
       .map(script => ({
         script,
-        live: windows.filter(
-          window => script.modifiedAt >= window.from && script.modifiedAt <= window.to
-        ),
+        live: windows.filter(window => inside(window, script.modifiedAt)),
       }))
       .filter(({ script, live }) => !live.some(window => window.intended.includes(script.name)))
       .sort((left, right) => left.script.modifiedAt - right.script.modifiedAt);
-    if (unexpected.length > 0) {
-      console.error(
-        'sts: Worker scripts changed while a deploy token was live, outside its scripts',
-        {
-          count: unexpected.length,
-        }
-      );
-    }
+    if (unexpected.length === 0) return;
+    console.error('sts: deploy token window check: unexpected Worker scripts', {
+      count: unexpected.length,
+    });
     for (const { script, live } of unexpected.slice(
       0,
       DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK
     )) {
-      try {
-        await this.audit.append(
-          this.stream,
-          deployTokenUnexpectedScriptEvent({
-            environment: this.config.environment,
-            script: script.name,
-            modifiedAt: script.modifiedAt,
-            tokenIds: live.flatMap(window =>
-              window.row.tokenId === null ? [] : [window.row.tokenId]
-            ),
-            workloads: [...new Set(live.map(window => window.row.workload))],
-            runIds: [...new Set(live.map(window => window.row.runId))],
-            intendedScripts: [...new Set(live.flatMap(window => window.intended))],
-            unexpectedInCheck: unexpected.length,
-          })
-        );
-      } catch (error) {
-        // The windows stay unchecked, so the next sweep writes the rows.
-        console.error('sts: deploy token script check audit append failed', {
-          reason: errorName(error),
+      await this.appendCheckRow(
+        deployTokenUnexpectedScriptEvent({
+          environment: this.config.environment,
+          script: script.name,
+          modifiedAt: script.modifiedAt,
+          ...liveTokens(live),
+          unexpectedInCheck: unexpected.length,
+        })
+      );
+    }
+  }
+
+  /**
+   * The `deploy_token.unexpected_route` rows of one check; throws `WindowCheckFailure`. A route
+   * list has no time, so a route counts when it differs from the zone's previous list (every route
+   * of a zone never listed before), and the tokens it names are every token with that zone live
+   * since that list. A removed route, or one that runs no Worker, is not reported.
+   */
+  private async auditUnexpectedRoutes(
+    routes: Map<string, ListedRoute[]>,
+    windows: LiveWindow[]
+  ): Promise<void> {
+    const unexpected: {
+      zone: string;
+      route: ListedRoute & { script: string };
+      previousScript: string | null;
+      firstListOfZone: boolean;
+      live: LiveWindow[];
+    }[] = [];
+    for (const [zone, listed] of routes) {
+      const since = this.db
+        .select({ listedAt: schema.deployTokenRouteZone.listedAt })
+        .from(schema.deployTokenRouteZone)
+        .where(eq(schema.deployTokenRouteZone.zone, zone))
+        .get()?.listedAt;
+      const previous = new Map(
+        this.db
+          .select()
+          .from(schema.deployTokenRoute)
+          .where(eq(schema.deployTokenRoute.zone, zone))
+          .all()
+          .map(route => [route.routeId, route])
+      );
+      const live = windows.filter(
+        window => window.zones.includes(zone) && (since === undefined || window.to >= since)
+      );
+      for (const route of listed) {
+        const before = previous.get(route.id);
+        const changed =
+          before === undefined ||
+          before.pattern !== route.pattern ||
+          before.script !== route.script;
+        const { script } = route;
+        if (!changed || script === null) continue;
+        if (live.some(window => window.intended.includes(script))) continue;
+        unexpected.push({
+          zone,
+          route: { ...route, script },
+          previousScript: before?.script ?? null,
+          firstListOfZone: since === undefined,
+          live,
         });
-        return true;
       }
     }
-    this.db
-      .update(schema.deployToken)
-      .set({ scriptsChecked: true })
-      .where(
-        inArray(
-          schema.deployToken.slot,
-          due.map(window => window.row.slot)
-        )
-      )
-      .run();
-    return true;
+    if (unexpected.length === 0) return;
+    console.error('sts: deploy token window check: unexpected Workers routes', {
+      count: unexpected.length,
+    });
+    for (const entry of unexpected.slice(0, DEPLOY_TOKEN_UNEXPECTED_ROUTE_EVENTS_PER_CHECK)) {
+      await this.appendCheckRow(
+        deployTokenUnexpectedRouteEvent({
+          environment: this.config.environment,
+          zone: entry.zone,
+          routeId: entry.route.id,
+          pattern: entry.route.pattern,
+          script: entry.route.script,
+          previousScript: entry.previousScript,
+          firstListOfZone: entry.firstListOfZone,
+          ...liveTokens(entry.live),
+          unexpectedInCheck: unexpected.length,
+        })
+      );
+    }
+  }
+
+  /** Appends one row of a window check; a failed append fails the check, which is retried. */
+  private async appendCheckRow(event: AuditEvent): Promise<void> {
+    try {
+      await this.audit.append(this.stream, event);
+    } catch (error) {
+      throw new WindowCheckFailure(`audit append failed: ${errorName(error)}`);
+    }
+  }
+
+  /**
+   * One failed check of `batch`: each window is tried again later, after
+   * `DEPLOY_TOKEN_WINDOW_CHECK_RETRY_MS` doubling per failure, and after
+   * `DEPLOY_TOKEN_WINDOW_CHECK_ATTEMPTS` failures it gets a `deploy_token.script_check_failed` row
+   * and is no longer held (a window whose row cannot be written is tried again).
+   */
+  private async windowCheckFailed(batch: LiveWindow[], now: number, detail: string): Promise<void> {
+    console.error('sts: deploy token window check failed', { detail, windows: batch.length });
+    for (const { row } of batch) {
+      const attempts = row.windowCheckAttempts + 1;
+      const retry = {
+        windowCheckAttempts: attempts,
+        windowCheckRetryAt: now + DEPLOY_TOKEN_WINDOW_CHECK_RETRY_MS * 2 ** (attempts - 1),
+      };
+      let done = false;
+      if (attempts >= DEPLOY_TOKEN_WINDOW_CHECK_ATTEMPTS && row.tokenId !== null) {
+        try {
+          await this.audit.append(
+            this.stream,
+            deployTokenScriptCheckFailedEvent({
+              environment: this.config.environment,
+              caller: CallerSchema.parse(JSON.parse(row.caller)),
+              permissionSet: row.permissionSet,
+              tokenId: row.tokenId,
+              attempts,
+              reason: detail,
+            })
+          );
+          done = true;
+        } catch (error) {
+          console.error('sts: deploy token script_check_failed audit append failed', {
+            reason: errorName(error),
+          });
+        }
+      }
+      this.db
+        .update(schema.deployToken)
+        .set(done ? { ...retry, windowCheck: 'failed', windowCheckRetryAt: null } : retry)
+        .where(eq(schema.deployToken.slot, row.slot))
+        .run();
+    }
   }
 
   /** Deletes one expired token the sweep found and audits the attempt. */
@@ -1185,11 +1435,34 @@ export class DeployTokenDO extends DurableObject<Env> {
   }
 
   /**
-   * Sets the alarm to the earliest of the audit work, the next owed deletion, the next expiry, an
-   * interrupted creation, the sweep and the row prune. After an alarm (`afterAlarm`), owed
-   * deletions wait at least `DEPLOY_TOKEN_DELETE_RETRY_MS`, so retries make at most
-   * `DEPLOY_TOKEN_DELETES_PER_ALARM` Cloudflare deletes per 30 seconds whatever the number of owed
-   * tokens.
+   * When the next window check is owed: the earliest window end plus tolerance, or its retry time,
+   * of a handed-over token whose check has not ended; null for none.
+   */
+  private nextWindowCheck(): number | null {
+    const { endedAt, expiresAt, windowCheckRetryAt } = schema.deployToken;
+    const row = this.db
+      .select({
+        at: sql<
+          number | null
+        >`min(max(min(coalesce(${endedAt}, ${expiresAt}), ${expiresAt}) + ${DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS}, coalesce(${windowCheckRetryAt}, 0)))`,
+      })
+      .from(schema.deployToken)
+      .where(
+        and(
+          inArray(schema.deployToken.state, ['active', 'deleted']),
+          isNull(schema.deployToken.windowCheck)
+        )
+      )
+      .get();
+    return row?.at ?? null;
+  }
+
+  /**
+   * Sets the alarm to the earliest of the audit work, the next owed deletion, the next expiry, the
+   * next window check, an interrupted creation, the sweep and the row prune. After an alarm
+   * (`afterAlarm`), owed deletions wait at least `DEPLOY_TOKEN_DELETE_RETRY_MS`, so retries make at
+   * most `DEPLOY_TOKEN_DELETES_PER_ALARM` Cloudflare deletes per 30 seconds whatever the number of
+   * owed tokens. Deletions and the window check wait out the credential hold.
    */
   private async scheduleAlarm(now: number, failed: boolean, afterAlarm = false): Promise<void> {
     let target = Number.POSITIVE_INFINITY;
@@ -1200,11 +1473,15 @@ export class DeployTokenDO extends DurableObject<Env> {
     }
     const [nextDeletion] = this.owedDeletions(Number.MAX_SAFE_INTEGER, 1);
     if (nextDeletion !== undefined) {
-      const due = nextDeletion.deleteRetryAt ?? now;
+      const due = Math.max(nextDeletion.deleteRetryAt ?? now, this.credentialHold.until);
       target = Math.min(
         target,
         afterAlarm ? Math.max(due, now + DEPLOY_TOKEN_DELETE_RETRY_MS) : due
       );
+    }
+    const windowCheck = this.nextWindowCheck();
+    if (windowCheck !== null && this.config.cloudflareDeployAccountId !== null) {
+      target = Math.min(target, Math.max(windowCheck, this.cloudflareResumeAt()));
     }
     const expiry = this.nextExpiry();
     if (expiry !== null) target = Math.min(target, expiry);

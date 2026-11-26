@@ -38,10 +38,15 @@ export const DEPLOY_TOKEN_CALLER_DENIED_REASONS = [
 ] as const;
 export type DeployTokenCallerDeniedReason = (typeof DEPLOY_TOKEN_CALLER_DENIED_REASONS)[number];
 
-/** Non-retryable: the caller gets no deploy token until its identity or policy changes. */
+/**
+ * Non-retryable: the caller gets no deploy token until its identity or policy changes, or, for
+ * `not_configured`, until STS's own deploy-token setup is complete (the forbidden permission groups
+ * are pinned).
+ */
 export const DEPLOY_TOKEN_DENIED_REASONS = [
   ...DEPLOY_TOKEN_CALLER_DENIED_REASONS,
   'grant_not_allowed',
+  'not_configured',
 ] as const;
 export type DeployTokenDeniedReason = (typeof DEPLOY_TOKEN_DENIED_REASONS)[number];
 

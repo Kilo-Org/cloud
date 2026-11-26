@@ -55,5 +55,11 @@ export async function resetLeaseObject(stub: DurableObjectStub): Promise<void> {
 
 /** The aborted instance also forgets its minting credential and manager access token. */
 export async function resetDeployTokenObject(stub: DurableObjectStub): Promise<void> {
-  await resetObject(stub, ['deploy_token', 'deploy_token_sweep']);
+  await resetObject(stub, [
+    'deploy_token',
+    'deploy_token_sweep',
+    'deploy_token_credential_hold',
+    'deploy_token_route_zone',
+    'deploy_token_route',
+  ]);
 }

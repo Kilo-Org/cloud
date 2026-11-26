@@ -116,9 +116,9 @@ export async function serveDeployToken(
   }
   const result = outcome.value;
   if (result.status === 'unavailable') return result;
-  if (result.status === 'limited') {
+  if (result.status === 'limited' || result.status === 'refused') {
     recordDeployTokenDenial(env, config, caller, waitUntil, result.reason);
-    return result;
+    return result.status === 'limited' ? result : { status: 'denied', reason: result.reason };
   }
   return {
     status: 'ok',

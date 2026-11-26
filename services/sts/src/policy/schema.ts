@@ -18,6 +18,7 @@ import {
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
 import {
+  CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS,
   CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
   MINTING_FOLDER,
   MINTING_SECRET_NAMES,
@@ -365,10 +366,12 @@ function dynamicProblems(policy: Policy, forbiddenGroupIds: readonly string[]): 
 }
 
 /**
- * A Cloudflare deploy-token grant serves only a GitHub job bound to a protected GitHub environment
- * (production also needs `refs/heads/main`, checked with the other GitHub rules). Every zone-scoped
- * group needs a zone, every zone a zone-scoped group, and no group may administer tokens or members,
- * by its declared name or by an id in `forbiddenGroupIds`.
+ * A Cloudflare deploy-token grant serves only a GitHub job bound to a protected GitHub environment.
+ * While staging and production share one Cloudflare account
+ * (`CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS`), a staging token reaches production Workers, so
+ * every such grant, in every environment, accepts `refs/heads/main` alone. Every zone-scoped group
+ * needs a zone, every zone a zone-scoped group, and no group may administer tokens or members, by
+ * its declared name or by an id in `forbiddenGroupIds`.
  */
 function cloudflareDeployProblems(
   policy: Policy,
@@ -379,10 +382,20 @@ function cloudflareDeployProblems(
   const { identity } = policy;
   if (identity.kind !== 'github-oidc') {
     problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT} is only for a github-oidc policy`);
-  } else if (identity.environment === undefined) {
-    problems.push(
-      `a github-oidc policy with dynamic ${CLOUDFLARE_DEPLOY_GRANT} must bind identity.environment`
-    );
+  } else {
+    if (identity.environment === undefined) {
+      problems.push(
+        `a github-oidc policy with dynamic ${CLOUDFLARE_DEPLOY_GRANT} must bind identity.environment`
+      );
+    }
+    if (
+      CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS &&
+      identity.refs.some(ref => ref !== GITHUB_PRODUCTION_REF)
+    ) {
+      problems.push(
+        `a github-oidc policy with dynamic ${CLOUDFLARE_DEPLOY_GRANT} accepts only ${GITHUB_PRODUCTION_REF}: staging and production share one Cloudflare account`
+      );
+    }
   }
   if (entry.maxActive > CLOUDFLARE_DEPLOY_MAX_ACTIVE_CEILING) {
     problems.push(

@@ -199,13 +199,23 @@ export const CLOUDFLARE_MINTING_TOKEN_SECRET = 'CLOUDFLARE_MINTING_TOKEN';
 export const MINTING_SECRET_NAMES: readonly string[] = [CLOUDFLARE_MINTING_TOKEN_SECRET];
 
 /**
+ * Staging and production STS mint in one Cloudflare account (the single `account_id` in
+ * `wrangler.jsonc`), so a token a staging policy grants can overwrite production Workers for its
+ * hour. While this holds, the loader admits a `cloudflare-deploy` grant only on a GitHub identity
+ * that accepts `refs/heads/main` alone, in every environment: the production gate is then `main`
+ * whichever environment's policy minted the token. A separate Cloudflare account for staging (an
+ * open owner decision, design Q65) would let this be false and relax the rule for staging.
+ */
+export const CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS = true;
+
+/**
  * Cloudflare permission groups no deploy token may hold, by id: the groups that create or edit API
  * tokens or manage members, roles or account settings, whose holder could make a credential that
  * outlives the 1-hour bound. The loader refuses a policy that lists one, and the deploy-token
  * object refuses to mint one and deletes a token Cloudflare returns with one. The ids are copied
  * from `GET /accounts/<account>/tokens/permission_groups` in setup step 3 (README "Cloudflare
- * deploy tokens"); until then the list is empty, which refuses nothing by id, and the exact match
- * of the returned groups with the policy's ids and names still applies.
+ * deploy tokens"). Empty refuses nothing by id, so the deploy-token object mints nothing while it
+ * is empty and `CF_DEPLOY_ACCOUNT_ID` is set: setup step 5 cannot take effect before step 3.
  */
 export const CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS: readonly string[] = [];
 
@@ -261,12 +271,42 @@ export const DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM = 2;
 export const DEPLOY_TOKEN_SWEEP_PAGE_SIZE = 50;
 
 /**
- * The sweep also lists the account's Worker scripts once per run (one call: Cloudflare's list has
- * no pages) and writes `deploy_token.unexpected_script` for each script changed while a handed-over
- * token was live that none of the live tokens' `intendedScripts` names, at most this many rows per
- * check (each row carries the total).
+ * The window check runs once a handed-over token's live window closed (its deletion or expiry,
+ * plus Cloudflare's clock tolerance). It lists the account's Worker scripts (one call: Cloudflare's
+ * list has no pages) and writes `deploy_token.unexpected_script` for each script changed in the
+ * window that none of the live tokens' `intendedScripts` names, at most this many rows per check
+ * (each row carries the total).
  */
 export const DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK = 20;
+
+/**
+ * The window check also lists the Workers routes of each zone the checked tokens could write
+ * (`GET /zones/<zone>/workers/routes`, no pages), at most `DEPLOY_TOKEN_ROUTE_ZONES_PER_CHECK`
+ * zones per check; windows with further zones wait for the next alarm. A zone that lists more than
+ * `DEPLOY_TOKEN_ROUTES_PER_ZONE_MAX` routes fails the check. It writes
+ * `deploy_token.unexpected_route` for each route added or changed since the previous list of its
+ * zone that points at a script no checked token intended, at most
+ * `DEPLOY_TOKEN_UNEXPECTED_ROUTE_EVENTS_PER_CHECK` rows per check (each row carries the total).
+ */
+export const DEPLOY_TOKEN_ROUTE_ZONES_PER_CHECK = 8;
+export const DEPLOY_TOKEN_ROUTES_PER_ZONE_MAX = 1000;
+export const DEPLOY_TOKEN_UNEXPECTED_ROUTE_EVENTS_PER_CHECK = 20;
+
+/**
+ * A failed window check is tried again after this long, doubling per failure. After
+ * `DEPLOY_TOKEN_WINDOW_CHECK_ATTEMPTS` failures the window gets a `deploy_token.script_check_failed`
+ * row and is no longer held: its row may be pruned.
+ */
+export const DEPLOY_TOKEN_WINDOW_CHECK_RETRY_MS = 15 * 60 * 1000;
+export const DEPLOY_TOKEN_WINDOW_CHECK_ATTEMPTS = 3;
+
+/**
+ * After Cloudflare refused the minting credential (401 or 403), the alarm makes no Cloudflare call
+ * and reads no credential for this long, doubling per refusal up to the cap; a call Cloudflare
+ * accepts ends the hold. A mint or a revoke a caller asks for still reads the credential again.
+ */
+export const DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_MS = RELAY_RETRY_MS;
+export const DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_CAP_MS = 60 * 60 * 1000;
 
 /** A deploy-token row stays this long after its token was deleted, for revoke answers and limits. */
 export const DEPLOY_TOKEN_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;

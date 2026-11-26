@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { DeployTokenDeleteCause } from '../audit/events';
 
 export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
@@ -12,11 +12,17 @@ export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
 export type DeployTokenState = 'pending' | 'active' | 'deleted' | 'failed';
 
 /**
+ * The window check of a handed-over token: `checked` (the scripts and routes changed while it was
+ * live were compared with the intended scripts) or `failed` (it gave up after its attempts and
+ * wrote `deploy_token.script_check_failed`). Null while the check is owed.
+ */
+export type DeployTokenWindowCheck = 'checked' | 'failed';
+
+/**
  * One row per Cloudflare deploy-token creation STS started, never the token value or the minting
  * credential. A row counts against its workload's active limit while `pending` or `active` and
  * unexpired, and against the hourly limit by `created_at` whatever its state. The alarm deletes a
- * row a day after it ended, and a handed-over token's row only once the sweep compared the Worker
- * scripts changed while it was live with its `intended_scripts`.
+ * row a day after it ended, and a handed-over token's row only once its window check ended.
  */
 export const deployToken = sqliteTable(
   'deploy_token',
@@ -46,10 +52,15 @@ export const deployToken = sqliteTable(
     deleteFailureAudited: integer('delete_failure_audited', { mode: 'boolean' })
       .notNull()
       .default(false),
-    /** The policy's `intendedScripts` when the token was made (JSON array), for the script check. */
+    /** The policy's `intendedScripts` when the token was made (JSON array), for the window check. */
     intendedScripts: text('intended_scripts').notNull(),
-    /** A handed-over token's live window was compared with the account's Worker scripts. */
-    scriptsChecked: integer('scripts_checked', { mode: 'boolean' }).notNull().default(false),
+    /** The policy's zones when the token was made (JSON array): the routes the token could write. */
+    zones: text('zones').notNull(),
+    windowCheck: text('window_check').$type<DeployTokenWindowCheck>(),
+    /** Failed window checks so far; each doubles the wait before the next. */
+    windowCheckAttempts: integer('window_check_attempts').notNull().default(0),
+    /** A failed window check: the earliest time the alarm may try it again. */
+    windowCheckRetryAt: integer('window_check_retry_at'),
   },
   table => [index('deploy_token_workload_created').on(table.workload, table.createdAt)]
 );
@@ -63,3 +74,35 @@ export const deployTokenSweep = sqliteTable('deploy_token_sweep', {
   nextSweepAt: integer('next_sweep_at').notNull(),
   page: integer('page'),
 });
+
+/**
+ * Set after Cloudflare refused the minting credential (one row, id 1): the alarm makes no
+ * Cloudflare call before `until`, and `hold_ms` is the hold the next refusal doubles. No row: no
+ * hold.
+ */
+export const deployTokenCredentialHold = sqliteTable('deploy_token_credential_hold', {
+  id: integer('id').primaryKey(),
+  until: integer('until').notNull(),
+  holdMs: integer('hold_ms').notNull(),
+});
+
+/**
+ * The zones whose Workers routes the window check listed, and when it last did. A zone without a
+ * row was never listed: its first check has no earlier list to compare with.
+ */
+export const deployTokenRouteZone = sqliteTable('deploy_token_route_zone', {
+  zone: text('zone').primaryKey(),
+  listedAt: integer('listed_at').notNull(),
+});
+
+/** Each zone's Workers routes as the window check last listed them. */
+export const deployTokenRoute = sqliteTable(
+  'deploy_token_route',
+  {
+    zone: text('zone').notNull(),
+    routeId: text('route_id').notNull(),
+    pattern: text('pattern').notNull(),
+    script: text('script'),
+  },
+  table => [primaryKey({ columns: [table.zone, table.routeId] })]
+);

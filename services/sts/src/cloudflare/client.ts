@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CLOUDFLARE_FETCH_TIMEOUT_MS } from '../constants';
+import { CLOUDFLARE_FETCH_TIMEOUT_MS, DEPLOY_TOKEN_ROUTES_PER_ZONE_MAX } from '../constants';
 
 /** https://developers.cloudflare.com/api/ */
 export const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4';
@@ -58,6 +58,17 @@ const ListedScriptsSchema = z.object({
   ),
 });
 
+const ListedRoutesSchema = z.object({
+  success: z.literal(true),
+  result: z.array(
+    z.object({
+      id: z.string().min(1),
+      pattern: z.string().min(1),
+      script: z.string().nullish(),
+    })
+  ),
+});
+
 /** One policy of a created token, as Cloudflare returned it. */
 export type ReturnedTokenPolicy = {
   effect: string;
@@ -104,7 +115,15 @@ export type TokenPage = { status: 'ok'; tokens: ListedToken[] } | CloudflareUnre
 /** A Worker script and when it last changed. */
 export type ListedScript = { name: string; modifiedAt: number };
 
-export type ScriptList = { status: 'ok'; scripts: ListedScript[] } | CloudflareUnreachable;
+/** `dropped`: listed entries without a name or a time, which the check cannot compare. */
+export type ScriptList =
+  | { status: 'ok'; scripts: ListedScript[]; dropped: number }
+  | CloudflareUnreachable;
+
+/** A Workers route of a zone: requests matching `pattern` run `script` (null: no Worker runs). */
+export type ListedRoute = { id: string; pattern: string; script: string | null };
+
+export type RouteList = { status: 'ok'; routes: ListedRoute[] } | CloudflareUnreachable;
 
 function retryAfterMs(response: Response): number | null {
   if (response.status !== 429) return null;
@@ -153,10 +172,10 @@ export function cloudflareTime(epochMs: number): string {
 
 /**
  * Plain-REST client for Cloudflare's account API tokens
- * (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/) and the
- * account's Worker script list, authenticated
- * with the minting credential the caller passes on each call. No response body is kept in an
- * error detail: a body can echo request data.
+ * (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/), the account's
+ * Worker script list and a zone's Workers routes, authenticated with the minting credential the
+ * caller passes on each call. No response body is kept in an error detail: a body can echo
+ * request data.
  */
 export class CloudflareTokens {
   constructor(private readonly accountId: string) {}
@@ -316,14 +335,70 @@ export class CloudflareTokens {
    * `GET /accounts/{account_id}/workers/scripts`: every Worker script of the account with its
    * `modified_on`, in one answer; the endpoint has no pages
    * (https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/list/).
-   * A script without a name or a time is left out.
+   * A script without a name or a time is left out and counted in `dropped`.
    */
   async listScripts(credential: string): Promise<ScriptList> {
+    const read = await this.getJson(
+      credential,
+      `/accounts/${this.accountId}/workers/scripts`,
+      'script list',
+      ListedScriptsSchema
+    );
+    if (read.status !== 'ok') return read;
+    const scripts: ListedScript[] = [];
+    let dropped = 0;
+    for (const script of read.body.result) {
+      if (script.id === undefined || script.modified_on === undefined) {
+        dropped += 1;
+        continue;
+      }
+      scripts.push({ name: script.id, modifiedAt: Date.parse(script.modified_on) });
+    }
+    return { status: 'ok', scripts, dropped };
+  }
+
+  /**
+   * `GET /zones/{zone_id}/workers/routes`: every Workers route of the zone, in one answer with no
+   * pages and no modification time
+   * (https://developers.cloudflare.com/api/resources/workers/subresources/routes/methods/list/).
+   * A zone with more than `DEPLOY_TOKEN_ROUTES_PER_ZONE_MAX` routes is not read.
+   */
+  async listRoutes(credential: string, zoneId: string): Promise<RouteList> {
+    const read = await this.getJson(
+      credential,
+      `/zones/${encodeURIComponent(zoneId)}/workers/routes`,
+      'route list',
+      ListedRoutesSchema
+    );
+    if (read.status !== 'ok') return read;
+    if (read.body.result.length > DEPLOY_TOKEN_ROUTES_PER_ZONE_MAX) {
+      return {
+        status: 'unreachable',
+        detail: `cloudflare route list holds more than ${DEPLOY_TOKEN_ROUTES_PER_ZONE_MAX} routes`,
+        credentialRefused: false,
+        retryAfterMs: null,
+      };
+    }
+    return {
+      status: 'ok',
+      routes: read.body.result.map(route => ({
+        id: route.id,
+        pattern: route.pattern,
+        script: route.script ?? null,
+      })),
+    };
+  }
+
+  /** One GET whose answer must match `schema`; `what` names it in an error detail. */
+  private async getJson<T>(
+    credential: string,
+    path: string,
+    what: string,
+    schema: z.ZodType<T>
+  ): Promise<{ status: 'ok'; body: T } | CloudflareUnreachable> {
     let response: Response;
     try {
-      response = await cloudflareFetch(credential, `/accounts/${this.accountId}/workers/scripts`, {
-        method: 'GET',
-      });
+      response = await cloudflareFetch(credential, path, { method: 'GET' });
     } catch (error) {
       if (error instanceof CloudflareTransportError) {
         return {
@@ -339,25 +414,20 @@ export class CloudflareTokens {
       await response.body?.cancel();
       return {
         status: 'unreachable',
-        detail: `cloudflare script list failed with status ${response.status}`,
+        detail: `cloudflare ${what} failed with status ${response.status}`,
         credentialRefused: isCredentialRefused(response.status),
         retryAfterMs: retryAfterMs(response),
       };
     }
-    const parsed = ListedScriptsSchema.safeParse(await response.json().catch(() => null));
+    const parsed = schema.safeParse(await response.json().catch(() => null));
     if (!parsed.success) {
       return {
         status: 'unreachable',
-        detail: 'cloudflare script list response did not match',
+        detail: `cloudflare ${what} response did not match`,
         credentialRefused: false,
         retryAfterMs: null,
       };
     }
-    const scripts: ListedScript[] = [];
-    for (const script of parsed.data.result) {
-      if (script.id === undefined || script.modified_on === undefined) continue;
-      scripts.push({ name: script.id, modifiedAt: Date.parse(script.modified_on) });
-    }
-    return { status: 'ok', scripts };
+    return { status: 'ok', body: parsed.data };
   }
 }

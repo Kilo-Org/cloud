@@ -769,11 +769,11 @@ export function deployTokenMintFailedEvent(input: {
 }
 
 /**
- * The sweep's detective check (design Q65): a Worker script of the account changed while one or
- * more handed-over deploy tokens were live, and none of those tokens' `intendedScripts` names it.
- * A deploy token can change any Worker of the account, so this may be a misused token, or a
- * change by someone else in that window. `unexpectedInCheck` is the number of such scripts in this
- * check; at most `DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK` rows are written per check.
+ * The window check (design Q65): a Worker script of the account changed while one or more
+ * handed-over deploy tokens were live, and none of those tokens' `intendedScripts` names it. A
+ * deploy token can change any Worker of the account, so this may be a misused token, or a change
+ * by someone else in that window. `unexpectedInCheck` is the number of such scripts in this check;
+ * at most `DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK` rows are written per check.
  */
 export function deployTokenUnexpectedScriptEvent(input: {
   environment: StsEnvironment;
@@ -808,6 +808,103 @@ export function deployTokenUnexpectedScriptEvent(input: {
         runIds: input.runIds.slice(0, 256),
         intendedScripts: input.intendedScripts.slice(0, 256),
         unexpectedInCheck: input.unexpectedInCheck,
+      },
+    },
+  });
+}
+
+/**
+ * The window check (design Q65): a Workers route of a zone the deploy tokens could write was added
+ * or changed since the previous list of that zone (`firstListOfZone`: there was none, so every
+ * route counts) and points at a script that none of the tokens live since then intends. A route
+ * list carries no time, so the tokens named are every token with that zone live since the
+ * previous list; it may also be a change by someone else. At most
+ * `DEPLOY_TOKEN_UNEXPECTED_ROUTE_EVENTS_PER_CHECK` rows per check, each with the total.
+ */
+export function deployTokenUnexpectedRouteEvent(input: {
+  environment: StsEnvironment;
+  zone: string;
+  routeId: string;
+  pattern: string;
+  script: string;
+  previousScript: string | null;
+  firstListOfZone: boolean;
+  tokenIds: string[];
+  workloads: string[];
+  runIds: string[];
+  intendedScripts: string[];
+  unexpectedInCheck: number;
+}): AuditEvent {
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.unexpected_route',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.other,
+      outcome: 'failure',
+      outcomeDetail: 'unexpected_route',
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        provider: 'cloudflare',
+        zone: input.zone.slice(0, 64),
+        routeId: input.routeId.slice(0, 64),
+        pattern: input.pattern.slice(0, 512),
+        script: input.script.slice(0, 256),
+        ...(input.previousScript === null
+          ? {}
+          : { previousScript: input.previousScript.slice(0, 256) }),
+        firstListOfZone: input.firstListOfZone,
+        tokenIds: input.tokenIds.slice(0, 256),
+        workloads: input.workloads.slice(0, 256),
+        runIds: input.runIds.slice(0, 256),
+        intendedScripts: input.intendedScripts.slice(0, 256),
+        unexpectedInCheck: input.unexpectedInCheck,
+      },
+    },
+  });
+}
+
+/**
+ * The window check of one handed-over token failed `attempts` times (Cloudflare refused or failed
+ * the lists, or the rows could not be written): it gives up, so the scripts and routes changed
+ * while that token was live are not compared. `reason` is the last failure, status codes only.
+ */
+export function deployTokenScriptCheckFailedEvent(input: {
+  environment: StsEnvironment;
+  caller: DeployTokenAuditCaller;
+  permissionSet: string;
+  tokenId: string;
+  attempts: number;
+  reason: string;
+}): AuditEvent {
+  const { caller } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.script_check_failed',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.other,
+      outcome: 'failure',
+      outcomeDetail: 'script_check_failed',
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        workload: caller.workload,
+        environment: input.environment,
+        provider: 'cloudflare',
+        permissionSet: input.permissionSet,
+        tokenId: input.tokenId,
+        attempts: input.attempts,
+        reason: input.reason.slice(0, 256),
+        ...runAttributes(caller.run),
       },
     },
   });

@@ -398,7 +398,22 @@ $$;
 -- and the proof must name the same key, and the proof's `jti` is recorded under the grant); a
 -- third-party client gets a grant family and its first rotating refresh token. The caller derives
 -- the new grant id from the code, so every attempt with one code names one grant; the grant id is
--- the `sid` of every token. A second use of a consumed code revokes the grant it created and fails.
+-- the `sid` of every token.
+--
+-- A retry (design 5.4): when signing, or anything else after this statement committed, failed,
+-- the client sends the same request again. The same client, redirect URI, PKCE challenge and DPoP
+-- key presenting the consumed code while the code's 60-second lifetime lasts get the same grant
+-- and new tokens, and the code is not counted as reused. Only hashes are stored, so the retry
+-- stores a new refresh token and the newest one wins: a first-party grant's token hash is
+-- replaced, so the earlier token is unknown from then on; a third-party family rotates to the new
+-- token, and the earlier one becomes a rotated token, whose use after its 60-second grace revokes
+-- the family. The retry writes a `token.issued` row (`rotation` `code_retry`) instead of a second
+-- `grant.created`. Any other use of a consumed code (another client, redirect URI, verifier or
+-- key, or after the code's lifetime) revokes the grant it created and fails (RFC 6749 section
+-- 4.1.2).
+--
+-- The audit row lists the `jti` each token will carry: the Worker signs the tokens after the
+-- statement commits, so a failed signing leaves ids no token carries, and the retry lists new ids.
 -- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `dpop_replay`.
 CREATE FUNCTION uts.exchange_authorization_code(
   p_environment text,
@@ -435,6 +450,8 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   code uts.authorization_codes%ROWTYPE;
+  same_request boolean;
+  retry boolean;
   chosen record;
   account_state uts.account_status;
   membership_state uts.membership_status;
@@ -442,6 +459,10 @@ DECLARE
   revoked_account text;
   new_session_id uuid;
   idle_window interval;
+  grant_state uts.grant_status;
+  family_end timestamptz;
+  previous_hash bytea;
+  previous_token_id uuid;
 BEGIN
   SELECT * INTO code FROM uts.authorization_codes AS stored WHERE stored.code_hash = p_code_hash
   FOR UPDATE;
@@ -451,7 +472,15 @@ BEGIN
     RETURN;
   END IF;
 
-  IF code.status = 'consumed' THEN
+  same_request := code.expires_at > now()
+    AND code.client_id = p_client_id
+    AND code.redirect_uri = p_redirect_uri
+    AND code.code_challenge = p_code_challenge
+    AND code.dpop_jkt IS NOT DISTINCT FROM p_dpop_jkt
+    AND (code.client_kind = 'first_party') = (p_client_class IS NOT NULL);
+  retry := code.status = 'consumed';
+
+  IF retry AND NOT (same_request AND code.grant_id = p_grant_id) THEN
     revoked_account := uts.end_grant(code.client_kind, code.grant_id, 'reuse_detected');
     IF revoked_account IS NOT NULL THEN
       PERFORM uts.write_audit_event(
@@ -469,13 +498,7 @@ BEGIN
     RETURN;
   END IF;
 
-  IF code.expires_at <= now()
-    OR code.client_id <> p_client_id
-    OR code.redirect_uri <> p_redirect_uri
-    OR code.code_challenge <> p_code_challenge
-    OR code.dpop_jkt IS DISTINCT FROM p_dpop_jkt
-    OR (code.client_kind = 'first_party') <> (p_client_class IS NOT NULL)
-  THEN
+  IF NOT same_request THEN
     outcome := 'invalid_grant';
     RETURN NEXT;
     RETURN;
@@ -518,11 +541,13 @@ BEGIN
     RETURN;
   END IF;
 
-  UPDATE uts.authorization_codes AS stored
-  SET status = 'consumed', consumed_at = now(), grant_id = p_grant_id
-  WHERE stored.code_hash = p_code_hash;
+  IF NOT retry THEN
+    UPDATE uts.authorization_codes AS stored
+    SET status = 'consumed', consumed_at = now(), grant_id = p_grant_id
+    WHERE stored.code_hash = p_code_hash;
+  END IF;
 
-  IF code.client_kind = 'first_party' THEN
+  IF NOT retry AND code.client_kind = 'first_party' THEN
     idle_window := CASE p_client_class WHEN 'desktop' THEN interval '30 days' ELSE interval '60 days' END;
     INSERT INTO uts.device_sessions (
       account_id, client_class, device_label, platform, auth_time, amr, client_ip, asn, country, city
@@ -539,7 +564,7 @@ BEGIN
       now() + CASE p_client_class WHEN 'desktop' THEN interval '180 days' ELSE interval '365 days' END
     );
     refresh_expires_at := now() + idle_window;
-  ELSE
+  ELSIF NOT retry THEN
     INSERT INTO uts.third_party_grant_families (
       id, account_id, client_id, consent_id, scopes, org_id, auth_time, amr, expires_at
     ) VALUES (
@@ -549,25 +574,80 @@ BEGIN
     INSERT INTO uts.third_party_refresh_tokens (family_id, token_hash, idle_expires_at)
     VALUES (p_grant_id, p_refresh_token_hash, now() + interval '30 days');
     refresh_expires_at := now() + interval '30 days';
+  ELSIF code.client_kind = 'first_party' THEN
+    SELECT grant_row.status, grant_row.token_hash,
+      least(grant_row.idle_expires_at, grant_row.expires_at)
+    INTO grant_state, previous_hash, refresh_expires_at
+    FROM uts.refresh_grants AS grant_row WHERE grant_row.id = p_grant_id
+    FOR UPDATE;
+    IF grant_state IS DISTINCT FROM 'active' THEN
+      outcome := 'invalid_grant';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+    UPDATE uts.refresh_grants AS grant_row SET token_hash = p_refresh_token_hash
+    WHERE grant_row.id = p_grant_id;
+  ELSE
+    SELECT family.status, family.expires_at INTO grant_state, family_end
+    FROM uts.third_party_grant_families AS family WHERE family.id = p_grant_id
+    FOR UPDATE;
+    IF grant_state IS DISTINCT FROM 'active' THEN
+      outcome := 'invalid_grant';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+    UPDATE uts.third_party_refresh_tokens AS token
+    SET status = 'rotated', rotated_at = now(), grace_until = now() + interval '60 seconds'
+    WHERE token.family_id = p_grant_id AND token.status = 'active'
+    RETURNING token.id, token.token_hash INTO previous_token_id, previous_hash;
+    IF NOT FOUND THEN
+      outcome := 'invalid_grant';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+    refresh_expires_at := least(now() + interval '30 days', family_end);
+    INSERT INTO uts.third_party_refresh_tokens (family_id, parent_id, token_hash, idle_expires_at)
+    VALUES (p_grant_id, previous_token_id, p_refresh_token_hash, refresh_expires_at);
   END IF;
 
   token_ids := ARRAY(SELECT gen_random_uuid() FROM generate_series(1, cardinality(chosen.scopes)));
-  PERFORM uts.write_audit_event(
-    p_environment, 'ai.kilo.uts.grant.created', 3002, 1, 'success', NULL, code.account_id,
-    jsonb_build_object(
-      'grantType', 'authorization_code',
-      'clientId', uts.audit_client_id(code.client_id),
-      'clientKind', code.client_kind,
-      'grantId', p_grant_id,
-      'codeRef', uts.credential_reference(p_code_hash),
-      'refreshRef', uts.credential_reference(p_refresh_token_hash),
-      'tokenRefs', to_jsonb(token_ids::text[]),
-      'scopes', to_jsonb(chosen.scopes),
-      'audiences', to_jsonb(uts.scope_audiences(chosen.scopes)),
-      'tokenLifetimeSeconds', 600,
-      'org', code.org_id
-    )
-  );
+  IF retry THEN
+    PERFORM uts.write_audit_event(
+      p_environment, 'ai.kilo.uts.token.issued', 6003, 1, 'success', NULL, code.account_id,
+      jsonb_build_object(
+        'grantType', 'authorization_code',
+        'clientId', uts.audit_client_id(code.client_id),
+        'clientKind', code.client_kind,
+        'grantId', p_grant_id,
+        'rotation', 'code_retry',
+        'codeRef', uts.credential_reference(p_code_hash),
+        'previousRefreshRef', uts.credential_reference(previous_hash),
+        'refreshRef', uts.credential_reference(p_refresh_token_hash),
+        'tokenRefs', to_jsonb(token_ids::text[]),
+        'scopes', to_jsonb(chosen.scopes),
+        'audiences', to_jsonb(uts.scope_audiences(chosen.scopes)),
+        'tokenLifetimeSeconds', 600,
+        'org', code.org_id
+      )
+    );
+  ELSE
+    PERFORM uts.write_audit_event(
+      p_environment, 'ai.kilo.uts.grant.created', 3002, 1, 'success', NULL, code.account_id,
+      jsonb_build_object(
+        'grantType', 'authorization_code',
+        'clientId', uts.audit_client_id(code.client_id),
+        'clientKind', code.client_kind,
+        'grantId', p_grant_id,
+        'codeRef', uts.credential_reference(p_code_hash),
+        'refreshRef', uts.credential_reference(p_refresh_token_hash),
+        'tokenRefs', to_jsonb(token_ids::text[]),
+        'scopes', to_jsonb(chosen.scopes),
+        'audiences', to_jsonb(uts.scope_audiences(chosen.scopes)),
+        'tokenLifetimeSeconds', 600,
+        'org', code.org_id
+      )
+    );
+  END IF;
   outcome := 'issued';
   subject_id := code.account_id;
   bound_org_id := code.org_id;

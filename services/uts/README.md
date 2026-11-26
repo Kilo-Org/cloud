@@ -126,7 +126,7 @@ reached an audit row, and times the mint path.
 | Endpoint | Behaviour | SQL |
 |---|---|---|
 | `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
-| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A second use of a code revokes the grant | `uts.exchange_authorization_code` |
+| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A retry of the same request while the code's 60-second lifetime lasts gets the same grant and a new refresh token (below); any other second use of a code revokes the grant | `uts.exchange_authorization_code` |
 | `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation, 60-second grace, reuse after the grace revokes the family and writes a feed entry | `uts.refresh_first_party`, `uts.refresh_third_party` |
 | `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
 | `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
@@ -146,6 +146,18 @@ grant id picks signs all of them, and `issued_tokens` lists them. The claims are
 `iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
 (`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with `Retry-After`; a
 failure no retry fixes gives 500.
+
+The tokens are signed after the statement commits. When signing fails (or the response is lost),
+the client sends the same code exchange again with a new DPoP proof. While the code's 60-second
+lifetime lasts, the same client, redirect URI, PKCE verifier and DPoP key get the grant the first
+attempt created, new access tokens and a new refresh token, and the code does not count as
+reused. Only hashes are stored, so the newest refresh token wins: a first-party grant's token hash
+is replaced, and the earlier token is unknown from then on; a third-party family rotates to the
+new token, and the earlier one becomes a rotated token whose use after its grace revokes the
+family. A consumed code with another client, redirect URI, verifier or key, or after its
+lifetime, still revokes the grant. The audit row of a mint lists the `jti` of each token the call
+is about to sign: after a failed signing no token carries those ids, and the retry's row
+(`token.issued`, `rotation` `code_retry`) lists the ids of the tokens it signs.
 
 ## Tests
 

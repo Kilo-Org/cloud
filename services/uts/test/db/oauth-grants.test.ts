@@ -156,7 +156,10 @@ async function thirdPartyConsent(accountId: string, scopes = '{mcp:tools.read}')
   return { clientId, consentId: consent.rows[0].id };
 }
 
-/** A third-party family created through a code exchange; returns its first refresh token. */
+/**
+ * A third-party family created through a code exchange; returns its first refresh token and the
+ * exchange it came from.
+ */
 async function thirdPartyFamily(accountId: string) {
   const { clientId, consentId } = await thirdPartyConsent(accountId);
   const code = token();
@@ -180,7 +183,7 @@ async function thirdPartyFamily(accountId: string) {
   ).toBe('issued');
   const refreshToken = token();
   const familyId = randomUUID();
-  const result = await grants.exchangeCode({
+  const exchange: ExchangeCodeInput = {
     environment,
     codeHash: sha256(code),
     clientId,
@@ -191,9 +194,9 @@ async function thirdPartyFamily(accountId: string) {
     refreshTokenHash: sha256(refreshToken),
     scopes: null,
     resources: null,
-  });
-  expect(result.outcome).toBe('issued');
-  return { clientId, familyId, refreshToken };
+  };
+  expect((await grants.exchangeCode(exchange)).outcome).toBe('issued');
+  return { clientId, familyId, refreshToken, exchange };
 }
 
 function refreshThirdParty(clientId: string, presented: string, next = token()) {
@@ -498,6 +501,161 @@ describe('code exchange', () => {
       type: 'ai.kilo.uts.authorization_code.reused',
       event: { data: { outcome: 'denied', attributes: { grantId: grant.grantId } } },
     });
+  });
+
+  it('answers a retry of the same exchange with the same grant and a new refresh token', async () => {
+    const accountId = await insertAccount(owner);
+    const first = await firstPartyGrant(accountId);
+    // The signing failed after the first exchange committed; the client sends the request again
+    // with a new DPoP proof.
+    const retryToken = `kilo_rt_${token()}`;
+    const retried = await grants.exchangeCode({
+      ...first,
+      binding: { kind: 'first_party', proof: proofOf(first.jkt), clientClass: 'desktop', device },
+      refreshTokenHash: sha256(retryToken),
+    });
+    if (retried.outcome !== 'issued') throw new Error(retried.outcome);
+    expect(retried.subjectId).toBe(accountId);
+    expect(retried.scopes).toEqual(['gateway:models.read', 'kilo-chat:messages.read']);
+
+    const stored = await owner.query(
+      `SELECT grant_row.id, grant_row.status, grant_row.token_hash
+       FROM uts.refresh_grants AS grant_row WHERE grant_row.account_id = $1`,
+      [accountId]
+    );
+    expect(stored.rows).toEqual([
+      { id: first.grantId, status: 'active', token_hash: sha256(retryToken) },
+    ]);
+    const refresh = (refreshToken: string) =>
+      grants.refreshFirstParty({
+        environment,
+        tokenHash: sha256(refreshToken),
+        grantId: first.grantId,
+        clientId: 'kilo-cli',
+        proof: proofOf(first.jkt),
+        scopes: null,
+        resources: null,
+      });
+    expect(await refresh(first.refreshToken)).toEqual({ outcome: 'invalid_grant' });
+    expect((await refresh(retryToken)).outcome).toBe('issued');
+
+    const rows = await auditRows(accountId);
+    expect(rows.map(row => row.type)).not.toContain('ai.kilo.uts.authorization_code.reused');
+    const retryRow = rows.find(row => row.event.data.attributes.rotation === 'code_retry');
+    expect(retryRow).toMatchObject({
+      type: 'ai.kilo.uts.token.issued',
+      event: {
+        data: {
+          attributes: {
+            grantType: 'authorization_code',
+            grantId: first.grantId,
+            previousRefreshRef: reference(first.refreshToken),
+            refreshRef: reference(retryToken),
+            tokenRefs: retried.tokenIds,
+          },
+        },
+      },
+    });
+  });
+
+  it('refuses a retry that replays the first proof, and leaves the grant active', async () => {
+    const accountId = await insertAccount(owner);
+    const first = await firstPartyGrant(accountId);
+    expect(await grants.exchangeCode({ ...first, refreshTokenHash: sha256(token()) })).toEqual({
+      outcome: 'dpop_replay',
+    });
+    const stored = await owner.query('SELECT status FROM uts.refresh_grants WHERE id = $1', [
+      first.grantId,
+    ]);
+    expect(stored.rows).toEqual([{ status: 'active' }]);
+  });
+
+  it.each([
+    [
+      'another verifier',
+      (input: ExchangeCodeInput) => ({
+        ...input,
+        codeChallenge: sha256(token()).toString('base64url'),
+      }),
+    ],
+    [
+      'another DPoP key',
+      (input: ExchangeCodeInput) => ({
+        ...input,
+        binding: {
+          kind: 'first_party' as const,
+          proof: proofOf(randomBytes(32)),
+          clientClass: 'desktop' as const,
+          device,
+        },
+      }),
+    ],
+    ['another client', (input: ExchangeCodeInput) => ({ ...input, clientId: 'kilo-other' })],
+  ])('revokes the grant when a retry comes with %s', async (_name, change) => {
+    const accountId = await insertAccount(owner);
+    const first = await firstPartyGrant(accountId);
+    const retry = change({
+      ...first,
+      binding: { kind: 'first_party', proof: proofOf(first.jkt), clientClass: 'desktop', device },
+      refreshTokenHash: sha256(token()),
+    });
+    expect(await grants.exchangeCode(retry)).toEqual({ outcome: 'invalid_grant' });
+    const stored = await owner.query(
+      'SELECT status, revoke_reason, token_hash FROM uts.refresh_grants WHERE id = $1',
+      [first.grantId]
+    );
+    expect(stored.rows).toEqual([
+      { status: 'revoked', revoke_reason: 'reuse_detected', token_hash: first.refreshTokenHash },
+    ]);
+    expect((await auditRows(accountId)).at(-1)?.type).toBe('ai.kilo.uts.authorization_code.reused');
+  });
+
+  it('revokes the grant when the same request comes again after the code lifetime', async () => {
+    const accountId = await insertAccount(owner);
+    const first = await firstPartyGrant(accountId);
+    await owner.query(
+      `UPDATE uts.authorization_codes
+       SET created_at = now() - interval '2 minutes', expires_at = now() - interval '1 minute',
+           consumed_at = now() - interval '90 seconds'
+       WHERE code_hash = $1`,
+      [first.codeHash]
+    );
+    const retry = {
+      ...first,
+      binding: {
+        kind: 'first_party' as const,
+        proof: proofOf(first.jkt),
+        clientClass: 'desktop' as const,
+        device,
+      },
+      refreshTokenHash: sha256(token()),
+    };
+    expect(await grants.exchangeCode(retry)).toEqual({ outcome: 'invalid_grant' });
+    const stored = await owner.query('SELECT status FROM uts.refresh_grants WHERE id = $1', [
+      first.grantId,
+    ]);
+    expect(stored.rows).toEqual([{ status: 'revoked' }]);
+  });
+
+  it('rotates a third-party family to the retried token', async () => {
+    const accountId = await insertAccount(owner);
+    const family = await thirdPartyFamily(accountId);
+    const retryToken = token();
+    const retried = await grants.exchangeCode({
+      ...family.exchange,
+      refreshTokenHash: sha256(retryToken),
+    });
+    expect(retried).toMatchObject({ outcome: 'issued', subjectId: accountId });
+    const tokens = await owner.query(
+      `SELECT token_hash, status, grace_until - rotated_at AS grace
+       FROM uts.third_party_refresh_tokens WHERE family_id = $1 ORDER BY issued_at, parent_id NULLS FIRST`,
+      [family.familyId]
+    );
+    expect(tokens.rows).toEqual([
+      { token_hash: sha256(family.refreshToken), status: 'rotated', grace: { minutes: 1 } },
+      { token_hash: sha256(retryToken), status: 'active', grace: null },
+    ]);
+    expect((await refreshThirdParty(family.clientId, retryToken).result).outcome).toBe('issued');
   });
 
   it('creates a third-party family whose id is the grant id, with its first token', async () => {

@@ -25,6 +25,7 @@ import { s256Challenge } from '../../src/oauth/pkce';
 import {
   createFirstPartyRefreshToken,
   grantIdOfCode,
+  grantIdOfFirstPartyRefreshToken,
   randomCredential,
 } from '../../src/token/credentials';
 import { keySet } from './support';
@@ -180,6 +181,49 @@ describe('token endpoint: authorization_code', () => {
       expect(response.status).toBe(400);
       expect(await errorOf(response)).toBe(outcome);
     }
+  });
+
+  it('answers a retry after a failed signing with the same grant and a new refresh token', async () => {
+    const grants = fakeGrants({
+      exchangeCode: async () => ({
+        outcome: 'issued',
+        refreshExpiresAt: new Date(Date.now() + 30 * 86_400_000),
+        ...minted(),
+      }),
+    });
+    const key = await dpopKey();
+    const code = randomCredential();
+    const exchange = async () =>
+      formRequest(
+        '/token',
+        {
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: 'http://127.0.0.1:4100/callback',
+          client_id: 'kilo-cli',
+          code_verifier: VERIFIER,
+        },
+        { DPoP: await dpopProof(key) }
+      );
+    const failed = await call(
+      await exchange(),
+      oauthDeps(grants.access, { sign: async () => ({ status: 'unavailable' }) })
+    );
+    expect(failed.status).toBe(503);
+    const retried = await call(await exchange(), oauthDeps(grants.access));
+    expect(retried.status).toBe(200);
+    const body = TokenResponseSchema.parse(await retried.json());
+
+    const [first, second] = grants.calls.map(({ input }) => input as ExchangeCodeInput);
+    expect(second.grantId).toBe(first.grantId);
+    expect(first.grantId).toBe(await grantIdOfCode(code));
+    expect(Buffer.from(second.refreshTokenHash)).not.toEqual(Buffer.from(first.refreshTokenHash));
+    if (first.binding.kind !== 'first_party' || second.binding.kind !== 'first_party') {
+      throw new Error('first-party bindings expected');
+    }
+    expect(second.binding.proof.jti).not.toBe(first.binding.proof.jti);
+    expect(grantIdOfFirstPartyRefreshToken(body.refresh_token ?? '')).toBe(first.grantId);
+    expect((await verifiedClaims(body.access_token, 'gateway')).claims.sid).toBe(first.grantId);
   });
 });
 

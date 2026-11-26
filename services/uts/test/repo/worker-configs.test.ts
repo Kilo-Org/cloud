@@ -9,6 +9,8 @@ import { experimental_readRawConfig } from 'wrangler';
 import {
   FEED_CONFIG,
   FEED_TEST_CONFIG,
+  JOSE_UNHANDLED_REJECTION_DATE,
+  JOSE_UNHANDLED_REJECTION_FLAG,
   MINT_CONFIG,
   MINT_DEV_CONFIG,
   MINT_TEST_CONFIG,
@@ -461,6 +463,67 @@ describe('the UTS configs themselves', () => {
       expect(utsConfigProblems([...configs, renamed])).toEqual([
         expect.stringContaining(`${path} deploys`),
       ]);
+    }
+  });
+
+  // jose's `verifyCompact` returns a promise it does not await, so a caught verification failure
+  // reaches workerd as a briefly unhandled rejection; workerd stops reporting it from the
+  // compatibility date that makes `unhandled_rejection_after_microtask_checkpoint` the default and
+  // refuses an explicit listing there (panva/jose#892). The flag therefore goes with a date before
+  // that one, so a config behaves the same before and after it.
+  const withFlag = (raw: Record<string, unknown>, date: string) => ({
+    ...raw,
+    compatibility_date: date,
+    compatibility_flags: [
+      ...((raw.compatibility_flags ?? []) as string[]),
+      JOSE_UNHANDLED_REJECTION_FLAG,
+    ],
+  });
+
+  it('fail a jose-verifying config that drops below the fix without listing the flag', () => {
+    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+      const problems = utsConfigProblems(
+        configWith(path, raw => ({ ...raw, compatibility_date: '2025-06-01' }))
+      );
+      const blocks = path === MINT_CONFIG ? ['(top level)', '(env.staging)'] : ['(top level)'];
+      expect(problems.map(problem => problem.split(':')[0])).toEqual(
+        blocks.map(block => `${path} ${block}`)
+      );
+      expect(
+        problems.every(problem => problem.includes(`must list ${JOSE_UNHANDLED_REJECTION_FLAG}`))
+      ).toBe(true);
+    }
+  });
+
+  it('accept a jose-verifying config before the fix that lists the flag', () => {
+    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+      const problems = utsConfigProblems(configWith(path, raw => withFlag(raw, '2025-06-01')));
+      expect(problems).toEqual([]);
+    }
+  });
+
+  it('fail a jose-verifying config that lists the flag where workerd makes it the default', () => {
+    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+      const problems = utsConfigProblems(
+        configWith(path, raw => withFlag(raw, JOSE_UNHANDLED_REJECTION_DATE))
+      );
+      const blocks = path === MINT_CONFIG ? ['(top level)', '(env.staging)'] : ['(top level)'];
+      expect(problems.map(problem => problem.split(':')[0])).toEqual(
+        blocks.map(block => `${path} ${block}`)
+      );
+      expect(problems.every(problem => problem.includes('drop it'))).toBe(true);
+    }
+  });
+
+  it('fail a jose-verifying config that leaves the compatibility date out', () => {
+    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+      const problems = utsConfigProblems(
+        configWith(path, ({ compatibility_date: _date, ...raw }) => raw)
+      );
+      expect(problems.length).toBeGreaterThan(0);
+      expect(
+        problems.every(problem => problem.includes('compatibility_date resolves to undefined'))
+      ).toBe(true);
     }
   });
 });

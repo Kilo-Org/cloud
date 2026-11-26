@@ -501,14 +501,12 @@ export class LeaseDO extends DurableObject<Env> {
       .set(
         result === 'revoke_failed'
           ? { revokeFailureAudited: true }
-          : result === 'unconfirmed'
-            ? unconfirmedEnd(row, now)
-            : {
-                state: row.state === 'active' ? 'revoked' : 'failed',
-                endedAt: now,
-                revokeCause: null,
-                revokeRetryAt: null,
-              }
+          : {
+              state: row.state === 'active' ? 'revoked' : 'failed',
+              endedAt: now,
+              revokeCause: null,
+              revokeRetryAt: null,
+            }
       )
       .where(eq(schema.lease.slot, row.slot))
       .run();

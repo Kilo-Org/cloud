@@ -4,13 +4,15 @@ import { vercelIdentity } from '@kilocode/service-token-client/vercel';
 import { STS_ISSUERS, type StsEnvironment } from '@kilocode/sts-contracts';
 import { STS_URL } from '@kilocode/web-shared/lib/config.server';
 import { getCache, waitUntil } from '@vercel/functions';
-import type { StsSecretReader } from '@/lib/sts-secret-reader';
 
 /**
  * The STS transport of the web app's internal API secret read. `sts-secret-reader.ts` imports this
  * module only on the first read under `SECRETS_SOURCE=sts`, so a deployment on `env` never loads
  * the secrets client, the Vercel OIDC exchange or the Runtime Cache.
  */
+
+/** Reads one secret from the deployment's STS bundle and returns it as stored. */
+export type StsSecretReader = (name: string) => Promise<string>;
 
 /** The deployment's runtime variables; `process.env` itself, read live on the first STS read. */
 type VercelRuntime = Readonly<Record<string, string | undefined>> & {

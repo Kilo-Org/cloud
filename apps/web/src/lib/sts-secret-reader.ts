@@ -4,6 +4,7 @@ import {
   installInternalApiSecretRead,
   type InternalApiSecretRead,
 } from '@kilocode/web-shared/lib/internal-api-secret';
+import type { StsSecretReader } from '@/lib/sts-secret-transport';
 
 /**
  * `SECRETS_SOURCE` selects where this web deployment reads `INTERNAL_API_SECRET` (design 4.4):
@@ -31,9 +32,6 @@ export function internalApiSecretFromSts(): boolean {
     internalApiSecretSource(process.env.SECRETS_SOURCE) === 'sts'
   );
 }
-
-/** Reads one secret from the deployment's STS bundle and returns it as stored. */
-export type StsSecretReader = (name: string) => Promise<string>;
 
 /** Longest wait for the transport module to load on the first STS read. */
 export const STS_TRANSPORT_LOAD_TIMEOUT_MS = 10_000;

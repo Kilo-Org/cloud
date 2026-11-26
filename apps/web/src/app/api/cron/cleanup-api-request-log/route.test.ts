@@ -1,4 +1,4 @@
-import type { DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { NextRequest } from 'next/server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 
@@ -72,6 +72,19 @@ async function insertApiRequestLogRecords(count: number, created_at: string) {
     .values(Array.from({ length: count }, () => logRecord(created_at)));
 }
 
+function makeOptIn(expires_at?: string) {
+  return {
+    id: crypto.randomUUID(),
+    target_type: 'account' as const,
+    target_id: `oauth/cleanup/${crypto.randomUUID()}`,
+    reason: 'Investigate errors',
+    added_by_email: 'admin@example.com',
+    added_at: '2020-01-01T00:00:00.000Z',
+    errors_only: true,
+    ...(expires_at ? { expires_at } : {}),
+  };
+}
+
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -114,16 +127,6 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
   });
 
   it('deletes expired opt-ins while preserving future and non-expiring rules', async () => {
-    const makeOptIn = (expires_at?: string) => ({
-      id: crypto.randomUUID(),
-      target_type: 'account' as const,
-      target_id: `oauth/cleanup/${crypto.randomUUID()}`,
-      reason: 'Investigate errors',
-      added_by_email: 'admin@example.com',
-      added_at: '2020-01-01T00:00:00.000Z',
-      errors_only: true,
-      ...(expires_at ? { expires_at } : {}),
-    });
     const now = Date.now();
     const rules = [
       makeOptIn(new Date(now - 1).toISOString()),
@@ -175,21 +178,35 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect([...fakeR2.objects.entries()]).toEqual([[recentObject, 'recent blob']]);
   });
 
-  it('keeps rows after a per-object delete error and retries the batch', async () => {
-    const expired1 = await insertApiRequestLogRecord(daysAgo(45));
-    const expired2 = await insertApiRequestLogRecord(daysAgo(31));
-    const firstObject = `${BUCKET}/${apiRequestLogBlobKey(expired1)}`;
-    const secondKey = apiRequestLogBlobKey(expired2);
-    const secondObject = `${BUCKET}/${secondKey}`;
-    fakeR2.objects.set(firstObject, 'first blob');
-    fakeR2.objects.set(secondObject, 'second blob');
-    jest.spyOn(fakeR2, 'send').mockImplementationOnce(async () => {
-      fakeR2.objects.delete(firstObject);
+  it('retries a failed object while clearing later groups and expired opt-ins', async () => {
+    const failed = await insertApiRequestLogRecord(daysAgo(46));
+    await insertApiRequestLogRecords(999, daysAgo(45));
+    const later = await insertApiRequestLogRecord(daysAgo(44));
+    const failedKey = apiRequestLogBlobKey(failed);
+    const failedObject = `${BUCKET}/${failedKey}`;
+    fakeR2.objects.set(failedObject, 'failed blob');
+    fakeR2.objects.set(`${BUCKET}/${apiRequestLogBlobKey(later)}`, 'later blob');
+    const send = fakeR2.send.bind(fakeR2);
+    const mockSend = jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
+      if (!(command instanceof DeleteObjectsCommand)) return send(command);
+      const objects = command.input.Delete?.Objects ?? [];
+      if (!objects.some(({ Key }) => Key === failedKey)) return send(command);
+      await send(
+        new DeleteObjectsCommand({
+          ...command.input,
+          Delete: { Objects: objects.filter(({ Key }) => Key !== failedKey), Quiet: true },
+        })
+      );
       return {
         $metadata: {},
-        Errors: [{ Code: 'AccessDenied', Key: secondKey, Message: 'provider detail' }],
+        Errors: [{ Code: 'AccessDenied', Key: failedKey, Message: 'provider detail' }],
       };
     });
+
+    const activeRule = makeOptIn();
+    await db
+      .insert(ai_gateway_request_logging_opt_ins)
+      .values({ opt_ins: [makeOptIn(daysAgo(1)), activeRule] });
 
     const request = makeRequest({ authorization: 'Bearer cron-secret' });
     await expect(GET(request)).rejects.toThrow(
@@ -199,27 +216,65 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
       outcome: 'failed',
       exception_name: 'ApiRequestLogBlobDeleteError',
     });
-    const retained = await db.select({ id: api_request_log_2.id }).from(api_request_log_2);
-    expect(retained.map(row => row.id).sort()).toEqual([expired1.id, expired2.id].sort());
-    expect([...fakeR2.objects.keys()]).toEqual([secondObject]);
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(await db.select({ id: api_request_log_2.id }).from(api_request_log_2)).toEqual([
+      { id: failed.id },
+    ]);
+    expect([...fakeR2.objects.keys()]).toEqual([failedObject]);
+    expect(await getRequestLoggingOptIns()).toEqual([activeRule]);
 
+    const next = await insertApiRequestLogRecord(daysAgo(43));
+    fakeR2.objects.set(`${BUCKET}/${apiRequestLogBlobKey(next)}`, 'next blob');
+    await expect(GET(request)).rejects.toThrow(
+      /^API request log blob delete failed \(object count: 1\)$/
+    );
+    expect(await db.select({ id: api_request_log_2.id }).from(api_request_log_2)).toEqual([
+      { id: failed.id },
+    ]);
+    expect([...fakeR2.objects.keys()]).toEqual([failedObject]);
+
+    mockSend.mockRestore();
     const response = await GET(request);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ deletedCount: 2, hasMore: false });
+    await expect(response.json()).resolves.toMatchObject({ deletedCount: 1, hasMore: false });
     expect(await db.select().from(api_request_log_2)).toEqual([]);
     expect(fakeR2.objects.size).toBe(0);
   });
 
-  it('keeps rows and omits provider details when a storage request fails', async () => {
-    const expired = await insertApiRequestLogRecord(daysAgo(45));
-    jest.spyOn(fakeR2, 'send').mockRejectedValueOnce(new Error('provider detail'));
+  it.each([undefined, 'unrelated-key'])(
+    'keeps the group when a storage error cannot be attributed to its object (%s)',
+    async key => {
+      const expired = await insertApiRequestLogRecord(daysAgo(45));
+      jest.spyOn(fakeR2, 'send').mockResolvedValueOnce({
+        $metadata: {},
+        Errors: [{ Code: 'AccessDenied', Key: key }],
+      });
+
+      await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow(
+        /^API request log blob delete failed \(object count: 1\)$/
+      );
+
+      expect(await db.select({ id: api_request_log_2.id }).from(api_request_log_2)).toEqual([
+        { id: expired.id },
+      ]);
+    }
+  );
+
+  it('keeps unconfirmed rows and omits provider details when a storage request fails', async () => {
+    await insertApiRequestLogRecords(1_000, daysAgo(46));
+    const unconfirmed = await insertApiRequestLogRecord(daysAgo(45));
+    const send = fakeR2.send.bind(fakeR2);
+    jest
+      .spyOn(fakeR2, 'send')
+      .mockImplementationOnce(send)
+      .mockRejectedValueOnce(new Error('provider detail'));
 
     await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow(
       /^API request log blob delete request failed$/
     );
 
     expect(await db.select({ id: api_request_log_2.id }).from(api_request_log_2)).toEqual([
-      { id: expired.id },
+      { id: unconfirmed.id },
     ]);
   });
 

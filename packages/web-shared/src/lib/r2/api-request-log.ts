@@ -128,31 +128,58 @@ export async function getApiRequestLogBlob(key: string): Promise<string | null> 
   }
 }
 
-/** Deletes the specified blobs. Missing objects count as deleted. */
-export async function deleteApiRequestLogBlobs(keys: readonly string[]): Promise<void> {
-  if (keys.length === 0) return;
+/**
+ * Returns the confirmed deletions, including missing objects, alongside any failure.
+ * The caller can remove confirmed rows and keep the rest for a retry.
+ */
+export async function deleteApiRequestLogBlobs(
+  keys: readonly string[]
+): Promise<{ deletedKeys: ReadonlySet<string>; error?: Error }> {
+  const deletedKeys = new Set<string>();
+  if (keys.length === 0) return { deletedKeys };
 
   const { client, bucket } = getStorage();
+  let failedCount = 0;
   for (let start = 0; start < keys.length; start += DELETE_OBJECTS_LIMIT) {
-    const objects = keys.slice(start, start + DELETE_OBJECTS_LIMIT).map(Key => ({ Key }));
+    const group = new Set(keys.slice(start, start + DELETE_OBJECTS_LIMIT));
     let result: DeleteObjectsCommandOutput;
     try {
       result = await client.send(
         new DeleteObjectsCommand({
           Bucket: bucket,
-          Delete: { Objects: objects, Quiet: true },
+          Delete: { Objects: Array.from(group, Key => ({ Key })), Quiet: true },
         })
       );
     } catch {
-      // The cron framework can log thrown errors. Keep provider details out of the error.
-      throw new ApiRequestLogBlobDeleteError('API request log blob delete request failed');
+      // Leave this group and the remaining groups for retry. Keep provider details out of errors.
+      return {
+        deletedKeys,
+        error: new ApiRequestLogBlobDeleteError('API request log blob delete request failed'),
+      };
     }
 
-    const failedCount = result.Errors?.filter(error => error.Code !== 'NoSuchKey').length ?? 0;
-    if (failedCount > 0) {
-      throw new ApiRequestLogBlobDeleteError(
-        `API request log blob delete failed (object count: ${failedCount})`
-      );
+    const errors = result.Errors ?? [];
+    // An error without a matching key makes the result for this group uncertain.
+    if (errors.some(({ Key }) => Key === undefined || !group.has(Key))) {
+      failedCount += group.size;
+      continue;
+    }
+    const failedKeys = new Set(
+      errors.filter(error => error.Code !== 'NoSuchKey').map(error => error.Key)
+    );
+    failedCount += failedKeys.size;
+    for (const key of group) {
+      if (!failedKeys.has(key)) deletedKeys.add(key);
     }
   }
+
+  if (failedCount > 0) {
+    return {
+      deletedKeys,
+      error: new ApiRequestLogBlobDeleteError(
+        `API request log blob delete failed (object count: ${failedCount})`
+      ),
+    };
+  }
+  return { deletedKeys };
 }

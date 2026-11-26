@@ -318,7 +318,9 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
   credential-changing scope; a scope limited to listed roles is neither third-party-safe nor
   PAT-eligible). It lists the account API scopes (`uts:pats.manage`, `uts:bot-keys.manage`,
   session-bound), `uts:probe.read`, `uts:security.read` (the web app's security view,
-  session-bound), `kilo-api:profile.read` (CLI and PATs), the CLI's Kilo API route scopes
+  session-bound), `uts:browser-session.read` (the web app's bootstrap at its code exchange,
+  session-bound, no account change), `kilo-api:profile.read` (CLI and PATs), the CLI's Kilo API
+  route scopes
   (`kilo-api:notifications.read`, `organizations.read`, `auto-routing.read`; session-bound
   `organizations.write` for organization members, `auto-routing.write`, `sessions.write`,
   `shell-security.analyze`, `feedback.write`, `credits.redeem`; no generic write scope), and the

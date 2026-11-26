@@ -3,6 +3,8 @@ import {
   KILO_WEB_CALLBACK_PATH,
   UTS_ACCOUNT_AUDIENCE,
   UTS_BOT_KEYS_MANAGE_SCOPE,
+  UTS_BROWSER_SESSION_READ_SCOPE,
+  UTS_CREDENTIAL_SCOPES,
   UTS_FIRST_PARTY_CLIENTS,
   UTS_ORG_ROLES,
   UTS_PATS_MANAGE_SCOPE,
@@ -95,23 +97,29 @@ describe('the UTS scope registry', () => {
     }
   });
 
-  it('lists the security view scope for the web app only, with a session', () => {
-    expect(utsScopeEntry(UTS_SECURITY_READ_SCOPE)).toEqual({
-      audience: UTS_ACCOUNT_AUDIENCE,
-      maxLifetimeSeconds: 600,
-      allowedClients: ['kilo-web'],
-      subjects: { kind: 'any_user' },
-      thirdPartySafe: false,
-      stepUp: false,
-      patEligible: false,
-      privileged: false,
-      requiresSession: true,
-      requiresOrgClaim: false,
-      delegable: false,
-    });
-    expect(credentialScopeCheck(UTS_SECURITY_READ_SCOPE, null)).toEqual({
-      status: 'not_pat_eligible',
-    });
+  it.each([UTS_SECURITY_READ_SCOPE, UTS_BROWSER_SESSION_READ_SCOPE])(
+    'lists %s for the web app only, with a session, 10 minutes, and no PAT carries it',
+    scope => {
+      expect(utsScopeEntry(scope)).toEqual({
+        audience: UTS_ACCOUNT_AUDIENCE,
+        maxLifetimeSeconds: 600,
+        allowedClients: ['kilo-web'],
+        subjects: { kind: 'any_user' },
+        thirdPartySafe: false,
+        stepUp: false,
+        patEligible: false,
+        privileged: false,
+        requiresSession: true,
+        requiresOrgClaim: false,
+        delegable: false,
+      });
+      expect(credentialScopeCheck(scope, null)).toEqual({ status: 'not_pat_eligible' });
+      expect(UTS_CREDENTIAL_SCOPES).not.toContain(scope);
+    }
+  );
+
+  it('names the browser-session bootstrap scope exactly', () => {
+    expect(UTS_BROWSER_SESSION_READ_SCOPE).toBe('uts:browser-session.read');
   });
 
   it.each([

@@ -89,6 +89,11 @@ export const UTS_PROBE_READ_SCOPE = 'uts:probe.read';
 export const KILO_API_PROFILE_READ_SCOPE = 'kilo-api:profile.read';
 /** The user's security view on the web app: sessions, devices, sign-in methods, audit events. */
 export const UTS_SECURITY_READ_SCOPE = 'uts:security.read';
+/**
+ * The web BFF's bootstrap scope at its code exchange: reads the caller's own browser session
+ * (status, sign-in time and methods, expiry), with no account change.
+ */
+export const UTS_BROWSER_SESSION_READ_SCOPE = 'uts:browser-session.read';
 
 /** Scopes that change credentials. No PAT or bot key may carry one, so a PAT never makes a PAT. */
 export const UTS_CREDENTIAL_SCOPES: readonly string[] = [
@@ -149,6 +154,9 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
   [UTS_BOT_KEYS_MANAGE_SCOPE]: ACCOUNT_API,
   [UTS_PROBE_READ_SCOPE]: { ...ACCOUNT_API, patEligible: true, requiresSession: false },
   [UTS_SECURITY_READ_SCOPE]: firstPartyScope(UTS_ACCOUNT_AUDIENCE, [BFF], {
+    requiresSession: true,
+  }),
+  [UTS_BROWSER_SESSION_READ_SCOPE]: firstPartyScope(UTS_ACCOUNT_AUDIENCE, [BFF], {
     requiresSession: true,
   }),
   [KILO_API_PROFILE_READ_SCOPE]: {

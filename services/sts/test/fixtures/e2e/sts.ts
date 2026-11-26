@@ -1,19 +1,24 @@
 import { SecretsBroker } from '../../../src/broker';
 import type { Env } from '../../../src/env';
 import { handleRequest } from '../../../src/http';
-import { BundleDO as StsBundleDO, RefresherDO as StsRefresherDO } from '../../../src/index';
+import {
+  BundleDO as StsBundleDO,
+  DeployTokenDO as StsDeployTokenDO,
+  RefresherDO as StsRefresherDO,
+} from '../../../src/index';
 import { loadPolicies } from '../../../src/policy/load';
 import type { MintAuthority } from '../../../src/tokens/mint';
 import { E2E_SCOPES } from './scopes';
 
-export { DenialDO, DeployTokenDO, LeaseDO, SignerDO, TokenSignerDO } from '../../../src/index';
+export { DenialDO, LeaseDO, SignerDO, TokenSignerDO } from '../../../src/index';
 
 /**
  * Test-only build of STS for the local end-to-end checks (README "Tests"); never deployed. It runs
- * STS's own routes, broker and Durable Objects, with three changes: mints are checked against the
- * end-to-end registry; the policies are the probe's and four CI jobs'; and requests to GitHub's
- * issuer, to the manager and to Cloudflare's API go to the local fake that `ci-bundle-check.ts`,
- * `lease-check.ts` or `deploy-token-check.ts` serves on port 8830.
+ * STS's own routes, broker and Durable Objects, with four changes: mints are checked against the
+ * end-to-end registry; the policies are the probe's and four CI jobs'; the deploy-token object
+ * pins one synthetic forbidden permission group, as setup step 3 pins the real ones; and requests
+ * to GitHub's issuer, to the manager and to Cloudflare's API go to the local fake that
+ * `ci-bundle-check.ts`, `lease-check.ts` or `deploy-token-check.ts` serves on port 8830.
  */
 const E2E_POLICIES = loadPolicies(
   {
@@ -139,6 +144,10 @@ export class BundleDO extends StsBundleDO {
 
 export class RefresherDO extends StsRefresherDO {
   static override readonly policies = E2E_POLICIES;
+}
+
+export class DeployTokenDO extends StsDeployTokenDO {
+  static override forbiddenPermissionGroupIds = ['e2e0000000000000000000000000f001'];
 }
 
 export default {

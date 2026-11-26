@@ -3,16 +3,17 @@
 //   ../../node_modules/.bin/tsx test/fixtures/e2e/deploy-token-check.ts
 //   wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/wrangler.sts.jsonc
 // The script serves a fake GitHub issuer, a fake Infisical (JWT Auth login and the `/ci/minting`
-// read) and a fake Cloudflare API (account tokens and the Worker script list) that records every
-// request, on port 8830; the test build of STS sends its requests for all three there. It checks
-// that a production-shaped deploy job gets a 1-hour token with the policy's permission groups, that
-// another workflow, a pull_request job and a job of another GitHub environment are refused, that
-// only the owner job's run can revoke a token, that the reaper deletes a token past its expiry,
-// that a creation whose answer was lost is audited and its token swept, that the sweep audits a
-// Worker changed while tokens were live that no token intended, and that no audit row carries a
-// token value or the minting credential. It waits about eight minutes for a 5-minute token to
-// expire and the sweep to follow. Every key, id and credential is synthetic. Exits 1 on the first
-// failure.
+// read) and a fake Cloudflare API (account tokens, the Worker script list and a zone's Workers
+// routes) that records every request, on port 8830; the test build of STS sends its requests for
+// all three there. It checks that a production-shaped deploy job gets a 1-hour token with the
+// policy's permission groups, that another workflow, a pull_request job and a job of another GitHub
+// environment are refused, that only the owner job's run can revoke a token, that the reaper
+// deletes a token past its expiry, that a creation whose answer was lost is audited and its token
+// swept, that the window check runs about 2 minutes after each window closes and audits once a
+// Worker and a route changed while tokens were live that no token intended, and that no audit row
+// carries a token value or the minting credential. It waits about eight minutes for a 5-minute
+// token to expire and the sweep to follow. Every key, id and credential is synthetic. Exits 1 on
+// the first failure.
 import {
   CloudflareDeployTokenResultSchema,
   type CloudflareDeployTokenResult,
@@ -45,11 +46,17 @@ type CloudflareCall = {
   path: string;
   authorization: string | undefined;
   body: Record<string, unknown> | null;
+  at: number;
 };
 const cloudflareCalls: CloudflareCall[] = [];
 const tokens = new Map<string, { name: string; expiresOn: string; value: string }>();
 /** The account's Worker scripts, as `GET .../workers/scripts` lists them. */
 const scripts: { id: string; modified_on: string }[] = [];
+const ZONE = 'e2e0000000000000000000000000c001';
+/** The zone's Workers routes, as `GET /zones/<zone>/workers/routes` lists them. */
+const routes: { id: string; pattern: string; script?: string }[] = [
+  { id: 'e2e-route-own', pattern: 'e2e.example.invalid/*', script: 'e2e-worker' },
+];
 /** Cloudflare's names of the policies' permission groups (test/fixtures/e2e/sts.ts). */
 const GROUP_NAMES: Record<string, string> = {
   e2e0000000000000000000000000a001: 'Workers Scripts Write',
@@ -110,6 +117,7 @@ const server = createServer((request, response) => {
       path,
       authorization: request.headers.authorization,
       body,
+      at: Date.now(),
     });
     if (request.headers.authorization !== `Bearer ${MINTING_CREDENTIAL}`) {
       return json(
@@ -175,6 +183,9 @@ const server = createServer((request, response) => {
     }
     if (request.method === 'GET' && path === `/accounts/${ACCOUNT}/workers/scripts`) {
       return json({ success: true, errors: [], messages: [], result: scripts });
+    }
+    if (request.method === 'GET' && path === `/zones/${ZONE}/workers/routes`) {
+      return json({ success: true, errors: [], messages: [], result: routes });
     }
     json({ success: false }, 404);
   })();
@@ -377,6 +388,12 @@ scripts.push(
   { id: 'e2e-rogue-worker', modified_on: changedAt },
   { id: 'e2e-untouched-worker', modified_on: '2020-01-01T00:00:00Z' }
 );
+// A route of the deploy job's zone repointed at a Worker no live token deploys.
+routes.push({
+  id: 'e2e-route-rogue',
+  pattern: 'e2e.example.invalid/admin/*',
+  script: 'e2e-rogue-worker',
+});
 check(
   (await revoke(token.tokenId, SHORT_CLAIMS)) === 404,
   "another workload cannot revoke the deploy job's token (404)"
@@ -390,6 +407,7 @@ check(
   'no refused revoke reached Cloudflare'
 );
 check((await revoke(token.tokenId, JOB_CLAIMS)) === 200, 'the owner job revokes its own token');
+const revokedAt = Date.now();
 check(
   !tokens.has(token.tokenId) &&
     cloudflareCalls.some(
@@ -405,19 +423,36 @@ console.log('waiting for the 5-minute token to expire and be reaped');
 for (let attempt = 0; attempt < 90 && tokens.has(shortId); attempt += 1) await sleep(5_000);
 check(!tokens.has(shortId), 'the reaper deleted the expired token');
 
-// 5. The sweep brought forward by the lost answer deletes that token once it expired, and its
-// script check runs over both closed windows.
+// 5. The sweep brought forward by the lost answer deletes that token once it expired. The window
+// check ran about 2 minutes after the revoke, and again after the 5-minute token expired.
 console.log('waiting for the sweep (about 7 minutes after the lost creation)');
 for (let attempt = 0; attempt < 48 && tokens.has(lostToken.id); attempt += 1) await sleep(5_000);
 check(!tokens.has(lostToken.id), 'the sweep deleted the token whose creation answer was lost');
+const scriptLists = () =>
+  cloudflareCalls.filter(
+    call => call.method === 'GET' && call.path === `/accounts/${ACCOUNT}/workers/scripts`
+  );
+for (let attempt = 0; attempt < 36 && scriptLists().length < 2; attempt += 1) await sleep(5_000);
+check(
+  scriptLists().length === 2 &&
+    scriptLists().every(call => call.authorization === `Bearer ${MINTING_CREDENTIAL}`),
+  'the window check listed the Worker scripts once per closed window, with the minting credential',
+  scriptLists().length
+);
+const firstList = scriptLists()[0]?.at ?? 0;
+check(
+  firstList >= revokedAt + 110_000 && firstList <= revokedAt + 180_000,
+  'the first window check ran about 2 minutes after the revoke, not at a daily sweep',
+  { secondsAfterRevoke: (firstList - revokedAt) / 1000 }
+);
 check(
   cloudflareCalls.some(
     call =>
       call.method === 'GET' &&
-      call.path === `/accounts/${ACCOUNT}/workers/scripts` &&
+      call.path === `/zones/${ZONE}/workers/routes` &&
       call.authorization === `Bearer ${MINTING_CREDENTIAL}`
   ),
-  'the sweep listed the Worker scripts with the minting credential'
+  "the window check listed the deploy job's zone routes with the minting credential"
 );
 
 // 6. The audit rows reach the queue, with no token value and no minting credential.
@@ -436,6 +471,7 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
     events.filter(event => event.type === 'ai.kilo.sts.deploy_token.reaped').length >= 2 &&
     events.some(event => event.type === 'ai.kilo.sts.deploy_token.mint_failed') &&
     events.some(event => event.type === 'ai.kilo.sts.deploy_token.unexpected_script') &&
+    events.some(event => event.type === 'ai.kilo.sts.deploy_token.unexpected_route') &&
     events.filter(event => event.type === 'ai.kilo.sts.deploy_token.minted').length >= 2 &&
     events.some(event => event.type === 'ai.kilo.sts.deploy_token.revoked')
   ) {
@@ -503,8 +539,20 @@ check(
     unexpected[0].attributes.script === 'e2e-rogue-worker' &&
     JSON.stringify([...(unexpected[0].attributes.tokenIds as string[])].sort()) ===
       JSON.stringify([token.tokenId, shortId].sort()),
-  'deploy_token.unexpected_script names the one Worker no live token intended, and both tokens',
+  'deploy_token.unexpected_script names the one Worker no live token intended, and both tokens, once over two checks',
   unexpected.map(event => event.attributes)
+);
+const unexpectedRoutes = deployEvents.filter(
+  event => event.type === 'ai.kilo.sts.deploy_token.unexpected_route'
+);
+check(
+  unexpectedRoutes.length === 1 &&
+    unexpectedRoutes[0].attributes.routeId === 'e2e-route-rogue' &&
+    unexpectedRoutes[0].attributes.script === 'e2e-rogue-worker' &&
+    unexpectedRoutes[0].attributes.zone === ZONE &&
+    JSON.stringify(unexpectedRoutes[0].attributes.tokenIds) === JSON.stringify([token.tokenId]),
+  'deploy_token.unexpected_route names the one route no token of its zone intended, and that token',
+  unexpectedRoutes.map(event => event.attributes)
 );
 check(
   denied('identity_rejected') && denied('not_owner') && denied('other_run'),

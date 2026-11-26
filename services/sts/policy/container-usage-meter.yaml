@@ -1,0 +1,4 @@
+# Registration only: services/container-usage-meter/wrangler.jsonc. No environment, identity or grant.
+workload: container-usage-meter
+registered: true
+secrets: []

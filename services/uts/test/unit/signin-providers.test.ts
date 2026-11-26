@@ -268,7 +268,13 @@ describe('OpenID Connect identity', () => {
       oidcStandIn(spec, await idToken({ sub: 'user-1', nonce: 'n-1', ...claims }));
       expect(await providerIdentity(spec, secret, callback)).toEqual({
         status: 'ok',
-        identity: { subject: 'user-1', email, emailProven: proven, workosConnectionId: null },
+        identity: {
+          subject: 'user-1',
+          email,
+          emailProven: proven,
+          workosConnectionId: null,
+          workosOrganizationId: null,
+        },
       });
       vi.restoreAllMocks();
     }
@@ -438,6 +444,7 @@ describe('GitHub and Discord identity', () => {
         email: 'main@example.com',
         emailProven: false,
         workosConnectionId: null,
+        workosOrganizationId: null,
       },
     });
     const userCall = calls.find(call => call.url === 'https://api.gh.test/user');
@@ -482,7 +489,12 @@ describe('WorkOS profile', () => {
       'https://workos.test/sso/token': () =>
         Response.json({
           access_token: 'w',
-          profile: { id: 'prof_1', connection_id: 'conn_1', email: 'Person@Corp.example' },
+          profile: {
+            id: 'prof_1',
+            connection_id: 'conn_1',
+            organization_id: 'org_1',
+            email: 'Person@Corp.example',
+          },
         }),
     });
     expect(
@@ -494,6 +506,7 @@ describe('WorkOS profile', () => {
         email: 'person@corp.example',
         emailProven: false,
         workosConnectionId: 'conn_1',
+        workosOrganizationId: 'org_1',
       },
     });
     expect(Object.fromEntries(new URLSearchParams(bodyOf(calls[0])))).toEqual({

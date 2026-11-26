@@ -15,7 +15,14 @@ import {
 import type { NoticeKind } from '../../src/notices/kinds';
 import { type NoticeStore, identityStoreNotices } from '../../src/notices/store';
 import { readSecurityView } from '../../src/notices/security-view';
-import { TestDatabase, insertAccount, insertGatePass, randomHash, sqlStateOf } from './harness';
+import {
+  TestDatabase,
+  insertAccount,
+  insertBrowserSession,
+  insertGatePass,
+  randomHash,
+  sqlStateOf,
+} from './harness';
 
 /**
  * Migration 0010 through the Worker's own statements (`src/notices/*`): sign-in recording and
@@ -769,6 +776,26 @@ describe('security view', () => {
     });
   });
 
+  it("answers the web BFF's caller, whose sid names its browser session, while it is live", async () => {
+    const { accountId } = await accountWithBaseline();
+    const sessionId = await insertBrowserSession(owner, accountId);
+    const store = new IdentityStore(reader);
+    expect((await readSecurityView(store, { accountId, grantId: sessionId })).outcome).toBe(
+      'listed'
+    );
+    expect(
+      await readSecurityView(store, { accountId: await insertAccount(owner), grantId: sessionId })
+    ).toEqual({ outcome: 'invalid_session' });
+    await owner.query(
+      `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now(), revoke_reason = 'sign_out'
+       WHERE id = $1`,
+      [sessionId]
+    );
+    expect(await readSecurityView(store, { accountId, grantId: sessionId })).toEqual({
+      outcome: 'invalid_session',
+    });
+  });
+
   it('runs on the reader login, which reads no sign-in address', async () => {
     expect(await sqlStateOf(() => reader.query('SELECT client_ip FROM uts.sign_ins'))).toBe(
       '42501'
@@ -785,9 +812,10 @@ describe('migration 0010 baseline', () => {
     try {
       const admin = await empty.connect();
       const migrations = await loadMigrations();
+      // The schema as it stood before 0010: every earlier migration, none after it.
       await applyMigrations(
         admin,
-        migrations.filter(migration => migration.name !== '0010_notices.sql')
+        migrations.filter(migration => migration.name < '0010_notices.sql')
       );
       await admin.query('SET ROLE uts_owner');
       const accountId = await insertAccount(admin);

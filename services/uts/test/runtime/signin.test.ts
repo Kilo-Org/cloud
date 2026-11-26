@@ -124,6 +124,29 @@ describe('sign-in hand-off', () => {
     expect((await handoff(confirm(ORIGIN), mobile)).status).toBe('approved');
   });
 
+  it('approves the web BFF on its exact HTTPS callback without the confirm page', async () => {
+    const live = session(0);
+    const handoff = signInHandoff(fakeSignIn({ readSession: async () => live }).deps);
+    const result = await handoff(withCookie(authorizeUrl), {
+      ...pending(),
+      client: { kind: 'confidential_web', clientId: 'kilo-web', name: 'Kilo web app' },
+      redirectUri: 'https://app.kilo.ai/api/auth/uts/callback',
+      scopes: ['uts:browser-session.read'],
+      audiences: ['uts'],
+    });
+    expect(result).toEqual({
+      status: 'approved',
+      approval: {
+        clientKind: 'first_party',
+        accountId: live.accountId,
+        browserSessionId: live.sessionId,
+        authTime: live.authTime,
+        amr: ['passkey'],
+        orgId: null,
+      },
+    });
+  });
+
   it('denies a third-party client until the consent screen serves it', async () => {
     const store = fakeSignIn();
     const result = await signInHandoff(store.deps)(withCookie(authorizeUrl), {

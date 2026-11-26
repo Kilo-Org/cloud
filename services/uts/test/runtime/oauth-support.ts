@@ -178,6 +178,17 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
     device: null,
     signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
     tickets: { config, tickets: unexpectedStore },
+    web: {
+      config,
+      keys: async () => ({ status: 'unconfigured' }),
+      sessions: unexpectedStore,
+      sign: signerAccess(env, config),
+      scopes: testScopes,
+      publish: recordingPublisher().publish,
+      bridge: { status: 'off' },
+      windows: new Map(),
+      now: Date.now,
+    },
     ...overrides,
   };
 }

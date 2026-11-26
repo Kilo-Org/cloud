@@ -6,9 +6,11 @@ export { auditEvent, auditPrune, auditWatermark } from './audit-tables';
 
 /**
  * `pending`: a creation holds its slot while the manager call runs; `active`: the lease was handed
- * to the caller; `revoked`: STS revoked it; `failed`: the creation gave nothing to the caller.
+ * to the caller; `revoked`: STS revoked it; `failed`: the creation gave nothing to the caller;
+ * `unconfirmed`: STS stopped trying to revoke a delivered lease without Infisical confirming it,
+ * and a person must end its sessions.
  */
-export type LeaseState = 'pending' | 'active' | 'revoked' | 'failed';
+export type LeaseState = 'pending' | 'active' | 'revoked' | 'failed' | 'unconfirmed';
 
 /**
  * One row per lease creation STS started, never a username or password. A row counts against its
@@ -45,7 +47,10 @@ export const lease = sqliteTable(
      * earliest first, so a lease that keeps failing cannot hold back the others.
      */
     revokeRetryAt: integer('revoke_retry_at'),
-    /** The `revoke_failed` row of an owed revocation is written; later failures write none. */
+    /**
+     * The `revoke_failed` row of an owed revocation is written; later failures write none, and a
+     * 404 from Infisical after it is `unconfirmed`, not `gone`.
+     */
     revokeFailureAudited: integer('revoke_failure_audited', { mode: 'boolean' })
       .notNull()
       .default(false),

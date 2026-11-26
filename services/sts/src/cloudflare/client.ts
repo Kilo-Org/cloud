@@ -36,6 +36,12 @@ const CreatedTokenSchema = z.object({
   }),
 });
 
+/** A create answer that names the token it made, whatever else it holds or leaves out. */
+const CreatedTokenIdSchema = z.object({
+  success: z.literal(true),
+  result: z.object({ id: z.string().regex(/^[0-9a-f]{32}$/) }),
+});
+
 const ListedTokensSchema = z.object({
   success: z.literal(true),
   result: z.array(
@@ -97,7 +103,9 @@ export type TokenCreation =
       credentialRefused: boolean;
       retryAfterMs: number | null;
     }
-  /** A timeout, a transport error, a 5xx or an unreadable 200: a token may exist. */
+  /** Cloudflare made the token `tokenId` but its answer cannot be read otherwise: delete it. */
+  | { status: 'unverified'; tokenId: string }
+  /** A timeout, a transport error, a 5xx or a 200 that names no token: a token may exist. */
   | { status: 'unknown'; detail: string; retryAfterMs: number | null };
 
 /** A call that could not reach Cloudflare, or that Cloudflare refused. */
@@ -227,8 +235,11 @@ export class CloudflareTokens {
         retryAfterMs: null,
       };
     }
-    const parsed = CreatedTokenSchema.safeParse(await response.json().catch(() => null));
+    const body: unknown = await response.json().catch(() => null);
+    const parsed = CreatedTokenSchema.safeParse(body);
     if (!parsed.success) {
+      const named = CreatedTokenIdSchema.safeParse(body);
+      if (named.success) return { status: 'unverified', tokenId: named.data.result.id };
       return {
         status: 'unknown',
         detail: 'cloudflare token create response did not match',

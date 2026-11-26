@@ -208,16 +208,46 @@ export const MINTING_SECRET_NAMES: readonly string[] = [CLOUDFLARE_MINTING_TOKEN
  */
 export const CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS = true;
 
+/** A Cloudflare permission group a deploy grant may list, and the resource it applies to. */
+export type CloudflareDeployGroupPin = { id: string; scope: 'account' | 'zone' };
+
 /**
- * Cloudflare permission groups no deploy token may hold, by id: the groups that create or edit API
- * tokens or manage members, roles or account settings, whose holder could make a credential that
- * outlives the 1-hour bound. The loader refuses a policy that lists one, and the deploy-token
- * object refuses to mint one and deletes a token Cloudflare returns with one. The ids are copied
- * from `GET /accounts/<account>/tokens/permission_groups` in setup step 3 (README "Cloudflare
- * deploy tokens"). Empty refuses nothing by id, so the deploy-token object mints nothing while it
- * is empty and `CF_DEPLOY_ACCOUNT_ID` is set: setup step 5 cannot take effect before step 3.
+ * What every Cloudflare deploy grant is checked against, by id, copied from `GET
+ * /accounts/<account>/tokens/permission_groups` and the dashboard in setup step 3 (README
+ * "Cloudflare deploy tokens"). The loader refuses a policy outside them, and the deploy-token
+ * object refuses to mint outside them.
+ * - `forbiddenGroupIds`: the groups that create or edit API tokens or manage members, roles or
+ *   account settings, whose holder could make a credential that outlives the 1-hour bound.
+ * - `allowedGroups`: the only groups a grant may list, each with its scope (the deploy groups:
+ *   Workers Scripts Write and Containers Write on the account, Workers Routes Write on a zone).
+ * - `allowedZones`: per STS environment, the only zones a grant of that environment may list.
+ *   Staging and production deploy to the one `kiloapps.io` zone, so it is in both lists and the
+ *   zone check cannot separate them; it keeps every other zone out.
+ * While `forbiddenGroupIds` or `allowedGroups` is empty the deploy-token object mints nothing
+ * once `CF_DEPLOY_ACCOUNT_ID` is set, so setup step 5 cannot take effect before step 3.
  */
-export const CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS: readonly string[] = [];
+export type CloudflareDeployPins = {
+  forbiddenGroupIds: readonly string[];
+  allowedGroups: readonly CloudflareDeployGroupPin[];
+  allowedZones: Readonly<Record<'development' | 'staging' | 'production', readonly string[]>>;
+};
+
+export const CLOUDFLARE_DEPLOY_PINS: CloudflareDeployPins = {
+  forbiddenGroupIds: [],
+  allowedGroups: [],
+  allowedZones: { development: [], staging: [], production: [] },
+};
+
+/**
+ * Per environment, at most this many Cloudflare tokens STS may hold at once against the account's
+ * cap of 500 account tokens: unexpired ones, ones being made, ones whose deletion is owed, and ones
+ * a lost creation may have made that the sweep has not cleared. Two environments then hold at most
+ * 200, so the account keeps room for every other account token.
+ */
+export const DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING = 100;
+
+/** A mint refused at that share is told to wait this long before it asks again. */
+export const DEPLOY_TOKEN_ACCOUNT_LIMIT_RETRY_AFTER_SECONDS = 300;
 
 /**
  * The deploy-token object reuses a minting credential it read this long ago, and reads it again

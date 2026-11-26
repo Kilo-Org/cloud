@@ -28,8 +28,8 @@ type DenialDatabase = DrizzleSqliteDODatabase<typeof schema>;
 
 /**
  * Distinct denials kept per minute. Further distinct ones in that minute only add to one overflow
- * row per kind and reason (3 bundle reasons, 7 token reasons, 8 lease reasons, 10 deploy-token
- * reasons), so a flood of varied valid tokens writes at most `MAX_DISTINCT_PER_MINUTE + 28` audit
+ * row per kind and reason (3 bundle reasons, 7 token reasons, 8 lease reasons, 11 deploy-token
+ * reasons), so a flood of varied valid tokens writes at most `MAX_DISTINCT_PER_MINUTE + 29` audit
  * events per minute.
  */
 export const MAX_DISTINCT_PER_MINUTE = 100;

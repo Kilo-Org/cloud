@@ -1,4 +1,5 @@
 import { SecretsBroker } from '../../../src/broker';
+import type { CloudflareDeployPins } from '../../../src/constants';
 import type { Env } from '../../../src/env';
 import { handleRequest } from '../../../src/http';
 import {
@@ -15,11 +16,21 @@ export { DenialDO, LeaseDO, SignerDO, TokenSignerDO } from '../../../src/index';
 /**
  * Test-only build of STS for the local end-to-end checks (README "Tests"); never deployed. It runs
  * STS's own routes, broker and Durable Objects, with four changes: mints are checked against the
- * end-to-end registry; the policies are the probe's and four CI jobs'; the deploy-token object
- * pins one synthetic forbidden permission group, as setup step 3 pins the real ones; and requests
- * to GitHub's issuer, to the manager and to Cloudflare's API go to the local fake that
+ * end-to-end registry; the policies are the probe's and four CI jobs'; the loader and the
+ * deploy-token object use synthetic Cloudflare pins, as setup step 3 pins the real ones; and
+ * requests to GitHub's issuer, to the manager and to Cloudflare's API go to the local fake that
  * `ci-bundle-check.ts`, `lease-check.ts` or `deploy-token-check.ts` serves on port 8830.
  */
+const E2E_PINS: CloudflareDeployPins = {
+  forbiddenGroupIds: ['e2e0000000000000000000000000f001'],
+  allowedGroups: [
+    { id: 'e2e0000000000000000000000000a001', scope: 'account' },
+    { id: 'e2e0000000000000000000000000a002', scope: 'account' },
+    { id: 'e2e0000000000000000000000000a003', scope: 'zone' },
+  ],
+  allowedZones: { development: ['e2e0000000000000000000000000c001'], staging: [], production: [] },
+};
+
 const E2E_POLICIES = loadPolicies(
   {
     'secrets-broker-e2e-probe.yaml': `
@@ -88,6 +99,7 @@ dynamic:
       - { id: 'e2e0000000000000000000000000a003', name: Workers Routes Write, scope: zone }
     zones: ['e2e0000000000000000000000000c001']
     intendedScripts: [e2e-worker]
+    intendedRoutes: ['e2e.example.invalid/*']
     maxActive: 3
     maxPerHour: 12
 `,
@@ -114,7 +126,7 @@ dynamic:
     maxPerHour: 4
 `,
   },
-  { scopeRegistry: E2E_SCOPES }
+  { scopeRegistry: E2E_SCOPES, cloudflareDeployPins: E2E_PINS }
 );
 
 const E2E_AUTHORITY: MintAuthority = { scopes: E2E_SCOPES, policies: E2E_POLICIES };
@@ -147,7 +159,7 @@ export class RefresherDO extends StsRefresherDO {
 }
 
 export class DeployTokenDO extends StsDeployTokenDO {
-  static override forbiddenPermissionGroupIds = ['e2e0000000000000000000000000f001'];
+  static override cloudflareDeployPins = E2E_PINS;
 }
 
 export default {

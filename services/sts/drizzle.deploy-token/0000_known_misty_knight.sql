@@ -30,6 +30,7 @@ CREATE TABLE `deploy_token` (
 	`delete_attempts` integer DEFAULT 0 NOT NULL,
 	`delete_failure_audited` integer DEFAULT false NOT NULL,
 	`intended_scripts` text NOT NULL,
+	`intended_routes` text NOT NULL,
 	`zones` text NOT NULL,
 	`window_check` text,
 	`window_check_attempts` integer DEFAULT 0 NOT NULL,

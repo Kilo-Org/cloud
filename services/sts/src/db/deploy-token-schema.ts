@@ -54,6 +54,8 @@ export const deployToken = sqliteTable(
       .default(false),
     /** The policy's `intendedScripts` when the token was made (JSON array), for the window check. */
     intendedScripts: text('intended_scripts').notNull(),
+    /** The policy's `intendedRoutes` when the token was made (JSON array), for the window check. */
+    intendedRoutes: text('intended_routes').notNull(),
     /** The policy's zones when the token was made (JSON array): the routes the token could write. */
     zones: text('zones').notNull(),
     windowCheck: text('window_check').$type<DeployTokenWindowCheck>(),

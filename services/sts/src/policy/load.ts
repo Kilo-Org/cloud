@@ -1,5 +1,6 @@
 import type { StsEnvironment, StsScopeRegistry } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
+import type { CloudflareDeployPins } from '../constants';
 import { sha256Base64Url } from '../crypto/hash';
 import {
   PolicySchema,
@@ -90,15 +91,15 @@ function bindingKeys(policy: Policy): string[] {
 }
 
 /**
- * `scopeRegistry` is the registry token grants are checked against, and
- * `forbiddenPermissionGroupIds` the Cloudflare permission groups no deploy grant may list
- * (default `CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS`); tests pass their own.
+ * `scopeRegistry` is the registry token grants are checked against, and `cloudflareDeployPins` the
+ * Cloudflare permission groups and zones deploy grants are checked against (default
+ * `CLOUDFLARE_DEPLOY_PINS`); tests pass their own.
  */
 export function loadPolicies(
   sources: Record<string, string>,
   options: {
     scopeRegistry?: StsScopeRegistry;
-    forbiddenPermissionGroupIds?: readonly string[];
+    cloudflareDeployPins?: CloudflareDeployPins;
   } = {}
 ): PolicyIndex {
   const policies: Policy[] = [];
@@ -118,7 +119,7 @@ export function loadPolicies(
     const problems = policyFileProblems(
       policy,
       options.scopeRegistry,
-      options.forbiddenPermissionGroupIds
+      options.cloudflareDeployPins
     );
     if (problems.length > 0) {
       throw new Error(`${file} is invalid: ${problems.join('; ')}`);

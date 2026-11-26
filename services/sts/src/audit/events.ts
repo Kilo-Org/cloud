@@ -612,10 +612,11 @@ export function deployTokenMintedEvent(input: {
 /**
  * Why STS deletes a deploy token: its caller asked (`caller`); it expired (`expired`, the reaper);
  * or STS could not hand it over (`late`: the creation outlasted its budget; `expiry_mismatch`:
- * Cloudflare's expiry is not the one asked for; `grant_mismatch`: the policies Cloudflare returns
- * are unreadable or differ from the ones sent in effect, groups or resources, a group's name is not
- * the one the policy declares for its id, or a group administers tokens or members;
- * `audit_failed`: the mint row could not be written).
+ * Cloudflare's expiry is not the one asked for or later than it; `grant_mismatch`: the answer
+ * names the token but cannot be read otherwise, or the policies Cloudflare returns are unreadable
+ * or differ from the ones sent in effect, groups or resources, a group's name is not the one the
+ * policy declares for its id, or a group administers tokens or members; `audit_failed`: the mint
+ * row could not be written).
  */
 export type DeployTokenDeleteCause =
   | 'caller'

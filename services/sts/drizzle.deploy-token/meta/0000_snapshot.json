@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5fa88fc9-ec18-44ec-8a1e-a178a7dcf8b7",
+  "id": "75039175-8bc2-4eae-987a-4ec3406abe4e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_event": {
@@ -188,6 +188,13 @@
         },
         "intended_scripts": {
           "name": "intended_scripts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "intended_routes": {
+          "name": "intended_routes",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

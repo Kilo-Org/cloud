@@ -36,8 +36,10 @@ import {
   type ReturnedTokenPolicy,
 } from '../cloudflare/client';
 import {
-  CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
+  CLOUDFLARE_DEPLOY_PINS,
   CLOUDFLARE_MINTING_TOKEN_SECRET,
+  DEPLOY_TOKEN_ACCOUNT_LIMIT_RETRY_AFTER_SECONDS,
+  DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING,
   DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_CAP_MS,
   DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_MS,
   DEPLOY_TOKEN_DELETES_PER_ALARM,
@@ -59,6 +61,7 @@ import {
   MINTING_FOLDER,
   RELAY_DELAY_MS,
   RELAY_RETRY_MS,
+  type CloudflareDeployPins,
 } from '../constants';
 import * as schema from '../db/deploy-token-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
@@ -244,6 +247,8 @@ type LiveWindow = {
   from: number;
   to: number;
   intended: string[];
+  /** The zone route patterns the token's grant intends (`intendedRoutes`). */
+  routes: string[];
   zones: string[];
 };
 
@@ -279,8 +284,8 @@ class WindowCheckFailure extends Error {
  * object serves the environment.
  */
 export class DeployTokenDO extends DurableObject<Env> {
-  /** The permission groups no token may hold; a test sets its own. Empty: the object mints none. */
-  static forbiddenPermissionGroupIds: readonly string[] = CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS;
+  /** The Cloudflare pins every mint is checked against; a test sets its own. */
+  static cloudflareDeployPins: CloudflareDeployPins = CLOUDFLARE_DEPLOY_PINS;
 
   private readonly config: StsConfig;
   private readonly db: DeployTokenDatabase;
@@ -341,11 +346,11 @@ export class DeployTokenDO extends DurableObject<Env> {
       console.warn('sts: deploy token refused: CF_DEPLOY_ACCOUNT_ID is empty in this environment');
       return UNAVAILABLE;
     }
-    const pinned = (this.constructor as typeof DeployTokenDO).forbiddenPermissionGroupIds;
-    if (pinned.length === 0) {
-      // Setup step 5 set the account before step 3 pinned the token-administering groups.
+    const pins = (this.constructor as typeof DeployTokenDO).cloudflareDeployPins;
+    if (pins.forbiddenGroupIds.length === 0 || pins.allowedGroups.length === 0) {
+      // Setup step 5 set the account before step 3 pinned the groups.
       console.error(
-        'sts: deploy token refused: CF_DEPLOY_ACCOUNT_ID is set but CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS is empty'
+        'sts: deploy token refused: CF_DEPLOY_ACCOUNT_ID is set but CLOUDFLARE_DEPLOY_PINS has no forbidden or allowed groups'
       );
       return { status: 'refused', reason: 'not_configured' };
     }
@@ -367,16 +372,29 @@ export class DeployTokenDO extends DurableObject<Env> {
     }
     const forbidden = grant.permissionGroups
       .map(group => group.id)
-      .filter(id => pinned.includes(id));
-    if (forbidden.length > 0) {
+      .filter(id => pins.forbiddenGroupIds.includes(id));
+    const outside = [
+      ...grant.permissionGroups
+        .filter(
+          group =>
+            !pins.allowedGroups.some(
+              allowed => allowed.id === group.id && allowed.scope === group.scope
+            )
+        )
+        .map(group => group.id),
+      ...grant.zones.filter(zone => !pins.allowedZones[this.config.environment].includes(zone)),
+    ];
+    if (forbidden.length > 0 || outside.length > 0) {
       // The loader refuses such a grant; this holds even for a grant that did not pass it.
-      console.error('sts: deploy token refused: the grant lists a forbidden permission group', {
+      console.error('sts: deploy token refused: a group or zone outside the pins', {
         workload: caller.workload,
-        groups: forbidden,
+        forbidden,
+        outside,
       });
       return UNAVAILABLE;
     }
-    const limited = this.limitFor(caller.workload, grant, callStartedAt);
+    const limited =
+      this.accountLimit(callStartedAt) ?? this.limitFor(caller.workload, grant, callStartedAt);
     if (limited !== null) return limited;
 
     const { slot } = this.db
@@ -390,6 +408,7 @@ export class DeployTokenDO extends DurableObject<Env> {
         createdAt: callStartedAt,
         expiresAt: deadline,
         intendedScripts: JSON.stringify(grant.intendedScripts),
+        intendedRoutes: JSON.stringify(grant.intendedRoutes),
         zones: JSON.stringify(grant.zones),
       })
       .returning({ slot: schema.deployToken.slot })
@@ -452,13 +471,25 @@ export class DeployTokenDO extends DurableObject<Env> {
       await this.auditMintFailed(caller, grant.permissionSet, slot, 'unknown', null);
       return await this.failCreation(slot);
     }
+    if (created.status === 'unverified') {
+      // Cloudflare made a token STS cannot check: delete it at once, as a grant it cannot verify.
+      console.error('sts: deploy token answer names a token but cannot be read; it is deleted', {
+        workload: caller.workload,
+      });
+      this.endCredentialHold();
+      return await this.deleteUnhanded(slot, created.tokenId, requestedExpiry, 'grant_mismatch');
+    }
     this.endCredentialHold();
 
     const { token } = created;
     let cause: DeployTokenDeleteCause | null = null;
     if (finishedAt > deadline) {
       cause = 'late';
-    } else if (Math.abs(token.expiresAt - requestedExpiry) > DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS) {
+    } else if (
+      // Never later than asked: the job is told the requested lifetime.
+      token.expiresAt > requestedExpiry ||
+      requestedExpiry - token.expiresAt > DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS
+    ) {
       cause = 'expiry_mismatch';
     } else {
       const problem = returnedGrantProblem(token.policies, policies, grant);
@@ -502,15 +533,7 @@ export class DeployTokenDO extends DurableObject<Env> {
         workload: caller.workload,
         cause,
       });
-      // Owed until Cloudflare takes it: the alarm retries this row if the first attempt fails.
-      this.db
-        .update(schema.deployToken)
-        .set({ tokenId: token.id, state: 'failed', expiresAt: token.expiresAt, deleteCause: cause })
-        .where(eq(schema.deployToken.slot, slot))
-        .run();
-      await this.deleteOnce(token.id);
-      await this.scheduleAlarm(Date.now(), false);
-      return UNAVAILABLE;
+      return await this.deleteUnhanded(slot, token.id, token.expiresAt, cause);
     }
     // In the same output gate as the audit row.
     this.db
@@ -526,6 +549,26 @@ export class DeployTokenDO extends DurableObject<Env> {
       expiresAt: token.expiresAt,
       ttlSeconds: grant.ttlSeconds,
     };
+  }
+
+  /**
+   * Deletes a token Cloudflare made that STS does not hand over, and answers `unavailable`; the
+   * deletion stays owed on the row until Cloudflare takes it, and the alarm retries it.
+   */
+  private async deleteUnhanded(
+    slot: number,
+    tokenId: string,
+    expiresAt: number,
+    cause: DeployTokenDeleteCause
+  ): Promise<DeployTokenMintResult> {
+    this.db
+      .update(schema.deployToken)
+      .set({ tokenId, state: 'failed', expiresAt, deleteCause: cause })
+      .where(eq(schema.deployToken.slot, slot))
+      .run();
+    await this.deleteOnce(tokenId);
+    await this.scheduleAlarm(Date.now(), false);
+    return UNAVAILABLE;
   }
 
   /** The name of the token a creation asks Cloudflare for. */
@@ -565,7 +608,9 @@ export class DeployTokenDO extends DurableObject<Env> {
   /**
    * Deletes one of the caller's own tokens. A token id STS never handed to this workload is
    * `not_found`, whoever holds it, and so is a token asked for by another run of the same workload.
-   * A token of the caller's that is already deleted answers `revoked` without a Cloudflare call.
+   * A token of the caller's that is already deleted answers `revoked` without a Cloudflare call. A
+   * deletion that failed is tried again no sooner than its row's retry time, by the caller as by
+   * the alarm: until then the caller hears `unavailable` with the time left, and no call is made.
    */
   async revoke(raw: DeployTokenRevokeRequest): Promise<DeployTokenRevokeOutcome> {
     const input = DeployTokenRevokeRequestSchema.parse(raw);
@@ -577,6 +622,13 @@ export class DeployTokenDO extends DurableObject<Env> {
     if (row.workload !== input.caller.workload) return { status: 'not_found', reason: 'not_owner' };
     if (row.runId !== input.caller.run.runId) return { status: 'not_found', reason: 'other_run' };
     if (row.state === 'deleted') return { status: 'revoked' };
+    const now = Date.now();
+    if (row.deleteRetryAt !== null && row.deleteRetryAt > now) {
+      return {
+        status: 'unavailable',
+        retryAfterSeconds: retryAfterSeconds(row.deleteRetryAt - now),
+      };
+    }
 
     if (row.deleteCause === null) {
       // Owed from now on: the alarm retries it if Cloudflare cannot take it.
@@ -681,6 +733,45 @@ export class DeployTokenDO extends DurableObject<Env> {
         null
       );
     }
+  }
+
+  /**
+   * The refusal while this environment holds `DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING` tokens that
+   * may exist at Cloudflare and count against the account's 500-token cap: creations in progress,
+   * handed-over tokens until deleted, tokens whose deletion is owed, and creations that ended
+   * without a token id recently enough that a lost token may still exist (its expiry plus the
+   * sweep's delay).
+   */
+  private accountLimit(now: number): DeployTokenMintResult | null {
+    const lostSince =
+      now -
+      DEPLOY_TOKEN_MINT_BUDGET_MS -
+      CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS * 1000 -
+      2 * DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS;
+    const row = this.db
+      .select({ outstanding: sql<number>`count(*)` })
+      .from(schema.deployToken)
+      .where(
+        or(
+          inArray(schema.deployToken.state, ['pending', 'active']),
+          isNotNull(schema.deployToken.deleteCause),
+          and(
+            eq(schema.deployToken.state, 'failed'),
+            isNull(schema.deployToken.tokenId),
+            gt(schema.deployToken.createdAt, lostSince)
+          )
+        )
+      )
+      .get();
+    if ((row?.outstanding ?? 0) < DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING) return null;
+    console.error('sts: deploy token refused: this environment holds its share of account tokens', {
+      outstanding: row?.outstanding,
+    });
+    return {
+      status: 'limited',
+      reason: 'account_limit',
+      retryAfterSeconds: DEPLOY_TOKEN_ACCOUNT_LIMIT_RETRY_AFTER_SECONDS,
+    };
   }
 
   /**
@@ -1060,11 +1151,11 @@ export class DeployTokenDO extends DurableObject<Env> {
         return;
       }
       this.endCredentialHold();
+      // STS always sets an expiry, so a token of its prefix without one is not one it handed over.
       const orphans = listed.tokens.filter(
         token =>
           token.name.startsWith(prefix) &&
-          token.expiresAt !== null &&
-          token.expiresAt <= now &&
+          (token.expiresAt === null || token.expiresAt <= now) &&
           this.rowFor(token.id) === undefined
       );
       let deleted = 0;
@@ -1106,6 +1197,7 @@ export class DeployTokenDO extends DurableObject<Env> {
         to:
           Math.min(row.endedAt ?? row.expiresAt, row.expiresAt) + DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
         intended: StringListSchema.parse(JSON.parse(row.intendedScripts)),
+        routes: StringListSchema.parse(JSON.parse(row.intendedRoutes)),
         zones: StringListSchema.parse(JSON.parse(row.zones)),
       }));
   }
@@ -1242,7 +1334,10 @@ export class DeployTokenDO extends DurableObject<Env> {
    * The `deploy_token.unexpected_route` rows of one check; throws `WindowCheckFailure`. A route
    * list has no time, so a route counts when it differs from the zone's previous list (every route
    * of a zone never listed before), and the tokens it names are every token with that zone live
-   * since that list. A removed route, or one that runs no Worker, is not reported.
+   * since that list. Such a route is expected only when a live token intends both its Worker
+   * (`intendedScripts`) and its pattern (`intendedRoutes`), so a new or changed pattern that sends
+   * traffic to an intended Worker counts too. A removed route, or one that runs no Worker, is not
+   * reported.
    */
   private async auditUnexpectedRoutes(
     routes: Map<string, ListedRoute[]>,
@@ -1280,7 +1375,12 @@ export class DeployTokenDO extends DurableObject<Env> {
           before.script !== route.script;
         const { script } = route;
         if (!changed || script === null) continue;
-        if (live.some(window => window.intended.includes(script))) continue;
+        if (
+          live.some(window => window.intended.includes(script)) &&
+          live.some(window => window.routes.includes(route.pattern))
+        ) {
+          continue;
+        }
         unexpected.push({
           zone,
           route: { ...route, script },

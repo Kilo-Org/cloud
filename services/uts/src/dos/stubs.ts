@@ -127,41 +127,73 @@ function signerObjectId(env: Env, config: UtsConfig, signer: number): DurableObj
 }
 
 /**
- * Checks that an object which already stores the state of signer `signer` is that signer's
- * object in this environment and jurisdiction, before it imports the stored keys. It compares the
- * object's id with the id the signer's name gives in this environment; an id carries its
- * jurisdiction but not always its name (an object started by an alarm or opened by its raw id has
- * none), so this check needs no name. A state copied to another object, or an object of another
- * environment, is refused.
+ * Checks that an object which already stores the state of `kind` object `index` is that object in
+ * this environment and jurisdiction, before it imports the stored keys. It compares the object's
+ * id with `expected`, the id that object's name gives in this environment (null when `index`
+ * names no such object); an id carries its jurisdiction but not always its name (an object
+ * started by an alarm or opened by its raw id has none), so this check needs no name. A state
+ * copied to another object, or an object of another environment, is refused.
  */
+function storedObjectCheck(
+  kind: 'signer' | 'feed',
+  config: UtsConfig,
+  id: DurableObjectId,
+  index: number,
+  expected: DurableObjectId | null
+): ObjectIdCheck {
+  const jurisdiction = id.jurisdiction ?? 'none';
+  if (jurisdiction !== config.jurisdiction) {
+    return {
+      status: 'refused',
+      reason: `${kind} object is in jurisdiction ${jurisdiction}, not ${config.jurisdiction}`,
+    };
+  }
+  if (expected === null || !id.equals(expected)) {
+    return {
+      status: 'refused',
+      reason: `stored state names ${kind} ${index}, but this is not that ${kind}'s ${config.environment} object`,
+    };
+  }
+  return { status: 'accepted', index };
+}
+
+/** `storedObjectCheck` for a signer object that stores signer `signer`'s keys. */
 export function storedSignerCheck(
   env: Env,
   config: UtsConfig,
   id: DurableObjectId,
   signer: number
 ): ObjectIdCheck {
-  const jurisdiction = id.jurisdiction ?? 'none';
-  if (jurisdiction !== config.jurisdiction) {
-    return {
-      status: 'refused',
-      reason: `signer object is in jurisdiction ${jurisdiction}, not ${config.jurisdiction}`,
-    };
-  }
-  if (!id.equals(signerObjectId(env, config, signer))) {
-    return {
-      status: 'refused',
-      reason: `stored state names signer ${signer}, but this is not that signer's ${config.environment} object`,
-    };
-  }
-  return { status: 'accepted', index: signer };
+  return storedObjectCheck('signer', config, id, signer, signerObjectId(env, config, signer));
 }
 
-/** The feed index a feed object takes from its id. */
+/** The feed index a new feed object takes from its id. */
 export function feedOfObjectId(
   config: UtsConfig,
   id: Pick<DurableObjectId, 'name' | 'jurisdiction'>
 ): ObjectIdCheck {
   return indexOfObjectId(config, id, 'feed', feedOfObjectName);
+}
+
+function feedNamespace(env: Env, config: UtsConfig): DurableObjectNamespace<UtsFeedDO> {
+  return config.jurisdiction === 'eu' ? env.UTS_FEED_DO.jurisdiction('eu') : env.UTS_FEED_DO;
+}
+
+/**
+ * `storedObjectCheck` for a feed object that stores feed `feed`'s keys. The stored state has the
+ * signer state's shape, so its index is checked as a feed index here.
+ */
+export function storedFeedCheck(
+  env: Env,
+  config: UtsConfig,
+  id: DurableObjectId,
+  feed: number
+): ObjectIdCheck {
+  const index = UtsFeedIndexSchema.safeParse(feed);
+  const expected = index.success
+    ? feedNamespace(env, config).idFromName(feedObjectName(config.environment, index.data))
+    : null;
+  return storedObjectCheck('feed', config, id, feed, expected);
 }
 
 export function getSignerStub(
@@ -191,8 +223,7 @@ export function getFeedStub(
   config: UtsConfig,
   feed: number
 ): DurableObjectStub<UtsFeedDO> {
-  const namespace =
-    config.jurisdiction === 'eu' ? env.UTS_FEED_DO.jurisdiction('eu') : env.UTS_FEED_DO;
+  const namespace = feedNamespace(env, config);
   const index = UtsFeedIndexSchema.parse(feed);
   return namespace.get(namespace.idFromName(feedObjectName(config.environment, index)), {
     locationHint: FEED_OBJECT_LOCATION_HINTS[index],

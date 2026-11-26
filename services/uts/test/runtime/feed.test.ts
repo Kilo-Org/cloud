@@ -77,6 +77,34 @@ describe('feed objects', () => {
     expect(await staging.publicKeys()).toMatchObject({ status: 'misconfigured' });
   });
 
+  it('load their stored keys when opened by a raw id, which carries no name, as an alarm does', async () => {
+    const first = await feedStub(0).publicKeys();
+    const id = env.UTS_FEED_DO.idFromString(feedStub(0).id.toString());
+    await runInDurableObject(feedStub(0), (_instance, state) => state.abort('test restart')).catch(
+      () => undefined
+    );
+    expect(await env.UTS_FEED_DO.get(id).publicKeys()).toEqual(first);
+  });
+
+  it("refuse stored keys in any object but that feed's object of this environment", async () => {
+    const state: unknown = await runInDurableObject(feedStub(1), (_instance, object) =>
+      object.storage.get('feed-key-state')
+    );
+    const stub = () => env.UTS_FEED_DO.getByName('staging:feed:1');
+    await runInDurableObject(stub(), async (_instance, object) => {
+      await object.storage.deleteAlarm();
+      await object.storage.deleteAll();
+      await object.storage.put('feed-key-state', state);
+    });
+    await runInDurableObject(stub(), (_instance, object) => object.abort('test restart')).catch(
+      () => undefined
+    );
+    expect(await stub().publicKeys()).toEqual({
+      status: 'misconfigured',
+      reason: "stored state names feed 1, but this is not that feed's development object",
+    });
+  });
+
   it('reach the UTS key set through the key-set shards', async () => {
     await resetKeySetShards();
     const answer = await feedAnswer();

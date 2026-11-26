@@ -2,7 +2,7 @@ import type { FeedPublicKeys, FeedReadsHead, FeedReadsList } from '@kilocode/uts
 import { DurableObject } from 'cloudflare:workers';
 import { withIdentityStore } from '../db/client';
 import { dataCenter } from '../dos/data-center';
-import { feedOfObjectId } from '../dos/stubs';
+import { feedOfObjectId, storedFeedCheck } from '../dos/stubs';
 import { readConfig, type Env, type UtsConfig } from '../env';
 import { identityStoreBinding } from '../grants/binding';
 import { generateFeedKey, importSigningKey } from '../keys/ed25519';
@@ -198,15 +198,28 @@ export class UtsFeedDO extends DurableObject<Env> {
   }
 
   async #load(): Promise<void> {
-    const id = feedOfObjectId(this.#config, this.ctx.id);
-    if (id.status === 'refused') {
-      console.error(JSON.stringify({ event: 'uts.feed.refused', reason: id.reason }));
-      this.#phase = id;
-      return;
-    }
     const now = Date.now();
     const stored: unknown = await this.ctx.storage.get(KEY_STATE);
-    if (stored === undefined) {
+    if (stored !== undefined) {
+      // A stored object needs no name: an alarm or a raw id opens it without one.
+      const state = SignerStateSchema.parse(stored);
+      const owner = storedFeedCheck(this.env, this.#config, this.ctx.id, state.signer);
+      if (owner.status === 'refused') {
+        this.#refuse(owner);
+        return;
+      }
+      this.#phase = {
+        status: 'ready',
+        feed: owner.index,
+        state,
+        signingKey: await importSigningKey(state.current.privateJwk),
+      };
+    } else {
+      const id = feedOfObjectId(this.#config, this.ctx.id);
+      if (id.status === 'refused') {
+        this.#refuse(id);
+        return;
+      }
       const state = await bootstrapState(id.index, now, () => generateFeedKey(id.index));
       await this.#commit(id.index, state);
       // Where the object landed, which never changes (design 5.7 proof run).
@@ -219,17 +232,14 @@ export class UtsFeedDO extends DurableObject<Env> {
           kids: publishedKeys(state).map(key => key.kid),
         })
       );
-    } else {
-      const state = SignerStateSchema.parse(stored);
-      this.#phase = {
-        status: 'ready',
-        feed: id.index,
-        state,
-        signingKey: await importSigningKey(state.current.privateJwk),
-      };
     }
     // The first run starts at once, so a restarted object backfills before its first head.
     if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(now);
+  }
+
+  #refuse(refused: { status: 'refused'; reason: string }): void {
+    console.error(JSON.stringify({ event: 'uts.feed.refused', reason: refused.reason }));
+    this.#phase = refused;
   }
 
   /** Persist first, cache second: memory never holds a key state storage does not. */

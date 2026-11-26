@@ -21,7 +21,9 @@ export type O11ySecretName =
  * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads the Secrets Store
  * bindings, `sts` reads the same names from the STS bundle. Production reads `sts`. Rollback is a
  * redeploy with the variable set back to `secrets-store`; both sources stay bound until the
- * cutover completes. An absent variable means `secrets-store`.
+ * cutover completes. After a rollback, `O11Y_SLACK_WEBHOOK_TICKET` and
+ * `O11Y_CF_CONTAINERS_API_TOKEN` read their pre-import Secrets Store copies: the old ticket
+ * webhook, not #kilo-o11y-alerts, and the old token. An absent variable means `secrets-store`.
  */
 export type O11ySecretsEnv = Partial<Record<O11ySecretName, SecretsStoreSecret>> & {
   SECRETS_SOURCE?: string;

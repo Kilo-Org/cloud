@@ -92,21 +92,29 @@
     "O11Y_API_BASE_URL": "https://api.kilo.ai",
     /**
      * Where every secret read goes: `secrets-store` (the Secrets Store bindings below) or `sts`
-     * (the STS bundle over the service binding above). Production reads through STS. Rollback is
-     * a redeploy with this set back to `secrets-store`; any other value refuses every secret read.
+     * (the STS bundle over the service binding above). Production reads through STS; any other
+     * value refuses every secret read. The dev stack runs this top-level config without `sts`,
+     * so the `dev` and `start` scripts pass `--var SECRETS_SOURCE:secrets-store`.
+     * Rollback is a redeploy with this set back to `secrets-store`. After a rollback,
+     * O11Y_SLACK_WEBHOOK_TICKET and O11Y_CF_CONTAINERS_API_TOKEN read their pre-import copies in
+     * the Secrets Store: the old ticket webhook (not #kilo-o11y-alerts) and the old token.
      */
     "SECRETS_SOURCE": "sts",
   },
   /**
    * Alert deployment requirements:
    * - O11Y_CF_AE_API_TOKEN needs account Analytics Read access.
-   * - O11Y_SLACK_WEBHOOK_TICKET must deliver to #kilo-o11y-alerts.
+   * - O11Y_SLACK_WEBHOOK_TICKET must deliver to #kilo-o11y-alerts. The STS value does; the
+   *   Secrets Store copy is the old webhook, which a rollback brings back.
    */
   /**
    * Secrets Store
    * https://developers.cloudflare.com/workers/configuration/secrets/#secrets-store
    * Production no longer reads these; they stay bound so rollback is one redeploy with
-   * `SECRETS_SOURCE` set to `secrets-store`. They go 7 days after the STS cutover.
+   * `SECRETS_SOURCE` set to `secrets-store`. o11y drops these bindings 7 days after its STS reads
+   * show no errors. A store secret itself goes only once its last consumer reads it through STS
+   * (design C.5): other Workers also bind O11Y_CF_AE_API_TOKEN, and the web app also reads
+   * O11Y_KILO_GATEWAY_CLIENT_SECRET.
    */
   "secrets_store_secrets": [
     {

@@ -30,7 +30,7 @@ export function decodeJws(compact: string): DecodedJws | null {
     return {
       header: header.data,
       payload: JSON.parse(text.decode(base64url.decode(payloadPart))),
-      signingInput: new TextEncoder().encode(`${headerPart}.${payloadPart}`),
+      signingInput: new Uint8Array(new TextEncoder().encode(`${headerPart}.${payloadPart}`)),
       signature: new Uint8Array(base64url.decode(signaturePart)),
     };
   } catch {

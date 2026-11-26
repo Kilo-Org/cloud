@@ -52,6 +52,7 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import {
   organizationVercelComputeRouter,
   personalVercelComputeRouter,
@@ -290,6 +291,50 @@ describe('Vercel discovery authorization', () => {
     for (const [, options] of fetchMock.mock.calls) {
       expect(options?.headers).toMatchObject({ Authorization: `Bearer ${TOKEN}` });
     }
+  });
+});
+
+// Storing and removing the organization's Vercel token need a real owner or
+// admin membership. A platform admin on a browser session, with support access
+// off, still reads the status through the guarded staff path.
+describe('Vercel credential writes by a platform admin without a membership', () => {
+  const previousSupport = process.env.SUPPORT_ACCESS_ENABLED;
+
+  beforeAll(() => {
+    delete process.env.SUPPORT_ACCESS_ENABLED;
+  });
+
+  afterAll(() => {
+    if (previousSupport === undefined) delete process.env.SUPPORT_ACCESS_ENABLED;
+    else process.env.SUPPORT_ACCESS_ENABLED = previousSupport;
+  });
+
+  it('refuses add and remove and keeps the owner credential and flow', async () => {
+    const staff = await insertTestUser({ is_admin: true });
+    const staffCaller = (await createSessionCallerForUser(staff.id)).organizations.vercelCompute;
+    const ownerCaller = createCaller({ user: owner });
+    const nonMember = {
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    };
+
+    // The guarded staff path admits this caller for a read.
+    await expect(staffCaller.getStatus({ organizationId })).resolves.toBeNull();
+
+    await expect(staffCaller.add(setupInput)).rejects.toMatchObject(nonMember);
+    expect(mockEnrollment).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expectNoSetup();
+
+    mockSelectionValidation();
+    const added = await ownerCaller.add(setupInput);
+
+    await expect(staffCaller.remove({ organizationId })).rejects.toMatchObject(nonMember);
+    expect(await getCredential()).toMatchObject({ id: added.credentialId });
+    expect(mockCleanupBuild).not.toHaveBeenCalled();
+
+    await expect(ownerCaller.remove({ organizationId })).resolves.toEqual({ success: true });
+    expect(await getCredential()).toBeUndefined();
   });
 });
 

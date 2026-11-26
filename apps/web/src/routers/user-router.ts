@@ -93,7 +93,10 @@ import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-me
 import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
 import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession, getStripeInvoicesPage } from '@/lib/stripe';
 import {
   reportChargeAttempted,
@@ -1046,8 +1049,10 @@ export const userRouter = createTRPCRouter({
       // session so the callback can store the BYOK connection for it. Only the
       // OpenAI (ChatGPT) provider has an organization-scoped connection, so any
       // other provider must not carry the organization into its callback. The
-      // connection is the member's own, so membership is enough. The access
-      // denial must surface as-is, so it stays outside the try.
+      // connection is the member's own credential, so only real (direct or
+      // inherited) membership counts; a platform-admin or support grant never
+      // stands in. The access denial must surface as-is, so it stays outside
+      // the try.
       if (input.organizationId) {
         if (input.provider !== 'openai') {
           throw new TRPCError({
@@ -1055,7 +1060,7 @@ export const userRouter = createTRPCRouter({
             message: 'Organization connections are only supported for OpenAI.',
           });
         }
-        const role = await ensureOrganizationAccess(ctx, input.organizationId);
+        const role = await ensureMemberOrganizationAccess(ctx.user, input.organizationId);
         // The shared-services connection is an organization setting, so
         // membership alone is not enough to connect it.
         if (input.chatGptScope === 'shared_services' && role !== 'owner' && role !== 'admin') {

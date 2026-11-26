@@ -3,7 +3,7 @@ import { StripeDisputeCaseActionError } from '@/lib/stripe/disputes';
 
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { disputeAcceptTRPCError } from '@/routers/admin/stripe-disputes-router';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   organizations,
@@ -38,7 +38,7 @@ beforeEach(async () => {
 
 describe('admin disputes router', () => {
   it('rejects non-admin users', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(caller.admin.disputes.list({ page: 1, limit: 25 })).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -115,7 +115,7 @@ describe('admin disputes router', () => {
       result_reference_id: 'dp_personal_list',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const summary = await caller.admin.disputes.summary();
     const needsAction = await caller.admin.disputes.list({ page: 1, limit: 25 });
     const organizationReview = await caller.admin.disputes.list({

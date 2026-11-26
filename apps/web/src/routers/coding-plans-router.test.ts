@@ -11,7 +11,7 @@ import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
 import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
 import { CODING_PLAN_IDS } from '@/lib/coding-plans/pricing';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import {
   TEST_BYOK_DATA_KEY,
   testByokEnvelope,
@@ -962,7 +962,7 @@ describe('coding plans router', () => {
 
   it('accepts provider and plan when admins upload inventory', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
 
     await expect(
@@ -983,7 +983,7 @@ describe('coding plans router', () => {
 
   it('rejects admin uploads when provider and plan do not match', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.codingPlans.adminUploadKeys({
@@ -999,7 +999,7 @@ describe('coding plans router', () => {
 
   it('reports malformed admin inventory entries as a request error', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.codingPlans.adminUploadKeys({
@@ -1015,7 +1015,7 @@ describe('coding plans router', () => {
 
   it('queues available inventory for manual revocation by the requested count and returns their upstream plan IDs', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const items = await Promise.all([insertInventory(), insertInventory(), insertInventory()]);
 
     const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 2 });
@@ -1047,7 +1047,7 @@ describe('coding plans router', () => {
 
   it('queues fewer than requested when not enough available inventory exists for the plan', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await insertInventory();
 
     const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 5 });
@@ -1060,7 +1060,7 @@ describe('coding plans router', () => {
   it('never queues assigned inventory or inventory referenced by a live subscription', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const assigned = await insertInventory({
       status: 'assigned',
       assigned_to_user_id: user.id,
@@ -1087,7 +1087,7 @@ describe('coding plans router', () => {
   it('queues an available credential even when a canceled subscription still references it via a stale key_inventory_id', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     // Simulates a credential that was assigned, revoked, and manually
     // recycled back to "available" via replaceManualCredentialRevocation.
     // The original (now canceled) subscription's key_inventory_id is never
@@ -1144,7 +1144,7 @@ describe('coding plans router', () => {
       canceled_at: subscriptionExpiresAt,
       cancellation_reason: 'user_cancelled',
     });
-    const adminCaller = await createCallerForUser(admin.id);
+    const adminCaller = await createSessionCallerForUser(admin.id);
     const userCaller = await createCallerForUser(user.id);
 
     await expect(userCaller.codingPlans.adminRevocationQueue({})).rejects.toThrow();
@@ -1218,7 +1218,7 @@ describe('coding plans router', () => {
       })
     );
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
       expect.objectContaining({
@@ -1276,7 +1276,7 @@ describe('coding plans router', () => {
         cancellation_reason: 'user_cancelled',
       },
     ]);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
       expect.objectContaining({
@@ -1300,7 +1300,7 @@ describe('coding plans router', () => {
         revocation_requested_at: new Date().toISOString(),
       })
       .returning();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
       expect.objectContaining({
@@ -1349,7 +1349,7 @@ describe('coding plans router', () => {
         };
       })
     );
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
       expect.objectContaining({
@@ -1369,7 +1369,7 @@ describe('coding plans router', () => {
         })
       )
     );
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const firstPage = await caller.codingPlans.adminListSubscriptions({ page: 1 });
     expect(firstPage.items).toHaveLength(20);
@@ -1393,7 +1393,7 @@ describe('coding plans router', () => {
         key_inventory_id: inventory.id,
       })
     );
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.codingPlans.adminListSubscriptions({});
 
@@ -1420,7 +1420,7 @@ describe('coding plans router', () => {
         subscriptionValues(idUser.id),
         subscriptionValues(otherUser.id),
       ]);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const emailMatches = await caller.codingPlans.adminListSubscriptions({
       search: 'unique-search-target',
@@ -1456,7 +1456,7 @@ describe('coding plans router', () => {
         cancel_at_period_end: true,
       }),
     ]);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const active = await caller.codingPlans.adminListSubscriptions({ status: 'active' });
     expect(active.items).toEqual([expect.objectContaining({ userId: activeUser.id })]);
@@ -1491,7 +1491,7 @@ describe('coding plans router', () => {
         })
       )
       .returning();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.codingPlans.adminCancelSubscription({ subscriptionId: active.id });
     const [updated] = await db
@@ -1545,7 +1545,7 @@ describe('coding plans router', () => {
         })
       )
       .returning();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.codingPlans.adminTerminateSubscription({ subscriptionId: pendingCancellation.id });
     const [updated] = await db
@@ -1595,7 +1595,7 @@ describe('coding plans router', () => {
         })
       )
       .returning();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.codingPlans.adminExtendSubscriptionPeriod({
@@ -1690,7 +1690,7 @@ describe('coding plans router', () => {
       credential_fingerprint: codingPlanCredentialFingerprint('already-present-key'),
     });
     const pending = await insertInventory({ status: 'revocation_pending' });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
     await caller.codingPlans.adminReplaceInventoryCredential({
@@ -1798,7 +1798,7 @@ describe('coding plans router', () => {
           status: 'active',
         })
       );
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const lockedDuringKms: boolean[] = [];
       kms.probe.onRequest = async () => {
         lockedDuringKms.push(await isRowLocked('coding_plan_key_inventory', assigned.id));
@@ -1873,7 +1873,7 @@ describe('coding plans router', () => {
           })
         )
         .returning();
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const lockedDuringKms: boolean[] = [];
       kms.probe.onRequest = async () => {
         lockedDuringKms.push(
@@ -1947,7 +1947,7 @@ describe('coding plans router', () => {
         })
       )
       .returning();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.codingPlans.adminReassignSubscriptionCredential({ subscriptionId: subscription.id })
@@ -1971,7 +1971,7 @@ describe('coding plans router', () => {
       encrypted_api_key: encryptApiKey('first-secret', BYOK_ENCRYPTION_KEY),
       credential_fingerprint: codingPlanCredentialFingerprint('first-secret'),
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     let resolveValidation: (() => void) | undefined;
     const validationGate = new Promise<void>(resolve => {
       resolveValidation = resolve;
@@ -2129,7 +2129,7 @@ describe('coding plans router', () => {
       credit_transaction_id: activationTransaction.id,
       created_at: daysAgo(11),
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.codingPlans.adminSubscriptionOverview()).resolves.toEqual({
       total: 8,

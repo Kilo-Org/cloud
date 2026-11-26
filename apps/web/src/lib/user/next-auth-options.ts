@@ -373,18 +373,16 @@ async function persistOpenAiChatGptConnection(
  * Whether the person completing a shared-services authorization may still
  * connect the organization's connection. The link start authorized the role,
  * but the consent round-trip can outlive it, so the callback re-reads the
- * current membership: an owner or admin of the organization, an owner or admin
- * of the parent organization whose access it inherits, or a Kilo platform admin
- * (elevated and audited by the link start's own access check) may persist the
- * connection. `canManageOrganization` is the rule every other organization
- * management surface uses.
+ * current membership: an owner or admin of the organization, or an owner or
+ * admin of the parent organization whose access it inherits, may persist the
+ * connection. The Kilo platform-admin flag never stands in for that role: the
+ * connection is an organization credential. `canManageOrganization` is the
+ * rule every other organization management surface uses.
  */
 async function mayConnectOpenAiChatGptSharedServices(
-  user: Pick<User, 'id' | 'is_admin'>,
+  user: Pick<User, 'id'>,
   organizationId: string
 ): Promise<boolean> {
-  if (user.is_admin) return true;
-
   const memberships = await getUserOrgMemberships(user.id);
   const organization = await getOrganizationById(organizationId);
   const roleIn = (id: string | null | undefined) =>

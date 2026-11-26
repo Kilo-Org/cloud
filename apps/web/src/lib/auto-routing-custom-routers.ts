@@ -48,7 +48,11 @@ import {
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureOrganizationAccess,
+  organizationRestAccessContext,
+  StaffRequestRefusal,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
@@ -98,7 +102,10 @@ export type CustomRouterRequestContext = {
   organization: { id: string; canEdit: boolean } | null;
 };
 
-async function resolveRequestContext(request: NextRequest): Promise<CustomRouterRequestContext> {
+/** A staff refusal is the shared guard's response, returned verbatim. */
+async function resolveRequestContext(
+  request: NextRequest
+): Promise<CustomRouterRequestContext | NextResponse> {
   const auth = await getUserFromAuth({ adminOnly: false });
   if (!auth.user) {
     const status = auth.authFailedResponse.status;
@@ -123,7 +130,12 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
   }
 
   try {
-    const role = await ensureOrganizationAccess({ user: auth.user }, organizationId);
+    // Staff without a membership pass only the shared staff guard, with this
+    // request's real credential, method and headers.
+    const role = await ensureOrganizationAccess(
+      organizationRestAccessContext(auth, { headers: request.headers, method: request.method }),
+      organizationId
+    );
     return {
       user: auth.user,
       organization: {
@@ -132,6 +144,9 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
       },
     };
   } catch (error) {
+    if (error instanceof TRPCError && error.cause instanceof StaffRequestRefusal) {
+      return error.cause.response;
+    }
     if (error instanceof TRPCError) {
       throw new CustomRouterApiError('forbidden', 'You do not have access to this organization');
     }
@@ -144,7 +159,9 @@ export async function handleCustomRouterRequest(
   handler: (context: CustomRouterRequestContext) => Promise<NextResponse>
 ): Promise<NextResponse> {
   try {
-    return await handler(await resolveRequestContext(request));
+    const context = await resolveRequestContext(request);
+    if (context instanceof NextResponse) return context;
+    return await handler(context);
   } catch (error) {
     if (error instanceof CustomRouterApiError) return customRouterErrorResponse(error);
     throw error;

@@ -1,4 +1,4 @@
-import type { Organization } from '@kilocode/db/schema';
+import type { Organization, User } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -10,8 +10,17 @@ import {
   ORGANIZATION_MANAGE_ROLES,
   ORGANIZATION_ROLE_PRIORITY,
 } from '@kilocode/app-shared/organizations';
-import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
+import { baseProcedure, requireStaffAuthority } from '@kilocode/web-shared/lib/trpc/init';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import type {
+  StaffAdmission,
+  StaffAuthorization,
+} from '@kilocode/web-shared/lib/admin/admin-guard';
+import type { StepUpRequirementPayload } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { requireStaffAuthorityForRequest } from '@kilocode/web-shared/lib/user/server';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
+import type { AdminNetworkDenialReason } from '@kilocode/web-shared/lib/admin/admin-network';
+import type { NextResponse } from 'next/server';
 import {
   elevateViaKiloAdmin,
   organizationTarget,
@@ -36,6 +45,7 @@ import {
   latestSupportGrantStatus,
   organizationState,
   recordSupportWriteUse,
+  type SupportResolution,
 } from '@kilocode/web-shared/lib/admin/support-access-resolver';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull, type SQL } from 'drizzle-orm';
@@ -194,16 +204,6 @@ export async function observeMembershipRole(
   }
 }
 
-async function observeBatchMembershipRoles(
-  loader: () => Promise<Map<string, OrganizationRole[]>>
-): Promise<Map<string, OrganizationRole[]> | null> {
-  try {
-    return await loader();
-  } catch {
-    return null;
-  }
-}
-
 export async function loadEffectiveMembershipRows(
   userId: string,
   organizationId: Organization['id'],
@@ -228,6 +228,9 @@ export async function loadEffectiveMembershipRowsWithOrganization(
   );
 }
 
+/** The successful `getUserFromAuth` result a REST or server-component caller holds. */
+export type OrganizationRestAuth = Parameters<typeof requireStaffAuthorityForRequest>[0];
+
 export type OrganizationAccessContext = Pick<
   TRPCContext,
   | 'user'
@@ -240,14 +243,49 @@ export type OrganizationAccessContext = Pick<
   | 'trpcPath'
   | 'trpcType'
   | 'webSessionId'
-  | 'adminStepUpState'
-  | 'adminStepUpDecision'
+  | 'webSessionPepper'
+  | 'adminAdmission'
   | 'stepUpClaims'
 > & {
   auditSurface?: 'trpc' | 'rest' | 'server-component';
   auditMethod?: string;
   delegatedWorkload?: boolean;
+  /**
+   * Set by a REST or server-component caller. Its staff branch then admits
+   * through `requireStaffAuthorityForRequest` with `headersList` and
+   * `auditMethod`, and a refusal carries the adapter's response
+   * ({@link StaffRequestRefusal}).
+   */
+  restAuth?: OrganizationRestAuth;
 };
+
+/**
+ * The organization access context of a REST handler or server component: the
+ * successful `getUserFromAuth` result plus the request's own headers and
+ * method, so a staff admission checks the network and binds its proof to this
+ * request. Never build a tRPC context for such a caller.
+ */
+export function organizationRestAccessContext(
+  auth: OrganizationRestAuth,
+  request: { headers: Headers; method?: string; surface?: 'rest' | 'server-component' }
+): OrganizationAccessContext & {
+  credential: OrganizationRestAuth['credential'];
+  headersList: Headers;
+} {
+  return {
+    user: auth.user,
+    tokenSource: auth.tokenSource,
+    internalApiUse: auth.internalApiUse,
+    credential: auth.credential,
+    webSessionId: auth.webSessionId,
+    webSessionPepper: auth.webSessionPepper,
+    headersList: request.headers,
+    restAuth: auth,
+    auditSurface: request.surface ?? 'rest',
+    auditMethod: request.method,
+    delegatedWorkload: auth.cloudAgentAuthority !== undefined,
+  };
+}
 
 export type ResolveOrganizationAccessOptions = {
   roles?: readonly OrganizationRole[];
@@ -255,16 +293,12 @@ export type ResolveOrganizationAccessOptions = {
   supportKey?: string | null;
   supportActionId?: string | null;
   surface?: SupportSurface;
-  /** Required for a REST write; tRPC derives it from the procedure type. */
+  /** Overrides the action class derived from the procedure type or request method. */
   requiredActionClass?: SupportActionClass;
   /** Telemetry reason for the elevation event. Defaults to the tRPC reason. */
   auditReason?: KiloAdminElevationReason;
-  /** `ensureOrganizationAccessAndFetchOrg` attributes the attempt before the fetch. */
-  skipOrganizationLiveness?: boolean;
   /** Reuse a membership read the caller already performed. */
   membershipRows?: { role: OrganizationRole }[];
-  /** Reuse a liveness check the caller already performed. */
-  organizationIsLive?: boolean;
 };
 
 function supportKeyFor(
@@ -276,12 +310,96 @@ function supportKeyFor(
   return { surface, key };
 }
 
+/**
+ * The action class of the request, which is both the staff admission's class
+ * and the class a support grant must cover: a tRPC mutation, or a REST request
+ * other than GET or HEAD (or one whose method is unknown), is a write. A
+ * server-component render is a read.
+ */
 function requiredActionClassFor(
-  ctx: OrganizationAccessContext,
-  options: ResolveOrganizationAccessOptions
+  ctx: Pick<OrganizationAccessContext, 'trpcPath' | 'trpcType' | 'auditSurface' | 'auditMethod'>,
+  options: Pick<ResolveOrganizationAccessOptions, 'requiredActionClass'>
 ): SupportActionClass {
   if (options.requiredActionClass) return options.requiredActionClass;
-  return ctx.trpcType === 'mutation' ? 'support_write' : 'support_read';
+  if (ctx.trpcPath !== undefined) {
+    return ctx.trpcType === 'mutation' ? 'support_write' : 'support_read';
+  }
+  if (ctx.auditSurface === 'server-component') return 'support_read';
+  const method = ctx.auditMethod?.toUpperCase();
+  return method === 'GET' || method === 'HEAD' ? 'support_read' : 'support_write';
+}
+
+/**
+ * A refused REST or server-component staff admission, carried as the cause of
+ * the `TRPCError` the organization helpers throw. The route answers with
+ * `response` (the adapter's 401 or 403, with the step-up requirement when one
+ * applies) instead of a generic denial. `adminNetworkDenial` is set when the
+ * admin network allowlist refused the request, so a page can show that reason.
+ */
+export class StaffRequestRefusal extends Error {
+  constructor(
+    readonly response: NextResponse<FailureResult<string>>,
+    readonly stepUp: StepUpRequirementPayload | undefined,
+    readonly adminNetworkDenial?: AdminNetworkDenialReason
+  ) {
+    super('Staff admission refused');
+    this.name = 'StaffRequestRefusal';
+  }
+}
+
+/**
+ * What a staff admission hands the organization helpers. `stepUp` and
+ * `decision` are present only for a tRPC admission, whose request proof a
+ * support write then reuses instead of spending a second one.
+ */
+export type OrganizationStaffAdmission = Pick<StaffAdmission, 'user'> &
+  Partial<Pick<StaffAdmission, 'stepUp' | 'decision'>>;
+
+/**
+ * The one staff admission for acting on an organization without a qualifying
+ * membership role: primary role re-read, browser session, network, then
+ * `authorize`, then the step-up proof for the request's action class against
+ * this one organization. A write is `support_write`, whose proof is bound to
+ * this operation and organization and is spent once.
+ *
+ * `authorize` receives the primary row and runs before the proof: it holds
+ * the liveness and grant checks, so a request it refuses never prompts for or
+ * spends a proof. It runs on every call.
+ *
+ * The tRPC adapter memoizes the proof per procedure call, so a middleware and
+ * a resolver that both call this share one admission; call this rather than
+ * `requireStaffAuthority` so the memo key is identical. A REST caller sets
+ * `ctx.restAuth` and calls this at most once per request.
+ */
+export async function requireOrganizationStaffAuthority(
+  ctx: OrganizationAccessContext,
+  organizationId: Organization['id'],
+  actionClass: SupportActionClass = requiredActionClassFor(ctx, {}),
+  authorize?: StaffAuthorization
+): Promise<OrganizationStaffAdmission> {
+  const target = { kind: 'organization', id: organizationId } as const;
+  if (!ctx.restAuth) return requireStaffAuthority(ctx, { actionClass, target, authorize });
+
+  const admitted = await requireStaffAuthorityForRequest(ctx.restAuth, {
+    actionClass,
+    target,
+    authorize,
+    surface: ctx.auditSurface === 'server-component' ? 'server-component' : 'rest',
+    requestHeaders: ctx.headersList,
+    requestMethod: ctx.auditMethod,
+  });
+  if (admitted.authFailedResponse) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Admin access required',
+      cause: new StaffRequestRefusal(
+        admitted.authFailedResponse,
+        admitted.stepUp,
+        admitted.adminNetworkDenial
+      ),
+    });
+  }
+  return { user: admitted.user };
 }
 
 function supportActionIdFor(
@@ -358,19 +476,71 @@ async function organizationRoleDeniedError(
   });
 }
 
+/** What {@link resolveOrganizationAccess} admitted, with the actor that holds it. */
+type ResolvedOrganizationAccess = {
+  access: OrganizationAccess;
+  /** The authenticated row for a member; the current primary row for staff. */
+  user: User;
+  /** For staff, the live row the admission read when the caller asked for it. */
+  organization: Organization | null;
+};
+
+/** The access, its actor and the live organization row. */
+export type OrganizationAccessWithOrganization = ResolvedOrganizationAccess & {
+  organization: Organization;
+};
+
 /**
  * The single support-access decision point for organization access.
  *
- * - A real membership role always passes and never queries a grant.
- * - OFF keeps today's `is_admin` -> `owner` shortcut.
- * - ON admits only `member` or an active, allowlisted `SupportContext`; admins
- *   who are real members keep their real role.
+ * - A real membership role the request allows always passes, for staff too,
+ *   and never reaches a staff check or a grant.
+ * - Every other staff path passes {@link requireOrganizationStaffAuthority}:
+ *   primary role, browser session and network first, then the liveness and
+ *   grant checks, and the step-up proof only once those approved the request.
+ * - OFF then keeps today's `is_admin` -> `owner` shortcut.
+ * - ON admits only an active, allowlisted `SupportContext`, and never over an
+ *   existing membership.
  */
 export async function resolveOrganizationAccess(
   ctx: OrganizationAccessContext,
   organizationId: Organization['id'],
   options: ResolveOrganizationAccessOptions = {}
 ): Promise<OrganizationAccess> {
+  return (await resolveAccess(ctx, organizationId, options, false)).access;
+}
+
+/**
+ * {@link resolveOrganizationAccess} plus the organization row and the actor.
+ * A member gets the organization from its own membership rows. For staff, the
+ * admission's liveness check reads the full row once, before the proof, and
+ * it is returned only after the admission succeeded.
+ */
+export async function resolveOrganizationAccessAndFetchOrg(
+  ctx: OrganizationAccessContext,
+  organizationId: Organization['id'],
+  options: Omit<ResolveOrganizationAccessOptions, 'membershipRows'> & {
+    membershipRows: CallerRoleRowWithOrganization[];
+  }
+): Promise<OrganizationAccessWithOrganization> {
+  const resolved = await resolveAccess(ctx, organizationId, options, true);
+  const { access } = resolved;
+  const organization =
+    access.kind === 'member'
+      ? options.membershipRows.find(row => row.role === access.role)?.organization
+      : resolved.organization;
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  return { ...resolved, organization };
+}
+
+async function resolveAccess(
+  ctx: OrganizationAccessContext,
+  organizationId: Organization['id'],
+  options: ResolveOrganizationAccessOptions,
+  readOrganization: boolean
+): Promise<ResolvedOrganizationAccess> {
   let rows: { role: OrganizationRole }[];
   let membershipObserved = true;
   if (options.membershipRows) {
@@ -385,65 +555,22 @@ export async function resolveOrganizationAccess(
         // like a non-member and produce a misleading grant-required denial.
         throw supportLookupFailedError();
       }
-      // OFF: elevation telemetry must never be the reason a request fails.
+      // OFF: the staff admission below authorizes without the membership.
       membershipObserved = false;
       rows = [];
     }
   }
-  const enabled = isSupportAccessEnabled();
-  const isAdmin = ctx.user.is_admin;
   const role = effectiveMembershipRole(rows, options.roles);
-  if (role && (!isAdmin || enabled)) {
-    return { kind: 'member', role };
+  if (role) {
+    return { access: { kind: 'member', role }, user: ctx.user, organization: null };
   }
 
-  if (!isAdmin) {
+  if (!ctx.user.is_admin) {
     throw await organizationRoleDeniedError(rows, organizationId);
   }
 
-  if (!enabled) {
-    const observation = {
-      membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
-      wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
-    };
-    if (!options.skipOrganizationLiveness) {
-      const organizationResult = settle(
-        db
-          .select({ id: organizations.id })
-          .from(organizations)
-          .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
-          .limit(1)
-      );
-      const result = await organizationResult;
-      if (!result.ok) {
-        // Parent ordering: a lookup failure is attributed before rethrowing.
-        await recordKiloAdminElevation(ctx, {
-          reason: options.auditReason ?? 'organization_access',
-          target: organizationTarget(organizationId),
-          ...observation,
-        });
-        throw result.error;
-      }
-      if (!result.value[0]) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-      }
-    }
-    await recordKiloAdminElevation(ctx, {
-      reason: options.auditReason ?? 'organization_access',
-      target: organizationTarget(organizationId),
-      ...observation,
-    });
-    return { kind: 'legacy_admin', role: 'owner' };
-  }
-
-  if (!options.skipOrganizationLiveness) {
-    const live = options.organizationIsLive ?? (await isLiveOrganization(organizationId));
-    if (!live) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-  }
-
-  if (rows.length > 0) {
+  const enabled = isSupportAccessEnabled();
+  if (enabled && rows.length > 0) {
     // A real member without the required role keeps the role-specific error;
     // a support grant cannot elevate over an existing membership.
     throw new TRPCError({
@@ -452,94 +579,154 @@ export async function resolveOrganizationAccess(
     });
   }
 
+  const requiredActionClass = requiredActionClassFor(ctx, options);
+  const auditReason = options.auditReason ?? 'organization_access';
+  const target = organizationTarget(organizationId);
+  const observation = {
+    membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
+    wouldPassWithoutAdmin: membershipObserved ? false : null,
+  };
   const { surface, key } = supportKeyFor(ctx, options);
   const supportActionId = supportActionIdFor(ctx, options, key);
-  let evaluation;
-  try {
-    evaluation = await evaluateSupportAccess({
-      actorKiloUserId: ctx.user.id,
-      organizationId,
-      requiredActionClass: requiredActionClassFor(ctx, options),
-      roles: options.roles,
-      surface,
-      key,
-      supportActionId,
-    });
-  } catch {
-    throw supportLookupFailedError();
-  }
+  // The grant this request's admission approved, set by `authorize` below.
+  const approved: { resolution: SupportResolution | null } = { resolution: null };
+  // The live row `authorize` read; returned only once the admission succeeded.
+  const loaded: { organization: Organization | null } = { organization: null };
+  const isLive = async (): Promise<boolean> => {
+    if (!readOrganization) return isLiveOrganization(organizationId);
+    loaded.organization = await getOrganizationById(organizationId);
+    return loaded.organization !== null;
+  };
 
-  if (evaluation.access) {
-    if (evaluation.access.actionClass === 'support_write') {
-      const entry = key
-        ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
-        : undefined;
-      let firstUseInRequest = true;
-      if (entry?.stepUp === 'fresh') {
-        firstUseInRequest = await requireSupportWriteUseStepUp({
-          userId: ctx.user.id,
+  const staff = await requireOrganizationStaffAuthority(
+    ctx,
+    organizationId,
+    requiredActionClass,
+    async actor => {
+      const actorCtx = { ...ctx, user: actor };
+      if (!enabled) {
+        const result = await settle(isLive());
+        if (!result.ok) {
+          // Parent ordering: a lookup failure is attributed before rethrowing.
+          await recordKiloAdminElevation(actorCtx, { reason: auditReason, target, ...observation });
+          throw result.error;
+        }
+        if (!result.value) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+        }
+        return;
+      }
+
+      if (!(await isLive())) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      let evaluation: SupportResolution;
+      try {
+        evaluation = await evaluateSupportAccess({
+          actorKiloUserId: actor.id,
           organizationId,
-          upstreamStepUpState: ctx.adminStepUpState,
-          upstreamStepUpDecision: ctx.adminStepUpDecision,
-          claimStore: ctx.stepUpClaims,
-          claimKey: `${organizationId}:${surface}:${key ?? ''}`,
-          credential: ctx.credential,
-          webSessionId: ctx.webSessionId ?? null,
-          route: ctx.trpcPath ?? null,
-          method: ctx.trpcType ?? null,
+          requiredActionClass,
+          roles: options.roles,
           surface,
+          key,
+          supportActionId,
         });
+      } catch {
+        throw supportLookupFailedError();
       }
-      if (firstUseInRequest) {
-        await recordSupportWriteUse({
-          grantId: evaluation.access.grantId,
-          actorKiloUserId: ctx.user.id,
-          grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
-          targetOrganizationId: organizationId,
-          supportActionId: evaluation.access.supportActionId,
-        });
+      if (evaluation.access) {
+        approved.resolution = evaluation;
+        return;
       }
+
+      let grantStatus: 'expired' | 'revoked' | null = null;
+      if (evaluation.decision === 'deny_no_grant') {
+        try {
+          grantStatus = await latestSupportGrantStatus({
+            actorKiloUserId: actor.id,
+            organizationId,
+          });
+        } catch {
+          throw supportLookupFailedError();
+        }
+      }
+      await recordKiloAdminElevation(actorCtx, {
+        reason: auditReason,
+        target,
+        ...observation,
+        supportDecision: evaluation.decision,
+        supportGrantId: evaluation.grantId,
+        supportActionId,
+        inventoryId: null,
+        supportInheritedFromOrganizationId: evaluation.inheritedFromOrganizationId,
+      });
+      throw deniedAccessError({
+        decision: evaluation.decision,
+        grantStatus,
+      });
     }
-    await recordKiloAdminElevation(ctx, {
-      reason: options.auditReason ?? 'organization_access',
-      target: organizationTarget(organizationId),
-      membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
-      wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
-      supportDecision: evaluation.decision,
-      supportGrantId: evaluation.grantId,
-      supportActionId,
-      inventoryId: evaluation.access.inventoryId,
-      supportInheritedFromOrganizationId: evaluation.access.inheritedFromOrganizationId,
-    });
-    return evaluation.access;
+  );
+  const actorCtx = { ...ctx, user: staff.user };
+  const resolved = (access: OrganizationAccess): ResolvedOrganizationAccess => ({
+    access,
+    user: staff.user,
+    organization: loaded.organization,
+  });
+
+  if (!enabled) {
+    await recordKiloAdminElevation(actorCtx, { reason: auditReason, target, ...observation });
+    return resolved({ kind: 'legacy_admin', role: 'owner' });
   }
 
-  let grantStatus: 'expired' | 'revoked' | null = null;
-  if (evaluation.decision === 'deny_no_grant') {
-    try {
-      grantStatus = await latestSupportGrantStatus({
-        actorKiloUserId: ctx.user.id,
+  const resolution = approved.resolution;
+  const access = resolution?.access;
+  if (!resolution || !access) {
+    throw new Error('A staff admission returned without an approved support grant');
+  }
+  if (access.actionClass === 'support_write') {
+    const entry = key
+      ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
+      : undefined;
+    let firstUseInRequest = true;
+    if (entry?.stepUp === 'fresh') {
+      // The admission spent this write's proof and its decision covers this
+      // write, so this records the use without a second spend; it still
+      // refuses while step-up is switched off.
+      firstUseInRequest = await requireSupportWriteUseStepUp({
+        userId: staff.user.id,
         organizationId,
+        upstreamStepUpState: staff.stepUp,
+        upstreamStepUpDecision: staff.decision ?? undefined,
+        claimStore: ctx.stepUpClaims,
+        claimKey: `${organizationId}:${surface}:${key ?? ''}`,
+        credential: ctx.credential,
+        webSessionId: ctx.webSessionId ?? null,
+        route: ctx.trpcPath ?? null,
+        method: ctx.trpcType ?? null,
+        surface,
       });
-    } catch {
-      throw supportLookupFailedError();
+    }
+    if (firstUseInRequest) {
+      await recordSupportWriteUse({
+        grantId: access.grantId,
+        actorKiloUserId: staff.user.id,
+        grantOrganizationId: access.inheritedFromOrganizationId ?? organizationId,
+        targetOrganizationId: organizationId,
+        supportActionId: access.supportActionId,
+      });
     }
   }
-  await recordKiloAdminElevation(ctx, {
-    reason: options.auditReason ?? 'organization_access',
-    target: organizationTarget(organizationId),
-    membershipRole: membershipObserved ? effectiveMembershipRole(rows) : null,
-    wouldPassWithoutAdmin: membershipObserved ? role !== null : null,
-    supportDecision: evaluation.decision,
-    supportGrantId: evaluation.grantId,
+  await recordKiloAdminElevation(actorCtx, {
+    reason: auditReason,
+    target,
+    ...observation,
+    supportDecision: resolution.decision,
+    supportGrantId: resolution.grantId,
     supportActionId,
-    inventoryId: null,
-    supportInheritedFromOrganizationId: evaluation.inheritedFromOrganizationId,
+    inventoryId: access.inventoryId,
+    supportInheritedFromOrganizationId: access.inheritedFromOrganizationId,
   });
-  throw deniedAccessError({
-    decision: evaluation.decision,
-    grantStatus,
-  });
+  return resolved(access);
 }
 
 /**
@@ -549,7 +736,7 @@ export async function resolveOrganizationAccess(
  * does not resolve, audit, or deny a second time.
  */
 export function organizationAccessRole(
-  ctx: TRPCContext,
+  ctx: Pick<OrganizationAccessContext, 'trpcPath'>,
   access: OrganizationAccess
 ): OrganizationRole {
   return access.kind === 'support' ? supportRoleForCurrentSurface(ctx, access) : access.role;
@@ -560,7 +747,7 @@ export function organizationAccessRole(
  * procedure is on the allowlist.
  */
 export async function ensureOrganizationAccess(
-  ctx: TRPCContext,
+  ctx: OrganizationAccessContext,
   organizationId: Organization['id'],
   roles?: readonly OrganizationRole[]
 ): Promise<OrganizationRole> {
@@ -624,7 +811,10 @@ export async function requireLiveOrganizationForPlatformAdmin(
  * after the organization middleware therefore keeps least privilege: the
  * middleware may admit a read, but a later `manage` assertion still fails.
  */
-function supportRoleForCurrentSurface(ctx: TRPCContext, access: SupportContext): OrganizationRole {
+function supportRoleForCurrentSurface(
+  ctx: Pick<OrganizationAccessContext, 'trpcPath'>,
+  access: SupportContext
+): OrganizationRole {
   if (ctx.trpcPath === undefined) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
@@ -659,13 +849,18 @@ function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, Organizati
  * Resolves the caller's effective role for each of `organizationIds` in a fixed
  * number of queries instead of one per organization.
  *
- * With support access OFF and a platform admin caller, every live organization
- * (not deleted) gets `owner`, and the elevation is recorded once with reason
- * `organization_access_batch`. In every other case, including support access ON,
- * the role is the highest one among the caller's direct and inherited membership
- * rows (a parent org owner, admin, or billing_manager inherits on its children;
- * only live organizations contribute rows). Organizations without such a role
- * are absent from the returned map.
+ * The role is the highest one among the caller's direct and inherited
+ * membership rows (a parent org owner, admin, or billing_manager inherits on
+ * its children; only live organizations contribute rows). Organizations
+ * without such a role are absent from the returned map.
+ *
+ * With support access OFF, a platform admin whose memberships do not give an
+ * allowed role in every requested organization passes the staff admission
+ * once for the batch (`support_read`, no single organization target), and
+ * then every live organization (not deleted) gets `owner`; the elevation is
+ * recorded once with reason `organization_access_batch`. Only queries batch
+ * organization roles: a write needs a proof bound to one organization, so a
+ * staff batch outside a query is refused.
  *
  * This batch path never consults a support grant. Grants are resolved per
  * organization by {@link resolveOrganizationAccess} against the procedure
@@ -681,64 +876,53 @@ export async function getOrganizationsAccessRoles(
   if (uniqueIds.length === 0) {
     return result;
   }
-  if (isSupportAccessEnabled()) {
-    const rolesByOrg = groupRolesByOrganization(
-      await selectCallerRoleRows(
-        ctx.user.id,
-        column => inArray(column, uniqueIds),
-        callerRoleFields
-      )
-    );
-    for (const [organizationId, roles] of rolesByOrg) {
-      const best = highestOrganizationRole(roles);
+  const rolesByOrg = groupRolesByOrganization(
+    await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
+  );
+  const membershipAllowsAll = uniqueIds.every(
+    id => highestOrganizationRole(rolesByOrg.get(id) ?? [], roles) !== null
+  );
+  if (isSupportAccessEnabled() || !ctx.user.is_admin || membershipAllowsAll) {
+    for (const [organizationId, memberRoles] of rolesByOrg) {
+      const best = highestOrganizationRole(memberRoles);
       if (best) result.set(organizationId, best);
     }
     return result;
   }
 
-  if (ctx.user.is_admin) {
-    // Only organizations that exist and are live are elevated, matching
-    // getOrganizationById.
-    const [liveOrgRows, rolesByOrg] = await Promise.all([
-      db
+  if (ctx.trpcType !== 'query') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+  }
+  // Only organizations that exist and are live are elevated, matching
+  // getOrganizationById. The read runs after the network and session checks.
+  let liveIds: string[] = [];
+  const staff = await requireStaffAuthority(ctx, {
+    actionClass: 'support_read',
+    target: { kind: 'organization', id: null },
+    authorize: async () => {
+      const liveOrgRows = await db
         .select({ id: organizations.id })
         .from(organizations)
-        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at))),
-      observeBatchMembershipRoles(async () =>
-        groupRolesByOrganization(
-          await selectCallerRoleRows(
-            ctx.user.id,
-            column => inArray(column, uniqueIds),
-            callerRoleFields
-          )
-        )
-      ),
-    ]);
-    const liveIds = liveOrgRows.map(row => row.id);
-    if (liveIds.length === 0) {
-      return result;
-    }
-    const grant = await elevateViaKiloAdmin(ctx, {
+        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at)));
+      liveIds = liveOrgRows.map(row => row.id);
+    },
+  });
+  if (liveIds.length === 0) {
+    return result;
+  }
+  const grant = await elevateViaKiloAdmin(
+    { ...ctx, user: staff.user },
+    {
       reason: 'organization_access_batch',
       target: organizationsTarget(liveIds),
       grant: 'owner',
       membershipRole: null,
-      wouldPassWithoutAdmin:
-        rolesByOrg === null
-          ? null
-          : liveIds.every(id => highestOrganizationRole(rolesByOrg.get(id) ?? [], roles) !== null),
-    });
-    for (const id of liveIds) result.set(id, grant);
-    return result;
-  }
-
-  const rolesByOrg = groupRolesByOrganization(
-    await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
+      wouldPassWithoutAdmin: liveIds.every(
+        id => highestOrganizationRole(rolesByOrg.get(id) ?? [], roles) !== null
+      ),
+    }
   );
-  for (const [organizationId, roles] of rolesByOrg) {
-    const best = highestOrganizationRole(roles);
-    if (best) result.set(organizationId, best);
-  }
+  for (const id of liveIds) result.set(id, grant);
   return result;
 }
 
@@ -765,58 +949,23 @@ export async function ensureOrganizationsAccess(
   }
 }
 
+/**
+ * The organization, for a caller with an allowed membership role or, for
+ * staff, once {@link resolveOrganizationAccessAndFetchOrg} admitted the staff
+ * branch; the staff row is the one the admission read.
+ */
 export async function ensureOrganizationAccessAndFetchOrg(
-  ctx: TRPCContext,
+  ctx: OrganizationAccessContext,
   organizationId: Organization['id'],
   roles?: readonly OrganizationRole[]
 ): Promise<Organization> {
-  if (ctx.user.is_admin && !isSupportAccessEnabled()) {
-    const organizationResult = settle(
-      db
-        .select()
-        .from(organizations)
-        .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
-    );
-    const observation = await observeMembershipRole(
-      () => loadEffectiveMembershipRows(ctx.user.id, organizationId),
-      roles
-    );
-    await recordKiloAdminElevation(ctx, {
-      reason: 'organization_fetch',
-      target: organizationTarget(organizationId),
-      ...observation,
-    });
-    const rowsResult = await organizationResult;
-    if (!rowsResult.ok) throw rowsResult.error;
-    const [organization] = rowsResult.value;
-    if (!organization) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    return organization;
-  }
-
   const rows = await loadEffectiveMembershipRowsWithOrganization(ctx.user.id, organizationId);
-  const role = effectiveMembershipRole(rows, roles);
-  if (role) {
-    const organization = rows.find(row => row.role === role)?.organization;
-    if (organization) return organization;
-  }
-
-  if (ctx.user.is_admin) {
-    const organization = await getOrganizationById(organizationId);
-    if (!organization) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    await resolveOrganizationAccess(ctx, organizationId, {
-      roles,
-      auditReason: 'organization_fetch',
-      membershipRows: rows,
-      organizationIsLive: true,
-    });
-    return organization;
-  }
-
-  throw await organizationRoleDeniedError(rows, organizationId);
+  const { organization } = await resolveOrganizationAccessAndFetchOrg(ctx, organizationId, {
+    roles,
+    auditReason: 'organization_fetch',
+    membershipRows: rows,
+  });
+  return organization;
 }
 
 /**
@@ -899,4 +1048,38 @@ export const organizationBillingMutationProcedure = baseProcedure
     });
     await requireActiveSubscriptionOrTrial(input.organizationId);
     return next({ ctx: { organizationAccess } });
+  });
+
+// Membership-only procedures for payment, credential, and OAuth surfaces on the
+// support never-list (SUPPORT_NEVER_KEYS): only a real direct or inherited
+// membership passes, so neither a staff admission nor a support grant stands in.
+export const organizationMemberOnlyMutationProcedure = baseProcedure
+  .input(OrganizationIdInputSchema)
+  .use(async ({ ctx, next, input }) => {
+    await ensureMemberOrganizationAccess(ctx.user, input.organizationId);
+    await requireActiveSubscriptionOrTrial(input.organizationId);
+    return next();
+  });
+
+export const organizationBillingMemberProcedure = baseProcedure
+  .input(OrganizationIdInputSchema)
+  .use(async ({ ctx, next, input }) => {
+    await ensureMemberOrganizationAccess(
+      ctx.user,
+      input.organizationId,
+      ORGANIZATION_BILLING_ROLES
+    );
+    return next();
+  });
+
+export const organizationBillingMemberMutationProcedure = baseProcedure
+  .input(OrganizationIdInputSchema)
+  .use(async ({ ctx, next, input }) => {
+    await ensureMemberOrganizationAccess(
+      ctx.user,
+      input.organizationId,
+      ORGANIZATION_BILLING_ROLES
+    );
+    await requireActiveSubscriptionOrTrial(input.organizationId);
+    return next();
   });

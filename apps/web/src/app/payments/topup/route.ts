@@ -78,8 +78,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
   let accountCreatedAt: Date | string = currentUser.created_at;
   let accountUsedMicrodollars = currentUser.microdollars_used;
   if (organizationId) {
+    // Payments are on the support never-list: only a real (direct or inherited)
+    // billing role may start a checkout for an organization.
     const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES, {
       requestMethod: request.method,
+      membershipOnly: true,
     });
     if (!orgContext.success) {
       return orgContext.nextResponse;

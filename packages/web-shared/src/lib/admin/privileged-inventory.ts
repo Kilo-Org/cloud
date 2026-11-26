@@ -367,20 +367,6 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
     read: 'platform_read',
     target: 'none',
   },
-  {
-    id: 'trpc.cliSessionsV2.list',
-    surface: 'trpc',
-    route: 'cliSessionsV2.list',
-    read: 'support_read',
-    target: 'none',
-  },
-  {
-    id: 'trpc.cliSessionsV2.search',
-    surface: 'trpc',
-    route: 'cliSessionsV2.search',
-    read: 'support_read',
-    target: 'none',
-  },
   adminEntry('trpc.codeIndexing', 'codeIndexing.*', {
     read: 'support_read',
     write: 'support_write',
@@ -391,13 +377,6 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
     write: 'support_write',
     target: 'organization',
   }),
-  {
-    id: 'trpc.securityAgent.getAuditReport',
-    surface: 'trpc',
-    route: 'securityAgent.getAuditReport',
-    read: 'support_read',
-    target: 'user',
-  },
   {
     id: 'trpc.organizations.securityAgent.getAuditReport',
     surface: 'trpc',
@@ -544,11 +523,24 @@ const restEntries: PrivilegedInventoryEntry[] = [
     write: 'support_write',
     target: 'organization',
   },
+  // The two code-index routes that still serve the index. Each entry names the
+  // personal branch, the only one that consults the staff guard with this
+  // class (bound to the caller's own account). A request that names an
+  // organization is classed at the organization admission instead, from its
+  // method: `support_read` for the GET, `support_write` for the PUT, bound to
+  // that organization. Neither route is on a support allowlist or the edge rule.
   {
-    id: 'rest.codeIndexing',
+    id: 'rest.codeIndexing.enabled',
     surface: 'rest',
-    route: '/api/code-indexing*',
-    read: 'support_read',
+    route: '/api/code-indexing/enabled',
+    read: 'platform_read',
+    target: 'user',
+  },
+  {
+    id: 'rest.codeIndexing.upsertByFile',
+    surface: 'rest',
+    route: '/api/code-indexing/upsert-by-file',
+    write: 'platform_write',
     target: 'user',
   },
   {
@@ -647,271 +639,531 @@ export const privilegedInventory: readonly PrivilegedInventoryEntry[] = [
 ];
 
 /**
- * Server-side files that read `is_admin` outside the checked-in route/procedure
- * inventory (shared helpers, token issuance, and branch-level bypasses).
- * `occurrences` records the reviewed count per file, so a new branch in an
- * already-listed file fails until it is reviewed. `file` is repository-relative.
+ * Why a server file references the staff role. Only `guard`, `grant` and
+ * `prefilter` affect authorization; the other uses carry no authority.
+ */
+export type StaffRoleUse =
+  /** The shared admission or a specialized guard decides from the current row. */
+  | 'guard'
+  /** Widens what the caller may read or do; a staff guard call must be awaited beside it. */
+  | 'grant'
+  /** A negated check that only refuses; any grant behind it is guarded separately. */
+  | 'prefilter'
+  /** A display or capability flag; the server enforces the action itself elsewhere. */
+  | 'ui_hint'
+  /** Attribution in an audit row, log line or refusal detail. */
+  | 'audit_metadata'
+  /** Describes the target account of an already guarded admin action. */
+  | 'target_metadata'
+  /** Copies the role into or out of the session claim, which carries no authority alone. */
+  | 'claim';
+
+/** Calls that admit staff authority for a mixed caller; each refuses by throwing or returning a refusal. */
+export type StaffGuardCall =
+  | 'requireStaffAuthority'
+  | 'requireStaffAuthorityForRequest'
+  | 'requireOrganizationStaffAuthority';
+
+/**
+ * One reviewed reference to the staff role. `snippet` is the reference's
+ * smallest enclosing declarator, property, statement, call, conditional, JSX
+ * attribute, destructuring pattern or `if` condition, with whitespace and
+ * trailing commas removed (see `referenceSnippet` in the inventory test), so a
+ * formatter change keeps it and an edited, added or moved reference fails the
+ * test until it is reviewed again. A `grant` names the guard that must be
+ * awaited in its enclosing block. With `via`, the read sits in a predicate
+ * chain: every call of a listed predicate must have that guard awaited in its
+ * block or delegate to a same-file function that awaits it. With `through`,
+ * the read's `if` condition (or, outside one, its block) awaits the named
+ * function, which the file imports from `through.file`; that function must
+ * await the guard itself or through same-file functions it awaits or returns.
+ */
+export type StaffRoleRead =
+  | { snippet: string; use: Exclude<StaffRoleUse, 'grant'> }
+  | {
+      snippet: string;
+      use: 'grant';
+      guard: StaffGuardCall;
+      via?: readonly string[];
+      through?: { call: string; file: string };
+    };
+
+/**
+ * Every server file that references the staff role (`is_admin`, a camel-case
+ * alias such as `isAdmin` or `isGlobalAdmin`, by member, bracket or
+ * destructuring) outside type positions. `file` is repository-relative.
  */
 export type InternalElevationSite = {
   id: string;
   file: string;
   actionClass: PrivilegedActionClass;
   surface: PrivilegedSurface;
-  occurrences: number;
+  reads: readonly StaffRoleRead[];
 };
 
 export const internalElevationSites: readonly InternalElevationSite[] = [
+  {
+    id: 'internal.app.organizations.compute',
+    file: 'apps/web/src/app/(app)/organizations/[id]/cloud/compute/page.tsx',
+    actionClass: 'support_read',
+    surface: 'server-component',
+    reads: [{ snippet: '{organization,role,isGlobalAdmin}', use: 'ui_hint' }],
+  },
+  {
+    id: 'internal.app.organizations.customModes',
+    file: 'apps/web/src/app/(app)/organizations/[id]/custom-modes/page.tsx',
+    actionClass: 'support_read',
+    surface: 'server-component',
+    reads: [{ snippet: '{organization,role,isGlobalAdmin}', use: 'ui_hint' }],
+  },
   {
     id: 'internal.app.organizations.welcome',
     file: 'apps/web/src/app/(app)/organizations/[id]/welcome/layout.tsx',
     actionClass: 'support_read',
     surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.app.auth.passkeyRegister',
-    file: 'apps/web/src/app/api/auth/passkey/register/route.ts',
-    actionClass: 'sensitive_write',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.lib.admin.requirePrivilegedActor',
-    file: 'apps/web/src/lib/admin/require-privileged-actor.ts',
-    actionClass: 'platform_read',
-    surface: 'trpc',
-    occurrences: 2,
-  },
-  {
-    id: 'internal.lib.auth.sessionStepUp',
-    file: 'apps/web/src/lib/auth/session-step-up.ts',
-    actionClass: 'sensitive_write',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.lib.auth.signInMethodChange',
-    file: 'apps/web/src/lib/auth/sign-in-method-change.ts',
-    actionClass: 'sensitive_write',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.components.adminUserStatusBadge',
-    file: 'apps/web/src/components/admin/UserStatusBadge.tsx',
-    actionClass: 'platform_read',
-    surface: 'server-component',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.components.organizationByPageLayout',
-    file: 'apps/web/src/components/organizations/OrganizationByPageLayout.tsx',
-    actionClass: 'support_read',
-    surface: 'server-component',
-    occurrences: 2,
+    reads: [{ snippet: 'isKiloAdmin:user.is_admin', use: 'ui_hint' }],
   },
   {
     id: 'internal.app.admin.creditCategories',
     file: 'apps/web/src/app/admin/api/credit-categories/[key]/route.ts',
     actionClass: 'platform_write',
     surface: 'rest',
-    occurrences: 2,
+    reads: [
+      { snippet: 'is_admin:kilocode_users.is_admin', use: 'target_metadata' },
+      { snippet: 'is_admin:user.is_admin', use: 'target_metadata' },
+    ],
+  },
+  {
+    id: 'internal.app.auth.passkeyRegister',
+    file: 'apps/web/src/app/api/auth/passkey/register/route.ts',
+    actionClass: 'sensitive_write',
+    surface: 'rest',
+    reads: [{ snippet: 'if(!params.user.is_admin)', use: 'audit_metadata' }],
+  },
+  {
+    id: 'internal.components.adminUserStatusBadge',
+    file: 'apps/web/src/components/admin/UserStatusBadge.tsx',
+    actionClass: 'platform_read',
+    surface: 'server-component',
+    reads: [{ snippet: 'if(user.is_admin)', use: 'target_metadata' }],
+  },
+  {
+    id: 'internal.components.organizationByPageLayout',
+    file: 'apps/web/src/components/organizations/OrganizationByPageLayout.tsx',
+    actionClass: 'support_read',
+    surface: 'server-component',
+    reads: [
+      {
+        snippet:
+          'if(denial!==undefined&&denial.isPlatformAdmin&&isSupportAccessEnabled()&&(denial.status===403||denial.status===503))',
+        use: 'ui_hint',
+      },
+      { snippet: 'isGlobalAdmin:user.is_admin&&!isSupport', use: 'ui_hint' },
+    ],
   },
   {
     id: 'internal.abuse.blockBlacklistedDomains',
     file: 'apps/web/src/lib/abuse/block-blacklisted-domains.ts',
     actionClass: 'sensitive_write',
     surface: 'rest',
-    occurrences: 1,
+    reads: [{ snippet: 'eq(kilocode_users.is_admin,false)', use: 'target_metadata' }],
   },
   {
     id: 'internal.admin.actionAudit',
     file: 'apps/web/src/lib/admin/admin-action-audit.ts',
     actionClass: 'platform_read',
     surface: 'rest',
-    occurrences: 1,
+    reads: [{ snippet: 'if(!ctx.user.is_admin)', use: 'audit_metadata' }],
   },
   {
     id: 'internal.admin.permissions',
     file: 'apps/web/src/lib/admin/admin-permissions.ts',
     actionClass: 'platform_read',
     surface: 'trpc',
-    occurrences: 3,
-  },
-  {
-    id: 'internal.admin.supportAccessResolver',
-    file: 'packages/web-shared/src/lib/admin/support-access-resolver.ts',
-    actionClass: 'support_read',
-    surface: 'trpc',
-    occurrences: 1,
+    reads: [
+      { snippet: 'return user.is_admin&&user.is_super_admin;', use: 'guard' },
+      { snippet: 'return user.is_admin&&user.can_view_sessions;', use: 'guard' },
+      { snippet: 'return user.is_admin&&user.can_export_api_request_logs;', use: 'guard' },
+    ],
   },
   {
     id: 'internal.admin.creditManagement',
     file: 'apps/web/src/lib/admin/credit-management.ts',
     actionClass: 'platform_read',
     surface: 'trpc',
-    occurrences: 1,
+    reads: [{ snippet: 'return user.is_admin&&user.can_manage_credits;', use: 'guard' }],
   },
   {
     id: 'internal.admin.githubInstallationUninstall',
     file: 'apps/web/src/lib/admin/github-installation-uninstall.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 1,
+    reads: [
+      { snippet: 'isAdmin:kilocode_users.is_admin', use: 'guard' },
+      { snippet: 'if(!admin||!admin.isAdmin||isBlockedAccount(admin))', use: 'prefilter' },
+    ],
   },
   {
-    id: 'internal.codeIndexing.util',
-    file: 'apps/web/src/lib/code-indexing/util.ts',
+    id: 'internal.lib.admin.requirePrivilegedActor',
+    file: 'apps/web/src/lib/admin/require-privileged-actor.ts',
     actionClass: 'platform_read',
     surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.bitbucket.credentials',
-    file: 'apps/web/src/lib/integrations/platforms/bitbucket/credentials.ts',
-    actionClass: 'support_write',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.bitbucket.workspaceAccessTokenAuthorization',
-    file: 'apps/web/src/lib/integrations/platforms/bitbucket/workspace-access-token-organization-authorization.ts',
-    actionClass: 'support_write',
-    surface: 'rest',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.securityAgent.auditLogService',
-    file: 'apps/web/src/lib/security-agent/services/audit-log-service.ts',
-    actionClass: 'platform_read',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.securityAgent.sharedHandlers',
-    file: 'apps/web/src/lib/security-agent/router/shared-handlers.ts',
-    actionClass: 'support_read',
-    surface: 'trpc',
-    occurrences: 3,
-  },
-  {
-    id: 'internal.user.deletionLegacyBackfill',
-    file: 'apps/web/src/lib/user/deletion-queue/deletion-legacy-backfill.ts',
-    actionClass: 'sensitive_write',
-    surface: 'rest',
-    occurrences: 2,
-  },
-  {
-    id: 'internal.user.nextAuthOptions',
-    file: 'apps/web/src/lib/user/next-auth-options.ts',
-    actionClass: 'platform_read',
-    surface: 'server-component',
-    occurrences: 3,
-  },
-  {
-    id: 'internal.routers.adminKiloclawInstances',
-    file: 'apps/web/src/routers/admin-kiloclaw-instances-router.ts',
-    actionClass: 'platform_write',
-    surface: 'trpc',
-    occurrences: 3,
-  },
-  {
-    id: 'internal.routers.admin',
-    file: 'apps/web/src/routers/admin-router.ts',
-    actionClass: 'platform_write',
-    surface: 'trpc',
-    occurrences: 10,
-  },
-  {
-    id: 'internal.routers.cliSessionsV2',
-    file: 'apps/web/src/routers/cli-sessions-v2-router.ts',
-    actionClass: 'support_read',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.routers.codeIndexing',
-    file: 'apps/web/src/routers/code-indexing/code-indexing-router.ts',
-    actionClass: 'support_read',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.routers.githubApps',
-    file: 'apps/web/src/routers/github-apps-router.ts',
-    actionClass: 'support_write',
-    surface: 'trpc',
-    occurrences: 3,
-  },
-  {
-    id: 'internal.routers.organizationCodeReviews',
-    file: 'apps/web/src/routers/organizations/organization-code-reviews-router.ts',
-    actionClass: 'support_read',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.routers.organizationMembers',
-    file: 'apps/web/src/routers/organizations/organization-members-router.ts',
-    actionClass: 'support_write',
-    surface: 'trpc',
-    occurrences: 3,
-  },
-  {
-    id: 'internal.routers.organizationSubOrganizations',
-    file: 'apps/web/src/routers/organizations/organization-sub-organizations-router.ts',
-    actionClass: 'support_write',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.routers.user',
-    file: 'apps/web/src/routers/user-router.ts',
-    actionClass: 'platform_read',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.user.nextAuthOptions',
-    file: 'apps/web/src/lib/user/next-auth-options.ts',
-    actionClass: 'platform_read',
-    surface: 'server-component',
-    occurrences: 3,
-  },
-  {
-    id: 'internal.webShared.trpcInit',
-    file: 'packages/web-shared/src/lib/trpc/init.ts',
-    actionClass: 'platform_read',
-    surface: 'trpc',
-    occurrences: 1,
-  },
-  {
-    id: 'internal.webShared.userServer',
-    file: 'packages/web-shared/src/lib/user/server.ts',
-    actionClass: 'platform_read',
-    surface: 'rest',
-    occurrences: 1,
+    reads: [
+      { snippet: 'allowed:user=>user.is_admin', use: 'guard' },
+      { snippet: 'isAdmin:currentUser.is_admin', use: 'guard' },
+    ],
   },
   {
     id: 'internal.admin.supportAccessService',
     file: 'apps/web/src/lib/admin/support-access-service.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 2,
+    reads: [
+      { snippet: 'if(!actor||isBlockedAccount(actor)||!actor.is_admin)', use: 'prefilter' },
+      {
+        snippet: 'if(!approver||isBlockedAccount(approver)||!approver.is_admin)',
+        use: 'prefilter',
+      },
+    ],
+  },
+  {
+    id: 'internal.lib.auth.sessionStepUp',
+    file: 'apps/web/src/lib/auth/session-step-up.ts',
+    actionClass: 'sensitive_write',
+    surface: 'rest',
+    reads: [
+      {
+        snippet:
+          'if(!currentUser||isBlockedAccount(currentUser)||!currentUser.is_admin||!isWebSessionCurrent(webSessionPepper,currentUser))',
+        use: 'prefilter',
+      },
+    ],
+  },
+  {
+    id: 'internal.lib.auth.signInMethodChange',
+    file: 'apps/web/src/lib/auth/sign-in-method-change.ts',
+    actionClass: 'sensitive_write',
+    surface: 'trpc',
+    reads: [{ snippet: 'if(user.is_admin)', use: 'audit_metadata' }],
+  },
+  {
+    id: 'internal.codeIndexing.util',
+    file: 'apps/web/src/lib/code-indexing/util.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    reads: [
+      {
+        snippet: 'return!isManuallyEnabledForUser(user.id)&&user.is_admin;',
+        use: 'grant',
+        guard: 'requireStaffAuthority',
+        via: ['isStaffPersonalIndexingCandidate', 'personalIndexingNeedsStaffAuthority'],
+      },
+    ],
+  },
+  {
+    id: 'internal.bitbucket.workspaceAccessTokenAuthorization',
+    file: 'apps/web/src/lib/integrations/platforms/bitbucket/workspace-access-token-organization-authorization.ts',
+    actionClass: 'support_write',
+    surface: 'rest',
+    reads: [
+      { snippet: 'isAdmin:kilocode_users.is_admin', use: 'guard' },
+      { snippet: 'if(!actor.isAdmin)', use: 'prefilter' },
+    ],
   },
   {
     id: 'internal.organizations.organizationAuth',
     file: 'apps/web/src/lib/organizations/organization-auth.ts',
     actionClass: 'support_read',
     surface: 'rest',
-    occurrences: 4,
+    reads: [
+      { snippet: 'if(!user.is_admin||options.membershipOnly)', use: 'prefilter' },
+      { snippet: 'isPlatformAdmin:user.is_admin', use: 'ui_hint' },
+      { snippet: 'isPlatformAdmin:user.is_admin', use: 'ui_hint' },
+    ],
+  },
+  {
+    id: 'internal.securityAgent.sharedHandlers',
+    file: 'apps/web/src/lib/security-agent/router/shared-handlers.ts',
+    actionClass: 'support_read',
+    surface: 'trpc',
+    reads: [
+      { snippet: 'isAdmin:ctx.user.is_admin', use: 'audit_metadata' },
+      { snippet: 'isAdmin:ctx.user.is_admin', use: 'audit_metadata' },
+    ],
+  },
+  {
+    id: 'internal.user.deletionLegacyBackfill',
+    file: 'apps/web/src/lib/user/deletion-queue/deletion-legacy-backfill.ts',
+    actionClass: 'sensitive_write',
+    surface: 'rest',
+    reads: [
+      { snippet: 'is_admin:kilocode_users.is_admin', use: 'guard' },
+      {
+        snippet: 'if(!admin||(!admin.is_admin&&!admin.is_super_admin)||isBlockedAccount(admin))',
+        use: 'prefilter',
+      },
+    ],
+  },
+  {
+    id: 'internal.user.nextAuthOptions',
+    file: 'apps/web/src/lib/user/next-auth-options.ts',
+    actionClass: 'platform_read',
+    surface: 'server-component',
+    reads: [
+      { snippet: 'token.isAdmin=existingUser.is_admin;', use: 'claim' },
+      { snippet: 'token.isAdmin=existingUser.is_admin;', use: 'claim' },
+      { snippet: 'if(existingUser.is_admin)', use: 'audit_metadata' },
+    ],
+  },
+  {
+    id: 'internal.middleware.adminApiRoutes',
+    file: 'apps/web/src/middleware/withAuthenticatedAdminApiRoutes.ts',
+    actionClass: 'platform_read',
+    surface: 'rest',
+    reads: [{ snippet: 'authorized:({token})=>!!token?.isAdmin', use: 'claim' }],
+  },
+  {
+    id: 'internal.routers.adminKiloclawInstances',
+    file: 'apps/web/src/routers/admin-kiloclaw-instances-router.ts',
+    actionClass: 'platform_write',
+    surface: 'trpc',
+    reads: [
+      { snippet: 'pin_pinned_by_is_admin:pinnedByUsers.is_admin', use: 'target_metadata' },
+      { snippet: 'pin_pinned_by_is_admin:pinnedByUsers.is_admin', use: 'target_metadata' },
+      { snippet: 'pin_pinned_by_is_admin:pinnedByUsers.is_admin', use: 'target_metadata' },
+    ],
+  },
+  {
+    id: 'internal.routers.admin',
+    file: 'apps/web/src/routers/admin-router.ts',
+    actionClass: 'platform_write',
+    surface: 'trpc',
+    reads: [
+      { snippet: 'is_admin:kilocode_users.is_admin', use: 'target_metadata' },
+      { snippet: 'is_admin:user.is_admin', use: 'target_metadata' },
+      {
+        snippet: 'if(!target.is_admin||!target.is_super_admin||isBlockedAccount(target))',
+        use: 'target_metadata',
+      },
+      { snippet: 'eq(kilocode_users.is_admin,true)', use: 'target_metadata' },
+      { snippet: 'isAdmin:user.is_admin', use: 'target_metadata' },
+      {
+        snippet: 'if(!currentUser||isBlockedAccount(currentUser)||!currentUser.is_admin)',
+        use: 'prefilter',
+      },
+      { snippet: 'eq(kilocode_users.is_admin,true)', use: 'target_metadata' },
+      { snippet: 'eq(kilocode_users.is_admin,false)', use: 'target_metadata' },
+      { snippet: 'if(!input.isAdmin&&actorId===targetId)', use: 'target_metadata' },
+      {
+        snippet: 'if(!input.isAdmin&&target.is_super_admin&&!serializeSuperadminRemoval)',
+        use: 'target_metadata',
+      },
+      { snippet: 'if(target.is_admin===input.isAdmin)', use: 'target_metadata' },
+      { snippet: 'if(target.is_admin===input.isAdmin)', use: 'target_metadata' },
+      { snippet: 'if(input.isAdmin)', use: 'target_metadata' },
+      {
+        snippet:
+          'input.isAdmin?{is_admin:true,web_session_pepper:crypto.randomUUID(),api_token_pepper:crypto.randomUUID()}:{is_admin:false,is_super_admin:false,can_view_sessions:false,can_manage_credits:false,can_export_api_request_logs:false,web_session_pepper:crypto.randomUUID(),api_token_pepper:crypto.randomUUID()}',
+        use: 'target_metadata',
+      },
+      { snippet: 'if(!input.isAdmin)', use: 'target_metadata' },
+      {
+        snippet: "input.isAdmin?'Granted platform admin access.':'Revoked platform admin access.'",
+        use: 'target_metadata',
+      },
+      {
+        snippet: "input.isAdmin?'Granted platform admin access':'Revoked platform admin access'",
+        use: 'target_metadata',
+      },
+      { snippet: 'isAdmin:input.isAdmin', use: 'target_metadata' },
+      { snippet: 'if(!target.is_admin)', use: 'target_metadata' },
+    ],
+  },
+  {
+    id: 'internal.routers.codeIndexing',
+    file: 'apps/web/src/routers/code-indexing/code-indexing-router.ts',
+    actionClass: 'support_read',
+    surface: 'trpc',
+    reads: [{ snippet: 'if(!ctx.user.is_admin)', use: 'grant', guard: 'requireStaffAuthority' }],
+  },
+  {
+    id: 'internal.routers.githubApps',
+    file: 'apps/web/src/routers/github-apps-router.ts',
+    actionClass: 'support_write',
+    surface: 'trpc',
+    reads: [
+      {
+        snippet:
+          "canCancel=status==='pending'&&((ctx.user.is_admin&&!isSupportAccessEnabled())||role==='owner'||role==='admin'||integration.kilo_requester_user_id===ctx.user.id)",
+        use: 'ui_hint',
+      },
+      {
+        snippet:
+          "canUninstall:((ctx.user.is_admin&&!isSupportAccessEnabled())||role==='owner'||role==='admin')&&(await canUninstallGitHubInstallation(integration))",
+        use: 'ui_hint',
+      },
+      {
+        snippet: 'if(!input.organizationId||!ctx.user.is_admin||isSupportAccessEnabled())',
+        use: 'grant',
+        guard: 'requireOrganizationStaffAuthority',
+      },
+    ],
+  },
+  {
+    id: 'internal.routers.organizationCodeReviews',
+    file: 'apps/web/src/routers/organizations/organization-code-reviews-router.ts',
+    actionClass: 'support_read',
+    surface: 'trpc',
+    reads: [{ snippet: 'canTriggerManualReview:ctx.user.is_admin', use: 'ui_hint' }],
+  },
+  {
+    id: 'internal.routers.organizationMembers',
+    file: 'apps/web/src/routers/organizations/organization-members-router.ts',
+    actionClass: 'support_write',
+    surface: 'trpc',
+    reads: [
+      {
+        snippet: 'if(needsStaffGrant&&(!user.is_admin||isSupportAccessEnabled()))',
+        use: 'grant',
+        guard: 'requireOrganizationStaffAuthority',
+      },
+      {
+        snippet: 'if(isSelfRemoval&&(!user.is_admin||isSupportAccessEnabled()))',
+        use: 'grant',
+        guard: 'requireOrganizationStaffAuthority',
+      },
+      {
+        // Owner authority for staff below owner: the awaited owner-role check
+        // admits them only through the organization's staff admission.
+        snippet:
+          "if(ctx.user.is_admin&&!isSupportAccessEnabled()&&(await ensureOrganizationAccess(ctx,organizationId,['owner']))==='owner')",
+        use: 'grant',
+        guard: 'requireOrganizationStaffAuthority',
+        through: {
+          call: 'ensureOrganizationAccess',
+          file: 'packages/web-shared/src/routers/organizations/utils.ts',
+        },
+      },
+      {
+        snippet:
+          "user.is_admin&&memberId===user.id?await getOrganizationMembershipRoles(user.id,organizationId,'direct_or_inherited'):undefined",
+        use: 'audit_metadata',
+      },
+    ],
+  },
+  {
+    id: 'internal.routers.organizationSubOrganizations',
+    file: 'apps/web/src/routers/organizations/organization-sub-organizations-router.ts',
+    actionClass: 'support_write',
+    surface: 'trpc',
+    reads: [
+      {
+        snippet:
+          'canCreateSubOrganizations=(ctx.user.is_admin&&!isSupportAccessEnabled())||Boolean((await db.select({id:organization_memberships.id}).from(organization_memberships).where(and(eq(organization_memberships.organization_id,input.organizationId),eq(organization_memberships.kilo_user_id,ctx.user.id),inArray(organization_memberships.role,ORGANIZATION_MANAGE_ROLES))).limit(1))[0])',
+        use: 'ui_hint',
+      },
+    ],
+  },
+  {
+    id: 'internal.routers.user',
+    file: 'apps/web/src/routers/user-router.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    reads: [{ snippet: 'isAdmin:ctx.user.is_admin', use: 'ui_hint' }],
+  },
+  {
+    id: 'internal.admin.accessLog',
+    file: 'packages/web-shared/src/lib/admin/admin-access-log.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    reads: [{ snippet: 'user.is_admin?adminTierFor(user):null', use: 'audit_metadata' }],
+  },
+  {
+    id: 'internal.admin.guard',
+    file: 'packages/web-shared/src/lib/admin/admin-guard.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    reads: [
+      { snippet: 'if(!request.user.is_admin)', use: 'prefilter' },
+      {
+        snippet:
+          'if(!current||current.id!==request.user.id||isBlockedAccount(current)||!current.is_admin)',
+        use: 'prefilter',
+      },
+    ],
+  },
+  {
+    id: 'internal.admin.supportAccessResolver',
+    file: 'packages/web-shared/src/lib/admin/support-access-resolver.ts',
+    actionClass: 'support_read',
+    surface: 'trpc',
+    reads: [{ snippet: 'eq(kilocode_users.is_admin,true)', use: 'guard' }],
+  },
+  {
+    id: 'internal.webShared.trpcInit',
+    file: 'packages/web-shared/src/lib/trpc/init.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    reads: [
+      {
+        snippet:
+          'ctx.user.is_admin?{trpcPath:path,trpcType:type,stepUpClaims:new Set<string>()}:{trpcPath:path,trpcType:type}',
+        use: 'guard',
+      },
+    ],
+  },
+  {
+    id: 'internal.webShared.userServer',
+    file: 'packages/web-shared/src/lib/user/server.ts',
+    actionClass: 'platform_read',
+    surface: 'rest',
+    reads: [
+      { snippet: 'session.isAdmin=castToken.isAdmin||false;', use: 'claim' },
+      { snippet: 'session.isAdmin=castToken.isAdmin||false;', use: 'claim' },
+      { snippet: 'if(opts.adminOnly&&!user.is_admin)', use: 'prefilter' },
+    ],
   },
   {
     id: 'internal.webShared.organizationsUtils',
     file: 'packages/web-shared/src/routers/organizations/utils.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 5,
+    reads: [
+      { snippet: 'if(!ctx.user.is_admin)', use: 'prefilter' },
+      {
+        snippet: 'if(!ctx.user.is_admin)',
+        use: 'grant',
+        guard: 'requireOrganizationStaffAuthority',
+      },
+      {
+        snippet: 'if(isSupportAccessEnabled()||!ctx.user.is_admin||membershipAllowsAll)',
+        use: 'grant',
+        guard: 'requireStaffAuthority',
+      },
+    ],
+  },
+  {
+    id: 'internal.workerUtils.securityFindingAudit',
+    file: 'packages/worker-utils/src/security-finding-audit.ts',
+    actionClass: 'support_read',
+    surface: 'worker',
+    reads: [
+      {
+        snippet:
+          'params.isAdmin?SecurityAuditLogActorType.KiloAdmin:SecurityAuditLogActorType.CustomerUser',
+        use: 'audit_metadata',
+      },
+    ],
+  },
+  {
+    // The MCP Worker's admin opt-in reads the role from apps/web `user.getMe`
+    // over the grant's bearer. It only refuses; the web admin guard refuses
+    // every bearer at the final call, so the claim grants nothing there.
+    id: 'internal.kiloMcp.pairing',
+    file: 'services/kilo-mcp/src/oauth/kilo-pairing.ts',
+    actionClass: 'platform_read',
+    surface: 'worker',
+    reads: [{ snippet: 'return(data as{isAdmin?:unknown}|null)?.isAdmin===true;', use: 'claim' }],
   },
 ];
 
@@ -980,10 +1232,17 @@ export function targetKindForEntry(
 const ACCOUNT_AREA_ID_FIELD = 'userId';
 
 /**
- * Per-procedure overrides: the field the resolver reads, or `null` for a
- * procedure in an account area that acts on another record and so names no
- * target. A procedure absent from this map and outside the account area names
- * no target either.
+ * Per-procedure overrides for any admin-tier procedure, not only `admin.*`:
+ * the validated input field the resolver reads, or `null` for a procedure in
+ * an account area that acts on another record and so names no target. A
+ * procedure absent from this map and outside the account area names no
+ * target either.
+ *
+ * The organization mutations below reach the shared organization admission
+ * with the same `organizationId` after the admin guard. Binding the guard's
+ * operation proof to that organization lets the later staff check reuse it;
+ * an unbound proof never covers a check that names an organization, so it
+ * would demand a second proof.
  */
 export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string | null> = {
   'admin.users.addNote': 'kilo_user_id',
@@ -993,6 +1252,14 @@ export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string | null> =
   'admin.ossSponsorship.addExistingOrgToOss': 'organizationId',
   'admin.supportAccess.request': 'organizationId',
   'admin.supportAccess.emergencyIssue': 'organizationId',
+  'organizations.reviewAgent.triggerBitbucketCodeReview': 'organizationId',
+  'organizations.sso.clearSsoDomain': 'organizationId',
+  'organizations.sso.createConfig': 'organizationId',
+  'organizations.sso.deleteConfig': 'organizationId',
+  'organizations.sso.generateAdminPortalLink': 'organizationId',
+  'organizations.sso.updateSsoDomain': 'organizationId',
+  'organizations.updatePlan': 'organizationId',
+  'organizations.updateSeatsRequired': 'organizationId',
 };
 
 /** The input field that procedure's resolver reads, or null when it has none. */

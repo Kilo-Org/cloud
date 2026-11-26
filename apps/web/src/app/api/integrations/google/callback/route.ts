@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
 import { requireOrganizationKiloClawComputeEntitlement } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
@@ -98,7 +98,7 @@ function oauthSentryContext(searchParams: URLSearchParams): {
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (verifiedState.owner.type === 'org') {
-      await ensureOrganizationAccess({ user, tokenSource }, verifiedState.owner.id);
+      await ensureMemberOrganizationAccess(user, verifiedState.owner.id);
     } else if (verifiedState.owner.id !== user.id) {
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }

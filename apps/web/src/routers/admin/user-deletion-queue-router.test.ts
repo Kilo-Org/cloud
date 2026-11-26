@@ -25,7 +25,7 @@ import {
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
 import { scrubControlPlanePii } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { inferRouterInputs } from '@trpc/server';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import type { RootRouter } from '@/routers/root-router';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
@@ -102,7 +102,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('requires admin access', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(
       caller.admin.userDeletionQueue.preview({ entries: [{ email: targetUser.google_user_email }] })
     ).rejects.toThrow('Admin access required');
@@ -113,7 +113,7 @@ describe('adminUserDeletionQueueRouter', () => {
     const [{ count: before }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(user_deletion_requests);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.userDeletionQueue.preview({
       entries: [
@@ -136,7 +136,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('submit creates catalog tasks when intake is enabled', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [result] = await caller.admin.userDeletionQueue.submit({
       entries: [{ email: targetUser.google_user_email, pylonTicket: '#ticket-1' }],
     });
@@ -153,7 +153,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('submit returns already_active for a duplicate target', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const first = await caller.admin.userDeletionQueue.submit({
       entries: [{ email: targetUser.google_user_email }],
     });
@@ -170,7 +170,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('refuses self-deletion without creating a request', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [{ count: before }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(user_deletion_requests);
@@ -185,7 +185,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('completed requests are not searchable by userId while detail by id still works', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [enqueued] = await caller.admin.userDeletionQueue.submit({
       entries: [{ email: targetUser.google_user_email }],
     });
@@ -221,7 +221,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('preview rejects an already queued email and the actor themselves', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [enqueued] = await caller.admin.userDeletionQueue.submit({
       entries: [{ email: targetUser.google_user_email }],
     });
@@ -238,7 +238,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('summary counts queued, needs-attention, and recent completions', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const before = await caller.admin.userDeletionQueue.summary();
 
     const [enqueued] = await caller.admin.userDeletionQueue.submit({
@@ -292,7 +292,7 @@ describe('adminUserDeletionQueueRouter', () => {
       state: { status: UserDeletionStepStatus.RetryWait, last_error_code: 'rate_limited' },
     },
   ] as const)('ignores legacy CSA for $tab with $state', async ({ tab, state }) => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [enqueued] = await caller.admin.userDeletionQueue.submit({
       entries: [{ email: targetUser.google_user_email }],
     });
@@ -324,7 +324,7 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   it('does not expose pause on the serialized request or router', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [enqueued] = await caller.admin.userDeletionQueue.submit({
       entries: [{ email: targetUser.google_user_email }],
     });
@@ -343,7 +343,7 @@ describe('adminUserDeletionQueueRouter', () => {
 
     describe.each(['previewHistoricalUsers', 'submitHistoricalUsers'] as const)('%s', method => {
       it('requires admin access', async () => {
-        const caller = await createCallerForUser(regularUser.id);
+        const caller = await createSessionCallerForUser(regularUser.id);
         await expect(
           caller.admin.userDeletionQueue[method]({ userIds: [targetUser.id] })
         ).rejects.toThrow('Admin access required');
@@ -351,7 +351,7 @@ describe('adminUserDeletionQueueRouter', () => {
 
       it('rejects invalid batches before writing any queue records', async () => {
         const user = await historicalUser();
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
         const before = await queueState();
         const invalidIds = [
           '',
@@ -385,7 +385,7 @@ describe('adminUserDeletionQueueRouter', () => {
 
       it('rejects caller-supplied admin IDs, catalogues, steps, and execution flags', async () => {
         const user = await historicalUser();
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
         const before = await queueState();
         for (const overrides of [
           { adminUserId: regularUser.id },
@@ -402,7 +402,7 @@ describe('adminUserDeletionQueueRouter', () => {
       });
 
       it('accepts 100 input IDs and a 1024-character opaque ID', async () => {
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
         const userId = 'oauth/Provider/'.padEnd(1024, 'x');
         await expect(
           caller.admin.userDeletionQueue[method]({ userIds: Array<string>(100).fill(userId) })
@@ -413,7 +413,7 @@ describe('adminUserDeletionQueueRouter', () => {
     it('preview exposes eligible, refused, and terminal existing results without writes or providers', async () => {
       const user = await historicalUser();
       const completedUser = await historicalUser();
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const [enqueued] = await caller.admin.userDeletionQueue.submitHistoricalUsers({
         userIds: [completedUser.id],
       });
@@ -444,7 +444,7 @@ describe('adminUserDeletionQueueRouter', () => {
 
     it('submit attributes one V3 user-ID-only request to the authenticated admin without notifications', async () => {
       const user = await historicalUser();
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const result = await caller.admin.userDeletionQueue.submitHistoricalUsers({
         userIds: [user.id, ` ${user.id} `, user.id],
       });
@@ -512,7 +512,7 @@ describe('adminUserDeletionQueueRouter', () => {
       const user = await historicalUser();
       const differentlyCased = await historicalUser(user.id.toLowerCase());
       const opaqueUser = await historicalUser(`external|Opaque ID:${crypto.randomUUID()}`);
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await expect(
         caller.admin.userDeletionQueue.previewHistoricalUsers({
           userIds: [` ${user.id} `, user.id, differentlyCased.id, ` ${opaqueUser.id} `],
@@ -526,7 +526,7 @@ describe('adminUserDeletionQueueRouter', () => {
 
     it('submit revalidates subscriptions added after preview', async () => {
       const user = await historicalUser();
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await expect(
         caller.admin.userDeletionQueue.previewHistoricalUsers({ userIds: [user.id] })
       ).resolves.toEqual([{ userId: user.id, status: 'eligible' }]);
@@ -546,24 +546,27 @@ describe('adminUserDeletionQueueRouter', () => {
     });
 
     it.each([{ is_admin: false }, { blocked_reason: 'blocked' }])(
-      'rechecks the authenticated admin against current database state: %j',
+      'refuses an admin revoked after sign-in before any resolver runs: %j',
       async overrides => {
         const user = await historicalUser();
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
         await expect(
           caller.admin.userDeletionQueue.previewHistoricalUsers({ userIds: [user.id] })
         ).resolves.toEqual([{ userId: user.id, status: 'eligible' }]);
         const before = await queueState();
         await db.update(kilocode_users).set(overrides).where(eq(kilocode_users.id, admin.id));
         try {
+          // The staff admission re-reads the primary row, so the caller's
+          // session row no longer grants access; the resolvers never answer
+          // with per-row results.
           for (const method of ['previewHistoricalUsers', 'submitHistoricalUsers'] as const) {
             await expect(
               caller.admin.userDeletionQueue[method]({ userIds: [user.id] })
-            ).resolves.toEqual([
-              { userId: user.id, status: 'refused', code: 'active_admin_required' },
-            ]);
+            ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Admin access required' });
           }
           expect(await queueState()).toEqual(before);
+          expect(await findUserById(user.id)).toEqual(user);
+          expect(fetch).not.toHaveBeenCalled();
         } finally {
           await db
             .update(kilocode_users)
@@ -577,7 +580,7 @@ describe('adminUserDeletionQueueRouter', () => {
       const firstUser = await historicalUser();
       const failedUser = await historicalUser();
       const lastUser = await historicalUser();
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const transaction = db.transaction.bind(db);
       const order: string[] = [];
       jest
@@ -630,7 +633,7 @@ describe('adminUserDeletionQueueRouter', () => {
     });
 
     it('stores TOTP alongside the cookie and reports it in meta', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await caller.admin.userDeletionQueue.replaceSubstackCredential({
         material: 'connect.sid=abc',
         totpSecret: secret,
@@ -651,7 +654,7 @@ describe('adminUserDeletionQueueRouter', () => {
     });
 
     it('rejects an invalid TOTP secret without echoing it', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const error = await caller.admin.userDeletionQueue
         .replaceSubstackCredential({ material: 'connect.sid=abc', totpSecret: 'super-secret-bad!' })
         .catch(caught => caught);

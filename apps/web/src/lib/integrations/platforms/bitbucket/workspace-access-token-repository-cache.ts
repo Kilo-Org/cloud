@@ -25,6 +25,7 @@ import {
   BitbucketWorkspaceAccessTokenOrganizationAuthorizationError,
   lockBitbucketWorkspaceAccessTokenOrganization,
   requireBitbucketWorkspaceAccessTokenOrganizationManager,
+  type BitbucketOrganizationManagerAuthority,
 } from './workspace-access-token-organization-authorization';
 
 const WorkspaceSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/);
@@ -76,18 +77,12 @@ type RefreshRepositoriesInput = {
   organizationId: string;
   kiloUserId: string;
   expectedIntegrationId: string;
+  authority: BitbucketOrganizationManagerAuthority;
 };
 
 type RefreshRepositoriesForMemberInput = {
   organizationId: string;
   kiloUserId: string;
-};
-
-type ListRepositoriesInput = {
-  organizationId: string;
-  kiloUserId: string;
-  expectedIntegrationId?: string;
-  syncPolicy?: 'cache_only' | 'refresh_if_uninitialized';
 };
 
 type WorkspaceIdentity = {
@@ -408,29 +403,6 @@ export async function getBitbucketCodeReviewerReadiness(organizationId: string) 
   };
 }
 
-export async function listBitbucketWorkspaceAccessTokenRepositories({
-  organizationId,
-  kiloUserId,
-  expectedIntegrationId,
-  syncPolicy = 'cache_only',
-}: ListRepositoriesInput): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
-  const cached = await readCachedBitbucketWorkspaceAccessTokenRepositories({
-    organizationId,
-    expectedIntegrationId,
-  });
-  if (syncPolicy !== 'refresh_if_uninitialized' || cached.status !== 'temporarily_unavailable') {
-    return cached;
-  }
-
-  const status = await getBitbucketWorkspaceAccessTokenStatus(organizationId);
-  if (!status.integrationId) return cached;
-  return refreshBitbucketWorkspaceAccessTokenRepositories({
-    organizationId,
-    kiloUserId,
-    expectedIntegrationId: status.integrationId,
-  });
-}
-
 async function isObservedCredentialGenerationCurrent(
   tx: DrizzleTransaction,
   organizationId: string,
@@ -469,6 +441,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
   organizationId,
   kiloUserId,
   expectedIntegrationId,
+  authority,
 }: RefreshRepositoriesInput): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
   const canonicalOrganizationId = canonicalizeUuid(organizationId);
   const canonicalExpectedIntegrationId = canonicalizeUuid(expectedIntegrationId);
@@ -489,7 +462,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
     organizationId: canonicalOrganizationId,
     kiloUserId,
     integration,
-    requireOrganizationManager: true,
+    organizationManagerAuthority: authority,
   });
 }
 
@@ -512,7 +485,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositoriesForMember(
     organizationId: canonicalOrganizationId,
     kiloUserId,
     integration,
-    requireOrganizationManager: false,
+    organizationManagerAuthority: null,
   });
 }
 
@@ -520,12 +493,13 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
   organizationId,
   kiloUserId,
   integration,
-  requireOrganizationManager,
+  organizationManagerAuthority,
 }: {
   organizationId: string;
   kiloUserId: string;
   integration: RefreshableParsedIntegration;
-  requireOrganizationManager: boolean;
+  /** Null for the member read path, which needs no manager role. */
+  organizationManagerAuthority: BitbucketOrganizationManagerAuthority | null;
 }): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
   const workspaceIdentity = integration.workspaceIdentity;
   const credential = integration.credential;
@@ -579,11 +553,12 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
   try {
     updated = await db.transaction(async tx => {
       await lockBitbucketWorkspaceAccessTokenOrganization(tx, organizationId);
-      if (requireOrganizationManager) {
+      if (organizationManagerAuthority) {
         await requireBitbucketWorkspaceAccessTokenOrganizationManager(
           tx,
           organizationId,
-          kiloUserId
+          kiloUserId,
+          organizationManagerAuthority
         );
       }
       const currentCredential = tx

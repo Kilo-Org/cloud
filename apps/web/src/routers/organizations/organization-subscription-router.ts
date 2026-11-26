@@ -29,6 +29,8 @@ import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
+  organizationBillingMemberProcedure,
+  organizationBillingMemberMutationProcedure,
   organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
@@ -305,7 +307,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return { status: paymentStatus };
     }),
 
-  getSubscriptionStripeUrl: organizationBillingProcedure
+  getSubscriptionStripeUrl: organizationBillingMemberProcedure
     .input(SubscriptionRequestSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -354,7 +356,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return { url: result };
     }),
 
-  cancel: organizationBillingMutationProcedure
+  cancel: organizationBillingMemberMutationProcedure
     .input(OrganizationIdInputSchema)
     .output(SubscriptionActionResponseSchema.extend({ message: z.string() }))
     .mutation(async ({ input }) => {
@@ -399,7 +401,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return result;
     }),
 
-  updateSeatCount: organizationBillingMutationProcedure
+  updateSeatCount: organizationBillingMemberMutationProcedure
     .input(UpdateSeatCountInputSchema)
     .output(UpdateSeatCountResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -474,7 +476,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return result;
     }),
 
-  getCustomerPortalUrl: organizationBillingProcedure
+  getCustomerPortalUrl: organizationBillingMemberProcedure
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -535,7 +537,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       };
     }),
 
-  changeBillingCycle: organizationBillingMutationProcedure
+  changeBillingCycle: organizationBillingMemberMutationProcedure
     .input(ChangeBillingCycleInputSchema)
     .output(BillingCycleChangeResponseSchema)
     .mutation(async ({ input }) => {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   verifyUserOwnsSessionByCloudAgentId,
@@ -51,7 +51,7 @@ function handleTRPCError(error: unknown): NextResponse {
  */
 export async function POST(request: Request) {
   try {
-    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
 
     if (authFailedResponse) {
       return authFailedResponse;
@@ -80,10 +80,12 @@ export async function POST(request: Request) {
 
     const { cloudAgentSessionId, organizationId } = validation.data;
 
+    // A stream ticket is a credential, so it is on the support never-list: only
+    // a real (direct or inherited) membership grants organization scope here.
     const sessionAccess = organizationId
       ? {
           verify: async () => {
-            await ensureOrganizationAccess({ user, tokenSource }, organizationId);
+            await ensureMemberOrganizationAccess(user, organizationId);
             return verifyOrgOwnsSessionByCloudAgentId(
               db,
               organizationId,

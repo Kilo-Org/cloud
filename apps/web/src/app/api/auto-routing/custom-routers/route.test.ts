@@ -34,12 +34,17 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import {
+  getUserFromAuth,
+  requireStaffAuthorityForRequest,
+} from '@kilocode/web-shared/lib/user/server';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest, type NextResponse } from 'next/server';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { staffStepUpRefusal } from '@/tests/helpers/staff-refusal.helper';
 import { MAX_CUSTOM_ROUTER_BODY_BYTES, lockOwner } from '@/lib/auto-routing-custom-routers';
 import { GET as listRouters, POST as createRouter } from './route';
 import {
@@ -1747,6 +1752,57 @@ describe('/api/auto-routing/custom-routers', () => {
         .from(auto_routing_custom_routers)
         .where(eq(auto_routing_custom_routers.slug, 'full'));
       expect(full?.entries).toHaveLength(20);
+    });
+  });
+
+  describe('staff without a membership', () => {
+    const mockedStaffAuthority = jest.mocked(requireStaffAuthorityForRequest);
+    let staff: User;
+    let organizationId: string;
+
+    beforeEach(async () => {
+      const organization = await createTestOrganization('Staff routers', user.id, 0);
+      organizationId = organization.id;
+      staff = await insertTestUser({ is_admin: true });
+      signIn(staff);
+      mockedStaffAuthority.mockImplementation(async (_auth, params) =>
+        staffStepUpRefusal(params, '/api/auto-routing/custom-routers')
+      );
+    });
+
+    test('a list returns the staff guard session step-up refusal', async () => {
+      const response = await listRouters(request(`?organizationId=${organizationId}`));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'MFA_REQUIRED',
+        stepUp: { actionClass: 'support_read', purpose: 'session', binding: null },
+      });
+    });
+
+    test('a create returns the operation step-up refusal and stores no router', async () => {
+      const response = await createRouter(
+        request(`?organizationId=${organizationId}`, {
+          method: 'POST',
+          body: routerBody({ scope: 'org', slug: 'efficient' }),
+        })
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        stepUp: {
+          actionClass: 'support_write',
+          binding: { method: 'post', targetKind: 'organization', targetId: organizationId },
+        },
+      });
+      expect(await db.select().from(auto_routing_custom_routers)).toEqual([]);
+    });
+
+    test('staff who hold a real membership never reach the staff guard', async () => {
+      await addUserToOrganization(organizationId, staff.id, 'member');
+
+      expect((await list(`?organizationId=${organizationId}`)).status).toBe(200);
+      expect(mockedStaffAuthority).not.toHaveBeenCalled();
     });
   });
 });

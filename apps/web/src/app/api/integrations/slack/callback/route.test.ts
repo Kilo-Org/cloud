@@ -43,7 +43,7 @@ jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   cancelProviderOAuthAttempt: (input: unknown) => mockCancelProviderOAuthAttempt(input),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),

@@ -415,6 +415,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
         organizationId: uppercaseOrganizationId,
         actorUserId: actor.id,
         integrationId: connected.integrationId,
+        authority: 'member',
       })
     ).resolves.toEqual({ integrationId: connected.integrationId });
     await expect(
@@ -995,6 +996,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
         organizationId: organization.id,
         actorUserId: actor.id,
         integrationId: connected.integrationId,
+        authority: 'member',
       })
     ).resolves.toEqual({ integrationId: connected.integrationId });
 
@@ -1086,44 +1088,105 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     ).resolves.toHaveLength(1);
   });
 
-  it.each(['billing_manager', 'platform_admin'] as const)(
-    'allows a current unblocked %s to connect and records that actor',
-    async actorKind => {
-      const organizationOwner = await insertTestUser();
-      const actor = await insertTestUser();
-      const organization = await createTestOrganization(
-        `${actorKind} Organization`,
-        organizationOwner.id,
-        0
-      );
-      if (actorKind === 'billing_manager') {
-        await db.insert(organization_memberships).values({
-          organization_id: organization.id,
-          kilo_user_id: actor.id,
-          role: 'billing_manager',
-        });
-      } else {
-        await db
-          .update(kilocode_users)
-          .set({ is_admin: true })
-          .where(eq(kilocode_users.id, actor.id));
-      }
-      mockSuccessfulProviderValidation();
+  it('allows a current unblocked billing manager to connect and records that actor', async () => {
+    const organizationOwner = await insertTestUser();
+    const actor = await insertTestUser();
+    const organization = await createTestOrganization(
+      'Billing Manager Organization',
+      organizationOwner.id,
+      0
+    );
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: actor.id,
+      role: 'billing_manager',
+    });
+    mockSuccessfulProviderValidation();
 
-      const connected = await connectBitbucketWorkspaceAccessToken({
+    const connected = await connectBitbucketWorkspaceAccessToken({
+      organizationId: organization.id,
+      actorUserId: actor.id,
+      accessToken: ACCESS_TOKEN,
+    });
+
+    const [audit] = await db
+      .select()
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id));
+    expect(connected.workspace.uuid).toBe(WORKSPACE_UUID);
+    expect(audit).toEqual(expect.objectContaining({ actor_id: actor.id }));
+  });
+
+  it('refuses to issue a credential to a platform admin without a membership', async () => {
+    const organizationOwner = await insertTestUser();
+    const actor = await insertTestUser({ is_admin: true });
+    const organization = await createTestOrganization(
+      'Platform Admin Organization',
+      organizationOwner.id,
+      0
+    );
+    const fetchMock = jest.spyOn(global, 'fetch');
+
+    await expect(
+      connectBitbucketWorkspaceAccessToken({
         organizationId: organization.id,
         actorUserId: actor.id,
         accessToken: ACCESS_TOKEN,
-      });
-
-      const [audit] = await db
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(
+      db
         .select()
-        .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.organization_id, organization.id));
-      expect(connected.workspace.uuid).toBe(WORKSPACE_UUID);
-      expect(audit).toEqual(expect.objectContaining({ actor_id: actor.id }));
-    }
-  );
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organization.id))
+    ).resolves.toEqual([]);
+  });
+
+  it('rechecks the staff role, not a membership, for a staff-admitted disconnect', async () => {
+    const organizationOwner = await insertTestUser();
+    const staff = await insertTestUser({ is_admin: true });
+    const organization = await createTestOrganization(
+      'Staff Disconnect Organization',
+      organizationOwner.id,
+      0
+    );
+    mockSuccessfulProviderValidation();
+    const connected = await connectBitbucketWorkspaceAccessToken({
+      organizationId: organization.id,
+      actorUserId: organizationOwner.id,
+      accessToken: ACCESS_TOKEN,
+    });
+
+    await expect(
+      disconnectBitbucketWorkspaceAccessToken({
+        organizationId: organization.id,
+        actorUserId: staff.id,
+        integrationId: connected.integrationId,
+        authority: 'member',
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized' });
+
+    await db.update(kilocode_users).set({ is_admin: false }).where(eq(kilocode_users.id, staff.id));
+    await expect(
+      disconnectBitbucketWorkspaceAccessToken({
+        organizationId: organization.id,
+        actorUserId: staff.id,
+        integrationId: connected.integrationId,
+        authority: 'staff',
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized' });
+
+    await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, staff.id));
+    await expect(
+      disconnectBitbucketWorkspaceAccessToken({
+        organizationId: organization.id,
+        actorUserId: staff.id,
+        integrationId: connected.integrationId,
+        authority: 'staff',
+      })
+    ).resolves.toEqual({ integrationId: connected.integrationId });
+  });
 
   it('rejects an invalid organization ID before authority or provider access', async () => {
     const fetchMock = jest.spyOn(global, 'fetch');

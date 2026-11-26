@@ -5,7 +5,9 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { User } from '@kilocode/db/schema';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
@@ -28,7 +30,7 @@ import type { OAuthConnectPlatform, StandardOAuthPlatform } from '@/lib/integrat
 
 /**
  * Maps an organization-access denial to a user-facing OAuth error code.
- * `ensureOrganizationAccess` throws the same UNAUTHORIZED code for both
+ * `ensureMemberOrganizationAccess` throws the same UNAUTHORIZED code for both
  * "no membership" and "insufficient role", so the message distinguishes them.
  * Returns null when the error is not an expected access denial.
  */
@@ -40,10 +42,15 @@ export function organizationAccessDenialErrorCode(error: unknown): string | null
   return 'permission_required';
 }
 
-type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
+type AuthenticatedOAuthUser = User;
 
+/**
+ * An organization OAuth connect stores a credential, so it is membership-only:
+ * a staff or support grant never stands in (SUPPORT_NEVER_KEYS), and OAuth
+ * state never carries staff authority.
+ */
 export type ResolveConnectOwnerOptions = {
-  organizationRoles?: Parameters<typeof ensureOrganizationAccess>[2];
+  organizationRoles?: readonly OrganizationRole[];
   requireActiveOrganizationSubscription?: boolean;
 };
 
@@ -98,7 +105,7 @@ export async function cancelMissingCodeProviderOAuthAttempt(input: {
   if (verified.userId !== input.user.id) return false;
   const owner = parseOAuthStateOwner(verified.owner);
   if (!owner) return false;
-  if (owner.type === 'org') await ensureOrganizationAccess({ user: input.user }, owner.id);
+  if (owner.type === 'org') await ensureMemberOrganizationAccess(input.user, owner.id);
   else if (owner.id !== input.user.id) return false;
   return cancelProviderOAuthAttempt({
     actorUserId: input.user.id,
@@ -196,7 +203,7 @@ export async function resolveOAuthConnectOwner(
     };
   }
 
-  await ensureOrganizationAccess({ user }, organizationId, options.organizationRoles);
+  await ensureMemberOrganizationAccess(user, organizationId, options.organizationRoles);
 
   if (options.requireActiveOrganizationSubscription) {
     await requireActiveSubscriptionOrTrial(organizationId);

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
@@ -315,7 +315,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     // completing an install can move the connection to another workspace, so this
     // completion requires the organization role that governs the integration.
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
+      await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(
         new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)

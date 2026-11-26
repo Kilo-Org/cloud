@@ -4,7 +4,7 @@ import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import {
   DiscordGuildAlreadyConnectedError,
@@ -58,7 +58,7 @@ jest.mock('@/lib/bot', () => ({
   bot: { initialize: jest.fn(async () => undefined), getAdapter: jest.fn() },
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -66,7 +66,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedExchangeDiscordCode = jest.mocked(exchangeDiscordCode);
 const mockedUpsertDiscordInstallation = jest.mocked(upsertDiscordInstallation);
 const mockedReleasePreviousDiscordGuild = jest.mocked(releasePreviousDiscordGuild);
@@ -126,7 +126,7 @@ function expectRedactedDiagnostic(state: string, code?: string) {
 describe('handleDiscordOAuthCallback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedEnsureOrganizationAccess.mockResolvedValue('billing_manager');
+    mockedEnsureMemberOrganizationAccess.mockResolvedValue('billing_manager');
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: USER_ID },
       authFailedResponse: null,
@@ -173,11 +173,11 @@ describe('handleDiscordOAuthCallback', () => {
       GUILD_ID,
       expect.any(Function)
     );
-    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
   });
 
   test('refuses an organization install for a member without the integration role', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have the required organizational role to access this feature',
@@ -194,8 +194,8 @@ describe('handleDiscordOAuthCallback', () => {
       response,
       `/organizations/${ORGANIZATION_ID}/integrations/discord?error=permission_required`
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      { user: expect.objectContaining({ id: USER_ID }) },
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_BILLING_ROLES
     );
@@ -205,7 +205,7 @@ describe('handleDiscordOAuthCallback', () => {
   });
 
   test('refuses an organization install for a caller outside the organization', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have access to this organization',

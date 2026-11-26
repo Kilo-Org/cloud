@@ -9,9 +9,9 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
-const mockedEnsureOrganizationAccess = jest.fn();
+const mockedEnsureMemberOrganizationAccess = jest.fn();
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: mockedEnsureOrganizationAccess,
+  ensureMemberOrganizationAccess: mockedEnsureMemberOrganizationAccess,
 }));
 const mockedRequireKiloClawAccess = jest.fn();
 jest.mock('@/lib/kiloclaw/access-gate', () => ({
@@ -137,7 +137,7 @@ describe('GET /api/integrations/google/connect', () => {
     expect(response.headers.get('location')).toBe(
       'https://accounts.google.com/o/oauth2/v2/auth?x=1'
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith({ id: USER_ID }, ORG_ID);
     expect(mockedRequireOrganizationKiloClawComputeEntitlement).toHaveBeenCalledWith(ORG_ID);
     expect(mockedRequireKiloClawAccess).not.toHaveBeenCalled();
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
@@ -191,7 +191,7 @@ describe('GET /api/integrations/google/connect', () => {
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?error=invalid_organization');
-    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
   });
 
   test('passes a valid returnTo through to the OAuth state', async () => {
@@ -223,7 +223,7 @@ describe('GET /api/integrations/google/connect', () => {
     );
 
     expect(response.status).toBe(307);
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith({ id: USER_ID }, ORG_ID);
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
       expect.objectContaining({

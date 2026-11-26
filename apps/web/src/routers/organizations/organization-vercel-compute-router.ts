@@ -33,9 +33,11 @@ import {
 } from '@/lib/byoc/vercel-connection';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
+  ensureMemberOrganizationAccess,
   organizationAdminProcedure,
   OrganizationIdInputSchema,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 
 const VercelIdentifierSchema = z.string().trim().min(1).max(256);
 const VercelTokenSchema = z.string().trim().min(1).max(4096);
@@ -586,11 +588,12 @@ export const organizationVercelComputeRouter = createTRPCRouter({
       );
     }),
 
-  add: organizationAdminProcedure
-    .input(OrganizationVercelComputeSetupInput)
-    .mutation(async ({ input }) => {
-      return await addForOwner(organizationOwner(input.organizationId), input);
-    }),
+  // Storing the organization's Vercel token needs a real owner or admin
+  // membership: no staff admission or support grant stands in.
+  add: baseProcedure.input(OrganizationVercelComputeSetupInput).mutation(async ({ ctx, input }) => {
+    await ensureMemberOrganizationAccess(ctx.user, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+    return await addForOwner(organizationOwner(input.organizationId), input);
+  }),
 
   retrySetup: organizationAdminProcedure.mutation(async ({ input }) => {
     return await retrySetupForOwner(organizationOwner(input.organizationId));
@@ -600,9 +603,16 @@ export const organizationVercelComputeRouter = createTRPCRouter({
     return await upgradeRuntimeForOwner(organizationOwner(input.organizationId));
   }),
 
-  remove: organizationAdminProcedure
+  // Removing the organization's Vercel token needs a real owner or admin
+  // membership: no staff admission or support grant stands in.
+  remove: baseProcedure
     .input(OrganizationIdInputSchema.extend(VercelComputeRemoveInput.shape))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await ensureMemberOrganizationAccess(
+        ctx.user,
+        input.organizationId,
+        ORGANIZATION_MANAGE_ROLES
+      );
       return await removeForOwner(organizationOwner(input.organizationId), input);
     }),
 });

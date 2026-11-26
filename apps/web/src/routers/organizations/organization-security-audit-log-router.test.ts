@@ -1,9 +1,22 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
+import { and, eq } from 'drizzle-orm';
 import { organization_memberships, security_audit_log } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import {
+  createBearerCallerForUser,
+  createCallerForUser,
+  createSessionCallerForUser,
+} from '@/routers/test-utils';
+import {
+  ALLOWED_ADMIN_ADDRESS,
+  OFF_NETWORK_ADDRESS,
+  withAdminStepUpEnabled,
+  withEnforcedAdminNetwork,
+} from '@/tests/helpers/admin-network.helper';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { TRPCError } from '@trpc/server';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 
 const COLUMNS = [
@@ -224,17 +237,30 @@ describe('organizations.securityAuditLog.export', () => {
   });
 });
 
-describe('organizations.securityAuditLog actor details follow the account permission', () => {
+/** Export audit rows recorded for the organization's audit log. */
+async function exportRows(organizationId: string) {
+  return db
+    .select({ id: security_audit_log.id })
+    .from(security_audit_log)
+    .where(
+      and(
+        eq(security_audit_log.owned_by_organization_id, organizationId),
+        eq(security_audit_log.action, SecurityAuditLogAction.AuditLogExported)
+      )
+    );
+}
+
+describe('organizations.securityAuditLog actor details', () => {
   afterEach(cleanupDbForTest);
 
-  it('requires the platform admin permission for an organization billing member', async () => {
+  it('masks staff actors for an organization billing member', async () => {
     const organization = await seedOrganizationWithAuditEntries();
     const billingMember = await insertTestUser({
       google_user_email: 'billing-manager@kilocode.ai',
     });
     await addBillingManager(organization.id, billingMember.id);
 
-    const caller = await createCallerForUser(billingMember.id);
+    const caller = await createSessionCallerForUser(billingMember.id);
     const { logs } = await caller.organizations.securityAuditLog.list({
       organizationId: organization.id,
     });
@@ -256,37 +282,66 @@ describe('organizations.securityAuditLog actor details follow the account permis
     expect(csv.data).not.toContain('"engineer@kilocode.ai"');
   });
 
-  it('reads actor details when the account has the platform admin permission', async () => {
+  it('masks staff actors for a staff bearer member without running the guard', async () => {
     const organization = await seedOrganizationWithAuditEntries();
     const admin = await insertTestUser({
-      google_user_email: 'administrator@example.test',
+      google_user_email: 'administrator-bearer@example.test',
       is_admin: true,
     });
     await addBillingManager(organization.id, admin.id);
 
-    const caller = await createCallerForUser(admin.id);
-    const { logs } = await caller.organizations.securityAuditLog.list({
-      organizationId: organization.id,
-    });
-    const actors = actorsByResource(logs);
-    expect(actors['staff-resource']).toEqual(STAFF_ACTOR);
-    expect(actors['customer-resource']).toEqual(CUSTOMER_ACTOR);
+    await withEnforcedAdminNetwork(async () => {
+      const caller = await createCallerForUser(admin.id, { headers: OFF_NETWORK_ADDRESS });
+      const { logs } = await caller.organizations.securityAuditLog.list({
+        organizationId: organization.id,
+      });
+      expect(actorsByResource(logs)['staff-resource']).toEqual(MASKED_ACTOR);
 
-    const exported = await caller.organizations.securityAuditLog.export({
-      organizationId: organization.id,
-      format: 'json',
+      const exported = await caller.organizations.securityAuditLog.export({
+        organizationId: organization.id,
+        format: 'json',
+      });
+      expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(MASKED_ACTOR);
     });
-    expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(STAFF_ACTOR);
-
-    const csv = await caller.organizations.securityAuditLog.export({
-      organizationId: organization.id,
-      format: 'csv',
-    });
-    expect(csv.data).toContain('"engineer@kilocode.ai"');
-    expect(csv.data).not.toContain('"admin@kilocode.ai"');
   });
 
-  it('requires an unblocked account for a blocked admin', async () => {
+  it('masks staff actors for a staff browser member off-network and without a proof', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const admin = await insertTestUser({
+      google_user_email: 'administrator-member@example.test',
+      is_admin: true,
+    });
+    await addBillingManager(organization.id, admin.id);
+
+    await withEnforcedAdminNetwork(() =>
+      withAdminStepUpEnabled(async () => {
+        const caller = await createSessionCallerForUser(admin.id, {
+          headers: OFF_NETWORK_ADDRESS,
+        });
+        const { logs } = await caller.organizations.securityAuditLog.list({
+          organizationId: organization.id,
+        });
+        const actors = actorsByResource(logs);
+        expect(actors['staff-resource']).toEqual(MASKED_ACTOR);
+        expect(actors['customer-resource']).toEqual(CUSTOMER_ACTOR);
+
+        const exported = await caller.organizations.securityAuditLog.export({
+          organizationId: organization.id,
+          format: 'json',
+        });
+        expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(MASKED_ACTOR);
+
+        const csv = await caller.organizations.securityAuditLog.export({
+          organizationId: organization.id,
+          format: 'csv',
+        });
+        expect(csv.data).toContain('"admin@kilocode.ai"');
+        expect(csv.data).not.toContain('"engineer@kilocode.ai"');
+      })
+    );
+  });
+
+  it('masks staff actors for a blocked admin member', async () => {
     const organization = await seedOrganizationWithAuditEntries();
     const blockedAdmin = await insertTestUser({
       google_user_email: 'blocked-administrator@example.test',
@@ -299,14 +354,116 @@ describe('organizations.securityAuditLog actor details follow the account permis
     const { logs } = await caller.organizations.securityAuditLog.list({
       organizationId: organization.id,
     });
-    const actors = actorsByResource(logs);
-    expect(actors['staff-resource']).toEqual(MASKED_ACTOR);
-    expect(actors['customer-resource']).toEqual(CUSTOMER_ACTOR);
+    expect(actorsByResource(logs)['staff-resource']).toEqual(MASKED_ACTOR);
 
     const exported = await caller.organizations.securityAuditLog.export({
       organizationId: organization.id,
       format: 'json',
     });
     expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(MASKED_ACTOR);
+  });
+
+  it('reads actor details for a non-member staff browser session the guard admits', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const admin = await insertTestUser({
+      google_user_email: 'administrator@example.test',
+      is_admin: true,
+    });
+
+    await withEnforcedAdminNetwork(async () => {
+      const caller = await createSessionCallerForUser(admin.id, {
+        headers: ALLOWED_ADMIN_ADDRESS,
+      });
+      const { logs } = await caller.organizations.securityAuditLog.list({
+        organizationId: organization.id,
+      });
+      const actors = actorsByResource(logs);
+      expect(actors['staff-resource']).toEqual(STAFF_ACTOR);
+      expect(actors['customer-resource']).toEqual(CUSTOMER_ACTOR);
+
+      const exported = await caller.organizations.securityAuditLog.export({
+        organizationId: organization.id,
+        format: 'json',
+      });
+      expect(exportedActorsByResource(exported.data)['staff-resource']).toEqual(STAFF_ACTOR);
+
+      const csv = await caller.organizations.securityAuditLog.export({
+        organizationId: organization.id,
+        format: 'csv',
+      });
+      expect(csv.data).toContain('"engineer@kilocode.ai"');
+      expect(csv.data).not.toContain('"admin@kilocode.ai"');
+    });
+  });
+
+  it('asks a non-member staff export for its own write proof only, before recording it', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const admin = await insertTestUser({
+      google_user_email: 'administrator-no-proof@example.test',
+      is_admin: true,
+    });
+
+    await withAdminStepUpEnabled(async () => {
+      const caller = await createSessionCallerForUser(admin.id);
+      const error: unknown = await caller.organizations.securityAuditLog
+        .export({ organizationId: organization.id, format: 'json' })
+        .catch(caught => caught);
+
+      if (!(error instanceof TRPCError)) throw error;
+      expect(error.code).toBe('FORBIDDEN');
+      expect(error.cause).toBeInstanceOf(StepUpRequiredError);
+      expect(error.cause).toMatchObject({ actionClass: 'support_write' });
+    });
+
+    expect(await exportRows(organization.id)).toEqual([]);
+  });
+
+  it('refuses a non-member staff browser session off the admin network before recording an export', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const admin = await insertTestUser({
+      google_user_email: 'administrator-off-network@example.test',
+      is_admin: true,
+    });
+
+    await withEnforcedAdminNetwork(async () => {
+      const caller = await createSessionCallerForUser(admin.id, { headers: OFF_NETWORK_ADDRESS });
+      const refusal = { code: 'FORBIDDEN', message: expect.stringContaining('Cloudflare WARP') };
+
+      await expect(
+        caller.organizations.securityAuditLog.list({ organizationId: organization.id })
+      ).rejects.toMatchObject(refusal);
+      await expect(
+        caller.organizations.securityAuditLog.export({
+          organizationId: organization.id,
+          format: 'csv',
+        })
+      ).rejects.toMatchObject(refusal);
+    });
+
+    expect(await exportRows(organization.id)).toEqual([]);
+  });
+
+  it('refuses a non-member staff bearer caller before recording an export', async () => {
+    const organization = await seedOrganizationWithAuditEntries();
+    const admin = await insertTestUser({
+      google_user_email: 'administrator-non-member-bearer@example.test',
+      is_admin: true,
+    });
+    const caller = await createBearerCallerForUser(admin.id);
+    const refusal = {
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    };
+
+    await expect(
+      caller.organizations.securityAuditLog.list({ organizationId: organization.id })
+    ).rejects.toMatchObject(refusal);
+    await expect(
+      caller.organizations.securityAuditLog.export({
+        organizationId: organization.id,
+        format: 'json',
+      })
+    ).rejects.toMatchObject(refusal);
+    expect(await exportRows(organization.id)).toEqual([]);
   });
 });

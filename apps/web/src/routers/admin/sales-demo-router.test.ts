@@ -1,4 +1,4 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
@@ -116,14 +116,14 @@ describe('sales demo router', () => {
   });
 
   it('rejects create for non-admin callers with FORBIDDEN', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
     await expect(
       caller.admin.salesDemo.create({ email: target.google_user_email })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('rejects create for a non allow-listed email with BAD_REQUEST', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.salesDemo.create({ email: 'not-an-employee@gmail.com' })
     ).rejects.toMatchObject({
@@ -133,7 +133,7 @@ describe('sales demo router', () => {
   });
 
   it('rejects create for a missing user with NOT_FOUND', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.salesDemo.create({ email: 'missing-user@kilocode.ai' })
     ).rejects.toMatchObject({
@@ -143,7 +143,7 @@ describe('sales demo router', () => {
   });
 
   it('creates an enterprise sales demo org with $25.03 remaining and 26 members', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.salesDemo.create({ email: target.google_user_email });
 
     firstOrgId = result.organizationId;
@@ -300,7 +300,7 @@ describe('sales demo router', () => {
   });
 
   it('rejects a second create for the same target with CONFLICT', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.salesDemo.create({ email: target.google_user_email })
     ).rejects.toMatchObject({
@@ -322,7 +322,7 @@ describe('sales demo router', () => {
   });
 
   it('creates a second org for a second target reusing the same 25 demo users', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.salesDemo.create({ email: target2.google_user_email });
     secondOrgId = result.organizationId;
 
@@ -336,7 +336,7 @@ describe('sales demo router', () => {
   });
 
   it('allows exactly one of two concurrent creates for the same target', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const results = await Promise.allSettled([
       caller.admin.salesDemo.create({ email: target3.google_user_email }),
@@ -371,7 +371,7 @@ describe('sales demo router', () => {
   });
 
   it('resets a dirty demo org, ledgering only the real spend above seeded', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const [before] = await db
       .select()
@@ -492,7 +492,7 @@ describe('sales demo router', () => {
   });
 
   it('writes no ledger row for a demo org with seeded usage and no real spend', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.salesDemo.reset({ organizationId: secondOrgId });
 
@@ -504,7 +504,7 @@ describe('sales demo router', () => {
   });
 
   it('rejects reset for a normal org with NOT_FOUND', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const normalOrg = await createOrganization('Sales Demo Normal Org', target.id);
     normalOrgId = normalOrg.id;
 

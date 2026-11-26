@@ -6,20 +6,28 @@ import {
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
   organizationMemberProcedure,
+  OrganizationIdInputSchema,
+  organizationRestAccessContext,
   requireLiveOrganizationForPlatformAdmin,
   resolveOrganizationAccess,
+  StaffRequestRefusal,
+  type OrganizationAccessContext,
 } from './utils';
+import { TRPCError } from '@trpc/server';
 import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import type { AdminStepUpDecision } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
+  adminProcedure,
   createCallerFactory,
   createTRPCRouter,
   type TRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
@@ -36,10 +44,11 @@ import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/ad
 import { and, eq } from 'drizzle-orm';
 
 /**
- * `is_admin` on these helpers is the escape hatch that lets a Kilo employee read
- * any customer organization from a plain `baseProcedure`. It bypasses both
- * `admin_access` guard choke points, so the audit trail depends entirely on the
- * `kilo_admin_elevation` emit inside each branch.
+ * `is_admin` on these helpers lets a Kilo employee act on a customer
+ * organization from a plain `baseProcedure`. That staff branch passes the one
+ * staff admission (browser session, network, primary role row, step-up) before
+ * it grants anything, and the audit trail is the `kilo_admin_elevation` emit
+ * after it. A qualifying membership never reaches either.
  */
 describe('organization access kilo_admin_elevation telemetry', () => {
   let events: AdminAccessEvent[];
@@ -57,14 +66,30 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     await db.delete(organizations);
   });
 
+  /** A staff browser session; the staff admission refuses any other credential. */
   function ctxFor(user: User): TRPCContext {
     return {
       user,
+      authViaToken: false,
+      credential: 'session',
+      tokenSource: null,
+      ip: '203.0.113.7',
+      trpcPath: 'organizations.getSettings',
+      trpcType: 'query',
+      stepUpClaims: new Set<string>(),
+    };
+  }
+
+  function bearerCtxFor(user: User): TRPCContext {
+    return {
+      user,
       authViaToken: true,
+      credential: 'human_bearer',
       tokenSource: 'cloud-agent',
       ip: '203.0.113.7',
       trpcPath: 'organizations.getSettings',
       trpcType: 'query',
+      stepUpClaims: new Set<string>(),
     };
   }
 
@@ -93,11 +118,9 @@ describe('organization access kilo_admin_elevation telemetry', () => {
         ensureOrganizationAccessAndFetchOrg(ctxFor(admin), organization.id)
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
-      // The fetch helper attributes the attempt before resolving it; the
-      // access helper records nothing because no elevation was granted.
-      const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
-      expect(elevationEvents).toHaveLength(1);
-      expect(elevationEvents[0]).toMatchObject({ reason: 'organization_fetch' });
+      // Both helpers check liveness before the step-up stage and grant
+      // nothing, so neither records an elevation.
+      expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toHaveLength(0);
     });
 
     test('a batched admin resolution elevates only live organizations', async () => {
@@ -162,8 +185,8 @@ describe('organization access kilo_admin_elevation telemetry', () => {
       kind: 'kilo_admin_elevation',
       kiloUserId: admin.id,
       adminTier: 'super_admin',
-      authVia: 'token',
-      tokenSource: 'cloud-agent',
+      authVia: 'session',
+      tokenSource: null,
       route: 'organizations.getSettings',
       method: 'query',
       ip: '203.0.113.7',
@@ -172,15 +195,21 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     });
   });
 
-  test('ensureOrganizationAccess does not label a REST caller as a tRPC request', async () => {
-    // Route handlers such as `/api/cloud-agent/sessions/stream-ticket` and
-    // `/api/auto-routing/custom-routers` call this helper with a hand-rolled
-    // `{ user }`. Labelling those `surface:"trpc"`/`authVia:"session"` would
-    // hide a token-authenticated admin read behind a web-console-looking event.
+  test('ensureOrganizationAccess admits a REST staff caller through the request adapter', async () => {
+    // Route handlers pass their successful `getUserFromAuth` result as
+    // `restAuth`, so the staff branch admits through the REST adapter and the
+    // event is labelled as the REST request it was.
     const admin = await insertTestUser({ is_admin: true });
     const organization = await orgOwnedByAnotherUser();
+    const restCtx: OrganizationAccessContext = {
+      user: admin,
+      restAuth: { user: admin, authFailedResponse: null, credential: 'session' },
+      auditSurface: 'rest',
+      auditMethod: 'GET',
+      headersList: new Headers(),
+    };
 
-    await expect(ensureOrganizationAccess({ user: admin }, organization.id)).resolves.toBe('owner');
+    await expect(ensureOrganizationAccess(restCtx, organization.id)).resolves.toBe('owner');
 
     const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
     expect(elevationEvents).toHaveLength(1);
@@ -188,11 +217,140 @@ describe('organization access kilo_admin_elevation telemetry', () => {
       surface: 'rest',
       kind: 'kilo_admin_elevation',
       kiloUserId: admin.id,
-      route: null,
-      method: null,
+      method: 'GET',
       reason: 'organization_access',
       target: `organization:${organization.id}`,
     });
+  });
+
+  test('a REST staff fetch reads the organization row once, inside the admission', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+    const storedRow = await db.query.organizations.findFirst({
+      where: eq(organizations.id, organization.id),
+    });
+    const restCtx = organizationRestAccessContext(
+      { user: admin, authFailedResponse: null, credential: 'session' },
+      { headers: new Headers(), method: 'GET' }
+    );
+
+    // Every statement the primary pool runs during the fetch. The membership
+    // reads join `organizations`; any other statement reading that table is
+    // an organization lookup of its own.
+    const querySpy = jest.spyOn(pool, 'query');
+    let fetched: unknown;
+    let statements: string[];
+    try {
+      fetched = await ensureOrganizationAccessAndFetchOrg(restCtx, organization.id);
+    } finally {
+      // `mockRestore` clears the recorded calls, so read them first.
+      statements = querySpy.mock.calls.map(([query]: unknown[]) => {
+        if (typeof query === 'string') return query;
+        if (typeof query !== 'object' || query === null || !('text' in query)) return '';
+        return typeof query.text === 'string' ? query.text : '';
+      });
+      querySpy.mockRestore();
+    }
+    const organizationLookups = statements.filter(
+      text => text.includes('from "organizations"') && !/\bjoin\b/i.test(text)
+    );
+
+    expect(fetched).toEqual(storedRow);
+    // Exactly one: the full row the admission's liveness check read, with no
+    // separate id-only liveness probe and no second fetch after the admission.
+    expect(organizationLookups).toHaveLength(1);
+    expect(organizationLookups[0]).toContain('"settings"');
+    expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toMatchObject([
+      { surface: 'rest', method: 'GET', reason: 'organization_fetch' },
+    ]);
+  });
+
+  test('a refused REST staff admission carries the adapter response', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+    const restCtx: OrganizationAccessContext = {
+      user: admin,
+      restAuth: { user: admin, authFailedResponse: null, credential: 'human_bearer' },
+      auditSurface: 'rest',
+      auditMethod: 'GET',
+      headersList: new Headers(),
+    };
+
+    const refusal = await ensureOrganizationAccess(restCtx, organization.id).catch(
+      (error: unknown) => error
+    );
+
+    if (!(refusal instanceof TRPCError) || !(refusal.cause instanceof StaffRequestRefusal)) {
+      throw new Error('expected a TRPCError carrying a StaffRequestRefusal');
+    }
+    expect(refusal.code).toBe('FORBIDDEN');
+    expect(refusal.cause.response.status).toBe(403);
+    expect(refusal.cause.stepUp).toMatchObject({ code: 'BEARER_NOT_ALLOWED' });
+    expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toHaveLength(0);
+  });
+
+  test('a bare context without browser-session provenance never gets staff authority', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+
+    await expect(ensureOrganizationAccess({ user: admin }, organization.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    });
+    expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toHaveLength(0);
+  });
+
+  test('a bearer staff credential is refused on every staff branch before any grant', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+    const bearerRefusal = {
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    };
+
+    await expect(
+      ensureOrganizationAccess(bearerCtxFor(admin), organization.id)
+    ).rejects.toMatchObject(bearerRefusal);
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(bearerCtxFor(admin), organization.id)
+    ).rejects.toMatchObject(bearerRefusal);
+    await expect(
+      getOrganizationsAccessRoles(bearerCtxFor(admin), [organization.id])
+    ).rejects.toMatchObject(bearerRefusal);
+    expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toHaveLength(0);
+  });
+
+  test('a staff user with a qualifying membership keeps the real role without admission', async () => {
+    // A bearer credential would be refused by the staff admission, so a
+    // resolved role proves the membership authorized on its own.
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'member',
+    });
+
+    await expect(ensureOrganizationAccess(bearerCtxFor(admin), organization.id)).resolves.toBe(
+      'member'
+    );
+    await expect(
+      getOrganizationsAccessRoles(bearerCtxFor(admin), [organization.id])
+    ).resolves.toEqual(new Map([[organization.id, 'member']]));
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(bearerCtxFor(admin), organization.id)
+    ).resolves.toMatchObject({ id: organization.id });
+    expect(events).toHaveLength(0);
+  });
+
+  test('a staff batch outside a query is refused', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organization = await orgOwnedByAnotherUser();
+
+    await expect(
+      getOrganizationsAccessRoles({ ...ctxFor(admin), trpcType: 'mutation' }, [organization.id])
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Admin access required' });
+    expect(events).toHaveLength(0);
   });
 
   function failMembershipQueries() {
@@ -216,7 +374,7 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     });
   }
 
-  test('a membership observation failure never fails the admin request', async () => {
+  test('an unreadable membership does not block an admitted staff request when OFF', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const organization = await orgOwnedByAnotherUser();
 
@@ -234,24 +392,19 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     });
   });
 
-  test('a membership observation failure never fails the batch admin request', async () => {
+  test('an unreadable membership fails the batch request closed', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const organization = await orgOwnedByAnotherUser();
 
     const selectSpy = failMembershipQueries();
-    let roles: Map<string, string>;
     try {
-      roles = await getOrganizationsAccessRoles(ctxFor(admin), [organization.id]);
+      await expect(getOrganizationsAccessRoles(ctxFor(admin), [organization.id])).rejects.toThrow(
+        'membership query failed'
+      );
     } finally {
       selectSpy.mockRestore();
     }
-
-    expect(roles.get(organization.id)).toBe('owner');
-    expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
-      kind: 'kilo_admin_elevation',
-      membershipRole: null,
-      wouldPassWithoutAdmin: null,
-    });
+    expect(events).toHaveLength(0);
   });
 
   test('ensureOrganizationAccess stays silent for a member resolving their own org', async () => {
@@ -324,20 +477,14 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     });
   });
 
-  test('ensureOrganizationAccessAndFetchOrg records an admin probing a missing org', async () => {
+  test('ensureOrganizationAccessAndFetchOrg refuses an admin probing a missing org', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const missingId = crypto.randomUUID();
 
     await expect(ensureOrganizationAccessAndFetchOrg(ctxFor(admin), missingId)).rejects.toThrow(
       /Organization not found/
     );
-
-    const elevationEvents = events.filter(event => event.kind === 'kilo_admin_elevation');
-    expect(elevationEvents).toHaveLength(1);
-    expect(elevationEvents[0]).toMatchObject({
-      reason: 'organization_fetch',
-      target: `organization:${missingId}`,
-    });
+    expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toHaveLength(0);
   });
 
   test('denies direct membership in a soft-deleted organization', async () => {
@@ -462,6 +609,17 @@ describe('binary support organization access', () => {
     await db.delete(organizations);
   });
 
+  /**
+   * A staff actor with a live session proof for `writeSessionId`, which the
+   * staff admission needs for any read while step-up is on. Writes add an
+   * operation proof through {@link writeCtxWithStepUp}.
+   */
+  async function staffAdmin(overrides: Partial<User> = {}) {
+    const admin = await insertTestUser({ is_admin: true, ...overrides });
+    await insertStepUpProof(admin.id, await enroll(admin.id));
+    return admin;
+  }
+
   async function orgAndAdmin() {
     const owner = await insertTestUser({ is_admin: false });
     const organization = await createTestOrganization(
@@ -469,7 +627,7 @@ describe('binary support organization access', () => {
       owner.id,
       0
     );
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     return { organization, admin };
   }
 
@@ -529,11 +687,18 @@ describe('binary support organization access', () => {
     return grant;
   }
 
+  /**
+   * A staff browser session for an allowlisted read. The staff admission needs
+   * a live session proof while step-up is on; {@link staffAdmin} mints one.
+   */
   function readCtx(user: User): TRPCContext {
     return {
       user,
+      credential: 'session',
+      webSessionId: writeSessionId,
       trpcPath: 'organizations.usageStats',
       trpcType: 'query',
+      stepUpClaims: new Set<string>(),
     };
   }
 
@@ -786,22 +951,29 @@ describe('binary support organization access', () => {
 
   /**
    * What the `adminProcedure` middleware leaves on the context once it has
-   * claimed and spent one operation proof for the exact tRPC route.
+   * admitted the request and spent one operation proof for the exact tRPC
+   * route.
    */
-  function freshUpstreamState(): NonNullable<TRPCContext['adminStepUpState']> {
+  function upstreamAdmission(
+    user: User,
+    decision: AdminStepUpDecision
+  ): NonNullable<TRPCContext['adminAdmission']> {
     return {
-      status: 'fresh',
-      method: 'webauthn_uv',
-      verifiedAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      user,
+      stepUp: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      },
+      decision,
     };
   }
 
   function writeCtxFor(
     user: User,
-    adminStepUpState?: TRPCContext['adminStepUpState'],
-    trpcPath = 'organizations.settings.updateDefaultModel',
-    adminStepUpDecision?: TRPCContext['adminStepUpDecision']
+    adminAdmission?: TRPCContext['adminAdmission'],
+    trpcPath = 'organizations.settings.updateDefaultModel'
   ): TRPCContext {
     return {
       user,
@@ -809,9 +981,22 @@ describe('binary support organization access', () => {
       webSessionId: writeSessionId,
       trpcPath,
       trpcType: 'mutation',
-      ...(adminStepUpState ? { adminStepUpState } : {}),
-      ...(adminStepUpDecision ? { adminStepUpDecision } : {}),
+      stepUpClaims: new Set<string>(),
+      ...(adminAdmission ? { adminAdmission } : {}),
     };
+  }
+
+  async function unconsumedProofCount(userId: string) {
+    const proofs = await db
+      .select({ consumedAt: session_step_up_proofs.consumed_at })
+      .from(session_step_up_proofs)
+      .where(
+        and(
+          eq(session_step_up_proofs.kilo_user_id, userId),
+          eq(session_step_up_proofs.purpose, 'operation')
+        )
+      );
+    return proofs.filter(proof => proof.consumedAt === null).length;
   }
 
   test('a fresh upstream step-up is reused instead of claiming a second proof', async () => {
@@ -825,10 +1010,13 @@ describe('binary support organization access', () => {
     try {
       await expect(
         ensureOrganizationAccess(
-          writeCtxFor(admin, freshUpstreamState(), 'organizations.settings.updateDefaultModel', {
-            actionClass: 'support_write',
-            target: { kind: 'organization', id: organization.id },
-          }),
+          writeCtxFor(
+            admin,
+            upstreamAdmission(admin, {
+              actionClass: 'support_write',
+              target: { kind: 'organization', id: organization.id },
+            })
+          ),
           organization.id
         )
       ).resolves.toBe('admin');
@@ -853,30 +1041,67 @@ describe('binary support organization access', () => {
     });
   });
 
-  test('without an upstream state the write use claims a proof bound to the organization', async () => {
+  test('the staff admission spends the one proof bound to the organization', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();
     await approveWriteGrant(admin.id, organization.id);
     const writeCtx = await writeCtxWithStepUp(admin, organization.id);
 
+    // The admission claims the proof; the support write use then reuses the
+    // admission's decision instead of asking for a second proof.
     const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
     try {
       await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
-      expect(requireFreshSpy).toHaveBeenCalledTimes(1);
-      expect(requireFreshSpy).toHaveBeenCalledWith({
-        userId: admin.id,
-        action: 'support_write_use',
-        actionClass: 'support_write',
-        organizationId: organization.id,
-        credential: 'session',
-        webSessionId: writeSessionId,
-        route: 'organizations.settings.updateDefaultModel',
-        method: 'mutation',
-        surface: 'trpc',
-      });
+      expect(requireFreshSpy).not.toHaveBeenCalled();
     } finally {
       requireFreshSpy.mockRestore();
     }
+    expect(await unconsumedProofCount(admin.id)).toBe(0);
+
+    // Another procedure call (a second tRPC batch element has its own claim
+    // set) cannot reuse that admission or the spent proof.
+    await expect(
+      ensureOrganizationAccess({ ...writeCtx, stepUpClaims: new Set<string>() }, organization.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
+    });
+  });
+
+  test('an upstream admission for another organization is not reused', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const grant = await approveWriteGrant(admin.id, organization.id);
+
+    // The request was already verified once, for another target; it is
+    // refused instead of being asked for a second proof.
+    for (const id of [null, crypto.randomUUID()]) {
+      await expect(
+        ensureOrganizationAccess(
+          writeCtxFor(
+            admin,
+            upstreamAdmission(admin, {
+              actionClass: 'support_write',
+              target: { kind: 'organization', id },
+            })
+          ),
+          organization.id
+        )
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ kind: 'different_operation' }),
+      });
+    }
+    const uses = await db
+      .select()
+      .from(support_access_grant_events)
+      .where(
+        and(
+          eq(support_access_grant_events.grant_id, grant.id),
+          eq(support_access_grant_events.event_type, 'used_write')
+        )
+      );
+    expect(uses).toEqual([]);
   });
 
   test('resolving organization access twice in one request', async () => {
@@ -890,10 +1115,11 @@ describe('binary support organization access', () => {
     try {
       await expect(ensureOrganizationAccess(middlewareCtx, organization.id)).resolves.toBe('admin');
       await expect(ensureOrganizationAccess(handlerCtx, organization.id)).resolves.toBe('admin');
-      expect(requireFreshSpy).toHaveBeenCalledTimes(1);
+      expect(requireFreshSpy).not.toHaveBeenCalled();
     } finally {
       requireFreshSpy.mockRestore();
     }
+    expect(await unconsumedProofCount(admin.id)).toBe(0);
 
     const uses = await db
       .select()
@@ -910,18 +1136,24 @@ describe('binary support organization access', () => {
   test('resolving organization access in two requests', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();
-    await approveWriteGrant(admin.id, organization.id);
+    const grant = await approveWriteGrant(admin.id, organization.id);
     const firstCtx = await writeCtxWithStepUp(admin, organization.id);
     const secondCtx = await writeCtxWithStepUp(admin, organization.id);
 
-    const requireFreshSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
-    try {
-      await expect(ensureOrganizationAccess(firstCtx, organization.id)).resolves.toBe('admin');
-      await expect(ensureOrganizationAccess(secondCtx, organization.id)).resolves.toBe('admin');
-      expect(requireFreshSpy).toHaveBeenCalledTimes(2);
-    } finally {
-      requireFreshSpy.mockRestore();
-    }
+    await expect(ensureOrganizationAccess(firstCtx, organization.id)).resolves.toBe('admin');
+    await expect(ensureOrganizationAccess(secondCtx, organization.id)).resolves.toBe('admin');
+    expect(await unconsumedProofCount(admin.id)).toBe(0);
+
+    const uses = await db
+      .select()
+      .from(support_access_grant_events)
+      .where(
+        and(
+          eq(support_access_grant_events.grant_id, grant.id),
+          eq(support_access_grant_events.event_type, 'used_write')
+        )
+      );
+    expect(uses).toHaveLength(2);
   });
 
   test('a support write use is still refused while step-up is switched off', async () => {
@@ -1048,7 +1280,7 @@ describe('binary support organization access', () => {
     }
   });
 
-  test('ON read grants still work with a bearer credential', async () => {
+  test('ON read grants refuse a bearer credential before the grant lookup', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();
     await insertGrant({
@@ -1056,18 +1288,25 @@ describe('binary support organization access', () => {
       organizationId: organization.id,
       actionClass: 'support_read',
     });
-
-    await expect(
-      ensureOrganizationAccess(
-        {
-          user: admin,
-          credential: 'human_bearer',
-          trpcPath: 'organizations.usageStats',
-          trpcType: 'query',
-        },
-        organization.id
-      )
-    ).resolves.toBe('member');
+    const selectSpy = failGrantLookupQueries();
+    try {
+      await expect(
+        ensureOrganizationAccess(
+          {
+            user: admin,
+            credential: 'human_bearer',
+            trpcPath: 'organizations.usageStats',
+            trpcType: 'query',
+          },
+          organization.id
+        )
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+      });
+    } finally {
+      selectSpy.mockRestore();
+    }
   });
 
   test('ON denies GitHub install cancellation through support', async () => {
@@ -1092,7 +1331,7 @@ describe('binary support organization access', () => {
     });
   });
 
-  test('ON denies a read grant on a write procedure', async () => {
+  test('ON denies a read grant on a write procedure without spending a proof', async () => {
     setSupportEnabled(true);
     const { organization, admin } = await orgAndAdmin();
     await insertGrant({
@@ -1102,15 +1341,32 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(
-        {
-          user: admin,
-          trpcPath: 'organizations.settings.updateDefaultModel',
-          trpcType: 'mutation',
-        },
-        organization.id
-      )
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      ensureOrganizationAccess(await writeCtxWithStepUp(admin, organization.id), organization.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
+    });
+    expect(await unconsumedProofCount(admin.id)).toBe(1);
+  });
+
+  test('ON a write without any grant neither prompts for nor spends a proof', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+
+    await expect(
+      ensureOrganizationAccess(writeCtxFor(admin), organization.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+    });
+
+    await expect(
+      ensureOrganizationAccess(await writeCtxWithStepUp(admin, organization.id), organization.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+    });
+    expect(await unconsumedProofCount(admin.id)).toBe(1);
   });
 
   test('ON picks the write grant even when a longer read grant exists', async () => {
@@ -1145,7 +1401,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      resolveOrganizationAccess({ user: admin, trpcType: 'POST' }, organization.id, {
+      resolveOrganizationAccess(await writeCtxWithStepUp(admin, organization.id), organization.id, {
         surface: 'rest',
         supportKey: '/api/organizations/[id]/user-tokens',
         requiredActionClass: 'support_write',
@@ -1153,6 +1409,54 @@ describe('binary support organization access', () => {
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ supportAccessReason: 'support_access_not_allowlisted' }),
+    });
+    expect(await unconsumedProofCount(admin.id)).toBe(1);
+  });
+
+  test('an explicit admin procedure admits a non-member staff write on one proof', async () => {
+    // The admin procedure binds its operation proof to the organization its
+    // input names, and the organization helper reuses that covering admission
+    // instead of asking for a second proof.
+    const { organization, admin } = await orgAndAdmin();
+    const route = 'organizations.sso.updateSsoDomain';
+    await insertStepUpProof(admin.id, await enroll(admin.id), undefined, undefined, {
+      route,
+      organizationId: organization.id,
+    });
+    const router = createTRPCRouter({
+      organizations: createTRPCRouter({
+        sso: createTRPCRouter({
+          updateSsoDomain: adminProcedure
+            .input(OrganizationIdInputSchema)
+            .mutation(({ ctx, input }) =>
+              ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES)
+            ),
+        }),
+      }),
+    });
+    const caller = createCallerFactory(router)({
+      user: admin,
+      authViaToken: false,
+      credential: 'session',
+      webSessionId: writeSessionId,
+      headersList: new Headers(),
+    });
+
+    await expect(
+      caller.organizations.sso.updateSsoDomain({ organizationId: organization.id })
+    ).resolves.toBe('owner');
+    expect(await unconsumedProofCount(admin.id)).toBe(0);
+    expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+      reason: 'organization_access',
+      target: `organization:${organization.id}`,
+    });
+
+    // The proof was spent; the next call is a new operation.
+    await expect(
+      caller.organizations.sso.updateSsoDomain({ organizationId: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
     });
   });
 
@@ -1248,7 +1552,7 @@ describe('binary support organization access', () => {
   test('a superadmin can use an emergency write grant', async () => {
     setSupportEnabled(true);
     const { organization } = await orgAndAdmin();
-    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const superadmin = await staffAdmin({ is_super_admin: true });
     const now = new Date();
     await db.insert(support_access_grants).values({
       actor_kilo_user_id: superadmin.id,
@@ -1299,7 +1603,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      resolveOrganizationAccess({ user: admin, trpcType: 'POST' }, organization.id, {
+      resolveOrganizationAccess(writeCtxFor(admin), organization.id, {
         surface: 'rest',
         supportKey: '/api/organizations/[id]/user-tokens',
         requiredActionClass: 'support_write',
@@ -1336,14 +1640,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(
-        {
-          user: admin,
-          trpcPath: 'organizations.settings.updateDefaultModel',
-          trpcType: 'mutation',
-        },
-        organization.id
-      )
+      ensureOrganizationAccess(writeCtxFor(admin), organization.id)
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
@@ -1377,7 +1674,7 @@ describe('binary support organization access', () => {
 
   test('ON admits an allowlisted read on a child through a grant on its parent', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     const grant = await insertGrant({
       actorKiloUserId: admin.id,
@@ -1406,7 +1703,7 @@ describe('binary support organization access', () => {
 
   test('ON denies a write on a child with only a read grant on its parent', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     await insertGrant({
       actorKiloUserId: admin.id,
@@ -1414,16 +1711,7 @@ describe('binary support organization access', () => {
       actionClass: 'support_read',
     });
 
-    await expect(
-      ensureOrganizationAccess(
-        {
-          user: admin,
-          trpcPath: 'organizations.settings.updateDefaultModel',
-          trpcType: 'mutation',
-        },
-        child.id
-      )
-    ).rejects.toMatchObject({
+    await expect(ensureOrganizationAccess(writeCtxFor(admin), child.id)).rejects.toMatchObject({
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
     });
@@ -1431,7 +1719,7 @@ describe('binary support organization access', () => {
 
   test('ON admits a write on a child through a fresh step-up and a write grant on its parent', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const approver = await insertTestUser({ is_admin: true });
     const { parent, child } = await parentAndChild();
     const grant = await insertGrant({
@@ -1463,7 +1751,7 @@ describe('binary support organization access', () => {
 
   test('ON inherited write on a child still rejects a bearer credential', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const approver = await insertTestUser({ is_admin: true });
     const { parent, child } = await parentAndChild();
     await insertGrant({
@@ -1491,7 +1779,7 @@ describe('binary support organization access', () => {
 
   test('ON inherited write on a child still requires a fresh proof', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const approver = await insertTestUser({ is_admin: true });
     const { parent, child } = await parentAndChild();
     await insertGrant({
@@ -1521,7 +1809,7 @@ describe('binary support organization access', () => {
 
   test('a grant on a child does not cover its parent or sibling', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     const sibling = await createTestOrganization(
       `support-sibling-${crypto.randomUUID()}`,
@@ -1545,7 +1833,7 @@ describe('binary support organization access', () => {
 
   test('a parent grant does not cover a detached or deleted child', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     await insertGrant({
       actorKiloUserId: admin.id,
@@ -1571,7 +1859,7 @@ describe('binary support organization access', () => {
 
   test('a parent grant does not cover a child once the parent is deleted', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     await insertGrant({
       actorKiloUserId: admin.id,
@@ -1591,7 +1879,7 @@ describe('binary support organization access', () => {
 
   test('ON reports expired and revoked parent grants for a child', async () => {
     setSupportEnabled(true);
-    const expiredAdmin = await insertTestUser({ is_admin: true });
+    const expiredAdmin = await staffAdmin();
     const expiredOrgs = await parentAndChild();
     await insertGrant({
       actorKiloUserId: expiredAdmin.id,
@@ -1606,7 +1894,7 @@ describe('binary support organization access', () => {
       cause: expect.objectContaining({ supportAccessReason: 'support_grant_expired' }),
     });
 
-    const revokedAdmin = await insertTestUser({ is_admin: true });
+    const revokedAdmin = await staffAdmin();
     const revokedOrgs = await parentAndChild();
     await insertGrant({
       actorKiloUserId: revokedAdmin.id,
@@ -1624,7 +1912,7 @@ describe('binary support organization access', () => {
 
   test('ON reports denied action-class telemetry with the inherited parent', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     const grant = await insertGrant({
       actorKiloUserId: admin.id,
@@ -1632,16 +1920,7 @@ describe('binary support organization access', () => {
       actionClass: 'support_read',
     });
 
-    await expect(
-      ensureOrganizationAccess(
-        {
-          user: admin,
-          trpcPath: 'organizations.settings.updateDefaultModel',
-          trpcType: 'mutation',
-        },
-        child.id
-      )
-    ).rejects.toMatchObject({
+    await expect(ensureOrganizationAccess(writeCtxFor(admin), child.id)).rejects.toMatchObject({
       code: 'FORBIDDEN',
       cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
     });
@@ -1656,7 +1935,7 @@ describe('binary support organization access', () => {
 
   test('ON reports not-allowlisted denial telemetry with the inherited parent', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     const grant = await insertGrant({
       actorKiloUserId: admin.id,
@@ -1666,7 +1945,7 @@ describe('binary support organization access', () => {
 
     await expect(
       ensureOrganizationAccess(
-        { user: admin, trpcPath: 'organizations.notAllowlisted', trpcType: 'query' },
+        { ...readCtx(admin), trpcPath: 'organizations.notAllowlisted' },
         child.id
       )
     ).rejects.toMatchObject({
@@ -1684,7 +1963,7 @@ describe('binary support organization access', () => {
 
   test("a deleted parent's expired grant does not report expired for the child", async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     await insertGrant({
       actorKiloUserId: admin.id,
@@ -1705,7 +1984,7 @@ describe('binary support organization access', () => {
 
   test('an active but time-expired parent grant does not admit the child', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     await insertGrant({
       actorKiloUserId: admin.id,
@@ -1722,7 +2001,7 @@ describe('binary support organization access', () => {
 
   test('a child grant is preferred over a parent grant', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     await insertGrant({
       actorKiloUserId: admin.id,
@@ -1747,7 +2026,7 @@ describe('binary support organization access', () => {
   test('a blocked or non-admin actor with a parent grant is denied on the child', async () => {
     setSupportEnabled(true);
 
-    const blocked = await insertTestUser({ is_admin: true });
+    const blocked = await staffAdmin();
     const blockedOrgs = await parentAndChild();
     await insertGrant({
       actorKiloUserId: blocked.id,
@@ -1765,10 +2044,10 @@ describe('binary support organization access', () => {
       ensureOrganizationAccess(readCtx(blockedUser!), blockedOrgs.child.id)
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
-      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+      message: 'Admin access required',
     });
 
-    const demoted = await insertTestUser({ is_admin: true });
+    const demoted = await staffAdmin();
     const demotedOrgs = await parentAndChild();
     await insertGrant({
       actorKiloUserId: demoted.id,
@@ -1789,7 +2068,7 @@ describe('binary support organization access', () => {
 
   test('ON denies a never-list surface on a child even with a parent write grant', async () => {
     setSupportEnabled(true);
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const approver = await insertTestUser({ is_admin: true });
     const { parent, child } = await parentAndChild();
     await insertGrant({
@@ -1800,7 +2079,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      resolveOrganizationAccess({ user: admin, trpcType: 'POST' }, child.id, {
+      resolveOrganizationAccess(writeCtxFor(admin), child.id, {
         surface: 'rest',
         supportKey: '/api/organizations/[id]/user-tokens',
         requiredActionClass: 'support_write',
@@ -1812,7 +2091,7 @@ describe('binary support organization access', () => {
   });
 
   test('OFF keeps the legacy owner shortcut on a child with a parent grant', async () => {
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await staffAdmin();
     const { parent, child } = await parentAndChild();
     await insertGrant({
       actorKiloUserId: admin.id,
@@ -1939,7 +2218,7 @@ describe('binary support organization access', () => {
       ensureOrganizationAccess(readCtx(blockedUser!), blocked.organization.id)
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
-      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+      message: 'Admin access required',
     });
   });
 

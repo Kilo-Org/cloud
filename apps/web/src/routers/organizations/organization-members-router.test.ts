@@ -1,4 +1,8 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import {
+  createBearerCallerForUser,
+  createCallerForUser,
+  createSessionCallerForUser,
+} from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -258,7 +262,7 @@ describe('organizations members trpc router', () => {
       const organization = await createOrganizationWithSeats('Elevated Audit Org', owner.id);
       const member = await insertTestUser({ is_admin: false });
       await addUserToOrganization(organization.id, member.id, 'member');
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.members.update({
         organizationId: organization.id,
@@ -304,7 +308,7 @@ describe('organizations members trpc router', () => {
         google_user_email: `kilo-admin-${crypto.randomUUID()}@admin.example.com`,
       });
       await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
-      const caller = await createCallerForUser(kiloAdmin.id);
+      const caller = await createSessionCallerForUser(kiloAdmin.id);
 
       await caller.organizations.members.update({
         organizationId: organization.id,
@@ -328,6 +332,40 @@ describe('organizations members trpc router', () => {
       });
     });
 
+    it('refuses owner authority to a Kilo admin holding the admin role when support access is on', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganizationWithSeats('Owner Authority On Org', owner.id);
+      const member = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+      const caller = await createSessionCallerForUser(kiloAdmin.id);
+
+      enableSupportAccess(true);
+      try {
+        await expect(
+          caller.organizations.members.update({
+            organizationId: organization.id,
+            memberId: member.id,
+            role: 'owner',
+          })
+        ).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+          message: 'Only an organization owner can manage owners',
+        });
+      } finally {
+        enableSupportAccess(false);
+      }
+      const membership = await db.query.organization_memberships.findFirst({
+        where: and(
+          eq(organization_memberships.organization_id, organization.id),
+          eq(organization_memberships.kilo_user_id, member.id)
+        ),
+      });
+      expect(membership?.role).toBe('member');
+      expect(await elevatedAudits(kiloAdmin.id, organization.id)).toEqual([]);
+    });
+
     it('records Kilo admin self-removal with the roles held before removal', async () => {
       const owner = await insertTestUser({ is_admin: false });
       const organization = await createOrganization('Self Removal Org', owner.id);
@@ -335,7 +373,7 @@ describe('organizations members trpc router', () => {
       await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
 
       await (
-        await createCallerForUser(kiloAdmin.id)
+        await createSessionCallerForUser(kiloAdmin.id)
       ).organizations.members.remove({
         organizationId: organization.id,
         memberId: kiloAdmin.id,
@@ -346,6 +384,28 @@ describe('organizations members trpc router', () => {
         action: 'organization.member.remove',
         metadata: { previousRole: 'admin', heldRoles: ['admin'] },
       });
+    });
+
+    it('refuses Kilo admin self-removal over a bearer credential and keeps the membership', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Bearer Self Removal Org', owner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+
+      await expect(
+        (await createBearerCallerForUser(kiloAdmin.id)).organizations.members.remove({
+          organizationId: organization.id,
+          memberId: kiloAdmin.id,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      const membership = await db.query.organization_memberships.findFirst({
+        where: and(
+          eq(organization_memberships.organization_id, organization.id),
+          eq(organization_memberships.kilo_user_id, kiloAdmin.id)
+        ),
+      });
+      expect(membership?.role).toBe('admin');
+      expect(await elevatedAudits(kiloAdmin.id, organization.id)).toEqual([]);
     });
 
     it('enforce applies the real role and rejects admin self-removal', async () => {
@@ -505,7 +565,7 @@ describe('organizations members trpc router', () => {
     });
 
     it('should allow system admin users to update members', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.organizations.members.update({
         organizationId: testOrganization.id,
@@ -1053,7 +1113,7 @@ describe('organizations members trpc router', () => {
           );
         expect(directAudits).toEqual([]);
 
-        const elevatedCaller = await createCallerForUser(adminUser.id);
+        const elevatedCaller = await createSessionCallerForUser(adminUser.id);
         await expect(
           elevatedCaller.organizations.members.setChildMemberships({
             ...input,
@@ -1081,6 +1141,35 @@ describe('organizations members trpc router', () => {
             },
           }),
         ]);
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('refuses a Kilo admin without a direct billing role over a bearer credential', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      await addUserToOrganization(testOrganization.id, kiloAdmin.id, 'member');
+      const child = await createChildOrganization('Bearer Staff Child Members', childOwner.id);
+      try {
+        await expect(
+          (await createBearerCallerForUser(kiloAdmin.id)).organizations.members.setChildMemberships(
+            {
+              organizationId: testOrganization.id,
+              memberId: target.id,
+              childOrganizationIds: [child.id],
+            }
+          )
+        ).rejects.toMatchObject({ code: expect.stringMatching(/^(FORBIDDEN|UNAUTHORIZED)$/) });
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, target.id)
+          ),
+        });
+        expect(membership).toBeUndefined();
       } finally {
         await cleanupChildOrganizations([child.id]);
       }
@@ -2137,7 +2226,7 @@ describe('organizations members trpc router', () => {
     });
 
     it('should allow system admin users to remove any member', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.organizations.members.remove({
         organizationId: testOrganization.id,
@@ -2908,7 +2997,7 @@ describe('organizations members trpc router', () => {
     });
 
     it('should allow system admin to invite any role', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.organizations.members.invite({
         organizationId: testOrganization.id,
@@ -3162,7 +3251,7 @@ describe('organizations members trpc router', () => {
 
       const inviteId = invitation[0].id;
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.organizations.members.deleteInvite({
         organizationId: testOrganization.id,

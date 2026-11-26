@@ -530,6 +530,7 @@ describe('organization Bitbucket router', () => {
       organizationId: organization.id,
       actorUserId: owner.id,
       integrationId: integration.id,
+      authority: 'member',
     });
   });
 
@@ -573,6 +574,35 @@ describe('organization Bitbucket router', () => {
     expect(mockConnect).not.toHaveBeenCalled();
     expect(mockRotate).not.toHaveBeenCalled();
     expect(mockDisconnect).not.toHaveBeenCalled();
+  });
+
+  it('refuses Workspace Access Token issue to a platform admin without a membership', async () => {
+    const integration = await insertStaticIntegration(organization.id, owner.id);
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.organizations.bitbucket.connect({
+        organizationId: organization.id,
+        accessToken: 'ATCT-admin-secret',
+      })
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    });
+    await expect(
+      caller.organizations.bitbucket.replaceToken({
+        organizationId: organization.id,
+        integrationId: integration.id,
+        accessToken: 'ATCT-admin-secret',
+      })
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    });
+
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(mockRotate).not.toHaveBeenCalled();
   });
 
   it('returns sanitized authorization loss when a manager is demoted during refresh', async () => {

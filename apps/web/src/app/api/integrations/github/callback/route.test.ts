@@ -43,7 +43,7 @@ import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
 import {
   GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
@@ -99,7 +99,7 @@ jest.mock('@/lib/integrations/github/installation-authorization', () => ({
   })),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   createPendingIntegration: jest.fn(),
@@ -154,7 +154,7 @@ const mockedVerifyGitHubInstallationAuthorization = jest.mocked(
 );
 const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
 const mockedObserveGitHubInstallationLifecycle = jest.mocked(observeGitHubInstallationLifecycle);
 const mockedConnectVerifiedGitHubInstallation = jest.mocked(connectVerifiedGitHubInstallation);
@@ -835,8 +835,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       expect.objectContaining({ platform: 'github' }),
       expect.anything()
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ user: expect.objectContaining({ id: USER_ID }) }),
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       'org-db-owner',
       ['owner', 'admin']
     );
@@ -854,7 +854,9 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       consumed_at: null,
       created_at: new Date().toISOString(),
     });
-    mockedEnsureOrganizationAccess.mockRejectedValueOnce(new Error('Organization role required'));
+    mockedEnsureMemberOrganizationAccess.mockRejectedValueOnce(
+      new Error('Organization role required')
+    );
 
     const { GET } = await import('./route');
     const response = await GET(
@@ -882,7 +884,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
 
     // Override to return the matching org owner
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
@@ -971,7 +973,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     });
 
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
@@ -1119,7 +1121,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     });
 
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
@@ -1195,7 +1197,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     mockedCreatePending.mockResolvedValue(undefined as never);
 
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');

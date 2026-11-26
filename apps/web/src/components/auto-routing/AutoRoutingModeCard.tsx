@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 import { MODE_OPTIONS } from './custom-router-display';
 
 type Props = {
@@ -53,14 +54,14 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   const [draft, setDraft] = useState<{ endpoint: string; mode: ModeSelection }>();
   const query = useQuery({
     queryKey: ['auto-routing-mode', organizationId ?? 'personal'],
-    queryFn: async () => readModeResponse(await fetch(endpoint)),
+    queryFn: async () => readModeResponse(await adminFetch(endpoint)),
   });
   const savedMode = query.data?.configuredMode ?? 'inherit';
   const selectedMode = draft?.endpoint === endpoint ? draft.mode : savedMode;
   const saveMutation = useMutation({
     mutationFn: async (mode: ModeSelection) =>
       readModeResponse(
-        await fetch(endpoint, {
+        await adminFetch(endpoint, {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ mode: mode === 'inherit' ? null : mode }),

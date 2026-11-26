@@ -13,7 +13,7 @@ import { retrieveAnthropicUserProfile } from '@kilocode/web-shared/lib/ai-gatewa
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { eq } from 'drizzle-orm';
 
 const profile = { id: 'uprof_123', type: 'user_profile', access_type: 'passthrough' };
@@ -38,7 +38,7 @@ describe('pullAnthropicUserProfileStatus', () => {
       .update(kilocode_users)
       .set({ anthropic_user_profile_id: 'uprof_123' })
       .where(eq(kilocode_users.id, target.id));
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.pullAnthropicUserProfileStatus({ userId: target.id })
@@ -53,7 +53,7 @@ describe('pullAnthropicUserProfileStatus', () => {
       .update(organizations)
       .set({ anthropic_user_profile_id: 'uprof_123' })
       .where(eq(organizations.id, organization.id));
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.organizations.admin.pullAnthropicUserProfileStatus({
@@ -68,7 +68,7 @@ describe('pullAnthropicUserProfileStatus', () => {
       .update(organizations)
       .set({ anthropic_user_profile_id: 'uprof_123' })
       .where(eq(organizations.id, organization.id));
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.organizations.admin.getDetails({ organizationId: organization.id })
@@ -77,7 +77,7 @@ describe('pullAnthropicUserProfileStatus', () => {
 
   it('fails when the user has no profile, without calling Anthropic', async () => {
     const target = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.pullAnthropicUserProfileStatus({ userId: target.id })
@@ -86,7 +86,7 @@ describe('pullAnthropicUserProfileStatus', () => {
   });
 
   it('fails when the user does not exist', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.pullAnthropicUserProfileStatus({ userId: 'missing-user' })
@@ -94,7 +94,7 @@ describe('pullAnthropicUserProfileStatus', () => {
   });
 
   it('fails when the organization does not exist', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.organizations.admin.pullAnthropicUserProfileStatus({
@@ -110,7 +110,7 @@ describe('pullAnthropicUserProfileStatus', () => {
       .update(kilocode_users)
       .set({ anthropic_user_profile_id: 'uprof_123' })
       .where(eq(kilocode_users.id, target.id));
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.pullAnthropicUserProfileStatus({ userId: target.id })
@@ -124,7 +124,7 @@ describe('pullAnthropicUserProfileStatus', () => {
       .update(kilocode_users)
       .set({ anthropic_user_profile_id: 'uprof_123' })
       .where(eq(kilocode_users.id, target.id));
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     jest
       .mocked(retrieveAnthropicUserProfile)
@@ -146,7 +146,7 @@ describe('pullAnthropicUserProfileStatus', () => {
 
   it('rejects non-admin users', async () => {
     const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
 
     await expect(
       caller.admin.users.pullAnthropicUserProfileStatus({ userId: user.id })

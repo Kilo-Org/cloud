@@ -12,7 +12,7 @@ import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 const KILO_DOMAIN = hosted_domain_specials.kilocode_admin;
@@ -107,7 +107,7 @@ async function proofRevocation(userId: string, proofId: string) {
 describe('admin.users.listPlatformAdmins', () => {
   test('non-admin callers cannot list admins', async () => {
     const nonAdmin = await insertTestUser({ is_admin: false });
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(caller.admin.users.listPlatformAdmins()).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -119,7 +119,7 @@ describe('admin.users.listPlatformAdmins', () => {
     const grandfathered = await insertGrandfatheredAdmin();
     await insertTestUser({ is_admin: false });
 
-    const caller = await createCallerForUser(qualifying.id);
+    const caller = await createSessionCallerForUser(qualifying.id);
     const result = await caller.admin.users.listPlatformAdmins();
 
     const adminIds = result.admins.map(admin => admin.id);
@@ -129,7 +129,7 @@ describe('admin.users.listPlatformAdmins', () => {
 
   test('reports canManageAdmins true for a superadmin', async () => {
     const qualifying = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(qualifying.id);
+    const caller = await createSessionCallerForUser(qualifying.id);
 
     const result = await caller.admin.users.listPlatformAdmins();
     expect(result.canManageAdmins).toBe(true);
@@ -138,7 +138,7 @@ describe('admin.users.listPlatformAdmins', () => {
 
   test('reports canManageAdmins false for an ordinary admin', async () => {
     const ordinaryAdmin = await insertGrandfatheredAdmin({ is_super_admin: false });
-    const caller = await createCallerForUser(ordinaryAdmin.id);
+    const caller = await createSessionCallerForUser(ordinaryAdmin.id);
 
     const result = await caller.admin.users.listPlatformAdmins();
     expect(result.canManageAdmins).toBe(false);
@@ -148,7 +148,7 @@ describe('admin.users.listPlatformAdmins', () => {
 describe('admin.users.searchPlatformAdminCandidates', () => {
   test('non-admin callers cannot search candidates', async () => {
     const nonAdmin = await insertTestUser({ is_admin: false });
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.users.searchPlatformAdminCandidates({ query: 'candidate' })
@@ -157,7 +157,7 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
 
   test('an ordinary admin cannot search candidates', async () => {
     const ordinaryAdmin = await insertGrandfatheredAdmin({ is_super_admin: false });
-    const caller = await createCallerForUser(ordinaryAdmin.id);
+    const caller = await createSessionCallerForUser(ordinaryAdmin.id);
 
     await expect(
       caller.admin.users.searchPlatformAdminCandidates({ query: 'candidate' })
@@ -215,7 +215,7 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
       is_admin: false,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const results = await caller.admin.users.searchPlatformAdminCandidates({
       query: searchToken,
     });
@@ -246,7 +246,7 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
       google_user_email: `${token}Xprobe@kilocode.ai`,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const results = await caller.admin.users.searchPlatformAdminCandidates({
       query: `${token}_probe`,
     });
@@ -265,7 +265,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
       web_session_pepper: 'before-grant-pepper',
       api_token_pepper: 'before-grant-api-pepper',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.users.setPlatformAdminAccess({
       userId: target.id,
@@ -295,7 +295,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
   test('a superadmin can grant an eligible anaconda.com target', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertAnacondaEligibleCandidate();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.users.setPlatformAdminAccess({
       userId: target.id,
@@ -313,7 +313,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
       hosted_domain: hosted_domain_specials.non_workspace_google_account,
       is_admin: false,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.setPlatformAdminAccess({ userId: ineligibleTarget.id, isAdmin: true })
@@ -326,7 +326,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
   test('an ordinary admin cannot grant', async () => {
     const grandfathered = await insertGrandfatheredAdmin({ is_super_admin: false });
     const target = await insertEligibleCandidate();
-    const caller = await createCallerForUser(grandfathered.id);
+    const caller = await createSessionCallerForUser(grandfathered.id);
 
     await expect(
       caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: true })
@@ -339,7 +339,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
   test('repeated grant is an idempotent no-op with no second note or session rotation', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertEligibleCandidate();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: true });
     const afterFirstGrant = await getUser(target.id);
@@ -365,7 +365,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
       web_session_pepper: 'before-redundant-grant-pepper',
       api_token_pepper: 'before-redundant-grant-api-pepper',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.users.setPlatformAdminAccess({
       userId: grandfatheredTarget.id,
@@ -386,7 +386,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
   test('non-admin callers cannot grant', async () => {
     const nonAdmin = await insertTestUser({ is_admin: false });
     const target = await insertEligibleCandidate();
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: true })
@@ -395,7 +395,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
 
   test('unknown target returns NOT_FOUND', async () => {
     const admin = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.setPlatformAdminAccess({
@@ -416,7 +416,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
       web_session_pepper: 'before-revoke-pepper',
       api_token_pepper: 'before-revoke-api-pepper',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.users.setPlatformAdminAccess({
       userId: target.id,
@@ -445,7 +445,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
   test('a grandfathered outside-domain superadmin can revoke another admin', async () => {
     const grandfathered = await insertGrandfatheredAdmin();
     const target = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(grandfathered.id);
+    const caller = await createSessionCallerForUser(grandfathered.id);
 
     const result = await caller.admin.users.setPlatformAdminAccess({
       userId: target.id,
@@ -459,7 +459,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
 
   test('self-revocation is forbidden', async () => {
     const admin = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.setPlatformAdminAccess({ userId: admin.id, isAdmin: false })
@@ -472,7 +472,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
   test('repeated revoke is an idempotent no-op with no new note or session rotation', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: false });
     const afterFirstRevoke = await getUser(target.id);
@@ -494,7 +494,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
   test('non-admin callers cannot revoke', async () => {
     const nonAdmin = await insertTestUser({ is_admin: false });
     const target = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: false })
@@ -508,8 +508,8 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
       .where(eq(kilocode_users.is_super_admin, true));
     const first = await insertQualifyingAdmin();
     const second = await insertQualifyingAdmin();
-    const firstCaller = await createCallerForUser(first.id);
-    const secondCaller = await createCallerForUser(second.id);
+    const firstCaller = await createSessionCallerForUser(first.id);
+    const secondCaller = await createSessionCallerForUser(second.id);
 
     const results = await Promise.allSettled([
       firstCaller.admin.users.setPlatformAdminAccess({ userId: second.id, isAdmin: false }),
@@ -536,7 +536,7 @@ describe('admin.users.setAdminPermissions', () => {
   test('ordinary admins cannot manage permissions', async () => {
     const ordinaryAdmin = await insertQualifyingAdmin({ is_super_admin: false });
     const target = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(ordinaryAdmin.id);
+    const caller = await createSessionCallerForUser(ordinaryAdmin.id);
 
     await expect(
       caller.admin.users.setAdminPermissions({
@@ -549,7 +549,7 @@ describe('admin.users.setAdminPermissions', () => {
   test('requires at least one permission in the patch', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.setAdminPermissions({ userId: target.id, permissions: {} })
@@ -565,7 +565,7 @@ describe('admin.users.setAdminPermissions', () => {
       web_session_pepper: 'before-permissions-web',
       api_token_pepper: 'before-permissions-api',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.users.setAdminPermissions({
       userId: target.id,
@@ -592,7 +592,7 @@ describe('admin.users.setAdminPermissions', () => {
 
   test('permits self session-viewer and credit-manager changes but not self-superadmin changes', async () => {
     const admin = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.setAdminPermissions({
@@ -619,7 +619,7 @@ describe('admin.users.setAdminPermissions', () => {
   test('grants and revokes API request log export access independently of session viewing', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertQualifyingAdmin({ can_view_sessions: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const granted = await caller.admin.users.setAdminPermissions({
       userId: target.id,
@@ -670,7 +670,7 @@ describe('admin.users.setAdminPermissions', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
     await caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: false });
 
     const updated = await getUser(target.id);
@@ -684,7 +684,7 @@ describe('admin.users.setAdminPermissions', () => {
   test('rejects targets that are not platform admins', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertEligibleCandidate();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.setAdminPermissions({
@@ -701,7 +701,7 @@ describe('admin.users.setAdminPermissions', () => {
       web_session_pepper: 'no-op-web',
       api_token_pepper: 'no-op-api',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.admin.users.setAdminPermissions({
       userId: target.id,
@@ -721,7 +721,7 @@ describe('admin.users.setAdminPermissions', () => {
       can_view_sessions: true,
       can_manage_credits: true,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.setAdminPermissions({
       userId: target.id,
@@ -742,7 +742,7 @@ describe('admin.users.setAdminPermissions', () => {
   test('records granted credit-manager and revoked superadmin notes', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertQualifyingAdmin({ is_super_admin: false });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.users.setAdminPermissions({
       userId: target.id,
@@ -765,7 +765,7 @@ describe('admin.users.setAdminPermissions', () => {
   test('blocked superadmins cannot manage permissions', async () => {
     const blocked = await insertQualifyingAdmin({ blocked_reason: 'security review' });
     const target = await insertQualifyingAdmin();
-    const caller = await createCallerForUser(blocked.id);
+    const caller = await createSessionCallerForUser(blocked.id);
 
     await expect(
       caller.admin.users.setAdminPermissions({
@@ -782,8 +782,8 @@ describe('admin.users.setAdminPermissions', () => {
       .where(eq(kilocode_users.is_super_admin, true));
     const first = await insertQualifyingAdmin();
     const second = await insertQualifyingAdmin();
-    const firstCaller = await createCallerForUser(first.id);
-    const secondCaller = await createCallerForUser(second.id);
+    const firstCaller = await createSessionCallerForUser(first.id);
+    const secondCaller = await createSessionCallerForUser(second.id);
 
     const results = await Promise.allSettled([
       firstCaller.admin.users.setAdminPermissions({
@@ -818,8 +818,8 @@ describe('admin.users.setAdminPermissions', () => {
       .where(eq(kilocode_users.is_super_admin, true));
     const first = await insertQualifyingAdmin();
     const second = await insertQualifyingAdmin();
-    const firstCaller = await createCallerForUser(first.id);
-    const secondCaller = await createCallerForUser(second.id);
+    const firstCaller = await createSessionCallerForUser(first.id);
+    const secondCaller = await createSessionCallerForUser(second.id);
 
     const results = await Promise.allSettled([
       firstCaller.admin.users.setPlatformAdminAccess({ userId: second.id, isAdmin: false }),
@@ -855,7 +855,7 @@ test('candidate search and grant eligibility never disagree for a hosted-domain-
     hosted_domain: hosted_domain_specials.non_workspace_google_account,
     is_admin: false,
   });
-  const caller = await createCallerForUser(admin.id);
+  const caller = await createSessionCallerForUser(admin.id);
 
   const searchResults = await caller.admin.users.searchPlatformAdminCandidates({
     query: target.google_user_email,
@@ -871,7 +871,7 @@ test('candidate search and grant eligibility never disagree for a hosted-domain-
 test('user_admin_notes rows are scoped to the target user, not the actor', async () => {
   const admin = await insertQualifyingAdmin();
   const target = await insertEligibleCandidate();
-  const caller = await createCallerForUser(admin.id);
+  const caller = await createSessionCallerForUser(admin.id);
 
   await caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: true });
 
@@ -903,7 +903,7 @@ describe('admin role change audit logging', () => {
   test('granting and revoking platform admin access records the previous roles', async () => {
     const superadmin = await insertQualifyingAdmin();
     const candidate = await insertEligibleCandidate();
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
 
     await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: true });
     await caller.admin.users.setAdminPermissions({
@@ -942,7 +942,7 @@ describe('admin role change audit logging', () => {
   test('no-op role changes are not recorded', async () => {
     const superadmin = await insertQualifyingAdmin();
     const admin = await insertQualifyingAdmin({ is_super_admin: false });
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
 
     await caller.admin.users.setPlatformAdminAccess({ userId: admin.id, isAdmin: true });
     await caller.admin.users.setAdminPermissions({
@@ -956,7 +956,7 @@ describe('admin role change audit logging', () => {
   test('role and permission changes revoke step-up proofs', async () => {
     const superadmin = await insertQualifyingAdmin();
     const candidate = await insertEligibleCandidate();
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
     const roleProof = await insertStepUpProof(candidate.id, 'role-change-session');
 
     await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: true });

@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { useTRPC } from '@/lib/trpc/utils';
 import { benchmarkRequestErrorCopy, blockedModelCopy } from './benchmark-display';
@@ -176,12 +177,12 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
           }
         : fields;
       const response = router
-        ? await fetch(customRouterItemEndpoint(router.scope, router.slug, organizationId), {
+        ? await adminFetch(customRouterItemEndpoint(router.scope, router.slug, organizationId), {
             method: 'PATCH',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(patch),
           })
-        : await fetch(customRoutersEndpoint(organizationId), {
+        : await adminFetch(customRoutersEndpoint(organizationId), {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ ...fields, scope, slug: draft.slug }),

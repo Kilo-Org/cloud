@@ -12,7 +12,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { eq } from 'drizzle-orm';
 
 let admin: User;
@@ -34,7 +34,7 @@ const normalizedOptOutModels = ['moonshotai/kimi-k3', 'openai/gpt-6'];
 
 describe('adminGatewayConfigRouter', () => {
   it('stores the normalized opt-out list and reads it back', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const saved = await caller.admin.gatewayConfig.set(input);
     expect({
@@ -58,7 +58,7 @@ describe('adminGatewayConfigRouter', () => {
   });
 
   it('rejects a blank opt-out entry without writing', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.gatewayConfig.set({
@@ -70,7 +70,7 @@ describe('adminGatewayConfigRouter', () => {
   });
 
   it('rejects an over-length opt-out entry without writing', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.gatewayConfig.set({
@@ -82,7 +82,7 @@ describe('adminGatewayConfigRouter', () => {
   });
 
   it('keeps organization features when the routing configuration is saved', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
     await caller.admin.gatewayConfig.setOrganizationFeatures({
@@ -105,7 +105,7 @@ describe('adminGatewayConfigRouter', () => {
   });
 
   it('preserves the permission-policy allowlist when an older client omits it', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
     await caller.admin.gatewayConfig.setOrganizationFeatures({
@@ -130,7 +130,7 @@ describe('adminGatewayConfigRouter', () => {
   });
 
   it('keeps the routing configuration when organization features are saved', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.gatewayConfig.set(input);
     await caller.admin.gatewayConfig.setOrganizationFeatures({
@@ -147,7 +147,7 @@ describe('adminGatewayConfigRouter', () => {
   });
 
   it('rejects an organization feature entry that is not an organization ID', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.gatewayConfig.setOrganizationFeatures({
@@ -162,7 +162,7 @@ describe('adminGatewayConfigRouter', () => {
 
   describe('previewOrganizationFeatures', () => {
     it('normalizes organization IDs and deduplicates them across feature lists', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const first = await createTestOrganization('First preview organization', admin.id, 0);
       const second = await createTestOrganization('Second preview organization', admin.id, 0);
 
@@ -184,7 +184,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('omits missing IDs and organizations not requested', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const organization = await createTestOrganization('Requested organization', admin.id, 0);
       await createTestOrganization('Unrequested organization', admin.id, 0);
 
@@ -199,7 +199,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('includes deleted organizations with isDeleted set to true', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const organization = await createTestOrganization('Deleted organization', admin.id, 0);
       await db
         .update(organizations)
@@ -217,7 +217,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('returns an empty preview for empty feature lists without creating configuration', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
@@ -236,7 +236,7 @@ describe('adminGatewayConfigRouter', () => {
       'gateway_settings',
       'org_permission_policy',
     ] as const)('rejects invalid IDs in %s without writing configuration', async feature => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
@@ -256,7 +256,7 @@ describe('adminGatewayConfigRouter', () => {
       'gateway_settings',
       'org_permission_policy',
     ] as const)('rejects more than 1000 entries in %s before deduplication', async feature => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
@@ -274,7 +274,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('leaves existing routing configuration and organization features unchanged', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const organization = await createTestOrganization('Unsaved organization', admin.id, 0);
       await caller.admin.gatewayConfig.set(input);
       await caller.admin.gatewayConfig.setOrganizationFeatures({
@@ -299,7 +299,7 @@ describe('adminGatewayConfigRouter', () => {
 
     it('rejects non-admin users', async () => {
       const user = await insertTestUser();
-      const caller = await createCallerForUser(user.id);
+      const caller = await createSessionCallerForUser(user.id);
       const organization = await createTestOrganization('Private organization', admin.id, 0);
 
       await expect(
@@ -333,7 +333,7 @@ describe('adminGatewayConfigRouter', () => {
     };
 
     it('returns the disabled defaults when nothing is stored', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual({
         revision: 0,
@@ -347,7 +347,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('stores normalized settings and reads them back', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(caller.admin.gatewayConfig.setAnthropicUserProfiles(settings)).resolves.toEqual(
         normalizedSettings
@@ -358,7 +358,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('replaces the whole stored object when saved again', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
       await caller.admin.gatewayConfig.setAnthropicUserProfiles({
@@ -380,7 +380,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('rejects a save from a stale revision and leaves the stored settings unchanged', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
       await expect(
@@ -397,7 +397,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('rejects a revision ahead of the stored one', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, revision: 1 })
@@ -409,7 +409,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('accepts a save with the current revision and increments it each time', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const first = await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
       const second = await caller.admin.gatewayConfig.setAnthropicUserProfiles({
@@ -426,7 +426,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('lets only one of two concurrent saves from the same revision win', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const results = await Promise.allSettled([
         caller.admin.gatewayConfig.setAnthropicUserProfiles(settings),
@@ -440,7 +440,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('rejects an ID that is both opted in and opted out without writing', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.gatewayConfig.setAnthropicUserProfiles({
@@ -458,7 +458,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('rejects a start date that is not an ISO date-time and an invalid organization ID', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, start_at: 'tomorrow' })
@@ -473,7 +473,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('keeps the other configuration keys when saved, and when they are saved', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await caller.admin.gatewayConfig.set(input);
       await caller.admin.gatewayConfig.setOrganizationFeatures({
@@ -500,7 +500,7 @@ describe('adminGatewayConfigRouter', () => {
 
     it('rejects non-admin users', async () => {
       const user = await insertTestUser();
-      const caller = await createCallerForUser(user.id);
+      const caller = await createSessionCallerForUser(user.id);
 
       await expect(
         caller.admin.gatewayConfig.setAnthropicUserProfiles(settings)
@@ -511,7 +511,7 @@ describe('adminGatewayConfigRouter', () => {
     });
 
     it('lists pending deletions first, then deletions of the last 30 days newest first', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
       await db.insert(anthropic_user_profile_deletions).values([
         {

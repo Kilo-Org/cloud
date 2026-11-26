@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from '@jest/globals';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
@@ -57,7 +57,7 @@ beforeEach(async () => {
 
 describe('adminCustomLlmRouter', () => {
   it('rejects a non-admin caller', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
     await expect(caller.admin.customLlm.list()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
@@ -65,7 +65,7 @@ describe('adminCustomLlmRouter', () => {
 
   describe('upsert', () => {
     it('creates a new custom LLM with encrypted API key and clean definition', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-1';
 
       const result = await caller.admin.customLlm.upsert({
@@ -93,7 +93,7 @@ describe('adminCustomLlmRouter', () => {
     it.each([false, true])(
       'creates a custom LLM without an internal ID and with disable_url_suffix=%s',
       async disableUrlSuffix => {
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
         const publicId = 'kilo-internal/test-model-no-internal-id';
         const definition: CustomLlmDefinition = {
           ...validDefinition,
@@ -126,7 +126,7 @@ describe('adminCustomLlmRouter', () => {
     );
 
     it('creates a new custom LLM with Google Service Account credentials', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-gsa';
 
       const gsa = {
@@ -160,7 +160,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('creates a new custom LLM with Amazon Bedrock IAM credentials', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-bedrock';
       const credentials = {
         type: 'aws_bedrock' as const,
@@ -187,7 +187,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects creating new custom LLM when credentials are completely missing', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-no-key';
 
       await expect(
@@ -202,7 +202,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('updates existing custom LLM preserving existing encrypted key when credentials are omitted', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-update-preserve';
 
       await caller.admin.customLlm.upsert({
@@ -227,7 +227,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('clears an omitted internal ID on update while preserving the suffix flag and credentials', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-update-no-internal-id';
       const definition: CustomLlmDefinition = {
         ...validDefinition,
@@ -260,7 +260,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('updates existing custom LLM rotating encrypted key when new credentials are provided', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-update-rotate';
 
       await caller.admin.customLlm.upsert({
@@ -305,7 +305,7 @@ describe('adminCustomLlmRouter', () => {
     ];
 
     it('stores a custom LLM with valid pricing tiers', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-priced';
 
       const result = await caller.admin.customLlm.upsert({
@@ -321,7 +321,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects pricing whose first tier does not start at context length 0', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-bad-pricing';
 
       await expect(
@@ -342,7 +342,7 @@ describe('adminCustomLlmRouter', () => {
     it.each(['stealth/test-model', 'kilo-internal/test-model-free'])(
       'rejects pricing for the free model id %s',
       async publicId => {
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
 
         await expect(
           caller.admin.customLlm.upsert({
@@ -358,7 +358,7 @@ describe('adminCustomLlmRouter', () => {
     );
 
     it('rejects adding pricing to an existing custom LLM with a free model id', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-free';
       await caller.admin.customLlm.upsert({
         public_id: publicId,
@@ -375,7 +375,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects copying a priced custom LLM to a free model id', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/test-model-priced',
         definition: { ...validDefinition, pricing: pricingTiers },
@@ -395,7 +395,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('stores may_train_on_prompts with pricing', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/test-model-zdr',
@@ -407,7 +407,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects may_train_on_prompts without pricing', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -421,7 +421,7 @@ describe('adminCustomLlmRouter', () => {
 
   describe('list', () => {
     it('lists custom LLMs without exposing encrypted_api_key in payload', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-list';
 
       await caller.admin.customLlm.upsert({
@@ -441,7 +441,7 @@ describe('adminCustomLlmRouter', () => {
 
   describe('copy', () => {
     it('copies a custom LLM with its encrypted credentials and new IDs and name', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const sourcePublicId = 'kilo-internal/test-model-copy-source';
       const copiedPublicId = 'kilo-internal/test-model-copy-target';
 
@@ -488,7 +488,7 @@ describe('adminCustomLlmRouter', () => {
     it.each(['source-model', undefined])(
       'copies without an internal ID when the source internal ID is %s, preserving other fields',
       async sourceInternalId => {
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
         const sourcePublicId = 'kilo-internal/test-model-copy-optional-id-source';
         const copiedPublicId = 'kilo-internal/test-model-copy-optional-id-target';
         const sourceDefinition: CustomLlmDefinition = {
@@ -534,7 +534,7 @@ describe('adminCustomLlmRouter', () => {
     );
 
     it('does not overwrite a custom LLM with the requested new ID', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const sourcePublicId = 'kilo-internal/test-model-copy-conflict-source';
       const existingPublicId = 'kilo-internal/test-model-copy-conflict-target';
 
@@ -568,7 +568,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it.each(['', '   '])('rejects a copy with a blank internal ID: %j', async internalId => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const sourcePublicId = 'kilo-internal/test-model-copy-empty-internal-id-source';
       const copiedPublicId = 'kilo-internal/test-model-copy-empty-internal-id-target';
 
@@ -601,7 +601,7 @@ describe('adminCustomLlmRouter', () => {
     const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
 
     it('accepts an id without the kilo-internal/ prefix and trims it', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const result = await caller.admin.customLlm.upsert({
         public_id: '  acme/model  ',
@@ -623,7 +623,7 @@ describe('adminCustomLlmRouter', () => {
       ['kimi-coding/model', 'direct BYOK prefix'],
       ['openai/gpt-4o', 'OpenRouter model list'],
     ])('rejects %s', async (publicId, message) => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -637,7 +637,7 @@ describe('adminCustomLlmRouter', () => {
     it.each(['stealth/custom-alpha', 'acme/model-free'])(
       'accepts the free model id %s',
       async publicId => {
-        const caller = await createCallerForUser(admin.id);
+        const caller = await createSessionCallerForUser(admin.id);
 
         const result = await caller.admin.customLlm.upsert({
           public_id: publicId,
@@ -653,7 +653,7 @@ describe('adminCustomLlmRouter', () => {
       await db
         .insert(custom_llm2)
         .values({ public_id: 'kilo-internal/Legacy-Model', definition: validDefinition });
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -671,7 +671,7 @@ describe('adminCustomLlmRouter', () => {
       await db
         .insert(custom_llm2)
         .values({ public_id: 'kilo-internal/Legacy-Model', definition: validDefinition });
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/Legacy-Model',
@@ -683,7 +683,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('applies the same rules to the copy target', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await caller.admin.customLlm.upsert({
         public_id: 'acme/copy-source',
         definition: validDefinition,
@@ -704,7 +704,7 @@ describe('adminCustomLlmRouter', () => {
     const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
 
     it('creates a public custom LLM', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'acme/public-model',
@@ -723,7 +723,7 @@ describe('adminCustomLlmRouter', () => {
       ['group_ids', { group_ids: ['00000000-0000-4000-8000-000000000123'] }],
       ['description', { public: { inference_providers: ['acme'], description: ' ' } }],
     ])('rejects a public definition with an invalid %s', async (_field, overrides) => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -735,7 +735,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('stores a private definition that nobody is granted yet', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const {
         organization_ids: _organizationIds,
         group_ids: _groupIds,
@@ -752,7 +752,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects api_kinds without the API that clients use', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -773,7 +773,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects an inference provider that is not a lowercase slug', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -825,7 +825,7 @@ describe('adminCustomLlmRouter', () => {
 
     it('rejects a non-https base_url when the URL policy is enforced', async () => {
       setEnv('NODE_ENV', 'production');
-      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
+      const caller = await createSessionCallerForUser(admin.id, { headers: allowedAddress });
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -845,7 +845,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects changing an existing definition to a non-https base_url when enforced', async () => {
-      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
+      const caller = await createSessionCallerForUser(admin.id, { headers: allowedAddress });
       const publicId = 'kilo-internal/http-update-model';
       await caller.admin.customLlm.upsert({
         public_id: publicId,
@@ -865,7 +865,7 @@ describe('adminCustomLlmRouter', () => {
 
     it('accepts an https base_url when the URL policy is enforced', async () => {
       setEnv('NODE_ENV', 'production');
-      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
+      const caller = await createSessionCallerForUser(admin.id, { headers: allowedAddress });
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/https-model',
@@ -878,7 +878,7 @@ describe('adminCustomLlmRouter', () => {
 
     it('accepts a non-https base_url in the test environment', async () => {
       setEnv('NODE_ENV', 'test');
-      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
+      const caller = await createSessionCallerForUser(admin.id, { headers: allowedAddress });
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/http-model-test-env',
@@ -915,7 +915,7 @@ describe('adminCustomLlmRouter', () => {
     };
 
     it('creates a partner for a model in the OpenRouter model list', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const result = await caller.admin.customLlm.upsert({
         public_id: catalogPublicId,
@@ -933,7 +933,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('keeps accepting updates to an existing partner', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await caller.admin.customLlm.upsert({
         public_id: catalogPublicId,
         definition: partnerDefinition,
@@ -949,7 +949,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('keeps an existing partner editable after its model leaves the OpenRouter model list', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await caller.admin.customLlm.upsert({
         public_id: catalogPublicId,
         definition: partnerDefinition,
@@ -969,7 +969,7 @@ describe('adminCustomLlmRouter', () => {
       await db
         .insert(custom_llm2)
         .values({ public_id: 'OpenAI/GPT-4o', definition: validDefinition });
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -987,7 +987,7 @@ describe('adminCustomLlmRouter', () => {
       jest
         .mocked(getOpenRouterModelsMetadataFromDatabase)
         .mockResolvedValue({ '~openai/gpt-latest': {} as GatewayModelWithEndpoints });
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -999,7 +999,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects a partner whose id is not in the OpenRouter model list', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -1017,7 +1017,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects a partner without pricing', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -1029,7 +1029,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects a partner that is also public or granted to an organization', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       for (const overrides of [
         { public: publicDefinition.public },
@@ -1050,7 +1050,7 @@ describe('adminCustomLlmRouter', () => {
         public_id: catalogPublicId,
         definition: partnerDefinition,
       });
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -1075,7 +1075,7 @@ describe('adminCustomLlmRouter', () => {
         public_id: 'acme/former-partner',
         definition: partnerDefinition,
       });
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'acme/former-partner',
@@ -1092,7 +1092,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects copying a partner', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await caller.admin.customLlm.upsert({
         public_id: catalogPublicId,
         definition: partnerDefinition,
@@ -1120,7 +1120,7 @@ describe('adminCustomLlmRouter', () => {
 
   describe('delete', () => {
     it('deletes a custom LLM by public_id', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-delete';
 
       await caller.admin.customLlm.upsert({
@@ -1140,7 +1140,7 @@ describe('adminCustomLlmRouter', () => {
 
   describe('setEnabled', () => {
     it('sets is_enabled in the definition without touching the rest or the credentials', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-toggle';
 
       await caller.admin.customLlm.upsert({
@@ -1179,7 +1179,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects an unknown public_id', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await expect(
         caller.admin.customLlm.setEnabled({ public_id: 'kilo-internal/missing', is_enabled: false })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });

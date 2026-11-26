@@ -727,6 +727,31 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     await expect(openAiSharedServicesSignIn()).resolves.toBe('/connected-accounts?linked=openai');
   });
+
+  it('refuses the shared-services connect for a platform admin without a managing membership', async () => {
+    const admin = await insertTestUser({
+      google_user_email: `link-admin-${randomUUID()}@example.com`,
+      web_session_pepper: randomUUID(),
+      is_admin: true,
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: admin.id,
+      targetProvider: 'openai',
+      organizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      chatGptScope: 'shared_services',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: admin } as never);
+    mockGetUserOrgMemberships.mockResolvedValueOnce([]);
+    mockGetOrganizationById.mockResolvedValueOnce({ parent_organization_id: null } as never);
+    await setOwnerSessionCookie(admin);
+
+    await expect(
+      signIn(openAiLinkCallback('shared-admin@example.com', 'openai-shared-admin-sub') as never)
+    ).resolves.toBe(
+      `/organizations/${SHARED_SERVICES_ORGANIZATION_ID}/byok?openai_error=LINKING-FAILED`
+    );
+  });
 });
 
 describe('authOptions.callbacks.signIn for Claude', () => {

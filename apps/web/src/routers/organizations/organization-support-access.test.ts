@@ -3,7 +3,7 @@ import { support_access_grants } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 
 function enableSupportAccess(enabled: boolean) {
   if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
@@ -48,7 +48,7 @@ describe('allowlisted support read call sites', () => {
   test('usageStats admits an allowlisted support read when on', async () => {
     enableSupportAccess(true);
     const { admin, organization } = await adminWithGrant();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const result = await caller.organizations.usageStats({ organizationId: organization.id });
 
@@ -58,7 +58,7 @@ describe('allowlisted support read call sites', () => {
   test('a non-allowlisted organization read still denies support when on', async () => {
     enableSupportAccess(true);
     const { admin, organization } = await adminWithGrant();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.organizations.bitbucket.getStatus({ organizationId: organization.id })
@@ -68,7 +68,7 @@ describe('allowlisted support read call sites', () => {
   test('off leaves the same non-allowlisted read available to an admin', async () => {
     enableSupportAccess(false);
     const { admin, organization } = await adminWithGrant();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.organizations.bitbucket.getStatus({ organizationId: organization.id })
@@ -80,10 +80,25 @@ describe('allowlisted support read call sites', () => {
     const { admin, organization } = await adminWithGrant('support_read', {
       blocked_at: new Date().toISOString(),
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.organizations.usageStats({ organizationId: organization.id })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  test('a bearer staff credential never reaches the support or legacy staff branch', async () => {
+    for (const enabled of [true, false]) {
+      enableSupportAccess(enabled);
+      const { admin, organization } = await adminWithGrant();
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.organizations.usageStats({ organizationId: organization.id })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+      });
+    }
   });
 });

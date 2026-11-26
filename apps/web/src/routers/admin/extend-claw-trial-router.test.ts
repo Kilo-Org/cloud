@@ -4,7 +4,7 @@ import { CURRENT_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscription_change_log, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import type { User } from '@kilocode/db/schema';
 
 let admin: User;
@@ -38,7 +38,7 @@ describe('matchUsers — at_limit ineligibility', () => {
       trial_ends_at: new Date(Date.now() + 400 * MS_PER_DAY).toISOString(),
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { matched } = await caller.admin.extendClawTrial.matchUsers({
       emails: [target.google_user_email],
     });
@@ -64,7 +64,7 @@ describe('matchUsers — at_limit ineligibility', () => {
       trial_ends_at: oneYearPlusOneDay.toISOString(),
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { matched } = await caller.admin.extendClawTrial.matchUsers({
       emails: [target.google_user_email],
     });
@@ -83,7 +83,7 @@ describe('matchUsers — at_limit ineligibility', () => {
       trial_ends_at: new Date(Date.now() + 200 * MS_PER_DAY).toISOString(),
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { matched } = await caller.admin.extendClawTrial.matchUsers({
       emails: [target.google_user_email],
     });
@@ -107,7 +107,7 @@ describe('extendTrials — 1-year ceiling', () => {
       trial_ends_at: currentEnd.toISOString(),
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const results = await caller.admin.extendClawTrial.extendTrials({
       emails: [target.google_user_email],
       trialDays: 365,
@@ -145,7 +145,7 @@ describe('extendTrials — normal extension', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const results = await caller.admin.extendClawTrial.extendTrials({
       emails: [target.google_user_email],
       trialDays: 7,
@@ -187,7 +187,7 @@ describe('extendTrials — normal extension', () => {
       })
       .returning();
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const results = await caller.admin.extendClawTrial.extendTrials({
       emails: [target.google_user_email],
       trialDays: 365,

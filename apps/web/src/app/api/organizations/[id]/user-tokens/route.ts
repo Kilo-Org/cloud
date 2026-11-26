@@ -9,46 +9,18 @@ import {
   isDelegableResource,
   isPagesResource,
   TypedResourceDelegationError,
-  type DelegableResource,
 } from '@/lib/auth/resource-delegation';
-import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
-import {
-  adminActionContextFromHeaders,
-  recordElevatedOrganizationAdminAction,
-} from '@/lib/admin/admin-action-audit';
-
-// Roles that may mint each token kind without the admin bypass, mirroring the
-// role checks below (which never fire for admins, who are forced to owner).
-function rolesAllowedToMint(resource: DelegableResource | undefined): OrganizationRole[] {
-  if (resource === undefined) return ['owner', 'admin', 'billing_manager', 'member'];
-  if (resource === 'attribution') return ['owner', 'member'];
-  return ['owner', 'admin', 'member'];
-}
-
-// Records a token minted by a Kilo admin whose own role would not allow it.
-async function recordTokenMint(
-  user: Parameters<typeof adminActionContextFromHeaders>[0],
-  organizationId: string,
-  headers: Headers,
-  resource: DelegableResource | undefined,
-  metadata: Record<string, unknown>
-) {
-  await recordElevatedOrganizationAdminAction(adminActionContextFromHeaders(user, headers), {
-    organizationId,
-    requiredRoles: rolesAllowedToMint(resource),
-    action: 'organization.token.mint',
-    message: 'Minted organization-scoped token',
-    metadata,
-  });
-}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const organizationId = (await params).id;
 
-  // Verify user has access to the organization (any member role is sufficient)
+  // Issuing a credential is never a platform-admin or support operation: the
+  // token carries the caller's own organization role, so only real (direct or
+  // inherited) membership may issue one. Any member role is sufficient here.
   const result = await getAuthorizedOrgContext(organizationId, undefined, {
     requestMethod: request.method,
+    membershipOnly: true,
   });
 
   if (!result.success) {
@@ -103,12 +75,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         details: { id: 'token.resource' },
         message: `Resource token generated for organization ${organization.name}`,
       });
-      await recordTokenMint(user, organizationId, request.headers, resource, {
-        tokenKind: 'resource',
-        resource,
-        organizationRole,
-        expiresAt: delegated.expiresAt,
-      });
       return NextResponse.json({
         token: delegated.token,
         expiresAt: delegated.expiresAt,
@@ -140,11 +106,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     actor_id: user.id,
     details: { id: 'token.user' },
     message: `User token generated for organization ${organization.name}`,
-  });
-  await recordTokenMint(user, organizationId, request.headers, undefined, {
-    tokenKind: 'legacy',
-    organizationRole: user.role,
-    expiresAt,
   });
 
   return NextResponse.json({

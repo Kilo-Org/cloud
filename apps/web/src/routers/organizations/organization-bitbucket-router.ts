@@ -28,6 +28,7 @@ import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/i
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
+  organizationBillingMemberProcedure,
   organizationBillingProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { platform_integrations } from '@kilocode/db/schema';
@@ -177,36 +178,30 @@ export const organizationBitbucketRouter = createTRPCRouter({
     return oauthStatus ?? { ...workspaceAccessTokenStatus, canManage };
   }),
 
-  connect: organizationBillingProcedure
+  connect: organizationBillingMemberProcedure
     .input(ConnectInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const result = await connectBitbucketWorkspaceAccessToken({
+        return await connectBitbucketWorkspaceAccessToken({
           organizationId: input.organizationId,
           actorUserId: ctx.user.id,
           accessToken: input.accessToken,
         });
-        await recordBitbucketWrite(ctx, input.organizationId, 'connect_workspace_access_token');
-        return result;
       } catch (error) {
         rethrowBitbucketMutationError(error);
       }
     }),
 
-  replaceToken: organizationBillingProcedure
+  replaceToken: organizationBillingMemberProcedure
     .input(ReplaceTokenInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const result = await rotateBitbucketWorkspaceAccessToken({
+        return await rotateBitbucketWorkspaceAccessToken({
           organizationId: input.organizationId,
           actorUserId: ctx.user.id,
           integrationId: input.integrationId,
           accessToken: input.accessToken,
         });
-        await recordBitbucketWrite(ctx, input.organizationId, 'replace_workspace_access_token', {
-          integrationId: input.integrationId,
-        });
-        return result;
       } catch (error) {
         rethrowBitbucketMutationError(error);
       }
@@ -240,10 +235,12 @@ export const organizationBitbucketRouter = createTRPCRouter({
           });
         }
 
+        // The locked recheck follows how the procedure boundary admitted the caller.
         return await refreshBitbucketWorkspaceAccessTokenRepositories({
           organizationId: input.organizationId,
           kiloUserId: ctx.user.id,
           expectedIntegrationId: input.integrationId,
+          authority: ctx.organizationAccess.kind === 'member' ? 'member' : 'staff',
         });
       } catch (error) {
         rethrowBitbucketMutationError(error);
@@ -276,6 +273,7 @@ export const organizationBitbucketRouter = createTRPCRouter({
           organizationId: input.organizationId,
           actorUserId: ctx.user.id,
           integrationId: input.integrationId,
+          authority: ctx.organizationAccess.kind === 'member' ? 'member' : 'staff',
         });
         await recordBitbucketWrite(ctx, input.organizationId, 'disconnect', {
           integrationId: input.integrationId,

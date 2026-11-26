@@ -12,7 +12,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureOrganizationAccess,
+  organizationRestAccessContext,
+  StaffRequestRefusal,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 
 function workerResultResponse(result: { status: number; body: unknown }): NextResponse {
@@ -24,8 +28,9 @@ function workerResultResponse(result: { status: number; body: unknown }): NextRe
   });
 }
 
-function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | null {
+function trpcErrorResponse(error: unknown): NextResponse | null {
   if (!(error instanceof TRPCError)) return null;
+  if (error.cause instanceof StaffRequestRefusal) return error.cause.response;
   const status =
     error.code === 'UNAUTHORIZED'
       ? 401
@@ -40,11 +45,12 @@ function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | nu
 async function resolveOwner(
   request: NextRequest,
   roles?: Parameters<typeof ensureOrganizationAccess>[2]
-): Promise<AutoRoutingModeOwnerQuery | { response: NextResponse<{ error: string }> }> {
-  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-  if (!user || authFailedResponse) {
+): Promise<AutoRoutingModeOwnerQuery | { response: NextResponse }> {
+  const auth = await getUserFromAuth({ adminOnly: false });
+  if (!auth.user || auth.authFailedResponse) {
     return { response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
   }
+  const { user } = auth;
 
   const organizationId = request.nextUrl.searchParams.get('organizationId');
   if (organizationId === null) {
@@ -55,7 +61,13 @@ async function resolveOwner(
   }
 
   try {
-    await ensureOrganizationAccess({ user, tokenSource }, organizationId, roles);
+    // Staff without a membership pass only the shared staff guard, with this
+    // request's real credential, method and headers.
+    await ensureOrganizationAccess(
+      organizationRestAccessContext(auth, { headers: request.headers, method: request.method }),
+      organizationId,
+      roles
+    );
   } catch (error) {
     const response = trpcErrorResponse(error);
     if (response) return { response };

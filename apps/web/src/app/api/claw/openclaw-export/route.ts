@@ -10,9 +10,8 @@ import {
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
 // Large workspaces can take a while to archive; raise the function timeout so
 // the streamed download isn't killed mid-flight (mirrors the api-request-log
@@ -43,7 +42,7 @@ function jsonError(message: string, status: number, code?: string): Response {
 export async function POST(request: NextRequest): Promise<Response> {
   await connection();
 
-  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({
+  const { user, authFailedResponse } = await getUserFromAuth({
     adminOnly: false,
   });
   if (authFailedResponse) {
@@ -75,7 +74,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   let instance: Awaited<ReturnType<typeof getActiveInstance>>;
   try {
     if (organizationId) {
-      await ensureOrganizationAccess({ user, tokenSource } as TRPCContext, organizationId);
+      // A workspace export is on the support never-list: only a real (direct or
+      // inherited) membership grants organization scope here.
+      await ensureMemberOrganizationAccess(user, organizationId);
       await requireActiveSubscriptionOrTrial(organizationId);
       instance = await getActiveOrgInstance(user.id, organizationId);
     } else {

@@ -8,7 +8,7 @@ import {
 } from '@/lib/app-shell/shell-paths';
 import { loadAppShellUser } from '@/lib/app-shell/session';
 import { oauthCallbackRedirectPath } from '@/lib/integrations/oauth/common';
-import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
+import { platform_integrations, type GitHubInstallState } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import {
@@ -31,7 +31,7 @@ import {
   updateGitHubInstallationRepositories,
 } from '@/lib/integrations/db/github-installations';
 import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   createPendingIntegration,
   findGitHubBotLinkIntegrations,
@@ -350,13 +350,10 @@ async function handleCoreInstallFlow(params: {
   const { user, owner, ownerId, returnTo, installationId, setupAction, githubAppType } = params;
   const searchParams = params.request.nextUrl.searchParams;
 
-  // Verify user has access to the owner
+  // Storing an organization installation is membership-only: the install state
+  // and staff grants never stand in for a manage membership.
   if (owner.type === 'org') {
-    await ensureOrganizationAccess(
-      { user: user as unknown as User },
-      owner.id,
-      ORGANIZATION_MANAGE_ROLES
-    );
+    await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_MANAGE_ROLES);
   } else {
     if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/', APP_URL));

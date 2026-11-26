@@ -15,6 +15,7 @@ import {
   type CustomRouterSummary,
   type PaidBenchmarkProgress,
 } from '@kilocode/auto-routing-contracts';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 
 export const BASE_ROUTER_OPTIONS: Array<{ value: AutoRouter; label: string }> = [
   { value: 'efficient', label: 'Efficient' },
@@ -55,7 +56,7 @@ export async function fetchPlatformMeasurements(
 ) {
   const params = new URLSearchParams({ router: baseRouter });
   if (organizationId) params.set('organizationId', organizationId);
-  const response = await fetch(`${AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH}?${params}`);
+  const response = await adminFetch(`${AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH}?${params}`);
   if (!response.ok) throw new Error(await errorMessage(response));
   return PlatformMeasurementsResponseSchema.parse(await response.json());
 }
@@ -73,7 +74,7 @@ async function errorMessage(response: Response): Promise<string> {
 export async function fetchCustomRouters(
   organizationId: string | undefined
 ): Promise<CustomRouterListResponse> {
-  const response = await fetch(customRoutersEndpoint(organizationId));
+  const response = await adminFetch(customRoutersEndpoint(organizationId));
   if (!response.ok) throw new Error(await errorMessage(response));
   return CustomRouterListResponseSchema.parse(await response.json());
 }
@@ -87,7 +88,7 @@ export async function deleteCustomRouter(
   router: Pick<CustomRouterSummary, 'scope' | 'slug'>,
   organizationId: string | undefined
 ): Promise<void> {
-  const response = await fetch(
+  const response = await adminFetch(
     customRouterItemEndpoint(router.scope, router.slug, organizationId),
     {
       method: 'DELETE',

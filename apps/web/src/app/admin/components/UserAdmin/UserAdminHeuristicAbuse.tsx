@@ -89,6 +89,12 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
     render: row => row.http_user_agent || 'N/A',
     visible: true,
   },
+  {
+    key: 'system_prompt_kind',
+    title: 'Guessed Client',
+    render: row => row.system_prompt_kind ?? 'N/A',
+    visible: true,
+  },
   { key: 'model', title: 'Model', render: row => row.model || 'N/A', visible: true },
   {
     key: 'requested_model',
@@ -141,12 +147,6 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
     title: 'middle_out',
     render: row => (row.has_middle_out_transform ? 'Yes' : 'No'),
     visible: true,
-  },
-  {
-    key: 'system_prompt_kind',
-    title: 'Guessed Client',
-    render: row => row.system_prompt_kind ?? 'N/A',
-    visible: false,
   },
   {
     key: 'cache_write_tokens',

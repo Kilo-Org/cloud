@@ -45,6 +45,16 @@ export function clientScopeRefusal(
 }
 
 /**
+ * Whether any of `scopes` needs a passkey step-up (`stepUp`, design 5.3). A web BFF session mints
+ * such a scope only through `POST /account/browser-sessions/token`, which checks the session's
+ * passkey; `/authorize`, the code exchange and the legacy bridge refuse it for `kilo-web`
+ * (`uts.scopes_need_step_up` mirrors this in the identity store).
+ */
+export function needsStepUp(scopes: readonly string[], registry: ScopeRegistry): boolean {
+  return scopes.some(scope => registry(scope)?.stepUp === true);
+}
+
+/**
  * What the scope registry (`UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`, design 5.3) allows
  * for a long-lived credential: a PAT or an org bot key carries one registered, PAT-eligible scope.
  * A scope that only members of one organization can hold needs the credential bound to an

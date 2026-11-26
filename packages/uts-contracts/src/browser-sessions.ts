@@ -153,8 +153,10 @@ export const BrowserSessionTokenSchema = z.strictObject({
 export type BrowserSessionToken = z.infer<typeof BrowserSessionTokenSchema>;
 
 /**
- * `end` (200): `session_id` only on the call that ended the session; a repeat, or a handle that
- * was ended or never existed, answers without it. Both are authoritative.
+ * `end` (200): `session_id` only on the call that ended the session; a repeat, or the stored handle
+ * of a session that already ended, answers without it. Both are authoritative. A handle that names
+ * no stored session (never issued, or replaced by a later code exchange such as a step-up) answers
+ * 401 `invalid_session`, so a stale handle never reports a live session as ended.
  */
 export const BrowserSessionEndSchema = z.strictObject({
   status: z.literal('ended'),

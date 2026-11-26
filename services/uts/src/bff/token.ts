@@ -15,7 +15,7 @@ import {
   tokenSelection,
 } from '../oauth/token-endpoint';
 import { jsonResponse } from '../responses';
-import { orgScopeRefusal } from '../scopes/policy';
+import { needsStepUp, orgScopeRefusal } from '../scopes/policy';
 import {
   browserSessionHandleOfExchange,
   isRandomCredential,
@@ -57,6 +57,13 @@ function refuseDpop(request: Request): Response | null {
     : null;
 }
 
+/** A step-up scope is minted only by the browser-session token call, which checks the passkey. */
+function stepUpRefusal(scopes: readonly string[], deps: WebClientDeps): Response | null {
+  return needsStepUp(scopes, deps.scopes)
+    ? oauthError('invalid_scope', 400, 'a scope that needs a step-up is minted only per session')
+    : null;
+}
+
 /** Signs the session's tokens with the session id as `sid`, then answers with the session. */
 async function sessionGrant(
   deps: WebClientDeps,
@@ -65,6 +72,9 @@ async function sessionGrant(
   handle: string,
   extra: Record<string, string>
 ): Promise<Response> {
+  // The code's own scopes, when the request names none, are checked here before signing.
+  const stepUp = stepUpRefusal(minted.scopes, deps);
+  if (stepUp !== null) return stepUp;
   const signed = await signMinted(deps, WEB_CLIENT, session.sessionId, minted);
   if (signed instanceof Response) return signed;
   return jsonResponse(
@@ -98,6 +108,8 @@ async function exchangeWebCode(
   if (refused !== null) return refused;
   const selection = tokenSelection(params, deps, WEB_CLIENT);
   if (selection instanceof Response) return selection;
+  const stepUpRequested = stepUpRefusal(selection.scopes ?? [], deps);
+  if (stepUpRequested !== null) return stepUpRequested;
   if (!isRandomCredential(code)) return grantError('invalid_grant');
 
   const handle = await browserSessionHandleOfExchange(code, verifier);
@@ -154,6 +166,9 @@ async function bridgeLegacySession(
   const selection = tokenSelection(params, deps, WEB_CLIENT);
   if (selection instanceof Response) return selection;
   const scopes = [...(selection.scopes ?? [UTS_BROWSER_SESSION_READ_SCOPE])].sort();
+  // A legacy session is never a step-up.
+  const stepUp = stepUpRefusal(scopes, deps);
+  if (stepUp !== null) return stepUp;
   if (selection.resources !== null && targetMismatch(scopes, selection.resources)) {
     return grantError('invalid_target');
   }

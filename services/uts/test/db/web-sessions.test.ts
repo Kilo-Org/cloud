@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AuditEventSchema } from '@kilocode/sts-contracts';
+import { UTS_SCOPE_REGISTRY, utsScopeEntry } from '@kilocode/uts-contracts';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -119,9 +120,10 @@ async function webSession() {
   const accountId = await insertAccount(owner);
   const sessionId = await insertBrowserSession(owner, accountId);
   const handle = token();
-  const issued = await exchange(await issueWebCode(accountId, sessionId), handle);
+  const code = await issueWebCode(accountId, sessionId);
+  const issued = await exchange(code, handle);
   expect(issued.outcome).toBe('issued');
-  return { accountId, sessionId, handle };
+  return { accountId, sessionId, handle, code };
 }
 
 const handleInput = (handle: string) => ({
@@ -428,10 +430,7 @@ describe('end, end-all and device revoke', () => {
       outcome: 'already_ended',
       feedEntries: [expect.objectContaining({ kind: 'session', id: sessionId })],
     });
-    expect(await sessions.end(handleInput(token()))).toEqual({
-      outcome: 'already_ended',
-      feedEntries: [],
-    });
+    expect(await sessions.end(handleInput(token()))).toEqual({ outcome: 'invalid_session' });
     expect((await sessionRow(other)).status).toBe('active');
     const subject = await owner.query(
       `SELECT count(*)::int AS count FROM uts.revocations WHERE kind = 'subject' AND subject_id = $1`,
@@ -492,6 +491,8 @@ describe('end, end-all and device revoke', () => {
       outcome: 'ended',
       feedEntries: [expect.objectContaining({ kind: 'grant', id: first.grantId })],
     });
+    // One device only: the other grant of the account still refreshes.
+    expect(await grantStatus(second.grantId)).toBe('active');
     const bySession = await sessions.revokeDevice({
       ...handleInput(handle),
       sid: second.deviceSessionId,
@@ -537,6 +538,37 @@ describe('end, end-all and device revoke', () => {
         ])
       )
     ).toBe('23514');
+  });
+});
+
+describe('a handle replaced by a step-up', () => {
+  it('cannot end the session, and the first code cannot bring it back, while the new handle lives', async () => {
+    const { accountId, sessionId, handle, code } = await webSession();
+    const newHandle = token();
+    expect((await exchange(await issueWebCode(accountId, sessionId), newHandle)).outcome).toBe(
+      'issued'
+    );
+    // A sign-out with the stale handle is not told the live session ended.
+    expect(await sessions.end(handleInput(handle))).toEqual({ outcome: 'invalid_session' });
+    // The first code with its own verifier no longer matches the session's handle.
+    expect((await exchange(code, handle)).outcome).toBe('invalid_grant');
+    expect((await sessionRow(sessionId)).status).toBe('active');
+    expect(
+      (await sessions.read({ handleHash: sha256(newHandle), assertion: assertion() })).outcome
+    ).toBe('active');
+  });
+});
+
+describe('the step-up mirror', () => {
+  it('agrees with the scope registry for every registered scope and an unknown one', async () => {
+    const scopes = [...Object.keys(UTS_SCOPE_REGISTRY), 'gateway:unknown.read'];
+    const result = await owner.query<{ scope: string; step_up: boolean }>(
+      'SELECT scope, uts.scopes_need_step_up(ARRAY[scope]) AS step_up FROM unnest($1::text[]) AS scope',
+      [scopes]
+    );
+    expect(result.rows).toEqual(
+      scopes.map(scope => ({ scope, step_up: utsScopeEntry(scope)?.stepUp === true }))
+    );
   });
 });
 

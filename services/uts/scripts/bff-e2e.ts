@@ -528,6 +528,11 @@ async function run(admin: pg.Client) {
   const stepped = await webSessionOf(webAuthorization());
   const oldRead = await sessionCall('read', grant.session_handle);
   const oldRetry = await exchange(code, first.verifier);
+  // A sign-out with the replaced handle is refused, and the session lives on under the new one.
+  const oldEnd = await sessionCall('end', grant.session_handle);
+  const newRead = await sessionCall('read', stepped.session_handle);
+  check(oldEnd.status === 401 && errorOf(oldEnd.body) === 'invalid_session', 'old handle end');
+  check(newRead.status === 200, 'new handle still live');
   check(stepped.session_id === grant.session_id, 'same session id');
   check(stepped.session_handle !== grant.session_handle, 'new handle');
   check(stepped.issued_at > grant.issued_at, 'issued_at moved');
@@ -546,6 +551,8 @@ async function run(admin: pg.Client) {
     amr: stepped.amr,
     oldHandleRead: `${oldRead.status} ${errorOf(oldRead.body)}`,
     oldCodeRetry: `${oldRetry.status} ${errorOf(oldRetry.body)}`,
+    oldHandleEnd: `${oldEnd.status} ${errorOf(oldEnd.body)}`,
+    newHandleRead: newRead.status,
   });
 
   // Wake the feed objects so a vouching one takes the revocations below.

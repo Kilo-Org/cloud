@@ -8,6 +8,7 @@ import {
   LegacyBridgeGrantSchema,
   UTS_CLIENT_ASSERTION_TYPE,
   UTS_JWT_TOKEN_TYPE,
+  type UtsScopeEntry,
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import {
@@ -26,7 +27,14 @@ import type { PendingAuthorization } from '../../src/oauth/authorize';
 import { authorizationServerMetadata } from '../../src/metadata/authorization-server';
 import { handleOAuthRequest } from '../../src/oauth/routes';
 import { browserSessionHandleOfExchange, randomCredential } from '../../src/token/credentials';
-import { errorOf, fakeGrants, formRequest, oauthDeps, recordingPublisher } from './oauth-support';
+import {
+  errorOf,
+  fakeGrants,
+  formRequest,
+  oauthDeps,
+  recordingPublisher,
+  testScopes,
+} from './oauth-support';
 import { config } from './test-env';
 
 /**
@@ -858,5 +866,140 @@ describe('authorization-server metadata for kilo-web', () => {
     expect(metadata({ bridge }, false).grant_types_supported).not.toContain(
       'urn:ietf:params:oauth:grant-type:token-exchange'
     );
+  });
+});
+
+describe('a kilo-web scope that needs a step-up', () => {
+  // The registry holds no such scope yet; this fixture is the first one that will.
+  const STEP_UP = 'uts:fixture.step-up';
+  const entry: UtsScopeEntry = {
+    audience: 'uts',
+    maxLifetimeSeconds: 300,
+    allowedClients: ['kilo-web'],
+    subjects: { kind: 'any_user' },
+    thirdPartySafe: false,
+    stepUp: true,
+    patEligible: false,
+    privileged: true,
+    requiresSession: true,
+    requiresOrgClaim: false,
+    delegable: false,
+    issuance: 'grant',
+    delegatesTo: [],
+    consentText: null,
+  };
+  const scopes = (scope: string) => (scope === STEP_UP ? entry : testScopes(scope));
+  const unverified: LegacySsoAuthority = async () => 'unverified';
+
+  it('is refused at /authorize, with iss', async () => {
+    const url = new URL(`${ISSUER}/authorize`);
+    for (const [name, value] of Object.entries({
+      client_id: 'kilo-web',
+      redirect_uri: REDIRECT,
+      response_type: 'code',
+      scope: STEP_UP,
+      code_challenge: randomCredential(),
+      code_challenge_method: 'S256',
+    })) {
+      url.searchParams.set(name, value);
+    }
+    const grants = fakeGrants();
+    const response = await handleOAuthRequest(
+      new Request(url),
+      '/authorize',
+      oauthDeps(grants.access, { scopes, web: webDeps(fakeSessions(), { scopes }) })
+    );
+    const location = new URL(response?.headers.get('Location') ?? 'invalid:');
+    expect(location.searchParams.get('error')).toBe('invalid_scope');
+    expect(location.searchParams.get('iss')).toBe(ISSUER);
+    expect(grants.calls).toEqual([]);
+  });
+
+  it('is refused by the code exchange, named or held by the code, and by the legacy bridge', async () => {
+    const exchangeFields = async (extra: Record<string, string>) => ({
+      grant_type: 'authorization_code',
+      code: randomCredential(),
+      redirect_uri: REDIRECT,
+      code_verifier: randomCredential(),
+      ...extra,
+      ...(await assertionFields(TOKEN_URL)),
+    });
+    const named = fakeSessions();
+    const namedAnswer = await call(
+      formRequest('/token', await exchangeFields({ scope: STEP_UP })),
+      webDeps(named, { scopes })
+    );
+    expect(await errorOf(namedAnswer)).toBe('invalid_scope');
+    expect(named.calls).toEqual([]);
+
+    // A code that holds the scope: the answer is refused before anything is signed.
+    const held = fakeSessions({
+      exchangeCode: async () => ({ outcome: 'issued', ...minted([STEP_UP]) }),
+    });
+    const heldAnswer = await call(
+      formRequest('/token', await exchangeFields({})),
+      webDeps(held, { scopes })
+    );
+    expect(heldAnswer.status).toBe(400);
+    expect(await errorOf(heldAnswer)).toBe('invalid_scope');
+
+    const bridge = fakeSessions();
+    const bridged = await call(
+      formRequest('/token', {
+        grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+        subject_token: await signed(
+          KEY,
+          {
+            iss: 'kilo-web',
+            sub: SUBJECT,
+            aud: TOKEN_URL,
+            iat: now(),
+            exp: now() + 30,
+            jti: `legacy-${crypto.randomUUID()}`,
+            auth_time: now() - 60,
+          },
+          { typ: 'kilo-legacy-session+jwt' }
+        ),
+        subject_token_type: UTS_JWT_TOKEN_TYPE,
+        scope: STEP_UP,
+        ...(await assertionFields(TOKEN_URL)),
+      }),
+      webDeps(bridge, { scopes, bridge: { status: 'on', authority: unverified } })
+    );
+    expect(await errorOf(bridged)).toBe('invalid_scope');
+    expect(bridge.calls).toEqual([]);
+  });
+
+  it('is minted only by the browser-session token call, which asks the store for the passkey', async () => {
+    const sessions = fakeSessions({ mint: async () => ({ outcome: 'step_up_required' }) });
+    const response = await call(
+      formRequest('/account/browser-sessions/token', {
+        ...(await assertionFields(`${ISSUER}/account/browser-sessions/token`)),
+        session_handle: randomCredential(),
+        scope: STEP_UP,
+        resource: ISSUER,
+      }),
+      webDeps(sessions, { scopes })
+    );
+    expect(await errorOf(response)).toBe('insufficient_user_authentication');
+    expect(sessions.calls[0].input).toMatchObject({ scope: STEP_UP, stepUp: true });
+  });
+});
+
+describe('end with a handle that names no stored session', () => {
+  it('answers 401 invalid_session and publishes nothing', async () => {
+    const published = recordingPublisher();
+    const response = await call(
+      formRequest('/account/browser-sessions/end', {
+        ...(await assertionFields(`${ISSUER}/account/browser-sessions/end`)),
+        session_handle: randomCredential(),
+      }),
+      webDeps(fakeSessions({ end: async () => ({ outcome: 'invalid_session' }) }), {
+        publish: published.publish,
+      })
+    );
+    expect(response.status).toBe(401);
+    expect(await errorOf(response)).toBe('invalid_session');
+    expect(published.batches).toEqual([]);
   });
 });

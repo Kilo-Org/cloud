@@ -62,7 +62,8 @@ export type MintResult =
 export type EndResult =
   | { outcome: 'ended'; sessionId: string; feedEntries: FeedEntry[] }
   | { outcome: 'already_ended'; feedEntries: FeedEntry[] }
-  | { outcome: 'assertion_replay' };
+  /** `invalid_session`: the handle names no stored session (never issued, or replaced). */
+  | { outcome: 'invalid_session' | 'assertion_replay' };
 export type EndAllResult =
   | { outcome: 'ended'; ended: number; feedEntries: FeedEntry[] }
   | { outcome: 'assertion_replay' };
@@ -177,7 +178,7 @@ const EndRowSchema = z.discriminatedUnion('outcome', [
     feed_entries: StatementFeedEntriesSchema,
   }),
   z.object({ outcome: z.literal('already_ended'), feed_entries: StatementFeedEntriesSchema }),
-  failure(['assertion_replay']),
+  failure(['invalid_session', 'assertion_replay']),
 ]);
 
 const EndAllRowSchema = z.discriminatedUnion('outcome', [

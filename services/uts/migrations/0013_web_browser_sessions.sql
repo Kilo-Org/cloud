@@ -215,6 +215,16 @@ AS $$
   WHERE entry.kind = $1 AND entry.subject_id = ANY ($2) AND entry.feed_expires_at > now()
 $$;
 
+-- Whether any of `p_scopes` needs a passkey step-up (`stepUp` in `UTS_SCOPE_REGISTRY`; the list
+-- here mirrors it, and `test/db/web-sessions.test.ts` holds both to every registered scope). The
+-- registry has no such scope yet. A `kilo-web` session mints one only through
+-- `uts.mint_web_session_token`, which checks the handle's passkey; the code exchange and the
+-- legacy bridge refuse it.
+CREATE FUNCTION uts.scopes_need_step_up(p_scopes text[]) RETURNS boolean
+LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+SET search_path = pg_catalog, pg_temp
+RETURN p_scopes && '{}'::text[];
+
 -- Whether a subject-wide revocation covers a session whose handle was issued at `p_issued_at`.
 CREATE FUNCTION uts.subject_revoked_since(p_account_id text, p_issued_at timestamptz)
 RETURNS boolean
@@ -328,6 +338,11 @@ BEGIN
   SELECT * INTO chosen FROM uts.select_token_scopes(code.scopes, p_scopes, p_resources);
   IF chosen.outcome <> 'ok' THEN
     outcome := chosen.outcome;
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  IF uts.scopes_need_step_up(chosen.scopes) THEN
+    outcome := 'invalid_scope';
     RETURN NEXT;
     RETURN;
   END IF;
@@ -565,9 +580,12 @@ END
 $$;
 
 -- POST /account/browser-sessions/end: ends the session a handle names, with its `session` feed
--- entry and audit row; never another session and never `revoked_before`. A repeat, an ended or an
--- unknown handle answers `already_ended`. Both outcomes return the session's entries still in the
--- feed. Outcomes: `ended`, `already_ended`, `assertion_replay`.
+-- entry and audit row; never another session and never `revoked_before`. A repeat, or a stored
+-- handle of a session that ended, answers `already_ended`; both return the session's entries
+-- still in the feed. A handle that names no stored session (never issued, or replaced by a later
+-- exchange of its session) answers `invalid_session`, so a sign-out with a stale handle is never
+-- told the session ended while it lives on under its new handle. Outcomes: `ended`,
+-- `already_ended`, `invalid_session`, `assertion_replay`.
 CREATE FUNCTION uts.end_web_session(
   p_environment text,
   p_handle_hash bytea,
@@ -594,7 +612,7 @@ BEGIN
   SELECT * INTO named FROM uts.browser_sessions AS session WHERE session.handle_hash = p_handle_hash
   FOR UPDATE;
   IF NOT FOUND THEN
-    outcome := 'already_ended';
+    outcome := 'invalid_session';
     RETURN NEXT;
     RETURN;
   END IF;
@@ -841,7 +859,9 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF NOT uts.is_scope_set(p_scopes) OR NOT uts.role_allows_scopes(p_scopes, NULL) THEN
+  IF NOT uts.is_scope_set(p_scopes) OR NOT uts.role_allows_scopes(p_scopes, NULL)
+    OR uts.scopes_need_step_up(p_scopes)
+  THEN
     outcome := 'invalid_scope';
     RETURN NEXT;
     RETURN;

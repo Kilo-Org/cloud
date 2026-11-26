@@ -10,7 +10,12 @@ import { webClientUnavailable } from '../bff/responses';
 import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
-import { type ScopeRegistry, clientScopeRefusal, orgScopeRefusal } from '../scopes/policy';
+import {
+  type ScopeRegistry,
+  clientScopeRefusal,
+  needsStepUp,
+  orgScopeRefusal,
+} from '../scopes/policy';
 import type { ThirdPartyClients } from '../third-party/clients';
 import { type ThirdPartyRedirectKind, thirdPartyRedirectKind } from '../third-party/metadata';
 import { randomCredential, sha256 } from '../token/credentials';
@@ -230,6 +235,9 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   const scopes = [...requested].sort();
   if (clientScopeRefusal(scopes, client, deps.scopes) !== null) {
     return fail('invalid_scope', 'a requested scope is not registered for this client');
+  }
+  if (client.kind === 'confidential_web' && needsStepUp(scopes, deps.scopes)) {
+    return fail('invalid_scope', 'a scope that needs a step-up is minted only per browser session');
   }
 
   const resources = params.all('resource');

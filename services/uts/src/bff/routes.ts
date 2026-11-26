@@ -140,7 +140,9 @@ async function serve(
       return await mintSessionToken(params, deps, input);
     case UTS_BROWSER_SESSION_END_PATH: {
       const result = await deps.sessions(sessions => sessions.end(input));
-      if (result.outcome === 'assertion_replay') return invalidClient();
+      if (result.outcome !== 'ended' && result.outcome !== 'already_ended') {
+        return refusal(result.outcome);
+      }
       return await afterPublish(
         deps,
         result.feedEntries,

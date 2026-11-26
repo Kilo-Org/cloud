@@ -616,6 +616,39 @@ export async function flushDueGlanceableRefreshesSafely(
 }
 
 /**
+ * The NotificationChannelDO alarm's sweep under the staging push gate
+ * (`push-gate.ts`), in place of `flushDueGlanceableRefreshesSafely`: nothing is
+ * delivered and no due time is rescheduled. A pending record whose change is
+ * older than any card can show (`GLANCEABLE_SNAPSHOT_EXPIRY_MS` after it was
+ * deferred) is reclaimed. Every other record stays untouched for the trailing
+ * flush once the gate reopens, and its expiry is reported so the alarm returns
+ * once to reclaim it rather than leaving it stored for good. A failure is
+ * contained like the flush's, so the idem/rate-limit GC still runs.
+ */
+export async function reclaimUndeliverableGlanceableRefreshesSafely(
+  storage: DurableObjectStorage,
+  nowMs: () => number = Date.now
+): Promise<number | null> {
+  try {
+    const pending = await storage.list<PendingGlanceableRefresh>({ prefix: PENDING_PREFIX });
+    const expired: string[] = [];
+    let earliestExpiry: number | null = null;
+    for (const [key, record] of pending) {
+      const expiresAt = (record.deferredAt ?? record.dueAt) + GLANCEABLE_SNAPSHOT_EXPIRY_MS;
+      if (expiresAt <= nowMs()) expired.push(key);
+      else if (earliestExpiry === null || expiresAt < earliestExpiry) earliestExpiry = expiresAt;
+    }
+    if (expired.length > 0) await storage.delete(expired);
+    return earliestExpiry;
+  } catch (error) {
+    console.warn('Glanceable pending refresh reclaim failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
  * Earliest `dueAt` among the pending refreshes still stored, or null when none
  * remains. The alarm sweep re-reads this after its awaits so a deferral that
  * landed mid-sweep is not overwritten by the alarm it schedules.

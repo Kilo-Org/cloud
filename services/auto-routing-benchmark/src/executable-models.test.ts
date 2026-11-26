@@ -1,4 +1,5 @@
 import { BenchmarkConfigSchema, resolveBenchmarkIdentity } from '@kilocode/auto-routing-contracts';
+import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { describe, expect, it, vi } from 'vitest';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 
@@ -37,7 +38,7 @@ function catalogFetch() {
 }
 
 describe('executable benchmark catalog', () => {
-  it('mints the benchmark identity and fetches the CLI organization catalog with matching credentials', async () => {
+  it('mints a kilo-api token for the benchmark identity and sends it only to the organization catalog', async () => {
     const fetch = catalogFetch();
     const catalog = await fetchExecutableBenchmarkModelCatalog(
       env,
@@ -54,6 +55,7 @@ describe('executable benchmark catalog', () => {
       body: JSON.stringify({
         userId: 'bot-internal-benchmark-user',
         organizationId: 'benchmark-org',
+        audience: KILO_API_AUDIENCE,
       }),
     });
     expect(modelsCall[0] instanceof Request ? modelsCall[0].url : modelsCall[0].toString()).toBe(
@@ -74,7 +76,11 @@ describe('executable benchmark catalog', () => {
     const fetch = catalogFetch();
     await fetchExecutableBenchmarkModelCatalog(env, identity, fetch);
     expect(fetch.mock.calls[0][1]?.body).toBe(
-      JSON.stringify({ userId: identity.benchmarkUserId, organizationId: identity.benchmarkOrgId })
+      JSON.stringify({
+        userId: identity.benchmarkUserId,
+        organizationId: identity.benchmarkOrgId,
+        audience: KILO_API_AUDIENCE,
+      })
     );
     const modelsInput = fetch.mock.calls[1][0];
     expect(modelsInput instanceof Request ? modelsInput.url : modelsInput.toString()).toBe(
@@ -93,6 +99,22 @@ describe('executable benchmark catalog', () => {
       fetchExecutableBenchmarkModelCatalog(env, resolveBenchmarkIdentity(config), fetch)
     ).rejects.toThrow('benchmark executable model catalog failed: HTTP 403');
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends a caller-minted kilo-api token without minting again', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json({ data: [{ id: 'candidate/model' }] }));
+    await fetchExecutableBenchmarkModelCatalog(
+      env,
+      resolveBenchmarkIdentity(config),
+      fetch,
+      'minted-api-token'
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][1]).toMatchObject({
+      headers: { authorization: 'Bearer minted-api-token' },
+    });
   });
 
   it('does not disclose token mint response bodies or continue without a valid token', async () => {

@@ -40,7 +40,7 @@ import { resolveBenchmarkIdentity } from '@kilocode/auto-routing-contracts';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { getBenchmarkConfig } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { MCP_CATALOG_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   internalBotAccountIssue,

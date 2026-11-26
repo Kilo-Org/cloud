@@ -18,7 +18,7 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
 import {
   generateCloudAgentWorkflowToken,
   generateWorkflowGatewayToken,
-} from '@kilocode/web-shared/lib/tokens';
+} from '@/lib/auth/kilo-token-signing';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('workflow service control tokens', () => {

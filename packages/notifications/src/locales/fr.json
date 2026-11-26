@@ -8,7 +8,8 @@
       "securityFinding": "Un signalement de sécurité nécessite une attention",
       "securityUpdate": "Une vérification de sécurité a une mise à jour",
       "agentBriefing": "Votre briefing de l'agent est prêt",
-      "activeAgentsGlanceable": "Les agents actifs ont une mise à jour"
+      "activeAgentsGlanceable": "Les agents actifs ont une mise à jour",
+      "accountSecurity": "Une activité de sécurité a eu lieu sur votre compte"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Violation SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Clé d'accès ajoutée à votre compte"
+      },
+      "passkeyRemoved": {
+        "title": "Clé d'accès supprimée de votre compte"
+      },
+      "signInMethodLinked": {
+        "title": "Méthode de connexion ajoutée à votre compte"
+      },
+      "signInMethodUnlinked": {
+        "title": "Méthode de connexion supprimée de votre compte"
+      },
+      "deviceSignInApproved": {
+        "title": "Connexion d'un appareil approuvée"
+      },
+      "apiKeyReset": {
+        "title": "Jeton d'API réinitialisé"
+      },
+      "browserSessionsRevoked": {
+        "title": "Déconnecté de tous les navigateurs"
+      },
+      "deviceSessionRevoked": {
+        "title": "Un appareil a été déconnecté de votre compte"
+      },
+      "signInResetBySupport": {
+        "title": "Connexion réinitialisée par l'assistance Kilo"
+      },
+      "newSignIn": {
+        "title": "Nouvelle connexion à votre compte"
+      },
+      "body": {
+        "deviceAndLocation": "Depuis {{device}} près de {{location}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
+        "device": "Depuis {{device}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
+        "location": "Près de {{location}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
+        "unknown": "Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
+        "selfNamedDevice": "Depuis un appareil qui s'est nommé lui-même « {{name}} ». Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
+        "support": "Effectué par l'assistance Kilo. Si vous ne l'avez pas demandé, contactez l'assistance."
+      }
     }
   },
   "sessionReady": {

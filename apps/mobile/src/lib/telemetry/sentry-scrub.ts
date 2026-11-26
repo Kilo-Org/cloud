@@ -437,7 +437,7 @@ function scrubExceptions(exception: Record<string, unknown>, contexts: unknown):
  *   so a volatile build path, host, or port inside the message or the stack
  *   cannot split one defect into many issues.
  */
-export function scrubEvent<T>(event: T): T {
+export function scrubEvent<T>(event: T): T | null {
   try {
     if (event == null || typeof event !== 'object') {
       return event;
@@ -505,7 +505,10 @@ export function scrubEvent<T>(event: T): T {
 
     return event;
   } catch {
-    return event;
+    // A failed scrub drops the event rather than sending it unscrubbed. It does
+    // not throw: a throw from a beforeSend hook makes the SDK capture an
+    // internal error event that skips these hooks.
+    return null;
   }
 }
 
@@ -537,6 +540,7 @@ export function scrubBreadcrumb<T>(breadcrumb: T): T | null {
 
     return breadcrumb;
   } catch {
-    return breadcrumb;
+    // A failed scrub drops the breadcrumb rather than attaching it unscrubbed.
+    return null;
   }
 }

@@ -12,7 +12,7 @@ import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   generateBoundedInternalServiceToken,
   TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+} from '@/lib/auth/kilo-token-signing';
 
 export const BitbucketRepositorySchema = z
   .object({

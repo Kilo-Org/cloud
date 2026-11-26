@@ -1,0 +1,891 @@
+import 'server-only';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { captureException } from '@sentry/nextjs';
+import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
+import { admin_action_audit_logs, organization_memberships, type User } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
+import {
+  AdminActionAuditAction,
+  type AdminActionAuditOutcome,
+  type AdminActionAuditTargetType,
+} from '@kilocode/db/schema-types';
+import {
+  adminTierFor,
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  routeFromHeaders,
+  type AdminAccessAttribution,
+  type AdminAuditContext,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  privilegedGuardTiers,
+  targetIdFromInput,
+} from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+
+/**
+ * Durable, identity-attributed record of a platform admin action.
+ *
+ * Every entry is written to `admin_action_audit_logs` and emitted in an
+ * `event:"admin_action"` structured log line (Axiom `vercel` dataset): one line
+ * per single-entry call, and for a bulk call one line per insert chunk and
+ * action/outcome pair, split into lines of at most 100 entries for a chunk
+ * that was not stored (see {@link AdminActionBulkEvent}). The table is
+ * browsable in the admin console and pruned after the retention window; the
+ * log line carries request metadata (IP, auth source) that the table
+ * deliberately does not store.
+ *
+ * Record after the action has resolved: a success entry once it succeeded, a
+ * failure entry (with a stable `errorCode`, never an error message) once it
+ * failed. A failed audit write is reported and flagged with `persisted:false`
+ * in the log line, but never thrown: the action has already happened, and
+ * failing the request would invite a retry of a non-idempotent operation.
+ *
+ * Admin tRPC mutations and admin REST write handlers run inside an audit
+ * scope ({@link runAdminAuditScope}) declared by an {@link AdminAuditSpec}. The
+ * scope records the success row itself for a declarative spec, records a
+ * failure row whenever the action fails, and reports a handler-recorded action
+ * that finished without recording anything. Organization writes a Kilo admin
+ * makes through the admin bypass run inside
+ * {@link runElevatedOrganizationWrite}, which records their outcome the same
+ * way.
+ *
+ * `message` and `metadata` are stored and logged verbatim. Never include
+ * tokens, credentials, or customer email addresses; reference users and
+ * organizations by ID through `target`. Operator-typed free text can name a
+ * customer, so pass it through {@link redactEmailAddressesInAuditText} before it
+ * becomes part of an entry.
+ */
+
+export type AdminActionContext = Omit<AdminAuditContext, 'user'> & {
+  user: Pick<User, 'id' | 'google_user_email' | 'google_user_name' | 'is_super_admin'>;
+};
+
+export type AdminActionTarget = {
+  type: AdminActionAuditTargetType;
+  id: string;
+};
+
+type AdminActionEntryFields = {
+  action: AdminActionAuditAction;
+  target: AdminActionTarget | null;
+  message: string;
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * One audited action. A failure entry names a stable `errorCode` (a
+ * `TRPCError` code, an HTTP status, or an error class name), which is stored
+ * as `metadata.errorCode`; never put the error message there.
+ */
+export type AdminActionEntry = AdminActionEntryFields &
+  ({ outcome?: 'success' } | { outcome: 'failure'; errorCode: string });
+
+type AdminActionEventAttribution = Pick<
+  AdminAccessAttribution,
+  'kiloUserId' | 'email' | 'adminTier' | 'authVia' | 'tokenSource' | 'route' | 'ip'
+>;
+
+/** The log line of a call that records one entry. */
+export type AdminActionEntryEvent = AdminActionEventAttribution & {
+  event: 'admin_action';
+  action: AdminActionAuditAction;
+  outcome: AdminActionAuditOutcome;
+  auditLogId: string | null;
+  persisted: boolean;
+  targetType: AdminActionAuditTargetType | null;
+  targetId: string | null;
+  message: string;
+  metadata: Record<string, unknown> | null;
+};
+
+/**
+ * The log line of a call that records several entries: one per insert chunk
+ * and action/outcome pair, listing the target ids in entry order. A failure
+ * line lists each entry's `errorCode` in `errorCodes`, aligned with
+ * `targetIds`; a success line has `errorCodes: null`. `targetType`, `message`
+ * and `metadata` are set when every listed entry shares them and null
+ * otherwise.
+ *
+ * A stored chunk's rows hold each entry's id, message and metadata, so its line
+ * lists no row ids and no per-entry messages or metadata. A chunk whose insert
+ * failed is logged `persisted:false` in
+ * lines of at most {@link UNSTORED_LINE_ENTRIES} entries that also list the
+ * messages and metadata the rows would hold in `messages` and `metadatas`,
+ * aligned with `targetIds`, unless the line's shared value already names them.
+ */
+export type AdminActionBulkEvent = AdminActionEventAttribution & {
+  event: 'admin_action';
+  action: AdminActionAuditAction;
+  outcome: AdminActionAuditOutcome;
+  entryCount: number;
+  persisted: boolean;
+  targetType: AdminActionAuditTargetType | null;
+  targetIds: (string | null)[];
+  errorCodes: string[] | null;
+  message: string | null;
+  metadata: Record<string, unknown> | null;
+  messages: string[] | null;
+  metadatas: (Record<string, unknown> | null)[] | null;
+};
+
+export type AdminActionEvent = AdminActionEntryEvent | AdminActionBulkEvent;
+
+// Stays well under PostgreSQL's 65,535 bind-parameter limit for bulk actions,
+// and keeps a stored chunk's line (target ids and error codes) small enough
+// that a large call stays under Vercel's per-request log volume.
+const INSERT_CHUNK_SIZE = 1_000;
+
+// An unstored line carries every entry's message and metadata, so it holds
+// fewer entries; a failed 1,000-entry chunk writes 10 lines, not 1,000.
+const UNSTORED_LINE_ENTRIES = 100;
+
+export type AdminActionSink = (event: AdminActionEvent) => void;
+
+const defaultSink: AdminActionSink = event => logExceptInTest(JSON.stringify(event));
+
+let currentSink: AdminActionSink = defaultSink;
+
+/** Test-only seam; pass `null` to restore the production sink. */
+export function setAdminActionSinkForTest(sink: AdminActionSink | null): void {
+  currentSink = sink ?? defaultSink;
+}
+
+export async function recordAdminAction(
+  ctx: AdminActionContext,
+  entry: AdminActionEntry
+): Promise<void> {
+  await recordAdminActions(ctx, [entry]);
+}
+
+/**
+ * Records several entries, e.g. one row per user in a bulk action. An empty
+ * list records nothing and does not count as recording for a handler spec.
+ */
+export async function recordAdminActions(
+  ctx: AdminActionContext,
+  entries: readonly AdminActionEntry[]
+): Promise<void> {
+  if (entries.length === 0) return;
+  noteAdminAuditRecordCall();
+  await writeAdminActions(ctx, entries);
+}
+
+function storedMetadata(entry: AdminActionEntry): Record<string, unknown> | null {
+  if (entry.outcome === 'failure') return { ...entry.metadata, errorCode: entry.errorCode };
+  return entry.metadata ?? null;
+}
+
+function eventAttribution(ctx: AdminActionContext): AdminActionEventAttribution {
+  return {
+    kiloUserId: ctx.user.id,
+    email: ctx.user.google_user_email,
+    adminTier: adminTierFor(ctx.user),
+    authVia: ctx.authViaToken ? 'token' : 'session',
+    tokenSource: ctx.tokenSource ?? null,
+    // A caller that names its own path (a tRPC procedure, or a route handler
+    // that sets one) wins over the best-effort route from the request headers.
+    route: ctx.trpcPath ?? ctx.auditRoute ?? null,
+    ip: ctx.ip ?? null,
+  };
+}
+
+async function writeAdminActions(
+  ctx: AdminActionContext,
+  entries: readonly AdminActionEntry[]
+): Promise<void> {
+  if (entries.length === 0) return;
+
+  const insertedIds: string[] = [];
+  try {
+    for (let start = 0; start < entries.length; start += INSERT_CHUNK_SIZE) {
+      const rows = await db
+        .insert(admin_action_audit_logs)
+        .values(
+          entries.slice(start, start + INSERT_CHUNK_SIZE).map(entry => ({
+            action: entry.action,
+            outcome: entry.outcome ?? 'success',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_type: entry.target?.type ?? null,
+            target_id: entry.target?.id ?? null,
+            message: entry.message,
+            metadata: storedMetadata(entry),
+          }))
+        )
+        .returning({ id: admin_action_audit_logs.id });
+      insertedIds.push(...rows.map(row => row.id));
+    }
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'admin_action_audit_insert' },
+      extra: { actions: entries.map(entry => entry.action) },
+    });
+  }
+
+  const attribution = eventAttribution(ctx);
+  if (entries.length === 1) {
+    emit(entryEvent(attribution, entries[0], insertedIds[0] ?? null));
+    return;
+  }
+
+  for (let start = 0; start < entries.length; start += INSERT_CHUNK_SIZE) {
+    const end = Math.min(start + INSERT_CHUNK_SIZE, entries.length);
+    // Chunks are inserted in order and the first failed insert stops the rest,
+    // so a chunk is stored exactly when its last entry has a row id.
+    const stored = end <= insertedIds.length;
+    const groups = new Map<string, number[]>();
+    for (let index = start; index < end; index++) {
+      const entry = entries[index];
+      const key = `${entry.action}\u0000${entry.outcome ?? 'success'}`;
+      const group = groups.get(key);
+      if (group) group.push(index);
+      else groups.set(key, [index]);
+    }
+    for (const indexes of groups.values()) {
+      const lineEntries = stored ? indexes.length : UNSTORED_LINE_ENTRIES;
+      for (let offset = 0; offset < indexes.length; offset += lineEntries) {
+        const listed = indexes.slice(offset, offset + lineEntries).map(index => entries[index]);
+        emit(bulkEvent(attribution, listed, stored));
+      }
+    }
+  }
+}
+
+function entryEvent(
+  attribution: AdminActionEventAttribution,
+  entry: AdminActionEntry,
+  auditLogId: string | null
+): AdminActionEntryEvent {
+  return {
+    event: 'admin_action',
+    action: entry.action,
+    outcome: entry.outcome ?? 'success',
+    auditLogId,
+    persisted: auditLogId !== null,
+    ...attribution,
+    targetType: entry.target?.type ?? null,
+    targetId: entry.target?.id ?? null,
+    message: entry.message,
+    metadata: storedMetadata(entry),
+  };
+}
+
+function bulkEvent(
+  attribution: AdminActionEventAttribution,
+  listed: readonly AdminActionEntry[],
+  persisted: boolean
+): AdminActionBulkEvent {
+  const [first] = listed;
+  function allEqual(read: (entry: AdminActionEntry) => unknown): boolean {
+    const key = JSON.stringify(read(first));
+    return listed.every(entry => JSON.stringify(read(entry)) === key);
+  }
+  const sharedTargetType = allEqual(entry => entry.target?.type ?? null);
+  const sharedMessage = allEqual(entry => entry.message);
+  const sharedMetadata = allEqual(storedMetadata);
+  return {
+    event: 'admin_action',
+    action: first.action,
+    outcome: first.outcome ?? 'success',
+    entryCount: listed.length,
+    persisted,
+    ...attribution,
+    targetType: sharedTargetType ? (first.target?.type ?? null) : null,
+    targetIds: listed.map(entry => entry.target?.id ?? null),
+    errorCodes:
+      first.outcome === 'failure'
+        ? listed.flatMap(entry => (entry.outcome === 'failure' ? [entry.errorCode] : []))
+        : null,
+    message: sharedMessage ? first.message : null,
+    metadata: sharedMetadata ? storedMetadata(first) : null,
+    messages: persisted || sharedMessage ? null : listed.map(entry => entry.message),
+    metadatas: persisted || sharedMetadata ? null : listed.map(storedMetadata),
+  };
+}
+
+function emit(event: AdminActionEvent): void {
+  try {
+    currentSink(event);
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_action_log' } });
+  }
+}
+
+export function userActionTarget(userId: string): AdminActionTarget {
+  return { type: 'user', id: userId };
+}
+
+// A local part starts with a letter or a digit, so punctuation that precedes a
+// pasted address in prose stays in the text: brackets, quotes, an ellipsis, a
+// dash, a question or exclamation mark, and a slash. Everything after that first
+// character is replaced, whatever it is, so no fragment of the local part
+// survives.
+const EMAIL_ADDRESS_PATTERN = /[\p{L}\p{N}][^\s@]*@[^\s@]+\.[\p{L}\p{M}]{2,}/gu;
+
+/**
+ * Replaces email addresses in operator-typed free text, such as the reason an
+ * admin gives for a refund. Apply it at the boundary where operator text enters
+ * and use the result for every record written from it: the audit table is
+ * browsable by every platform admin, and the target user records hold block
+ * reason, admin note and credit transaction description that admins read too.
+ *
+ * The domain match accepts Unicode letters and combining marks and requires a
+ * dotted domain of at least two letters: an intranet host without a dot, and a
+ * bracketed IP literal, are not treated as customer addresses and stay in the
+ * text.
+ */
+export function redactEmailAddressesInAuditText(text: string): string {
+  return text.replace(EMAIL_ADDRESS_PATTERN, '[redacted-email]');
+}
+
+export function organizationActionTarget(organizationId: string): AdminActionTarget {
+  return { type: 'organization', id: organizationId };
+}
+
+/**
+ * Runs an organization write and records it when a Kilo admin makes it through
+ * the `is_admin` escape hatch, i.e. when their own membership in the
+ * organization would not allow it. Admins acting within a role they actually
+ * hold are ordinary members: their writes, like everyone else's, run without a
+ * row.
+ *
+ * Whether the bypass is used is decided before `run` starts, from the roles
+ * the admin holds at that moment, so a write that changes the admin's own
+ * membership (e.g. self-removal) is judged by the roles it started with. Start
+ * it right after the guard admitted the caller. The row is written once `run`
+ * ends: a failure row with a stable `errorCode` when it throws (the error is
+ * rethrown unchanged), else the outcome `run` named with
+ * {@link setAdminAuditOutcome}, else the one `outcomeOf` reports. Without
+ * either, a `Response` result is judged by {@link responseAuditOutcome} and any
+ * other result is a success.
+ *
+ * `requiredRoles` and `membershipScope` must mirror the guard the admin
+ * bypassed: some guards accept roles inherited from a parent organization,
+ * others only a direct membership. The inherited scope reads the admin's roles
+ * through the organization guards' own membership lookup, so a role held only
+ * in a soft-deleted parent counts as no role, as it does for the guard. The
+ * row's metadata is `metadata`, anything `run` adds with
+ * {@link addAdminAuditMetadata}, and the admin's `heldRoles`.
+ *
+ * Like {@link recordAdminAction}, the audit never fails the write: if the
+ * membership lookup fails, the write is recorded with `heldRoles: null`.
+ * Reads stay as `kilo_admin_elevation` log lines; use this only for writes.
+ */
+export async function runElevatedOrganizationWrite<TResult>(
+  ctx: AdminActionContext & { user: { is_admin: boolean } },
+  write: ElevatedOrganizationWrite<TResult>,
+  run: () => Promise<TResult>
+): Promise<TResult> {
+  // Counts as the audit of an enclosing scope even when nothing is written: an
+  // admin acting within a role they hold is an ordinary member.
+  noteAdminAuditRecordCall();
+  // Its own scope, so metadata `run` adds never reaches an enclosing scope.
+  const state: AdminAuditScopeState = {
+    actions: [write.action],
+    target: { kind: 'unset' },
+    metadata: {},
+    recordCalls: 0,
+    actor: null,
+    failureAction: null,
+    inputParsingStarted: false,
+    outcome: null,
+  };
+  const heldRoles = await bypassedOrganizationHeldRoles(ctx, write);
+  if (heldRoles === undefined) return adminAuditScope.run(state, run);
+
+  let outcome: AdminAuditOutcome | undefined;
+  try {
+    const result = await adminAuditScope.run(state, run);
+    outcome =
+      state.outcome ??
+      (write.outcomeOf
+        ? write.outcomeOf(result)
+        : result instanceof Response
+          ? responseAuditOutcome(result)
+          : { outcome: 'success' });
+    return result;
+  } catch (error) {
+    outcome = { outcome: 'failure', errorCode: adminAuditErrorCode(error) };
+    throw error;
+  } finally {
+    if (outcome) {
+      await writeAdminActions(ctx, [
+        {
+          ...outcome,
+          action: write.action,
+          target: organizationActionTarget(write.organizationId),
+          message: write.message,
+          metadata: { ...write.metadata, ...state.metadata, heldRoles },
+        },
+      ]);
+    }
+  }
+}
+
+export type ElevatedOrganizationWrite<TResult> = {
+  organizationId: string;
+  requiredRoles: readonly OrganizationRole[];
+  membershipScope?: OrganizationMembershipScope;
+  action: AdminActionAuditAction;
+  message: string;
+  metadata?: Record<string, unknown>;
+  outcomeOf?: (result: TResult) => AdminAuditOutcome;
+};
+
+/**
+ * The roles an admin about to bypass an organization guard holds there: null
+ * when the lookup failed, undefined when no bypass is involved (not an admin,
+ * or an admin holding a role the guard accepts).
+ */
+async function bypassedOrganizationHeldRoles(
+  ctx: { user: { id: string; is_admin: boolean } },
+  write: Pick<
+    ElevatedOrganizationWrite<unknown>,
+    'organizationId' | 'requiredRoles' | 'membershipScope'
+  >
+): Promise<OrganizationRole[] | null | undefined> {
+  if (!ctx.user.is_admin) return undefined;
+  let heldRoles: OrganizationRole[] | null = null;
+  try {
+    heldRoles = await getOrganizationMembershipRoles(
+      ctx.user.id,
+      write.organizationId,
+      write.membershipScope ?? 'direct_or_inherited'
+    );
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_action_membership_lookup' } });
+  }
+  if (heldRoles?.some(role => write.requiredRoles.includes(role))) return undefined;
+  return heldRoles;
+}
+
+export type OrganizationMembershipScope = 'direct' | 'direct_or_inherited';
+
+/**
+ * The caller's real roles in an organization: its direct memberships, or with
+ * the inherited scope the effective roles the organization guards read
+ * (direct memberships in a live organization plus roles inherited from a live
+ * parent), mirroring ensureOrganizationAccess for non-admins.
+ */
+async function getOrganizationMembershipRoles(
+  userId: string,
+  organizationId: string,
+  scope: OrganizationMembershipScope
+): Promise<OrganizationRole[]> {
+  const rows =
+    scope === 'direct'
+      ? await db
+          .select({ role: organization_memberships.role })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.kilo_user_id, userId),
+              eq(organization_memberships.organization_id, organizationId)
+            )
+          )
+      : await loadEffectiveMembershipRows(userId, organizationId);
+  return [...new Set(rows.map(row => row.role))];
+}
+
+/** Audit context for REST route handlers, which have request headers instead of a tRPC context. */
+export function adminActionContextFromHeaders(
+  user: AdminActionContext['user'] & { is_admin: boolean },
+  headersList: Headers
+): AdminActionContext & { user: { is_admin: boolean } } {
+  return {
+    user,
+    authViaToken: authViaTokenFromHeaders(headersList),
+    tokenSource: null,
+    ip: clientIpFromHeaders(headersList),
+    auditRoute: routeFromHeaders(headersList) ?? undefined,
+  };
+}
+
+/**
+ * How one admin write is audited, declared next to it: on a tRPC mutation as
+ * `.meta({ adminAudit })`, on a REST write handler through
+ * {@link auditedAdminRoute}.
+ *
+ * - `declarative`: the scope records the success row itself. Its target is the
+ *   one the handler set with {@link setAdminAuditTarget}, else `target(input)`,
+ *   where `input` is the raw tRPC input or the awaited REST route params. Do
+ *   not also record the same action in the handler.
+ * - `handler`: the handler records its own rows with {@link recordAdminAction},
+ *   {@link recordAdminActions} or {@link runElevatedOrganizationWrite}.
+ *   A call that succeeds without one is reported (and throws in tests).
+ * - `exempt`: nothing is recorded. Only for mutation-typed reads and
+ *   development-only operators; `reason` says which.
+ *
+ * Either recording kind gets one failure row, with a stable `errorCode`, when
+ * the call throws or fails. Its action is the declarative action, else the one
+ * the handler named with {@link setAdminAuditFailureAction}, else the first
+ * handler action. That row keeps a target only when it was validated: the one
+ * the handler set, or the spec target once the call's input parsed. A refusal
+ * before parsing (the step-up check, a narrower guard, the input schema
+ * itself) records no target, since its raw input names nothing validated.
+ */
+export type AdminAuditSpec =
+  | {
+      kind: 'declarative';
+      action: AdminActionAuditAction;
+      target?: (input: unknown) => AdminActionTarget | null;
+    }
+  | {
+      kind: 'handler';
+      actions: readonly [AdminActionAuditAction, ...AdminActionAuditAction[]];
+    }
+  | { kind: 'exempt'; reason: string };
+
+/** Declarative target read from one string field of the call input. */
+export function inputFieldTarget(
+  type: AdminActionAuditTargetType,
+  field: string
+): (input: unknown) => AdminActionTarget | null {
+  return input => {
+    const id = targetIdFromInput(field, input);
+    return id === null ? null : { type, id };
+  };
+}
+
+export type AdminAuditActor = AdminActionContext['user'] & { is_admin: boolean };
+
+type AdminAuditScopeState = {
+  /** The actions the scope's spec declares; the first is the default failure action. */
+  actions: readonly [AdminActionAuditAction, ...AdminActionAuditAction[]];
+  target: { kind: 'unset' } | { kind: 'set'; target: AdminActionTarget | null };
+  metadata: Record<string, unknown>;
+  recordCalls: number;
+  actor: AdminAuditActor | null;
+  failureAction: AdminActionAuditAction | null;
+  /** Whether the call's input parser has read its input (see {@link AdminAuditRun}). */
+  inputParsingStarted: boolean;
+  /** The outcome the call named with {@link setAdminAuditOutcome}, if any. */
+  outcome: AdminAuditOutcome | null;
+};
+
+const adminAuditScope = new AsyncLocalStorage<AdminAuditScopeState>();
+
+/** Overrides the spec target for the rows the enclosing audit scope records. */
+export function setAdminAuditTarget(target: AdminActionTarget | null): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.target = { kind: 'set', target };
+}
+
+/**
+ * Adds metadata to the rows the enclosing audit scope records. Safe ids and
+ * counts only, as for any entry.
+ */
+export function addAdminAuditMetadata(metadata: Record<string, unknown>): void {
+  const state = adminAuditScope.getStore();
+  if (state) Object.assign(state.metadata, metadata);
+}
+
+/**
+ * Names the action a failure of the enclosing audit scope records, for a
+ * handler spec that declares several. It must be one of the spec's actions.
+ */
+export function setAdminAuditFailureAction(action: AdminActionAuditAction): void {
+  const state = adminAuditScope.getStore();
+  if (!state) return;
+  if (!state.actions.includes(action)) {
+    reportAdminAuditGap(`failure action ${action} is not declared by the audit spec`);
+    return;
+  }
+  state.failureAction = action;
+}
+
+/**
+ * Names the authenticated admin of a REST handler wrapped in
+ * {@link auditedAdminRoute}; call it right after the admin check. A tRPC
+ * scope takes the admin from its context instead.
+ */
+export function setAdminAuditActor(user: AdminAuditActor): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.actor = user;
+}
+
+/**
+ * Names the outcome the enclosing audit scope records when the call returns,
+ * in place of judging its result. A handler whose result does not reliably say
+ * how it went, such as a redirect, names it on every branch it returns from. A
+ * throw still records a failure with the thrown value's code.
+ */
+export function setAdminAuditOutcome(outcome: AdminAuditOutcome): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.outcome = outcome;
+}
+
+function noteAdminAuditRecordCall(): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.recordCalls += 1;
+}
+
+/**
+ * Reports that the enclosing tRPC call's input parser reads the raw input. The
+ * tRPC admin procedure installs this on the raw-input reader it hands on, after
+ * its step-up check: nothing between that point and the parser reads the raw
+ * input, so the first read is the parser's.
+ */
+export function noteAdminAuditInputParsing(): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.inputParsingStarted = true;
+}
+
+export type AdminAuditOutcome =
+  | { outcome: 'success' }
+  | { outcome: 'failure'; errorCode: string; inputRejected?: boolean };
+
+/**
+ * The outcome of a write answered with a `Response` that named none with
+ * {@link setAdminAuditOutcome}. A status of 400 or above fails with the status
+ * as its code. A redirect's target does not reliably say how the write went
+ * (an OAuth callback appends its result to a caller-chosen return path, which
+ * can carry its own query or fragment), so a write answered with a redirect
+ * must name its outcome: one that names none is reported as an audit gap and
+ * recorded as a failure with code `outcome_unrecorded`. Any other response is
+ * a success.
+ */
+function responseAuditOutcome(response: Response): AdminAuditOutcome {
+  if (response.status >= 400) return { outcome: 'failure', errorCode: String(response.status) };
+  if (response.status >= 300) {
+    reportAdminAuditGap('a redirect response named no audit outcome');
+    return { outcome: 'failure', errorCode: 'outcome_unrecorded' };
+  }
+  return { outcome: 'success' };
+}
+
+export type AdminAuditRun<TResult> = {
+  spec: AdminAuditSpec;
+  /** The tRPC path or REST pathname; the recorded rows' message names it. */
+  route: string;
+  /**
+   * The audit context of the call's admin. `actor` is the admin a REST handler
+   * named with {@link setAdminAuditActor}, null when it named none. Return
+   * null when no admin is known: a failure then records nothing, since the
+   * request never reached an admin action.
+   */
+  context: (actor: AdminAuditActor | null) => AdminActionContext | null;
+  input: () => Promise<unknown>;
+  /**
+   * Whether the call's input parser reports reading the input through
+   * {@link noteAdminAuditInputParsing}, as a tRPC procedure's does. A failure
+   * then keeps the spec target only when the parser read the input and did not
+   * reject it. False for a REST handler, whose input is the route params of the
+   * path it matched.
+   */
+  reportsInputParsing: boolean;
+  run: () => Promise<TResult>;
+  outcomeOf: (result: TResult) => AdminAuditOutcome;
+};
+
+/**
+ * Runs one admin write inside an audit scope and records what its spec
+ * declares. The result, or the thrown error, is passed through unchanged.
+ */
+export async function runAdminAuditScope<TResult>(
+  params: AdminAuditRun<TResult>
+): Promise<TResult> {
+  const { spec } = params;
+  if (spec.kind === 'exempt') return params.run();
+
+  const state: AdminAuditScopeState = {
+    actions: spec.kind === 'declarative' ? [spec.action] : spec.actions,
+    target: { kind: 'unset' },
+    metadata: {},
+    recordCalls: 0,
+    actor: null,
+    failureAction: null,
+    inputParsingStarted: false,
+    outcome: null,
+  };
+  let result: TResult;
+  try {
+    result = await adminAuditScope.run(state, params.run);
+  } catch (error) {
+    await recordScopeFailure(params, state, {
+      outcome: 'failure',
+      errorCode: adminAuditErrorCode(error),
+      inputRejected: isAdminAuditInputRejection(error),
+    });
+    throw error;
+  }
+
+  const outcome = state.outcome ?? params.outcomeOf(result);
+  if (outcome.outcome === 'failure') {
+    await recordScopeFailure(params, state, outcome);
+  } else if (spec.kind === 'declarative') {
+    const ctx = params.context(state.actor);
+    if (ctx === null) {
+      reportAdminAuditGap(`${params.route} succeeded without naming its admin actor`);
+    } else {
+      await writeAdminActions(ctx, [
+        {
+          action: spec.action,
+          target: await scopeTarget(params, state),
+          message: params.route,
+          metadata: scopeMetadata(state),
+        },
+      ]);
+    }
+  } else if (state.recordCalls === 0) {
+    reportAdminAuditGap(`${params.route} succeeded without recording ${spec.actions.join(', ')}`);
+  }
+  return result;
+}
+
+async function recordScopeFailure<TResult>(
+  params: AdminAuditRun<TResult>,
+  state: AdminAuditScopeState,
+  failure: Extract<AdminAuditOutcome, { outcome: 'failure' }>
+): Promise<void> {
+  const ctx = params.context(state.actor);
+  if (ctx === null) return;
+  const inputParsed =
+    !failure.inputRejected && (!params.reportsInputParsing || state.inputParsingStarted);
+  await writeAdminActions(ctx, [
+    {
+      action: state.failureAction ?? state.actions[0],
+      outcome: 'failure',
+      errorCode: failure.errorCode,
+      target: state.target.kind === 'set' || inputParsed ? await scopeTarget(params, state) : null,
+      message: `${params.route} failed`,
+      metadata: scopeMetadata(state),
+    },
+  ]);
+}
+
+async function scopeTarget<TResult>(
+  params: AdminAuditRun<TResult>,
+  state: AdminAuditScopeState
+): Promise<AdminActionTarget | null> {
+  if (state.target.kind === 'set') return state.target.target;
+  if (params.spec.kind !== 'declarative' || params.spec.target === undefined) return null;
+  try {
+    return params.spec.target(await params.input());
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_action_audit_target' } });
+    return null;
+  }
+}
+
+function scopeMetadata(state: AdminAuditScopeState): Record<string, unknown> | undefined {
+  return Object.keys(state.metadata).length > 0 ? { ...state.metadata } : undefined;
+}
+
+const MAX_ERROR_CODE_LENGTH = 64;
+
+/**
+ * A stable code for a thrown value: the `TRPCError` code, else the error's
+ * `name` (its class, unless it set its own). Never the message, which can
+ * carry user data or secrets.
+ */
+export function adminAuditErrorCode(error: unknown): string {
+  if (error instanceof TRPCError) return error.code;
+  if (error instanceof Error) return error.name.slice(0, MAX_ERROR_CODE_LENGTH) || 'Error';
+  return typeof error;
+}
+
+/**
+ * Whether a thrown value is tRPC's refusal of input that never parsed: a
+ * `BAD_REQUEST` caused by the procedure's zod schema.
+ */
+export function isAdminAuditInputRejection(error: unknown): boolean {
+  return (
+    error instanceof TRPCError && error.code === 'BAD_REQUEST' && error.cause instanceof z.ZodError
+  );
+}
+
+/**
+ * Reports an admin write the audit could not attribute or did not see
+ * recorded. Throws in tests so the gap fails the test that exercised it.
+ */
+export function reportAdminAuditGap(message: string): void {
+  const error = new Error(`Admin audit gap: ${message}`);
+  captureException(error, { tags: { operation: 'admin_action_audit_gap' } });
+  if (process.env.NODE_ENV === 'test') throw error;
+}
+
+const AUDITED_ADMIN_ROUTE = Symbol.for('kilocode.auditedAdminRoute');
+
+/**
+ * Wraps an App Router admin write handler in an audit scope. The response is
+ * judged by {@link responseAuditOutcome}: a failure records a failure row with
+ * its code; a throw records a failure row and is rethrown. The handler must
+ * call {@link setAdminAuditActor} once it has authenticated the admin; until
+ * then a failure records nothing.
+ */
+export function auditedAdminRoute<TArgs extends [Request, ...unknown[]]>(
+  spec: AdminAuditSpec,
+  handler: (...args: TArgs) => Promise<Response>
+): (...args: TArgs) => Promise<Response> {
+  const wrapped = (...args: TArgs): Promise<Response> => {
+    const [request, routeContext] = args;
+    const route = new URL(request.url).pathname;
+    return runAdminAuditScope({
+      spec,
+      route,
+      context: actor =>
+        actor === null
+          ? null
+          : { ...adminActionContextFromHeaders(actor, request.headers), auditRoute: route },
+      input: () => routeParams(routeContext),
+      reportsInputParsing: false,
+      run: () => handler(...args),
+      outcomeOf: response => responseAuditOutcome(response),
+    });
+  };
+  Object.defineProperty(wrapped, AUDITED_ADMIN_ROUTE, { value: spec, enumerable: false });
+  return wrapped;
+}
+
+/** Whether a route module export was built with {@link auditedAdminRoute}. */
+export function isAuditedAdminRoute(handler: unknown): boolean {
+  return typeof handler === 'function' && AUDITED_ADMIN_ROUTE in handler;
+}
+
+async function routeParams(routeContext: unknown): Promise<unknown> {
+  if (typeof routeContext !== 'object' || routeContext === null || !('params' in routeContext)) {
+    return null;
+  }
+  return await routeContext.params;
+}
+
+const AdminAuditSpecShape = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('declarative'),
+    action: AdminActionAuditAction,
+    target: z.unknown().optional(),
+  }),
+  z.object({ kind: z.literal('handler'), actions: z.array(AdminActionAuditAction).min(1) }),
+  z.object({ kind: z.literal('exempt'), reason: z.string().trim().min(1) }),
+]);
+
+const AdminAuditMetaShape = z.object({ adminAudit: AdminAuditSpecShape });
+
+export type DiscoveredProcedure = {
+  _def?: { type?: string; middlewares?: readonly unknown[]; meta?: unknown };
+};
+
+/**
+ * Paths of the admin-guarded mutations among `procedures` (a router's
+ * `_def.procedures`) whose meta declares no valid `adminAudit` spec.
+ */
+export function adminMutationsMissingAuditSpec(
+  procedures: Record<string, DiscoveredProcedure>
+): string[] {
+  return Object.entries(procedures)
+    .filter(
+      ([, procedure]) =>
+        procedure._def?.type === 'mutation' &&
+        privilegedGuardTiers(procedure._def.middlewares ?? []).includes('admin') &&
+        !AdminAuditMetaShape.safeParse(procedure._def.meta).success
+    )
+    .map(([path]) => path)
+    .sort();
+}

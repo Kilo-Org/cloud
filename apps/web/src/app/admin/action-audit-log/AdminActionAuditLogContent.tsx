@@ -318,7 +318,16 @@ function TargetLink({ type, id }: { type: AdminActionAuditTargetType | null; id:
   const href =
     type === 'user'
       ? `/admin/users/${encodeURIComponent(id)}`
-      : `/admin/organizations/${encodeURIComponent(id)}`;
+      : type === 'organization'
+        ? `/admin/organizations/${encodeURIComponent(id)}`
+        : null;
+  if (href === null) {
+    return (
+      <span>
+        {type}:{id}
+      </span>
+    );
+  }
   return (
     <Link href={href} className="hover:underline">
       {type}:{id}

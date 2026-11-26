@@ -3,6 +3,13 @@ import {
   createTRPCRouter,
   UpstreamApiError,
 } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+  recordAdminActions,
+  setAdminAuditTarget,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrphanVolumeContextProtections,
@@ -60,7 +67,7 @@ import type {
   ResizeMachineResponse,
   RestoreVolumeSnapshotResponse,
 } from '@/lib/kiloclaw/types';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';
@@ -359,22 +366,20 @@ async function clearAdminInstanceDestructionDeadlineWithChangeLog(params: {
 /**
  * Resolve the target instance for admin operations.
  * When instanceId is provided, look it up directly and throw NOT_FOUND if missing.
- * Otherwise fall back to the user's active (personal) instance.
+ * Otherwise fall back to the user's active (personal) instance. Inside an
+ * audited admin write, the resolved instance id goes into the audit row.
  */
 async function resolveInstance(userId: string, instanceId?: string) {
-  if (instanceId) {
-    const instance = await getInstanceById(instanceId);
-    if (!instance) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: `Instance ${instanceId} not found`,
-        cause: new UpstreamApiError('instance_not_found'),
-      });
-    }
-    return instance;
+  const instance = instanceId ? await getInstanceById(instanceId) : await getActiveInstance(userId);
+  if (instanceId && !instance) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: `Instance ${instanceId} not found`,
+      cause: new UpstreamApiError('instance_not_found'),
+    });
   }
-
-  return getActiveInstance(userId);
+  if (instance) addAdminAuditMetadata({ instanceId: instance.id });
+  return instance;
 }
 
 function assertInstanceBelongsToUser(
@@ -879,6 +884,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   cycleInboundEmailAddress: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.inbound_email.cycle',
+        target: inputFieldTarget('kiloclaw_instance', 'id'),
+      },
+    })
     .input(GetInstanceSchema)
     .mutation(async ({ input, ctx }) => {
       const [instance] = await db
@@ -904,6 +916,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   setInboundEmailEnabled: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.inbound_email.update_enabled',
+        target: inputFieldTarget('kiloclaw_instance', 'id'),
+      },
+    })
     .input(SetInboundEmailEnabledSchema)
     .mutation(async ({ input, ctx }) => {
       const [instance] = await db
@@ -942,6 +961,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   // row (no provider/Postgres changes) and refuses reservations backing an
   // active instance or in a non-releasable state.
   releaseReservation: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.provision_reservation.release',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -953,6 +979,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      addAdminAuditMetadata({ instanceId: input.instanceId });
       const client = new KiloClawInternalClient();
       const result = await client.releaseProvisionReservation(
         input.userId,
@@ -1272,55 +1299,98 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }
   }),
 
-  gatewayStart: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to start gateway';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.startGateway(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to start gateway for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  gatewayStart: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.gateway.start',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to start gateway';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        return await client.startGateway(input.userId, workerInstanceId(instance));
+      } catch (err) {
+        console.error('Failed to start gateway for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
-  gatewayStop: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to stop gateway';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.stopGateway(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to stop gateway for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  gatewayStop: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.gateway.stop',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to stop gateway';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        return await client.stopGateway(input.userId, workerInstanceId(instance));
+      } catch (err) {
+        console.error('Failed to stop gateway for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
-  gatewayRestart: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to restart gateway';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.restartGatewayProcess(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to restart gateway for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  gatewayRestart: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.gateway.restart',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to restart gateway';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        return await client.restartGatewayProcess(input.userId, workerInstanceId(instance));
+      } catch (err) {
+        console.error('Failed to restart gateway for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
-  runDoctor: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to run doctor';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.runDoctor(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to run doctor for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  runDoctor: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.doctor.run',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to run doctor';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        return await client.runDoctor(input.userId, workerInstanceId(instance));
+      } catch (err) {
+        console.error('Failed to run doctor for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
   startDoctorViaController: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.doctor.start',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -1359,6 +1429,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   cancelDoctorViaController: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.doctor.cancel',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(GatewayProcessSchema)
     .mutation(async ({ input }) => {
       const fallbackMessage = 'Failed to cancel doctor (controller)';
@@ -1374,6 +1451,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   startKiloCliRun: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.cli_run.start',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -1457,6 +1541,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   cancelKiloCliRun: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.cli_run.cancel',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -1631,17 +1722,26 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return { output: row?.output ?? null };
     }),
 
-  restoreConfig: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to restore config';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.restoreConfig(input.userId, undefined, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to restore config for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  restoreConfig: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.config.restore',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to restore config';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        return await client.restoreConfig(input.userId, undefined, workerInstanceId(instance));
+      } catch (err) {
+        console.error('Failed to restore config for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
   fileTree: adminProcedure
     .input(
@@ -1684,6 +1784,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   writeFile: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.file.write',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -1695,6 +1802,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
+      addAdminAuditMetadata({ path: input.path });
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         const client = new KiloClawInternalClient();
@@ -1736,45 +1844,70 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
-  machineStart: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to start machine';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      const result = await client.start(input.userId, workerInstanceId(instance), {
-        skipCooldown: true,
-        reason: 'admin_request',
-      });
-      if (instance && result.currentStatus === 'running') {
-        try {
-          await clearTrialInactivityStopAfterStart({
-            kiloUserId: input.userId,
-            instanceId: instance.id,
-          });
-        } catch (error) {
-          console.error('Failed to clear trial inactivity stop marker after admin start:', error);
+  machineStart: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.machine.start',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to start machine';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        const result = await client.start(input.userId, workerInstanceId(instance), {
+          skipCooldown: true,
+          reason: 'admin_request',
+        });
+        if (instance && result.currentStatus === 'running') {
+          try {
+            await clearTrialInactivityStopAfterStart({
+              kiloUserId: input.userId,
+              instanceId: instance.id,
+            });
+          } catch (error) {
+            console.error('Failed to clear trial inactivity stop marker after admin start:', error);
+          }
         }
+        return result;
+      } catch (err) {
+        console.error('Failed to start machine for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
       }
-      return result;
-    } catch (err) {
-      console.error('Failed to start machine for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+    }),
 
-  forceRetryRecovery: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to retry recovery';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.forceRetryRecovery(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to retry recovery for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  forceRetryRecovery: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.recovery.retry',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to retry recovery';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        return await client.forceRetryRecovery(input.userId, workerInstanceId(instance));
+      } catch (err) {
+        console.error('Failed to retry recovery for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
   cleanupRecoveryPreviousVolume: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.recovery.cleanup_retained_volume',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(GatewayProcessSchema)
     .mutation(async ({ input, ctx }) => {
       const fallbackMessage = 'Failed to clean up retained recovery volume';
@@ -1811,21 +1944,37 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
-  machineStop: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
-    const fallbackMessage = 'Failed to stop machine';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.stop(input.userId, workerInstanceId(instance), {
-        reason: 'admin_request',
-      });
-    } catch (err) {
-      console.error('Failed to stop machine for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  machineStop: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.machine.stop',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to stop machine';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        return await client.stop(input.userId, workerInstanceId(instance), {
+          reason: 'admin_request',
+        });
+      } catch (err) {
+        console.error('Failed to stop machine for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
   restartMachine: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.machine.restart',
+        target: inputFieldTarget('kiloclaw_instance', 'instanceId'),
+      },
+    })
     .input(
       z.object({
         instanceId: z.string().uuid(),
@@ -1956,6 +2105,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
    * `pinned_*`, `pinned_*` outranks `already_on_target`.
    */
   bulkChangeVersion: adminProcedure
+    .meta({
+      adminAudit: { kind: 'handler', actions: ['kiloclaw.instances.bulk_change_version'] },
+    })
     .input(
       z.object({
         // Practical limit: the UI only allows per-page selection, so 500
@@ -2189,6 +2341,40 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         console.error('Failed to write audit log for bulkChangeVersion:', auditErr);
       }
 
+      // One admin row per affected user (the owner of each applied instance).
+      const appliedSet = new Set(applied);
+      const appliedByUser = new Map<string, string[]>();
+      for (const row of rows) {
+        if (!appliedSet.has(row.instance_id)) continue;
+        const instanceIds = appliedByUser.get(row.user_id) ?? [];
+        instanceIds.push(row.instance_id);
+        appliedByUser.set(row.user_id, instanceIds);
+      }
+      const summary = {
+        imageTag: input.imageTag,
+        overridePins: input.overridePins,
+        skippedCount: skipped.length,
+        failedCount: failed.length,
+      };
+      await recordAdminActions(
+        ctx,
+        appliedByUser.size > 0
+          ? Array.from(appliedByUser, ([userId, instanceIds]) => ({
+              action: 'kiloclaw.instances.bulk_change_version' as const,
+              target: userActionTarget(userId),
+              message: `Bulk version change to ${input.imageTag}`,
+              metadata: { ...summary, appliedInstanceIds: instanceIds },
+            }))
+          : [
+              {
+                action: 'kiloclaw.instances.bulk_change_version' as const,
+                target: null,
+                message: `Bulk version change to ${input.imageTag} applied no instances`,
+                metadata: { ...summary, requestedCount: input.instanceIds.length },
+              },
+            ]
+      );
+
       return { applied, skipped, failed };
     }),
 
@@ -2205,6 +2391,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
    * notification fan-out using these fields.
    */
   scheduleAction: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'kiloclaw.scheduled_action.create' } })
     .input(
       z.discriminatedUnion('actionType', [
         z.object({
@@ -2353,6 +2540,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         noticeChannels: input.noticeChannels,
       });
 
+      setAdminAuditTarget({ type: 'other', id: result.id });
+      addAdminAuditMetadata({
+        actionType: input.actionType,
+        instanceCount: liveInstanceIds.length,
+      });
+
       // Audit log fire-and-forget. Multi-user actions still use the
       // actor's id as the target_user_id sentinel since the column is
       // notNull; the actual targeted instances are in metadata.
@@ -2457,6 +2650,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   createFleetUpgrade: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'kiloclaw.fleet_upgrade.create' } })
     .input(FleetUpgradeFilterSchema)
     .mutation(async ({ input, ctx }) => {
       assertScheduledTimeInFuture(input.startsAt, 'startsAt');
@@ -2500,6 +2694,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         targets: stageTargets,
         notify: input.notify,
         noticeChannels: input.noticeChannels,
+      });
+
+      setAdminAuditTarget({ type: 'other', id: result.id });
+      addAdminAuditMetadata({
+        targetImageTag: input.targetImageTag,
+        targetCount: stageTargets.length,
       });
 
       try {
@@ -2747,10 +2947,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
    * in production after creating a test notification. The sweep is
    * idempotent and bounded; calling it on demand is safe.
    */
-  runNoticeSweepNow: adminProcedure.mutation(async () => {
-    const internalClient = new KiloClawInternalClient();
-    return internalClient.runScheduledActionNoticeSweep();
-  }),
+  runNoticeSweepNow: adminProcedure
+    .meta({
+      adminAudit: { kind: 'declarative', action: 'kiloclaw.scheduled_action.run_notice_sweep' },
+    })
+    .mutation(async () => {
+      const internalClient = new KiloClawInternalClient();
+      return internalClient.runScheduledActionNoticeSweep();
+    }),
 
   listUpcomingScheduledActionsForInstance: adminProcedure
     .input(z.object({ instanceId: z.string().uuid() }))
@@ -2833,6 +3037,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
    * rows are processed).
    */
   cancelScheduledActionTarget: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.scheduled_action.cancel_target',
+        target: inputFieldTarget('kiloclaw_instance', 'instanceId'),
+      },
+    })
     .input(
       z.object({
         scheduledActionId: z.string().uuid(),
@@ -2840,6 +3051,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      addAdminAuditMetadata({ scheduledActionId: input.scheduledActionId });
       const result = await db.transaction(async tx => {
         const [updated] = await tx
           .update(kiloclaw_scheduled_action_targets)
@@ -3002,6 +3214,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
    * notice was already dispatched.
    */
   cancelScheduledAction: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.scheduled_action.cancel',
+        target: inputFieldTarget('other', 'id'),
+      },
+    })
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const result = await db.transaction(async tx => {
@@ -3167,6 +3386,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   destroyFlyMachine: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.machine.destroy_fly',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -3246,6 +3472,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   extendVolume: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.volume.extend',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -3344,94 +3577,103 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
-  destroy: adminProcedure.input(DestroyInstanceSchema).mutation(async ({ input, ctx }) => {
-    const [instance] = await db
-      .select({
-        id: kiloclaw_instances.id,
-        user_id: kiloclaw_instances.user_id,
-        sandbox_id: kiloclaw_instances.sandbox_id,
-        destroyed_at: kiloclaw_instances.destroyed_at,
-      })
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.id, input.id))
-      .limit(1);
+  destroy: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.instance.destroy',
+        target: inputFieldTarget('kiloclaw_instance', 'id'),
+      },
+    })
+    .input(DestroyInstanceSchema)
+    .mutation(async ({ input, ctx }) => {
+      const [instance] = await db
+        .select({
+          id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, input.id))
+        .limit(1);
 
-    if (!instance) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
-    }
-
-    if (instance.destroyed_at !== null) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Instance is already destroyed' });
-    }
-
-    console.log(
-      `[admin-kiloclaw] Destroy triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for instance ${instance.id} (user: ${instance.user_id})`
-    );
-
-    const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
-    const client = new KiloClawInternalClient();
-    try {
-      await client.destroy(instance.user_id, workerInstanceId(instance), {
-        reason: 'admin_request',
-      });
-    } catch (error) {
-      if (destroyedRow) {
-        await restoreDestroyedInstance(destroyedRow.id);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
       }
-      throw error;
-    }
 
-    // Post-destroy cleanup: best-effort DB tidying that must not report
-    // failure after a successful destroy.
-    try {
-      await clearAdminInstanceDestructionDeadlineWithChangeLog({
-        actorUserId: ctx.user.id,
-        userId: instance.user_id,
-        instanceId: instance.id,
-        reason: 'admin_destroy_clear_lifecycle_state',
-      });
+      if (instance.destroyed_at !== null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Instance is already destroyed' });
+      }
 
-      // Clear lifecycle emails so they can fire again if the user re-provisions.
-      const resettableEmailTypes = [
-        'claw_suspended_trial',
-        'claw_suspended_subscription',
-        'claw_suspended_payment',
-        'claw_destruction_warning',
-        'claw_instance_destroyed',
-      ];
-      await db
-        .delete(kiloclaw_email_log)
-        .where(
-          and(
-            eq(kiloclaw_email_log.user_id, instance.user_id),
-            eq(kiloclaw_email_log.instance_id, instance.id),
-            inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
-          )
-        );
-      // Clear per-instance ready emails so a future re-provision triggers the notification.
-      await db
-        .delete(kiloclaw_email_log)
-        .where(
-          and(
-            eq(kiloclaw_email_log.user_id, instance.user_id),
-            or(
-              and(
-                eq(kiloclaw_email_log.instance_id, instance.id),
-                eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
-              ),
-              and(
-                isNull(kiloclaw_email_log.instance_id),
-                eq(kiloclaw_email_log.email_type, `claw_instance_ready:${instance.sandbox_id}`)
+      console.log(
+        `[admin-kiloclaw] Destroy triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for instance ${instance.id} (user: ${instance.user_id})`
+      );
+
+      const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
+      const client = new KiloClawInternalClient();
+      try {
+        await client.destroy(instance.user_id, workerInstanceId(instance), {
+          reason: 'admin_request',
+        });
+      } catch (error) {
+        if (destroyedRow) {
+          await restoreDestroyedInstance(destroyedRow.id);
+        }
+        throw error;
+      }
+
+      // Post-destroy cleanup: best-effort DB tidying that must not report
+      // failure after a successful destroy.
+      try {
+        await clearAdminInstanceDestructionDeadlineWithChangeLog({
+          actorUserId: ctx.user.id,
+          userId: instance.user_id,
+          instanceId: instance.id,
+          reason: 'admin_destroy_clear_lifecycle_state',
+        });
+
+        // Clear lifecycle emails so they can fire again if the user re-provisions.
+        const resettableEmailTypes = [
+          'claw_suspended_trial',
+          'claw_suspended_subscription',
+          'claw_suspended_payment',
+          'claw_destruction_warning',
+          'claw_instance_destroyed',
+        ];
+        await db
+          .delete(kiloclaw_email_log)
+          .where(
+            and(
+              eq(kiloclaw_email_log.user_id, instance.user_id),
+              eq(kiloclaw_email_log.instance_id, instance.id),
+              inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
+            )
+          );
+        // Clear per-instance ready emails so a future re-provision triggers the notification.
+        await db
+          .delete(kiloclaw_email_log)
+          .where(
+            and(
+              eq(kiloclaw_email_log.user_id, instance.user_id),
+              or(
+                and(
+                  eq(kiloclaw_email_log.instance_id, instance.id),
+                  eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+                ),
+                and(
+                  isNull(kiloclaw_email_log.instance_id),
+                  eq(kiloclaw_email_log.email_type, `claw_instance_ready:${instance.sandbox_id}`)
+                )
               )
             )
-          )
-        );
-    } catch (cleanupError) {
-      console.error('[admin-kiloclaw] Post-destroy cleanup failed:', cleanupError);
-    }
+          );
+      } catch (cleanupError) {
+        console.error('[admin-kiloclaw] Post-destroy cleanup failed:', cleanupError);
+      }
 
-    return { success: true };
-  }),
+      return { success: true };
+    }),
 
   adminAuditLogs: adminProcedure
     .input(
@@ -3461,55 +3703,69 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
-  devNukeAll: adminProcedure.mutation(async ({ ctx }) => {
-    if (process.env.NODE_ENV !== 'development') {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'This endpoint is only available in development mode',
-      });
-    }
-
-    const activeInstances = await db
-      .select({
-        id: kiloclaw_instances.id,
-        user_id: kiloclaw_instances.user_id,
-        sandbox_id: kiloclaw_instances.sandbox_id,
-      })
-      .from(kiloclaw_instances)
-      .where(isNull(kiloclaw_instances.destroyed_at));
-
-    console.log(
-      `[admin-kiloclaw] DevNukeAll triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}): ${activeInstances.length} active instances`
-    );
-
-    const client = new KiloClawInternalClient();
-    let destroyed = 0;
-    const errors: Array<{ userId: string; error: string }> = [];
-
-    for (const instance of activeInstances) {
-      const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
-      try {
-        await client.destroy(instance.user_id, workerInstanceId(instance), {
-          reason: 'admin_request',
+  devNukeAll: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'development-only operator, refused outside NODE_ENV=development',
+      },
+    })
+    .mutation(async ({ ctx }) => {
+      if (process.env.NODE_ENV !== 'development') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This endpoint is only available in development mode',
         });
-        destroyed++;
-      } catch (err) {
-        if (destroyedRow) {
-          await restoreDestroyedInstance(destroyedRow.id);
-        }
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        errors.push({ userId: instance.user_id, error: message });
-        console.error(
-          `[admin-kiloclaw] DevNukeAll: failed to destroy instance ${instance.id} (user: ${instance.user_id}):`,
-          err
-        );
       }
-    }
 
-    return { total: activeInstances.length, destroyed, errors };
-  }),
+      const activeInstances = await db
+        .select({
+          id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+        })
+        .from(kiloclaw_instances)
+        .where(isNull(kiloclaw_instances.destroyed_at));
+
+      console.log(
+        `[admin-kiloclaw] DevNukeAll triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}): ${activeInstances.length} active instances`
+      );
+
+      const client = new KiloClawInternalClient();
+      let destroyed = 0;
+      const errors: Array<{ userId: string; error: string }> = [];
+
+      for (const instance of activeInstances) {
+        const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
+        try {
+          await client.destroy(instance.user_id, workerInstanceId(instance), {
+            reason: 'admin_request',
+          });
+          destroyed++;
+        } catch (err) {
+          if (destroyedRow) {
+            await restoreDestroyedInstance(destroyedRow.id);
+          }
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          errors.push({ userId: instance.user_id, error: message });
+          console.error(
+            `[admin-kiloclaw] DevNukeAll: failed to destroy instance ${instance.id} (user: ${instance.user_id}):`,
+            err
+          );
+        }
+      }
+
+      return { total: activeInstances.length, destroyed, errors };
+    }),
 
   reassociateVolume: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.volume.reassociate',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -3559,6 +3815,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   resizeMachine: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.machine.resize',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -3613,6 +3876,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   setAdminMachineSizeOverride: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.admin_size_override.set',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -3668,6 +3938,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   clearAdminMachineSizeOverride: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.admin_size_override.clear',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -3721,6 +3998,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   restoreVolumeSnapshot: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.snapshot.restore',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),
@@ -3769,116 +4053,131 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
   // ── Orphan detection ──────────────────────────────────────────────────
 
-  detectOrphans: adminProcedure.input(DetectOrphansSchema).mutation(async ({ input }) => {
-    // 1. Fetch all active (non-destroyed) instances created within the date range.
-    //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
-    const MAX_SCAN = 1000;
-    const instances = await db
-      .select({
-        id: kiloclaw_instances.id,
-        user_id: kiloclaw_instances.user_id,
-        sandbox_id: kiloclaw_instances.sandbox_id,
-        organization_id: kiloclaw_instances.organization_id,
-        created_at: kiloclaw_instances.created_at,
-        user_email: kilocode_users.google_user_email,
-        subscription_id: kiloclaw_subscriptions.id,
-        subscription_status: kiloclaw_subscriptions.status,
-      })
-      .from(kiloclaw_instances)
-      .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
-      .leftJoin(
-        kiloclaw_subscriptions,
-        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
-      )
-      .where(
-        and(
-          isNull(kiloclaw_instances.destroyed_at),
-          gte(kiloclaw_instances.created_at, input.createdAfter),
-          lte(kiloclaw_instances.created_at, input.createdBefore)
-        )
-      )
-      .orderBy(desc(kiloclaw_instances.created_at))
-      .limit(MAX_SCAN + 1);
-
-    const capped = instances.length > MAX_SCAN;
-    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
-
-    if (toScan.length === 0) {
-      return { orphans: [], scanned: 0, capped: false };
-    }
-
-    // 2. Fan out getDebugStatus calls with concurrency limit.
-    const CONCURRENCY = 10;
-    const client = new KiloClawInternalClient();
-
-    type OrphanResult = {
-      id: string;
-      user_id: string;
-      sandbox_id: string;
-      organization_id: string | null;
-      created_at: string;
-      user_email: string | null;
-      subscription_id: string | null;
-      subscription_status: string | null;
-      workerStatusError: string | null;
-    };
-
-    const orphans: OrphanResult[] = [];
-
-    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
-      const batch = toScan.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map(async instance => {
-          const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
-          const status = await client.getDebugStatus(instance.user_id, instId);
-          return { instance, status };
+  detectOrphans: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'mutation-typed read: fans out worker debug-status GETs and writes nothing',
+      },
+    })
+    .input(DetectOrphansSchema)
+    .mutation(async ({ input }) => {
+      // 1. Fetch all active (non-destroyed) instances created within the date range.
+      //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
+      const MAX_SCAN = 1000;
+      const instances = await db
+        .select({
+          id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          organization_id: kiloclaw_instances.organization_id,
+          created_at: kiloclaw_instances.created_at,
+          user_email: kilocode_users.google_user_email,
+          subscription_id: kiloclaw_subscriptions.id,
+          subscription_status: kiloclaw_subscriptions.status,
         })
-      );
+        .from(kiloclaw_instances)
+        .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+        .leftJoin(
+          kiloclaw_subscriptions,
+          eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+        )
+        .where(
+          and(
+            isNull(kiloclaw_instances.destroyed_at),
+            gte(kiloclaw_instances.created_at, input.createdAfter),
+            lte(kiloclaw_instances.created_at, input.createdBefore)
+          )
+        )
+        .orderBy(desc(kiloclaw_instances.created_at))
+        .limit(MAX_SCAN + 1);
 
-      for (let j = 0; j < results.length; j++) {
-        const result = results[j];
-        if (result.status === 'fulfilled') {
-          const { instance, status } = result.value;
-          // A null/undefined status means the DO has never been provisioned.
-          if (!status?.status) {
-            orphans.push({
-              id: instance.id,
-              user_id: instance.user_id,
-              sandbox_id: instance.sandbox_id,
-              organization_id: instance.organization_id,
-              created_at: instance.created_at,
-              user_email: instance.user_email,
-              subscription_id: instance.subscription_id,
-              subscription_status: instance.subscription_status,
-              workerStatusError: null,
-            });
-          }
-        } else {
-          // If the status call itself failed, flag it as a potential orphan
-          // with the error — the admin can investigate.
-          const instance = batch[j];
-          if (instance) {
-            orphans.push({
-              id: instance.id,
-              user_id: instance.user_id,
-              sandbox_id: instance.sandbox_id,
-              organization_id: instance.organization_id,
-              created_at: instance.created_at,
-              user_email: instance.user_email,
-              subscription_id: instance.subscription_id,
-              subscription_status: instance.subscription_status,
-              workerStatusError:
-                result.reason instanceof Error ? result.reason.message : 'Status check failed',
-            });
+      const capped = instances.length > MAX_SCAN;
+      const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+
+      if (toScan.length === 0) {
+        return { orphans: [], scanned: 0, capped: false };
+      }
+
+      // 2. Fan out getDebugStatus calls with concurrency limit.
+      const CONCURRENCY = 10;
+      const client = new KiloClawInternalClient();
+
+      type OrphanResult = {
+        id: string;
+        user_id: string;
+        sandbox_id: string;
+        organization_id: string | null;
+        created_at: string;
+        user_email: string | null;
+        subscription_id: string | null;
+        subscription_status: string | null;
+        workerStatusError: string | null;
+      };
+
+      const orphans: OrphanResult[] = [];
+
+      for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+        const batch = toScan.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(async instance => {
+            const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
+            const status = await client.getDebugStatus(instance.user_id, instId);
+            return { instance, status };
+          })
+        );
+
+        for (let j = 0; j < results.length; j++) {
+          const result = results[j];
+          if (result.status === 'fulfilled') {
+            const { instance, status } = result.value;
+            // A null/undefined status means the DO has never been provisioned.
+            if (!status?.status) {
+              orphans.push({
+                id: instance.id,
+                user_id: instance.user_id,
+                sandbox_id: instance.sandbox_id,
+                organization_id: instance.organization_id,
+                created_at: instance.created_at,
+                user_email: instance.user_email,
+                subscription_id: instance.subscription_id,
+                subscription_status: instance.subscription_status,
+                workerStatusError: null,
+              });
+            }
+          } else {
+            // If the status call itself failed, flag it as a potential orphan
+            // with the error — the admin can investigate.
+            const instance = batch[j];
+            if (instance) {
+              orphans.push({
+                id: instance.id,
+                user_id: instance.user_id,
+                sandbox_id: instance.sandbox_id,
+                organization_id: instance.organization_id,
+                created_at: instance.created_at,
+                user_email: instance.user_email,
+                subscription_id: instance.subscription_id,
+                subscription_status: instance.subscription_status,
+                workerStatusError:
+                  result.reason instanceof Error ? result.reason.message : 'Status check failed',
+              });
+            }
           }
         }
       }
-    }
 
-    return { orphans, scanned: toScan.length, capped };
-  }),
+      return { orphans, scanned: toScan.length, capped };
+    }),
 
   destroyOrphan: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.orphan.destroy',
+        target: inputFieldTarget('kiloclaw_instance', 'id'),
+      },
+    })
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       // Verify the instance exists and is not already destroyed.
@@ -3952,42 +4251,51 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
   // A mutation, not a query: this is an expensive admin-triggered fan-out
   // (matches `detectOrphans`) — it must not auto-refetch on the client.
-  findOrphanVolumes: adminProcedure.input(FindOrphanVolumesSchema).mutation(async ({ input }) => {
-    const MAX_SCAN = 500;
-    const CONCURRENCY = 10;
+  findOrphanVolumes: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason:
+          'mutation-typed read: scans destroyed instances and lists Fly volumes via worker GETs',
+      },
+    })
+    .input(FindOrphanVolumesSchema)
+    .mutation(async ({ input }) => {
+      const MAX_SCAN = 500;
+      const CONCURRENCY = 10;
 
-    type DestroyedInstanceScanRow = {
-      id: string;
-      user_id: string;
-      sandbox_id: string;
-      organization_id: string | null;
-      destroyed_at: string;
-      latest_sandbox_destroyed_at: string | null;
-      user_email: string | null;
-      subscription_status: string | null;
-      subscription_ended_at: string | null;
-    };
+      type DestroyedInstanceScanRow = {
+        id: string;
+        user_id: string;
+        sandbox_id: string;
+        organization_id: string | null;
+        destroyed_at: string;
+        latest_sandbox_destroyed_at: string | null;
+        user_email: string | null;
+        subscription_status: string | null;
+        subscription_ended_at: string | null;
+      };
 
-    // 1. The latest destroyed row per (user, sandbox) inside the requested
-    //    window.
-    //
-    // This is intentionally written as raw SQL matching the production query
-    // we used to diagnose the scanner. The previous Drizzle `selectDistinctOn`
-    // derived table returned `scanned: 0` in production for a narrow same-day
-    // ISO window even though this SQL shape returned the matching rows.
-    //
-    // `DISTINCT ON` collapses reprovisioned sandboxes to the latest destroyed
-    // row inside the admin-selected scan window, restoring the pre-#3407 scan
-    // semantics. `latest_sandbox_destroyed_at` still tracks the latest
-    // destruction across all time so grace-period safety is measured from the
-    // most recent volume use, not just from the selected row.
-    // Timestamps are cast explicitly so ISO inputs and Postgres timestamp text
-    // are compared as timestamptz values in every runtime. The outer SELECT
-    // formats timestamps as strict ISO 8601 (to_char with AT TIME ZONE 'UTC')
-    // so downstream code never has to parse Postgres's space-separated text
-    // representation (e.g. "2026-05-15 10:06:30.976+00").
-    const cursorPredicate = input.cursor
-      ? sql`
+      // 1. The latest destroyed row per (user, sandbox) inside the requested
+      //    window.
+      //
+      // This is intentionally written as raw SQL matching the production query
+      // we used to diagnose the scanner. The previous Drizzle `selectDistinctOn`
+      // derived table returned `scanned: 0` in production for a narrow same-day
+      // ISO window even though this SQL shape returned the matching rows.
+      //
+      // `DISTINCT ON` collapses reprovisioned sandboxes to the latest destroyed
+      // row inside the admin-selected scan window, restoring the pre-#3407 scan
+      // semantics. `latest_sandbox_destroyed_at` still tracks the latest
+      // destruction across all time so grace-period safety is measured from the
+      // most recent volume use, not just from the selected row.
+      // Timestamps are cast explicitly so ISO inputs and Postgres timestamp text
+      // are compared as timestamptz values in every runtime. The outer SELECT
+      // formats timestamps as strict ISO 8601 (to_char with AT TIME ZONE 'UTC')
+      // so downstream code never has to parse Postgres's space-separated text
+      // representation (e.g. "2026-05-15 10:06:30.976+00").
+      const cursorPredicate = input.cursor
+        ? sql`
           and (
             ranked.destroyed_at < ${input.cursor.destroyedAt}::timestamptz
             or (
@@ -3996,9 +4304,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             )
           )
         `
-      : sql``;
+        : sql``;
 
-    const { rows: instances } = await db.execute<DestroyedInstanceScanRow>(sql`
+      const { rows: instances } = await db.execute<DestroyedInstanceScanRow>(sql`
       select
         ranked.id::text as id,
         ranked.user_id,
@@ -4047,196 +4355,203 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       limit ${MAX_SCAN + 1}
     `);
 
-    const capped = instances.length > MAX_SCAN;
-    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
-    const lastScanned = toScan.at(-1);
-    const nextCursor =
-      capped && lastScanned?.destroyed_at
-        ? {
-            // destroyed_at is already ISO 8601 (formatted by to_char in the
-            // query above) so no Date round-trip is needed here.
-            destroyedAt: lastScanned.destroyed_at,
-            id: lastScanned.id,
-          }
-        : null;
+      const capped = instances.length > MAX_SCAN;
+      const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+      const lastScanned = toScan.at(-1);
+      const nextCursor =
+        capped && lastScanned?.destroyed_at
+          ? {
+              // destroyed_at is already ISO 8601 (formatted by to_char in the
+              // query above) so no Date round-trip is needed here.
+              destroyedAt: lastScanned.destroyed_at,
+              id: lastScanned.id,
+            }
+          : null;
 
-    type VolumeRow = {
-      instance_id: string;
-      user_id: string;
-      user_email: string | null;
-      sandbox_id: string;
-      organization_id: string | null;
-      destroyed_at: string;
-      // Lineage truth: the most recent destruction across ALL provisions of
-      // this (user, sandbox), not just the row that matched the scan window.
-      // This is the date the 7-day orphan grace clock actually runs from. For a
-      // reprovisioned sandbox it can be far more recent than `destroyed_at`
-      // (the windowed row), so surfacing it stops the table from appearing to
-      // contradict the user's subscription timeline.
-      latest_sandbox_destroyed_at: string | null;
-      subscription_status: string | null;
-      subscription_ended_at: string | null;
-      fly_app: string;
-      volume_id: string;
-      volume_name: string;
-      volume_state: string;
-      volume_region: string;
-      volume_size_gb: number;
-      attached_machine_id: string | null;
-      volume_created_at: string;
-      do_status: string | null;
-      classification: OrphanVolumeClassification;
-    };
-    type ScanErrorRow = {
-      instance_id: string;
-      user_id: string;
-      user_email: string | null;
-      sandbox_id: string;
-      error: string;
-    };
-
-    if (toScan.length === 0) {
-      return {
-        volumes: [] as VolumeRow[],
-        errors: [] as ScanErrorRow[],
-        scanned: 0,
-        capped: false,
-        nextCursor: null,
+      type VolumeRow = {
+        instance_id: string;
+        user_id: string;
+        user_email: string | null;
+        sandbox_id: string;
+        organization_id: string | null;
+        destroyed_at: string;
+        // Lineage truth: the most recent destruction across ALL provisions of
+        // this (user, sandbox), not just the row that matched the scan window.
+        // This is the date the 7-day orphan grace clock actually runs from. For a
+        // reprovisioned sandbox it can be far more recent than `destroyed_at`
+        // (the windowed row), so surfacing it stops the table from appearing to
+        // contradict the user's subscription timeline.
+        latest_sandbox_destroyed_at: string | null;
+        subscription_status: string | null;
+        subscription_ended_at: string | null;
+        fly_app: string;
+        volume_id: string;
+        volume_name: string;
+        volume_state: string;
+        volume_region: string;
+        volume_size_gb: number;
+        attached_machine_id: string | null;
+        volume_created_at: string;
+        do_status: string | null;
+        classification: OrphanVolumeClassification;
       };
-    }
+      type ScanErrorRow = {
+        instance_id: string;
+        user_id: string;
+        user_email: string | null;
+        sandbox_id: string;
+        error: string;
+      };
 
-    const client = new KiloClawInternalClient();
-    const now = new Date();
-    const { accessGrantingContextKeys, pendingDestructionContextKeys } =
-      await getOrphanVolumeContextProtections(
-        db,
-        toScan.map(instance => ({
-          user_id: instance.user_id,
-          organization_id: instance.organization_id,
-        })),
-        now
-      );
-    const volumes: VolumeRow[] = [];
-    const errors: ScanErrorRow[] = [];
+      if (toScan.length === 0) {
+        return {
+          volumes: [] as VolumeRow[],
+          errors: [] as ScanErrorRow[],
+          scanned: 0,
+          capped: false,
+          nextCursor: null,
+        };
+      }
 
-    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
-      const batch = toScan.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map(instance =>
-          client.scanOrphanVolumes(instance.user_id, instance.id, instance.sandbox_id)
-        )
-      );
-
-      for (let j = 0; j < results.length; j++) {
-        const instance = batch[j];
-        const result = results[j];
-        if (!instance || !result) continue;
-
-        // The worker call itself failed — surface it so an empty result is
-        // never silently read as "no orphans".
-        if (result.status === 'rejected') {
-          errors.push({
-            instance_id: instance.id,
+      const client = new KiloClawInternalClient();
+      const now = new Date();
+      const { accessGrantingContextKeys, pendingDestructionContextKeys } =
+        await getOrphanVolumeContextProtections(
+          db,
+          toScan.map(instance => ({
             user_id: instance.user_id,
-            user_email: instance.user_email,
-            sandbox_id: instance.sandbox_id,
-            error: result.reason instanceof Error ? result.reason.message : 'Volume scan failed',
-          });
-          continue;
-        }
+            organization_id: instance.organization_id,
+          })),
+          now
+        );
+      const volumes: VolumeRow[] = [];
+      const errors: ScanErrorRow[] = [];
 
-        const scan = result.value;
-        // listVolumes failed inside the worker — same false-negative risk.
-        if (scan.scanError) {
-          errors.push({
-            instance_id: instance.id,
-            user_id: instance.user_id,
-            user_email: instance.user_email,
-            sandbox_id: instance.sandbox_id,
-            error: `Could not list Fly volumes: ${scan.scanError}`,
-          });
-          continue;
-        }
-        // The DO state could not be read, so a volume cannot be confirmed as
-        // an orphan. Surface it as an unscanned instance rather than silently
-        // dropping it from a results table that only shows confirmed orphans.
-        if (scan.doStatusError !== null) {
-          errors.push({
-            instance_id: instance.id,
-            user_id: instance.user_id,
-            user_email: instance.user_email,
-            sandbox_id: instance.sandbox_id,
-            error: `Could not read Durable Object state: ${scan.doStatusError}`,
-          });
-          continue;
-        }
+      for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+        const batch = toScan.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(instance =>
+            client.scanOrphanVolumes(instance.user_id, instance.id, instance.sandbox_id)
+          )
+        );
 
-        // destroyed_at is non-null here (the WHERE clause guarantees it).
-        const destroyedAt = instance.destroyed_at as string;
-        const graceDestroyedAt = instance.latest_sandbox_destroyed_at ?? destroyedAt;
-        const graceElapsed =
-          now.getTime() - new Date(graceDestroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
-        const contextKey = orphanVolumeSubscriptionContextKey({
-          user_id: instance.user_id,
-          organization_id: instance.organization_id,
-        });
-        const hasAccess = accessGrantingContextKeys.has(contextKey);
-        const destructionScheduled = pendingDestructionContextKeys.has(contextKey);
+        for (let j = 0; j < results.length; j++) {
+          const instance = batch[j];
+          const result = results[j];
+          if (!instance || !result) continue;
 
-        // Only volumes whose name exactly matches THIS instance are ours.
-        // A non-matching volume belongs to a different (possibly live)
-        // sandbox sharing the app and must never be surfaced as reapable.
-        for (const v of scan.volumes) {
-          if (!v.nameMatchesInstance) continue;
-
-          const classification = classifyOrphanVolume({
-            volumeState: v.state,
-            attachedMachineId: v.attached_machine_id,
-            trackedByLiveDo: v.trackedByLiveDo,
-            doStatus: scan.doStatus,
-            doStatusError: scan.doStatusError,
-            hasAccessGrantingSubscription: hasAccess,
-            destructionScheduled,
-            graceElapsed,
-          });
-          // Surface confirmed orphans ONLY. Every other classification —
-          // attached to a machine, live DO, active subscription, pending
-          // destruction, still in grace, Fly already reaping — is correctly
-          // not an orphan and is dropped rather than shown as a non-actionable
-          // row.
-          if (classification !== 'safe_destroy') {
+          // The worker call itself failed — surface it so an empty result is
+          // never silently read as "no orphans".
+          if (result.status === 'rejected') {
+            errors.push({
+              instance_id: instance.id,
+              user_id: instance.user_id,
+              user_email: instance.user_email,
+              sandbox_id: instance.sandbox_id,
+              error: result.reason instanceof Error ? result.reason.message : 'Volume scan failed',
+            });
             continue;
           }
 
-          volumes.push({
-            instance_id: instance.id,
+          const scan = result.value;
+          // listVolumes failed inside the worker — same false-negative risk.
+          if (scan.scanError) {
+            errors.push({
+              instance_id: instance.id,
+              user_id: instance.user_id,
+              user_email: instance.user_email,
+              sandbox_id: instance.sandbox_id,
+              error: `Could not list Fly volumes: ${scan.scanError}`,
+            });
+            continue;
+          }
+          // The DO state could not be read, so a volume cannot be confirmed as
+          // an orphan. Surface it as an unscanned instance rather than silently
+          // dropping it from a results table that only shows confirmed orphans.
+          if (scan.doStatusError !== null) {
+            errors.push({
+              instance_id: instance.id,
+              user_id: instance.user_id,
+              user_email: instance.user_email,
+              sandbox_id: instance.sandbox_id,
+              error: `Could not read Durable Object state: ${scan.doStatusError}`,
+            });
+            continue;
+          }
+
+          // destroyed_at is non-null here (the WHERE clause guarantees it).
+          const destroyedAt = instance.destroyed_at as string;
+          const graceDestroyedAt = instance.latest_sandbox_destroyed_at ?? destroyedAt;
+          const graceElapsed =
+            now.getTime() - new Date(graceDestroyedAt).getTime() > ORPHAN_VOLUME_GRACE_PERIOD_MS;
+          const contextKey = orphanVolumeSubscriptionContextKey({
             user_id: instance.user_id,
-            user_email: instance.user_email,
-            sandbox_id: instance.sandbox_id,
             organization_id: instance.organization_id,
-            destroyed_at: destroyedAt,
-            latest_sandbox_destroyed_at: instance.latest_sandbox_destroyed_at,
-            subscription_status: instance.subscription_status,
-            subscription_ended_at: instance.subscription_ended_at,
-            fly_app: scan.flyApp,
-            volume_id: v.id,
-            volume_name: v.name,
-            volume_state: v.state,
-            volume_region: v.region,
-            volume_size_gb: v.size_gb,
-            attached_machine_id: v.attached_machine_id,
-            volume_created_at: v.created_at,
-            do_status: scan.doStatus,
-            classification,
           });
+          const hasAccess = accessGrantingContextKeys.has(contextKey);
+          const destructionScheduled = pendingDestructionContextKeys.has(contextKey);
+
+          // Only volumes whose name exactly matches THIS instance are ours.
+          // A non-matching volume belongs to a different (possibly live)
+          // sandbox sharing the app and must never be surfaced as reapable.
+          for (const v of scan.volumes) {
+            if (!v.nameMatchesInstance) continue;
+
+            const classification = classifyOrphanVolume({
+              volumeState: v.state,
+              attachedMachineId: v.attached_machine_id,
+              trackedByLiveDo: v.trackedByLiveDo,
+              doStatus: scan.doStatus,
+              doStatusError: scan.doStatusError,
+              hasAccessGrantingSubscription: hasAccess,
+              destructionScheduled,
+              graceElapsed,
+            });
+            // Surface confirmed orphans ONLY. Every other classification —
+            // attached to a machine, live DO, active subscription, pending
+            // destruction, still in grace, Fly already reaping — is correctly
+            // not an orphan and is dropped rather than shown as a non-actionable
+            // row.
+            if (classification !== 'safe_destroy') {
+              continue;
+            }
+
+            volumes.push({
+              instance_id: instance.id,
+              user_id: instance.user_id,
+              user_email: instance.user_email,
+              sandbox_id: instance.sandbox_id,
+              organization_id: instance.organization_id,
+              destroyed_at: destroyedAt,
+              latest_sandbox_destroyed_at: instance.latest_sandbox_destroyed_at,
+              subscription_status: instance.subscription_status,
+              subscription_ended_at: instance.subscription_ended_at,
+              fly_app: scan.flyApp,
+              volume_id: v.id,
+              volume_name: v.name,
+              volume_state: v.state,
+              volume_region: v.region,
+              volume_size_gb: v.size_gb,
+              attached_machine_id: v.attached_machine_id,
+              volume_created_at: v.created_at,
+              do_status: scan.doStatus,
+              classification,
+            });
+          }
         }
       }
-    }
 
-    return { volumes, errors, scanned: toScan.length, capped, nextCursor };
-  }),
+      return { volumes, errors, scanned: toScan.length, capped, nextCursor };
+    }),
 
   destroyOrphanVolume: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.orphan_volume.destroy',
+        target: inputFieldTarget('kiloclaw_instance', 'instanceId'),
+      },
+    })
     .input(
       z.object({
         instanceId: z.string().uuid(),
@@ -4391,6 +4706,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   setEarlyAccess: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'kiloclaw.early_access.set',
+        target: inputFieldTarget('user', 'userId'),
+      },
+    })
     .input(
       z.object({
         userId: z.string().min(1),

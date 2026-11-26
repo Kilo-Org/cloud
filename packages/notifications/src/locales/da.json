@@ -8,7 +8,8 @@
       "securityFinding": "Et sikkerhedsfund kræver opmærksomhed",
       "securityUpdate": "En sikkerhedskontrol har en opdatering",
       "agentBriefing": "Din agentbriefing er klar",
-      "activeAgentsGlanceable": "Aktive agenter har en opdatering"
+      "activeAgentsGlanceable": "Aktive agenter har en opdatering",
+      "accountSecurity": "Der har været sikkerhedsaktivitet på din konto"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-overtrædelse"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Adgangsnøgle tilføjet til din konto"
+      },
+      "passkeyRemoved": {
+        "title": "Adgangsnøgle fjernet fra din konto"
+      },
+      "signInMethodLinked": {
+        "title": "Loginmetode tilføjet til din konto"
+      },
+      "signInMethodUnlinked": {
+        "title": "Loginmetode fjernet fra din konto"
+      },
+      "deviceSignInApproved": {
+        "title": "Login fra enhed godkendt"
+      },
+      "apiKeyReset": {
+        "title": "API-token nulstillet"
+      },
+      "browserSessionsRevoked": {
+        "title": "Logget ud af alle browsere"
+      },
+      "deviceSessionRevoked": {
+        "title": "Enhed logget ud af din konto"
+      },
+      "signInResetBySupport": {
+        "title": "Login nulstillet af Kilo-support"
+      },
+      "newSignIn": {
+        "title": "Nyt login på din konto"
+      },
+      "body": {
+        "deviceAndLocation": "Fra {{device}} nær {{location}}. Var det ikke dig? Gennemgå din kontosikkerhed nu.",
+        "device": "Fra {{device}}. Var det ikke dig? Gennemgå din kontosikkerhed nu.",
+        "location": "Nær {{location}}. Var det ikke dig? Gennemgå din kontosikkerhed nu.",
+        "unknown": "Var det ikke dig? Gennemgå din kontosikkerhed nu.",
+        "selfNamedDevice": "Fra en enhed, der kaldte sig selv \"{{name}}\". Var det ikke dig? Gennemgå din kontosikkerhed nu.",
+        "support": "Udført af Kilo-support. Har du ikke bedt om det, så kontakt support."
+      }
     }
   },
   "sessionReady": {

@@ -1,4 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { model_eval_ingestions } from '@kilocode/db/schema';
 import { desc, sql } from 'drizzle-orm';
@@ -51,13 +52,22 @@ export const adminModelEvalIngestRouter = createTRPCRouter({
     };
   }),
 
-  syncNow: adminProcedure.mutation(async () => {
-    const result = await syncModelEvalPromotions();
-    revalidateModelStatsRoutes();
-    return result;
-  }),
+  syncNow: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'model_eval.promotions.sync' } })
+    .mutation(async () => {
+      const result = await syncModelEvalPromotions();
+      revalidateModelStatsRoutes();
+      return result;
+    }),
 
   repullPromotion: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'model_eval.promotion.repull',
+        target: inputFieldTarget('other', 'promotionName'),
+      },
+    })
     .input(z.object({ promotionName: z.string().min(1) }))
     .mutation(async ({ input }) => {
       const result = await syncModelEvalPromotions({ promotionName: input.promotionName });

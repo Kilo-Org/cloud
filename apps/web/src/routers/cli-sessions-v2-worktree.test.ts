@@ -83,7 +83,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateApiToken: jest.fn(() => 'cloud-agent-token'),
 }));
 

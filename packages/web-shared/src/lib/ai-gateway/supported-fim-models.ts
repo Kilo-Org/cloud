@@ -3,7 +3,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
-export type FimProvider = 'mistral' | 'inception';
+export type FimProvider = 'mistral';
 
 type SupportedFimModel = {
   id: string;
@@ -18,9 +18,8 @@ type ProviderModels = Array<{
 }>;
 
 export const CODESTRAL_FIM_MODEL_ID = 'mistralai/codestral-2508';
-export const MERCURY_EDIT_FIM_MODEL_ID = 'inception/mercury-edit-2';
 
-/** Exact public IDs accepted by Kilo's FIM and edit routes. Aliases are intentionally omitted. */
+/** Exact public IDs accepted by Kilo's FIM route. Aliases are intentionally omitted. */
 export const SUPPORTED_FIM_MODELS = [
   {
     id: CODESTRAL_FIM_MODEL_ID,
@@ -42,30 +41,6 @@ export const SUPPORTED_FIM_MODELS = [
         pricing: {
           prompt: '0.000000300000',
           completion: '0.000000900000',
-        },
-      },
-    },
-  },
-  {
-    id: MERCURY_EDIT_FIM_MODEL_ID,
-    upstreamModel: 'mercury-edit-2',
-    provider: 'inception',
-    snapshotModel: {
-      slug: MERCURY_EDIT_FIM_MODEL_ID,
-      name: 'Inception: Mercury Edit 2',
-      author: 'Inception',
-      description: 'Inception diffusion model for autocomplete and next-edit prediction.',
-      context_length: 128_000,
-      input_modalities: ['text'],
-      output_modalities: ['text'],
-      group: 'Inception',
-      updated_at: '2026-07-29T00:00:00.000Z',
-      endpoint: {
-        provider_display_name: 'Inception',
-        is_free: false,
-        pricing: {
-          prompt: '0.000000250000',
-          completion: '0.000000750000',
         },
       },
     },

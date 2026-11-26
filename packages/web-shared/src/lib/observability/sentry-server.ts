@@ -6,6 +6,7 @@
 import { httpIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
 import {
+  dropTraceTransactionName,
   scrubSentryBreadcrumb,
   scrubSentryEvent,
 } from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
@@ -98,11 +99,17 @@ export function initServerSentry(): void {
     return;
   }
 
-  init({
+  const client = init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
     // Tracing is fully disabled.
     tracesSampleRate: 0,
+    // An incoming `sentry-trace` header with a positive decision outranks the
+    // rate; a sampler outranks the header, so no transaction or span is built.
+    // Spans stream by default and skip beforeSend, so every span name is also
+    // ignored in case one is still started.
+    tracesSampler: () => 0,
+    ignoreSpans: [/.*/],
 
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
@@ -184,4 +191,5 @@ export function initServerSentry(): void {
 
     beforeBreadcrumb: scrubSentryBreadcrumb,
   });
+  client?.on('createDsc', dropTraceTransactionName);
 }

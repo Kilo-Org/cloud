@@ -8,7 +8,8 @@
       "securityFinding": "Tietoturvalöydös vaatii huomiota",
       "securityUpdate": "Tietoturvatarkistuksella on päivitys",
       "agentBriefing": "Agenttikatsauksesi on valmis",
-      "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys"
+      "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys",
+      "accountSecurity": "Tililläsi oli tietoturvaan liittyvää toimintaa"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-rikkomus"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Tilillesi lisättiin pääsyavain"
+      },
+      "passkeyRemoved": {
+        "title": "Tililtäsi poistettiin pääsyavain"
+      },
+      "signInMethodLinked": {
+        "title": "Tilillesi lisättiin kirjautumistapa"
+      },
+      "signInMethodUnlinked": {
+        "title": "Tililtäsi poistettiin kirjautumistapa"
+      },
+      "deviceSignInApproved": {
+        "title": "Laitteen kirjautuminen hyväksyttiin"
+      },
+      "apiKeyReset": {
+        "title": "API-tunnus nollattiin"
+      },
+      "browserSessionsRevoked": {
+        "title": "Kirjauduttiin ulos kaikista selaimista"
+      },
+      "deviceSessionRevoked": {
+        "title": "Laite kirjattiin ulos tililtäsi"
+      },
+      "signInResetBySupport": {
+        "title": "Kilon tuki nollasi kirjautumisen"
+      },
+      "newSignIn": {
+        "title": "Uusi kirjautuminen tilillesi"
+      },
+      "body": {
+        "deviceAndLocation": "Laitteelta {{device}} läheltä sijaintia {{location}}. Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
+        "device": "Laitteelta {{device}}. Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
+        "location": "Läheltä sijaintia {{location}}. Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
+        "unknown": "Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
+        "selfNamedDevice": "Laitteelta, joka kutsui itseään nimellä \"{{name}}\". Etkö se ollut sinä? Tarkista tilisi tietoturva nyt.",
+        "support": "Kilon tuen tekemä. Jos et pyytänyt tätä, ota yhteyttä tukeen."
+      }
     }
   },
   "sessionReady": {

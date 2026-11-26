@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { fetchO11yJson, O11yRequestError } from '@/lib/o11y-client';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { TRPCError } from '@trpc/server';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const AlertingConfigSchema = z.object({
   model: z.string().min(1),
@@ -96,22 +97,38 @@ export const adminAlertingRouter = createTRPCRouter({
       wrapO11yError(error, 'Failed to fetch alerting config');
     }
   }),
-  updateConfig: adminProcedure.input(AlertingConfigSchema).mutation(async ({ input }) => {
-    const normalized = { ...input, model: normalizeModelId(input.model) };
-    try {
-      return await fetchO11yJson({
-        path: '/alerting/config',
-        schema: AlertingConfigResponseSchema,
-        method: 'PUT',
-        body: normalized,
-        errorMessage: 'Failed to update alerting config',
-        parseErrorMessage: 'Invalid alerting config response',
-      });
-    } catch (error) {
-      wrapO11yError(error, 'Failed to update alerting config');
-    }
-  }),
+  updateConfig: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'alerting.config.update',
+        target: inputFieldTarget('model', 'model'),
+      },
+    })
+    .input(AlertingConfigSchema)
+    .mutation(async ({ input }) => {
+      const normalized = { ...input, model: normalizeModelId(input.model) };
+      try {
+        return await fetchO11yJson({
+          path: '/alerting/config',
+          schema: AlertingConfigResponseSchema,
+          method: 'PUT',
+          body: normalized,
+          errorMessage: 'Failed to update alerting config',
+          parseErrorMessage: 'Invalid alerting config response',
+        });
+      } catch (error) {
+        wrapO11yError(error, 'Failed to update alerting config');
+      }
+    }),
   deleteConfig: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'alerting.config.delete',
+        target: inputFieldTarget('model', 'model'),
+      },
+    })
     .input(z.object({ model: z.string().min(1) }))
     .mutation(async ({ input }) => {
       const model = normalizeModelId(input.model);
@@ -129,6 +146,12 @@ export const adminAlertingRouter = createTRPCRouter({
       }
     }),
   getBaseline: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'mutation-typed read: GETs the alert baseline from the o11y service',
+      },
+    })
     .input(z.object({ model: z.string().min(1) }))
     .mutation(async ({ input }) => {
       try {
@@ -158,22 +181,38 @@ export const adminAlertingRouter = createTRPCRouter({
       wrapO11yError(error, 'Failed to fetch TTFB alerting config');
     }
   }),
-  updateTtfbConfig: adminProcedure.input(TtfbAlertingConfigSchema).mutation(async ({ input }) => {
-    const normalized = { ...input, model: normalizeModelId(input.model) };
-    try {
-      return await fetchO11yJson({
-        path: '/alerting/ttfb-config',
-        schema: TtfbAlertingConfigResponseSchema,
-        method: 'PUT',
-        body: normalized,
-        errorMessage: 'Failed to update TTFB alerting config',
-        parseErrorMessage: 'Invalid TTFB alerting config response',
-      });
-    } catch (error) {
-      wrapO11yError(error, 'Failed to update TTFB alerting config');
-    }
-  }),
+  updateTtfbConfig: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'alerting.ttfb_config.update',
+        target: inputFieldTarget('model', 'model'),
+      },
+    })
+    .input(TtfbAlertingConfigSchema)
+    .mutation(async ({ input }) => {
+      const normalized = { ...input, model: normalizeModelId(input.model) };
+      try {
+        return await fetchO11yJson({
+          path: '/alerting/ttfb-config',
+          schema: TtfbAlertingConfigResponseSchema,
+          method: 'PUT',
+          body: normalized,
+          errorMessage: 'Failed to update TTFB alerting config',
+          parseErrorMessage: 'Invalid TTFB alerting config response',
+        });
+      } catch (error) {
+        wrapO11yError(error, 'Failed to update TTFB alerting config');
+      }
+    }),
   deleteTtfbConfig: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'alerting.ttfb_config.delete',
+        target: inputFieldTarget('model', 'model'),
+      },
+    })
     .input(z.object({ model: z.string().min(1) }))
     .mutation(async ({ input }) => {
       const model = normalizeModelId(input.model);
@@ -191,6 +230,12 @@ export const adminAlertingRouter = createTRPCRouter({
       }
     }),
   getTtfbBaseline: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'mutation-typed read: GETs the TTFB alert baseline from the o11y service',
+      },
+    })
     .input(z.object({ model: z.string().min(1) }))
     .mutation(async ({ input }) => {
       try {

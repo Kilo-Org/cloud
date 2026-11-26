@@ -548,7 +548,7 @@ function base64url(input: string): string {
 }
 
 /** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
- *  `generateApiToken` in packages/web-shared/src/lib/tokens.ts). */
+ *  `generateApiToken` in apps/web/src/lib/auth/kilo-token-signing.ts). */
 function makeToken(payload: Record<string, unknown>): string {
   return `${base64url('{"alg":"none"}')}.${base64url(JSON.stringify(payload))}.signature`;
 }

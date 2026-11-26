@@ -10,17 +10,23 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   const actual = jest.requireActual('@/lib/device-auth/device-auth');
   return { ...actual, approveDeviceAuthRequest: jest.fn() };
 });
+jest.mock('@/lib/security-notices', () => ({
+  ...jest.requireActual('@/lib/security-notices'),
+  scheduleSecurityNotice: jest.fn(),
+}));
 import {
   approveDeviceAuthRequest,
   DEVICE_AUTH_REFUSAL_CODES,
   DeviceAuthRefusalError,
   refusalCopyFor,
 } from '@/lib/device-auth/device-auth';
+import { scheduleSecurityNotice } from '@/lib/security-notices';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { POST } from './route';
 
 const mockApprove = jest.mocked(approveDeviceAuthRequest);
 const mockGetUserFromSession = jest.mocked(getUserFromSessionForCredentialIssuance);
+const mockScheduleSecurityNotice = jest.mocked(scheduleSecurityNotice);
 
 describe('POST /api/device-auth/tokens', () => {
   const createRequest = (body: string, headers: Record<string, string> = {}) =>
@@ -34,6 +40,12 @@ describe('POST /api/device-auth/tokens', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockApprove.mockResolvedValue({
+      id: 'request-1',
+      requestingClientName: null,
+      userAgent: 'Kilo-Code/1.2.3',
+      ipAddress: '198.51.100.24',
+    });
   });
 
   it('approves a valid code for an authenticated same-origin session', async () => {
@@ -49,6 +61,67 @@ describe('POST /api/device-auth/tokens', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
     expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {});
+  });
+
+  it('sends one approval notice naming the requesting device, not the approver', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+
+    await POST(createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders));
+
+    expect(mockScheduleSecurityNotice).toHaveBeenCalledTimes(1);
+    expect(mockScheduleSecurityNotice).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1' }),
+      {
+        type: 'device_sign_in_approved',
+        deviceAuthRequestId: 'request-1',
+        requester: { kind: 'recognised', label: 'Kilo CLI' },
+        requestIp: '198.51.100.24',
+      },
+      expect.objectContaining({ actor: 'owner', occurredAt: expect.any(Date) })
+    );
+  });
+
+  it('attributes a name the requesting device chose to that device', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+    mockApprove.mockResolvedValueOnce({
+      id: 'request-2',
+      requestingClientName: 'Kilo security check',
+      userAgent: 'Kilo-Code/1.2.3',
+      ipAddress: null,
+    });
+
+    await POST(createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders));
+
+    expect(mockScheduleSecurityNotice).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        requester: { kind: 'self_named', name: 'Kilo security check' },
+      }),
+      expect.anything()
+    );
+  });
+
+  it('sends no notice when the approval is refused', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+    mockApprove.mockRejectedValueOnce(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending)
+    );
+
+    const response = await POST(
+      createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders)
+    );
+
+    expect(response.status).toBe(409);
+    expect(mockScheduleSecurityNotice).not.toHaveBeenCalled();
   });
 
   it('passes the confirmed client to the approval', async () => {

@@ -304,6 +304,8 @@ type EnrollResult = {
   enrolledTier: ContributorTier;
   creditAmountUsd: number;
   creditGranted: boolean;
+  /** The Kilo account the membership credits, null when none is linked. */
+  creditedKiloUserId: string | null;
 };
 
 function getContributorTierSuggestion(input: {
@@ -881,6 +883,7 @@ export async function enrollContributorChampion(input: {
     enrolledTier: resolvedTier,
     creditAmountUsd,
     creditGranted,
+    creditedKiloUserId: linkedKiloUserId,
   };
 }
 
@@ -889,6 +892,8 @@ type UpgradeResult = {
   creditGrantedUsd: number;
   /** Amount still due inside the current window, with no Kilo account linked. */
   creditPendingUsd: number;
+  /** The Kilo account the membership credits, null when none is linked. */
+  creditedKiloUserId: string | null;
 };
 
 export async function upgradeContributorChampionTier(input: {
@@ -977,6 +982,7 @@ export async function upgradeContributorChampionTier(input: {
     upgradedTier: input.newTier,
     creditGrantedUsd: result.creditGrantedUsd,
     creditPendingUsd: result.creditPendingUsd,
+    creditedKiloUserId: linkedKiloUserId,
   };
 }
 
@@ -1334,7 +1340,12 @@ export async function manualEnrollContributor(input: {
     return grant.grantedMicrodollars > 0;
   });
 
-  return { enrolledTier: resolvedTier, creditAmountUsd, creditGranted };
+  return {
+    enrolledTier: resolvedTier,
+    creditAmountUsd,
+    creditGranted,
+    creditedKiloUserId: linkedKiloUserId,
+  };
 }
 
 export type {

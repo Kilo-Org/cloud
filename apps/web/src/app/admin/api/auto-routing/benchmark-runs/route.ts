@@ -11,6 +11,11 @@ import {
   listBenchmarkRuns,
   startBenchmarkRun,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import {
+  addAdminAuditMetadata,
+  auditedAdminRoute,
+  setAdminAuditActor,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET(request: NextRequest) {
@@ -33,27 +38,28 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result.body, { status: result.status });
 }
 
-export async function POST(request: NextRequest) {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
+export const POST = auditedAdminRoute(
+  { kind: 'declarative', action: 'auto_routing.benchmark_run.start' },
+  async (request: NextRequest) => {
+    const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(user);
 
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const parsed = StartBenchmarkRunRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid start benchmark run request' }, { status: 400 });
+    }
+    const { kind, force, queue, router } = parsed.data;
+    addAdminAuditMetadata({ kind, force, queue, router });
+
+    const result = await startBenchmarkRun(kind, force, queue, router);
+    return NextResponse.json(result.body, { status: result.status });
   }
-
-  const parsed = StartBenchmarkRunRequestSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid start benchmark run request' }, { status: 400 });
-  }
-
-  const result = await startBenchmarkRun(
-    parsed.data.kind,
-    parsed.data.force,
-    parsed.data.queue,
-    parsed.data.router
-  );
-  return NextResponse.json(result.body, { status: result.status });
-}
+);

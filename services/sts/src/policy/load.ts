@@ -1,8 +1,10 @@
 import type { StsEnvironment, StsScopeRegistry } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
+import type { CloudflareDeployPins } from '../constants';
 import { sha256Base64Url } from '../crypto/hash';
 import {
   PolicySchema,
+  isLeaseDynamicGrant,
   policyFileProblems,
   vercelEnvironmentKey,
   type DynamicGrant,
@@ -22,7 +24,9 @@ export type PolicySnapshotEntry = {
   audiences?: string[];
   scopes?: string[];
   /**
-   * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant; absent when the
+   * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant, and one
+   * `cloudflare-deploy:<permissionSet>:<ttlSeconds>:<maxActive>:<maxPerHour>:<groups>:<zones>` with
+   * the first 8 characters of each sorted id, so a changed group or zone shows. Absent when the
    * policy has none, so the snapshot and its hash stay what a reader without leases expects (a
    * rollback to it then parses the stored snapshot).
    */
@@ -30,7 +34,16 @@ export type PolicySnapshotEntry = {
 };
 
 function dynamicKey(entry: DynamicGrant): string {
-  return `${entry.grant}:${entry.maxTtlSeconds}:${entry.defaultTtlSeconds}:${entry.maxActive}`;
+  if (isLeaseDynamicGrant(entry)) {
+    return `${entry.grant}:${entry.maxTtlSeconds}:${entry.defaultTtlSeconds}:${entry.maxActive}`;
+  }
+  const short = (ids: string[]) =>
+    [...ids]
+      .sort()
+      .map(id => id.slice(0, 8))
+      .join('+');
+  const groups = short(entry.permissionGroups.map(group => group.id));
+  return `${entry.grant}:${entry.permissionSet}:${entry.ttlSeconds}:${entry.maxActive}:${entry.maxPerHour}:${groups}:${short(entry.zones)}`;
 }
 
 export type PolicyIndex = {
@@ -84,10 +97,17 @@ function bindingKeys(policy: Policy): string[] {
   }
 }
 
-/** `scopeRegistry` is the registry token grants are checked against; tests pass their own. */
+/**
+ * `scopeRegistry` is the registry token grants are checked against, and `cloudflareDeployPins` the
+ * Cloudflare permission groups and zones deploy grants are checked against (default
+ * `CLOUDFLARE_DEPLOY_PINS`); tests pass their own.
+ */
 export function loadPolicies(
   sources: Record<string, string>,
-  options: { scopeRegistry?: StsScopeRegistry } = {}
+  options: {
+    scopeRegistry?: StsScopeRegistry;
+    cloudflareDeployPins?: CloudflareDeployPins;
+  } = {}
 ): PolicyIndex {
   const policies: Policy[] = [];
   for (const [file, source] of Object.entries(sources)) {
@@ -103,7 +123,11 @@ export function loadPolicies(
       throw new Error(`${file} does not match the policy schema: ${parsed.error.message}`);
     }
     const policy = parsed.data;
-    const problems = policyFileProblems(policy, options.scopeRegistry);
+    const problems = policyFileProblems(
+      policy,
+      options.scopeRegistry,
+      options.cloudflareDeployPins
+    );
     if (problems.length > 0) {
       throw new Error(`${file} is invalid: ${problems.join('; ')}`);
     }

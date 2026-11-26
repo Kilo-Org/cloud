@@ -11,6 +11,7 @@ import { LEASE_OBJECT_DEADLINE_MS, LEASE_RETRY_AFTER_SECONDS } from '../constant
 import { getLeaseStub } from '../dos/stubs';
 import type { Env, StsConfig } from '../env';
 import type { PolicyIndex } from '../policy/load';
+import { leaseDynamicGrant } from '../policy/schema';
 import { callWithDeadline } from '../rpc';
 
 /** An identified lease caller: the audit fields, plus the stable claims its denial rows carry. */
@@ -69,7 +70,7 @@ export async function serveLease(
   if (!parsed.success) return { status: 'invalid_request' };
   const { grant } = parsed.data;
   const policy = input.policies.get(config.environment, caller.workload);
-  const entry = policy?.dynamic.find(candidate => candidate.grant === grant);
+  const entry = policy === null ? undefined : leaseDynamicGrant(policy, grant);
   if (entry === undefined) {
     const reason = policy === null ? 'unknown_workload' : 'grant_not_allowed';
     recordLeaseDenial(env, config, caller, waitUntil, reason, { grant });

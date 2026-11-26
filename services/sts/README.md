@@ -2,10 +2,11 @@
 
 STS serves each workload one bundle of runtime secrets read from Infisical Cloud EU, it mints
 short-lived service tokens (Ed25519 JWTs, one audience and one scope each) for the audiences a
-workload's policy grants, and it brokers database leases from Infisical's dynamic PostgreSQL
-engine for the lease grants a policy lists. It records every delivery, mint, lease and key change
-in audit logs that a queue relays to the audit pipeline. CI deploy tokens and the audit queue
-consumer are not part of this Worker.
+workload's policy grants, it brokers database leases from Infisical's dynamic PostgreSQL engine
+for the lease grants a policy lists, and it mints 1-hour Cloudflare deploy tokens for the GitHub
+deploy jobs a policy names. It records every delivery, mint, lease, deploy token and key change in
+audit logs that a queue relays to the audit pipeline. The audit queue consumer is not part of this
+Worker.
 
 ## How a read works
 
@@ -226,7 +227,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
   regular refresh, with no backoff. The refresher records the failure
   (`refresher_state.ci_failed_at`), so until then a fill of an empty CI bundle object makes no
   manager read while `/workloads` and `/shared` are current: a refused `/ci` costs at most one read
-  per refresh interval, not one per CI request.
+  per refresh interval, not one per CI request. The read drops every entry in `/ci/minting` and
+  below before anything else sees it: those are the minting credentials, which only the
+  deploy-token object reads, with a read of its own
+  ([Cloudflare deploy tokens](#cloudflare-deploy-tokens)).
 - **Missing folder.** Infisical answers a folder that does not exist with 404 and error
   `SecretPathNotFound`; STS reads that as an empty folder, not an outage. Only a transport error, a
   timeout, 429, 5xx, a refused login or a malformed response counts as unreachable.
@@ -250,15 +254,16 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 
 ### Internal Durable Objects
 
-`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`, `TokenSignerDO` and `LeaseDO` are internal.
-Their methods skip the policy check and the audit row that `SecretsBroker` performs (the token
-signer signs what STS's policy check allowed, the lease object leases what it allowed), so no other
-Worker may reach them: a `durable_objects.bindings[].script_name`, workflow `script_name`, migration
-`from_script` or export `transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe`
-binding, or an STS service binding at any entrypoint other than `SecretsBroker` fails
-`test/repo/worker-configs.test.ts`. A config outside `services/sts/` that binds a class named
-`BundleDO`, `RefresherDO`, `DenialDO`, `TokenSignerDO` or `LeaseDO` fails too (`SignerDO` is also
-the audit relay's own class name).
+`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`, `TokenSignerDO`, `LeaseDO` and `DeployTokenDO`
+are internal. Their methods skip the policy check and the audit row that `SecretsBroker` performs
+(the token signer signs what STS's policy check allowed, the lease and deploy-token objects lease
+and mint what it allowed), so no other Worker may reach them: a
+`durable_objects.bindings[].script_name`, workflow `script_name`, migration `from_script` or export
+`transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe` binding, or an STS service
+binding at any entrypoint other than `SecretsBroker` fails `test/repo/worker-configs.test.ts`. A
+config outside `services/sts/` that binds a class named `BundleDO`, `RefresherDO`, `DenialDO`,
+`TokenSignerDO`, `LeaseDO` or `DeployTokenDO` fails too (`SignerDO` is also the audit relay's own
+class name).
 
 ## Configuration
 
@@ -277,14 +282,16 @@ at the start of each entry.
 | `DO_JURISDICTION` | `eu` in production and staging, `none` locally. |
 | `TOKEN_SIGNING_KIDS_REVOKED` | Comma list of service-token signing kids taken out of service; empty by default (runbook above). |
 | `LEASE_CI_MIGRATION_TARGET` | `<host>:<port>/<database>` of the primary's direct endpoint, returned with a `ci-migration` lease; empty returns no target. Plain values, never a credential. |
+| `CF_DEPLOY_ACCOUNT_ID` | The Cloudflare account STS mints CI deploy tokens in (32 hexadecimal characters). Empty: this environment mints none, and every deploy-token request answers `unavailable` ([Cloudflare deploy tokens](#cloudflare-deploy-tokens)). Not a credential. |
 
 Wrangler inherits no vars into an env block, so every block sets each var, and
 `test/repo/worker-configs.test.ts` checks that each STS block passes the same schema `readConfig`
 uses and that its `STS_ISSUER` equals `STS_ISSUERS` in `@kilocode/sts-contracts`.
 
 Bindings: `AUDIT_QUEUE` (queue producer), `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`,
-`STS_DENIAL_DO`, `STS_TOKEN_SIGNER_DO` (migration `v3`), `STS_LEASE_DO` (migration `v4`). Trigger:
-cron `*/5 * * * *` in production and staging, `[]` in the local block.
+`STS_DENIAL_DO`, `STS_TOKEN_SIGNER_DO` (migration `v3`), `STS_LEASE_DO` (migration `v4`),
+`STS_DEPLOY_TOKEN_DO` (migration `v5`). Trigger: cron `*/5 * * * *` in production and staging, `[]`
+in the local block.
 
 ## Policy
 
@@ -320,7 +327,10 @@ hold; both default to empty, so a policy without them mints nothing. Every scope
 `STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`; today only the canary scopes `web:sts.canary` and `usage-ingest:sts.canary`) and
 belong to a listed audience, every audience needs at least one scope, and no audience may be the
 workload itself. `dynamic` lists the database lease grants the workload may request
-([Database leases](#database-leases)); it defaults to empty, so a policy without it leases nothing.
+([Database leases](#database-leases)) and its Cloudflare deploy-token grant
+([Cloudflare deploy tokens](#cloudflare-deploy-tokens)); it defaults to empty, so a policy without
+it leases and mints nothing. No policy may name a minting credential (`CLOUDFLARE_MINTING_TOKEN`)
+in `secrets`, whatever its identity.
 
 ```yaml
 audiences: [web]
@@ -993,6 +1003,444 @@ rest. A workload at its limits on its one grant has two distinct refusals (`too_
 many unknown lease ids: one hop per distinct id, until 100 distinct denials in the minute, after
 which the isolate counts the rest as one overflow row per reason.
 
+## Cloudflare deploy tokens
+
+STS mints one Cloudflare account API token for one CI deploy (design 4.4, 4.5 and 6.1 job 3). The
+deploy job proves itself with its GitHub OIDC token; STS creates the token with a minting
+credential that only STS reads, for the permission set the job's policy names, for at most 1 hour.
+Cloudflare does not federate GitHub OIDC, so this replaces a stored long-lived deploy token.
+
+**What the token can do, and what it cannot be limited to.** STS cannot limit a minted token to
+named Workers. Cloudflare has documented tokens scoped to "Specified Workers" (the `Individual
+Workers Admin` and `Editor` groups, account-owned tokens) since 2026-09-15
+(https://developers.cloudflare.com/changelog/post/2026-09-15-granular-worker-permissions/), but
+creating one fails with `"com.cloudflare.edge.worker.script" is not a supported resource type`,
+in the dashboard as through the API (reports from 2026-09-28 to 2026-10-15, for example
+https://community.cloudflare.com/t/cannot-create-api-token-scoped-to-one-worker/963400), the
+create-token docs still name only the User, Account and Zone resource types
+(https://developers.cloudflare.com/fundamentals/api/how-to/create-via-api/), and no script
+resource key is published. Custom Domains have no per-Worker roles, and creating a new Worker
+needs product-level Admin (https://developers.cloudflare.com/workers/authorization/workers/).
+Setup check 6 tries such a token; until it works, a token with `Workers Scripts Write` can change
+every Worker in the account for its hour, and a token with zone `Workers Routes Write` every route
+of its zones. This is the fallback that the bouncer integration design accepts (section 4): an
+account-wide deploy right, only for a job of one repository's protected GitHub environment on
+`main`, for 1 hour. While staging and production share one
+account (below), the loader holds every `cloudflare-deploy` grant, in every environment, to
+`refs/heads/main` alone (`CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS` in `src/constants.ts`), so
+the gate is `main` whichever environment's policy minted the token. `main` is not the whole gate:
+while the account is shared, a staging job on `main` gets production-Worker rights without the
+production GitHub environment's protection rules, so the staging deploy environment must carry
+the same rules (setup step 6 checks it). A policy's `intendedScripts` lists the Workers the job
+deploys, for review and audit only; STS does not and cannot enforce it.
+An account-wide deploy right also lets its holder deploy a Worker that binds STS with any
+`props.caller` and so read that workload's bundle (design 6.4, deploy-level trust): for its hour,
+a minted token is as strong as the stored deploy token it replaces (design decision Q65). That
+includes STS itself: STS deploys into the same account, so a minted token can replace the STS
+Worker, and the replacement keeps STS's bindings (its signer and Durable Objects), reads
+`/ci/minting` and mints with the minting token directly, past the pinned groups, the hour and the
+audit. With the minting token it can create account tokens that outlive any hour. The stored
+deploy token reaches STS the same way today. Moving STS into its own Cloudflare account, where no
+deploy token reaches it, closes this; that is an open owner decision with the staging account
+(design Q65).
+
+The hour bounds the token, not what it leaves behind. A misused token can deploy or replace a
+Worker, and that Worker keeps running after the token expired: one that binds STS with any
+`props.caller` keeps reading that workload's bundle until someone finds and removes it. Staging
+and production share one Cloudflare account (the single `account_id` in `wrangler.jsonc`), so a
+token minted by staging STS for a staging deploy job can also overwrite production Workers for its
+hour; the `sts-<environment>-` name prefix separates only STS's own bookkeeping (the sweep), not
+what a token can reach. That is the same reach as the stored deploy token it replaces. A separate
+Cloudflare account for staging would close it, and would let the `main`-only rule above relax for
+staging; that is an open owner decision (design Q65). The detective control is the window check
+below: about 2 minutes after each token's hour ends, STS lists the account's Worker scripts and
+its zones' Workers routes, and writes `deploy_token.unexpected_script` or
+`deploy_token.unexpected_route` for a change that no token live at the time intended. It cannot
+see a Worker created and deleted inside the window. Nor can it see a change to the STS Worker of
+its own environment: a token that replaced STS also replaced the code that runs the check. A
+monitor outside STS covers that (setup step 7).
+
+**Policy.** A `github-oidc` policy bound to a GitHub environment lists one `cloudflare-deploy`
+entry in `dynamic`:
+
+```yaml
+workload: ci-deploy-bouncer
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/bouncer
+  repositoryId: '<repository id>'
+  repositoryOwnerId: '<owner id>'
+  environment: production
+  jobWorkflowRefs: [Kilo-Org/bouncer/.github/workflows/deploy.yml@refs/heads/main]
+  events: [push]
+secrets: []
+dynamic:
+  - grant: cloudflare-deploy
+    permissionSet: bouncer-deploy
+    permissionGroups: # ids from GET /accounts/<account>/tokens/permission_groups (setup step 3)
+      - { id: '<id>', name: Workers Scripts Write, scope: account }
+      - { id: '<id>', name: Containers Write, scope: account }
+      - { id: '<id>', name: Workers Routes Write, scope: zone }
+    zones: ['<kiloapps.io zone id>']
+    intendedScripts: [bouncer, bouncer-watch]
+    intendedRoutes: [] # zone route patterns the job may add or change; bouncer uses a Custom Domain
+    ttlSeconds: 3600 # the default; 300 to 3600
+    maxActive: 2 # unexpired tokens at once
+    maxPerHour: 4 # mint requests per hour, whatever their outcome
+```
+
+STS sends only the ids: the `account` groups apply to the account in `CF_DEPLOY_ACCOUNT_ID`, the
+`zone` groups to each listed zone. A name never authorizes and is never sent. It is Cloudflare's
+name for that id, copied in setup step 3: the minted token must come back with exactly that name
+for each id (see "How a token is made"), so a mislabelled id is caught at the first mint. The
+loader refuses the grant on any identity but a `github-oidc` one with an `environment`, one that
+accepts a ref other than `refs/heads/main` (in every environment while the account is shared; a
+production policy also accepts only `refs/heads/main`, as every GitHub policy does), a second
+`cloudflare-deploy` entry, a `ttlSeconds` above 3600 or below 300, a `maxActive` above 3, a
+`maxPerHour` above 12 or below `maxActive`, a group listed twice, a `zone` group without zones or
+zones without a `zone` group, a group whose name matches `API Token` or `member`, and any group or
+zone outside the pins in `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`). Those pins hold three
+lists, filled in at setup step 3 and empty until then: `allowedGroups`, the only groups a grant may
+list, each with its scope (the three deploy groups); `allowedZones`, per STS environment, the only
+zones a grant of that environment may list (`kiloapps.io` serves staging and production alike, so
+it is in both lists and this check cannot separate them; it keeps every other zone out); and
+`forbiddenGroupIds`, the token, member, role and account-settings groups, which a deploy token
+that can create tokens or manage members could use to make a credential that outlives its hour.
+`DeployTokenDO` checks the same pins again before it calls Cloudflare. While `allowedGroups` or
+`forbiddenGroupIds` is empty and `CF_DEPLOY_ACCOUNT_ID` is set, it refuses every mint with
+`denied` `not_configured` (403, not retryable) and calls nothing, so setup step 5 cannot take
+effect before step 3. The minting token's own policy does not stop a token group: it must hold
+`Account API Tokens Write` to mint at all, and Cloudflare documents no rule that limits what an
+account token may grant to the tokens it creates (the subset rule on
+https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/ is written
+for members). So the pins and the runtime check of the returned token are what keep token
+provisioning, and any group beyond the deploy groups, out of a minted token; setup check 6
+confirms the minting token's fixed policy bounds it too.
+
+**Calling it.** The job asks with no body and revokes in an `always()` step:
+
+```sh
+oidc() { curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://sts.kiloapps.io" | jq -r .value; }
+answer=$(curl -sS --fail-with-body -X POST https://sts.kiloapps.io/v1/ci/cloudflare-deploy-token \
+  -H "Authorization: Bearer $(oidc)")
+echo "::add-mask::$(jq -r .token <<<"$answer")"
+# CLOUDFLARE_API_TOKEN=<.token> pnpm run deploy && pnpm run watch:deploy
+# then, in an always() step, with a fresh OIDC token:
+curl -sS -X POST https://sts.kiloapps.io/v1/ci/cloudflare-deploy-token/revoke \
+  -H "Authorization: Bearer $(oidc)" -H 'content-type: application/json' \
+  -d "{\"tokenId\":\"$(jq -r .tokenId <<<"$answer")\"}"
+```
+
+| Answer | HTTP | Meaning |
+|---|---|---|
+| `ok` | 200 | `token` (`cfat_...`), `tokenId`, `expiresAt`, `ttlSeconds`, `permissionSet` |
+| `denied` | 401 or 403 | `identity_rejected` (401: another workflow, event, ref or GitHub environment, a fork's event, or a token without a run id), `unknown_workload`, `environment_mismatch`, `grant_not_allowed`, `not_configured` (STS's setup step 3 has not pinned the forbidden and allowed groups; no retry helps) |
+| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` unexpired tokens, one being made or one whose deletion failed included), `rate_limited` (`maxPerHour` mint requests in the last hour) or `account_limit` (this environment holds 100 tokens that may exist at Cloudflare: being made, unexpired, owed a deletion, possibly left by a creation whose outcome is unknown (not one Cloudflare refused or that was never sent), or found by the sweep and not yet deleted; two environments then hold at most 200 of the account's 500, 5 minutes) |
+| `invalid_request` | 400 (413 above 1 KB) | A body other than empty or `{}` |
+| `unavailable` | 503, `Retry-After` | No minting credential, Cloudflare refused or failed (a 429's `Retry-After` is passed on), the object did not answer in 35 seconds, or the environment has no `CF_DEPLOY_ACCOUNT_ID` |
+
+Revoke answers `revoked` (200) for the caller's own token, also when it is already deleted (no
+Cloudflare call then), and `not_found` (404) for any token id STS did not hand to this workload
+and run: another workload's, another run's of the same workflow (a re-run attempt of the same run
+may revoke it), or one STS never issued. Each `not_found` writes a denial row with its reason
+(`not_owner`, `other_run`, `unknown_token`). After a failed deletion, a revoke before the row's
+retry time answers `unavailable` with the time left and makes no Cloudflare call: the caller and
+the alarm wait for the same retry time.
+
+**How a token is made.** The Worker checks the job's token and the policy grant, then makes one
+call to `DeployTokenDO`, one object per environment, bounded at 35 seconds and never retried (a
+creation changes the account). The object's 30-second budget runs from when STS called it. The
+object:
+
+1. Refuses a request that reached it after its budget, or while Cloudflare's last `Retry-After`
+   runs, with no Cloudflare call. Refuses a grant that lists a pinned forbidden group id (the
+   loader refuses it too) and a request at the workload's limits. A creation in progress holds
+   its slot as a `pending` row, and the object sets its alarm to the row's budget end: if the
+   object stops during the creation, the alarm ends the row as an `unknown` outcome (step 5).
+2. Reads the minting credential: `CLOUDFLARE_MINTING_TOKEN` in `/ci/minting` of its own
+   environment, with `GET /api/v4/secrets` for that folder alone (`recursive=false`), as the STS
+   identity. It keeps the value in memory only, for 4 minutes (a rotation reaches it within 4
+   minutes) or until Cloudflare answers 401 or 403 to it.
+3. Calls `POST /accounts/<CF_DEPLOY_ACCOUNT_ID>/tokens` with `name`
+   `sts-<environment>-<workload>-<run id>-<row>`, the policies above, `not_before` now and
+   `expires_on` now plus `ttlSeconds`, whole seconds
+   (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/create/).
+4. Deletes the token at once and answers `unavailable` when it cannot hand it over: the budget ran
+   out before or right after the `deploy_token.minted` row was written (`late`), Cloudflare's
+   `expires_on` is later than the one asked for, or more than 2 minutes earlier
+   (`expiry_mismatch`; the job is told the requested lifetime, so a later expiry is never handed
+   over), the answer names the token but cannot be read otherwise (`grant_mismatch`), the policies
+   Cloudflare returns are not exactly the ones sent (`grant_mismatch`: the same effect, group ids
+   and resources per policy, and each group named exactly as the policy declares its id, so a
+   group without a name or with another name fails; the loader refuses a declared name like a
+   token or member administration group, and step 1 a pinned id, so an exact match holds
+   neither), or the row could not be written (`audit_failed`). The token value never leaves the
+   object then.
+5. Otherwise writes `deploy_token.minted` and marks the row active in the same output gate, and
+   returns the token. A creation Cloudflare refused (4xx) writes `deploy_token.mint_failed` with
+   outcome `refused` and the status. A creation that timed out, got a 5xx, or got an answer that
+   names no token id, or was cut off by the object stopping, may have made a token nobody received: it
+   writes `deploy_token.mint_failed` with outcome `unknown` and the token's name, and the sweep
+   deletes that token once it expired (it is brought forward to then: the requested expiry plus
+   2 minutes, or, for a creation cut off, the budget end plus 1 hour and 2 minutes).
+
+**Deletion, the reaper and the sweep.** An expired Cloudflare token stays in the account and
+counts against its cap of 500 account tokens
+(https://developers.cloudflare.com/fundamentals/api/reference/limits/), so STS deletes every token
+it made: on the owner's revoke, and otherwise at expiry, when the object's alarm marks the row owed
+and calls `DELETE /accounts/<account>/tokens/<id>`. A deletion Cloudflare cannot take stays owed on
+the row until it succeeds, also after expiry: the first failure writes a row with result
+`delete_failed` (if that append fails, the next failure writes it), and the alarm retries no sooner
+than 30 seconds after the last attempt, doubling per failure up to 1 hour, or after Cloudflare's
+`Retry-After` when longer. One alarm makes at most 5 deletes, least recently tried first, and an
+alarm that retried waits 30 seconds before the next retry. A caller's revoke answers `unavailable`
+meanwhile, with the time left; a revoke that arrives while the alarm is deleting that token joins
+that call and answers from its outcome. Once a day, and once more after a creation whose outcome
+STS does not know, the alarm also sweeps the account's token list (`GET
+/accounts/<account>/tokens`, 50 a page, 2 pages per
+alarm) and deletes every token whose name starts with `sts-<environment>-`, for which STS holds no
+row, and that has expired or carries no expiry (STS always sets one, so such a token is not one it
+handed over). It never touches another environment's tokens, an unexpired token, or a token
+named otherwise. The list asks for expired tokens too (`include_expired=true`): Cloudflare leaves
+them out otherwise, and lists them only while recently expired
+(https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/list/), so a
+lost creation's token is swept 2 minutes after its expiry. A token the sweep cannot delete (a 403,
+a 5xx, no answer) does not hold the sweep up: it goes into `deploy_token_sweep_retry`, the sweep
+passes over it, finishes its pages and runs again a day later, and the alarm tries that token
+again by id, 30 seconds after the failure, doubling per failure up to a day. Its `delete_failed`
+row is written once, and its `deleted` (or `gone`) row once Cloudflare takes it. A 401 or a 429
+on a sweep delete stops the sweep as on any call (the hold or Cloudflare's wait below, then the
+same page again) and adds no wait of the token's own. A 429 without a readable `Retry-After`
+waits 1 minute. Until it is deleted, such a token counts against the environment's 100-token
+share (`account_limit`), as it does against the account's cap. When Cloudflare answers 401 or 403
+to the minting credential on a list, or 401 on a delete or a token creation (a 403 there can refuse
+just that request: a group outside the minting token's own policy, or a token an earlier minting
+token created, see "Rotation"), the object drops the credential and stores a hold: until it ends,
+the alarm makes no Cloudflare call and reads no credential (deletes, the window check and the
+sweep all wait for it, the sweep's next run included). The hold starts at 1 minute and doubles
+with each refusal up to 1 hour; a call Cloudflare accepts ends it. A mint or revoke a caller asks
+for still reads the credential again, so a replaced minting token works at once. Rows are deleted
+a day after their token was deleted, and a handed-over token's row only once its window check
+ended.
+
+**Window check (detective control).** About 2 minutes after a handed-over token's live window
+closes (its deletion or expiry, plus the 2-minute clock tolerance), the alarm lists the account's
+Worker scripts (`GET /accounts/<account>/workers/scripts`, one call: the list has no pages,
+https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/list/) and,
+for each zone the closed windows' grants list, the zone's Workers routes (`GET
+/zones/<zone>/workers/routes`, one call per zone with no pages,
+https://developers.cloudflare.com/api/resources/workers/subresources/routes/methods/list/). It
+runs before the alarm's deletions, so deletions that keep failing cannot starve it. A window runs
+from the token's creation to its deletion or expiry, widened by 2 minutes on each side.
+
+- **Scripts.** Every script whose `modified_on` falls inside a closed window, and not inside a
+  window checked before (that check already compared it), is compared with the `intendedScripts`
+  of every token live at that moment. A script none of them names gets one
+  `deploy_token.unexpected_script` row.
+- **Routes.** A route list carries no modification time, so STS keeps each zone's list from its
+  previous check and compares: a route added or changed since then (its pattern or its Worker)
+  gets one `deploy_token.unexpected_route` row (with the previous Worker) unless a token with that
+  zone live since the previous list intends both its Worker (`intendedScripts`) and its pattern
+  (`intendedRoutes`). One token must intend the pair, so one token's pattern pointed at another
+  token's Worker is reported, and so is a deploy that widens or adds a pattern for its own Worker,
+  sending another host's traffic to it. A zone's first list has nothing to compare with, so it
+  reports every route outside the intended Workers and patterns (`firstListOfZone: true`); that is
+  noise once per zone, chosen over silently trusting the first list. The list is stored with the
+  windows' check mark, in one write.
+- **Bounds.** At most 20 rows of each kind per check, each with the total; at most 8 zones per
+  check (windows with further zones wait for the next alarm, a second later); a zone with more
+  than 1,000 routes fails the check.
+- **Failures.** A failed check (no credential, a failed or refused list, a row that could not be
+  written) counts against each window in it and is tried again 15 minutes later, then 30. After 3
+  failures the window gets `deploy_token.script_check_failed` (attempts, last reason) and stops
+  holding its row. A 401 or 403 also starts the credential hold above.
+- **What it cannot see.** A Worker or route created and deleted inside a window leaves nothing in
+  the lists, and that is exactly how a misused token would read a bundle and clean up. A later
+  deploy of the same script, inside or after the window, hides an earlier change (only the last
+  `modified_on` is visible). A removed route, or one switched to no Worker, is not reported.
+  Workers for Platforms dispatch-namespace scripts (`Workers Scripts Write` reaches them too),
+  Containers, Custom Domains, secrets and other Worker settings that leave `modified_on` alone are
+  not listed. Listed scripts without a name or a time are left out; the check logs how many. A
+  change by someone else in a window (the dashboard, another deploy credential, the other
+  environment's STS in the shared account) also shows. A change to the STS Worker of the same
+  environment is reported only by a check the changed STS still runs, so it is not a control for
+  that case (setup step 7).
+- **Why not Cloudflare's audit log.** Audit Logs v2
+  (https://developers.cloudflare.com/api/resources/accounts/subresources/logs/subresources/audit/methods/list/)
+  name the acting API token (`actor.token_id`, `actor.token_name`) and are kept 18 months
+  (https://developers.cloudflare.com/fundamentals/account/account-security/audit-logs/), so
+  filtered to the minted token they would also show deletions and route changes. STS does not use
+  them yet: they need `Audit Logs Read` (or Account Settings Read) on the minting token; the API
+  documents only exclusion filters for the token id; the docs cover "about 95 % of
+  products" without naming the Workers endpoints, state no ingestion delay and no per-plan
+  availability; and without one real entry for a `wrangler deploy`, a check cannot tell a
+  script upload from other actions. It is recorded as the stronger option in design Q65, with the
+  staging check that would settle it.
+
+The minting token's `Workers Scripts Write` covers the script list and its zone `Workers Routes
+Write` the route list.
+
+**Minting credential.** Only `DeployTokenDO` reads `/ci/minting`. The refresher drops every entry
+in `/ci/minting` and below from its `/ci` read before it stores or resolves anything, a bundle
+resolves only `/ci/<workload>` (a GitHub workload is named `ci-<job>`, so never `minting`) and
+`/shared`, and the loader refuses `CLOUDFLARE_MINTING_TOKEN` in any policy's `secrets`. The value
+is never written to storage, a log or an audit row: it lives in the object's memory and in the
+`Authorization` header of its Cloudflare calls. Error details carry status codes only, never a
+response body. Accepted: the refresher's recursive `/ci` read still receives the `/ci/minting`
+values over the wire (TLS to Infisical) and drops them in memory. An Infisical permission that
+keeps `/ci/minting` out of that read cannot coexist with the one STS identity that must also read
+`/ci/minting`, and a second identity only for the minting read would add a credential for no
+gain: both reads run in the same Worker.
+
+**Audit.** On the `sts:<environment>:deploy-tokens` stream, with flat attributes and never a
+token value or the minting credential: `ai.kilo.sts.deploy_token.minted` (workload, identity,
+channel, `provider: cloudflare`, `permissionSet`, `tokenId`, `tokenName`, `ttlSeconds`,
+`expiresAt`, `permissionGroups` (ids), `zones`, `intendedScripts`, and the job's `jobWorkflowRef`,
+`runId`, `runAttempt`); `ai.kilo.sts.deploy_token.mint_failed` (outcome `unknown` or `refused`,
+`slot`, `tokenName`, `httpStatus` for a refusal, the workload, permission set and run);
+`ai.kilo.sts.deploy_token.revoked` (`cause`: `caller`, `late`, `expiry_mismatch`,
+`grant_mismatch` or `audit_failed`; `result`: `deleted`, `gone` or `delete_failed`, with outcome
+`failure`); `ai.kilo.sts.deploy_token.reaped` (`source: ledger` with the workload and run, or
+`source: sweep` with the token's name; `result` as above); and
+`ai.kilo.sts.deploy_token.unexpected_script` (`script`, `modifiedAt`, and the `tokenIds`,
+`workloads`, `runIds` and `intendedScripts` of the tokens live then, `unexpectedInCheck`; outcome
+`failure`); `ai.kilo.sts.deploy_token.unexpected_route` (`zone`, `routeId`, `pattern`, `script`,
+`previousScript`, `firstListOfZone`, and the tokens as above); and
+`ai.kilo.sts.deploy_token.script_check_failed` (the token, its workload and run, `attempts`, the
+last `reason`). Refusals go through the denial object as `ai.kilo.sts.deploy_token.denied` with
+their reason, the token id for a revoke, and the caller's stable claims.
+
+**Setup, per environment (staging first). Needs Igor's approval before any step runs.** No step
+is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
+
+1. **Creator.** The minting credential is an account-owned API token, not a person or a dedicated
+   member: account tokens "act as service principals with their own specific set of permissions"
+   (https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/). Only a
+   member with API Token Provisioning or a Super Administrator can create one (same page); Igor, a
+   Super Administrator, does steps 2 and 3 in his own dashboard session. No mailbox, invite or
+   member role is needed. Every Super Administrator of the account (8 today) can see and manage
+   every account token, so each of them can delete or roll the minting token
+   (`PUT /accounts/<account>/tokens/<id>/value`,
+   https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/value/methods/update/)
+   and so obtain a working value; the value itself is shown once, at creation. Both environments'
+   tokens act in the one account staging and production share.
+2. **Minting token.** In **Manage account > Account API tokens > Create Token**, create
+   `sts-minting-<env>` (`sts-minting-staging`, `sts-minting-production`) with exactly these
+   permissions: on the account (`Kilo Code`, `e115e769bcdd4c3d66af59d3332cb394`) `Account API
+   Tokens` Edit, `Workers Scripts` Edit and `Containers` Edit; on the zone `kiloapps.io` `Workers
+   Routes` Edit. No other permission, zone or account; no IP filter (Workers have no fixed egress
+   address); expiry 90 days from creation. The dashboard's Edit is the API's Write. This fixed
+   policy replaces the member role: it is what the deploy rights of every minted token are
+   expected to stay within, and setup check 6 confirms Cloudflare enforces it.
+3. **Permission-group ids.** In the same dashboard session (Super Administrator), read `GET
+   /accounts/<account>/tokens/permission_groups`, which lists every group with its id and name
+   (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/permission_groups/methods/list/);
+   copy the ids and Cloudflare's exact names of the deploy groups of step 2 (`Workers Scripts
+   Write`, `Containers Write`, `Workers Routes Write`) into the policy. Fill
+   `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`): `allowedGroups` with those three ids and their
+   scopes (account, account, zone); `allowedZones` with the `kiloapps.io` zone id for staging and
+   production; and `forbiddenGroupIds` with the ids of every group that reads or writes API tokens,
+   members, roles or account settings (for example `Account API Tokens Write`, `API Tokens Write`,
+   `Account Settings Write`, `Memberships Write`). Then deploy. Ids are resolved here, once, never
+   by name at runtime. Until this deploy, STS refuses every mint (`not_configured`) once step 5
+   set the account.
+4. **Infisical.** Store the minting token as `CLOUDFLARE_MINTING_TOKEN` in `/ci/minting` of the
+   environment. The STS identity's `readValue` on `/ci/**` (the grant every GitHub policy needs,
+   [Infisical setup](#infisical-setup-per-environment)) covers it. No other identity, role or
+   person except the break-glass owner may read `/ci/minting`; the STS deploy job's identity reads
+   `/sts-deploy` only.
+5. **STS.** Set `CF_DEPLOY_ACCOUNT_ID` in that environment's block of `wrangler.jsonc` and deploy;
+   then add the policy (`ci-deploy-bouncer`) with its grant and deploy again.
+6. **Checks in staging.** A staging deploy job gets a token and deploys with it. Try to create a
+   token scoped to one Worker ("Specified Workers", `Individual Workers Editor`), once in the
+   dashboard and once through `POST /accounts/<account>/tokens` with the minting token; record
+   both answers in Q65 before setup goes on. If either works, a follow-up switches minting to
+   per-Worker scope (the script resource key still to be confirmed) and reopens Q65; until then
+   the pins keep the account-wide groups of step 3. Asking Cloudflare
+   with the minting token for a group outside its own policy (for example `DNS Read`) is refused,
+   so its policy is the ceiling; if it is not, the pinned ids and the returned-grant check are the
+   only limit and Q65 is reopened. A minted token cannot create a token (`POST
+   /accounts/<account>/tokens` with it answers 403). The minting token cannot list, roll or delete
+   an account token it did not create: have a Super Administrator create a throwaway canary account
+   token, try each with the minting token, then delete the canary; if any succeeds, the minting
+   token reaches every account token's rights and Q65 is reopened. A minted token that the job did
+   not revoke is gone from the account's token list about an hour later. The sweep's list with
+   `include_expired=true` returns a token that expired a few minutes ago. Whether a rotated minting
+   token still lists and deletes its predecessor's tokens: the list API gives a caller with
+   `list_self` only the tokens it created, and the docs do not say which an account token gets; the
+   answer only changes the rotation step below, not the code. The window check's script list and
+   the zone's route list answer 200 with the minting token. Which rate-limit budget the calls draw
+   from: read the `Ratelimit` header (remaining quota) of a call made with the minting token, run a
+   deploy with a minted token, then read it again; if the deploy's calls lowered it, the minting
+   token and its minted tokens share one budget, if not, each token has its own. Record the answers
+   in the cost paragraph below and Q65. Finally, while the account is shared, confirm in each
+   deploying repository's settings that the GitHub environment a staging `cloudflare-deploy` policy
+   binds carries the same protection rules as production's (required reviewers, deployment branch
+   `main`, no self-review): a staging token reaches production Workers.
+7. **Monitor of the STS Worker, outside STS.** The window check runs inside STS, so it cannot
+   report a change to the STS Worker of its own environment. Set up a scheduled job outside STS
+   (an Axiom monitor on Cloudflare's Workers deployment data, or a cron job with a read-only
+   token) that compares the STS Worker's `modified_on` or current deployment id, per environment,
+   with the runs of the STS deploy job, and alerts on any deployment no run made. This is setup
+   work for staging and production; STS does not build it.
+
+**Rotation (every 90 days, or at once on a leak).** A Super Administrator creates the new minting
+token as in step 2, puts it into `/ci/minting`, and waits 5 minutes (STS reads it within 4). Then
+they wait 1 hour and 5 minutes more, so every token the old credential minted has expired and its
+deletion or sweep has run, and look in **Account API tokens** (a Super Administrator sees every
+account token) for any `sts-<env>-` token still there: STS's deletes with the new credential may be
+refused for tokens the old one created (Cloudflare documents no rule either way; such a 403 fails
+that deletion alone, which STS retries up to hourly). Delete each by hand (STS's next retry then
+finds it gone), then delete the old minting token. On a leak of the minting token, delete it at
+once instead and clear its `sts-<env>-` children by hand the same way; on a leak of a minted token,
+delete it in the dashboard; it expires within the hour anyway.
+
+**Cost.** Per deploy (one token for both of bouncer's deploy steps, revoked by the job): 2 STS
+requests, 2 `DeployTokenDO` calls, 2 Cloudflare API calls (create and delete; a token the job does
+not revoke costs the same delete at expiry), 2 audit rows, at most 2 Infisical reads of
+`/ci/minting` plus 1 login and 1 `SignerDO` call (deploys are sparse, so assume the cached
+credential and access token have lapsed), and the alarms that relay the rows. The window check
+adds, per deploy: 1 script list call and 1 route list call per zone of the grant (1 for bouncer),
+usually with the credential the revoke read 2 minutes before (at most 1 more read, login and
+`SignerDO` call for a token that expired unrevoked), at most 20 rows of each kind, a scan of the
+day's rows against the account's scripts (500 at most on a paid plan) and the zone's routes, and
+a rewrite of each listed zone's stored route list (1 row delete per stored route and 1 row write
+per listed route, plus 1 for the zone: about 2 writes per route of bouncer's zone per deploy).
+At 43 releases a day: 86 STS requests, 86 `DeployTokenDO` calls, 172 Cloudflare calls, 86 audit
+rows, at most 86 Infisical reads and 43 logins (against Infisical's 600 requests a minute). The
+daily sweep adds, once a day: 1 login, 1 `SignerDO` call and 1 Infisical read (the cached
+credential has always lapsed by then) and 1 token list call while STS keeps the account clean (at
+most 10 at the 500-token cap). A token the sweep can never delete (a 403 that never clears, such
+as a predecessor's token after a rotation, or a lasting 5xx) costs, until someone deletes it by
+hand: 1 `delete_failed` row in all, 1 stored row, 1 delete call 30 seconds after the failure and
+then at doubling waits (12 calls in its first 34 hours), then 1 a day, sharing the alarm's 5
+deletes per 30 seconds; it holds one of the environment's 100 places and one of the account's
+500 for as long, and the sweep goes on past it. A failed creation adds 1
+`deploy_token.mint_failed` row; a failed window check repeats its list calls on each retry, at most
+3 times per window, and then writes 1 `deploy_token.script_check_failed` row. Cloudflare's
+published limit is 1,200 requests per 5 minutes per user, counted together across the dashboard,
+API keys and API tokens; its table lists
+the same 1,200 per 5 minutes for "Client API per user/account token"
+(https://developers.cloudflare.com/fundamentals/api/reference/limits/). The page does not say
+which budget an account-owned token's calls count against (the token's own, or the creator's);
+until staging check 6 answers it, assume the worst case: STS's minting calls and every minted
+token's own `wrangler deploy` calls draw from one budget (no person uses these tokens, so no
+dashboard traffic shares it). STS's own share: 43 deploys inside one 5-minute window make 172
+calls (14 %; the window checks come 2 minutes after each revoke, so they may fall into the next
+window); deletion retries add at most 5 deletes and 2 list calls per 30 seconds (70 per 5
+minutes), and every call stops for a 429's `Retry-After`, so
+STS stays under 21 % of the budget even in a burst during a Cloudflare outage. The rest is the
+deploys' own calls, which are the same calls the stored deploy token makes today. When Cloudflare
+refuses the minting credential (a 401, or a 403 on a list), the credential hold stops the alarm
+after its first refused call: a revoked minting token costs 1 login, 1 `SignerDO` call, 1
+Infisical read and 1 Cloudflare call per hold, at 1, 2, 4, ... minutes up to 1 hour (6 in the
+first hour, then 1 an
+hour) until someone replaces it. STS holds at most `maxActive` unexpired tokens per policy (3 at
+most), so the 500-token cap is out of reach while the reaper runs. Volume does not grow with
+clients or Vercel instances: only GitHub deploy jobs with this grant mint.
+
 ## Infisical setup, per environment
 
 **Machine identity with JWT Auth** (https://infisical.com/docs/documentation/platform/identities/jwt-auth;
@@ -1157,7 +1605,15 @@ grants, bundle delivery, ETags, policy narrowing, fills, relay and pruning, the 
 mocked Infisical: login, folder reads, resolution, references, backoff, webhooks; the key-ring
 timeline with an injected clock, the token signer, mint over both entry points and token denials;
 leases over both entry points against a mocked Infisical lease API: lifetimes, clamping, the
-active and per-minute limits, owner-only revocation, undelivered leases, pruning, lease denials)
+active and per-minute limits, owner-only revocation, undelivered leases, pruning, lease denials;
+Cloudflare deploy tokens over HTTP against a fake Cloudflare API and a fake `/ci/minting`: the
+request Cloudflare gets, the limits, owner- and run-bound revocation, failed and retried
+deletions, the reaper and the sweep, the window check of scripts and routes with its timing,
+bounds, retries and give-up, interrupted creations, the credential hold after a refused
+credential, the returned-token checks, the pinned forbidden and allowed groups and zones and the
+refusal while they are empty, the account limit, the policy rules (`main` only while the account
+is shared), the `/ci/minting` filter, and
+no token value or credential in storage, logs or audit rows)
 and then the Node suites: `test/repo/` (policy files, the Worker config checks, and a check that
 every `wrangler.jsonc` under `services/` other than a service's own, a symlink included, sits under
 `test/fixtures/`, which the production deploy job skips, that no `wrangler.json` and no tracked
@@ -1233,6 +1689,53 @@ lease is refused `too_many_active` with no Infisical call, that a GitHub job get
 the other's lease while each revokes its own, that a job of another run cannot revoke the job's
 lease, and that the `lease.created`, `lease.revoked` and `lease.denied` rows reach the queue with
 no username or password.
+
+**Local end-to-end check of Cloudflare deploy tokens.** The test build also carries two deploy
+policies, `ci-e2e-deploy` (1-hour tokens, account and zone groups) and `ci-e2e-deploy-short`
+(5-minute tokens, another repository). `deploy-token-check.ts` serves the fake GitHub issuer, a
+fake Infisical with a synthetic `/ci/minting` credential and a fake Cloudflare account token API
+that records every request, on port 8830, so it runs alone like the other two:
+
+```sh
+cd services/sts
+../../node_modules/.bin/tsx test/fixtures/e2e/deploy-token-check.ts
+# in another shell
+npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/wrangler.sts.jsonc
+```
+
+It checks that a production-shaped deploy job gets a token with exactly the configured permission
+groups on the account and the zone, created with the minting credential, with `expires_on` 1 hour
+after `not_before`; that a job of another workflow file, a `pull_request` job and a job of another
+GitHub environment get 401 with no Cloudflare call; that a creation whose answer is lost (the fake
+makes the token, then answers 502) answers `unavailable` and writes `deploy_token.mint_failed`;
+that another workload and another run cannot revoke the token while the owner job can; that the
+reaper deletes the 5-minute token once it expired (about 6 minutes); that the sweep brought
+forward by the lost answer deletes the lost token once it expired (about 8 minutes); that the
+window check runs about 2 minutes after the revoke and again after the 5-minute token expired,
+listing the Worker scripts and the deploy job's zone routes with the minting credential; that
+`deploy_token.unexpected_script` names, once over both checks, the one Worker changed while both
+tokens were live that neither token's `intendedScripts` names, with both token ids; that
+`deploy_token.unexpected_route` names the one route of the zone repointed at that Worker, with
+the token of that zone; and that the `deploy_token.minted`, `.mint_failed`, `.revoked`,
+`.reaped`, `.unexpected_script`, `.unexpected_route` and `.denied` rows reach the queue with no
+token value and no minting credential.
+
+**Fail-before proof of the deploy-token rules.** Each security rule has a test that fails when the
+rule is removed: owner- and run-bound revoke, the denial reason in the audit row, the audited and
+retried failed revoke, no credential in logs or audit rows, the `/ci/minting` filter and name
+check, the checks of the token Cloudflare returns (unreadable or missing group names, a name other
+than the declared one, another effect, account or zone, a group moved between policies, a later
+expiry, an answer that names the token but cannot be read), the pinned forbidden and allowed
+groups and zones at load and before a mint, the refusal while the pins are empty, the policy
+rules (the `main`-only rule of the shared account included), the limits, the account limit and
+the `rate_limited` retry time, the revoke that waits for the retry time, the reaper, the sweep's
+prefix, expiry and no-expiry rules and its expired-token list, the end of an interrupted creation,
+the `mint_failed` rows, the window check (its timing, the once-per-change rule, the route list
+against the previous list and `intendedRoutes`, the bounds, the dropped-script count, the retries
+and give-up), the credential hold (no call or read during it, the sweep held with it, the
+doubling, a 403 that fails one request alone), and the
+identity denial row. The mutation script that removes each rule in turn and runs its test is kept
+with the PR's proof, not in the repository.
 
 **Local check of the lease SQL.** `sql/leases/check.sh` starts a throwaway PostgreSQL in Docker
 (`PG_IMAGE`, default `postgres:16`; `PG_PORT`, default 55432) shaped like Supabase (`postgres` a

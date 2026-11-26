@@ -2,6 +2,7 @@ import { StsEnvironmentSchema, type StsEnvironment } from '@kilocode/sts-contrac
 import { z } from 'zod';
 import type { BundleDO } from './dos/BundleDO';
 import type { DenialDO } from './dos/DenialDO';
+import type { DeployTokenDO } from './dos/DeployTokenDO';
 import type { LeaseDO } from './dos/LeaseDO';
 import type { RefresherDO } from './dos/RefresherDO';
 import type { SignerDO } from './dos/SignerDO';
@@ -60,6 +61,11 @@ export const EnvVarsSchema = z.object({
   DO_JURISDICTION: z.enum(['eu', 'none']),
   TOKEN_SIGNING_KIDS_REVOKED: RevokedKidsSchema,
   LEASE_CI_MIGRATION_TARGET: DatabaseTargetSchema,
+  /**
+   * The Cloudflare account id STS mints CI deploy tokens in (README "Cloudflare deploy tokens").
+   * Empty: this environment mints none.
+   */
+  CF_DEPLOY_ACCOUNT_ID: z.union([z.literal(''), z.string().regex(/^[0-9a-f]{32}$/)]),
 });
 
 /** The claims Infisical JWT Auth checks on the login JWT; every value is exact (design 4.2). */
@@ -88,6 +94,11 @@ export type StsConfig = {
   revokedTokenKids: readonly string[];
   /** The connection target a `ci-migration` lease returns, or null for none. */
   ciMigrationTarget: DatabaseTarget | null;
+  /**
+   * The Cloudflare account STS mints CI deploy tokens in, or null when this environment mints
+   * none (every deploy-token request answers `unavailable`).
+   */
+  cloudflareDeployAccountId: string | null;
 };
 
 export type Env = {
@@ -101,12 +112,14 @@ export type Env = {
   DO_JURISDICTION: string;
   TOKEN_SIGNING_KIDS_REVOKED: string;
   LEASE_CI_MIGRATION_TARGET: string;
+  CF_DEPLOY_ACCOUNT_ID: string;
   STS_BUNDLE_DO: DurableObjectNamespace<BundleDO>;
   STS_REFRESHER_DO: DurableObjectNamespace<RefresherDO>;
   STS_SIGNER_DO: DurableObjectNamespace<SignerDO>;
   STS_DENIAL_DO: DurableObjectNamespace<DenialDO>;
   STS_TOKEN_SIGNER_DO: DurableObjectNamespace<TokenSignerDO>;
   STS_LEASE_DO: DurableObjectNamespace<LeaseDO>;
+  STS_DEPLOY_TOKEN_DO: DurableObjectNamespace<DeployTokenDO>;
   AUDIT_QUEUE: Queue;
 };
 
@@ -135,5 +148,6 @@ export function readConfig(env: Env): StsConfig {
     },
     revokedTokenKids: vars.TOKEN_SIGNING_KIDS_REVOKED,
     ciMigrationTarget: vars.LEASE_CI_MIGRATION_TARGET,
+    cloudflareDeployAccountId: vars.CF_DEPLOY_ACCOUNT_ID === '' ? null : vars.CF_DEPLOY_ACCOUNT_ID,
   };
 }

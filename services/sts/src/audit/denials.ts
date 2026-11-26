@@ -1,6 +1,9 @@
 import {
   AudienceSchema,
   BUNDLE_DENIED_REASONS,
+  CloudflareTokenIdSchema,
+  DEPLOY_TOKEN_DENIED_REASONS,
+  DEPLOY_TOKEN_LIMITED_REASONS,
   LEASE_DENIED_REASONS,
   LEASE_LIMITED_REASONS,
   LeaseGrantSchema,
@@ -39,6 +42,21 @@ export const LEASE_DENIAL_REASONS = [
 ] as const;
 export type LeaseDenialReason = (typeof LEASE_DENIAL_REASONS)[number];
 
+/**
+ * Why STS refused a Cloudflare deploy token or its revoke: the caller's answer (`denied` or
+ * `limited`), or, for a revoke the caller hears as `not_found`, whether the token is another
+ * workload's (`not_owner`), another GitHub run's of the same workload (`other_run`), or one STS
+ * never issued (`unknown_token`).
+ */
+export const DEPLOY_TOKEN_DENIAL_REASONS = [
+  ...DEPLOY_TOKEN_DENIED_REASONS,
+  ...DEPLOY_TOKEN_LIMITED_REASONS,
+  'not_owner',
+  'other_run',
+  'unknown_token',
+] as const;
+export type DeployTokenDenialReason = (typeof DEPLOY_TOKEN_DENIAL_REASONS)[number];
+
 type DenialBase = {
   channel: 'worker-binding' | 'http';
   actor: string;
@@ -71,7 +89,14 @@ export type LeaseDenial = DenialBase & {
   leaseId?: string;
 };
 
-export type Denial = BundleDenial | TokenDenial | LeaseDenial;
+/** A refused deploy token or revoke from an identified caller; a revoke names the token id. */
+export type DeployTokenDenial = DenialBase & {
+  kind: 'deploy_token';
+  reason: DeployTokenDenialReason;
+  tokenId?: string;
+};
+
+export type Denial = BundleDenial | TokenDenial | LeaseDenial | DeployTokenDenial;
 
 /** The longest actor, claim value, audience or scope a denial row holds. */
 export const DENIAL_FIELD_MAX_LENGTH = 256;
@@ -104,6 +129,12 @@ export const DenialSchema: z.ZodType<Denial> = z.union([
     grant: LeaseGrantSchema.optional(),
     leaseId: LeaseIdSchema.optional(),
   }),
+  z.strictObject({
+    ...DenialBaseSchema,
+    kind: z.literal('deploy_token'),
+    reason: z.enum(DEPLOY_TOKEN_DENIAL_REASONS),
+    tokenId: CloudflareTokenIdSchema.optional(),
+  }),
 ]);
 
 /** Identical denials in one minute merge into one row; this is the identity they merge on. */
@@ -133,6 +164,16 @@ export function denialKey(denial: Denial): string {
       claims,
     ]);
   }
+  if (denial.kind === 'deploy_token') {
+    return JSON.stringify([
+      'deploy_token',
+      denial.channel,
+      denial.reason,
+      denial.actor,
+      denial.tokenId ?? null,
+      claims,
+    ]);
+  }
   return JSON.stringify([denial.channel, denial.reason, denial.actor, claims]);
 }
 
@@ -151,6 +192,8 @@ export function overflowDenial(denial: Denial): Denial {
       return { ...base, kind: 'token', reason: denial.reason };
     case 'lease':
       return { ...base, kind: 'lease', reason: denial.reason };
+    case 'deploy_token':
+      return { ...base, kind: 'deploy_token', reason: denial.reason };
     default:
       return { ...base, reason: denial.reason };
   }

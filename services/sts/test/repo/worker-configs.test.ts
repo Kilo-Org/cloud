@@ -292,6 +292,7 @@ describe('worker config rules', () => {
       DO_JURISDICTION: 'eu',
       TOKEN_SIGNING_KIDS_REVOKED: '',
       LEASE_CI_MIGRATION_TARGET: '',
+      CF_DEPLOY_ACCOUNT_ID: '',
     };
     const sts = (blockVars: Record<string, string>) =>
       parseWorkerConfig('services/sts/wrangler.jsonc', { name: 'sts', vars: blockVars });
@@ -312,6 +313,7 @@ describe('worker config rules', () => {
           ...vars,
           MANAGER_PROJECT_SLUG: 'kilo-project',
           LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:5432/postgres',
+          CF_DEPLOY_ACCOUNT_ID: 'e115e769bcdd4c3d66af59d3332cb394',
         }),
       ])
     ).toEqual([]);
@@ -319,6 +321,7 @@ describe('worker config rules', () => {
       { MANAGER_PROJECT_SLUG: 'Kilo Project' },
       { LEASE_CI_MIGRATION_TARGET: 'postgres://user:secret@db.example.invalid/postgres' },
       { LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:99999/postgres' },
+      { CF_DEPLOY_ACCOUNT_ID: 'cfat_not-an-account-id' },
     ]) {
       expect(stsVarProblems([sts({ ...vars, ...bad })]), JSON.stringify(bad)).toEqual([
         expect.stringContaining('vars do not pass EnvVarsSchema'),

@@ -58,6 +58,8 @@
     "TOKEN_SIGNING_KIDS_REVOKED": "",
     // `<host>:<port>/<database>` a ci-migration lease returns; empty returns none.
     "LEASE_CI_MIGRATION_TARGET": "",
+    // Cloudflare account STS mints CI deploy tokens in; empty mints none (README "Cloudflare deploy tokens").
+    "CF_DEPLOY_ACCOUNT_ID": "",
   },
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }],
@@ -70,6 +72,7 @@
       { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
       { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
       { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+      { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
     ],
   },
   "migrations": [
@@ -77,6 +80,7 @@
     { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
     { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
     { "tag": "v4", "new_sqlite_classes": ["LeaseDO"] },
+    { "tag": "v5", "new_sqlite_classes": ["DeployTokenDO"] },
   ],
   "env": {
     "staging": {
@@ -101,6 +105,7 @@
         "DO_JURISDICTION": "eu",
         "TOKEN_SIGNING_KIDS_REVOKED": "",
         "LEASE_CI_MIGRATION_TARGET": "",
+        "CF_DEPLOY_ACCOUNT_ID": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }],
@@ -113,6 +118,7 @@
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
           { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
           { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+          { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
         ],
       },
     },
@@ -134,6 +140,7 @@
         "DO_JURISDICTION": "none",
         "TOKEN_SIGNING_KIDS_REVOKED": "",
         "LEASE_CI_MIGRATION_TARGET": "",
+        "CF_DEPLOY_ACCOUNT_ID": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }],
@@ -146,6 +153,7 @@
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
           { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
           { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+          { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
         ],
       },
     },

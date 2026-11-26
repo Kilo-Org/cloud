@@ -1,3 +1,4 @@
+import type { AuditEvent, StsEnvironment } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
 import { and, asc, eq, lt, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
@@ -12,7 +13,12 @@ import {
   type Denial,
   type DenialCount,
 } from '../audit/denials';
-import { bundleDeniedEvent, leaseDeniedEvent, tokenDeniedEvent } from '../audit/events';
+import {
+  bundleDeniedEvent,
+  deployTokenDeniedEvent,
+  leaseDeniedEvent,
+  tokenDeniedEvent,
+} from '../audit/events';
 import { AuditLog } from '../audit/log';
 import { RELAY_DELAY_MS, RELAY_RETRY_MS } from '../constants';
 import * as schema from '../db/denial-schema';
@@ -22,8 +28,9 @@ type DenialDatabase = DrizzleSqliteDODatabase<typeof schema>;
 
 /**
  * Distinct denials kept per minute. Further distinct ones in that minute only add to one overflow
- * row per kind and reason (3 bundle reasons, 7 token reasons, 8 lease reasons), so a flood of
- * varied valid tokens writes at most `MAX_DISTINCT_PER_MINUTE + 18` audit events per minute.
+ * row per kind and reason (3 bundle reasons, 7 token reasons, 8 lease reasons, 11 deploy-token
+ * reasons), so a flood of varied valid tokens writes at most `MAX_DISTINCT_PER_MINUTE + 29` audit
+ * events per minute.
  */
 export const MAX_DISTINCT_PER_MINUTE = 100;
 
@@ -48,12 +55,29 @@ function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
 }
 
+/** The audit event for one merged denial row, by the denial's kind. */
+function deniedEvent(
+  window: { environment: StsEnvironment; count: number; windowStart: string; overflow: boolean },
+  denial: Denial
+): AuditEvent {
+  switch (denial.kind) {
+    case 'token':
+      return tokenDeniedEvent({ ...window, denial });
+    case 'lease':
+      return leaseDeniedEvent({ ...window, denial });
+    case 'deploy_token':
+      return deployTokenDeniedEvent({ ...window, denial });
+    default:
+      return bundleDeniedEvent({ ...window, denial });
+  }
+}
+
 /**
  * One object per environment: the `sts:<environment>:denials` audit stream. Refused bundle reads,
- * tokens, leases and revokes from identified callers arrive here, at most one call per request;
- * identical denials merge per minute into one event with a count, written by the alarm after the
- * minute ends (`ai.kilo.sts.bundle.denied`, `ai.kilo.sts.token.denied` or
- * `ai.kilo.sts.lease.denied`).
+ * tokens, leases, deploy tokens and revokes from identified callers arrive here, at most one call
+ * per request; identical denials merge per minute into one event with a count, written by the
+ * alarm after the minute ends (`ai.kilo.sts.bundle.denied`, `ai.kilo.sts.token.denied`,
+ * `ai.kilo.sts.lease.denied` or `ai.kilo.sts.deploy_token.denied`).
  */
 export class DenialDO extends DurableObject<Env> {
   private readonly config: StsConfig;
@@ -146,14 +170,7 @@ export class DenialDO extends DurableObject<Env> {
       };
       const denial = row.denial;
       try {
-        await this.audit.append(
-          this.stream,
-          denial.kind === 'token'
-            ? tokenDeniedEvent({ ...window, denial })
-            : denial.kind === 'lease'
-              ? leaseDeniedEvent({ ...window, denial })
-              : bundleDeniedEvent({ ...window, denial })
-        );
+        await this.audit.append(this.stream, deniedEvent(window, denial));
       } catch (error) {
         console.error('sts: denial audit append failed; the row stays for the next alarm', {
           reason: errorName(error),

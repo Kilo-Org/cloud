@@ -400,9 +400,19 @@ describe('email codes and limits', () => {
     account: string | null = null
   ) {
     return writer.query(
-      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at)
-       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END)`,
-      [purpose, randomHash(), account, randomHash(), attempts, status, consumed]
+      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at, address)
+       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END,
+               CASE WHEN $8::boolean THEN 'current'::uts.email_code_address END)`,
+      [
+        purpose,
+        randomHash(),
+        account,
+        randomHash(),
+        attempts,
+        status,
+        consumed,
+        purpose === 'tier_a',
+      ]
     );
   }
 
@@ -428,6 +438,22 @@ describe('email codes and limits', () => {
       CHECK_VIOLATION
     );
     await insertEmailCode('pending', 0, false, 'tier_a', accountId);
+  });
+
+  it('give a tier A code, and only a tier A code, the address it went to', async () => {
+    const insertAddressed = (purpose: string, address: string | null) =>
+      writer.query(
+        `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, address)
+         VALUES ($1, $2, $3, $4, now() + interval '10 minutes', $5)`,
+        [purpose, randomHash(), accountId, randomHash(), address]
+      );
+    await insertAddressed('tier_a', 'new');
+    for (const [purpose, address] of [
+      ['tier_a', null],
+      ['sign_in', 'current'],
+    ] as const) {
+      expect(await sqlStateOf(() => insertAddressed(purpose, address))).toBe(CHECK_VIOLATION);
+    }
   });
 
   it('cap a limit row at 5 codes per hour and stop only sign-in codes', async () => {

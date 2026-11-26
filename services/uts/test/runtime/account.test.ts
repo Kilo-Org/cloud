@@ -6,9 +6,15 @@ import {
   PatListSchema,
   UTS_BOT_KEYS_MANAGE_SCOPE,
   UTS_PATS_MANAGE_SCOPE,
+  UtsPublicJwkSchema,
 } from '@kilocode/uts-contracts';
+import { SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import { describe, expect, it } from 'vitest';
-import { type AccessTokenKeys, shardAccessTokenKeys } from '../../src/account/bearer';
+import {
+  type AccessTokenKeys,
+  checkAccountBearer,
+  shardAccessTokenKeys,
+} from '../../src/account/bearer';
 import {
   type AccountDeps,
   type CredentialNotice,
@@ -124,7 +130,7 @@ describe('account API authentication', () => {
     );
   });
 
-  it('refuses a PAT, a malformed value and a token for another audience or issuer', async () => {
+  it('refuses a PAT, a malformed value, a token for another audience, and one without sid', async () => {
     const tokens = [
       'kilo_pat_' + 'A'.repeat(49),
       'not-a-token',
@@ -139,7 +145,7 @@ describe('account API authentication', () => {
     expect(unused.calls).toEqual([]);
   });
 
-  it('refuses a token past its expiry and skew, and one signed by a key outside the key set', async () => {
+  it('refuses a token past its expiry and skew, and one whose signature does not verify', async () => {
     const token = await accessToken();
     const later = Math.floor(Date.now() / 1000) + 600 + 61;
     const expired = await call(
@@ -152,6 +158,74 @@ describe('account API authentication', () => {
     expect(
       (await call(request('/account/pats', { token: forged }), deps(unused.access))).status
     ).toBe(401);
+  });
+
+  it('refuses a token under a kid the key set lacks, and a token of another issuer', async () => {
+    const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
+    const jwk = await exportJWK(publicKey);
+    const kid = `uts-token-03-${await calculateJwkThumbprint(jwk, 'sha256')}`;
+    const now = Math.floor(Date.now() / 1000);
+    const sign = (issuer: string) =>
+      new SignJWT({
+        aud: 'uts',
+        sub: ACCOUNT,
+        client_id: 'kilo-cli',
+        jti: crypto.randomUUID(),
+        scope: UTS_PATS_MANAGE_SCOPE,
+        sid: GRANT,
+        env: 'development',
+      })
+        .setProtectedHeader({ alg: 'EdDSA', typ: 'at+jwt', kid })
+        .setIssuer(issuer)
+        .setIssuedAt(now)
+        .setExpirationTime(now + 600)
+        .sign(privateKey);
+
+    // The real key-set shard holds no such kid.
+    expect(await shardAccessTokenKeys(env, config)(kid)).toEqual({ status: 'unknown' });
+    const unknownKid = await call(
+      request('/account/pats', { token: await sign(config.endpoints.issuer) }),
+      deps(unused.access)
+    );
+    expect(unknownKid.status).toBe(401);
+
+    // With the key known, the right issuer passes and another issuer is refused.
+    const key = UtsPublicJwkSchema.parse({ ...jwk, kid, alg: 'EdDSA', use: 'sig' });
+    const keys: AccessTokenKeys = async wanted =>
+      wanted === kid ? { status: 'found', key } : { status: 'unknown' };
+    const listing = fakeAccount({ listPats: async () => ({ outcome: 'listed', pats: [] }) });
+    const known = await call(
+      request('/account/pats', { token: await sign(config.endpoints.issuer) }),
+      deps(listing.access, { keys })
+    );
+    expect(known.status).toBe(200);
+    const otherIssuer = await call(
+      request('/account/pats', { token: await sign('https://uts.kiloapps.io') }),
+      deps(unused.access, { keys })
+    );
+    expect(otherIssuer.status).toBe(401);
+    expect(unused.calls).toEqual([]);
+  });
+
+  it('serves only scopes the registry marks as session-bound', async () => {
+    const token = await accessToken({ scope: 'uts:probe.read' });
+    for (const scope of ['uts:probe.read', 'kilo-api:profile.read', 'gateway:unknown.read']) {
+      await expect(
+        checkAccountBearer(`Bearer ${token}`, scope, config, async () => ({ status: 'unknown' }), 0)
+      ).rejects.toThrow('is not registered as session-bound');
+    }
+  });
+
+  it('refuses a client the scope registry does not allow for the route', async () => {
+    for (const clientId of ['https://client.example.com/app', 'kilo-web']) {
+      const response = await call(
+        request('/account/pats', { token: await accessToken({ client_id: clientId }) }),
+        deps(unused.access)
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: 'access_denied' });
+    }
+    expect(unused.calls).toEqual([]);
   });
 
   it('answers 403 with the needed scope for a token of another scope', async () => {
@@ -461,6 +535,7 @@ describe('org bot key routes', () => {
     ['lapsed', 409],
     ['not_found', 404],
     ['not_org_admin', 403],
+    ['gate_required', 401],
   ] as const)('answers a keep that is %s with %i', async (outcome, status) => {
     const fake = fakeAccount({ keepBotKey: async () => outcome });
     const keyId = crypto.randomUUID();

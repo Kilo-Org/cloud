@@ -11,6 +11,9 @@ import { UTS_ACCESS_TOKEN_LIFETIME_SECONDS, audienceOfScope } from './token';
 /** The audience of the UTS account API and the PAT probe route, both on the issuer origin. */
 export const UTS_ACCOUNT_AUDIENCE = 'uts';
 
+/** The audience of the Kilo API, the web app's own routes. The STS service audience is `web`. */
+export const KILO_API_AUDIENCE = 'kilo-api';
+
 /** The marker in `allowedClients` for clients that register by a Client ID Metadata Document. */
 export const THIRD_PARTY_CLIENTS = 'third_party';
 
@@ -40,6 +43,12 @@ export type UtsScopeEntry = {
   patEligible: boolean;
   /** Whether the mint raises a high-severity audit event. */
   privileged: boolean;
+  /**
+   * Whether a token for it must name a session-bound grant in `sid`. A PAT or an org bot key never
+   * satisfies it, so no scope is both session-bound and PAT-eligible. Verifiers map this through
+   * their scope registry port; a route can also require a session itself.
+   */
+  requiresSession: boolean;
 };
 
 /** The scope the account API needs to create, list and revoke the caller's own PATs. */
@@ -48,6 +57,11 @@ export const UTS_PATS_MANAGE_SCOPE = 'uts:pats.manage';
 export const UTS_BOT_KEYS_MANAGE_SCOPE = 'uts:bot-keys.manage';
 /** The scope of the PAT probe route, which answers who a PAT belongs to and nothing else. */
 export const UTS_PROBE_READ_SCOPE = 'uts:probe.read';
+/**
+ * Read the caller's own profile, balance and usage on the Kilo API (`GET /api/profile`,
+ * `/api/profile/balance`, `/api/profile/usage`).
+ */
+export const KILO_API_PROFILE_READ_SCOPE = 'kilo-api:profile.read';
 
 /** Scopes that change credentials. No PAT or bot key may carry one, so a PAT never makes a PAT. */
 export const UTS_CREDENTIAL_SCOPES: readonly string[] = [
@@ -55,6 +69,7 @@ export const UTS_CREDENTIAL_SCOPES: readonly string[] = [
   UTS_BOT_KEYS_MANAGE_SCOPE,
 ];
 
+/** The account API acts on the caller's session: every action reads the grant its `sid` names. */
 const ACCOUNT_API = {
   audience: UTS_ACCOUNT_AUDIENCE,
   maxLifetimeSeconds: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
@@ -64,13 +79,25 @@ const ACCOUNT_API = {
   stepUp: false,
   patEligible: false,
   privileged: false,
+  requiresSession: true,
 } as const satisfies UtsScopeEntry;
 
 export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
   [UTS_PATS_MANAGE_SCOPE]: ACCOUNT_API,
   // The routes check that the caller is an owner or admin of the organization in the path.
   [UTS_BOT_KEYS_MANAGE_SCOPE]: ACCOUNT_API,
-  [UTS_PROBE_READ_SCOPE]: { ...ACCOUNT_API, patEligible: true },
+  [UTS_PROBE_READ_SCOPE]: { ...ACCOUNT_API, patEligible: true, requiresSession: false },
+  [KILO_API_PROFILE_READ_SCOPE]: {
+    audience: KILO_API_AUDIENCE,
+    maxLifetimeSeconds: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
+    allowedClients: ['kilo-cli'],
+    subjects: { kind: 'any_user' },
+    thirdPartySafe: false,
+    stepUp: false,
+    patEligible: true,
+    privileged: false,
+    requiresSession: false,
+  },
 };
 
 /** The registry entry of `scope`, or null when the registry does not list it. */

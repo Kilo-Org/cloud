@@ -202,25 +202,45 @@ failed signing no token carries those ids, and the retry's row (`token.issued`, 
 Every account route takes a UTS access token for the `uts` audience with the route's scope and a
 `sid` (`src/account/bearer.ts`): `EdDSA` under a `uts-token-` key that the isolate's key-set shard
 holds (one Durable Object call per request), `typ` `at+jwt`, the issuer, 60 seconds of skew and
-the claim profile. A PAT names no session, so it is refused there. Each action is one statement
-that reads the grant the `sid` names and its device session, so a revoked grant, an ended
-session or a blocked account fails at once, with no feed lookup.
+the claim profile, and a client that the scope registry allows for the scope (today `kilo-cli`
+only). A PAT names no session, so it is refused there. Each action is one statement that reads the
+grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
+account fails at once, with no feed lookup.
+
+`/authorize` and `/token` check scope syntax only; they do not apply the registry's allowed
+clients, third-party-safe flag or eligible subjects yet. Until they do, the client check above and
+the `sid` lookup (it finds first-party grants only) keep other clients' tokens off the account
+API.
+
+Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`; the environment's
+UTS issuer for `uts`, which the account API's RFC 9728 metadata names; and the environment's web
+app origin for `kilo-api` (`KILO_API_RESOURCES` in `@kilocode/uts-contracts`: `https://app.kilo.ai`,
+`https://staging-app.kilo.ai`, and `http://localhost:3000` in development only), which
+`kiloApiProtectedResourceMetadata` names. Another environment's origin, a path, a trailing slash or
+a query answers `invalid_target`.
 
 | Route | Scope | Behaviour | SQL |
 |---|---|---|---|
 | `POST /account/pats` | `uts:pats.manage` | Tier B gate (a sign-in within 10 minutes, or a passkey step-up of the same session); the scope must be registered and PAT-eligible; 90 days unless `expires_in_days` (1 to 365) says otherwise; at most 100 live PATs per account; the PAT appears once in the answer. A gate refusal answers 401 with the RFC 9470 challenge (`insufficient_user_authentication`, `max_age="600"`) | `uts.create_pat` |
 | `GET /account/pats` | `uts:pats.manage` | The live PATs, newest first, with the last four characters | `uts.list_pats` |
 | `DELETE /account/pats/<id>` | `uts:pats.manage` | Revokes; writes a 15-minute feed entry; 204 also when already revoked | `uts.revoke_pat` |
-| `POST /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | An owner or admin of the organization; tier B gate; at most 100 live keys per organization | `uts.create_bot_key` |
+| `POST /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | An owner or admin of the organization; tier B gate; at most 100 live keys per organization (a key flagged within 7 days counts) | `uts.create_bot_key` |
 | `GET /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | The live keys; a flagged key shows when it stops | `uts.list_bot_keys` |
 | `DELETE /account/orgs/<org>/bot-keys/<id>` | `uts:bot-keys.manage` | Revokes; 15-minute feed entry | `uts.revoke_bot_key` |
-| `POST /account/orgs/<org>/bot-keys/<id>/keep` | `uts:bot-keys.manage` | Keeps a flagged key before its 7-day cutoff | `uts.keep_bot_key` |
+| `POST /account/orgs/<org>/bot-keys/<id>/keep` | `uts:bot-keys.manage` | Keeps a flagged key before its 7-day cutoff; tier B gate, since keeping restores long-lived access | `uts.keep_bot_key` |
 | `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per address per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
 
 - A create writes the credential, its gate pass (consumed by that one row), the owner's in-app
   notice and the audit row in one statement. The push and email notice goes through the
-  `CredentialNotices` port after the statement; no provider is wired yet, and the in-app notice
-  stands either way.
+  `CredentialNotices` port after the statement; slice 3.8 (security notices) implements the port,
+  and until then only the in-app notice is written.
+- A create that names an organization, and a keep, lock the caller's membership row `FOR SHARE`
+  (`uts.lock_org_role`), so a concurrent `uts.remove_org_member` waits and then revokes or flags
+  the new credential, or the create waits for the removal and is refused. The 100-credential caps
+  hold under concurrent creates: the account's row lock orders PAT creates, a transaction advisory
+  lock per organization orders bot key creates.
+- Last use of PATs and bot keys is not written yet: `last_used_at` stays null until the lookup
+  carries the client network (design 5.3 hourly last use and new-network audit).
 - PATs and bot keys are `kilo_pat_` or `kilo_bot_` plus 32 random bytes in base64url plus a
   6-character CRC-32 checksum (`src/pat/format.ts`, the format `@kilocode/verify` parses). The
   identity store keeps the SHA-256 and the last four characters; audit rows name a credential by
@@ -231,16 +251,22 @@ session or a blocked account fails at once, with no feed lookup.
   keeps them) and gives each owner and admin one notice; a stale event changes nothing.
 - `uts.open_tier_a_gate_pass` opens a tier A pass for the sign-in method and email actions: a
   sign-in within 10 minutes with the account's strongest method, the emailed code (and the code to
-  the new address for an email change), and no method added in the last 24 hours for a removal or
-  an email change.
+  the new address for an email change, which must be another address), and no method added in the
+  last 24 hours for a removal or an email change. Each tier A code row records whether it went to
+  the primary address (`current`) or the new one (`new`), and each code counts only in its own
+  role. The service that sends a `current` code, and the caller of the gate, hash the account's
+  primary address itself, never an address from the request.
 - `PatLookup` (`src/pat/entrypoint.ts`) is the lookup port of `@kilocode/verify` for Worker
   verifiers: the lowercase-hex SHA-256 in, `found`, `not_found`, `rate_limited` or `unavailable`
   out (`UtsPatLookupResultSchema`). It answers only callers its environment lists
   (`PAT_LOOKUP_CALLERS`), runs at most 100 lookups at once per isolate, and sends one statement
   through the PAT config.
 - The scope registry is `UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`; `test/repo` checks every
-  entry against the rules of design 5.3 (no PAT carries a privileged, step-up, staff or
-  credential-changing scope; a privileged scope needs a step-up and lives at most 5 minutes).
+  entry against the rules of design 5.3 (no PAT carries a privileged, step-up, staff,
+  credential-changing or session-bound scope; a privileged scope needs a step-up and lives at most
+  5 minutes). It lists `uts:pats.manage` and `uts:bot-keys.manage` (session-bound),
+  `uts:probe.read`, and `kilo-api:profile.read` (the Kilo API profile, balance and usage reads;
+  CLI and PATs). The account API serves only session-bound scopes, and refuses a token without `sid`.
 
 ## Tests
 
@@ -335,6 +361,11 @@ change, as on the first deploy of an environment, detection takes them out of th
 the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` deploys
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
 order). A change to only one of them deploys in the matrix.
+
+Provisioning the identity store's Hyperdrive configs for an environment: the PAT lookup config
+(`IDENTITY_STORE_PAT`) needs at least 34 connections, so that one isolate's 100 lookups in flight
+are at most 3 times its connections (design 3, "PAT lookups"). At 20 percent of
+`max_connections`, that is a database with `max_connections` of 170 or more.
 
 ## Identity store
 

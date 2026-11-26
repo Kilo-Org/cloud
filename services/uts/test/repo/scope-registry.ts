@@ -21,7 +21,8 @@ const PRIVILEGED_MAX_LIFETIME_SECONDS = 300;
  * - a third-party-safe or PAT-eligible scope is neither privileged, nor behind a step-up, nor held
  *   by a staff list; a scope that changes credentials is never PAT-eligible, so a PAT never makes a
  *   PAT;
- * - a privileged scope needs a passkey step-up.
+ * - a privileged scope needs a passkey step-up;
+ * - a scope that needs a session is never PAT-eligible, because a PAT names no session.
  */
 export function scopeRegistryProblems(registry: Readonly<Record<string, UtsScopeEntry>>): string[] {
   const problems: string[] = [];
@@ -62,6 +63,9 @@ export function scopeRegistryProblems(registry: Readonly<Record<string, UtsScope
       problem('changes credentials but is PAT-eligible');
     }
     if (entry.privileged && !entry.stepUp) problem('is privileged without a step-up');
+    if (entry.requiresSession && entry.patEligible) {
+      problem('needs a session but is PAT-eligible; a PAT names no session');
+    }
   }
   return problems;
 }

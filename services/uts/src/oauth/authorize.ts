@@ -182,7 +182,7 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   const resources = params.all('resource');
   let audiences = [...new Set(scopes.map(audienceOfScope))];
   if (resources.length > 0) {
-    const named = audiencesOfResources(resources);
+    const named = audiencesOfResources(resources, deps.config.environment);
     if (named === null || targetMismatch(scopes, named)) {
       return fail(
         'invalid_target',

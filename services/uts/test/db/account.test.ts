@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { AuditEventSchema } from '@kilocode/sts-contracts';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -34,6 +35,30 @@ afterAll(() => db.drop());
 const environment = 'development';
 const sha256 = (value: string) => createHash('sha256').update(value).digest();
 const reference = (hash: Buffer) => hash.toString('base64url').slice(0, 8);
+
+/** A second app connection's statement store, for the tests that run two statements at once. */
+async function secondConnection() {
+  const client = await db.connect('uts_app_b');
+  const pid = (await client.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+  return { client, pid, account: identityStoreAccount(new IdentityStore(client)) };
+}
+
+/**
+ * Waits until the session `pid` waits for a lock, so the test knows the statement it started
+ * there is blocked rather than finished or not yet sent. `pg_locks` is readable by every role.
+ */
+async function waitUntilBlocked(pid: number): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const result = await owner.query<{ waiting: boolean }>(
+      'SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted) AS waiting',
+      [pid]
+    );
+    if (result.rows[0].waiting) return;
+    await sleep(20);
+  }
+  throw new Error(`session ${pid} never waited for a lock`);
+}
 
 type Session = { accountId: string; grantId: string; deviceSessionId: string };
 
@@ -100,6 +125,27 @@ async function createdPat(holder: Session, overrides: Parameters<typeof patInput
   const result = await account.createPat(input);
   if (result.outcome !== 'created') throw new Error(`expected created, got ${result.outcome}`);
   return { token, id: result.id, result };
+}
+
+/** `count` PATs of `holder`, live for a day, or created 2 days ago and expired a day ago. */
+async function insertPats(holder: Session, count: number, state: 'live' | 'expired') {
+  await owner.query(
+    `WITH passes AS (
+       INSERT INTO uts.gate_passes (account_id, device_session_id, tier, action, satisfied_by,
+         expires_at, status, consumed_at)
+       SELECT $1, $2, 'b', 'pat_create', '{recent_sign_in}', now() + interval '10 minutes',
+         'consumed', now()
+       FROM generate_series(1, $3::integer)
+       RETURNING id
+     )
+     INSERT INTO uts.personal_access_tokens (account_id, name, token_hash, last_four, audience,
+       scope, gate_pass_id, created_at, expires_at)
+     SELECT $1, 'bulk', sha256(convert_to(id::text, 'UTF8')), 'abcd', 'uts', 'uts:probe.read', id,
+       now() - CASE WHEN $4::boolean THEN interval '0' ELSE interval '2 days' END,
+       now() + CASE WHEN $4::boolean THEN interval '1 day' ELSE interval '-1 day' END
+     FROM passes`,
+    [holder.accountId, holder.deviceSessionId, count, state === 'live']
+  );
 }
 
 const AuditRowSchema = z.object({ event_type: z.string(), event: z.unknown() });
@@ -183,6 +229,15 @@ describe('PAT create', () => {
     expect(text).not.toContain(hexOfHash(sha256(token)));
     expect(text).not.toContain(sha256(token).toString('base64url'));
     expect(text).not.toContain('ci deploy');
+  });
+
+  it('creates a PAT for the Kilo API profile scope under the kilo-api audience', async () => {
+    const holder = await session();
+    const { token } = await createdPat(holder, { scope: 'kilo-api:profile.read' });
+    expect(await lookupPat(new IdentityStore(patLogin), sha256(token))).toMatchObject({
+      audience: 'kilo-api',
+      scope: 'kilo-api:profile.read',
+    });
   });
 
   it('is found by its hash through the PAT login', async () => {
@@ -282,22 +337,8 @@ describe('PAT create', () => {
 
   it('keeps an account at 100 live PATs; revoked and expired ones do not count', async () => {
     const holder = await session();
-    await owner.query(
-      `WITH passes AS (
-         INSERT INTO uts.gate_passes (account_id, device_session_id, tier, action, satisfied_by,
-           expires_at, status, consumed_at)
-         SELECT $1, $2, 'b', 'pat_create', '{recent_sign_in}', now() + interval '10 minutes',
-           'consumed', now()
-         FROM generate_series(1, 100)
-         RETURNING id
-       )
-       INSERT INTO uts.personal_access_tokens (account_id, name, token_hash, last_four, audience,
-         scope, gate_pass_id, expires_at)
-       SELECT $1, 'bulk', sha256(convert_to(id::text, 'UTF8')), 'abcd', 'uts', 'uts:probe.read', id,
-         now() + interval '1 day'
-       FROM passes`,
-      [holder.accountId, holder.deviceSessionId]
-    );
+    await insertPats(holder, 100, 'live');
+    await insertPats(holder, 1, 'expired');
     expect((await account.createPat(patInput(holder).input)).outcome).toBe('limit_reached');
     await owner.query(
       `UPDATE uts.personal_access_tokens SET status = 'revoked', revoked_at = now(),
@@ -306,6 +347,26 @@ describe('PAT create', () => {
       [holder.accountId]
     );
     expect((await account.createPat(patInput(holder).input)).outcome).toBe('created');
+  });
+
+  it('puts two concurrent creates in order, so the 100th and 101st cannot both pass', async () => {
+    const holder = await session();
+    await insertPats(holder, 99, 'live');
+    const first = await db.connect('uts_app_a');
+    const second = await secondConnection();
+    await first.query('BEGIN');
+    try {
+      const created = await identityStoreAccount(new IdentityStore(first)).createPat(
+        patInput(holder).input
+      );
+      expect(created.outcome).toBe('created');
+      const racing = second.account.createPat(patInput(holder).input);
+      await waitUntilBlocked(second.pid);
+      await first.query('COMMIT');
+      expect((await racing).outcome).toBe('limit_reached');
+    } finally {
+      await first.query('ROLLBACK');
+    }
   });
 
   it('allows 1 to 365 days and refuses any other lifetime', async () => {
@@ -419,6 +480,33 @@ async function createdBotKey(holder: Session, orgId: string) {
   return { token, id: result.id };
 }
 
+/** `count` bot keys of `orgId`, created by `holder`, active or flagged `flaggedDaysAgo` days ago. */
+async function insertBotKeys(
+  holder: Session,
+  orgId: string,
+  count: number,
+  flaggedDaysAgo: number | null = null
+) {
+  await owner.query(
+    `WITH passes AS (
+       INSERT INTO uts.gate_passes (account_id, device_session_id, tier, action, satisfied_by,
+         expires_at, status, consumed_at)
+       SELECT $1, $2, 'b', 'bot_key_create', '{recent_sign_in}', now() + interval '10 minutes',
+         'consumed', now()
+       FROM generate_series(1, $4::integer)
+       RETURNING id
+     )
+     INSERT INTO uts.org_bot_keys (org_id, created_by, name, token_hash, last_four, audience, scope,
+       gate_pass_id, created_at, expires_at, status, flagged_at)
+     SELECT $3, $1, 'bulk', sha256(convert_to(id::text, 'UTF8')), 'wxyz', 'uts', 'uts:probe.read',
+       id, now() - interval '10 days', now() + interval '30 days',
+       CASE WHEN $5::integer IS NULL THEN 'active' ELSE 'flagged' END::uts.bot_key_status,
+       now() - make_interval(days => $5::integer)
+     FROM passes`,
+    [holder.accountId, holder.deviceSessionId, orgId, count, flaggedDaysAgo]
+  );
+}
+
 describe('org bot keys', () => {
   it('lets only an owner or admin create one, after a tier B gate', async () => {
     const { orgId, admin, member } = await organization();
@@ -461,6 +549,37 @@ describe('org bot keys', () => {
       org: orgId,
     });
     expect(await eventsText()).not.toContain(token);
+  });
+
+  it('keeps an organization at 100 live keys; a key flagged within 7 days counts, an older one not', async () => {
+    const { orgId, admin } = await organization();
+    await insertBotKeys(admin, orgId, 98);
+    await insertBotKeys(admin, orgId, 1, 2);
+    await insertBotKeys(admin, orgId, 1, 8);
+    expect((await account.createBotKey(botKeyInput(admin, orgId).input)).outcome).toBe('created');
+    expect((await account.createBotKey(botKeyInput(admin, orgId).input)).outcome).toBe(
+      'limit_reached'
+    );
+  });
+
+  it('puts two concurrent creates in one organization in order', async () => {
+    const { orgId, admin } = await organization();
+    await insertBotKeys(admin, orgId, 99);
+    const first = await db.connect('uts_app_a');
+    const second = await secondConnection();
+    await first.query('BEGIN');
+    try {
+      const created = await identityStoreAccount(new IdentityStore(first)).createBotKey(
+        botKeyInput(admin, orgId).input
+      );
+      expect(created.outcome).toBe('created');
+      const racing = second.account.createBotKey(botKeyInput(admin, orgId).input);
+      await waitUntilBlocked(second.pid);
+      await first.query('COMMIT');
+      expect((await racing).outcome).toBe('limit_reached');
+    } finally {
+      await first.query('ROLLBACK');
+    }
   });
 
   it('lists the live keys for an admin only, and revokes with a feed entry', async () => {
@@ -623,6 +742,14 @@ describe('member removal', () => {
       `UPDATE uts.org_bot_keys SET flagged_at = now() - interval '8 days' WHERE id = $1`,
       [lapsed.id]
     );
+    const stale = await session({ accountId: admin.accountId, minutesAgo: 30 });
+    expect(await account.keepBotKey({ environment, ...stale, orgId, keyId: fresh.id })).toBe(
+      'gate_required'
+    );
+    const refused = (await auditRows(admin.accountId)).find(
+      row => row.type === 'ai.kilo.uts.gate.refused'
+    );
+    expect(refused?.event.data.attributes).toMatchObject({ action: 'bot_key_keep', tier: 'b' });
     const keep = (keyId: string) => account.keepBotKey({ environment, ...admin, orgId, keyId });
     expect(await keep(fresh.id)).toBe('kept');
     expect(await keep(fresh.id)).toBe('not_flagged');
@@ -638,14 +765,95 @@ describe('member removal', () => {
       botKeys: [{ id: fresh.id, status: 'kept', kept_by: admin.accountId }],
     });
   });
+
+  it('revokes an org-bound PAT whose create was still open when the removal arrived', async () => {
+    const { orgId, member } = await organization();
+    const creator = await db.connect('uts_app_a');
+    const remover = await secondConnection();
+    await creator.query('BEGIN');
+    try {
+      const { token, input } = patInput(member, { orgId });
+      const created = await identityStoreAccount(new IdentityStore(creator)).createPat(input);
+      expect(created.outcome).toBe('created');
+      const removal = remover.client.query('SELECT * FROM uts.remove_org_member($1, $2, $3, 2)', [
+        environment,
+        orgId,
+        member.accountId,
+      ]);
+      await waitUntilBlocked(remover.pid);
+      await creator.query('COMMIT');
+      expect((await removal).rows).toEqual([
+        { outcome: 'removed', flagged_keys: 0, revoked_pats: 1, revoked_grants: 0 },
+      ]);
+      expect(await lookupPat(new IdentityStore(patLogin), sha256(token))).toBeNull();
+    } finally {
+      await creator.query('ROLLBACK');
+    }
+  });
+
+  it('flags a bot key whose create was still open when its creator was removed', async () => {
+    const { orgId, admin } = await organization();
+    const creator = await db.connect('uts_app_a');
+    const remover = await secondConnection();
+    await creator.query('BEGIN');
+    try {
+      const { input } = botKeyInput(admin, orgId);
+      const created = await identityStoreAccount(new IdentityStore(creator)).createBotKey(input);
+      expect(created.outcome).toBe('created');
+      const removal = remover.client.query('SELECT * FROM uts.remove_org_member($1, $2, $3, 2)', [
+        environment,
+        orgId,
+        admin.accountId,
+      ]);
+      await waitUntilBlocked(remover.pid);
+      await creator.query('COMMIT');
+      expect((await removal).rows).toEqual([
+        { outcome: 'removed', flagged_keys: 1, revoked_pats: 0, revoked_grants: 0 },
+      ]);
+      const key = await owner.query('SELECT status FROM uts.org_bot_keys WHERE org_id = $1', [
+        orgId,
+      ]);
+      expect(key.rows).toEqual([{ status: 'flagged' }]);
+    } finally {
+      await creator.query('ROLLBACK');
+    }
+  });
+
+  it('refuses a create that waited for a removal of the same member', async () => {
+    const { orgId, member } = await organization();
+    const remover = await db.connect('uts_app_a');
+    const creator = await secondConnection();
+    await remover.query('BEGIN');
+    try {
+      await remover.query('SELECT * FROM uts.remove_org_member($1, $2, $3, 2)', [
+        environment,
+        orgId,
+        member.accountId,
+      ]);
+      const creating = creator.account.createPat(patInput(member, { orgId }).input);
+      await waitUntilBlocked(creator.pid);
+      await remover.query('COMMIT');
+      expect((await creating).outcome).toBe('org_denied');
+    } finally {
+      await remover.query('ROLLBACK');
+    }
+  });
 });
 
-/** A pending tier A code for `emailHash`, whose keyed hash is `codeHash`. */
-async function tierACode(accountId: string, emailHash: Buffer, codeHash: Buffer) {
+/**
+ * A pending tier A code for `emailHash`, whose keyed hash is `codeHash`, sent to the account's
+ * primary address (`current`) or to the new address of an email change (`new`).
+ */
+async function tierACode(
+  accountId: string,
+  emailHash: Buffer,
+  codeHash: Buffer,
+  address: 'current' | 'new' = 'current'
+) {
   await owner.query(
-    `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at)
-     VALUES ('tier_a', $1, $2, $3, now() + interval '10 minutes')`,
-    [emailHash, accountId, codeHash]
+    `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, address)
+     VALUES ('tier_a', $1, $2, $3, now() + interval '10 minutes', $4)`,
+    [emailHash, accountId, codeHash, address]
   );
 }
 
@@ -754,7 +962,7 @@ describe('tier A gate passes', () => {
     const holder = await session({ amr: ['oauth'] });
     const [email, code, newEmail, newCode] = [0, 1, 2, 3].map(() => randomBytes(32));
     await tierACode(holder.accountId, email, code);
-    await tierACode(holder.accountId, newEmail, newCode);
+    await tierACode(holder.accountId, newEmail, newCode, 'new');
     expect(
       (await openTierA(holder, 'email_change', { email, code, newEmail, newCode: randomBytes(32) }))
         .outcome
@@ -770,6 +978,54 @@ describe('tier A gate passes', () => {
     expect(pass.rows).toEqual([
       { satisfied_by: ['recent_sign_in', 'email_code', 'email_code_new'] },
     ]);
+  });
+
+  it('never count a code sent to a new address as the code to the primary address', async () => {
+    const holder = await session({ amr: ['oauth'] });
+    const [email, code, newEmail, newCode, otherEmail, otherCode] = [0, 1, 2, 3, 4, 5].map(() =>
+      randomBytes(32)
+    );
+    await tierACode(holder.accountId, email, code);
+    await tierACode(holder.accountId, newEmail, newCode, 'new');
+    await tierACode(holder.accountId, otherEmail, otherCode, 'new');
+    // The new address's code as the primary one, beside another new address the caller holds.
+    expect(
+      (
+        await openTierA(holder, 'email_change', {
+          email: newEmail,
+          code: newCode,
+          newEmail: otherEmail,
+          newCode: otherCode,
+        })
+      ).outcome
+    ).toBe('code_invalid');
+    // A code left from an abandoned email change does not open any other tier A action.
+    expect(
+      (await openTierA(holder, 'method_add', { email: newEmail, code: newCode })).outcome
+    ).toBe('code_invalid');
+    // The primary address's code is not a new address's code either.
+    expect(
+      (
+        await openTierA(holder, 'email_change', {
+          email: otherEmail,
+          code: otherCode,
+          newEmail: email,
+          newCode: code,
+        })
+      ).outcome
+    ).toBe('code_invalid');
+    expect(await codeState(email)).toEqual([{ status: 'pending', attempts: 0 }]);
+  });
+
+  it('refuse an email change to the same address', async () => {
+    const holder = await session({ amr: ['oauth'] });
+    const [email, code] = [randomBytes(32), randomBytes(32)];
+    await tierACode(holder.accountId, email, code);
+    expect(
+      await sqlStateOf(() =>
+        openTierA(holder, 'email_change', { email, code, newEmail: email, newCode: code })
+      )
+    ).toBe('22023');
   });
 
   it('refuse a tier B action, and a new address on any action but an email change', async () => {

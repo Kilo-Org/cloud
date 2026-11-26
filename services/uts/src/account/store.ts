@@ -69,7 +69,9 @@ export type KeepBotKeyResult =
   | 'lapsed'
   | 'not_found'
   | 'invalid_session'
-  | 'not_org_admin';
+  | 'not_org_admin'
+  /** Keeping a key passes the tier B gate, as a create does. */
+  | 'gate_required';
 
 export type AccountStore = {
   createPat(input: CreatePatInput): Promise<CreatePatResult>;
@@ -166,6 +168,7 @@ const KeepRowSchema = z.object({
     'not_found',
     'invalid_session',
     'not_org_admin',
+    'gate_required',
   ]),
 });
 

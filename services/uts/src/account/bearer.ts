@@ -1,22 +1,28 @@
 import {
+  THIRD_PARTY_CLIENTS,
   UTS_ACCESS_TOKEN_TYPE,
   UTS_ACCOUNT_AUDIENCE,
   UtsAccessTokenClaimsSchema,
   UtsTokenKidSchema,
   type UtsPublicJwk,
+  utsScopeEntry,
 } from '@kilocode/uts-contracts';
 import { decodeProtectedHeader, importJWK, jwtVerify } from 'jose';
 import type { Env, UtsConfig } from '../env';
 import { PAT_PREFIX } from '../pat/format';
+import { identifyClient } from '../oauth/clients';
 import { readKeySetShard, readThroughIsolateShard } from '../signer-keys';
 
 /**
  * The account API's check of a UTS access token (design 7, the rows that apply to a UTS token
  * verified by UTS itself): `EdDSA` with a `uts-token-` key of the signer objects, `typ` `at+jwt`,
  * the environment's issuer, the `uts` audience, time with 60 seconds of skew, the claim profile of
- * `UtsAccessTokenClaimsSchema`, and the route's one scope. The route acts on a session, so the
- * token must name its grant (`sid`); a PAT names none and is refused. Revocation needs no feed
- * here: every account statement reads the grant and its session, so a revoked grant fails there.
+ * `UtsAccessTokenClaimsSchema`, the route's one scope, and a client that the scope registry allows
+ * for that scope. `/authorize` and `/token` do not apply the registry yet, so this check is what
+ * keeps a token of another client off the account API. Every account route acts on a session, so
+ * its scope is registered with `requiresSession`, and the token must name its grant (`sid`); a PAT
+ * names none and is refused. Revocation needs no feed here: every account statement reads the
+ * grant and its session, so a revoked grant fails there.
  */
 
 const SKEW_SECONDS = 60;
@@ -43,6 +49,8 @@ export type BearerCheck =
   | { status: 'missing' }
   | { status: 'invalid' }
   | { status: 'insufficient_scope' }
+  /** The scope registry does not allow the token's client for the route's scope. */
+  | { status: 'client_not_allowed' }
   | { status: 'unavailable' };
 
 /**
@@ -76,6 +84,11 @@ export async function checkAccountBearer(
   keys: AccessTokenKeys,
   nowSeconds: number
 ): Promise<BearerCheck> {
+  const entry = utsScopeEntry(requiredScope);
+  if (entry === null || !entry.requiresSession) {
+    // A route definition error, not a request error: every account statement needs the grant.
+    throw new Error(`account route scope ${requiredScope} is not registered as session-bound`);
+  }
   if (authorization === null) return { status: 'missing' };
   const token = BEARER.exec(authorization)?.[1];
   if (token === undefined || token.startsWith(PAT_PREFIX)) return { status: 'invalid' };
@@ -112,18 +125,26 @@ export async function checkAccountBearer(
   if (
     !claims.success ||
     claims.data.env !== config.environment ||
-    claims.data.iat > nowSeconds + SKEW_SECONDS ||
-    claims.data.sid === undefined
+    claims.data.iat > nowSeconds + SKEW_SECONDS
   ) {
     return { status: 'invalid' };
   }
+  // The scope requires a session (checked above), and a token names its session by `sid`.
+  const grantId = claims.data.sid;
+  if (grantId === undefined) return { status: 'invalid' };
   if (claims.data.scope !== requiredScope) return { status: 'insufficient_scope' };
+  const clientId = claims.data.client_id;
+  if (
+    !entry.allowedClients.includes(clientId) &&
+    !(
+      entry.allowedClients.includes(THIRD_PARTY_CLIENTS) &&
+      identifyClient(clientId).kind === 'third_party'
+    )
+  ) {
+    return { status: 'client_not_allowed' };
+  }
   return {
     status: 'ok',
-    caller: {
-      accountId: claims.data.sub,
-      grantId: claims.data.sid,
-      orgId: claims.data.org ?? null,
-    },
+    caller: { accountId: claims.data.sub, grantId, orgId: claims.data.org ?? null },
   };
 }

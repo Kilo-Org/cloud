@@ -368,6 +368,8 @@ async function botKeyRoute(
           return invalidSession(deps.config);
         case 'not_org_admin':
           return notOrgAdmin();
+        case 'gate_required':
+          return gateRequiredResponse();
       }
     }
   }
@@ -397,6 +399,8 @@ export async function handleAccountRequest(
       return credentialMissing(deps.config);
     case 'invalid':
       return credentialInvalid(deps.config, 'the access token is not valid for this route');
+    case 'client_not_allowed':
+      return accountError('access_denied', 403, 'this client may not use this route');
     case 'insufficient_scope':
       return insufficientScope(deps.config, scope);
     case 'unavailable':

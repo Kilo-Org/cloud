@@ -13,12 +13,18 @@
 --   the account's strongest method within 10 minutes plus an emailed code, and for an email change
 --   a code to the new address too. A method added in the last 24 hours blocks removing a method and
 --   changing the email. `uts.open_tier_a_gate_pass` opens a pass that the action's own statement
---   consumes.
+--   consumes. Each tier A code row records which address it went to (`current` or `new`), and the
+--   gate accepts each code only in its own role.
+-- * A create that names an organization, and a keep of a flagged bot key, lock the caller's
+--   membership row (`FOR SHARE`) in the role check, so a concurrent removal waits for the new row
+--   and then revokes or flags it, or the create waits for the removal and is refused.
 -- * A refused gate writes at most one denied audit row per grant per minute
 --   (`uts.claim_denied_audit`), so a caller cannot grow the audit log at will.
 -- * A revoked PAT or bot key gets a feed entry for 15 minutes, which outlasts every PAT cache layer
 --   (design 5.6).
--- * An account holds at most 100 live PATs, and an organization at most 100 live bot keys.
+-- * An account holds at most 100 live PATs, and an organization at most 100 live bot keys. The
+--   account's row lock (PATs) or a transaction advisory lock per organization (bot keys) puts
+--   concurrent creates in order, so the count each create reads is final.
 -- * Audit rows name a PAT or a bot key by its id and by `uts.credential_reference` of its hash,
 --   never by the value or the hash, and never carry the user-chosen name.
 
@@ -27,6 +33,19 @@ SET LOCAL ROLE uts_owner;
 -- Org admins hear of the bot keys a removed member created (design 5.8). PostgreSQL accepts the
 -- new value inside this transaction; the plpgsql bodies below use it only when they run.
 ALTER TYPE uts.notice_kind ADD VALUE 'bot_key_flagged';
+
+-- Keeping a flagged bot key restores long-lived organization access, so it passes the tier B gate
+-- like a create (design 5.8, 5.11).
+ALTER TYPE uts.gated_action ADD VALUE 'bot_key_keep';
+
+-- The address a tier A code went to: the account's primary address (`current`) or the new address
+-- of an email change (`new`). The service that sends a `current` code, and the caller of
+-- `uts.open_tier_a_gate_pass`, hash the account's primary address itself, never an address taken
+-- from the request.
+CREATE TYPE uts.email_code_address AS ENUM ('current', 'new');
+ALTER TABLE uts.email_codes
+  ADD COLUMN address uts.email_code_address,
+  ADD CONSTRAINT email_codes_address_shape CHECK ((purpose = 'tier_a') = (address IS NOT NULL));
 
 -- Writes one audit row whose actor is UTS itself, for an event no user started (a membership
 -- event). The subject account, when there is one, is the row's account.
@@ -131,8 +150,8 @@ BEGIN
       p_environment, 'ai.kilo.uts.gate.refused', 3001, 99, 'denied', p_reason, p_account_id,
       jsonb_build_object(
         'action', p_action,
-        'tier', CASE WHEN p_action IN ('pat_create', 'bot_key_create', 'ci_policy_create',
-          'device_approve', 'third_party_approve') THEN 'b' ELSE 'a' END,
+        'tier', CASE WHEN p_action IN ('pat_create', 'bot_key_create', 'bot_key_keep',
+          'ci_policy_create', 'device_approve', 'third_party_approve') THEN 'b' ELSE 'a' END,
         'grantId', p_grant_id
       )
     );
@@ -160,6 +179,33 @@ RETURN EXISTS (
     AND (p_roles IS NULL OR membership.role = ANY (p_roles))
     AND uts.org_requirement_met(p_org_id, membership.status, policy.enforcement, p_amr)
 );
+
+-- `uts.org_role_met` for a statement that creates or restores a credential bound to the
+-- organization: the membership row it finds stays locked `FOR SHARE` until the statement's
+-- transaction ends. `uts.remove_org_member` updates that row first, so it waits until the new
+-- credential is committed and then revokes or flags it; a create that comes second waits for the
+-- removal, reads the row again, and finds no active membership.
+CREATE FUNCTION uts.lock_org_role(
+  p_org_id uuid,
+  p_account_id text,
+  p_amr uts.auth_method[],
+  p_roles uts.org_role[]
+) RETURNS boolean
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  PERFORM 1
+  FROM uts.org_memberships AS membership
+  LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = membership.org_id
+  WHERE membership.org_id = p_org_id
+    AND membership.account_id = p_account_id
+    AND (p_roles IS NULL OR membership.role = ANY (p_roles))
+    AND uts.org_requirement_met(p_org_id, membership.status, policy.enforcement, p_amr)
+  FOR SHARE OF membership;
+  RETURN FOUND;
+END
+$$;
 
 -- POST /account/pats: a tier B gate, then the PAT, its consumed gate pass, the creator's notice and
 -- the audit row. Outcomes: `created`; `invalid_session`; `gate_required` (no sign-in or passkey
@@ -204,7 +250,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF p_org_id IS NOT NULL AND NOT uts.org_role_met(p_org_id, p_account_id, holder.amr, NULL) THEN
+  IF p_org_id IS NOT NULL AND NOT uts.lock_org_role(p_org_id, p_account_id, holder.amr, NULL) THEN
     outcome := 'org_denied';
     RETURN NEXT;
     RETURN;
@@ -381,7 +427,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF NOT uts.org_role_met(p_org_id, p_account_id, holder.amr, ARRAY['owner', 'admin']::uts.org_role[]) THEN
+  IF NOT uts.lock_org_role(p_org_id, p_account_id, holder.amr, ARRAY['owner', 'admin']::uts.org_role[]) THEN
     outcome := 'not_org_admin';
     RETURN NEXT;
     RETURN;
@@ -563,9 +609,10 @@ END
 $$;
 
 -- POST /account/orgs/<org>/bot-keys/<id>/keep: an owner or admin keeps a flagged key before its
--- 7-day cutoff, so it works on until it expires (design 5.8). Outcomes: `kept`, `not_flagged` (the
--- key is active, kept or revoked), `lapsed` (past the cutoff or expired), `not_found`,
--- `invalid_session`, `not_org_admin`.
+-- 7-day cutoff, so it works on until it expires (design 5.8). Keeping restores long-lived access,
+-- so it passes the tier B gate as a create does. Outcomes: `kept`, `not_flagged` (the key is
+-- active, kept or revoked), `lapsed` (past the cutoff or expired), `not_found`, `invalid_session`,
+-- `not_org_admin`, `gate_required`.
 CREATE FUNCTION uts.keep_bot_key(
   p_environment text,
   p_account_id text,
@@ -579,6 +626,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   holder record;
+  checks uts.gate_check[];
   found_key uts.org_bot_keys%ROWTYPE;
 BEGIN
   SELECT * INTO holder FROM uts.account_session(p_account_id, p_grant_id);
@@ -587,8 +635,17 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF NOT uts.org_role_met(p_org_id, p_account_id, holder.amr, ARRAY['owner', 'admin']::uts.org_role[]) THEN
+  IF NOT uts.lock_org_role(p_org_id, p_account_id, holder.amr, ARRAY['owner', 'admin']::uts.org_role[]) THEN
     outcome := 'not_org_admin';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  checks := uts.tier_b_checks(p_account_id, holder.device_session_id, holder.auth_time);
+  IF cardinality(checks) = 0 THEN
+    PERFORM uts.audit_gate_refusal(
+      p_environment, p_account_id, p_grant_id, 'bot_key_keep', 'fresh sign-in required'
+    );
+    outcome := 'gate_required';
     RETURN NEXT;
     RETURN;
   END IF;
@@ -612,7 +669,8 @@ BEGIN
         'botKeyRef', uts.credential_reference(found_key.token_hash),
         'org', p_org_id,
         'createdBy', found_key.created_by,
-        'grantId', p_grant_id
+        'grantId', p_grant_id,
+        'gateChecks', to_jsonb(checks::text[])
       )
     );
     outcome := 'kept';
@@ -755,12 +813,14 @@ BEGIN
 END
 $$;
 
--- Consumes the newest pending tier A code sent to `p_email_hash` for the account when its keyed
--- hash is `p_code_hash`; a wrong code counts an attempt, and the fifth wrong attempt exhausts the
--- code. Returns whether the code matched. With `p_consume` false it only checks, so a caller can
--- check two codes before it consumes either.
+-- Consumes the newest pending tier A code of the account that went to the address in role
+-- `p_address`, with the keyed address hash `p_email_hash`, when its keyed hash is `p_code_hash`; a
+-- wrong code counts an attempt, and the fifth wrong attempt exhausts the code. Returns whether the
+-- code matched. With `p_consume` false it only checks, so a caller can check two codes before it
+-- consumes either.
 CREATE FUNCTION uts.use_tier_a_code(
   p_account_id text,
+  p_address uts.email_code_address,
   p_email_hash bytea,
   p_code_hash bytea,
   p_consume boolean
@@ -774,6 +834,7 @@ BEGIN
   SELECT * INTO code FROM uts.email_codes AS stored
   WHERE stored.email_hash = p_email_hash
     AND stored.purpose = 'tier_a'
+    AND stored.address = p_address
     AND stored.status = 'pending'
     AND stored.account_id = p_account_id
     AND stored.expires_at > now()
@@ -802,11 +863,14 @@ $$;
 -- Opens a tier A gate pass (design 5.11) for one action of the caller's own session; the action's
 -- statement consumes it within 10 minutes. It needs a sign-in within 10 minutes with the account's
 -- strongest method (a passkey when the account holds one, else SSO when it has an SSO link, else
--- any method) and the code emailed to the account's address; an email change also needs the code
--- sent to the new address. A method added in the last 24 hours blocks removing a method or a
--- passkey and changing the email. Outcomes: `opened` with the pass; `invalid_session`;
--- `gate_required` (no recent strongest-method sign-in); `cooling_off`; `code_invalid` (a missing,
--- wrong, expired or exhausted code; a wrong code counts an attempt).
+-- any method) and the code emailed to the account's primary address; an email change also needs
+-- the code sent to the new address, which must be another address. Each code counts only in its
+-- own role: `p_email_hash` and `p_code_hash` match only a code sent to the primary address
+-- (`current`), and the new pair only a code sent to the new address (`new`), so a code to the new
+-- address never stands in for the primary one. A method added in the last 24 hours blocks removing
+-- a method or a passkey and changing the email. Outcomes: `opened` with the pass;
+-- `invalid_session`; `gate_required` (no recent strongest-method sign-in); `cooling_off`;
+-- `code_invalid` (a missing, wrong, expired or exhausted code; a wrong code counts an attempt).
 CREATE FUNCTION uts.open_tier_a_gate_pass(
   p_environment text,
   p_account_id text,
@@ -834,6 +898,9 @@ BEGIN
   IF (p_action = 'email_change') <> (p_new_email_hash IS NOT NULL AND p_new_code_hash IS NOT NULL) THEN
     RAISE EXCEPTION 'an email change, and only an email change, names the new address and its code'
       USING ERRCODE = '22023';
+  END IF;
+  IF p_action = 'email_change' AND p_email_hash IS NOT DISTINCT FROM p_new_email_hash THEN
+    RAISE EXCEPTION 'an email change needs a new address' USING ERRCODE = '22023';
   END IF;
   SELECT * INTO holder FROM uts.account_session(p_account_id, p_grant_id);
   IF NOT FOUND THEN
@@ -877,9 +944,9 @@ BEGIN
     RETURN;
   END IF;
 
-  old_ok := uts.use_tier_a_code(p_account_id, p_email_hash, p_code_hash, false);
+  old_ok := uts.use_tier_a_code(p_account_id, 'current', p_email_hash, p_code_hash, false);
   IF p_action = 'email_change' THEN
-    new_ok := uts.use_tier_a_code(p_account_id, p_new_email_hash, p_new_code_hash, false);
+    new_ok := uts.use_tier_a_code(p_account_id, 'new', p_new_email_hash, p_new_code_hash, false);
     checks := checks || 'email_code_new'::uts.gate_check;
   END IF;
   IF NOT (old_ok AND new_ok) THEN
@@ -888,9 +955,9 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  PERFORM uts.use_tier_a_code(p_account_id, p_email_hash, p_code_hash, true);
+  PERFORM uts.use_tier_a_code(p_account_id, 'current', p_email_hash, p_code_hash, true);
   IF p_action = 'email_change' THEN
-    PERFORM uts.use_tier_a_code(p_account_id, p_new_email_hash, p_new_code_hash, true);
+    PERFORM uts.use_tier_a_code(p_account_id, 'new', p_new_email_hash, p_new_code_hash, true);
   END IF;
 
   INSERT INTO uts.gate_passes (account_id, device_session_id, tier, action, satisfied_by, expires_at)

@@ -1,4 +1,9 @@
-import { UTS_GRANT_TYPES, UTS_MAX_TOKENS_PER_CALL, UTS_TOKEN_PATH } from '@kilocode/uts-contracts';
+import {
+  UTS_GRANT_TYPES,
+  UTS_MAX_TOKENS_PER_CALL,
+  UTS_TOKEN_PATH,
+  type UtsEnvironment,
+} from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
@@ -83,7 +88,7 @@ function grantError(
 type TokenSelection = { scopes: string[] | null; resources: string[] | null };
 
 /** The optional `scope` and `resource` of a token request (RFC 6749 section 6, RFC 8707). */
-function tokenSelection(params: Params): TokenSelection | Response {
+function tokenSelection(params: Params, environment: UtsEnvironment): TokenSelection | Response {
   const scopeParam = params.one('scope');
   if (scopeParam.status === 'repeated') return oauthError('invalid_request', 400, 'scope repeats');
   let scopes: string[] | null = null;
@@ -96,7 +101,7 @@ function tokenSelection(params: Params): TokenSelection | Response {
   const resourceValues = params.all('resource');
   let resources: string[] | null = null;
   if (resourceValues.length > 0) {
-    resources = audiencesOfResources(resourceValues);
+    resources = audiencesOfResources(resourceValues, environment);
     if (resources === null || (scopes !== null && targetMismatch(scopes, resources))) {
       return grantError('invalid_target');
     }
@@ -170,7 +175,7 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
   if (!CodeVerifierSchema.safeParse(verifier).success) {
     return oauthError('invalid_request', 400, 'code_verifier is malformed');
   }
-  const selection = tokenSelection(params);
+  const selection = tokenSelection(params, deps.config.environment);
   if (selection instanceof Response) return selection;
   if (!isRandomCredential(code)) return grantError('invalid_grant');
 
@@ -222,7 +227,7 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
   if (identity instanceof Response) return identity;
   const token = required(params, 'refresh_token');
   if (token instanceof Response) return token;
-  const selection = tokenSelection(params);
+  const selection = tokenSelection(params, deps.config.environment);
   if (selection instanceof Response) return selection;
 
   if (identity.kind === 'first_party') {

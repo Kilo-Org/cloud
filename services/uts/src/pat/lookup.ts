@@ -10,7 +10,8 @@ import { hashOfHex } from './format';
  * finds only a live PAT of an active account; `not_found` covers unknown, revoked and expired PATs
  * and PATs of blocked accounts alike. Each mint isolate runs at most 100 lookups at once and
  * answers `rate_limited` above that, before it opens a connection; the PAT config's own connection
- * limit bounds the lookups that reach Postgres at once over all isolates.
+ * limit bounds the lookups that reach Postgres at once over all isolates. Sizing rule (design 3):
+ * the PAT config has at least 34 connections, so one isolate's 100 is at most 3 times them.
  */
 
 export const PAT_LOOKUPS_IN_FLIGHT = 100;

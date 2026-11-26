@@ -1,6 +1,7 @@
 import {
   UTS_MAX_TOKENS_PER_CALL,
   UtsScopeSchema,
+  type UtsEnvironment,
   audienceOfResource,
   audienceOfScope,
 } from '@kilocode/uts-contracts';
@@ -67,13 +68,16 @@ export function parseScopes(value: string, max: number): string[] | null {
 }
 
 /**
- * The audiences that RFC 8707 `resource` values name, without repeats; null when a value names no
- * Kilo service or more than 8 services are named.
+ * The audiences that RFC 8707 `resource` values name in `environment`, without repeats; null when
+ * a value names no Kilo service there or more than 8 services are named (`audienceOfResource`).
  */
-export function audiencesOfResources(resources: readonly string[]): string[] | null {
+export function audiencesOfResources(
+  resources: readonly string[],
+  environment: UtsEnvironment
+): string[] | null {
   const audiences = new Set<string>();
   for (const resource of resources) {
-    const audience = audienceOfResource(resource);
+    const audience = audienceOfResource(resource, environment);
     if (audience === null) return null;
     audiences.add(audience);
   }

@@ -199,6 +199,17 @@ export const CLOUDFLARE_MINTING_TOKEN_SECRET = 'CLOUDFLARE_MINTING_TOKEN';
 export const MINTING_SECRET_NAMES: readonly string[] = [CLOUDFLARE_MINTING_TOKEN_SECRET];
 
 /**
+ * Cloudflare permission groups no deploy token may hold, by id: the groups that create or edit API
+ * tokens or manage members, roles or account settings, whose holder could make a credential that
+ * outlives the 1-hour bound. The loader refuses a policy that lists one, and the deploy-token
+ * object refuses to mint one and deletes a token Cloudflare returns with one. The ids are copied
+ * from `GET /accounts/<account>/tokens/permission_groups` in setup step 3 (README "Cloudflare
+ * deploy tokens"); until then the list is empty, which refuses nothing by id, and the exact match
+ * of the returned groups with the policy's ids and names still applies.
+ */
+export const CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS: readonly string[] = [];
+
+/**
  * The deploy-token object reuses a minting credential it read this long ago, and reads it again
  * after that (a rotation reaches it within 4 minutes) or at once after Cloudflare refused it.
  */
@@ -248,6 +259,14 @@ export const DEPLOY_TOKEN_DELETES_PER_ALARM = 5;
 export const DEPLOY_TOKEN_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM = 2;
 export const DEPLOY_TOKEN_SWEEP_PAGE_SIZE = 50;
+
+/**
+ * The sweep also lists the account's Worker scripts once per run (one call: Cloudflare's list has
+ * no pages) and writes `deploy_token.unexpected_script` for each script changed while a handed-over
+ * token was live that none of the live tokens' `intendedScripts` names, at most this many rows per
+ * check (each row carries the total).
+ */
+export const DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK = 20;
 
 /** A deploy-token row stays this long after its token was deleted, for revoke answers and limits. */
 export const DEPLOY_TOKEN_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;

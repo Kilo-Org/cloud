@@ -612,9 +612,10 @@ export function deployTokenMintedEvent(input: {
 /**
  * Why STS deletes a deploy token: its caller asked (`caller`); it expired (`expired`, the reaper);
  * or STS could not hand it over (`late`: the creation outlasted its budget; `expiry_mismatch`:
- * Cloudflare's expiry is not the one asked for; `grant_mismatch`: its permission groups are not
- * the ones asked for, or one administers tokens or members; `audit_failed`: the mint row could not
- * be written).
+ * Cloudflare's expiry is not the one asked for; `grant_mismatch`: the policies Cloudflare returns
+ * are unreadable or differ from the ones sent in effect, groups or resources, a group's name is not
+ * the one the policy declares for its id, or a group administers tokens or members;
+ * `audit_failed`: the mint row could not be written).
  */
 export type DeployTokenDeleteCause =
   | 'caller'
@@ -716,6 +717,97 @@ export function deployTokenReapedEvent(input: {
         ...(input.tokenName === null ? {} : { tokenName: input.tokenName.slice(0, 512) }),
         ...(input.expiresAt === null ? {} : { expiresAt: new Date(input.expiresAt).toISOString() }),
         ...(caller === null ? {} : runAttributes(caller.run)),
+      },
+    },
+  });
+}
+
+/**
+ * A creation that handed nothing over and may have made a token, or that Cloudflare refused:
+ * `unknown` (a timeout, a 5xx, an unreadable answer, or an object that stopped while the creation
+ * ran; the sweep deletes such a token once it expired) or `refused` (a 4xx: Cloudflare made none).
+ * It names the token Cloudflare would carry, never a value.
+ */
+export function deployTokenMintFailedEvent(input: {
+  environment: StsEnvironment;
+  caller: DeployTokenAuditCaller;
+  permissionSet: string;
+  slot: number;
+  tokenName: string;
+  outcome: 'unknown' | 'refused';
+  httpStatus: number | null;
+}): AuditEvent {
+  const { caller } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.mint_failed',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.create,
+      outcome: 'failure',
+      outcomeDetail: input.outcome,
+      actor: { kind: 'workload', id: caller.workload },
+      attributes: {
+        workload: caller.workload,
+        environment: input.environment,
+        identity: caller.identity,
+        channel: caller.channel,
+        provider: 'cloudflare',
+        permissionSet: input.permissionSet,
+        outcome: input.outcome,
+        slot: input.slot,
+        tokenName: input.tokenName.slice(0, 512),
+        ...(input.httpStatus === null ? {} : { httpStatus: input.httpStatus }),
+        ...runAttributes(caller.run),
+      },
+    },
+  });
+}
+
+/**
+ * The sweep's detective check (design Q65): a Worker script of the account changed while one or
+ * more handed-over deploy tokens were live, and none of those tokens' `intendedScripts` names it.
+ * A deploy token can change any Worker of the account, so this may be a misused token, or a
+ * change by someone else in that window. `unexpectedInCheck` is the number of such scripts in this
+ * check; at most `DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK` rows are written per check.
+ */
+export function deployTokenUnexpectedScriptEvent(input: {
+  environment: StsEnvironment;
+  script: string;
+  modifiedAt: number;
+  tokenIds: string[];
+  workloads: string[];
+  runIds: string[];
+  intendedScripts: string[];
+  unexpectedInCheck: number;
+}): AuditEvent {
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.unexpected_script',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.other,
+      outcome: 'failure',
+      outcomeDetail: 'unexpected_script',
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        provider: 'cloudflare',
+        script: input.script.slice(0, 256),
+        modifiedAt: new Date(input.modifiedAt).toISOString(),
+        tokenIds: input.tokenIds.slice(0, 256),
+        workloads: input.workloads.slice(0, 256),
+        runIds: input.runIds.slice(0, 256),
+        intendedScripts: input.intendedScripts.slice(0, 256),
+        unexpectedInCheck: input.unexpectedInCheck,
       },
     },
   });

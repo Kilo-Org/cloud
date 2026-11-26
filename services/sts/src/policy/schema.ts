@@ -17,7 +17,11 @@ import {
   type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
-import { MINTING_FOLDER, MINTING_SECRET_NAMES } from '../constants';
+import {
+  CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
+  MINTING_FOLDER,
+  MINTING_SECRET_NAMES,
+} from '../constants';
 
 const SlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
 const StableIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -204,18 +208,21 @@ export const CLOUDFLARE_DEPLOY_MAX_PER_HOUR_CEILING = 12;
 export const CloudflareIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
 
 /**
- * A permission group no deploy token may hold, matched on the name the policy declares and on the
- * name Cloudflare returns for the minted token: a token that can create API tokens or manage
- * members can make a credential that outlives the 1-hour bound.
+ * A permission group no deploy token may hold, matched on the name the policy declares: a token
+ * that can create API tokens or manage members can make a credential that outlives the 1-hour
+ * bound. A name check only catches a mistake; the ids in `CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS`,
+ * and the check that Cloudflare names each returned id as the policy does, catch a group listed
+ * under another name.
  */
-export const FORBIDDEN_PERMISSION_GROUP_NAME = /api[ _-]?tokens?|member/i;
+const FORBIDDEN_PERMISSION_GROUP_NAME = /api[ _-]?tokens?|member/i;
 
 /**
  * One Cloudflare permission group, by the id Cloudflare lists at
  * `GET /accounts/<account>/tokens/permission_groups`, resolved when the policy is written (README
- * "Cloudflare deploy tokens"). STS sends only the id. `name` is for people reading the policy and
- * for the load-time check of `FORBIDDEN_PERMISSION_GROUP_NAME`; `scope` says which resource the
- * group applies to: the account of `CF_DEPLOY_ACCOUNT_ID`, or each listed zone.
+ * "Cloudflare deploy tokens"). STS sends only the id. `name` is Cloudflare's name for that id: the
+ * loader checks it against `FORBIDDEN_PERMISSION_GROUP_NAME`, and a minted token whose returned
+ * name for the id differs is deleted. `scope` says which resource the group applies to: the account
+ * of `CF_DEPLOY_ACCOUNT_ID`, or each listed zone.
  */
 const CloudflarePermissionGroupSchema = z.strictObject({
   id: CloudflareIdSchema,
@@ -318,14 +325,14 @@ export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
  * (bouncer-watch); `ci-migration` serves a GitHub job, and only one bound to a protected GitHub
  * environment (production also needs `refs/heads/main`, checked with the other GitHub rules).
  */
-function dynamicProblems(policy: Policy): string[] {
+function dynamicProblems(policy: Policy, forbiddenGroupIds: readonly string[]): string[] {
   const problems: string[] = [];
   if (hasDuplicates(policy.dynamic.map(entry => entry.grant))) {
     problems.push('dynamic lists a grant twice');
   }
   for (const entry of policy.dynamic) {
     if (!isLeaseDynamicGrant(entry)) {
-      problems.push(...cloudflareDeployProblems(policy, entry));
+      problems.push(...cloudflareDeployProblems(policy, entry, forbiddenGroupIds));
       continue;
     }
     const ceiling = LEASE_GRANT_MAX_TTL_SECONDS[entry.grant];
@@ -360,9 +367,14 @@ function dynamicProblems(policy: Policy): string[] {
 /**
  * A Cloudflare deploy-token grant serves only a GitHub job bound to a protected GitHub environment
  * (production also needs `refs/heads/main`, checked with the other GitHub rules). Every zone-scoped
- * group needs a zone, every zone a zone-scoped group, and no group may administer tokens or members.
+ * group needs a zone, every zone a zone-scoped group, and no group may administer tokens or members,
+ * by its declared name or by an id in `forbiddenGroupIds`.
  */
-function cloudflareDeployProblems(policy: Policy, entry: CloudflareDeployGrant): string[] {
+function cloudflareDeployProblems(
+  policy: Policy,
+  entry: CloudflareDeployGrant,
+  forbiddenGroupIds: readonly string[]
+): string[] {
   const problems: string[] = [];
   const { identity } = policy;
   if (identity.kind !== 'github-oidc') {
@@ -398,6 +410,11 @@ function cloudflareDeployProblems(policy: Policy, entry: CloudflareDeployGrant):
     if (FORBIDDEN_PERMISSION_GROUP_NAME.test(group.name)) {
       problems.push(
         `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permission group ${group.name} administers tokens or members`
+      );
+    }
+    if (forbiddenGroupIds.includes(group.id)) {
+      problems.push(
+        `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permission group ${group.id} is a forbidden group (CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS)`
       );
     }
   }
@@ -490,13 +507,18 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
 
 /**
  * Cross-field checks a single schema cannot express. Returns one message per problem. `registry`
- * is the scope registry the grants are checked against; tests pass their own.
+ * is the scope registry the grants are checked against, and `forbiddenGroupIds` the Cloudflare
+ * permission groups no deploy grant may list; tests pass their own.
  */
 export function policyFileProblems(
   policy: Policy,
-  registry: StsScopeRegistry = STS_SCOPE_REGISTRY
+  registry: StsScopeRegistry = STS_SCOPE_REGISTRY,
+  forbiddenGroupIds: readonly string[] = CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS
 ): string[] {
-  const problems: string[] = [...grantProblems(policy, registry), ...dynamicProblems(policy)];
+  const problems: string[] = [
+    ...grantProblems(policy, registry),
+    ...dynamicProblems(policy, forbiddenGroupIds),
+  ];
   if (hasDuplicates(policy.environments)) problems.push('environments contains a duplicate');
   if (hasDuplicates(policy.secrets)) problems.push('secrets contains a duplicate');
   for (const name of policy.secrets) {

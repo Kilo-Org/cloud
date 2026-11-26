@@ -89,10 +89,17 @@ function bindingKeys(policy: Policy): string[] {
   }
 }
 
-/** `scopeRegistry` is the registry token grants are checked against; tests pass their own. */
+/**
+ * `scopeRegistry` is the registry token grants are checked against, and
+ * `forbiddenPermissionGroupIds` the Cloudflare permission groups no deploy grant may list
+ * (default `CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS`); tests pass their own.
+ */
 export function loadPolicies(
   sources: Record<string, string>,
-  options: { scopeRegistry?: StsScopeRegistry } = {}
+  options: {
+    scopeRegistry?: StsScopeRegistry;
+    forbiddenPermissionGroupIds?: readonly string[];
+  } = {}
 ): PolicyIndex {
   const policies: Policy[] = [];
   for (const [file, source] of Object.entries(sources)) {
@@ -108,7 +115,11 @@ export function loadPolicies(
       throw new Error(`${file} does not match the policy schema: ${parsed.error.message}`);
     }
     const policy = parsed.data;
-    const problems = policyFileProblems(policy, options.scopeRegistry);
+    const problems = policyFileProblems(
+      policy,
+      options.scopeRegistry,
+      options.forbiddenPermissionGroupIds
+    );
     if (problems.length > 0) {
       throw new Error(`${file} is invalid: ${problems.join('; ')}`);
     }

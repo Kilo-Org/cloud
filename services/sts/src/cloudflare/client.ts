@@ -14,21 +14,25 @@ export type CloudflareTokenPolicy = {
   resources: Record<string, '*'>;
 };
 
+/** One policy of a created token as Cloudflare returns it: every group with its name. */
+const ReturnedPolicySchema = z.object({
+  effect: z.string(),
+  permission_groups: z.array(z.object({ id: z.string().min(1), name: z.string().min(1) })).min(1),
+  resources: z.record(z.string(), z.string()),
+});
+
 const CreatedTokenSchema = z.object({
   success: z.literal(true),
   result: z.object({
     id: z.string().regex(/^[0-9a-f]{32}$/),
     value: z.string().min(1),
     expires_on: z.iso.datetime({ offset: true }),
-    policies: z
-      .array(
-        z.object({
-          permission_groups: z.array(
-            z.object({ id: z.string().min(1), name: z.string().optional() })
-          ),
-        })
-      )
-      .min(1),
+    /**
+     * Null when STS cannot read them: a group without its name, a resource value that is not a
+     * string, or no policy at all. The token exists, so STS deletes it as a `grant_mismatch`
+     * instead of treating the answer as unknown.
+     */
+    policies: z.array(ReturnedPolicySchema).min(1).nullable().catch(null),
   }),
 });
 
@@ -44,12 +48,30 @@ const ListedTokensSchema = z.object({
   ),
 });
 
+const ListedScriptsSchema = z.object({
+  success: z.literal(true),
+  result: z.array(
+    z.object({
+      id: z.string().optional(),
+      modified_on: z.iso.datetime({ offset: true }).optional(),
+    })
+  ),
+});
+
+/** One policy of a created token, as Cloudflare returned it. */
+export type ReturnedTokenPolicy = {
+  effect: string;
+  permissionGroups: { id: string; name: string }[];
+  resources: Record<string, string>;
+};
+
 /** What Cloudflare says about the token it made; never logged, `value` goes to the caller only. */
 export type CreatedToken = {
   id: string;
   value: string;
   expiresAt: number;
-  permissionGroups: { id: string; name: string | null }[];
+  /** Null when Cloudflare's answer held no readable policy list (see `CreatedTokenSchema`). */
+  policies: ReturnedTokenPolicy[] | null;
 };
 
 export type TokenCreation =
@@ -64,27 +86,25 @@ export type TokenCreation =
   /** A timeout, a transport error, a 5xx or an unreadable 200: a token may exist. */
   | { status: 'unknown'; detail: string; retryAfterMs: number | null };
 
+/** A call that could not reach Cloudflare, or that Cloudflare refused. */
+export type CloudflareUnreachable = {
+  status: 'unreachable';
+  detail: string;
+  credentialRefused: boolean;
+  retryAfterMs: number | null;
+};
+
 /** `gone`: Cloudflare no longer has the token (404). */
-export type TokenDeletion =
-  | { status: 'deleted' }
-  | { status: 'gone' }
-  | {
-      status: 'unreachable';
-      detail: string;
-      credentialRefused: boolean;
-      retryAfterMs: number | null;
-    };
+export type TokenDeletion = { status: 'deleted' } | { status: 'gone' } | CloudflareUnreachable;
 
 export type ListedToken = { id: string; name: string; expiresAt: number | null };
 
-export type TokenPage =
-  | { status: 'ok'; tokens: ListedToken[] }
-  | {
-      status: 'unreachable';
-      detail: string;
-      credentialRefused: boolean;
-      retryAfterMs: number | null;
-    };
+export type TokenPage = { status: 'ok'; tokens: ListedToken[] } | CloudflareUnreachable;
+
+/** A Worker script and when it last changed. */
+export type ListedScript = { name: string; modifiedAt: number };
+
+export type ScriptList = { status: 'ok'; scripts: ListedScript[] } | CloudflareUnreachable;
 
 function retryAfterMs(response: Response): number | null {
   if (response.status !== 429) return null;
@@ -133,7 +153,8 @@ export function cloudflareTime(epochMs: number): string {
 
 /**
  * Plain-REST client for Cloudflare's account API tokens
- * (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/), authenticated
+ * (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/) and the
+ * account's Worker script list, authenticated
  * with the minting credential the caller passes on each call. No response body is kept in an
  * error detail: a body can echo request data.
  */
@@ -199,9 +220,15 @@ export class CloudflareTokens {
         id: result.id,
         value: result.value,
         expiresAt: Date.parse(result.expires_on),
-        permissionGroups: result.policies.flatMap(policy =>
-          policy.permission_groups.map(group => ({ id: group.id, name: group.name ?? null }))
-        ),
+        policies:
+          result.policies?.map(policy => ({
+            effect: policy.effect,
+            permissionGroups: policy.permission_groups.map(group => ({
+              id: group.id,
+              name: group.name,
+            })),
+            resources: policy.resources,
+          })) ?? null,
       },
     };
   }
@@ -283,5 +310,54 @@ export class CloudflareTokens {
         expiresAt: token.expires_on ? Date.parse(token.expires_on) : null,
       })),
     };
+  }
+
+  /**
+   * `GET /accounts/{account_id}/workers/scripts`: every Worker script of the account with its
+   * `modified_on`, in one answer; the endpoint has no pages
+   * (https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/list/).
+   * A script without a name or a time is left out.
+   */
+  async listScripts(credential: string): Promise<ScriptList> {
+    let response: Response;
+    try {
+      response = await cloudflareFetch(credential, `/accounts/${this.accountId}/workers/scripts`, {
+        method: 'GET',
+      });
+    } catch (error) {
+      if (error instanceof CloudflareTransportError) {
+        return {
+          status: 'unreachable',
+          detail: error.detail,
+          credentialRefused: false,
+          retryAfterMs: null,
+        };
+      }
+      throw error;
+    }
+    if (!response.ok) {
+      await response.body?.cancel();
+      return {
+        status: 'unreachable',
+        detail: `cloudflare script list failed with status ${response.status}`,
+        credentialRefused: isCredentialRefused(response.status),
+        retryAfterMs: retryAfterMs(response),
+      };
+    }
+    const parsed = ListedScriptsSchema.safeParse(await response.json().catch(() => null));
+    if (!parsed.success) {
+      return {
+        status: 'unreachable',
+        detail: 'cloudflare script list response did not match',
+        credentialRefused: false,
+        retryAfterMs: null,
+      };
+    }
+    const scripts: ListedScript[] = [];
+    for (const script of parsed.data.result) {
+      if (script.id === undefined || script.modified_on === undefined) continue;
+      scripts.push({ name: script.id, modifiedAt: Date.parse(script.modified_on) });
+    }
+    return { status: 'ok', scripts };
   }
 }

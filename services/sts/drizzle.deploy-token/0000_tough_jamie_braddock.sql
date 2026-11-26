@@ -28,7 +28,9 @@ CREATE TABLE `deploy_token` (
 	`delete_cause` text,
 	`delete_retry_at` integer,
 	`delete_attempts` integer DEFAULT 0 NOT NULL,
-	`delete_failure_audited` integer DEFAULT false NOT NULL
+	`delete_failure_audited` integer DEFAULT false NOT NULL,
+	`intended_scripts` text NOT NULL,
+	`scripts_checked` integer DEFAULT false NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `deploy_token_token_id_unique` ON `deploy_token` (`token_id`);--> statement-breakpoint

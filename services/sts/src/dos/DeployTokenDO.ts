@@ -1,5 +1,6 @@
 import { withDORetry } from '@kilocode/worker-utils';
 import {
+  CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS,
   CloudflareTokenIdSchema,
   StsEnvironmentSchema,
   WorkloadNameSchema,
@@ -12,9 +13,11 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 import migrations from '../../drizzle.deploy-token/migrations';
 import {
+  deployTokenMintFailedEvent,
   deployTokenMintedEvent,
   deployTokenReapedEvent,
   deployTokenRevokedEvent,
+  deployTokenUnexpectedScriptEvent,
   type DeployTokenAuditCaller,
   type DeployTokenDeleteCause,
   type DeployTokenDeletionResult,
@@ -24,10 +27,11 @@ import {
   CloudflareTokens,
   cloudflareTime,
   type CloudflareTokenPolicy,
-  type CreatedToken,
   type ListedToken,
+  type ReturnedTokenPolicy,
 } from '../cloudflare/client';
 import {
+  CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
   CLOUDFLARE_MINTING_TOKEN_SECRET,
   DEPLOY_TOKEN_DELETES_PER_ALARM,
   DEPLOY_TOKEN_DELETE_RETRY_CAP_MS,
@@ -39,6 +43,7 @@ import {
   DEPLOY_TOKEN_SWEEP_INTERVAL_MS,
   DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM,
   DEPLOY_TOKEN_SWEEP_PAGE_SIZE,
+  DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK,
   MINTING_CREDENTIAL_CACHE_MS,
   MINTING_FOLDER,
   RELAY_DELAY_MS,
@@ -48,11 +53,7 @@ import * as schema from '../db/deploy-token-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import { GithubRunSchema } from '../identity/verify';
 import { InfisicalClient } from '../infisical/client';
-import {
-  CloudflareDeployGrantSchema,
-  FORBIDDEN_PERMISSION_GROUP_NAME,
-  type CloudflareDeployGrant,
-} from '../policy/schema';
+import { CloudflareDeployGrantSchema, type CloudflareDeployGrant } from '../policy/schema';
 import { getSignerStub } from './stubs';
 
 type DeployTokenDatabase = DrizzleSqliteDODatabase<typeof schema>;
@@ -162,17 +163,67 @@ export function deployTokenPolicies(
 }
 
 /**
- * True when the token Cloudflare made carries exactly the permission groups asked for, and none
- * whose Cloudflare name administers tokens or members.
+ * Why the policies Cloudflare returns for a created token are not exactly the ones STS sent, or
+ * null when they are: the same policies with the same effect, permission-group ids and resources,
+ * and every returned group named exactly as the policy declares its id (a name Cloudflare leaves
+ * out makes the list unreadable, `null`). The loader refuses a declared name that administers
+ * tokens or members and `mint` refuses a pinned forbidden id before the call, so an exact match
+ * holds neither. Never includes a token value.
  */
-function carriesGrant(token: CreatedToken, grant: CloudflareDeployGrant): boolean {
-  const asked = new Set(grant.permissionGroups.map(group => group.id));
-  const got = new Set(token.permissionGroups.map(group => group.id));
-  if (asked.size !== got.size || [...asked].some(id => !got.has(id))) return false;
-  return !token.permissionGroups.some(
-    group => group.name !== null && FORBIDDEN_PERMISSION_GROUP_NAME.test(group.name)
-  );
+export function returnedGrantProblem(
+  returned: ReturnedTokenPolicy[] | null,
+  sent: CloudflareTokenPolicy[],
+  grant: CloudflareDeployGrant
+): string | null {
+  if (returned === null) return 'the returned policies are unreadable or name no group';
+  const key = (effect: string, ids: string[], resources: Record<string, string>) =>
+    JSON.stringify([
+      effect,
+      [...ids].sort(),
+      Object.entries(resources).sort(([left], [right]) => left.localeCompare(right)),
+    ]);
+  const asked = sent
+    .map(policy =>
+      key(
+        policy.effect,
+        policy.permission_groups.map(group => group.id),
+        policy.resources
+      )
+    )
+    .sort();
+  const got = returned
+    .map(policy =>
+      key(
+        policy.effect,
+        policy.permissionGroups.map(group => group.id),
+        policy.resources
+      )
+    )
+    .sort();
+  if (asked.length !== got.length || asked.some((entry, index) => entry !== got[index])) {
+    return 'the returned effect, groups or resources differ from the ones sent';
+  }
+  const declared = new Map(grant.permissionGroups.map(group => [group.id, group.name]));
+  for (const policy of returned) {
+    for (const group of policy.permissionGroups) {
+      if (declared.get(group.id) !== group.name) {
+        return `group ${group.id} is not named as the policy declares it`;
+      }
+    }
+  }
+  return null;
 }
+
+/**
+ * A row the alarm may delete once it ended a day ago: no deletion owed, not a live token, and a
+ * handed-over token only after the sweep compared its live window with the Worker scripts.
+ */
+const prunable = and(
+  isNull(schema.deployToken.deleteCause),
+  ne(schema.deployToken.state, 'active'),
+  ne(schema.deployToken.state, 'pending'),
+  or(ne(schema.deployToken.state, 'deleted'), eq(schema.deployToken.scriptsChecked, true))
+);
 
 /**
  * One object per environment (design 6.1 job 3, 4.4): it mints Cloudflare account API tokens for
@@ -186,6 +237,10 @@ function carriesGrant(token: CreatedToken, grant: CloudflareDeployGrant): boolea
  * object serves the environment.
  */
 export class DeployTokenDO extends DurableObject<Env> {
+  /** The permission groups no token may hold; a test's subclass sets its own. */
+  static readonly forbiddenPermissionGroupIds: readonly string[] =
+    CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS;
+
   private readonly config: StsConfig;
   private readonly db: DeployTokenDatabase;
   private readonly audit: AuditLog;
@@ -193,11 +248,15 @@ export class DeployTokenDO extends DurableObject<Env> {
   private readonly manager: InfisicalClient;
   /** Deletions in flight, by token id: concurrent ones (callers and the alarm) share one call. */
   private readonly deleting = new Map<string, Promise<DeployTokenDeletionResult>>();
+  /** The slots of the creations this instance is running; a `pending` row outside it was cut off. */
+  private readonly creating = new Set<number>();
   /** The minting credential and when it was read; memory only, never storage. */
   private credential: { value: string; readAt: number } | null = null;
   private pendingCredential: Promise<CredentialRead> | null = null;
   /** No Cloudflare call before this time: Cloudflare answered 429 with `Retry-After`. */
   private cloudflareHoldUntil = 0;
+  /** The alarm running now; Cloudflare refused the minting credential during it. */
+  private alarmRun: { credentialRefused: boolean } | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -248,6 +307,18 @@ export class DeployTokenDO extends DurableObject<Env> {
         retryAfterSeconds: retryAfterSeconds(this.cloudflareHoldUntil - callStartedAt),
       };
     }
+    const pinned = (this.constructor as typeof DeployTokenDO).forbiddenPermissionGroupIds;
+    const forbidden = grant.permissionGroups
+      .map(group => group.id)
+      .filter(id => pinned.includes(id));
+    if (forbidden.length > 0) {
+      // The loader refuses such a grant; this holds even for a grant that did not pass it.
+      console.error('sts: deploy token refused: the grant lists a forbidden permission group', {
+        workload: caller.workload,
+        groups: forbidden,
+      });
+      return UNAVAILABLE;
+    }
     const limited = this.limitFor(caller.workload, grant, callStartedAt);
     if (limited !== null) return limited;
 
@@ -261,11 +332,30 @@ export class DeployTokenDO extends DurableObject<Env> {
         state: 'pending',
         createdAt: callStartedAt,
         expiresAt: deadline,
+        intendedScripts: JSON.stringify(grant.intendedScripts),
       })
       .returning({ slot: schema.deployToken.slot })
       .get();
-    this.ensureSweepScheduled(callStartedAt);
+    this.creating.add(slot);
+    try {
+      this.ensureSweepScheduled(callStartedAt);
+      // Should this instance stop during the creation, the alarm finds the row past its budget.
+      const current = await this.ctx.storage.getAlarm();
+      if (current === null || current > deadline) await this.ctx.storage.setAlarm(deadline);
+      return await this.create(slot, caller, grant, accountId, deadline);
+    } finally {
+      this.creating.delete(slot);
+    }
+  }
 
+  /** The creation behind `mint`, for the slot it took. */
+  private async create(
+    slot: number,
+    caller: DeployTokenAuditCaller,
+    grant: CloudflareDeployGrant,
+    accountId: string,
+    deadline: number
+  ): Promise<DeployTokenMintResult> {
     const credential = await this.mintingCredential();
     if (credential.status !== 'ok') {
       console.error('sts: deploy token refused: no minting credential', {
@@ -274,12 +364,13 @@ export class DeployTokenDO extends DurableObject<Env> {
       });
       return await this.failCreation(slot);
     }
-    const name = `${deployTokenNamePrefix(this.config.environment)}${caller.workload}-${caller.run.runId}-${slot}`;
+    const name = this.tokenName(caller.workload, caller.run.runId, slot);
+    const policies = deployTokenPolicies(accountId, grant);
     const notBefore = Date.now();
     const requestedExpiry = Date.parse(cloudflareTime(notBefore + grant.ttlSeconds * 1000));
     const created = await new CloudflareTokens(accountId).create(credential.value, {
       name,
-      policies: deployTokenPolicies(accountId, grant),
+      policies,
       notBefore,
       expiresAt: requestedExpiry,
     });
@@ -290,6 +381,7 @@ export class DeployTokenDO extends DurableObject<Env> {
         status: created.httpStatus,
       });
       this.noteFailure(created);
+      await this.auditMintFailed(caller, grant.permissionSet, slot, 'refused', created.httpStatus);
       return await this.failCreation(slot, created.retryAfterMs);
     }
     if (created.status === 'unknown') {
@@ -299,6 +391,7 @@ export class DeployTokenDO extends DurableObject<Env> {
         detail: created.detail,
       });
       this.requestSweep(requestedExpiry + DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS);
+      await this.auditMintFailed(caller, grant.permissionSet, slot, 'unknown', null);
       return await this.failCreation(slot);
     }
 
@@ -308,9 +401,17 @@ export class DeployTokenDO extends DurableObject<Env> {
       cause = 'late';
     } else if (Math.abs(token.expiresAt - requestedExpiry) > DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS) {
       cause = 'expiry_mismatch';
-    } else if (!carriesGrant(token, grant)) {
-      cause = 'grant_mismatch';
     } else {
+      const problem = returnedGrantProblem(token.policies, policies, grant);
+      if (problem !== null) {
+        console.error('sts: Cloudflare returned another grant than the one asked for', {
+          workload: caller.workload,
+          problem,
+        });
+        cause = 'grant_mismatch';
+      }
+    }
+    if (cause === null) {
       try {
         await this.audit.append(
           this.stream,
@@ -368,6 +469,40 @@ export class DeployTokenDO extends DurableObject<Env> {
     };
   }
 
+  /** The name of the token a creation asks Cloudflare for. */
+  private tokenName(workload: string, runId: string, slot: number): string {
+    return `${deployTokenNamePrefix(this.config.environment)}${workload}-${runId}-${slot}`;
+  }
+
+  /** Writes `deploy_token.mint_failed`; a failed append is logged only, the creation has ended. */
+  private async auditMintFailed(
+    caller: DeployTokenAuditCaller,
+    permissionSet: string,
+    slot: number,
+    outcome: 'unknown' | 'refused',
+    httpStatus: number | null
+  ): Promise<void> {
+    try {
+      await this.audit.append(
+        this.stream,
+        deployTokenMintFailedEvent({
+          environment: this.config.environment,
+          caller,
+          permissionSet,
+          slot,
+          tokenName: this.tokenName(caller.workload, caller.run.runId, slot),
+          outcome,
+          httpStatus,
+        })
+      );
+    } catch (error) {
+      console.error('sts: deploy token mint_failed audit append failed', {
+        workload: caller.workload,
+        reason: errorName(error),
+      });
+    }
+  }
+
   /**
    * Deletes one of the caller's own tokens. A token id STS never handed to this workload is
    * `not_found`, whoever holds it, and so is a token asked for by another run of the same workload.
@@ -398,53 +533,100 @@ export class DeployTokenDO extends DurableObject<Env> {
   }
 
   /**
-   * Relays audit rows, marks expired tokens owed, retries owed deletions (at most
-   * `DEPLOY_TOKEN_DELETES_PER_ALARM`, least recently tried first), runs the sweep when due with
-   * what is left of that budget, and prunes ended rows.
+   * Relays audit rows, marks expired tokens owed, ends creations an earlier instance of this object
+   * left `pending`, retries owed deletions (at most `DEPLOY_TOKEN_DELETES_PER_ALARM`, least
+   * recently tried first), runs the sweep when due with what is left of that budget, and prunes
+   * ended rows. Once Cloudflare answers 401 or 403 to the minting credential, the alarm makes no
+   * further Cloudflare call and reads no credential until its next run.
    */
   async alarm(): Promise<void> {
-    let failed = false;
+    const run = { credentialRefused: false };
+    this.alarmRun = run;
     try {
-      await this.audit.relay(this.stream);
-    } catch (error) {
-      failed = true;
-      console.warn('sts: deploy-token audit relay failed; rows stay for the next alarm', {
-        reason: errorName(error),
-      });
-    }
-    let now = Date.now();
-    this.db
-      .update(schema.deployToken)
-      .set({ deleteCause: 'expired' })
-      .where(
-        and(
-          eq(schema.deployToken.state, 'active'),
-          isNull(schema.deployToken.deleteCause),
-          lte(schema.deployToken.expiresAt, now)
-        )
-      )
-      .run();
-    const owed = this.owedDeletions(now, DEPLOY_TOKEN_DELETES_PER_ALARM);
-    for (const row of owed) {
-      if (row.tokenId !== null) await this.deleteOnce(row.tokenId);
-    }
-    await this.sweepIfDue(Date.now(), DEPLOY_TOKEN_DELETES_PER_ALARM - owed.length);
-    now = Date.now();
-    this.audit.pruneIfDue(now);
-    this.db
-      .delete(schema.deployToken)
-      .where(
-        and(
-          isNull(schema.deployToken.deleteCause),
-          ne(schema.deployToken.state, 'active'),
-          lt(
-            sql`coalesce(${schema.deployToken.endedAt}, ${schema.deployToken.expiresAt})`,
-            now - DEPLOY_TOKEN_ROW_RETENTION_MS
+      let failed = false;
+      try {
+        await this.audit.relay(this.stream);
+      } catch (error) {
+        failed = true;
+        console.warn('sts: deploy-token audit relay failed; rows stay for the next alarm', {
+          reason: errorName(error),
+        });
+      }
+      let now = Date.now();
+      this.db
+        .update(schema.deployToken)
+        .set({ deleteCause: 'expired' })
+        .where(
+          and(
+            eq(schema.deployToken.state, 'active'),
+            isNull(schema.deployToken.deleteCause),
+            lte(schema.deployToken.expiresAt, now)
           )
         )
-      )
-      .run();
-    await this.scheduleAlarm(Date.now(), failed, true);
+        .run();
+      await this.endInterruptedCreations(now);
+      const owed = this.owedDeletions(now, DEPLOY_TOKEN_DELETES_PER_ALARM);
+      for (const row of owed) {
+        if (run.credentialRefused) break;
+        if (row.tokenId !== null) await this.deleteOnce(row.tokenId);
+      }
+      if (!run.credentialRefused) {
+        await this.sweepIfDue(Date.now(), DEPLOY_TOKEN_DELETES_PER_ALARM - owed.length);
+      }
+      now = Date.now();
+      this.audit.pruneIfDue(now);
+      this.db
+        .delete(schema.deployToken)
+        .where(
+          and(
+            prunable,
+            lt(
+              sql`coalesce(${schema.deployToken.endedAt}, ${schema.deployToken.expiresAt})`,
+              now - DEPLOY_TOKEN_ROW_RETENTION_MS
+            )
+          )
+        )
+        .run();
+      await this.scheduleAlarm(Date.now(), failed, true);
+    } finally {
+      this.alarmRun = null;
+    }
+  }
+
+  /**
+   * A `pending` row past its creation budget that no creation of this instance holds was left by
+   * an instance that stopped while Cloudflare was creating its token: the creation's outcome is
+   * unknown. Ends it, writes `deploy_token.mint_failed` (`unknown`), and brings the sweep forward
+   * to when such a token has expired: its expiry is at most `CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS`
+   * after the budget ended, plus Cloudflare's tolerance.
+   */
+  private async endInterruptedCreations(now: number): Promise<void> {
+    const interrupted = this.db
+      .select()
+      .from(schema.deployToken)
+      .where(and(eq(schema.deployToken.state, 'pending'), lt(schema.deployToken.expiresAt, now)))
+      .all()
+      .filter(row => !this.creating.has(row.slot));
+    for (const row of interrupted) {
+      console.error('sts: a deploy token creation was interrupted; the sweep checks for it', {
+        workload: row.workload,
+      });
+      this.requestSweep(
+        row.expiresAt + CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS * 1000 + DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS
+      );
+      this.db
+        .update(schema.deployToken)
+        .set({ state: 'failed', endedAt: now })
+        .where(eq(schema.deployToken.slot, row.slot))
+        .run();
+      await this.auditMintFailed(
+        CallerSchema.parse(JSON.parse(row.caller)),
+        row.permissionSet,
+        row.slot,
+        'unknown',
+        null
+      );
+    }
   }
 
   /**
@@ -487,10 +669,13 @@ export class DeployTokenDO extends DurableObject<Env> {
       .orderBy(asc(schema.deployToken.createdAt))
       .all();
     if (recent.length >= grant.maxPerHour) {
+      // A slot opens when enough creations leave the hour to bring the count below the cap; a
+      // lowered cap can leave more than `maxPerHour` in it.
+      const freeing = recent[recent.length - grant.maxPerHour];
       return {
         status: 'limited',
         reason: 'rate_limited',
-        retryAfterSeconds: retryAfterSeconds(recent[0].createdAt + HOUR_MS - now),
+        retryAfterSeconds: retryAfterSeconds(freeing.createdAt + HOUR_MS - now),
       };
     }
     return null;
@@ -554,9 +739,15 @@ export class DeployTokenDO extends DurableObject<Env> {
     return { status: 'unavailable', detail: read.detail };
   }
 
-  /** Drops a refused credential and honours a `Retry-After`; logs nothing of the credential. */
+  /**
+   * Drops a refused credential (and ends the running alarm's Cloudflare work, so it reads no new
+   * credential before its next run) and honours a `Retry-After`; logs nothing of the credential.
+   */
   private noteFailure(failure: { credentialRefused: boolean; retryAfterMs: number | null }): void {
-    if (failure.credentialRefused) this.credential = null;
+    if (failure.credentialRefused) {
+      this.credential = null;
+      if (this.alarmRun !== null) this.alarmRun.credentialRefused = true;
+    }
     if (failure.retryAfterMs !== null) {
       this.cloudflareHoldUntil = Math.max(
         this.cloudflareHoldUntil,
@@ -745,10 +936,11 @@ export class DeployTokenDO extends DurableObject<Env> {
   }
 
   /**
-   * Reads up to `DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM` pages of the account's token list and deletes,
-   * within `budget`, every expired token named for this environment that STS holds no row for.
-   * A page where it deleted something is read again (the list shifted); a page shorter than the
-   * page size ends the sweep, and the next one runs a day later.
+   * Starts a sweep with the Worker script check (`checkScripts`), then reads up to
+   * `DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM` pages of the account's token list and deletes, within
+   * `budget`, every expired token named for this environment that STS holds no row for. A page
+   * where it deleted something is read again (the list shifted); a page shorter than the page size
+   * ends the sweep, and the next one runs a day later.
    */
   private async sweepIfDue(now: number, budget: number): Promise<void> {
     const state = this.db
@@ -772,6 +964,10 @@ export class DeployTokenDO extends DurableObject<Env> {
       return;
     }
     const tokens = new CloudflareTokens(accountId);
+    if (state.page === null && !(await this.checkScripts(tokens, credential.value, now))) {
+      this.setSweep(Math.max(now + RELAY_RETRY_MS, this.cloudflareHoldUntil), null);
+      return;
+    }
     const prefix = deployTokenNamePrefix(this.config.environment);
     let page = state.page ?? 1;
     let left = budget;
@@ -792,7 +988,7 @@ export class DeployTokenDO extends DurableObject<Env> {
       );
       let deleted = 0;
       for (const orphan of orphans) {
-        if (left <= 0) break;
+        if (left <= 0 || this.alarmRun?.credentialRefused === true) break;
         left -= 1;
         if ((await this.sweepDelete(tokens, credential.value, orphan)) !== 'delete_failed') {
           deleted += 1;
@@ -800,7 +996,7 @@ export class DeployTokenDO extends DurableObject<Env> {
       }
       if (deleted < orphans.length) {
         // Out of budget, or a deletion failed: this page again on the next alarm.
-        this.setSweep(soon, page);
+        this.setSweep(Math.max(soon, this.cloudflareHoldUntil), page);
         return;
       }
       if (deleted === 0) {
@@ -812,6 +1008,109 @@ export class DeployTokenDO extends DurableObject<Env> {
       }
     }
     this.setSweep(soon, page);
+  }
+
+  /**
+   * The detective check behind design Q65: a deploy token can change any Worker of the account, so
+   * once a handed-over token's live window closed (it was deleted or it expired), one call lists
+   * the account's Worker scripts and every script whose `modified_on` falls inside a window not yet
+   * checked is compared with the `intendedScripts` of every token live at that time. Each script
+   * none of them names gets one `deploy_token.unexpected_script` row (at most
+   * `DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK`), and the windows are marked checked. Only a
+   * script's last change is visible, so a later change of the same script hides an earlier one.
+   * False when the sweep must stop: Cloudflare refused the credential or answered 429. Any other
+   * failure leaves the windows for the next sweep, and the token sweep goes on.
+   */
+  private async checkScripts(
+    tokens: CloudflareTokens,
+    credential: string,
+    now: number
+  ): Promise<boolean> {
+    const windows = this.db
+      .select()
+      .from(schema.deployToken)
+      .where(inArray(schema.deployToken.state, ['active', 'deleted']))
+      .all()
+      .map(row => {
+        const end = Math.min(row.endedAt ?? row.expiresAt, row.expiresAt);
+        return {
+          row,
+          closed: end <= now,
+          // The slack covers the clock difference between this object and Cloudflare.
+          from: row.createdAt - DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
+          to: end + DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS,
+          intended: z.array(z.string()).parse(JSON.parse(row.intendedScripts)),
+        };
+      });
+    const due = windows.filter(window => window.closed && !window.row.scriptsChecked);
+    if (due.length === 0) return true;
+    const listed = await tokens.listScripts(credential);
+    if (listed.status !== 'ok') {
+      console.error('sts: deploy token script check could not list Worker scripts', {
+        detail: listed.detail,
+      });
+      this.noteFailure(listed);
+      return !listed.credentialRefused && listed.retryAfterMs === null;
+    }
+    const unexpected = listed.scripts
+      .filter(script =>
+        due.some(window => script.modifiedAt >= window.from && script.modifiedAt <= window.to)
+      )
+      .map(script => ({
+        script,
+        live: windows.filter(
+          window => script.modifiedAt >= window.from && script.modifiedAt <= window.to
+        ),
+      }))
+      .filter(({ script, live }) => !live.some(window => window.intended.includes(script.name)))
+      .sort((left, right) => left.script.modifiedAt - right.script.modifiedAt);
+    if (unexpected.length > 0) {
+      console.error(
+        'sts: Worker scripts changed while a deploy token was live, outside its scripts',
+        {
+          count: unexpected.length,
+        }
+      );
+    }
+    for (const { script, live } of unexpected.slice(
+      0,
+      DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK
+    )) {
+      try {
+        await this.audit.append(
+          this.stream,
+          deployTokenUnexpectedScriptEvent({
+            environment: this.config.environment,
+            script: script.name,
+            modifiedAt: script.modifiedAt,
+            tokenIds: live.flatMap(window =>
+              window.row.tokenId === null ? [] : [window.row.tokenId]
+            ),
+            workloads: [...new Set(live.map(window => window.row.workload))],
+            runIds: [...new Set(live.map(window => window.row.runId))],
+            intendedScripts: [...new Set(live.flatMap(window => window.intended))],
+            unexpectedInCheck: unexpected.length,
+          })
+        );
+      } catch (error) {
+        // The windows stay unchecked, so the next sweep writes the rows.
+        console.error('sts: deploy token script check audit append failed', {
+          reason: errorName(error),
+        });
+        return true;
+      }
+    }
+    this.db
+      .update(schema.deployToken)
+      .set({ scriptsChecked: true })
+      .where(
+        inArray(
+          schema.deployToken.slot,
+          due.map(window => window.row.slot)
+        )
+      )
+      .run();
+    return true;
   }
 
   /** Deletes one expired token the sweep found and audits the attempt. */
@@ -858,9 +1157,21 @@ export class DeployTokenDO extends DurableObject<Env> {
         >`min(coalesce(${schema.deployToken.endedAt}, ${schema.deployToken.expiresAt}))`,
       })
       .from(schema.deployToken)
-      .where(and(isNull(schema.deployToken.deleteCause), ne(schema.deployToken.state, 'active')))
+      .where(prunable)
       .get();
     return row === undefined || row.end === null ? null : row.end + DEPLOY_TOKEN_ROW_RETENTION_MS;
+  }
+
+  /** The earliest budget end of a `pending` row no creation of this instance holds, or null. */
+  private nextInterruptedCreation(): number | null {
+    const deadlines = this.db
+      .select({ slot: schema.deployToken.slot, deadline: schema.deployToken.expiresAt })
+      .from(schema.deployToken)
+      .where(eq(schema.deployToken.state, 'pending'))
+      .all()
+      .filter(row => !this.creating.has(row.slot))
+      .map(row => row.deadline);
+    return deadlines.length === 0 ? null : Math.min(...deadlines);
   }
 
   /** The earliest expiry of a handed-over token not yet owed for deletion, or null. */
@@ -874,10 +1185,11 @@ export class DeployTokenDO extends DurableObject<Env> {
   }
 
   /**
-   * Sets the alarm to the earliest of the audit work, the next owed deletion, the next expiry, the
-   * sweep and the row prune. After an alarm (`afterAlarm`), owed deletions wait at least
-   * `DEPLOY_TOKEN_DELETE_RETRY_MS`, so retries make at most `DEPLOY_TOKEN_DELETES_PER_ALARM`
-   * Cloudflare deletes per 30 seconds whatever the number of owed tokens.
+   * Sets the alarm to the earliest of the audit work, the next owed deletion, the next expiry, an
+   * interrupted creation, the sweep and the row prune. After an alarm (`afterAlarm`), owed
+   * deletions wait at least `DEPLOY_TOKEN_DELETE_RETRY_MS`, so retries make at most
+   * `DEPLOY_TOKEN_DELETES_PER_ALARM` Cloudflare deletes per 30 seconds whatever the number of owed
+   * tokens.
    */
   private async scheduleAlarm(now: number, failed: boolean, afterAlarm = false): Promise<void> {
     let target = Number.POSITIVE_INFINITY;
@@ -896,6 +1208,8 @@ export class DeployTokenDO extends DurableObject<Env> {
     }
     const expiry = this.nextExpiry();
     if (expiry !== null) target = Math.min(target, expiry);
+    const interrupted = this.nextInterruptedCreation();
+    if (interrupted !== null) target = Math.min(target, interrupted);
     const sweep = this.db
       .select({ at: schema.deployTokenSweep.nextSweepAt })
       .from(schema.deployTokenSweep)

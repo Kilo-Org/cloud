@@ -16,17 +16,25 @@ import {
 } from 'vitest';
 import { clearDenialBuffers } from '../../src/audit/denials';
 import {
+  CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
   CLOUDFLARE_MINTING_TOKEN_SECRET,
   DEPLOY_TOKEN_DELETES_PER_ALARM,
   DEPLOY_TOKEN_MINT_BUDGET_MS,
   DEPLOY_TOKEN_RETRY_AFTER_SECONDS,
+  DEPLOY_TOKEN_ROW_RETENTION_MS,
+  DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK,
   MINTING_FOLDER,
 } from '../../src/constants';
-import { DeployTokenDO } from '../../src/dos/DeployTokenDO';
+import {
+  DeployTokenDO,
+  deployTokenPolicies,
+  returnedGrantProblem,
+} from '../../src/dos/DeployTokenDO';
 import { getDenialStub, getDeployTokenStub, getSignerStub } from '../../src/dos/stubs';
 import { handleRequest } from '../../src/http';
 import { InfisicalClient } from '../../src/infisical/client';
 import { loadPolicies } from '../../src/policy/load';
+import type { CloudflareDeployGrant } from '../../src/policy/schema';
 import type { MintAuthority } from '../../src/tokens/mint';
 import { stubOfflineNetwork } from './manager';
 import { resetDenialObject, resetDeployTokenObject } from './reset';
@@ -104,19 +112,49 @@ secrets: []
   }),
 };
 
+/** The caller STS passes the object for a run of the bouncer deploy job, for direct calls. */
+const CALLER = {
+  workload: 'ci-deploy-bouncer',
+  identity: 'github',
+  channel: 'http',
+  run: { jobWorkflowRef: DEPLOY_WORKFLOW, runId: '1' },
+} as const;
+
+function bouncerGrant(): CloudflareDeployGrant {
+  const grant = authority.policies.get('development', 'ci-deploy-bouncer')?.dynamic[0];
+  if (grant === undefined || grant.grant !== 'cloudflare-deploy') throw new Error('no grant');
+  return grant;
+}
+
 type Recorded = { method: string; path: string; authorization: string | null; body: unknown };
+
+/** One policy of a created token as the fake returns it; tests may change it before it goes out. */
+type FakePolicy = {
+  id: string;
+  effect: string;
+  permission_groups: { id: string; name?: string }[];
+  resources: Record<string, string>;
+};
+
+type FakeScript = { id: string; modified_on: string };
 
 type FakeCloudflare = {
   calls: Recorded[];
   creates: () => Recorded[];
   deletes: () => Recorded[];
+  scriptLists: () => Recorded[];
   /** Tokens that exist at the fake, by id. */
   tokens: Map<string, { name: string; expiresOn: string }>;
+  /** The account's Worker scripts, as `GET .../workers/scripts` lists them. */
+  scripts: FakeScript[];
   setCreateStatus: (status: number) => void;
   setDeleteStatus: (status: number) => void;
   setListStatus: (status: number) => void;
+  setScriptsStatus: (status: number) => void;
   /** Adds this permission group (named) to every token the fake makes. */
   addGroup: (group: { id: string; name: string } | null) => void;
+  /** Changes the policies of every token the fake makes, as Cloudflare would return them. */
+  editPolicies: (edit: ((policies: FakePolicy[]) => void) | null) => void;
   setExpirySkewMs: (ms: number) => void;
   manager: { reads: URL[]; removeCredential: () => void };
 };
@@ -129,11 +167,14 @@ type FakeCloudflare = {
 function installFakes(github: TestProvider): FakeCloudflare {
   const calls: Recorded[] = [];
   const tokens = new Map<string, { name: string; expiresOn: string }>();
+  const scripts: FakeScript[] = [];
   const reads: URL[] = [];
   let createStatus = 200;
   let deleteStatus = 200;
   let listStatus = 200;
+  let scriptsStatus = 200;
   let extraGroup: { id: string; name: string } | null = null;
+  let editPolicies: ((policies: FakePolicy[]) => void) | null = null;
   let expirySkewMs = 0;
   let credentialPresent = true;
   let serial = 0;
@@ -187,22 +228,28 @@ function installFakes(github: TestProvider): FakeCloudflare {
       const request = body as {
         name: string;
         expires_on: string;
-        policies: { permission_groups: { id: string }[] }[];
+        policies: {
+          effect: string;
+          permission_groups: { id: string }[];
+          resources: Record<string, string>;
+        }[];
       };
       const id = serial.toString(16).padStart(32, 'e');
       const expiresOn = new Date(Date.parse(request.expires_on) + expirySkewMs)
         .toISOString()
         .replace('.000Z', 'Z');
       tokens.set(id, { name: request.name, expiresOn });
-      const policies = request.policies.map(policy => ({
+      const policies: FakePolicy[] = request.policies.map(policy => ({
         id: 'f'.repeat(32),
-        effect: 'allow',
+        effect: policy.effect,
         permission_groups: policy.permission_groups.map(group => ({
           id: group.id,
           name: GROUP_NAMES[group.id],
         })),
+        resources: { ...policy.resources },
       }));
       if (extraGroup !== null) policies[0].permission_groups.push(extraGroup);
+      editPolicies?.(policies);
       return Response.json({
         success: true,
         errors: [],
@@ -243,6 +290,10 @@ function installFakes(github: TestProvider): FakeCloudflare {
         result_info: { page, per_page: perPage, count: all.length, total_count: all.length },
       });
     }
+    if (method === 'GET' && path === `/accounts/${ACCOUNT_ID}/workers/scripts`) {
+      if (scriptsStatus !== 200) return new Response('refused', { status: scriptsStatus });
+      return Response.json({ success: true, errors: [], messages: [], result: scripts });
+    }
     return new Response('not found', { status: 404 });
   };
   vi.stubGlobal('fetch', fetchImpl);
@@ -250,7 +301,9 @@ function installFakes(github: TestProvider): FakeCloudflare {
     calls,
     creates: () => calls.filter(call => call.method === 'POST'),
     deletes: () => calls.filter(call => call.method === 'DELETE'),
+    scriptLists: () => calls.filter(call => call.path.endsWith('/workers/scripts')),
     tokens,
+    scripts,
     setCreateStatus: status => {
       createStatus = status;
     },
@@ -260,8 +313,14 @@ function installFakes(github: TestProvider): FakeCloudflare {
     setListStatus: status => {
       listStatus = status;
     },
+    setScriptsStatus: status => {
+      scriptsStatus = status;
+    },
     addGroup: group => {
       extraGroup = group;
+    },
+    editPolicies: edit => {
+      editPolicies = edit;
     },
     setExpirySkewMs: ms => {
       expirySkewMs = ms;
@@ -403,6 +462,26 @@ async function sqlInObject(statement: string): Promise<void> {
   await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) => {
     state.storage.sql.exec(statement);
   });
+}
+
+/**
+ * Runs the deploy-token object's alarm now. It is set an hour ahead first, so the runtime does not
+ * fire it on its own while the test runs it.
+ */
+async function alarmNow(): Promise<void> {
+  const stub = getDeployTokenStub(env, config);
+  await runInDurableObject(stub, async (_instance, state) => {
+    await state.storage.setAlarm(Date.now() + 3600_000);
+  });
+  await runDurableObjectAlarm(stub);
+}
+
+async function deployTokenEvents(type: string): Promise<Event[]> {
+  return (await tokenEvents()).filter(event => event.type === `ai.kilo.sts.deploy_token.${type}`);
+}
+
+function cloudflareIso(epochMs: number): string {
+  return new Date(epochMs).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
 /** Everything the console received, as one string, for the no-credential-in-logs checks. */
@@ -677,11 +756,125 @@ describe('mint', () => {
     ]);
   });
 
-  it('drops a credential Cloudflare refused, and reads the manager again on the next mint', async () => {
+  it.each<[string, (policies: FakePolicy[]) => void]>([
+    [
+      'leaves out a group name',
+      policies => {
+        delete policies[0].permission_groups[0].name;
+      },
+    ],
+    [
+      'names a group otherwise than the policy declares its id',
+      policies => {
+        policies[0].permission_groups[0].name = 'Workers KV Storage Write';
+      },
+    ],
+    [
+      // A policy listing the id of a token-administering group under a harmless name.
+      'names a declared id as a token-administering group',
+      policies => {
+        policies[0].permission_groups[0].name = 'Account API Tokens Write';
+      },
+    ],
+    [
+      'returns another account',
+      policies => {
+        policies[0].resources = { [`com.cloudflare.api.account.${'9'.repeat(32)}`]: '*' };
+      },
+    ],
+    [
+      'returns another zone',
+      policies => {
+        policies[1].resources = { [`com.cloudflare.api.account.zone.${'8'.repeat(32)}`]: '*' };
+      },
+    ],
+    [
+      'returns a deny policy',
+      policies => {
+        policies[0].effect = 'deny';
+      },
+    ],
+    [
+      'moves a group onto the zone policy',
+      policies => {
+        const [moved] = policies[0].permission_groups.splice(1, 1);
+        policies[1].permission_groups.push(moved);
+      },
+    ],
+  ])('deletes a token whose returned grant %s', async (_name, edit) => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    cloudflare.editPolicies(edit);
+    expect((await mint()).result).toMatchObject({ status: 'unavailable' });
+    expect(cloudflare.deletes()).toHaveLength(1);
+    expect(cloudflare.tokens.size).toBe(0);
+    expect((await tokenEvents()).map(event => [event.type, event.data.attributes.cause])).toEqual([
+      ['ai.kilo.sts.deploy_token.revoked', 'grant_mismatch'],
+    ]);
+  });
+
+  it('refuses to mint a grant that lists a pinned forbidden permission group, with no Cloudflare call', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    class PinnedDeployTokenDO extends DeployTokenDO {
+      static override readonly forbiddenPermissionGroupIds = [CONTAINERS_GROUP];
+    }
+    const result = await runInDurableObject(
+      getDeployTokenStub(env, config),
+      async (_instance, state) =>
+        await new PinnedDeployTokenDO(state, env).mint({
+          environment: 'development',
+          caller: CALLER,
+          grant: bouncerGrant(),
+          requestedAt: Date.now(),
+        })
+    );
+    expect(result).toEqual({
+      status: 'unavailable',
+      retryAfterSeconds: DEPLOY_TOKEN_RETRY_AFTER_SECONDS,
+    });
+    expect(cloudflare.calls).toEqual([]);
+  });
+
+  it('advertises when a slot opens under an hourly cap lowered below the creations in the hour', async () => {
+    installFakes(github);
+    const now = Date.now();
+    for (const minutesAgo of [50, 40, 30, 20]) {
+      const createdAt = now - minutesAgo * 60_000;
+      await sqlInObject(
+        `INSERT INTO deploy_token (workload, caller, run_id, permission_set, state, created_at, expires_at, ended_at, intended_scripts) VALUES ('ci-deploy-bouncer', '${JSON.stringify(CALLER)}', '1', 'bouncer-deploy', 'failed', ${createdAt}, ${createdAt + 30_000}, ${createdAt + 30_000}, '[]')`
+      );
+    }
+    const result = await getDeployTokenStub(env, config).mint({
+      environment: 'development',
+      caller: CALLER,
+      grant: { ...bouncerGrant(), maxActive: 1, maxPerHour: 2 },
+      requestedAt: Date.now(),
+    });
+    // Two of the four must leave the hour: the one made 30 minutes ago is the second to leave.
+    if (result.status !== 'limited') throw new Error(`expected a refusal, got ${result.status}`);
+    expect(result.reason).toBe('rate_limited');
+    expect(result.retryAfterSeconds).toBeGreaterThan(29 * 60);
+    expect(result.retryAfterSeconds).toBeLessThanOrEqual(30 * 60);
+  });
+
+  it('drops a credential Cloudflare refused, audits the refusal, and reads the manager again on the next mint', async () => {
     const cloudflare = installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     cloudflare.setCreateStatus(403);
     expect((await mint()).result).toMatchObject({ status: 'unavailable' });
+    const [failed] = await tokenEvents();
+    expect(failed.type).toBe('ai.kilo.sts.deploy_token.mint_failed');
+    expect(failed.data.outcomeDetail).toBe('refused');
+    expect(failed.data.attributes).toMatchObject({
+      workload: 'ci-deploy-bouncer',
+      outcome: 'refused',
+      httpStatus: 403,
+      runId: '9001',
+    });
+    expect(failed.data.attributes.tokenName).toMatch(
+      /^sts-development-ci-deploy-bouncer-9001-\d+$/
+    );
     cloudflare.setCreateStatus(200);
     issued((await mint()).result);
     expect(cloudflare.manager.reads).toHaveLength(2);
@@ -698,7 +891,7 @@ describe('mint', () => {
     expect(cloudflare.creates()).toHaveLength(1);
   });
 
-  it('brings the sweep forward after a creation whose outcome is unknown', async () => {
+  it('audits a creation whose outcome is unknown and brings the sweep forward', async () => {
     const cloudflare = installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     cloudflare.setCreateStatus(502);
@@ -710,6 +903,13 @@ describe('mint', () => {
         .one()
     );
     expect(next.next_sweep_at).toBeLessThan(before + 2 * 3600_000);
+    const events = await tokenEvents();
+    expect(events.map(event => [event.type, event.data.attributes.outcome])).toEqual([
+      ['ai.kilo.sts.deploy_token.mint_failed', 'unknown'],
+    ]);
+    expect(events[0].data.attributes.slot).toEqual(expect.any(Number));
+    expect(events[0].data.attributes).not.toHaveProperty('httpStatus');
+    expect(JSON.stringify(events)).not.toContain('cfat_');
   });
 });
 
@@ -894,6 +1094,174 @@ describe('reaper', () => {
     expect(next.next_sweep_at).toBeGreaterThan(Date.now());
     expect(next.next_sweep_at).toBeLessThan(Date.now() + 5 * 60_000);
   });
+
+  it('stops its deletes and the sweep for the run once Cloudflare refuses the credential', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    issued((await mint()).result);
+    issued((await mint()).result);
+    await sqlInObject(`UPDATE deploy_token SET expires_at = ${Date.now() - 1000}`);
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    cloudflare.setDeleteStatus(403);
+    const readsBefore = cloudflare.manager.reads.length;
+    await alarmNow();
+    // One delete with the cached credential; after its 403 no second delete, no new read, no sweep.
+    expect(cloudflare.deletes()).toHaveLength(1);
+    expect(cloudflare.manager.reads.length - readsBefore).toBe(0);
+    expect(cloudflare.calls.filter(call => call.method === 'GET')).toEqual([]);
+    // The next alarm tries again with a fresh read.
+    cloudflare.setDeleteStatus(200);
+    await sqlInObject('UPDATE deploy_token SET delete_retry_at = 0');
+    await alarmNow();
+    expect(cloudflare.tokens.size).toBe(0);
+    expect(cloudflare.manager.reads.length - readsBefore).toBe(1);
+  });
+
+  it('ends a creation an earlier instance left pending, audits it, and brings the sweep forward', async () => {
+    installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const deadline = Date.now() - 1000;
+    await sqlInObject(
+      `INSERT INTO deploy_token (slot, workload, caller, run_id, permission_set, state, created_at, expires_at, intended_scripts) VALUES (41, 'ci-deploy-bouncer', '${JSON.stringify(CALLER)}', '1', 'bouncer-deploy', 'pending', ${deadline - 30_000}, ${deadline}, '["bouncer"]')`
+    );
+    await alarmNow();
+    const state = await runInDurableObject(
+      getDeployTokenStub(env, config),
+      (_instance, storage) => ({
+        row: storage.storage.sql
+          .exec<{ state: string }>('SELECT state FROM deploy_token WHERE slot = 41')
+          .one(),
+        sweep: storage.storage.sql
+          .exec<{ next_sweep_at: number }>('SELECT next_sweep_at FROM deploy_token_sweep')
+          .one(),
+      })
+    );
+    expect(state.row.state).toBe('failed');
+    // Such a token expires at most 1 hour after the budget ended; the sweep comes 2 minutes later.
+    expect(state.sweep.next_sweep_at).toBe(deadline + 3600_000 + 120_000);
+    const failed = await deployTokenEvents('mint_failed');
+    expect(failed.map(event => event.data.attributes)).toEqual([
+      expect.objectContaining({
+        outcome: 'unknown',
+        slot: 41,
+        tokenName: 'sts-development-ci-deploy-bouncer-1-41',
+        workload: 'ci-deploy-bouncer',
+      }),
+    ]);
+  });
+});
+
+describe('script check', () => {
+  it('audits a Worker changed while a token was live that its intendedScripts does not name, once', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const before = Date.now();
+    const token = issued((await mint()).result);
+    expect((await revoke(token.tokenId)).status).toBe(200);
+    cloudflare.scripts.push(
+      { id: 'bouncer', modified_on: cloudflareIso(Date.now()) },
+      { id: 'evil-worker', modified_on: cloudflareIso(Date.now()) },
+      { id: 'old-worker', modified_on: cloudflareIso(before - 10 * 60_000) }
+    );
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    await alarmNow();
+    expect(cloudflare.scriptLists()).toHaveLength(1);
+    expect(cloudflare.scriptLists()[0].authorization).toBe(`Bearer ${MINTING_CREDENTIAL}`);
+    const flagged = await deployTokenEvents('unexpected_script');
+    expect(flagged.map(event => event.data.attributes)).toEqual([
+      {
+        environment: 'development',
+        provider: 'cloudflare',
+        script: 'evil-worker',
+        modifiedAt: expect.any(String),
+        tokenIds: [token.tokenId],
+        workloads: ['ci-deploy-bouncer'],
+        runIds: ['9001'],
+        intendedScripts: ['bouncer', 'bouncer-watch'],
+        unexpectedInCheck: 1,
+      },
+    ]);
+    // The window is checked: the next sweep lists no scripts and writes no row.
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    await alarmNow();
+    expect(cloudflare.scriptLists()).toHaveLength(1);
+    expect(await deployTokenEvents('unexpected_script')).toHaveLength(1);
+  });
+
+  it('checks no window still open, and writes a bounded number of rows per check', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const token = issued((await mint()).result);
+    for (let index = 0; index < 25; index += 1) {
+      cloudflare.scripts.push({ id: `stray-${index}`, modified_on: cloudflareIso(Date.now()) });
+    }
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    await alarmNow();
+    expect(cloudflare.scriptLists()).toEqual([]);
+
+    expect((await revoke(token.tokenId)).status).toBe(200);
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    await alarmNow();
+    const flagged = await deployTokenEvents('unexpected_script');
+    expect(flagged).toHaveLength(DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK);
+    expect(flagged.every(event => event.data.attributes.unexpectedInCheck === 25)).toBe(true);
+  });
+
+  it('keeps an unchecked window when Cloudflare cannot list scripts, and still sweeps tokens', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const token = issued((await mint()).result);
+    expect((await revoke(token.tokenId)).status).toBe(200);
+    // The token was live a day ago: its row is past retention, but it waits for its check.
+    const ended = Date.now() - DEPLOY_TOKEN_ROW_RETENTION_MS - 60_000;
+    await sqlInObject(
+      `UPDATE deploy_token SET created_at = ${ended - 60_000}, ended_at = ${ended}`
+    );
+    cloudflare.scripts.push({ id: 'evil-worker', modified_on: cloudflareIso(ended - 30_000) });
+    cloudflare.setScriptsStatus(503);
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    await alarmNow();
+    expect(cloudflare.scriptLists()).toHaveLength(1);
+    expect(
+      cloudflare.calls.filter(call => call.method === 'GET' && call.path.includes('/tokens?'))
+    ).toHaveLength(1);
+    const left = await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) =>
+      state.storage.sql
+        .exec<{ scripts_checked: number }>('SELECT scripts_checked FROM deploy_token')
+        .toArray()
+    );
+    expect(left).toEqual([{ scripts_checked: 0 }]);
+
+    cloudflare.setScriptsStatus(200);
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    await alarmNow();
+    const flagged = await deployTokenEvents('unexpected_script');
+    expect(flagged.map(event => event.data.attributes.script)).toEqual(['evil-worker']);
+    // Checked, so the prune of that alarm removed it.
+    const after = await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) =>
+      state.storage.sql.exec('SELECT slot FROM deploy_token').toArray()
+    );
+    expect(after).toEqual([]);
+  });
+});
+
+describe('returned grant check', () => {
+  const grant = bouncerGrant();
+  const sent = deployTokenPolicies(ACCOUNT_ID, grant);
+  const returned = () =>
+    sent.map(policy => ({
+      effect: policy.effect,
+      permissionGroups: policy.permission_groups.map(group => ({
+        id: group.id,
+        name: GROUP_NAMES[group.id],
+      })),
+      resources: { ...policy.resources },
+    }));
+
+  it('accepts exactly the grant sent, and refuses an unreadable list', () => {
+    expect(returnedGrantProblem(returned(), sent, grant)).toBeNull();
+    expect(returnedGrantProblem(null, sent, grant)).toMatch('unreadable');
+  });
 });
 
 describe('policy', () => {
@@ -1030,6 +1398,22 @@ secrets: [${CLOUDFLARE_MINTING_TOKEN_SECRET}]
 `,
       })
     ).toThrow('is a minting credential');
+  });
+
+  it('refuses a group whose id is pinned as forbidden, whatever its name, and loads with an empty pin', () => {
+    expect(() =>
+      loadPolicies(
+        { 'ci-deploy-x.yaml': policyFile() },
+        { forbiddenPermissionGroupIds: [SCRIPTS_GROUP] }
+      )
+    ).toThrow('is a forbidden group');
+    expect(() =>
+      loadPolicies({ 'ci-deploy-x.yaml': policyFile() }, { forbiddenPermissionGroupIds: [] })
+    ).not.toThrow();
+    // Empty until setup step 3; every pinned value is a permission-group id.
+    expect(CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS.every(id => /^[0-9a-f]{32}$/.test(id))).toBe(
+      true
+    );
   });
 });
 

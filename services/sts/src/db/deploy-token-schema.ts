@@ -15,7 +15,8 @@ export type DeployTokenState = 'pending' | 'active' | 'deleted' | 'failed';
  * One row per Cloudflare deploy-token creation STS started, never the token value or the minting
  * credential. A row counts against its workload's active limit while `pending` or `active` and
  * unexpired, and against the hourly limit by `created_at` whatever its state. The alarm deletes a
- * row a day after it ended.
+ * row a day after it ended, and a handed-over token's row only once the sweep compared the Worker
+ * scripts changed while it was live with its `intended_scripts`.
  */
 export const deployToken = sqliteTable(
   'deploy_token',
@@ -45,6 +46,10 @@ export const deployToken = sqliteTable(
     deleteFailureAudited: integer('delete_failure_audited', { mode: 'boolean' })
       .notNull()
       .default(false),
+    /** The policy's `intendedScripts` when the token was made (JSON array), for the script check. */
+    intendedScripts: text('intended_scripts').notNull(),
+    /** A handed-over token's live window was compared with the account's Worker scripts. */
+    scriptsChecked: integer('scripts_checked', { mode: 'boolean' }).notNull().default(false),
   },
   table => [index('deploy_token_workload_created').on(table.workload, table.createdAt)]
 );

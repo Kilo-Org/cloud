@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "21638acd-7f21-42c5-aebf-cb841f164a6a",
+  "id": "27806be1-29f9-428b-bd49-51f5de10a3dc",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_event": {
@@ -180,6 +180,21 @@
         },
         "delete_failure_audited": {
           "name": "delete_failure_audited",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "intended_scripts": {
+          "name": "intended_scripts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "scripts_checked": {
+          "name": "scripts_checked",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

@@ -19,9 +19,8 @@
  *    the caller's STS call (STS checks the signature). The entry holds the whole token under a key
  *    anyone can compute, so code that can use the same Runtime Cache partition can read and present
  *    it. Vercel separates `preview` and `production`; a custom environment may share the preview
- *    partition. Before this caches STS-audience tokens of a custom environment, a proof shows its
- *    partition is separate or the entry is encrypted with a key only that environment holds
- *    (README, "The shared-cache algorithm").
+ *    partition, so the slice-4 client encrypts every custom-environment entry (README, "Carried
+ *    into the phase 2 slice-4 client").
  * 3. Instance memory, then the shared cache: a hit is used. On a miss, a base token with under
  *    60 seconds left fails the request at once: no exchange, no waiting.
  * 4. Otherwise wait a random 0..`jitterMs` and read again, so a cold wave spreads out.
@@ -41,7 +40,8 @@
  *    429 costs one more exchange per marker lifetime, never a burst.
  * 8. No token by `deadlineMs`: the request fails, and the caller's STS call fails with it. Every
  *    cache call, wait and exchange ends at the deadline: one still running then is abandoned (the
- *    exchange is aborted), so no token is handed out after it.
+ *    exchange is aborted). A token the exchange returned in time is handed out even when its
+ *    cache write is cut short, at the deadline at the latest.
  *
  * Cache cost per request: a memory hit reads nothing; a cache hit is 1 read; a miss that reaches
  * the claim is 4 reads (read, read after jitter, claim check, read-back) and 1 write (the marker;
@@ -401,9 +401,8 @@ export class SharedExchangedToken {
           const ttl = cacheTtlSeconds(exchanged.exp, nowSeconds());
           if (ttl === null) return fail('the exchanged token expires within 60 seconds');
           this.remember(key, exchanged, ttl);
+          // The write ends at the deadline at the latest; the token in hand is valid either way.
           await write(key, exchanged, ttl);
-          // A write the deadline cut short: the token stays in memory for the next request.
-          if (clock.now() >= deadline) break;
           return finish('exchanged', exchanged);
         }
       }

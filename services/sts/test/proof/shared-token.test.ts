@@ -318,7 +318,7 @@ describe('shared exchanged token (D10)', () => {
     expect(calls.attempts).toBe(0);
   });
 
-  it('hands out no token when writing it runs past the deadline, and keeps it for the next request', async () => {
+  it('returns the token in hand at the deadline when writing it runs past it, and keeps it in memory', async () => {
     const { calls, exchange } = fakeExchange({ budget: 100 });
     const stored = new Map<string, unknown>();
     // Reads and the claim marker are quick; the token write hangs.
@@ -333,7 +333,9 @@ describe('shared exchanged token (D10)', () => {
       settings: { jitterMs: 1, deadlineMs: 400 },
     });
     const first = await instance.get(BASE_TOKEN, AUDIENCE, exchange);
-    expect(first).toMatchObject({ status: 'failed', detail: 'no token before the deadline' });
+    expect(first).toMatchObject({ status: 'ok', report: { source: 'exchanged' } });
+    // The write was cut at the 400 ms deadline instead of taking its 2 s.
+    expect(first.report.timeToTokenMs).toBeGreaterThanOrEqual(390);
     expect(first.report.timeToTokenMs).toBeLessThan(600);
     expect((await instance.get(BASE_TOKEN, AUDIENCE, exchange)).report.source).toBe('memory');
     expect(calls.attempts).toBe(1);

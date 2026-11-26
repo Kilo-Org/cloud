@@ -38,6 +38,12 @@ export type Env = {
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.
    */
   IDENTITY_STORE?: Hyperdrive;
+  /**
+   * The identity store's PAT lookup Hyperdrive config (login `uts_pat`), bound once the
+   * environment's identity store is provisioned; it serves PAT lookups only (design 5.2).
+   * `patStoreBinding` (src/pat/lookup.ts) is the only reader.
+   */
+  IDENTITY_STORE_PAT?: Hyperdrive;
 };
 
 /** The mint Worker's deployed name in each environment. */

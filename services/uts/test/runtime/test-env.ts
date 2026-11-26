@@ -1,16 +1,20 @@
 import { env as runtimeEnv } from 'cloudflare:workers';
-import type { SignerKeysBinding } from '@kilocode/uts-contracts';
+import type { PatLookupBinding, SignerKeysBinding } from '@kilocode/uts-contracts';
 import { readConfig, type Env, type UtsConfig } from '../../src/env';
 
 /**
  * The bindings `wrangler.test.jsonc` adds for the tests: the mint Worker's SignerKeys entrypoint
- * as three callers, and its default entrypoint with the feed Worker's props.
+ * as three callers, its default entrypoint with the feed Worker's props, and its PatLookup
+ * entrypoint as three callers.
  */
 export type TestEnv = Env & {
   FEED_MINT: SignerKeysBinding;
   OTHER_MINT: SignerKeysBinding;
   PROPLESS_MINT: SignerKeysBinding;
   DEFAULT_MINT: Fetcher;
+  VERIFIER_PAT_LOOKUP: PatLookupBinding;
+  OTHER_PAT_LOOKUP: PatLookupBinding;
+  PROPLESS_PAT_LOOKUP: PatLookupBinding;
 };
 
 // The runtime env is untyped here; this binds it to the bindings `wrangler.test.jsonc` declares

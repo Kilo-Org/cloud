@@ -68,7 +68,7 @@ export function newSignerKeysCache(): SignerKeysCache {
 const CallerPropsSchema = z.strictObject({ caller: z.string().min(1) });
 
 /** The caller a service binding's `props` name; null when the binding carries no valid props. */
-function callerOf(props: unknown): string | null {
+export function callerOf(props: unknown): string | null {
   const parsed = CallerPropsSchema.safeParse(props);
   return parsed.success ? parsed.data.caller : null;
 }
@@ -262,9 +262,7 @@ export async function readThroughIsolateShard(
  * `shard`. It answers only the feed Worker of the mint Worker's own environment: a service binding
  * carries `props.caller`, and only a deploy in the account can set props, so the check is
  * deploy-level trust, as for the STS broker (design 6.4). Any other caller, or a binding without
- * props, gets `refused` without a shard call. A shard that refused to load gives `misconfigured`.
- * A shard call that fails until its deadline throws, and the feed Worker counts the read as
- * failed. The answer is plain data, so it stays readable after the caller disposes the RPC result.
+ * props, gets `refused` without a shard call.
  */
 export async function signerKeysRead(
   env: Env,
@@ -277,6 +275,20 @@ export async function signerKeysRead(
     console.warn(JSON.stringify({ event: 'uts.signer_keys.refused', caller }));
     return { status: 'refused' };
   }
+  return await readKeySetShard(env, config, shard);
+}
+
+/**
+ * The signer keys key-set shard `shard` holds, for the `SignerKeys` entrypoint and for the mint
+ * Worker's own access-token check (src/account/bearer.ts). A shard that refused to load gives
+ * `misconfigured`. A shard call that fails until its deadline throws, and the caller counts the
+ * read as failed. The answer is plain data, so it stays readable after the RPC result is disposed.
+ */
+export async function readKeySetShard(
+  env: Env,
+  config: UtsConfig,
+  shard: number
+): Promise<SignerKeysRead> {
   const result = await withDORetry(
     () => getKeySetShardStub(env, config, shard),
     async (stub): Promise<KeySetShardResult> => {

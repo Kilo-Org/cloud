@@ -1175,10 +1175,10 @@ dynamic:
   - grant: cloudflare-deploy
     permissionSet: bouncer-deploy
     permissionGroups: # ids from GET /accounts/<account>/tokens/permission_groups (setup step 3)
-      - { id: '<id>', name: Workers Scripts Write, scope: account }
-      - { id: '<id>', name: Containers Write, scope: account }
-      - { id: '<id>', name: Workers Routes Write, scope: zone }
-    zones: ['<kiloapps.io zone id>']
+      - { id: 'e086da7e2179491d91ee5f35b3ca210a', name: Workers Scripts Write, scope: account }
+      - { id: 'bdbcd690c763475a985e8641dddc09f7', name: Workers Containers Write, scope: account }
+      - { id: '28f4b596e7d643029c524985477ae49a', name: Workers Routes Write, scope: zone }
+    zones: ['9f7103cbcadbe93a052c120f231e8507'] # kiloapps.io
     intendedScripts: [bouncer, bouncer-watch]
     intendedRoutes: [] # zone route patterns the job may add or change; bouncer uses a Custom Domain
     ttlSeconds: 3600 # the default; 300 to 3600
@@ -1408,8 +1408,9 @@ channel, `provider: cloudflare`, `permissionSet`, `tokenId`, `tokenName`, `ttlSe
 last `reason`). Refusals go through the denial object as `ai.kilo.sts.deploy_token.denied` with
 their reason, the token id for a revoke, and the caller's stable claims.
 
-**Setup, per environment (staging first). Needs Igor's approval before any step runs.** No step
-is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
+**Setup, per environment (staging first). Igor approved it on 2026-11-26.** Steps 3 and 5 are
+done: `CLOUDFLARE_DEPLOY_PINS` holds the ids below, and `CF_DEPLOY_ACCOUNT_ID` is set in the
+staging and production blocks of `wrangler.jsonc` (development stays empty).
 
 1. **Creator.** The minting credential is an account-owned API token, not a person or a dedicated
    member: account tokens "act as service principals with their own specific set of permissions"
@@ -1434,7 +1435,8 @@ is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
    /accounts/<account>/tokens/permission_groups`, which lists every group with its id and name
    (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/permission_groups/methods/list/);
    copy the ids and Cloudflare's exact names of the deploy groups of step 2 (`Workers Scripts
-   Write`, `Containers Write`, `Workers Routes Write`) into the policy. Fill
+   Write`, `Workers Containers Write` (the dashboard's "Containers"), `Workers Routes Write`)
+   into the policy. Fill
    `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`): `allowedGroups` with those three ids and their
    scopes (account, account, zone); `allowedZones` with the `kiloapps.io` zone id for staging and
    production; and `forbiddenGroupIds` with the ids of every group that reads or writes API tokens,

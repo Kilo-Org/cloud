@@ -246,10 +246,25 @@ export type CloudflareDeployPins = {
   allowedZones: Readonly<Record<'development' | 'staging' | 'production', readonly string[]>>;
 };
 
+// Copied on 2026-11-26 from `GET /accounts/e115e769bcdd4c3d66af59d3332cb394/tokens/permission_groups`
+// and `GET /zones?name=kiloapps.io` in a Super Administrator's dashboard session (setup step 3).
 export const CLOUDFLARE_DEPLOY_PINS: CloudflareDeployPins = {
-  forbiddenGroupIds: [],
-  allowedGroups: [],
-  allowedZones: { development: [], staging: [], production: [] },
+  forbiddenGroupIds: [
+    'eb56a6953c034b9d97dd838155666f06', // Account API Tokens Read
+    '5bc3f8b21c554832afc660159ab75fa4', // Account API Tokens Write
+    'c1fde68c7bcc44588cbb6ddbc16d6480', // Account Settings Read
+    '1af1fa2adc104452b74a9a3364202f20', // Account Settings Write (members and roles)
+  ],
+  allowedGroups: [
+    { id: 'e086da7e2179491d91ee5f35b3ca210a', scope: 'account' }, // Workers Scripts Write
+    { id: 'bdbcd690c763475a985e8641dddc09f7', scope: 'account' }, // Workers Containers Write
+    { id: '28f4b596e7d643029c524985477ae49a', scope: 'zone' }, // Workers Routes Write
+  ],
+  allowedZones: {
+    development: [],
+    staging: ['9f7103cbcadbe93a052c120f231e8507'], // kiloapps.io
+    production: ['9f7103cbcadbe93a052c120f231e8507'], // kiloapps.io
+  },
 };
 
 /**

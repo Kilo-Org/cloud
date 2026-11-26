@@ -48,6 +48,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { linkKiloUser } from '@/lib/bot-identity';
+import { linkConflictPage } from '@/lib/bot/link-account-page';
 import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -150,7 +151,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
   const githubUser = await exchangeGitHubOAuthCode(code, appType);
 
   await bot.initialize();
-  await linkKiloUser(
+  const linkResult = await linkKiloUser(
     bot.getState(),
     {
       platform: PLATFORM.GITHUB,
@@ -160,6 +161,13 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     },
     user.id
   );
+
+  if (linkResult === 'conflict') {
+    return linkConflictPage(
+      'GitHub',
+      'If you cannot sign in to that account, an organization owner can uninstall the Kilo GitHub App from this installation and install it again, which clears the links held for it.'
+    );
+  }
 
   return htmlPage(
     'GitHub account linked',

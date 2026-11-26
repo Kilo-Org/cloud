@@ -23,6 +23,7 @@ import {
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
+import { linkConflictPage } from '@/lib/bot/link-account-page';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   type VerifiedLinearBotLinkState,
@@ -165,7 +166,7 @@ async function handleLinearBotLinkCallback(
     }
 
     await bot.initialize();
-    await linkKiloUser(
+    const linkResult = await linkKiloUser(
       bot.getState(),
       {
         platform: PLATFORM.LINEAR,
@@ -174,6 +175,13 @@ async function handleLinearBotLinkCallback(
       },
       user.id
     );
+
+    if (linkResult === 'conflict') {
+      return linkConflictPage(
+        'Linear',
+        'If you cannot sign in to that account, a workspace owner or admin can disconnect the Linear integration and connect it again, which clears the links held for that workspace.'
+      );
+    }
 
     return htmlPage(
       'Linear account linked',

@@ -38,7 +38,7 @@ export type PlatformIdentity = {
   githubAppType?: 'standard' | 'lite';
 };
 
-type LinkAccountContext = {
+export type LinkAccountContext = {
   thread: SerializedThread;
   message: SerializedMessage;
 };
@@ -62,16 +62,48 @@ export async function resolveKiloUserId(
   return state.get<string>(botIdentityRedisKey(platform, teamId, userId));
 }
 
+export type LinkKiloUserResult = 'linked' | 'conflict';
+
 /**
- * Persist a platform-user → Kilo-user link.
+ * Persist a platform-user → Kilo-user link, compare-and-set.
+ *
+ * A platform identity maps to exactly one Kilo account. Writing a link for a
+ * Kilo user that already holds this identity is idempotent; writing one for a
+ * different Kilo user is refused and reported as `conflict`, so no caller can
+ * silently move an existing mapping to a different account. The write is
+ * `setIfNotExists`, so two concurrent links race to a single winner and the
+ * loser re-reads the stored value instead of overwriting it.
  */
 export async function linkKiloUser(
   state: StateAdapter,
   identity: PlatformIdentity,
   kiloUserId: string
-): Promise<void> {
+): Promise<LinkKiloUserResult> {
   const { platform, teamId, userId } = identity;
-  await state.set(botIdentityRedisKey(platform, teamId, userId), kiloUserId);
+  const key = botIdentityRedisKey(platform, teamId, userId);
+
+  if (await state.setIfNotExists(key, kiloUserId)) {
+    return 'linked';
+  }
+
+  const holder = await state.get<string>(key);
+  if (holder === kiloUserId) {
+    return 'linked';
+  }
+
+  // The identity is free again when nothing is stored for it, so the claim is
+  // retried once. A value in the re-read belongs to another Kilo account.
+  if (holder === null) {
+    if (await state.setIfNotExists(key, kiloUserId)) {
+      return 'linked';
+    }
+    // The retried claim can lose to a concurrent write, and an unlink can race
+    // a link and empty the key first, so the stored value is read again before
+    // reporting a conflict.
+    return (await state.get<string>(key)) === kiloUserId ? 'linked' : 'conflict';
+  }
+
+  return 'conflict';
 }
 
 /**
@@ -217,6 +249,33 @@ export async function consumeLinkAccountContext(
   return await state.setIfNotExists(consumedKey, true, LINK_ACCOUNT_CONTEXT_TTL_MS);
 }
 
+/**
+ * Give back a single-use claim taken by `consumeLinkAccountContext`, so a
+ * pending link whose write wrote nothing stays completable until its TTL.
+ */
+export async function releaseLinkAccountContextConsumption(
+  state: StateAdapter,
+  contextKey: string
+): Promise<void> {
+  await state.delete(`${contextKey}:consumed`);
+}
+
+/**
+ * Read the chat message a pending link was minted for. Returns `null` when the
+ * context expired or no longer parses.
+ */
+export async function loadLinkAccountContext(
+  state: StateAdapter,
+  contextKey: string
+): Promise<LinkAccountContext | null> {
+  try {
+    const context = await state.get<unknown>(contextKey);
+    return linkAccountContextSchema.parse(context);
+  } catch {
+    return null;
+  }
+}
+
 /** Verify and decode a link token. Returns the payload or `null` on failure. */
 export async function verifyLinkToken(
   state: StateAdapter,
@@ -232,17 +291,13 @@ export async function verifyLinkToken(
   });
   if (!payload) return null;
 
-  try {
-    const context = await state.get<unknown>(payload.contextKey);
-    const linkAccountContext = linkAccountContextSchema.parse(context);
+  const linkAccountContext = await loadLinkAccountContext(state, payload.contextKey);
+  if (!linkAccountContext) return null;
 
-    return {
-      contextKey: payload.contextKey,
-      identity: payload.identity,
-      thread: linkAccountContext.thread,
-      message: linkAccountContext.message,
-    };
-  } catch {
-    return null;
-  }
+  return {
+    contextKey: payload.contextKey,
+    identity: payload.identity,
+    thread: linkAccountContext.thread,
+    message: linkAccountContext.message,
+  };
 }

@@ -1,3 +1,4 @@
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { STANDARD_OAUTH_PLATFORMS } from '@/lib/integrations/oauth/paths';
 
 const CALLBACK_PATH_REGEX = /^\/(users\/)?[-a-zA-Z0-9]+\/?(\?.*)?(#.*)?$/;
@@ -16,6 +17,10 @@ export function stripHost(url: string): string {
 
 export function isValidCallbackPath(path: string): boolean {
   if (path === '/api/auth/pending-link/complete') {
+    return true;
+  }
+  // The chat link page resumes after sign-in; its only parameter is the signed token.
+  if (isChatLinkAccountPath(path)) {
     return true;
   }
   if (
@@ -37,13 +42,36 @@ export function isValidCallbackPath(path: string): boolean {
   ) {
     return true;
   }
-  if (isValidIntegrationOAuthConnectCallbackPath(path)) {
+  // Integration OAuth round trips resume at the platform's `connect` API
+  // route, or at its `callback` route for the chat account-link resume, which
+  // carries the provider's `code`/`state`.
+  if (isValidIntegrationOAuthPath(path)) {
     return true;
   }
   return CALLBACK_PATH_REGEX.test(path);
 }
 
-function isValidIntegrationOAuthConnectCallbackPath(path: string): boolean {
+function isChatLinkAccountPath(path: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(path, PLACEHOLDER_ORIGIN);
+  } catch {
+    return false;
+  }
+
+  if (url.origin !== PLACEHOLDER_ORIGIN || url.hash) {
+    return false;
+  }
+
+  if (url.pathname !== '/api/chat/link-account') {
+    return false;
+  }
+
+  const keys = [...url.searchParams.keys()];
+  return keys.length > 0 && keys.every(key => key === 'token');
+}
+
+function isValidIntegrationOAuthPath(path: string): boolean {
   if (!path.startsWith('/api/integrations/') || path.startsWith('//')) {
     return false;
   }
@@ -64,12 +92,26 @@ function isValidIntegrationOAuthConnectCallbackPath(path: string): boolean {
   }
 
   const [, api, integrations, platform, action, ...rest] = url.pathname.split('/');
-  return (
-    api === 'api' &&
-    integrations === 'integrations' &&
-    action === 'connect' &&
-    rest.length === 0 &&
-    STANDARD_OAUTH_PLATFORM_SET.has(platform)
+  if (
+    api !== 'api' ||
+    integrations !== 'integrations' ||
+    rest.length !== 0 ||
+    !STANDARD_OAUTH_PLATFORM_SET.has(platform)
+  ) {
+    return false;
+  }
+  // Every standard platform resumes at its `connect` route. Only the chat
+  // account-link resume returns through a platform `callback` route today,
+  // carrying the provider's `code`/`state`.
+  if (action === 'connect') {
+    return true;
+  }
+  if (platform !== PLATFORM.SLACK || action !== 'callback') {
+    return false;
+  }
+  // The callback route reads only the provider's `code`, `state`, and `error`.
+  return [...url.searchParams.keys()].every(
+    key => key === 'code' || key === 'state' || key === 'error'
   );
 }
 

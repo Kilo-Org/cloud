@@ -371,6 +371,23 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     );
   });
 
+  test('refuses to move an existing GitHub mapping to another Kilo account', async () => {
+    mockedLinkKiloUser.mockResolvedValueOnce('conflict');
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.text();
+    expect(body).toContain('already linked to a different Kilo account');
+    expect(body).toContain(
+      'an organization owner can uninstall the Kilo GitHub App from this installation and install it again'
+    );
+    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
+  });
+
   test('allows one healthy legacy no-ID state while management and sharing are disabled', async () => {
     mockedVerifyGitHubBotLinkState.mockReturnValue({
       userId: USER_ID,

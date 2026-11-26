@@ -1,4 +1,12 @@
-import { consumeLinkAccountContext, createLinkAccountToken, verifyLinkToken } from './bot-identity';
+import {
+  consumeLinkAccountContext,
+  createLinkAccountToken,
+  linkKiloUser,
+  loadLinkAccountContext,
+  resolveKiloUserId,
+  verifyLinkToken,
+  type PlatformIdentity,
+} from './bot-identity';
 
 const thread = {
   _type: 'chat:Thread',
@@ -25,21 +33,31 @@ const message = {
   threadId: 'thread',
 };
 
+function createState() {
+  const values = new Map<string, unknown>();
+  return {
+    values,
+    set: async (key: string, value: unknown) => {
+      values.set(key, value);
+    },
+    get: async (key: string) => values.get(key),
+    setIfNotExists: async (key: string, value: unknown) => {
+      if (values.has(key)) return false;
+      values.set(key, value);
+      return true;
+    },
+    delete: async (key: string) => {
+      values.delete(key);
+    },
+  };
+}
+
+const slackIdentity: PlatformIdentity = { platform: 'slack', teamId: 'T1', userId: 'U1' };
+
 test.each(['standard', 'lite'] as const)(
   'preserves %s app identity through signed link token verification and replay protection',
   async githubAppType => {
-    const values = new Map<string, unknown>();
-    const state = {
-      set: async (key: string, value: unknown) => {
-        values.set(key, value);
-      },
-      get: async (key: string) => values.get(key),
-      setIfNotExists: async (key: string, value: unknown) => {
-        if (values.has(key)) return false;
-        values.set(key, value);
-        return true;
-      },
-    };
+    const state = createState();
     const token = await createLinkAccountToken({
       identity: { platform: 'github', teamId: '777', userId: 'github-user', githubAppType },
       thread: thread as never,
@@ -62,3 +80,152 @@ test.each(['standard', 'lite'] as const)(
     );
   }
 );
+
+test('rejects a link token whose stored context expired', async () => {
+  const state = createState();
+  const token = await createLinkAccountToken({
+    identity: slackIdentity,
+    thread: thread as never,
+    message: message as never,
+    state: state as never,
+  });
+
+  for (const key of [...state.values.keys()]) {
+    if (!key.endsWith(':consumed')) state.values.delete(key);
+  }
+
+  await expect(verifyLinkToken(state as never, token)).resolves.toBeNull();
+});
+
+test('loadLinkAccountContext returns the stored thread and message', async () => {
+  const state = createState();
+  await createLinkAccountToken({
+    identity: slackIdentity,
+    thread: thread as never,
+    message: message as never,
+    state: state as never,
+  });
+
+  const [contextKey] = [...state.values.keys()];
+  const context = await loadLinkAccountContext(state as never, contextKey!);
+
+  expect(context?.thread).toEqual(thread);
+  expect(context?.message).toEqual(message);
+  await expect(loadLinkAccountContext(state as never, 'missing-key')).resolves.toBeNull();
+});
+
+describe('linkKiloUser', () => {
+  test('links an unmapped platform identity', async () => {
+    const state = createState();
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
+
+  test('re-linking the same Kilo user is idempotent', async () => {
+    const state = createState();
+
+    await linkKiloUser(state as never, slackIdentity, 'kilo-1');
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
+
+  test('refuses to reassign an identity held by another Kilo user', async () => {
+    const state = createState();
+
+    await linkKiloUser(state as never, slackIdentity, 'kilo-1');
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-2')).resolves.toBe('conflict');
+    // The original mapping is untouched.
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
+
+  test('losing a concurrent write to the same user still reports linked', async () => {
+    const state = createState();
+    // Simulates the other request winning the race between setIfNotExists and
+    // the follow-up read, for the same Kilo user.
+    await state.set('identity:slack:T1:U1', 'kilo-1');
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+  });
+
+  test('losing a concurrent write to another user reports conflict', async () => {
+    const state = createState();
+    await state.set('identity:slack:T1:U1', 'kilo-2');
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('conflict');
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-2');
+  });
+
+  test('an identity with no stored holder links on the retried compare-and-set', async () => {
+    const base = createState();
+    // The first compare-and-set is refused, then the re-read finds nothing
+    // stored for the identity, which is the state this test covers.
+    let setAttempts = 0;
+    let reads = 0;
+    const state = {
+      ...base,
+      setIfNotExists: async (key: string, value: unknown) => {
+        setAttempts += 1;
+        if (setAttempts === 1) return false;
+        return await base.setIfNotExists(key, value);
+      },
+      get: async (key: string) => {
+        reads += 1;
+        return reads === 1 ? null : await base.get(key);
+      },
+    };
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+    expect(setAttempts).toBe(2);
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
+
+  test('a retried claim refused while the mapping becomes ours reports linked', async () => {
+    const base = createState();
+    // The first claim is refused and the re-read finds nothing stored; the
+    // retried claim is refused after another writer stored this Kilo user's
+    // mapping.
+    let setAttempts = 0;
+    let reads = 0;
+    const state = {
+      ...base,
+      setIfNotExists: async (key: string, value: unknown) => {
+        setAttempts += 1;
+        if (setAttempts === 1) return false;
+        await base.set(key, value);
+        return false;
+      },
+      get: async (key: string) => {
+        reads += 1;
+        return reads === 1 ? null : await base.get(key);
+      },
+    };
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+    expect(setAttempts).toBe(2);
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
+
+  test('a retried claim refused while another account holds the identity reports conflict', async () => {
+    const base = createState();
+    let setAttempts = 0;
+    let reads = 0;
+    const state = {
+      ...base,
+      setIfNotExists: async (key: string) => {
+        setAttempts += 1;
+        if (setAttempts === 1) return false;
+        await base.set(key, 'kilo-2');
+        return false;
+      },
+      get: async (key: string) => {
+        reads += 1;
+        return reads === 1 ? null : await base.get(key);
+      },
+    };
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('conflict');
+    expect(setAttempts).toBe(2);
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-2');
+  });
+});

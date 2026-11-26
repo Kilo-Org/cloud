@@ -1,0 +1,196 @@
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+
+const SLACK_TEAM_CLAIM = 'https://slack.com/team_id';
+const SLACK_USER_CLAIM = 'https://slack.com/user_id';
+
+const mockFetch = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  SLACK_CLIENT_ID: 'client-id',
+  SLACK_CLIENT_SECRET: 'client-secret',
+}));
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
+import { captureException } from '@sentry/nextjs';
+import {
+  exchangeSlackOidcCode,
+  fetchSlackIdentity,
+  getSlackOidcAuthorizeUrl,
+  getSlackOidcRedirectUri,
+  requireSlackOidcClientCredentials,
+  revokeSlackOidcToken,
+  SlackOidcError,
+} from './slack-oidc';
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.mocked(captureException).mockClear();
+  global.fetch = mockFetch as never;
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('getSlackOidcAuthorizeUrl', () => {
+  test('refuses to start the round trip without both client credentials', () => {
+    expect(() =>
+      requireSlackOidcClientCredentials({ clientId: 'client-id', clientSecret: undefined })
+    ).toThrow('Account linking is not available right now.');
+    expect(() =>
+      requireSlackOidcClientCredentials({ clientId: undefined, clientSecret: 'client-secret' })
+    ).toThrow('Account linking is not available right now.');
+    expect(
+      requireSlackOidcClientCredentials({ clientId: 'client-id', clientSecret: 'client-secret' })
+    ).toEqual({ clientId: 'client-id', clientSecret: 'client-secret' });
+  });
+
+  test('requests only the openid scope and returns to the registered Slack callback', () => {
+    const url = new URL(getSlackOidcAuthorizeUrl('signed-state', 'T123'));
+
+    expect(url.origin + url.pathname).toBe('https://slack.com/openid/connect/authorize');
+    expect(url.searchParams.get('response_type')).toBe('code');
+    expect(url.searchParams.get('scope')).toBe('openid');
+    expect(url.searchParams.get('client_id')).toBe('client-id');
+    expect(url.searchParams.get('state')).toBe('signed-state');
+    expect(url.searchParams.get('redirect_uri')).toBe(getSlackOidcRedirectUri());
+    expect(url.searchParams.get('redirect_uri')).toContain('/api/integrations/slack/callback');
+  });
+
+  test('names the workspace the link is for as the team parameter', () => {
+    const first = new URL(getSlackOidcAuthorizeUrl('signed-state', 'T123'));
+    const second = new URL(getSlackOidcAuthorizeUrl('signed-state', 'T456'));
+
+    expect(first.searchParams.get('team')).toBe('T123');
+    expect(second.searchParams.get('team')).toBe('T456');
+  });
+});
+
+describe('exchangeSlackOidcCode', () => {
+  test('posts the code to the OIDC token endpoint and returns the access token', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true, access_token: 'xoxp-oidc' }));
+
+    await expect(exchangeSlackOidcCode('the-code')).resolves.toBe('xoxp-oidc');
+
+    const [requestUrl, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(requestUrl).toBe('https://slack.com/api/openid.connect.token');
+    expect(init.method).toBe('POST');
+    const body = new URLSearchParams(init.body as string);
+    expect(body.get('grant_type')).toBe('authorization_code');
+    expect(body.get('code')).toBe('the-code');
+    expect(body.get('client_id')).toBe('client-id');
+    expect(body.get('redirect_uri')).toBe(getSlackOidcRedirectUri());
+  });
+
+  test('rejects a token response without an access token', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: false, error: 'invalid_code' }));
+
+    await expect(exchangeSlackOidcCode('the-code')).rejects.toBeInstanceOf(SlackOidcError);
+  });
+
+  test('rejects a non-2xx token response', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: false }, 500));
+
+    await expect(exchangeSlackOidcCode('the-code')).rejects.toBeInstanceOf(SlackOidcError);
+  });
+});
+
+describe('fetchSlackIdentity', () => {
+  test('reads the Slack-reported team and user ids from userinfo', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ ok: true, [SLACK_TEAM_CLAIM]: 'T123', [SLACK_USER_CLAIM]: 'U123' })
+    );
+
+    await expect(fetchSlackIdentity('xoxp-oidc')).resolves.toEqual({
+      teamId: 'T123',
+      userId: 'U123',
+    });
+
+    const [requestUrl, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(requestUrl).toBe('https://slack.com/api/openid.connect.userInfo');
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer xoxp-oidc');
+  });
+
+  test('rejects a userinfo response without the Slack identity claims', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true, sub: 'someone' }));
+
+    await expect(fetchSlackIdentity('xoxp-oidc')).rejects.toBeInstanceOf(SlackOidcError);
+  });
+
+  test('rejects a userinfo response that is not ok', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: false, error: 'invalid_auth' }));
+
+    await expect(fetchSlackIdentity('xoxp-oidc')).rejects.toBeInstanceOf(SlackOidcError);
+  });
+});
+
+describe('revokeSlackOidcToken', () => {
+  test('never throws when revocation fails', async () => {
+    mockFetch.mockRejectedValue(new Error('network down'));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+  });
+
+  test('records a revocation answer that is not an acceptance without throwing', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: false, error: 'invalid_token' }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(capture.mock.calls[0]?.[1]).toMatchObject({
+      tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' },
+      extra: { error: 'invalid_token' },
+    });
+  });
+
+  test('sends the token in the body of a form-encoded POST', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
+
+    await revokeSlackOidcToken('xoxp-oidc');
+
+    expect(mockFetch.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({ 'content-type': 'application/x-www-form-urlencoded' }),
+      body: 'token=xoxp-oidc',
+    });
+  });
+
+  test('records a declined revocation once without throwing', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true, revoked: false }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(capture.mock.calls[0]?.[1]).toMatchObject({
+      tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' },
+      extra: { error: null, revoked: false },
+    });
+  });
+
+  test('records nothing when Slack reports the token revoked', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true, revoked: true }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  test('records nothing for an accepted revocation', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).not.toHaveBeenCalled();
+  });
+});

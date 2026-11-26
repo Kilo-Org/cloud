@@ -231,9 +231,9 @@ export const pollDeviceAuthCode = async ({
   signal,
 }: PollDeviceAuthCodeOptions): Promise<DeviceAuthPollResult> => {
   const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/device-auth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ deviceCode }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
     ...(signal === undefined ? {} : { signal }),
   });
 

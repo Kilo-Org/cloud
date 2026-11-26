@@ -269,9 +269,9 @@ describe('device auth API client', () => {
     });
 
     expect(fetch).toHaveBeenCalledExactlyOnceWith('https://app.kilo.ai/api/device-auth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceCode: 'device-code' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
       signal,
     });
   });

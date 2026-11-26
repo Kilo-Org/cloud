@@ -21,6 +21,12 @@
  *    `invalidate`, which drops it from memory and the cache so the next request exchanges again
  *    (once per STS refusal). Code that writes this project's cache runs with the project's own
  *    trust.
+ * 2a. When STS refuses a token this instance exchanged itself, `invalidate` writes a refusal
+ *    marker for the deployment and audience that lives `refusedTtlSeconds` (the client's
+ *    `DENIED_RECHECK_MS`, 60 s). While it lives no instance of the deployment drops a cached token
+ *    STS refused, nor exchanges: each answers from its client's denied state. A deployment STS
+ *    refuses outright (a policy naming the wrong project or environment) so costs at most one
+ *    exchange per marker lifetime and region, not one per claim-marker lifetime.
  * 3. Instance memory, then the shared cache: a hit is used. On a miss, a base token with under
  *    60 seconds left fails the request at once: no exchange, no waiting.
  * 4. Otherwise wait a random 0..`jitterMs` and read again, so a cold wave spreads out.
@@ -42,8 +48,10 @@
  *
  * Cache cost per request: a memory hit reads nothing; a cache hit is 1 read; a miss that reaches
  * the claim is 4 reads (read, read after jitter, claim check, read-back) and 1 write (the marker;
- * 2 for the exchanger, which also writes the token), then 2 reads per poll step (claim check and
- * token read; 3 reads and 1 write in the step where the marker has expired and it claims again).
+ * for the exchanger 1 more read, the refusal marker, and 1 more write, the token), then 2 reads
+ * per poll step (claim check and token read; 3 reads and 1 write in the step where the marker has
+ * expired and it claims again). `invalidate` adds 1 write for a token this instance exchanged, and
+ * 1 or 2 reads and at most 1 delete for one it took from the cache.
  */
 
 /** The part of `getCache()` from `@vercel/functions` this uses. */
@@ -70,6 +78,8 @@ export type SharedTokenSettings = {
   pollMaxMs: number;
   exchangeRetryMs: number;
   deadlineMs: number;
+  /** Lifetime of the refusal marker (step 2a); equals the client's `DENIED_RECHECK_MS`. */
+  refusedTtlSeconds: number;
   /** Mixed into the cache and memory key; the proof run salts each run so runs do not share. */
   keyPrefix: string;
 };
@@ -83,6 +93,7 @@ export const DEFAULT_SETTINGS: SharedTokenSettings = {
   pollMaxMs: 800,
   exchangeRetryMs: 20_000,
   deadlineMs: 20_000,
+  refusedTtlSeconds: 60,
   keyPrefix: '',
 };
 
@@ -178,6 +189,12 @@ function isClaim(value: unknown): value is { owner: string } {
   );
 }
 
+function isRefused(value: unknown): value is { refused: true } {
+  return (
+    typeof value === 'object' && value !== null && 'refused' in value && value.refused === true
+  );
+}
+
 /** Seconds to keep an exchanged token: until 60 seconds before `exp`; `null` when that has passed. */
 export function cacheTtlSeconds(exp: number, nowSeconds: number): number | null {
   const left = exp - MIN_REMAINING_SECONDS - nowSeconds;
@@ -228,11 +245,13 @@ export class SharedExchangedToken {
   }
 
   /**
-   * Drops `token` after STS refused it (`identity_rejected`), when this instance took it from the
-   * Runtime Cache: the entry in memory and, if it still holds that token, the one in the cache, so
-   * the next `get` reads or exchanges a fresh one. Returns whether it dropped it. A token this
-   * instance exchanged itself is kept and `false` returned: Vercel issued it for this deployment,
-   * so exchanging again would get the same refusal and spend the project's exchange budget.
+   * Called after STS refused `token` (`identity_rejected`). A token this instance took from the
+   * Runtime Cache is dropped from memory and, if the cache still holds it, from the cache, and
+   * `true` returned, so the next `get` reads or exchanges a fresh one; unless a refusal marker
+   * lives (step 2a): then it is kept and `false` returned. A token this instance exchanged itself
+   * is kept and `false` returned, and the refusal marker written: Vercel issued it for this
+   * deployment, so exchanging again would get the same refusal and spend the project's exchange
+   * budget, which previews share with production.
    */
   async invalidate(token: string): Promise<boolean> {
     const claims = claimsOf(token);
@@ -241,7 +260,15 @@ export class SharedExchangedToken {
     if (deployment === null || typeof audience !== 'string') return false;
     const key = await cacheKey(this.settings.keyPrefix, deployment, audience);
     const remembered = this.memory.get(key);
-    if (remembered?.token !== token || !remembered.shared) return false;
+    if (remembered?.token !== token) return false;
+    // A cache that fails keeps no marker and no deletion; this instance still exchanges no more.
+    if (!remembered.shared) {
+      await this.cache
+        .set(`${key}:refused`, { refused: true }, { ttl: this.settings.refusedTtlSeconds })
+        .catch(() => undefined);
+      return false;
+    }
+    if (isRefused(await this.cache.get(`${key}:refused`).catch(() => null))) return false;
     this.memory.delete(key);
     try {
       if (asEntry(await this.cache.get(key), deployment, audience)?.token === token) {
@@ -359,6 +386,10 @@ export class SharedExchangedToken {
     let pollMs = settings.pollStartMs;
     while (clock.now() < deadline) {
       if (await mayExchange()) {
+        // Step 2a: no exchange while STS refuses this deployment's freshly exchanged token.
+        if (isRefused(await read(`${key}:refused`))) {
+          return fail('STS refused a token freshly exchanged for this deployment and audience');
+        }
         report.exchangeAttempts += 1;
         nextExchangeAt = clock.now() + settings.exchangeRetryMs;
         const attempt = await exchange(baseToken, audience);

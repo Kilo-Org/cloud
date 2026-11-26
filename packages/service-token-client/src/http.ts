@@ -19,8 +19,9 @@ export const HTTP_ATTEMPT_TIMEOUT_MS = 30_000;
 
 /**
  * Returns the caller's identity token for one attempt. `invalidate`, when the source caches
- * tokens it did not obtain itself (the shared Vercel cache), drops a token STS refused and says
- * whether it did, so the next call can return a different one.
+ * tokens it did not obtain itself (the shared Vercel cache), hears of every token STS refused:
+ * it drops one it took from that cache and says whether it did, so the next call can return a
+ * different one.
  */
 export type IdentityTokenSource = {
   (): string | Promise<string>;
@@ -42,10 +43,11 @@ export type HttpServiceTokensOptions = {
 /**
  * Mints over `POST /v1/token`. An identity provider that fails or returns an empty token is a
  * retryable failure, so the client keeps serving the tokens it holds. When STS answers
- * `identity_rejected` for a token the identity source took from a shared cache, the source drops
- * it and the same attempt asks once more with a fresh one; a second refusal is the attempt's
- * answer, so one refusal costs at most one more identity token and one more mint per attempt, and
- * the client asks again only after `DENIED_RECHECK_MS`.
+ * `identity_rejected`, the identity source hears of it through `invalidate`; when it drops a
+ * token it took from a shared cache, the same attempt asks once more with a fresh one. A second
+ * refusal is the attempt's answer and reaches `invalidate` too, so the source can stop asking for
+ * fresh tokens (the Vercel source's refusal marker): one refusal costs at most one more identity
+ * token and one more mint per attempt, and the client asks again only after `DENIED_RECHECK_MS`.
  */
 export function createHttpServiceTokens(options: HttpServiceTokensOptions): ServiceTokens {
   const url = `${options.stsUrl.replace(/\/+$/, '')}${STS_TOKEN_HTTP_PATH}`;
@@ -79,14 +81,13 @@ export function createHttpServiceTokens(options: HttpServiceTokensOptions): Serv
   return createServiceTokens(
     async request => {
       const first = await mintWith(request);
-      if (
-        first.result.status === 'identity_rejected' &&
-        identity.invalidate !== undefined &&
-        (await identity.invalidate(first.token))
-      ) {
-        return (await mintWith(request)).result;
+      if (first.result.status !== 'identity_rejected' || identity.invalidate === undefined) {
+        return first.result;
       }
-      return first.result;
+      if (!(await identity.invalidate(first.token))) return first.result;
+      const second = await mintWith(request);
+      if (second.result.status === 'identity_rejected') await identity.invalidate(second.token);
+      return second.result;
     },
     { attemptTimeoutMs: HTTP_ATTEMPT_TIMEOUT_MS }
   );

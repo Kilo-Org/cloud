@@ -394,10 +394,13 @@ renews the base token during a deployment's life, even mid-wave, so the token it
 key); memory, then the cache, a cached token used until its own `exp` minus 60 seconds whatever
 base token the reader holds; on a miss a random wait and a re-read, then a claim marker so one
 request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
-exchanging again. The cache key is not secret: code that can write the same Runtime Cache
-partition (other deployments of the project in the same scope; a custom environment may share the
-preview partition) can stall a deployment's exchanges, never change which token it presents (the
-reader checks the claims, STS checks the signature); production has its own partition. There is no
+exchanging again. A cached token STS refuses is dropped and exchanged once more; when STS refuses
+the fresh one too, a refusal marker stops every instance of the deployment from exchanging for
+that audience for 60 seconds (the client's denied recheck). The cache key is not secret: code that
+can write the same Runtime Cache partition (other deployments of the project in the same scope; a
+custom environment may share the preview partition) can stall a deployment's exchanges, never
+change which token it presents (the reader checks the claims, STS checks the signature);
+production has its own partition. There is no
 early refresh: the exchanged token keeps the base token's `exp`, so
 exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
 the request at once. When the cache is down (the claim marker does not read back), each request

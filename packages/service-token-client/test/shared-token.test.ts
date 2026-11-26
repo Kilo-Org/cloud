@@ -173,7 +173,7 @@ describe('shared exchanged token (D10)', () => {
     const keys = new Set<string>();
     const recording: SharedCache = {
       get: async key => {
-        if (!key.endsWith(':claim')) keys.add(key);
+        if (!/:(claim|refused)$/.test(key)) keys.add(key);
         return await cache.get(key);
       },
       set: async (key, value, options) => await cache.set(key, value, options),

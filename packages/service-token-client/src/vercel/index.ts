@@ -90,8 +90,10 @@ export function vercelExchange(fetchFn: typeof fetch = fetch): Exchange {
  * 60 seconds before its own `exp`; on a miss a random wait and a re-read, then a claim marker so one
  * request exchanges; no second exchange after a 429 while the marker lives; a request with no token
  * after 20 seconds, or with a base token that has under 60 seconds left on a miss, fails.
- * `invalidate` drops a token STS refused when it came from the shared cache (see
- * `SharedExchangedToken.invalidate`); `createHttpServiceTokens` calls it.
+ * `invalidate` drops a token STS refused when it came from the shared cache, and writes a 60 s
+ * refusal marker for the deployment when STS refused the instance's own exchanged token, so no
+ * instance re-exchanges while STS refuses the deployment (see `SharedExchangedToken.invalidate`);
+ * `createHttpServiceTokens` calls it.
  */
 export function vercelIdentity(options: VercelIdentityOptions): IdentityTokenSource {
   const shared = new SharedExchangedToken(options.cache, { settings: options.settings });

@@ -2,7 +2,9 @@ import type { MintRequest } from '@kilocode/sts-contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { DENIED_RECHECK_MS } from '../src/client';
 import { createHttpServiceTokens } from '../src/http';
+import type { ServiceTokens } from '../src/types';
 import {
+  DEFAULT_SETTINGS,
   VERCEL_EXCHANGE_URL,
   vercelExchange,
   vercelIdentity,
@@ -131,11 +133,12 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
       token: poisoned,
       exp: JSON.parse(Buffer.from(poisoned.split('.')[1], 'base64url').toString()).exp,
     };
+    const marker = /:(claim|refused)$/;
     const cache: SharedCache = {
-      get: async key => (!key.endsWith(':claim') && entry !== null ? entry : await inner.get(key)),
+      get: async key => (!marker.test(key) && entry !== null ? entry : await inner.get(key)),
       set: async (key, value, options) => await inner.set(key, value, options),
       delete: async key => {
-        if (!key.endsWith(':claim')) entry = null;
+        if (!marker.test(key)) entry = null;
         await inner.delete(key);
       },
     };
@@ -225,6 +228,63 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
       expect(await settled(tokens.get(INGEST))).toMatchObject({ reason: 'denied' });
       expect(presented).toHaveLength(3);
       expect(exchanges).toEqual([STS]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a deployment STS refuses outright exchanges at most once per DENIED_RECHECK_MS across its instances', async () => {
+    expect(DEFAULT_SETTINGS.refusedTtlSeconds * 1000).toBe(DENIED_RECHECK_MS);
+    vi.useFakeTimers();
+    try {
+      const base = unsignedJwt({ ...DEPLOYMENT, iat: nowSeconds(), exp: nowSeconds() + 7200 });
+      const cache = memoryCache();
+      const exchangedAt: number[] = [];
+      // Like Vercel, but every exchange gives a distinct token.
+      const exchange: Exchange = async (baseToken, audience) => {
+        exchangedAt.push(Date.now());
+        const claims = JSON.parse(
+          Buffer.from(baseToken.split('.')[1] ?? '', 'base64url').toString()
+        );
+        return {
+          kind: 'token',
+          token: unsignedJwt({ ...claims, aud: audience, n: exchangedAt.length }),
+        };
+      };
+      const { fetchFn, presented } = sts(() => true);
+      const instances: ServiceTokens[] = [];
+
+      // Vercel starts a new instance every 10 s for 5 minutes; each serves a request every 5 s.
+      const durationMs = 300_000;
+      for (let at = 0; at < durationMs; at += 5_000) {
+        if (at % 10_000 === 0) {
+          instances.push(
+            createHttpServiceTokens({
+              stsUrl: STS,
+              getIdentityToken: vercelIdentity({
+                stsAudience: STS,
+                cache,
+                getBaseToken: async () => base,
+                exchange,
+                settings: { jitterMs: 1, settleMs: 1 },
+              }),
+              fetch: fetchFn as typeof fetch,
+            })
+          );
+        }
+        for (const tokens of instances) void tokens.get(INGEST).catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(5_000);
+      }
+
+      // Every instance asked STS, and none got a token.
+      expect(instances).toHaveLength(30);
+      expect(presented.length).toBeGreaterThanOrEqual(30);
+      // Without the refusal marker each new instance would drop the cached token and exchange.
+      expect(exchangedAt.length).toBeGreaterThanOrEqual(1);
+      expect(exchangedAt.length).toBeLessThanOrEqual(durationMs / DENIED_RECHECK_MS);
+      for (let i = 1; i < exchangedAt.length; i += 1) {
+        expect(exchangedAt[i] - exchangedAt[i - 1]).toBeGreaterThanOrEqual(DENIED_RECHECK_MS);
+      }
     } finally {
       vi.useRealTimers();
     }

@@ -845,8 +845,8 @@ so with a run every 300 s each side mints once per run, warm or cold. Per run an
 | STS audit rows | 2 `token.issued` (a denial adds one `token.denied`) | 576 |
 | Audit queue messages | at most 2; the signer relays up to 500 events per message, so usually they share one with other rows | at most 576 |
 | STS key-set fetches | one per verifier isolate per 5 minutes: each usage-ingest isolate that serves a verify-route call and each web instance that serves the route fetches once when its copy is older than 5 minutes. The 3 or 4 verify calls and the scheduled run can land on different isolates, so a run can cost several. The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | at most (usage-ingest isolates + web instances) x 288 |
-| Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt | at most 288; in practice one per base-token renewal or new deployment |
-| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 or 2 writes on a miss | at most about 1,700 operations |
+| Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt. When STS refuses that fresh token too, the client writes a refusal marker for the deployment and audience that lives 60 s (`DENIED_RECHECK_MS`): until it expires no instance of the deployment drops a cached token or exchanges, each answers from its denied state. A deployment STS keeps refusing (a `web.yaml` naming the wrong project or environment) so costs at most 1 exchange per 60 s per audience and region, however many instances it runs; 17 such deployments spend about 17 of the project's roughly 100 exchanges a minute, a limit previews share with production, where without the marker each could spend about 6 | at most 288; in practice one per base-token renewal or new deployment |
+| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal | at most about 1,700 operations |
 | Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
 
 Both environments together double each daily figure.
@@ -863,7 +863,8 @@ each verifier isolate fetches the key set once per 5 minutes. At one audience pe
 | 200,000 | about 833 per second (843 with the 2,200 Vercel instances of design section 6.1) | about 1.7 per second |
 
 A Vercel caller adds one exchange per deployment, audience and base-token renewal, shared through
-the Runtime Cache, and one cache read per new instance.
+the Runtime Cache, and one cache read per new instance. A deployment STS refuses adds at most one
+exchange per minute per audience and region, through the refusal marker.
 
 ## Deploy
 

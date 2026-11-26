@@ -14,16 +14,26 @@ const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
 
+function originOf(url: string): string | undefined {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+// Parsed once: a base URL that does not parse adds no origin, so it never
+// matches a request.
+const KILO_ORIGINS = new Set(
+  [originOf(API_BASE_URL), originOf(WEB_BASE_URL)].filter(origin => origin !== undefined)
+);
+
 // An HTTP span keeps the request URL with its path and query, and a custom model
 // backend's path or query can hold a credential. Only a request to Kilo's own
 // API or web origin gets a span; a URL that does not parse gets none.
 export function isKiloRequestUrl(url: string): boolean {
-  try {
-    const origin = new URL(url).origin;
-    return origin === new URL(API_BASE_URL).origin || origin === new URL(WEB_BASE_URL).origin;
-  } catch {
-    return false;
-  }
+  const origin = originOf(url);
+  return origin !== undefined && KILO_ORIGINS.has(origin);
 }
 
 /** Test-only extras: transport and transportOptions are forwarded into init

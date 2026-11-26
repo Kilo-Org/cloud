@@ -26,10 +26,12 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   CodingPlanInventoryUploadError,
   getAssignedCodingPlanApiKey,
+  getAvailableCodingPlanIds,
   getAssignedCodingPlanUsageContext,
   queueAvailableInventoryForRevocation,
   reassignSubscriptionCredential,
   replaceInventoryCredential,
+  requestCodingPlanAvailabilityNotification,
   subscribeToCodingPlan,
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
@@ -319,6 +321,34 @@ describe('claiming an inventory credential', () => {
 
     expect(kms.requests.filter(request => request.path === '/decrypt')).toHaveLength(0);
     expect((await selectInventory(inventory.id)).status).toBe('available');
+  });
+
+  it('does not count a row without an envelope as stock for availability or the waitlist', async () => {
+    const user = await insertSubscribableUser();
+    await insertInventoryRow({
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
+    });
+
+    await expect(getAvailableCodingPlanIds()).resolves.not.toContain(BYTEPLUS_PLAN_ID);
+    await expect(
+      requestCodingPlanAvailabilityNotification(user.id, BYTEPLUS_PLAN_ID)
+    ).resolves.toEqual({ requested: true });
+
+    await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
+    await expect(getAvailableCodingPlanIds()).resolves.toContain(BYTEPLUS_PLAN_ID);
+  });
+
+  it('subscribe claims sealed stock past a row without an envelope', async () => {
+    const user = await insertSubscribableUser();
+    const unsealed = await insertInventoryRow({
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
+    });
+    await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
+
+    await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'past-unsealed-subscribe');
+
+    expect(await installedByokPlaintext(user.id)).toBe('healthy-secret');
+    expect((await selectInventory(unsealed.id)).status).toBe('available');
   });
 
   it('subscribe opens another row under the lock when its prepared candidate was claimed', async () => {

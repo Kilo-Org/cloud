@@ -112,6 +112,15 @@ type ClaimedInventoryCredential = {
   encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope | null;
 };
 
+/**
+ * Inventory a subscriber can be given: available, and holding a KMS envelope. A row without
+ * one cannot be opened, so it is not stock for availability, the waitlist or a claim.
+ */
+const claimableInventory = and(
+  eq(coding_plan_key_inventory.status, 'available'),
+  isNotNull(coding_plan_key_inventory.encrypted_api_key_envelope)
+);
+
 /** An available inventory credential decrypted before the claiming transaction. */
 type PreparedInventoryCredential = { row: ClaimedInventoryCredential; plaintext: string };
 
@@ -159,7 +168,7 @@ async function prepareAvailableInventoryCredential(
         and(
           eq(coding_plan_key_inventory.plan_id, planId),
           eq(coding_plan_key_inventory.provider_id, providerId),
-          eq(coding_plan_key_inventory.status, 'available'),
+          claimableInventory,
           unreadableIds.length > 0
             ? notInArray(coding_plan_key_inventory.id, unreadableIds)
             : undefined
@@ -445,6 +454,7 @@ export async function subscribeToCodingPlan(
         SELECT id FROM coding_plan_key_inventory
         WHERE plan_id = ${plan.planId}
           AND status = 'available'
+          AND encrypted_api_key_envelope IS NOT NULL
           ${excludeUnreadableInventory(prepared.unreadableIds)}
         ORDER BY (id = ${prepared.candidate?.row.id ?? null}::uuid) IS TRUE DESC
         LIMIT 1
@@ -731,6 +741,7 @@ export async function reassignSubscriptionCredential(
           WHERE plan_id = ${subscription.planId}
             AND provider_id = ${subscription.providerId}
             AND status = 'available'
+            AND encrypted_api_key_envelope IS NOT NULL
             ${excludeUnreadableInventory(prepared.unreadableIds)}
           ORDER BY (id = ${prepared.candidate?.row.id ?? null}::uuid) IS TRUE DESC
           LIMIT 1
@@ -948,7 +959,7 @@ export async function getAvailableCodingPlanIds(): Promise<string[]> {
   const rows = await db
     .selectDistinct({ planId: coding_plan_key_inventory.plan_id })
     .from(coding_plan_key_inventory)
-    .where(eq(coding_plan_key_inventory.status, 'available'));
+    .where(claimableInventory);
   return rows.map(row => row.planId);
 }
 
@@ -996,12 +1007,7 @@ export async function requestCodingPlanAvailabilityNotification(
     const [availableCredential] = await tx
       .select({ id: coding_plan_key_inventory.id })
       .from(coding_plan_key_inventory)
-      .where(
-        and(
-          eq(coding_plan_key_inventory.plan_id, plan.planId),
-          eq(coding_plan_key_inventory.status, 'available')
-        )
-      )
+      .where(and(eq(coding_plan_key_inventory.plan_id, plan.planId), claimableInventory))
       .limit(1);
     if (availableCredential) {
       throw new Error(`${plan.providerName} ${plan.name} is currently available.`);

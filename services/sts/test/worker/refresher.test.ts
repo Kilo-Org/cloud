@@ -338,7 +338,12 @@ describe('policy audit stream', () => {
     expect(rows).toHaveLength(1);
     const event = JSON.parse(rows[0]);
     expect(event.type).toBe('ai.kilo.sts.policy.changed');
-    expect([...event.data.attributes.addedWorkloads].sort()).toEqual(['audit-relay', 'o11y']);
+    expect([...event.data.attributes.addedWorkloads].sort()).toEqual([
+      'audit-relay',
+      'o11y',
+      'usage-ingest',
+      'web',
+    ]);
     expect(event.data.attributes.removedWorkloads).toEqual([]);
   });
 

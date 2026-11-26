@@ -104,7 +104,8 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
  * its own top-level name, read that workload's bundle.
  */
 export const EXTERNAL_WORKLOADS: ReadonlyMap<string, string> = new Map([
-  // watch/wrangler.jsonc there binds `sts` from its top-level (production) block.
+  // watch/wrangler.jsonc there is to bind `sts` from its top-level (production) block once
+  // bouncer's step 2 lands.
   ['bouncer-watch', 'Kilo-Org/bouncer'],
 ]);
 

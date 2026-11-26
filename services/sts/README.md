@@ -153,13 +153,13 @@ Adding a file also means adding it to `src/policy/registry.ts`; the typed import
 `src/policy/index.ts` makes the two disagree at typecheck, and `test/repo/policy-files.test.ts`
 checks the directory itself.
 
-Workloads STS serves today, all over `worker-binding`:
+Workloads with a policy, all over `worker-binding`:
 
 | Workload | Environments | Worker config |
 |---|---|---|
 | `o11y` | development, staging, production | `services/o11y/wrangler.jsonc` |
 | `audit-relay` | development, staging, production | `services/audit-relay/wrangler.jsonc` |
-| `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer` |
+| `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's

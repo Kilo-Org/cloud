@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { assertKiloModelAvailable } from '../model-validation.js';
+import { modelValidationAudience } from '../model-validation-audience.js';
 import type { CloudAgentSessionState, PersistenceEnv } from '../persistence/types.js';
 import { fetchSessionMetadata } from './metadata.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
@@ -44,9 +45,10 @@ async function assertModelFromStoredContext(
   let token = metadata.auth.kilocodeToken;
   if (hasModernRuntimeAuthorization(metadata)) {
     // The owning DO renews short-lived backing tokens within the existing delegation.
+    const destination = modelValidationAudience(input.env, metadata.identity.orgId);
     const runtimeToken = await withDORetry(
       () => getSandboxSessionStub(input.env, input.userId, input.cloudAgentSessionId),
-      stub => stub.getRuntimeToken(),
+      stub => stub.getRuntimeToken(destination),
       'getRuntimeTokenForModelPreflight'
     );
     if (!runtimeToken) {

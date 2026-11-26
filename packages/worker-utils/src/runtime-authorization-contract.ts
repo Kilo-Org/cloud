@@ -39,6 +39,67 @@ export function resolveRuntimeEnvironment(value: string | undefined): RuntimeEnv
   return value === 'development' ? 'development' : 'production';
 }
 
+/**
+ * The services that receive a Cloud Agent runtime token. Each destination gets
+ * its own token, so the token one service accepts is refused by the others.
+ */
+export const RuntimeTokenDestinationSchema = z.enum(['kilo-api', 'kilo-gateway', 'session-ingest']);
+export type RuntimeTokenDestination = z.infer<typeof RuntimeTokenDestinationSchema>;
+export const RUNTIME_TOKEN_DESTINATIONS = RuntimeTokenDestinationSchema.options;
+
+/** The runtime tokens of one issuance, one per destination, with one expiry. */
+export const RuntimeTokensSchema = z
+  .object({
+    'kilo-api': z.string().min(1),
+    'kilo-gateway': z.string().min(1),
+    'session-ingest': z.string().min(1),
+  })
+  .strict();
+export type RuntimeTokens = z.infer<typeof RuntimeTokensSchema>;
+
+/**
+ * How the issuer assigns runtime token audiences. `per-destination` mints one
+ * single-audience token for each destination. `combined` mints the earlier
+ * single token whose audience lists every destination; it remains only so the
+ * rollout can return to it with a configuration change, until verifiers refuse
+ * multi-audience tokens.
+ */
+export const RuntimeTokenAudienceModeSchema = z.enum(['combined', 'per-destination']);
+export type RuntimeTokenAudienceMode = z.infer<typeof RuntimeTokenAudienceModeSchema>;
+
+/**
+ * The issuer mode a deployment configures. A missing value keeps `combined`,
+ * the token shape every deployed reader handles; any other value must name a
+ * mode, so a mistyped configuration fails closed instead of reverting.
+ */
+export function resolveRuntimeTokenAudienceMode(
+  value: string | undefined
+): RuntimeTokenAudienceMode {
+  return value === undefined ? 'combined' : RuntimeTokenAudienceModeSchema.parse(value);
+}
+
+/** Whether `aud` is exactly the combined claim: every destination, in issuance order. */
+export function isCombinedRuntimeTokenAudience(aud: unknown): boolean {
+  return (
+    Array.isArray(aud) &&
+    aud.length === RUNTIME_TOKEN_DESTINATIONS.length &&
+    RUNTIME_TOKEN_DESTINATIONS.every((value, index) => aud[index] === value)
+  );
+}
+
+/**
+ * Whether a stored runtime token may still be sent to `destination`: its
+ * audience is exactly that destination, or exactly the combined claim. Either
+ * issuer mode reads both forms, so a mode change renews nothing early; every
+ * other layout is refused.
+ */
+export function isRuntimeTokenAudience(
+  aud: unknown,
+  destination: RuntimeTokenDestination
+): boolean {
+  return aud === destination || isCombinedRuntimeTokenAudience(aud);
+}
+
 /** A lowercase SHA-256 hex digest, the shape every runtime credential digest field uses. */
 export const Sha256HexDigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const nullablePepperDigest = z.union([Sha256HexDigestSchema, z.literal('null')]);

@@ -115,6 +115,9 @@ const UsageMetadataSchema = z.object({
   is_free: z.boolean().nullable(),
   abuse_delay: z.number().nullable(),
   abuse_downgraded_from: z.string().nullable(),
+  // Additive like reasoning_setting: older senders omit it. Plain text rather than an enum, so a
+  // kind added on a newer sender never rejects the record on an older receiver.
+  system_prompt_kind: z.string().nullable().default(null),
 });
 
 /**
@@ -152,9 +155,10 @@ export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSc
  *
  * - Nullable fields use `.nullable()`. Except for additive rollout fields that
  *   default to null, missing keys are rejected: `JSON.stringify` drops
- *   `undefined`-valued keys, and `null` is load-bearing here. For organization
- *   usage `toInsertableDbUsageRecord` explicitly sets `user_prompt_prefix` and
- *   `system_prompt_prefix` to `null` so prompt text is never persisted.
+ *   `undefined`-valued keys, and `null` is load-bearing here.
+ *   The gateway no longer extracts prompt text, so senders always send
+ *   `user_prompt_prefix` and `system_prompt_prefix` as `null`, and the writer
+ *   ignores both, so prompt text is never persisted.
  * - `created_at` is validated as strict ISO 8601. Both `core.created_at` and
  *   `metadata.created_at` come from `new Date().toISOString()` on the sender, so
  *   this holds by construction. It would NOT hold for a value read back out of

@@ -259,6 +259,7 @@ describe('null-pepper personal webhook compatibility', () => {
         resourceKind: 'cloud-agent-next',
         resourceId: 'session-1',
         environment: 'production',
+        audienceMode: 'per-destination',
         adapters: {
           getPrincipal: async () => ({
             id: 'oauth/personal',
@@ -269,11 +270,13 @@ describe('null-pepper personal webhook compatibility', () => {
           }),
         },
       });
-      expect(decodeJwt(runtime.token)).toMatchObject({
-        apiTokenPepper: null,
-        aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
-        tokenPurpose: 'delegated-workload',
-      });
+      for (const audience of ['kilo-api', 'kilo-gateway', 'session-ingest'] as const) {
+        expect(decodeJwt(runtime.tokens[audience])).toMatchObject({
+          apiTokenPepper: null,
+          aud: audience,
+          tokenPurpose: 'delegated-workload',
+        });
+      }
     }
   });
 });

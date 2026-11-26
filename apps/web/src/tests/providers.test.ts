@@ -12,7 +12,7 @@ import type { OpenRouterChatCompletionRequest } from '@kilocode/web-shared/lib/a
  */
 
 describe('extractPromptInfo', () => {
-  test('should extract system and user prompt info from standard message format', () => {
+  test('should extract system prompt info from standard message format', () => {
     const requestBody = {
       model: 'test-model',
       stream: false,
@@ -31,14 +31,10 @@ describe('extractPromptInfo', () => {
 
     const result = extractPromptInfo(requestBody);
 
-    expect(result.system_prompt_prefix).toBe(
-      'You are a helpful assistant. Follow these guidelines: be concise, be accurate, be helpful.'
-    );
     expect(result.system_prompt_length).toBe(90);
-    expect(result.user_prompt_prefix).toBe('Tell me about JavaScript promises.');
   });
 
-  test('should handle user message with content array format', () => {
+  test('should measure the system prompt when the user message has a content array', () => {
     const requestBody = {
       model: 'test-model',
       stream: false,
@@ -60,11 +56,7 @@ describe('extractPromptInfo', () => {
 
     const result = extractPromptInfo(requestBody);
 
-    expect(result.system_prompt_prefix).toBe('You are a helpful assistant.');
     expect(result.system_prompt_length).toBe(28);
-    expect(result.user_prompt_prefix).toBe(
-      "Can you explain how React hooks work?\nThey're kind of confusing."
-    );
   });
 
   test('should handle missing system prompt', () => {
@@ -81,9 +73,7 @@ describe('extractPromptInfo', () => {
 
     const result = extractPromptInfo(requestBody);
 
-    expect(result.system_prompt_prefix).toBe('');
     expect(result.system_prompt_length).toBe(0);
-    expect(result.user_prompt_prefix).toBe('What is Node.js?');
   });
 
   test('should handle missing user prompt', () => {
@@ -100,9 +90,7 @@ describe('extractPromptInfo', () => {
 
     const result = extractPromptInfo(requestBody);
 
-    expect(result.system_prompt_prefix).toBe('You are a helpful assistant.');
     expect(result.system_prompt_length).toBe(28);
-    expect(result.user_prompt_prefix).toBe('');
   });
 
   test('should handle OpenAI format with system message in messages array', () => {
@@ -123,14 +111,10 @@ describe('extractPromptInfo', () => {
 
     const result = extractPromptInfo(requestBody);
 
-    expect(result.system_prompt_prefix).toBe(
-      'You are a helpful AI assistant that provides accurate information.'
-    );
     expect(result.system_prompt_length).toBe(66);
-    expect(result.user_prompt_prefix).toBe('What are the benefits of TypeScript?');
   });
 
-  test('should truncate long system prompts to 100 chars for prefix', () => {
+  test('should measure the full length of long system prompts', () => {
     const longSystemPrompt = 'A'.repeat(200);
     const requestBody = {
       model: 'test-model',
@@ -149,7 +133,6 @@ describe('extractPromptInfo', () => {
 
     const result = extractPromptInfo(requestBody);
 
-    expect(result.system_prompt_prefix).toBe('A'.repeat(100));
     expect(result.system_prompt_length).toBe(200);
   });
 });

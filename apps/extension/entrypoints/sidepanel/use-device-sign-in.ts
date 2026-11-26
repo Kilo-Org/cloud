@@ -76,7 +76,7 @@ export const useDeviceSignIn = ({
 
       return pollDeviceAuthCode({
         apiBaseUrl,
-        code: pendingAuthRequest.code,
+        deviceCode: pendingAuthRequest.deviceCode,
         fetch,
         signal,
       });

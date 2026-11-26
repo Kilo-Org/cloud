@@ -75,6 +75,8 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_ADMISSION_OBSERVATION_FLAG } from '@kilocode/worker-utils/kilo-token-admission-observation';
+import { gatewayRateLimitKey } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   KILO_TOKEN_MAX_LIFETIME_SECONDS,
   KILO_TOKEN_VERSION,
@@ -2735,5 +2737,130 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
 
     expect(result.user?.id).toBe(admin.id);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('gateway admission observation at the real call sites', () => {
+  const ADDRESS = '203.0.113.7';
+  const originalFlag = process.env[KILO_TOKEN_ADMISSION_OBSERVATION_FLAG];
+  let log: { mock: { calls: unknown[][] } };
+
+  function admissionLines(): string[] {
+    return log.mock.calls
+      .map(([line]) => String(line))
+      .filter(line => line.includes('"kilo_token_admission"'));
+  }
+
+  function setFlag(value: string | undefined) {
+    if (value === undefined) delete process.env[KILO_TOKEN_ADMISSION_OBSERVATION_FLAG];
+    else process.env[KILO_TOKEN_ADMISSION_OBSERVATION_FLAG] = value;
+  }
+
+  // The order a gateway route runs: the account cap first, then authentication.
+  async function gatewayRequest(token: string) {
+    const requestHeaders = new Headers({ authorization: `Bearer ${token}` });
+    mockHeaders.mockResolvedValue(requestHeaders);
+    const accountKey = gatewayRateLimitKey(requestHeaders, ADDRESS);
+    const linesAfterKey = admissionLines().length;
+    const auth = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+    return { accountKey, linesAfterKey, auth };
+  }
+
+  async function multiAudienceUser(aud: string[]) {
+    const user = await insertTestUser({ api_token_pepper: `observe-${crypto.randomUUID()}` });
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud,
+    });
+    return { user, token };
+  }
+
+  beforeEach(() => {
+    log = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    setFlag(originalFlag);
+  });
+
+  test('observes an eligible gateway bearer once, at authentication only', async () => {
+    const { user, token } = await multiAudienceUser([KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE]);
+
+    setFlag(undefined);
+    const off = await gatewayRequest(token);
+    expect(admissionLines()).toEqual([]);
+
+    setFlag('true');
+    const on = await gatewayRequest(token);
+
+    expect(off.accountKey).toBe(user.id);
+    expect(on.accountKey).toBe(off.accountKey);
+    expect(off.auth.user?.id).toBe(user.id);
+    expect(on.auth.user?.id).toBe(off.auth.user?.id);
+    expect(on.auth.authFailedResponse).toBeNull();
+    // The cap reads the same header but must not report the decision again.
+    expect(on.linesAfterKey).toBe(0);
+    const written = admissionLines();
+    expect(written.map(line => JSON.parse(line) as unknown)).toEqual([
+      {
+        event: 'kilo_token_admission',
+        v: 1,
+        boundary: 'web_bearer',
+        policy_audience: 'kilo-gateway',
+        outcome: 'admitted',
+        multi: true,
+        control: false,
+        aud_set: 'kilo-api+kilo-gateway',
+        issuer: 'unknown',
+        cohort: 'not_internal_bot',
+        client: 'unknown',
+      },
+    ]);
+    for (const forbidden of [token, user.id, String(user.api_token_pepper), ADDRESS]) {
+      expect(written.join('\n')).not.toContain(forbidden);
+    }
+  });
+
+  test('refuses a multi-audience bearer without the gateway audience and reports it once', async () => {
+    const { token } = await multiAudienceUser([KILO_API_AUDIENCE, 'kilo-session-ingest']);
+    setFlag('true');
+
+    const { accountKey, linesAfterKey, auth } = await gatewayRequest(token);
+
+    expect(accountKey).toBe(`anon:${ADDRESS}`);
+    expect(auth.user).toBeNull();
+    expect(auth.authFailedResponse?.status).toBe(401);
+    expect(linesAfterKey).toBe(0);
+    expect(admissionLines().map(line => JSON.parse(line) as unknown)).toEqual([
+      expect.objectContaining({ policy_audience: 'kilo-gateway', outcome: 'audience_not_allowed' }),
+    ]);
+  });
+
+  test('reports nothing for a bearer that fails signature verification', async () => {
+    const user = await insertTestUser({ api_token_pepper: `observe-${crypto.randomUUID()}` });
+    const token = signPolicyClaims(
+      {
+        version: KILO_TOKEN_VERSION,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        aud: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+      },
+      'not-the-signing-secret'
+    );
+    setFlag('true');
+
+    const { accountKey, auth } = await gatewayRequest(token);
+
+    expect(accountKey).toBe(`anon:${ADDRESS}`);
+    expect(auth.user).toBeNull();
+    expect(auth.authFailedResponse?.status).toBe(401);
+    expect(admissionLines()).toEqual([]);
   });
 });

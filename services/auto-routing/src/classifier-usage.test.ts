@@ -138,8 +138,8 @@ describe('classifier usage identity', () => {
       streamed: false,
       has_tools: false,
       api_kind: payload.input.apiKind,
-      user_prompt_prefix: '',
-      system_prompt_prefix: '',
+      user_prompt_prefix: null,
+      system_prompt_prefix: null,
     });
     expect(usage.posthog_distinct_id).toBeNull();
     expect(JSON.stringify(usage)).not.toContain('private');

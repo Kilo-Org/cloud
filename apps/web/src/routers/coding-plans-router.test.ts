@@ -6,6 +6,7 @@ import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gatewa
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
 import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
 import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
@@ -48,6 +49,7 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
   },
 }));
 
+const ADMIN_USER_ID = 'admin-user-id';
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
@@ -356,6 +358,7 @@ describe('coding plans router', () => {
       'minimax',
       PLAN_ID,
       [inventoryEntry(`minimax-disabled-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       { validateCredential: async () => true }
     );
 
@@ -382,6 +385,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`catalog-available-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({
           valid: true,
@@ -476,6 +480,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`notify-activation-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({
           valid: true,
@@ -507,6 +512,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`unused-router-key-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-unused-router' }),
       }
@@ -536,6 +542,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`router-managed-key-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-router-managed' }),
       }
@@ -722,6 +729,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry('byteplus-inference-key', 'assigned-byteplus-username')],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({
           valid: true,
@@ -776,6 +784,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`sk-cp-state-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-usage-states' }),
       }
@@ -831,6 +840,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`sk-cp-corrupt-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-corrupt' }),
       }
@@ -876,6 +886,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`sk-cp-upstream-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-upstream' }),
       }
@@ -908,6 +919,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`second-purchase-key-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-second-purchase' }),
       }
@@ -933,6 +945,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PLAN_ID,
       [inventoryEntry(`provider-lite-key-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-provider-lite' }),
       }
@@ -941,6 +954,7 @@ describe('coding plans router', () => {
       'byteplus-coding',
       BYTEPLUS_PRO_PLAN_ID,
       [inventoryEntry(`provider-pro-key-${crypto.randomUUID()}`)],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-provider-pro' }),
       }
@@ -1810,7 +1824,8 @@ describe('coding plans router', () => {
         apiKey: 'assigned-replacement-key',
       });
 
-      expect(lockedDuringKms).toEqual([false]);
+      // One data key for the inventory row, one for the installed BYOK key.
+      expect(lockedDuringKms).toEqual([false, false]);
 
       const [replacedByok] = await db
         .select()
@@ -1821,17 +1836,36 @@ describe('coding plans router', () => {
         kms_key_id: 'alias/test',
       });
       expect(
-        decryptApiKey(replacedByok.encrypted_api_key_envelope!.encrypted_data, kms.dataKeys[0])
+        decryptApiKey(replacedByok.encrypted_api_key_envelope!.encrypted_data, kms.dataKeys[1])
       ).toBe('assigned-replacement-key');
-      expect(kms.fetchMock).toHaveBeenCalledTimes(1);
-      const [, init] = kms.fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-      expect(JSON.parse(String(init.body))).toEqual({
-        key_id: installedByok.id,
-        actor_user_id: admin.id,
-        owner_type: 'user',
-        owner_id: user.id,
-        provider_id: 'minimax',
+      expect(kms.fetchMock).toHaveBeenCalledTimes(2);
+      const requestBodies = kms.fetchMock.mock.calls.map(call => {
+        const [, init] = call as unknown as [string, RequestInit];
+        return JSON.parse(String(init.body));
       });
+      expect(requestBodies).toEqual([
+        {
+          key_id: assigned.id,
+          actor_user_id: admin.id,
+          owner_type: 'organization',
+          owner_id: KILO_ORGANIZATION_ID,
+          provider_id: 'coding-plan-inventory',
+        },
+        {
+          key_id: installedByok.id,
+          actor_user_id: admin.id,
+          owner_type: 'user',
+          owner_id: user.id,
+          provider_id: 'minimax',
+        },
+      ]);
+      const [replacedInventory] = await db
+        .select()
+        .from(coding_plan_key_inventory)
+        .where(eq(coding_plan_key_inventory.id, assigned.id));
+      expect(
+        decryptApiKey(replacedInventory.encrypted_api_key_envelope!.encrypted_data, kms.dataKeys[0])
+      ).toBe('assigned-replacement-key');
     } finally {
       kms.restore();
     }

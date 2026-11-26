@@ -5,6 +5,7 @@ import {
   RuntimeAuthorizationRevokedError,
 } from '@kilocode/worker-utils/runtime-authorization';
 import { shouldCaptureCloudAgentException } from '../../sentry.js';
+import { RuntimeTokenDestinationRequiredError } from '../../session/runtime-authorization-persistence.js';
 import {
   classifyRuntimeProxyFenceError,
   isRuntimeProxyScopeViewDenialError,
@@ -171,6 +172,15 @@ describe('classifyRuntimeProxyFenceError', () => {
     expect(
       classifyRuntimeProxyFenceError(new RuntimeProxyScopeViewDenialError('scope_mismatch'))
     ).toBe('deny');
+  });
+
+  it('denies a missing token destination as permanent, matched by instanceof', () => {
+    expect(classifyRuntimeProxyFenceError(new RuntimeTokenDestinationRequiredError())).toBe('deny');
+    // The same message from any other error keeps the retryable default.
+    const plain = new Error('Runtime token destination required');
+    expect(classifyRuntimeProxyFenceError(plain)).toBe('retry');
+    plain.name = 'RuntimeTokenDestinationRequiredError';
+    expect(classifyRuntimeProxyFenceError(plain)).toBe('retry');
   });
 
   it('retries a fence transport failure', () => {

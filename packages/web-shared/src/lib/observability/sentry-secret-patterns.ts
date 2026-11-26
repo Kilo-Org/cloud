@@ -2,7 +2,7 @@
 // code that puts upstream text into Sentry data. Keep this module edge-safe: no
 // SDK runtime values and no Node builtins.
 
-import { sanitizeAnalyticsText } from '@kilocode/web-shared/lib/sanitize-analytics-url';
+import { sanitizeAnalyticsText as sanitizeAnalyticsPaths } from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
 export const FILTERED_VALUE = '[Filtered]';
 export const MAX_REDACTED_TEXT_LENGTH = 32 * 1024;
@@ -28,6 +28,15 @@ const WEBHOOK_URL_PATTERNS = [
 
 const URL_USERINFO_PATTERN = /\b([a-z][a-z0-9+.-]{1,20}:\/\/)[^\s/?#@"'<>]+@/gi;
 
+// The base64 JSON payload cannot contain the underscore delimiter.
+const SENTRY_ORG_TOKEN_PATTERN =
+  /\bsntrys_eyJ[A-Za-z0-9+/]+={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g;
+
+function sanitizeAnalyticsText(text: string): string {
+  // The base64 secret can contain a slash segment that looks like a capability path.
+  return sanitizeAnalyticsPaths(text.replace(SENTRY_ORG_TOKEN_PATTERN, FILTERED_VALUE));
+}
+
 const SECRET_VALUE_PATTERNS = [
   // A JWS has three segments and a JWE has five; a JWE can have an empty key segment.
   // The first segment stops before another `-eyJ`, so a run such as `eyJ-eyJ-...`
@@ -41,6 +50,10 @@ const SECRET_VALUE_PATTERNS = [
   /\bwhsec_[A-Za-z0-9+/=]{16,}/g,
   /\bglpat-[A-Za-z0-9_-]{20,}/g,
   /\bya29\.[A-Za-z0-9_-]{20,}/g,
+  /\bAIza[A-Za-z0-9_-]{30,}/g,
+  /\bAQ\.[A-Za-z0-9_-]{20,}/g,
+  /\bnpm_[A-Za-z0-9]{36}\b/g,
+  /\bsntryu_[A-Fa-f0-9]{64}\b/g,
 ];
 
 // A `name=value` pair in a query, a form body, a cookie or a log line, also in

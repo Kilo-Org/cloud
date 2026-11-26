@@ -11,6 +11,7 @@ import type {
   RuntimeProxyScopeViewUnavailableReason,
 } from '../sandbox/sandbox-do.js';
 import type { ScopeGrantView } from '../sandbox/scope-view.js';
+import { RuntimeTokenDestinationRequiredError } from '../../session/runtime-authorization-persistence.js';
 
 /** Stable searchable tag for one failed runtime credential proxy fence read. */
 export const RUNTIME_PROXY_FENCE_LOG_TAG = 'runtime_proxy_fence_failed';
@@ -74,8 +75,9 @@ export class RuntimeProxyFenceTransportError extends TRPCError {
 /**
  * How the Session DO answers a failed local grant resolution.
  *
- * - `deny`: a 401. The handle is not valid for the caller's grant, so neither
- *   the scope view nor a shared-scope fallback is served.
+ * - `deny`: a 401. The handle is not valid for the caller's grant, or the
+ *   caller omitted the token destination that the configured issuer mode
+ *   requires, so neither the scope view nor a shared-scope fallback is served.
  * - `retry`: rethrow, and the facade answers its retryable 503
  *   `Credential unavailable`.
  * - `fallback`: only a revoked or expired local runtime authorization, which a
@@ -87,7 +89,7 @@ export type RuntimeProxyFenceErrorOutcome = 'deny' | 'retry' | 'fallback';
 /**
  * Classifies a failure from the local grant resolution. The exact contract:
  *
- * - `RuntimeProxyScopeViewDenialError` -> `deny`.
+ * - `RuntimeProxyScopeViewDenialError` or `RuntimeTokenDestinationRequiredError` -> `deny`.
  * - `RuntimeProxyFenceTransportError` -> `retry`.
  * - `RuntimeAuthorizationRevokedError` or `RuntimeAuthorizationExpiredError` ->
  *   `fallback`.
@@ -102,7 +104,11 @@ export type RuntimeProxyFenceErrorOutcome = 'deny' | 'retry' | 'fallback';
  * names is not treated as an authorization failure.
  */
 export function classifyRuntimeProxyFenceError(error: unknown): RuntimeProxyFenceErrorOutcome {
-  if (isRuntimeProxyScopeViewDenialError(error)) return 'deny';
+  if (
+    isRuntimeProxyScopeViewDenialError(error) ||
+    error instanceof RuntimeTokenDestinationRequiredError
+  )
+    return 'deny';
   if (error instanceof RuntimeProxyFenceTransportError) return 'retry';
   if (
     error instanceof RuntimeAuthorizationRevokedError ||

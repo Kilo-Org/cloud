@@ -104,7 +104,6 @@ export async function runBot(input: BotRunInput): Promise<BotRunResult> {
       'tool_calls:',
       message.tool_calls?.length || 0
     );
-    console.log(`${logPrefix} Message content preview:`, message.content?.slice(0, 200));
 
     if (message.tool_calls && message.tool_calls.length > 0) {
       console.log(`${logPrefix} Tool calls detected:`, message.tool_calls.length);
@@ -163,7 +162,6 @@ export async function runBot(input: BotRunInput): Promise<BotRunResult> {
   }
 
   console.log(`${logPrefix} Final response length:`, finalResponse.length);
-  console.log(`${logPrefix} Final response preview:`, finalResponse.slice(0, 500));
 
   return {
     response: finalResponse,

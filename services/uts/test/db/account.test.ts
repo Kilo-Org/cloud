@@ -410,11 +410,20 @@ describe('PAT list and revoke', () => {
     });
   });
 
-  it('revokes once, with a 15-minute feed entry and an audit row, and the lookup stops', async () => {
+  it('revokes once, with a 15-minute feed entry returned and stored, an audit row, and the lookup stops', async () => {
     const holder = await session();
     const { token, id } = await createdPat(holder);
-    expect(await account.revokePat({ environment, ...holder, patId: id })).toBe('revoked');
-    expect(await account.revokePat({ environment, ...holder, patId: id })).toBe('already_revoked');
+    const revoked = await account.revokePat({ environment, ...holder, patId: id });
+    expect(revoked).toEqual({
+      outcome: 'revoked',
+      feedEntries: [expect.objectContaining({ kind: 'pat', id, revokedBefore: null })],
+    });
+    const [entry] = revoked.feedEntries;
+    expect(entry.expiresAt - entry.revokedAt).toBe(15 * 60_000);
+    expect(await account.revokePat({ environment, ...holder, patId: id })).toEqual({
+      outcome: 'already_revoked',
+      feedEntries: [],
+    });
     expect(await lookupPat(new IdentityStore(patLogin), sha256(token))).toBeNull();
     const feed = await owner.query(
       `SELECT kind, feed_expires_at - revoked_at AS ttl FROM uts.revocations WHERE subject_id = $1`,
@@ -438,10 +447,13 @@ describe('PAT list and revoke', () => {
     const holder = await session();
     const other = await session();
     const { id } = await createdPat(holder);
-    expect(await account.revokePat({ environment, ...other, patId: id })).toBe('not_found');
+    expect(await account.revokePat({ environment, ...other, patId: id })).toEqual({
+      outcome: 'not_found',
+      feedEntries: [],
+    });
     expect(
       await account.revokePat({ environment, ...holder, grantId: other.grantId, patId: id })
-    ).toBe('invalid_session');
+    ).toEqual({ outcome: 'invalid_session', feedEntries: [] });
   });
 });
 
@@ -597,16 +609,15 @@ describe('org bot keys', () => {
         { id, org: orgId, status: 'active', created_by: admin.accountId, last_used_at: null },
       ],
     });
-    expect(await account.revokeBotKey({ environment, ...member, orgId, keyId: id })).toBe(
-      'not_org_admin'
-    );
-    expect(await account.revokeBotKey({ environment, ...admin, orgId, keyId: id })).toBe('revoked');
-    expect(await account.revokeBotKey({ environment, ...admin, orgId, keyId: id })).toBe(
-      'already_revoked'
-    );
-    expect(await account.revokeBotKey({ environment, ...admin, orgId, keyId: randomUUID() })).toBe(
-      'not_found'
-    );
+    const revoke = (session: Session, keyId: string) =>
+      account.revokeBotKey({ environment, ...session, orgId, keyId });
+    expect(await revoke(member, id)).toEqual({ outcome: 'not_org_admin', feedEntries: [] });
+    expect(await revoke(admin, id)).toEqual({
+      outcome: 'revoked',
+      feedEntries: [expect.objectContaining({ kind: 'bot_key', id, revokedBefore: null })],
+    });
+    expect(await revoke(admin, id)).toEqual({ outcome: 'already_revoked', feedEntries: [] });
+    expect(await revoke(admin, randomUUID())).toEqual({ outcome: 'not_found', feedEntries: [] });
     expect(await lookupBotKey(new IdentityStore(patLogin), sha256(token))).toBeNull();
     const feed = await owner.query('SELECT kind FROM uts.revocations WHERE subject_id = $1', [id]);
     expect(feed.rows).toEqual([{ kind: 'bot_key' }]);
@@ -733,15 +744,18 @@ describe('member removal', () => {
     ]);
     const fresh = await createdBotKey(member, orgId);
     const lapsed = await createdBotKey(member, orgId);
+    // A flag time never moves once set (`uts.refuse_reopening`), so the lapsed key is flagged 8
+    // days back before the removal flags the fresh one.
+    await owner.query(
+      `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() - interval '8 days'
+       WHERE id = $1`,
+      [lapsed.id]
+    );
     await app.query('SELECT * FROM uts.remove_org_member($1, $2, $3, 2)', [
       environment,
       orgId,
       member.accountId,
     ]);
-    await owner.query(
-      `UPDATE uts.org_bot_keys SET flagged_at = now() - interval '8 days' WHERE id = $1`,
-      [lapsed.id]
-    );
     const stale = await session({ accountId: admin.accountId, minutesAgo: 30 });
     expect(await account.keepBotKey({ environment, ...stale, orgId, keyId: fresh.id })).toBe(
       'gate_required'

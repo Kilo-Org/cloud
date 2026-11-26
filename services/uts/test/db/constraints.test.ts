@@ -777,7 +777,8 @@ describe('gate pass binding', () => {
       crypto.randomUUID(),
       await insertGatePass(writer, accountId, 'bot_key_create')
     );
-    await app.query(
+    // Only the account functions change bot keys (migration 0005); the trigger binds the owner too.
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
        WHERE id = $1`,
       [key.rows[0].id]
@@ -820,7 +821,7 @@ describe('gate pass binding', () => {
         crypto.randomUUID(),
         await insertGatePass(writer, accountId, 'bot_key_create')
       );
-      await app.query(
+      await writer.query(
         `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() WHERE id = $1`,
         [key.rows[0].id]
       );
@@ -842,12 +843,12 @@ describe('gate pass binding', () => {
       )
     ).toBe(CHECK_VIOLATION);
 
-    await app.query(
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'kept', kept_by = 'admin', kept_at = now()
        WHERE id = $1`,
       [await flaggedKey()]
     );
-    await app.query(
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
        WHERE id = $1`,
       [await flaggedKey()]

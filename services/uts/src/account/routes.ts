@@ -19,6 +19,7 @@ import { gateRequiredResponse } from '../gates/challenge';
 import { failureResponse } from '../oauth/errors';
 import { createSecret, lastFour, secretHash, type SecretKind } from '../pat/format';
 import { jsonResponse } from '../responses';
+import type { FeedPublish } from '../revocation/publish';
 import { credentialScopeCheck } from '../scopes/policy';
 import { type AccessTokenKeys, type AccountCaller, checkAccountBearer } from './bearer';
 import {
@@ -63,6 +64,8 @@ export type AccountDeps = {
   account: AccountAccess;
   keys: AccessTokenKeys;
   notices: CredentialNotices | null;
+  /** Writes a committed revoke's feed entries to the feed objects (src/revocation/publish.ts). */
+  publish: FeedPublish;
   context: WaitUntil;
   nowSeconds: () => number;
 };
@@ -287,15 +290,29 @@ async function createBotKey(
   }
 }
 
-function revokeResponse(outcome: RevokeBotKeyResult, config: UtsConfig): Response {
-  switch (outcome) {
+/** Seconds a client waits before it retries a revoke whose feed entry no feed object took. */
+const UNPUBLISHED_RETRY_SECONDS = 2;
+
+/**
+ * The answer to a PAT or bot key revoke. A revoke publishes the feed entry its statement wrote, as
+ * `/revoke` does (design 5.6): it answers 204 once one feed object confirms, and 503 when neither
+ * does; the revocation stands, the backfill adds the entry, and the retry finds it revoked.
+ */
+async function revokeResponse(
+  result: RevokeBotKeyResult,
+  deps: AccountDeps
+): Promise<Response> {
+  switch (result.outcome) {
     case 'revoked':
     case 'already_revoked':
+      if ((await deps.publish(result.feedEntries)) === 'unpublished') {
+        return dependencyUnavailable(UNPUBLISHED_RETRY_SECONDS);
+      }
       return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
     case 'not_found':
       return accountError('not_found', 404, 'no such credential');
     case 'invalid_session':
-      return invalidSession(config);
+      return invalidSession(deps.config);
     case 'not_org_admin':
       return notOrgAdmin();
   }
@@ -316,10 +333,10 @@ async function patRoute(
     return jsonResponse(body, 200);
   }
   if (request.method !== 'DELETE') return methodNotAllowed('DELETE');
-  const outcome = await deps.account(store =>
+  const result = await deps.account(store =>
     store.revokePat({ environment: deps.config.environment, ...caller, patId: route.patId })
   );
-  return revokeResponse(outcome, deps.config);
+  return await revokeResponse(result, deps);
 }
 
 async function botKeyRoute(
@@ -345,10 +362,10 @@ async function botKeyRoute(
     }
     case 'bot_key': {
       if (request.method !== 'DELETE') return methodNotAllowed('DELETE');
-      const outcome = await deps.account(store =>
+      const result = await deps.account(store =>
         store.revokeBotKey({ environment: deps.config.environment, ...session, keyId: route.keyId })
       );
-      return revokeResponse(outcome, deps.config);
+      return await revokeResponse(result, deps);
     }
     case 'bot_key_keep': {
       if (request.method !== 'POST') return methodNotAllowed('POST');

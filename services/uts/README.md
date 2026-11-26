@@ -140,12 +140,14 @@ configs (names, `eu` jurisdiction, placement, traces, the development config's d
 ### Revocation feed
 
 Design 5.6. Every revoking statement (`/revoke`, a second use of a code, a reused third-party
-token) writes its `uts.revocations` rows and returns them in the same statement
-(`uts.feed_entries_of_statement()`, migration 0006; one index probe, skipped on the issued path).
-After the commit the Worker writes them to both feed objects in parallel
-(`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2 seconds.
-`/revoke` answers 503 when neither confirms (the revocation stands, the backfill adds it); the
-reuse paths answer as before. A failed publish logs kinds and counts, never ids.
+token, a PAT or org bot key revoke on the account API) writes its `uts.revocations` rows and
+returns them in the same statement (`uts.feed_entries_of_statement()`, migration 0006; one index
+probe, skipped on the issued path). After the commit the Worker writes them to both feed objects
+in parallel (`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2
+seconds. `/revoke` and the account API's revokes answer 503 when neither confirms (the revocation
+stands, the backfill adds it, and the retry finds it revoked); the reuse paths answer as before. A
+failed publish logs kinds and counts, never ids. `uts.remove_org_member` has no Worker caller in
+this package, so the entries it writes reach the feed objects through the backfill.
 
 The two feed objects (`src/feed/UtsFeedDO.ts`) are named `<environment>:feed:<0|1>`, in the `eu`
 jurisdiction, feed 0 with the `weur` hint and feed 1 with `eeur`; only this Worker binds them, so

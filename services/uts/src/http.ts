@@ -18,6 +18,7 @@ import type { AddressWindows } from './pat/address-limit';
 import { identityStorePatLookup, lookupPatHash, patStoreBinding } from './pat/lookup';
 import { type PatProbeDeps, handlePatProbe } from './pat/probe';
 import { jsonResponse } from './responses';
+import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
 import type { SignerAccess } from './token/mint';
 
@@ -47,6 +48,7 @@ function accountDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): Accoun
       withIdentityStore(binding.connectionString, ctx, store => work(identityStoreAccount(store))),
     keys: shardAccessTokenKeys(env, config),
     notices: null,
+    publish: feedPublisher(env, config, ctx),
     context: ctx,
     nowSeconds: () => Math.floor(Date.now() / 1000),
   };

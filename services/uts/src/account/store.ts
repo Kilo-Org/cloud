@@ -7,6 +7,7 @@ import {
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { IdentityStore } from '../db/client';
+import { type FeedEntry, StatementFeedEntriesSchema } from '../revocation/entries';
 
 /**
  * The account API statements (migration `0005_pats_bot_keys_gates.sql`). Each call is one SQL
@@ -41,7 +42,12 @@ export type ListPatsResult =
   | { outcome: 'invalid_session' };
 
 export type RevokePatInput = AccountSession & { environment: UtsEnvironment; patId: string };
-export type RevokeResult = 'revoked' | 'already_revoked' | 'not_found' | 'invalid_session';
+export type RevokeOutcome = 'revoked' | 'already_revoked' | 'not_found' | 'invalid_session';
+/**
+ * The outcome and the feed entries the statement wrote (one for `revoked`, none otherwise), which
+ * the caller publishes to the feed objects (design 5.6).
+ */
+export type RevokeResult = { outcome: RevokeOutcome; feedEntries: FeedEntry[] };
 
 type OrgSession = AccountSession & { orgId: string };
 
@@ -62,7 +68,10 @@ export type ListBotKeysResult =
   | { outcome: 'invalid_session' | 'not_org_admin' };
 
 export type BotKeyActionInput = OrgSession & { environment: UtsEnvironment; keyId: string };
-export type RevokeBotKeyResult = RevokeResult | 'not_org_admin';
+export type RevokeBotKeyResult = {
+  outcome: RevokeOutcome | 'not_org_admin';
+  feedEntries: FeedEntry[];
+};
 export type KeepBotKeyResult =
   | 'kept'
   | 'not_flagged'
@@ -139,11 +148,20 @@ const ListPatsRowSchema = z.discriminatedUnion('outcome', [
 
 const RevokePatRowSchema = z.object({
   outcome: z.enum(['revoked', 'already_revoked', 'not_found', 'invalid_session']),
+  feed_entries: StatementFeedEntriesSchema,
 });
 
 const RevokeBotKeyRowSchema = z.object({
   outcome: z.enum(['revoked', 'already_revoked', 'not_found', 'invalid_session', 'not_org_admin']),
+  feed_entries: StatementFeedEntriesSchema,
 });
+
+/**
+ * The select list of a revoke function: its outcome, and for `revoked` the feed entries the
+ * statement wrote (`uts.feed_entries_of_statement()`, migration 0006), read in the same statement.
+ */
+const WITH_FEED_ENTRIES = `result.outcome, CASE WHEN result.outcome = 'revoked'
+  THEN uts.feed_entries_of_statement() ELSE '[]'::jsonb END AS feed_entries`;
 
 const CreateBotKeyRowSchema = z.discriminatedUnion('outcome', [
   z.object({
@@ -221,11 +239,11 @@ export function identityStoreAccount(store: IdentityStore): AccountStore {
 
     async revokePat(input) {
       const row = await one(
-        'SELECT * FROM uts.revoke_pat($1, $2, $3, $4)',
+        `SELECT ${WITH_FEED_ENTRIES} FROM uts.revoke_pat($1, $2, $3, $4) AS result`,
         [input.environment, input.accountId, input.grantId, input.patId],
         RevokePatRowSchema
       );
-      return row.outcome;
+      return { outcome: row.outcome, feedEntries: row.feed_entries };
     },
 
     async createBotKey(input) {
@@ -264,11 +282,11 @@ export function identityStoreAccount(store: IdentityStore): AccountStore {
 
     async revokeBotKey(input) {
       const row = await one(
-        'SELECT * FROM uts.revoke_bot_key($1, $2, $3, $4, $5)',
+        `SELECT ${WITH_FEED_ENTRIES} FROM uts.revoke_bot_key($1, $2, $3, $4, $5) AS result`,
         [input.environment, input.accountId, input.grantId, input.orgId, input.keyId],
         RevokeBotKeyRowSchema
       );
-      return row.outcome;
+      return { outcome: row.outcome, feedEntries: row.feed_entries };
     },
 
     async keepBotKey(input) {

@@ -21,10 +21,11 @@ import {
   handleAccountRequest,
 } from '../../src/account/routes';
 import type { AccountAccess, AccountStore } from '../../src/account/store';
+import type { FeedEntry } from '../../src/revocation/entries';
 import type { SignableClaims } from '../../src/keys/claims';
 import { getSignerStub } from '../../src/dos/stubs';
 import { isWellFormedSecret, lastFour } from '../../src/pat/format';
-import { storeFailure } from './oauth-support';
+import { recordingPublisher, storeFailure } from './oauth-support';
 import { claims } from './support';
 import { config, env } from './test-env';
 
@@ -93,6 +94,7 @@ function deps(
     account,
     keys: shardAccessTokenKeys(env, config),
     notices: null,
+    publish: recordingPublisher().publish,
     context: { waitUntil: promise => waited.push(promise) },
     nowSeconds: () => Math.floor(Date.now() / 1000),
     waited,
@@ -118,6 +120,12 @@ async function call(req: Request, accountDeps: AccountDeps): Promise<Response> {
 }
 
 const created = { id: crypto.randomUUID(), createdAt: new Date(), expiresAt: new Date() };
+
+/** The feed entry a PAT or bot key revoke returns (a 15-minute entry). */
+function credentialEntry(kind: 'pat' | 'bot_key', id: string): FeedEntry {
+  const now = Date.now();
+  return { kind, id, revokedBefore: null, revokedAt: now, expiresAt: now + 15 * 60_000 };
+}
 
 describe('account API authentication', () => {
   const unused = fakeAccount({});
@@ -401,21 +409,43 @@ describe('PAT routes', () => {
     }
   });
 
-  it('revokes idempotently and answers 404 for no such PAT', async () => {
-    for (const [outcome, status] of [
-      ['revoked', 204],
-      ['already_revoked', 204],
-      ['not_found', 404],
-      ['invalid_session', 401],
+  it('revokes idempotently, publishes the feed entry, and answers 404 for no such PAT', async () => {
+    const entry = credentialEntry('pat', created.id);
+    for (const [outcome, feedEntries, status] of [
+      ['revoked', [entry], 204],
+      ['already_revoked', [], 204],
+      ['not_found', [], 404],
+      ['invalid_session', [], 401],
     ] as const) {
-      const fake = fakeAccount({ revokePat: async () => outcome });
+      const fake = fakeAccount({
+        revokePat: async () => ({ outcome, feedEntries: [...feedEntries] }),
+      });
+      const feed = recordingPublisher();
       const response = await call(
         request(`/account/pats/${created.id}`, { method: 'DELETE', token: await accessToken() }),
-        deps(fake.access)
+        deps(fake.access, { publish: feed.publish })
       );
       expect(response.status).toBe(status);
       expect(fake.calls[0].input).toMatchObject({ patId: created.id, grantId: GRANT });
+      expect(feed.batches).toEqual(status === 204 ? [[...feedEntries]] : []);
     }
+  });
+
+  it('answers 503 when no feed object took the entry, and the retry finds it revoked', async () => {
+    const fake = fakeAccount({
+      revokePat: async () => ({
+        outcome: 'revoked',
+        feedEntries: [credentialEntry('pat', created.id)],
+      }),
+    });
+    const feed = recordingPublisher('unpublished');
+    const response = await call(
+      request(`/account/pats/${created.id}`, { method: 'DELETE', token: await accessToken() }),
+      deps(fake.access, { publish: feed.publish })
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('2');
+    expect(feed.batches).toHaveLength(1);
   });
 
   it('answers 503 for a retryable store failure and 500 for any other', async () => {
@@ -550,16 +580,21 @@ describe('org bot key routes', () => {
     expect(fake.calls[0].input).toMatchObject({ orgId: ORG, keyId });
   });
 
-  it('revokes a key', async () => {
-    const fake = fakeAccount({ revokeBotKey: async () => 'revoked' });
+  it('revokes a key and publishes its feed entry', async () => {
     const keyId = crypto.randomUUID();
+    const entry = credentialEntry('bot_key', keyId);
+    const fake = fakeAccount({
+      revokeBotKey: async () => ({ outcome: 'revoked', feedEntries: [entry] }),
+    });
+    const feed = recordingPublisher();
     const response = await call(
       request(`/account/orgs/${ORG}/bot-keys/${keyId}`, {
         method: 'DELETE',
         token: await botToken(),
       }),
-      deps(fake.access)
+      deps(fake.access, { publish: feed.publish })
     );
     expect(response.status).toBe(204);
+    expect(feed.batches).toEqual([[entry]]);
   });
 });

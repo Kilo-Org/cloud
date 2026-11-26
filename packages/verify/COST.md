@@ -45,9 +45,17 @@ While an isolate serves traffic, under the request's `waitUntil`; an idle isolat
 - These totals depend on the number of warm instances, not on the client count: 10,000, 50,000 or
   200,000 clients only change how many instances are warm. The table is the upper bound for all
   three, at the peak instance counts above.
-- The ±20 % jitter keeps the mean interval at 4 minutes (minus `Age`), so the totals stand; it only
-  spreads the fetches. When every UTS signer read fails, `Age` grows past the refresh point and
-  each fetch counts as failed: the isolate moves to the retry waits of section 4.
+- The ±20 % jitter keeps the mean interval at 4 minutes (minus `Age`), so the totals stand; it
+  spreads the background refreshes and the retry waits, but not the 24-hour limit below. When every
+  UTS signer read fails, `Age` grows past the refresh point and each fetch counts as failed: the
+  isolate moves to the first row of the table in section 4 (5 s doubling to 60 s), and stays on
+  it past the 24-hour limit.
+- **The 24-hour burst.** A held UTS set stops serving 24 hours after its oldest keys were read,
+  and the library refreshes at once at that point (design 5.7). Every warm isolate holds the same
+  oldest-read time (to the second), so each one makes one fetch within about 1 s: about 7,200 at
+  5,000 Worker isolates plus 2,200 Vercel instances. The feed Worker must answer that burst from
+  its per-data-centre cache, not with one signer read per request. A failed refresh then backs off
+  as in section 4, each wait jittered.
 
 **Releases.** A release cold-starts the instances of the released service. With `warm` and the
 bootstrap port, a cold instance makes 2 fetches in parallel (UTS bootstrap, STS key set), down from
@@ -68,11 +76,16 @@ so cancelling requests cannot raise any rate below.
 
 | Dependency down | Retry waits per isolate | Steady rate per isolate | 5,000 isolates | 2,200 instances |
 |---|---|---|---|---|
-| UTS key set, last good set serving (up to 24 h), or every answer past the refresh point | 5, 10, 20, 40, 60, 60 … s, each ±20 % | 1/min, after about 2 min | 83/s | 37/s |
+| UTS key set, last good set serving (up to 24 h), every answer past the refresh point, or a held set past its 24-hour limit | 5, 10, 20, 40, 60, 60 … s, each ±20 %; the count restarts only after a success | 1/min, after about 2 min | 83/s | 37/s |
 | STS key set, set expired (it never serves past 5 min, so STS routes get 503) | 5 s ±20 % | 12/min | 1,000/s | 440/s |
 | Either key set, cold isolate (no set) | 5 s ±20 % | 12/min | only cold isolates | only cold instances |
 | Revocation feed, copy serving short tokens (head up to 10 min) | 5, 10, 20, 30, 30 … s | 2/min, after about 1 min | 167/s | 73/s |
 | Bootstrap, cold isolate | 5 s fixed | 12/min | only cold isolates | only cold instances |
+
+A UTS outage longer than 24 hours keeps the 60 s cadence: once the held set passes its limit,
+requests get 503, and the first fetch after UTS recovers comes at most about 60 s later (72 s with
+the jitter). That is the cost of not raising the feed load to the 5 s rate of a cold isolate
+(1,000/s at 5,000 isolates) for the rest of the outage.
 
 First minute of a UTS key-set outage: fetches at 0, 5, 15 and 35 s, so 4 per isolate (333/s at
 5,000 isolates, falling to 83/s). An STS outage keeps the 5 s wait, because no STS copy serves and

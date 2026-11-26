@@ -5,7 +5,9 @@
  * `_sample_interval` weighting for correct results under AE sampling.
  */
 
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
+import { readO11ySecret } from '../secrets';
 
 export type AeQueryEnv = {
   O11Y_CF_ACCOUNT_ID: string;
@@ -32,8 +34,12 @@ export type ErrorRateBaselineRow = {
 // _sample_interval scales rows back to full volume when AE sampling is enabled.
 // https://developers.cloudflare.com/analytics/analytics-engine/sql-api/#sampling
 
-async function queryAnalyticsEngine<T>(sql: string, env: AeQueryEnv): Promise<T[]> {
-  const apiToken = await env.O11Y_CF_AE_API_TOKEN.get();
+async function queryAnalyticsEngine<T>(
+  sql: string,
+  env: AeQueryEnv,
+  ctx?: SecretsExecutionContext
+): Promise<T[]> {
+  const apiToken = await readO11ySecret(env, 'O11Y_CF_AE_API_TOKEN', ctx);
   const url = `https://api.cloudflare.com/client/v4/accounts/${env.O11Y_CF_ACCOUNT_ID}/analytics_engine/sql`;
 
   const response = await fetch(url, {
@@ -59,7 +65,8 @@ async function queryAnalyticsEngine<T>(sql: string, env: AeQueryEnv): Promise<T[
 export function queryErrorRates(
   windowMinutes: number,
   minRequests: number,
-  env: AeQueryEnv
+  env: AeQueryEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<ErrorRateRow[]> {
   const sql = `
 		SELECT
@@ -75,7 +82,7 @@ export function queryErrorRates(
 		HAVING weighted_total >= ${minRequests}
 		FORMAT JSON
 	`;
-  return queryAnalyticsEngine<ErrorRateRow>(sql, env);
+  return queryAnalyticsEngine<ErrorRateRow>(sql, env, ctx);
 }
 
 const MODEL_ID_PATTERN = /^[A-Za-z0-9._:/@~-]+$/;
@@ -113,7 +120,8 @@ export function parseModelId(value: string): string {
 
 export async function queryErrorRateBaseline(
   model: string,
-  env: AeQueryEnv
+  env: AeQueryEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<ErrorRateBaselineRow | null> {
   const modelValue = escapeSqlString(parseModelId(model));
   const sql = `
@@ -129,7 +137,7 @@ export async function queryErrorRateBaseline(
 		FORMAT JSON
 	`;
 
-  const rows = await queryAnalyticsEngine<ErrorRateBaselineRow>(sql, env);
+  const rows = await queryAnalyticsEngine<ErrorRateBaselineRow>(sql, env, ctx);
   return rows[0] ?? null;
 }
 
@@ -154,7 +162,8 @@ export function queryTtfbExceedRates(
   windowMinutes: number,
   minRequests: number,
   thresholdMs: number,
-  env: AeQueryEnv
+  env: AeQueryEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<TtfbExceedRow[]> {
   const sql = `
 		SELECT
@@ -171,7 +180,7 @@ export function queryTtfbExceedRates(
 		HAVING weighted_total >= ${minRequests}
 		FORMAT JSON
 	`;
-  return queryAnalyticsEngine<TtfbExceedRow>(sql, env);
+  return queryAnalyticsEngine<TtfbExceedRow>(sql, env, ctx);
 }
 
 export type TtfbBaselineRow = {
@@ -193,7 +202,11 @@ type TtfbBaseline3dRow = {
  * Uses quantileExactWeighted for correct results under AE sampling.
  * Only considers successful requests (blob4 = '0').
  */
-export async function queryTtfbBaseline(model: string, env: AeQueryEnv): Promise<TtfbBaselineRow> {
+export async function queryTtfbBaseline(
+  model: string,
+  env: AeQueryEnv,
+  ctx?: SecretsExecutionContext
+): Promise<TtfbBaselineRow> {
   const modelValue = escapeSqlString(parseModelId(model));
   const sql = `
 		SELECT
@@ -207,7 +220,7 @@ export async function queryTtfbBaseline(model: string, env: AeQueryEnv): Promise
 		FORMAT JSON
 	`;
 
-  const rows = await queryAnalyticsEngine<TtfbBaseline3dRow>(sql, env);
+  const rows = await queryAnalyticsEngine<TtfbBaseline3dRow>(sql, env, ctx);
   const row = rows[0];
 
   return {

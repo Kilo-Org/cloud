@@ -144,7 +144,9 @@ function createNativeRequest(body: unknown): NextRequest {
 }
 
 // An enrollment notice leaves an outbox row that references its user; a later
-// suite in the same worker that deletes every user would hit it.
+// suite in the same worker that deletes every user would hit it. Each suite
+// that inserts users deletes those rows in its own afterAll, which runs before
+// the worker setup's root afterAll closes the database connections.
 const createdUserIds: string[] = [];
 
 async function insertUser(fields: Partial<User> = {}): Promise<User> {
@@ -153,13 +155,12 @@ async function insertUser(fields: Partial<User> = {}): Promise<User> {
   return created;
 }
 
-afterAll(async () => {
-  if (createdUserIds.length > 0) {
-    await db
-      .delete(transactional_email_log)
-      .where(inArray(transactional_email_log.user_id, createdUserIds));
-  }
-});
+async function deleteCreatedUsersNoticeRows(): Promise<void> {
+  if (createdUserIds.length === 0) return;
+  await db
+    .delete(transactional_email_log)
+    .where(inArray(transactional_email_log.user_id, createdUserIds));
+}
 
 describe('POST /api/auth/passkey/register', () => {
   beforeEach(async () => {
@@ -557,6 +558,8 @@ describe('POST /api/auth/passkey/register (native app)', () => {
   let user: User;
   let deviceSessionId: string;
 
+  afterAll(deleteCreatedUsersNoticeRows);
+
   beforeEach(async () => {
     jest.clearAllMocks();
     rateLimitTest.resetReportThrottle();
@@ -818,6 +821,8 @@ describe('POST /api/auth/passkey/register (native app)', () => {
 describe('POST /api/auth/passkey/register (browser email code)', () => {
   const sessionPepper = 'browser-session-pepper';
   let user: User;
+
+  afterAll(deleteCreatedUsersNoticeRows);
 
   function signIn(webSessionId: string, authenticatedAt = Math.floor(Date.now() / 1000)) {
     mockGetUserFromAuth.mockResolvedValue({

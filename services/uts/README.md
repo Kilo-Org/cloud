@@ -196,11 +196,13 @@ failed signing no token carries those ids, and the retry's row (`token.issued`, 
 `code_retry`) lists the ids of the tokens it signs.
 
 A blocked third-party client (`uts.third_party_clients.status`) gets nothing more: the code
-exchange, the refresh read and the introspection read each check the client's status, and the
-trigger `third_party_clients_end_families` revokes every live family of the client when it is
-blocked, with one feed entry each (`revoke_reason` `client_blocked`), so its live access tokens
-stop at the verifiers too and an unblock brings no family back. The trigger writes no audit row;
-the operator action that blocks the client writes it.
+exchange, the refresh read and the introspection read each check the client's status, so the
+status change alone stops it at once. `uts.maintain_oauth_rows()` then revokes the client's live
+families, at most 5,000 per call, each with its feed entry (`revoke_reason` `client_blocked`), so
+its live access tokens stop at the verifiers within one cron cycle plus feed propagation (they
+expire within 10 minutes anyway) and an unblock brings no family back. The block itself stays one
+short statement whatever the client's family count. The batches write no audit row; the operator
+action that blocks the client writes it.
 
 ## Tests
 
@@ -455,26 +457,30 @@ current token row; each refresh replaces it and keeps the replaced token as a to
 `third_party_rotated_tokens` (16-byte key, family id, family end) until the family is past its
 90-day end (below). A tombstone with its two index entries takes about 120 bytes. As an upper
 bound, with every family refreshing every 8 minutes, a family gathers 90 days / 8 minutes =
-16,200 tombstones by its end, and families of evenly spread ages hold half that on average:
+16,200 tombstones by its end. Size the disk on the "at most" column: tombstones of a revoked
+family stay until its 90-day end too, and a client that authorizes again often (a lost rotation
+answer revokes its family) keeps close to that bound. The average assumes families of evenly
+spread ages:
 
-| Active third-party families | Tombstones, average | Table and indexes, average | At most (every family at its end) |
+| Active third-party families | Tombstones, at most | Table and indexes, at most (disk sizing) | Average (evenly spread ages) |
 |---|---|---|---|
-| 10k | 81M | ~10 GB | ~19 GB |
-| 50k | 405M | ~49 GB | ~97 GB |
-| 200k | 1.62B | ~194 GB | ~389 GB |
+| 10k | 162M | ~19 GB | ~10 GB |
+| 50k | 810M | ~97 GB | ~49 GB |
+| 200k | 3.24B | ~389 GB | ~194 GB |
 
 ### OAuth row maintenance
 
 The app login cannot delete credential rows, so `uts.maintain_oauth_rows()` (SECURITY DEFINER)
-removes the rows no statement reads again. Each call deletes at most 5,000 rows of each kind and
-returns one `(kind, deleted)` row per kind. Like `uts.maintain_audit_partitions()`, it has no
-caller in this service yet: the UTS cron that slice 3.9 adds calls both, this one until every
-count is under 5,000. `uts_app` holds EXECUTE on it by choice until then; it takes no input and
-every delete is time-gated, so a caller can only remove dead rows sooner. Slice 3.9 moves it to a
-dedicated maintenance role. It deletes:
+removes the rows no statement reads again and ends the families of blocked clients. Each call
+handles at most 5,000 rows of each kind and returns one `(kind, deleted)` row per kind. Like
+`uts.maintain_audit_partitions()`, it has no caller in this service yet: the UTS cron that slice
+3.9 adds calls both, this one until every count is under 5,000. `uts_app` holds EXECUTE on it by
+choice until then; it takes no input and every step is time- or status-gated, so a caller can
+only do the same work sooner. Slice 3.9 moves it to a dedicated maintenance role. It handles:
 
 | Rows | When | Why that is safe |
 |---|---|---|
+| `blocked_client_families` | A live family of a blocked client: revoked (`client_blocked`) with its feed entry, not deleted; rows a refresh holds wait for the next call (`SKIP LOCKED`) | Every read already refuses the blocked client, so the batch only makes the revocation reach the verifiers |
 | `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
 | `third_party_refresh_tokens` | The current token of a family that is revoked or past its 90-day end | It fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
 | `third_party_rotated_tokens` | Past the family's 90-day end, oldest first | No token of the family can be issued or refreshed again, so no reuse check needs the tombstone. Until then a replaced token that comes back revokes the family, however long ago it was replaced |

@@ -384,30 +384,17 @@ BEGIN
 END
 $$;
 
--- Blocking a third-party client (design 5.9) ends every family it holds, each with its feed
--- entry, so the client's live access tokens stop at the verifiers too and unblocking it brings no
--- family back. Every statement that reads a family also checks its client, so refresh, code
--- exchange and introspection stop at once even before this runs. Like
--- `uts.flag_bot_keys_of_deleted_account`, the trigger writes no audit row: the statement that
--- blocks the client writes it, with the operator as the actor (design 8.1).
+-- Blocking a third-party client (design 5.9) is the status change alone: every statement that
+-- reads a family also checks its client, so code exchange, refresh and introspection stop at
+-- once. `uts.maintain_oauth_rows()` then ends the client's live families in batches, each with
+-- its feed entry, so its access tokens stop at the verifiers too and an unblock brings no family
+-- back. Ending them in the blocking statement would grow with the client's families and hold
+-- every family row lock until it ends. The status change writes its own audit row, with the
+-- operator as the actor (design 8.1); the batches write none.
 CREATE INDEX third_party_grant_families_client_idx ON uts.third_party_grant_families (client_id)
   WHERE status = 'active';
-CREATE FUNCTION uts.end_families_of_blocked_client() RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $$
-BEGIN
-  PERFORM uts.end_grant('third_party', family.id, 'client_blocked')
-  FROM uts.third_party_grant_families AS family
-  WHERE family.client_id = NEW.client_id AND family.status = 'active';
-  RETURN NEW;
-END
-$$;
-CREATE TRIGGER third_party_clients_end_families
-  AFTER UPDATE OF status ON uts.third_party_clients
-  FOR EACH ROW WHEN (OLD.status = 'active' AND NEW.status = 'blocked')
-  EXECUTE FUNCTION uts.end_families_of_blocked_client();
+CREATE INDEX third_party_clients_blocked_idx ON uts.third_party_clients (client_id)
+  WHERE status = 'blocked';
 
 -- Whether a refused attempt on a grant writes its denied audit row: true for the first refusal in
 -- a minute, which claims that minute; false while the grant's last denied row is under a minute
@@ -477,7 +464,7 @@ BEGIN
     WHERE membership.org_id = p_org_id AND membership.account_id = p_account_id;
   END IF;
   IF account_state IS DISTINCT FROM 'active'
-    OR NOT uts.org_requirement_met(p_org_id, membership_state, enforcement, p_amr::uts.auth_method[])
+    OR uts.org_requirement_met(p_org_id, membership_state, enforcement, p_amr::uts.auth_method[]) IS NOT TRUE
   THEN
     outcome := 'access_denied';
     RETURN NEXT;
@@ -669,7 +656,7 @@ BEGIN
     WHERE membership.org_id = code.org_id AND membership.account_id = code.account_id;
   END IF;
   IF account_state IS DISTINCT FROM 'active'
-    OR NOT uts.org_requirement_met(code.org_id, membership_state, enforcement, code.amr)
+    OR uts.org_requirement_met(code.org_id, membership_state, enforcement, code.amr) IS NOT TRUE
     OR (code.client_kind = 'third_party' AND NOT EXISTS (
       SELECT 1 FROM uts.third_party_consents AS consent
       JOIN uts.third_party_clients AS client ON client.client_id = consent.client_id
@@ -849,9 +836,9 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT uts.org_requirement_met(
+  IF uts.org_requirement_met(
     grant_row.org_id, grant_row.membership_status, grant_row.sso_enforcement, grant_row.amr
-  ) THEN
+  ) IS NOT TRUE THEN
     outcome := 'invalid_grant';
     RETURN NEXT;
     RETURN;
@@ -977,9 +964,9 @@ BEGIN
     OR presented.client_status IS DISTINCT FROM 'active'
     OR presented.consent_status IS DISTINCT FROM 'active'
     OR presented.account_status IS DISTINCT FROM 'active'
-    OR NOT uts.org_requirement_met(
+    OR uts.org_requirement_met(
       presented.org_id, presented.membership_status, presented.sso_enforcement, presented.amr
-    )
+    ) IS NOT TRUE
   THEN
     outcome := 'invalid_grant';
     RETURN NEXT;
@@ -1155,9 +1142,9 @@ BEGIN
       OR grant_row.account_status IS DISTINCT FROM 'active'
       OR grant_row.expires_at <= now()
       OR grant_row.idle_expires_at <= now()
-      OR NOT uts.org_requirement_met(
+      OR uts.org_requirement_met(
         grant_row.org_id, grant_row.membership_status, grant_row.sso_enforcement, grant_row.amr
-      )
+      ) IS NOT TRUE
     THEN
       outcome := 'inactive';
       RETURN NEXT;
@@ -1201,7 +1188,7 @@ BEGIN
     AND client.status = 'active'
     AND consent.status = 'active'
     AND account.status = 'active'
-    AND uts.org_requirement_met(family.org_id, membership.status, policy.enforcement, family.amr);
+    AND uts.org_requirement_met(family.org_id, membership.status, policy.enforcement, family.amr) IS TRUE;
   outcome := CASE WHEN FOUND THEN 'active' ELSE 'inactive' END;
   RETURN NEXT;
 END
@@ -1215,6 +1202,9 @@ $$;
 -- tokens, or a code within its lifetime:
 -- * authorization codes 1 hour past their 60-second lifetime, used or not (until then a second
 --   use of a used code still revokes its grant);
+-- * the live families of a blocked third-party client (not a deletion: each is revoked with
+--   reason `client_blocked` and its feed entry, through `third_party_clients_blocked_idx` and
+--   `third_party_grant_families_client_idx`; rows a refresh holds are left for the next call);
 -- * the current token of a third-party family that ended (revoked, or past its 90-day end): it
 --   already fails on the family's status;
 -- * tombstones of replaced third-party tokens once their family is past its 90-day end, oldest
@@ -1231,6 +1221,28 @@ AS $$
 DECLARE
   batch CONSTANT integer := 5000;
 BEGIN
+  WITH ended AS (
+    UPDATE uts.third_party_grant_families AS family
+    SET status = 'revoked', revoked_at = now(), revoke_reason = 'client_blocked'
+    WHERE family.id IN (
+      SELECT live.id
+      FROM uts.third_party_clients AS client
+      JOIN uts.third_party_grant_families AS live
+        ON live.client_id = client.client_id AND live.status = 'active'
+      WHERE client.status = 'blocked'
+      LIMIT batch
+      FOR UPDATE OF live SKIP LOCKED
+    ) AND family.status = 'active'
+    RETURNING family.id
+  ), fed AS (
+    INSERT INTO uts.revocations (kind, subject_id, feed_expires_at)
+    SELECT 'third_party_family', ended.id::text, now() + interval '20 minutes' FROM ended
+    ON CONFLICT ON CONSTRAINT revocations_kind_subject_key DO NOTHING
+  )
+  SELECT count(*)::integer INTO deleted FROM ended;
+  kind := 'blocked_client_families';
+  RETURN NEXT;
+
   DELETE FROM uts.authorization_codes AS code
   WHERE code.code_hash IN (
     SELECT stale.code_hash FROM uts.authorization_codes AS stale

@@ -1175,10 +1175,18 @@ describe('introspection', () => {
 });
 
 describe('a blocked third-party client', () => {
-  it('ends every family of the client with a feed entry, and stops its refresh, introspection and code exchange', async () => {
+  it('refuses refresh, introspection and code exchange at once, then ends every family over successive maintenance calls', async () => {
     const accountId = await insertAccount(owner);
     const family = await thirdPartyFamily(accountId);
     const other = await thirdPartyFamily(accountId);
+    // More live families of the client than one maintenance batch (5,000).
+    await owner.query(
+      `INSERT INTO uts.third_party_grant_families
+         (account_id, client_id, consent_id, scopes, auth_time, amr, expires_at)
+       SELECT $1, $2, $3, '{mcp:tools.read}', now(), '{oauth}', now() + interval '90 days'
+       FROM generate_series(1, 5000)`,
+      [accountId, family.clientId, family.consentId]
+    );
     // A code of the same client, issued before the block and not yet exchanged.
     const code = token();
     const challenge = sha256(token()).toString('base64url');
@@ -1199,34 +1207,21 @@ describe('a blocked third-party client', () => {
       })
     ).toBe('issued');
 
-    // The app login blocks the client; the trigger ends its families.
+    // The block is the status change alone: no family changes in that statement.
     await app.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [
       family.clientId,
     ]);
-    const families = await owner.query(
-      'SELECT id, status, revoke_reason FROM uts.third_party_grant_families WHERE account_id = $1',
-      [accountId]
-    );
-    expect(families.rows).toEqual(
-      expect.arrayContaining([
-        { id: family.familyId, status: 'revoked', revoke_reason: 'client_blocked' },
-        { id: other.familyId, status: 'active', revoke_reason: null },
-      ])
-    );
-    const feed = await owner.query('SELECT kind FROM uts.revocations WHERE subject_id = $1', [
-      family.familyId,
-    ]);
-    expect(feed.rows).toEqual([{ kind: 'third_party_family' }]);
+    const live = async () =>
+      (
+        await owner.query<{ live: number }>(
+          `SELECT count(*)::int AS live FROM uts.third_party_grant_families
+           WHERE client_id = $1 AND status = 'active'`,
+          [family.clientId]
+        )
+      ).rows[0].live;
+    expect(await live()).toBe(5001);
 
-    // A family that is active again stays refused while its client is blocked.
-    await owner.query(
-      `UPDATE uts.third_party_grant_families
-       SET status = 'active', revoked_at = NULL, revoke_reason = NULL WHERE id = $1`,
-      [family.familyId]
-    );
-    expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
-      outcome: 'invalid_grant',
-    });
+    // Every path refuses the blocked client at once.
     expect(
       await grants.introspect({
         tokenHash: sha256(family.refreshToken),
@@ -1234,6 +1229,9 @@ describe('a blocked third-party client', () => {
         proof: null,
       })
     ).toEqual({ outcome: 'inactive' });
+    expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
+      outcome: 'invalid_grant',
+    });
     expect(
       await grants.exchangeCode({
         ...family.exchange,
@@ -1243,6 +1241,36 @@ describe('a blocked third-party client', () => {
         refreshTokenHash: sha256(token()),
       })
     ).toEqual({ outcome: 'invalid_grant' });
+
+    // Maintenance ends the families one batch per call, each with its feed entry.
+    const ended = async () =>
+      (
+        await app.query<{ kind: string; deleted: number }>(
+          'SELECT kind, deleted FROM uts.maintain_oauth_rows()'
+        )
+      ).rows.find(row => row.kind === 'blocked_client_families')?.deleted;
+    expect(await ended()).toBe(5000);
+    expect(await live()).toBe(1);
+    expect(await ended()).toBe(1);
+    expect(await ended()).toBe(0);
+    expect(await live()).toBe(0);
+    const feed = await owner.query<{ entries: number; reasons: string[] }>(
+      `SELECT count(entry.id)::int AS entries, array_agg(DISTINCT family.revoke_reason::text) AS reasons
+       FROM uts.third_party_grant_families AS family
+       LEFT JOIN uts.revocations AS entry
+         ON entry.kind = 'third_party_family' AND entry.subject_id = family.id::text
+       WHERE family.client_id = $1`,
+      [family.clientId]
+    );
+    expect(feed.rows).toEqual([{ entries: 5001, reasons: ['client_blocked'] }]);
+
+    // An unblock brings no family back; another client's family is untouched.
+    await app.query(`UPDATE uts.third_party_clients SET status = 'active' WHERE client_id = $1`, [
+      family.clientId,
+    ]);
+    expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
+      outcome: 'invalid_grant',
+    });
     expect((await refreshThirdParty(other.clientId, other.refreshToken).result).outcome).toBe(
       'issued'
     );
@@ -1461,6 +1489,7 @@ describe('OAuth row maintenance', () => {
     const first = await counts();
     expect(Object.keys(first).sort()).toEqual([
       'authorization_codes',
+      'blocked_client_families',
       'dpop_proofs',
       'revocations',
       'third_party_refresh_tokens',
@@ -1473,6 +1502,7 @@ describe('OAuth row maintenance', () => {
     expect(first.dpop_proofs).toBeGreaterThanOrEqual(1);
     expect(await counts()).toEqual({
       authorization_codes: 0,
+      blocked_client_families: 0,
       dpop_proofs: 0,
       revocations: 0,
       third_party_refresh_tokens: 0,

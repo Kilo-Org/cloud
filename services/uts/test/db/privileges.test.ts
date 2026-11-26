@@ -133,6 +133,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
       'SELECT kind FROM uts.maintain_oauth_rows()'
     );
     expect(maintenance.rows.map(row => row.kind)).toEqual([
+      'blocked_client_families',
       'authorization_codes',
       'third_party_refresh_tokens',
       'third_party_rotated_tokens',

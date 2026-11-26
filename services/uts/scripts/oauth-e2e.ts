@@ -451,26 +451,36 @@ async function main() {
     refresh_token: t3,
     client_id: THIRD_PARTY,
   });
-  const blockedFamily = (
-    await admin.query<{ status: string; revoke_reason: string | null; feed: number }>(
-      `SELECT family.status, family.revoke_reason,
-              (SELECT count(*)::int FROM uts.revocations AS entry
-               WHERE entry.kind = 'third_party_family' AND entry.subject_id = family.id::text) AS feed
-       FROM uts.third_party_refresh_tokens AS token
-       JOIN uts.third_party_grant_families AS family ON family.id = token.family_id
-       WHERE token.token_hash = $1`,
-      [sha256(t3)]
-    )
-  ).rows[0];
+  const familyOfT3 = async () =>
+    (
+      await admin.query<{ status: string; revoke_reason: string | null; feed: number }>(
+        `SELECT family.status, family.revoke_reason,
+                (SELECT count(*)::int FROM uts.revocations AS entry
+                 WHERE entry.kind = 'third_party_family' AND entry.subject_id = family.id::text) AS feed
+         FROM uts.authorization_codes AS code
+         JOIN uts.third_party_grant_families AS family ON family.id = code.grant_id
+         WHERE code.code_hash = $1`,
+        [sha256(againCode)]
+      )
+    ).rows[0];
   log('refresh after the client is blocked', {
     status: blockedRefresh.status,
     body: blockedRefresh.body,
-    family: blockedFamily,
+    family: await familyOfT3(),
   });
   log(
     'introspect after the block',
     (await post('/introspect', { token: t3, client_id: THIRD_PARTY })).body
   );
+  // The row-maintenance cron ends the blocked client's families in batches.
+  const maintained = await admin.query<{ kind: string; deleted: number }>(
+    'SELECT kind, deleted FROM uts.maintain_oauth_rows()'
+  );
+  log('maintenance after the block', {
+    blockedClientFamilies: maintained.rows.find(row => row.kind === 'blocked_client_families')
+      ?.deleted,
+    family: await familyOfT3(),
+  });
 
   // Timing of the first-party mint path, before the grant is revoked.
   const http: number[] = [];

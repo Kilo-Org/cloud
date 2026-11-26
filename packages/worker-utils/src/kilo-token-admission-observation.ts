@@ -20,6 +20,8 @@ import {
  * compatibility dates from 2025-04-01.
  */
 export const KILO_TOKEN_ADMISSION_OBSERVATION_FLAG = 'KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED';
+/** The one owned synthetic subject whose accepted single-audience tokens prove delivery. */
+export const KILO_TOKEN_ADMISSION_CONTROL_SUBJECT = 'KILO_TOKEN_ADMISSION_CONTROL_SUBJECT';
 
 export type KiloTokenAdmissionBoundary = 'web_bearer' | 'resource' | 'policy' | 'exact_audience';
 
@@ -35,6 +37,12 @@ export type KiloTokenAdmissionLine = {
    * labelling; `aud_set` can collapse unknown or repeated names into one label.
    */
   multi: boolean;
+  /**
+   * An accepted single-audience or audience-less token of the configured
+   * control subject that is not an internal bot token. A control line never
+   * enters a multi-audience or cohort count.
+   */
+  control: boolean;
   /** Labelled audiences in fixed order joined with `+`; `none` when absent. */
   aud_set: string;
   issuer: 'runtime_authorization' | 'cloud_agent_authority' | 'internal_bot' | 'unknown';
@@ -67,6 +75,37 @@ export function isKiloTokenAdmissionObservationEnabled(): boolean {
 
 export function isMultiAudience(aud: unknown): boolean {
   return Array.isArray(aud) && aud.length > 1;
+}
+
+/**
+ * The configured control subject, or null. A value with surrounding or inner
+ * whitespace, a comma, or the `bot-` prefix of bot accounts configures none.
+ */
+export function parseAdmissionControlSubject(raw: string): string | null {
+  return raw === '' || /[\s,]/.test(raw) || raw.startsWith('bot-') ? null : raw;
+}
+
+// Parsed once per distinct value: a verified token costs one string compare.
+let parsedControlRaw: string | undefined;
+let controlSubject: string | null = null;
+
+/**
+ * True for the signed claims of the configured control subject that are
+ * neither an internal bot token nor multi-audience. Call only while
+ * observation is enabled.
+ */
+export function isAdmissionControl(claims: { readonly [claim: string]: unknown }): boolean {
+  const raw = process.env?.[KILO_TOKEN_ADMISSION_CONTROL_SUBJECT] ?? '';
+  if (raw !== parsedControlRaw) {
+    parsedControlRaw = raw;
+    controlSubject = parseAdmissionControlSubject(raw);
+  }
+  return (
+    controlSubject !== null &&
+    claims.kiloUserId === controlSubject &&
+    claims.tokenSource !== 'internal-bot' &&
+    !isMultiAudience(claims.aud)
+  );
 }
 
 // Bit of one audience name in `AUDIENCE_LABELS`; every unlisted name is `other`.
@@ -109,21 +148,26 @@ export function writeKiloTokenAdmissionLine(line: KiloTokenAdmissionLine): void 
 
 /**
  * Reports a shared verifier's acceptance of a token that names more than one
- * audience. Positional arguments keep the disabled path free of allocation.
+ * audience, or of a control token. Positional arguments keep the disabled path
+ * free of allocation.
  */
 export function observeSharedVerifierAdmission(
   boundary: Exclude<KiloTokenAdmissionBoundary, 'web_bearer'>,
   policyAudience: string,
   claims: { readonly [claim: string]: unknown }
 ): void {
-  if (!isKiloTokenAdmissionObservationEnabled() || !isMultiAudience(claims.aud)) return;
+  if (!isKiloTokenAdmissionObservationEnabled()) return;
+  const multi = isMultiAudience(claims.aud);
+  const control = !multi && isAdmissionControl(claims);
+  if (!multi && !control) return;
   writeKiloTokenAdmissionLine({
     event: 'kilo_token_admission',
     v: 1,
     boundary,
     policy_audience: audienceLabel(policyAudience),
     outcome: 'admitted',
-    multi: true,
+    multi,
+    control,
     aud_set: audienceSetLabel(claims.aud),
     issuer: issuerLabel(claims),
   });

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { SignJWT } from 'jose';
 import {
+  KILO_TOKEN_ADMISSION_CONTROL_SUBJECT,
   KILO_TOKEN_ADMISSION_OBSERVATION_FLAG,
   audienceSetLabel,
+  parseAdmissionControlSubject,
 } from './kilo-token-admission-observation';
 import {
   signModernKiloToken,
@@ -88,6 +90,7 @@ describe('shared verifier admission observation', () => {
       policy_audience: 'kilo-api',
       outcome: 'admitted',
       multi: true,
+      control: false,
       aud_set: 'kilo-api+kilo-gateway+other',
       issuer: 'internal_bot',
     };
@@ -171,6 +174,111 @@ describe('shared verifier admission observation', () => {
     await expect(verifyKiloTokenForResource(token, SECRET, API_POLICY)).rejects.toThrow();
     await expect(verifyKiloTokenForPolicy(token, SECRET, API_POLICY)).rejects.toThrow();
     await expect(verifyKiloToken(token, SECRET, { audience: 'kilo-api' })).rejects.toThrow();
+
+    expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe('control subject observation', () => {
+  const CONTROL = 'synthetic-control-subject';
+
+  beforeEach(() => {
+    vi.stubEnv(KILO_TOKEN_ADMISSION_CONTROL_SUBJECT, CONTROL);
+  });
+
+  it('marks an accepted single-audience or audience-less control token on every verifier', async () => {
+    await verifyKiloTokenForResource(
+      await legacyToken({ kiloUserId: CONTROL, aud: 'kilo-api' }),
+      SECRET,
+      API_POLICY
+    );
+    await verifyKiloTokenForPolicy(await legacyToken({ kiloUserId: CONTROL }), SECRET, API_POLICY);
+    await verifyKiloToken(
+      await legacyToken({ kiloUserId: CONTROL, aud: 'session-ingest' }),
+      SECRET,
+      {
+        audience: 'session-ingest',
+      }
+    );
+
+    expect(lines()).toEqual([
+      {
+        event: 'kilo_token_admission',
+        v: 1,
+        boundary: 'resource',
+        policy_audience: 'kilo-api',
+        outcome: 'admitted',
+        multi: false,
+        control: true,
+        aud_set: 'kilo-api',
+        issuer: 'unknown',
+      },
+      expect.objectContaining({ boundary: 'policy', control: true, aud_set: 'none' }),
+      expect.objectContaining({ boundary: 'exact_audience', control: true }),
+    ]);
+    expect(log.mock.calls.map(([line]) => String(line)).join('\n')).not.toContain(CONTROL);
+  });
+
+  it('never marks a multi-audience control token, which stays a multi line', async () => {
+    await verifyKiloTokenForResource(
+      await legacyToken({ kiloUserId: CONTROL, aud: BOTH_AUDIENCES }),
+      SECRET,
+      API_POLICY
+    );
+
+    expect(lines()).toEqual([expect.objectContaining({ multi: true, control: false })]);
+  });
+
+  it.each([
+    ['another subject', { kiloUserId: 'synthetic-other-subject' }],
+    [
+      'an internal bot token of the control subject',
+      { kiloUserId: CONTROL, tokenSource: 'internal-bot' },
+    ],
+  ])('writes nothing for %s', async (_label, claims) => {
+    await verifyKiloTokenForResource(await legacyToken(claims), SECRET, API_POLICY);
+
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a forged signature', { secret: 'forged-secret-at-least-32-characters' }],
+    ['an expired token', { expiresInSeconds: -60 }],
+  ])('writes nothing when it refuses %s', async (_label, options) => {
+    const token = await legacyToken({ kiloUserId: CONTROL }, options);
+
+    await expect(verifyKiloTokenForResource(token, SECRET, API_POLICY)).rejects.toThrow();
+
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing while the observation flag is off', async () => {
+    vi.stubEnv(KILO_TOKEN_ADMISSION_OBSERVATION_FLAG, '');
+
+    await verifyKiloTokenForResource(
+      await legacyToken({ kiloUserId: CONTROL }),
+      SECRET,
+      API_POLICY
+    );
+
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it.each(['', ' synthetic-control-subject', 'a b', 'a,b', 'bot-internal-synthetic'])(
+    'configures no control subject for %j',
+    raw => {
+      expect(parseAdmissionControlSubject(raw)).toBeNull();
+    }
+  );
+
+  it('marks nothing under a refused control subject', async () => {
+    vi.stubEnv(KILO_TOKEN_ADMISSION_CONTROL_SUBJECT, `${CONTROL},other`);
+
+    await verifyKiloTokenForResource(
+      await legacyToken({ kiloUserId: CONTROL }),
+      SECRET,
+      API_POLICY
+    );
 
     expect(log).not.toHaveBeenCalled();
   });

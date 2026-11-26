@@ -3,6 +3,7 @@ import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token
 import {
   audienceLabel,
   audienceSetLabel,
+  isAdmissionControl,
   isMultiAudience,
   issuerLabel,
   writeKiloTokenAdmissionLine,
@@ -114,7 +115,9 @@ export function admissionClientFromHeaders(
  * Reports a web bearer decision on a signature-verified token, admitted or
  * refused, when the token names more than one audience or is an internal bot
  * token presented to `kilo-api`. Observing before the audience refusal keeps a
- * bot that lost `kilo-api` access visible instead of reading as zero.
+ * bot that lost `kilo-api` access visible instead of reading as zero. An
+ * admitted token of the control subject is reported too; a refused one never
+ * counts as control.
  *
  * The caller checks the flag first, so a disabled observer does no work.
  */
@@ -127,7 +130,8 @@ export function observeWebBearerAdmission(
   const cohort = internalBotCohort(claims, configuredCohorts());
   const multi = isMultiAudience(claims.aud);
   const botKiloApiCall = cohort !== 'not_internal_bot' && policyAudience === KILO_API_AUDIENCE;
-  if (!botKiloApiCall && !multi) return;
+  const control = outcome === 'admitted' && !multi && isAdmissionControl(claims);
+  if (!botKiloApiCall && !multi && !control) return;
   writeKiloTokenAdmissionLine({
     event: 'kilo_token_admission',
     v: 1,
@@ -135,6 +139,7 @@ export function observeWebBearerAdmission(
     policy_audience: audienceLabel(policyAudience),
     outcome,
     multi,
+    control,
     aud_set: audienceSetLabel(claims.aud),
     issuer: issuerLabel(claims),
     cohort,

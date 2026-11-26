@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import jwt from 'jsonwebtoken';
 import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { KILO_TOKEN_ADMISSION_OBSERVATION_FLAG } from '@kilocode/worker-utils/kilo-token-admission-observation';
+import {
+  KILO_TOKEN_ADMISSION_CONTROL_SUBJECT,
+  KILO_TOKEN_ADMISSION_OBSERVATION_FLAG,
+} from '@kilocode/worker-utils/kilo-token-admission-observation';
 import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import {
   KILO_TOKEN_ADMISSION_COHORTS_VARIABLE,
@@ -47,6 +50,7 @@ function headers(token: string, extra: Record<string, string> = {}) {
 const originalEnv = {
   flag: process.env[KILO_TOKEN_ADMISSION_OBSERVATION_FLAG],
   cohorts: process.env[KILO_TOKEN_ADMISSION_COHORTS_VARIABLE],
+  control: process.env[KILO_TOKEN_ADMISSION_CONTROL_SUBJECT],
 };
 let log: jest.SpiedFunction<typeof console.log>;
 
@@ -68,6 +72,7 @@ beforeEach(() => {
 afterEach(() => {
   restore(KILO_TOKEN_ADMISSION_OBSERVATION_FLAG, originalEnv.flag);
   restore(KILO_TOKEN_ADMISSION_COHORTS_VARIABLE, originalEnv.cohorts);
+  restore(KILO_TOKEN_ADMISSION_CONTROL_SUBJECT, originalEnv.control);
   log.mockRestore();
 });
 
@@ -91,6 +96,7 @@ describe('validateAuthorizationHeader admission observation', () => {
         policy_audience: 'kilo-api',
         outcome: 'admitted',
         multi: false,
+        control: false,
         aud_set: 'none',
         issuer: 'internal_bot',
         cohort: 'bouncer_watch',
@@ -234,6 +240,58 @@ describe('validateAuthorizationHeader admission observation', () => {
         cohort: 'internal_bot_unlisted',
       }),
     ]);
+  });
+});
+
+describe('web bearer control subject', () => {
+  const CONTROL = 'synthetic-control-subject';
+
+  beforeEach(() => {
+    process.env[KILO_TOKEN_ADMISSION_CONTROL_SUBJECT] = CONTROL;
+  });
+
+  it('marks an admitted control token without writing its subject', () => {
+    const result = validateAuthorizationHeader(headers(signed({ kiloUserId: CONTROL })), {
+      observeAdmission: true,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(lines()).toEqual([
+      expect.objectContaining({
+        outcome: 'admitted',
+        multi: false,
+        control: true,
+        cohort: 'not_internal_bot',
+      }),
+    ]);
+    expect(log.mock.calls.map(([line]) => String(line)).join('\n')).not.toContain(CONTROL);
+  });
+
+  it('writes nothing for a refused control token', () => {
+    const result = validateAuthorizationHeader(
+      headers(signed({ kiloUserId: CONTROL, aud: 'kilo-gateway' })),
+      { observeAdmission: true }
+    );
+
+    expect(result.reason).toBe('audience_not_allowed');
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('keeps a multi-audience control token a multi line', () => {
+    validateAuthorizationHeader(
+      headers(signed({ kiloUserId: CONTROL, aud: ['kilo-api', 'kilo-gateway'] })),
+      { observeAdmission: true }
+    );
+
+    expect(lines()).toEqual([expect.objectContaining({ multi: true, control: false })]);
+  });
+
+  it('keeps an internal bot token of the control subject in its cohort, not control', () => {
+    process.env[KILO_TOKEN_ADMISSION_CONTROL_SUBJECT] = BOUNCER_WATCH;
+
+    validateAuthorizationHeader(headers(signed(botClaims)), { observeAdmission: true });
+
+    expect(lines()).toEqual([expect.objectContaining({ cohort: 'bouncer_watch', control: false })]);
   });
 });
 

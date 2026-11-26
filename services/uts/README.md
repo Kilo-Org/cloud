@@ -145,14 +145,14 @@ configs (names, `eu` jurisdiction, placement, traces, the development config's d
 ### Revocation feed
 
 Design 5.6. Every revoking statement (`/revoke`, a second use of a code, a reused third-party
-token, a PAT or org bot key revoke on the account API) writes its `uts.revocations` rows and
-returns them in the same statement (`uts.feed_entries_of_statement()`, migration 0006; one index
-probe, skipped on the issued path). After the commit the Worker writes them to both feed objects
-in parallel (`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2
-seconds. `/revoke` and the account API's revokes answer 503 when neither confirms (the revocation
-stands, the backfill adds it, and the retry finds it revoked); the reuse paths answer as before. A
-failed publish logs kinds and counts, never ids. `uts.remove_org_member` has no Worker caller in
-this package, so the entries it writes reach the feed objects through the backfill.
+token, a PAT or org bot key revoke on the account API, a subject operation or a membership
+removal on the `/internal/` routes) writes its `uts.revocations` rows and returns them in the same
+statement (`uts.feed_entries_of_statement()`, migration 0006; one index probe, skipped on the
+issued path). After the commit the Worker writes them to both feed objects in parallel
+(`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2 seconds.
+`/revoke`, the account API's revokes and the `/internal/` routes answer 503 when neither confirms
+(the revocation stands, the backfill adds it, and the retry finds it revoked); the reuse paths
+answer as before. A failed publish logs kinds and counts, never ids.
 
 The two feed objects (`src/feed/UtsFeedDO.ts`) are named `<environment>:feed:<0|1>`, in the `eu`
 jurisdiction, feed 0 with the `weur` hint and feed 1 with `eeur`; only this Worker binds them, so
@@ -178,9 +178,11 @@ only it writes entries. Each one:
 
 The list is canonical JSON: subject → `revoked_before` (whole seconds, rounded down); grant, third-party
 family, session and sandbox grant → `revoked_sids`; PAT and bot key → `revoked_pat_ids`; `kid` →
-`revoked_kids`; `blocked_account` → `blocked_accounts`. A PAT entry stays 15 minutes; a grant or
-family entry 20 minutes. The feed objects' public keys reach the key set through the key-set
-shards, beside the signers'. The feed Worker reads heads and lists through the `FeedReads`
+`revoked_kids`; `blocked_account` → `blocked_accounts`. An `unblocked_account` entry feeds no field:
+it removes the account's `blocked_account` entry unless that block is newer, and keeps an older
+copy of the block out while it lasts (`mergeEntry`, migration 0014). A PAT entry stays 15 minutes;
+a grant or family entry 20 minutes. The feed objects' public keys reach the key set through the
+key-set shards, beside the signers'. The feed Worker reads heads and lists through the `FeedReads`
 entrypoint, which answers only the feed Worker's `props.caller` and gives each object call 800 ms.
 Without an `IDENTITY_STORE` binding (staging and production today) no backfill runs, so the objects
 sign no head and the feed answers `unavailable`.
@@ -660,6 +662,100 @@ entry serves it with a caller check from the `Kilo-Dev-Account` and `Kilo-Dev-Gr
 exchanges (baseline, new device on a new network, a second new device, the first one again),
 every notice kind through the development routes, a retried email through the background pass,
 and the security view before and after `/revoke`.
+
+## Subject operations and identity import
+
+Design 5.2 and 5.6, migration 0014. The web app keeps owning some account authority until its
+cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
+enqueues each write in the same transaction as the app's own write, and its outbox sends it to UTS.
+Each call is one statement with its audit row (actor: the calling workload; the app's own actor
+string in `requestedBy`). It answers 200 only once a vouching feed object took the entries the
+statement wrote.
+
+**Callers.** Workers bind the mint Worker's named entrypoint `SubjectRevocation` with
+`props.caller` (`SUBJECT_REVOCATION_CALLERS`, empty in staging and production until a caller
+proof names one). The web app calls `POST <issuer>/internal/...` with an STS token for audience
+`uts`, workload `web` (`UTS_INTERNAL_WORKLOADS`), and the route's one scope:
+
+- `/internal/subjects/revoke` and `/unblock`: `uts:subjects.revoke`;
+- `/internal/subjects/end-browser-sessions`: `uts:browser-sessions.end`;
+- `/internal/subjects/end-device-sessions`: `uts:device-sessions.end`;
+- `/internal/subjects/revoke-api-credentials`: `uts:api-credentials.revoke`;
+- `/internal/accounts/import`: `uts:accounts.import`;
+- `/internal/authority/email`, `/membership`, `/sso-organization`: `uts:authority.sync`;
+- `/internal/app-events/read` and `/ack`: `uts:app-events.read`.
+
+The token check is a port (`src/subjects/service-tokens.ts`). The deployed entry has none until
+the mint Worker carries `@kilocode/verify`, so every `/internal/` route answers
+`503 temporarily_unavailable` with `Retry-After: 60` and writes nothing; so does every route while
+`IDENTITY_STORE` is unbound. The development entry takes a stand-in bearer,
+`uts-dev-sts:<workload>:<scope>`, for the local run only.
+
+**Operations** (`@kilocode/uts-contracts` `UTS_SUBJECT_OPERATIONS`). The body is
+`{ operation_id, subject, reason, actor, source_version }`; `actor` is `user:<id>`, `admin:<id>`
+(no whitespace, 1-255 characters) or `system:<source>` (`[a-z0-9_.-]`, 1-64); `source_version` is
+0 to 2^53 - 1. An `operation_id` is kept 7 days; a repeat answers `already_applied` and hands the
+entries of the first run to the feed again.
+
+- `revoke` with `access_block`, `account_recovery` or `account_reset`: `revoked_before = now` (70
+  minutes in the feed), every browser session, device grant, third-party family, PAT, CI trust
+  policy and sandbox grant revoked, each grant and session with its `revoked_sids` entry and each
+  PAT with its `revoked_pat_ids` entry. `access_block` also blocks the account and lists it in
+  `blocked_accounts` for 70 minutes.
+- `revoke` with `account_deleted`: the same, with `revoked_before` and `blocked_accounts` kept 24
+  hours; the active bot keys the account created are flagged (audit rows and org admin notices);
+  then the row and everything it holds are deleted, and a deletion tombstone stays for good.
+- `unblock` with `access_unblock`: `409 retry_later unblock_too_soon` with `Retry-After` (1-60)
+  while the block is under 60 seconds old; then the account is active again, and an
+  `unblocked_account` entry takes it out of `blocked_accounts`. Nothing revoked comes back: a
+  revoked session, grant, family or PAT keeps its status (triggers, migrations 0001 and 0014).
+- `end-browser-sessions` (`staff_signout`, `workos_relink`, `scim_mailbox_move`,
+  `apple_consent_revoked`): browser sessions only. `end-device-sessions`
+  (`apple_consent_revoked`): CLI, IDE, extension and mobile grants only.
+  `revoke-api-credentials` (`staff_api_reset`): PATs only. None writes `revoked_before`.
+
+Outcomes: `200 applied | already_applied | no_subject`; `409 retry_later` (with `Retry-After`);
+`409 refused` with `account_deleted` (an unblock of a deleted subject) or `reason_not_allowed`;
+`400 invalid_request` (a malformed body, or an `operation_id` reused for another operation);
+`401`/`403` for the token; `503 temporarily_unavailable` with `Retry-After`. The outbox retries
+only `503`, `retry_later` and network errors.
+
+**Source versions and tombstones.** `uts.accounts.event_version` holds the newest source version
+applied. A block or unblock older than it is superseded (`already_applied`, nothing changes); a
+revocation applies whatever its version. An operation for a subject UTS does not hold answers
+`no_subject` and writes a tombstone. `uts.import_account` reads them first: a deletion refuses the
+import for good, a block imports the account blocked (unless a later unblock), a revoke sets
+`revoked_before`, and an import older than any tombstone is `stale`.
+
+**Import** (`AccountImportRequestSchema`): the app user id (never `uts_`), the primary email, the
+status, the verified provider identities with their link times, the SSO tie
+`{ app_organization_id, workos_organization_id, workos_connection_id, role }`, the passkeys (each
+with the WebAuthn user handle it was created under; the relying-party id is the Worker's), and the
+source version. Every check runs before the first write: `imported` or `already_imported`;
+`409 retry_later sso_connection_unknown` until the organization's SSO sync arrives; `409 refused`
+with `deleted`, `stale`, `identity_taken`, `email_taken`, `passkey_taken` or
+`sso_authority_mismatch`.
+
+**Authority sync.** `email` moves the primary email forward by version (the audit row names no
+address); `membership` adds, changes or (with `role: null`) removes a membership through
+`uts.remove_org_member`, ordered by the subject's version; `sso-organization` writes the SSO policy,
+the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
+by the organization's own version. The authority check behind the legacy bridge and
+`sso_app_organization` is `uts.sso_app_organization` through `src/subjects/authority.ts`: verified
+only when the connection is active, belongs to that WorkOS organization, maps to the app
+organization, and the active account holds an active membership there.
+
+**The user-created event.** Inserting an account with a `uts_` id writes one `uts.app_account_events`
+row in the same statement (trigger `accounts_user_created`). The app reads the oldest with
+`/internal/app-events/read` `{ limit }` and acknowledges with `/internal/app-events/ack`
+`{ event_ids }`, which deletes them; a deleted account takes its unread event along. Each event is
+`{ event_id, type: "user.created", occurred_at, account: { id, primary_email } }`; the app creates
+its user row with `account.id` as the user id, idempotently.
+
+`scripts/subjects-e2e.ts` (`UTS_E2E_BASE_URL`, `UTS_E2E_FEED_URL`, `UTS_E2E_ADMIN_URL`) plays the
+outbox against the mint and feed Workers: the import cases, each operation's effect on a CLI grant,
+a mobile grant, a PAT and a browser session with its feed entries, the unblock wait, a 503 while no
+feed object answers, terminal deletion, the user-created event and the audit rows.
 
 ## Tests
 

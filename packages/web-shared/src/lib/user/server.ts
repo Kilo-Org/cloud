@@ -688,6 +688,7 @@ async function resolveUserFromAuth(
       expectedAudience: opts.expectedAudience,
       runtimeProxyAttestationVerified,
       requestPathname: opts.requestPathname,
+      observeAdmission: true,
     });
     if (authorizationValidationResult.error != undefined) {
       return authError(401, authorizationValidationResult.error, '?', {

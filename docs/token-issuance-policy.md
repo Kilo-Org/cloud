@@ -138,6 +138,177 @@ Both resource boundaries retain supported audience-less legacy tokens. Explicit 
 
 Do not treat every legacy-only verifier as a resource-migration target. Existing deletion/export/Git operation audiences stay mandatory. Git user-authorization disconnect currently has a legacy-only contract and needs a dedicated operation-contract decision before its producer adopts an audience; do not widen it with the general API or gateway audience. Stored-token renewal and runtime reuse checks are separate issuer-migration work.
 
+### Q9 admission observation
+
+Q9 refuses a legacy token that names more than one audience. Before any verifier refuses one, `KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED=true` measures who still presents such tokens and how the CLI-based internal bots use `kilo-api`. It never changes a verdict, `isKiloResourceAudienceAllowed` stays a pure predicate, and the flag is off by default. When it is off, each verified token costs one `process.env` read and nothing is built.
+
+**Boundaries.** A line is written only after the signature verified, so a forged or expired token never produces one.
+
+| `boundary` | Where | Written for | `outcome` |
+|---|---|---|---|
+| `web_bearer` | `validateAuthorizationHeader`, only when `getUserFromAuth` calls it (`observeAdmission: true`); the gateway rate-limit key reads the same header without reporting | a multi-audience token, or an internal bot token presented to `kilo-api` | `admitted`, or the refusal reason after the signature: `audience_not_allowed`, `token_version_outdated`, `cloud_agent_authority_denied`, `runtime_attestation_required` |
+| `resource` | `verifyKiloTokenForResource` | an accepted multi-audience token | `admitted` |
+| `policy` | `verifyKiloTokenForPolicy` | an accepted multi-audience token | `admitted` |
+| `exact_audience` | `verifyKiloToken` with an `audience` option | an accepted multi-audience token | `admitted` |
+
+`web_bearer` observes before the audience refusal, so a bot that loses `kilo-api` access after per-audience minting shows up as `audience_not_allowed` instead of disappearing. Account checks that run later (pepper, blocked account, organization) can still refuse an `admitted` token.
+
+**Fields.** `event: "kilo_token_admission"`, `v: 1`, `boundary`, `policy_audience` (`kilo-api`, `kilo-gateway`, `session-ingest`, `cloud-agent-next`, else `other`), `outcome`, `multi` (`true` when the `aud` claim is an array of two or more entries, decided before any labelling), `aud_set` (the labelled audiences in fixed order joined with `+`, `other` for any unlisted name, `more` when the claim has more names than the read cap, `none` when absent; at most eight names are read), and `issuer` (`runtime_authorization`, `cloud_agent_authority`, `internal_bot`, `unknown`, from signed claims). `web_bearer` adds `cohort` and `client`. Count multi-audience tokens with `multi`, never from `aud_set`: repeated names (`["kilo-api","kilo-api"]`) and several unlisted names collapse to one label there. The token, subject, organization, raw claims, headers, route and address are never written; the log pipeline attaches its own request metadata, which queries must not project.
+
+**Cohorts** come from signed claims. A cohort requires the signed `tokenSource: 'internal-bot'` that only `POST /api/internal/bot-token` sets. The default benchmark user (`DEFAULT_BENCHMARK_USER_ID`) is `benchmark`. Other subjects come from the server-owned `KILO_TOKEN_ADMISSION_COHORTS` list of `label=subject` entries, with labels `bouncer_watch`, `kwf_work_sessions` and `kwf_other`; it is parsed once per distinct value. A malformed entry, an unknown label, a repeated subject or the default benchmark user refuses the whole list. Unset or refused, every other internal bot is `internal_bot_unlisted`; everything else is `not_internal_bot`. The list only labels lines and never affects what a verifier accepts.
+
+**Clients** come from unsigned headers and are observed labels, not proof. `cli_marked` means a Kilo CLI marker (`X-KILOCODE-EDITORNAME: Kilo CLI …`, or a user agent starting `opencode-kilo-provider` or `Kilo-Code/`); `unmarked` means other client headers; `unknown` means neither header. Any caller holding the token can set or omit these headers, and the CLI itself sends some calls with only its runtime's user agent. The exact number of CLI calls therefore cannot be proved: report each signed cohort's total and its `cli_marked`, `unmarked` and `unknown` counts, and treat the split as observed only.
+
+**Counting zero.** This section describes a planned measurement capability, not measured production coverage: no surface is measured until it passes every rule below. A zero supports Q9 only for a surface, cohort and window that all pass every rule. Anything else is "not measured", and an unmeasured surface or cohort cannot pass the Q9 gate.
+
+1. **Window.** One representative run of consecutive measured days, 14 by default. It starts after the last issuer and client change, is at least as long as the longest remaining legacy token lifetime plus one re-mint cycle of every covered client, and it includes days on which each covered cohort actually ran its normal schedule. A day that fails any rule breaks the run.
+2. **Serving versions.** Every version that served traffic on the surface during the window, including canaries, rollbacks and instant rollbacks, contains this code, shown by the deployment history. One unproven serving version makes its days unmeasured.
+3. **Flag.** The flag reads exactly `true` on every serving version for the whole window, shown by that version's own configuration, checked again after every deploy in the window. Do not assume a value set only in a dashboard survives a deploy: a Worker deploy replaces variables that its configuration does not declare unless it keeps them explicitly. A Worker reads the flag from `process.env`, which `nodejs_compat` fills for compatibility dates from 2025-04-01 or with the compatibility flag that enables it; a Worker without that, or without log export, is unmeasured until its configuration changes. Unmeasured Workers cannot pass Q9.
+4. **Positive line per surface and cohort.** Each day, every deployed surface produces at least one line from a synthetic or owned request on that surface, and every covered cohort produces at least one line under its own label: each mapped cohort and, separately, `benchmark`. A surface or cohort without its positive line that day is unmeasured.
+   - A production positive uses only credentials that the normal, authorized issuers already mint for that owned account. Never sign or mint a multi-audience credential to create a positive.
+   - The positive's client records the platform request id of each positive request from the response, and keeps the list as evidence (`request.id` on Vercel, `Event.RayID` on Logpush). Positive requests are subtracted only as "Subtracting the positives" below allows; otherwise they stay in the first-party count.
+   - A Worker that reports only multi-audience tokens needs a safe owned multi-audience positive. Once the issuers mint single-audience tokens no such positive may exist; that Worker then stays unmeasured, and a staging positive control never makes it measured, because staging proves only the code path.
+5. **Mapping.** The cohort list is accepted, unchanged for the whole window, and names every subject of each covered cohort. A cohort under a refused or changed list is not eligible for a zero claim. Any `internal_bot_unlisted` line in the window makes every internal-bot zero claim ineligible: an unlisted signed internal bot may be a covered client under a subject the list does not name.
+6. **Loss and precision.** No sampling on the drain or Logpush, and no `unparsed` lines (a line cut by a size limit fails `parse_json`). `dcount` is an estimate and never decides the gate: every number that decides it, and every zero, comes from the exact queries below, which also report the lines without a request id as loss. A zero means `lines = 0` in the exact query (after any allowed subtraction), never `requests = 0`: a line without a request id is never ignored, and any such line makes the count nonzero. `request.id` exists in the `vercel` schema but can be null; such lines cannot be joined or deduplicated, so any nonzero loss is reported with the result. Worker lines carry no request id and count verifier passes, not unique calls; one call can pass several verifiers, and a Worker zero means `passes = 0`. Whole dropped lines are not detectable from the event schema; the positive lines are the only completeness signal.
+
+**Queries** (replace `START`, `END` and the script names; run only with explicit approval). Every query is raw-inclusive: it counts the positive requests of rule 4 together with first-party traffic.
+
+```kusto
+// Vercel: signed bot cohorts at kilo-api, raw lines and an estimate (not for the gate)
+['vercel']
+| where _time between (datetime(START) .. datetime(END))
+| where isnotnull(['vercel.projectName']) and ['vercel.environment'] == 'production'
+| where message startswith '{"event":"kilo_token_admission"'
+| extend m = parse_json(message)
+| where tostring(m.boundary) == 'web_bearer' and tostring(m.policy_audience) == 'kilo-api'
+    and tostring(m.cohort) != 'not_internal_bot'
+| summarize lines = count(), requests_estimate = dcount(['request.id']),
+    cli_marked_lines = countif(tostring(m.client) == 'cli_marked'),
+    unmarked_lines = countif(tostring(m.client) == 'unmarked'),
+    unknown_lines = countif(tostring(m.client) == 'unknown')
+    by day = bin(_time, 1d), surface = ['vercel.projectName'], deployment = ['vercel.deploymentId'], cohort = tostring(m.cohort), outcome = tostring(m.outcome), multi = tobool(m.multi), aud_set = tostring(m.aud_set)
+```
+
+```kusto
+// Vercel: exact cohort request counts with request-id loss (decides the gate)
+['vercel']
+| where _time between (datetime(START) .. datetime(END))
+| where isnotnull(['vercel.projectName']) and ['vercel.environment'] == 'production'
+| where message startswith '{"event":"kilo_token_admission"'
+| extend m = parse_json(message)
+| where tostring(m.boundary) == 'web_bearer' and tostring(m.policy_audience) == 'kilo-api'
+    and tostring(m.cohort) != 'not_internal_bot'
+| extend request = tostring(['request.id'])
+| summarize lines = count()
+    by day = bin(_time, 1d), surface = ['vercel.projectName'], cohort = tostring(m.cohort), outcome = tostring(m.outcome), client = tostring(m.client), request
+| summarize requests = countif(isnotempty(request)), lines_without_request_id = sumif(lines, isempty(request)), lines = sum(lines)
+    by day, surface, cohort, outcome, client
+```
+
+```kusto
+// Vercel: multi-audience lines, unparsed lines and an estimate, per surface and day (not for the gate)
+['vercel']
+| where _time between (datetime(START) .. datetime(END))
+| where isnotnull(['vercel.projectName']) and ['vercel.environment'] == 'production'
+| where message startswith '{"event":"kilo_token_admission"'
+| extend m = parse_json(message)
+| summarize multi_lines = countif(tobool(m.multi)),
+    multi_requests_estimate = dcountif(['request.id'], tobool(m.multi)),
+    unparsed = countif(isnull(m.boundary))
+    by day = bin(_time, 1d), surface = ['vercel.projectName'], deployment = ['vercel.deploymentId'], boundary = tostring(m.boundary), policy_audience = tostring(m.policy_audience), outcome = tostring(m.outcome), aud_set = tostring(m.aud_set), issuer = tostring(m.issuer)
+```
+
+```kusto
+// Vercel: exact multi-audience request counts with request-id loss (decides a nonzero count)
+['vercel']
+| where _time between (datetime(START) .. datetime(END))
+| where isnotnull(['vercel.projectName']) and ['vercel.environment'] == 'production'
+| where message startswith '{"event":"kilo_token_admission"'
+| extend m = parse_json(message)
+| where tobool(m.multi)
+| extend request = tostring(['request.id'])
+| summarize lines = count()
+    by day = bin(_time, 1d), surface = ['vercel.projectName'], policy_audience = tostring(m.policy_audience), outcome = tostring(m.outcome), issuer = tostring(m.issuer), request
+| summarize requests = countif(isnotempty(request)), lines_without_request_id = sumif(lines, isempty(request)), lines = sum(lines)
+    by day, surface, policy_audience, outcome, issuer
+```
+
+```kusto
+// Workers: exact multi-audience verifier passes (not unique calls) and unparsed lines, per surface and day
+['cloudflare-logpush']
+| where _time between (datetime(START) .. datetime(END))
+| where ScriptName in ('WORKER_A', 'WORKER_B')
+| mv-expand Logs
+| extend line = tostring(Logs.Message[0])
+| where line startswith '{"event":"kilo_token_admission"'
+| extend m = parse_json(line)
+| summarize passes = countif(tobool(m.multi)), unparsed = countif(isnull(m.boundary)),
+    passes_without_ray_id = countif(tobool(m.multi) and isempty(tostring(['Event.RayID'])))
+    by day = bin(_time, 1d), surface = ScriptName, version = ['ScriptVersion.ID'], boundary = tostring(m.boundary), policy_audience = tostring(m.policy_audience), aud_set = tostring(m.aud_set), issuer = tostring(m.issuer)
+```
+
+`multi_lines` and `passes` are exact line counts. A Worker result is reported as raw passes. `Event.RayID` is present only on HTTP invocations; Durable Object, queue and RPC invocations carry none, which `passes_without_ray_id` reports.
+
+**Subtracting the positives.** Precondition, per surface: a test positive showed that the id its client recorded from the response equals the logged field (`request.id` on Vercel, `Event.RayID` on Logpush). For a surface where this is not shown, including any Worker whose positive runs through a path without `Event.RayID`, report raw-inclusive counts, subtract nothing, and leave any zero on that surface unmeasured. Where it is shown, first confirm that every recorded id for the window produced an admission line, exactly. The check reads only admission lines, so an id present only in ordinary request logs does not count:
+
+```kusto
+['vercel']
+| where _time between (datetime(START) .. datetime(END))
+| where isnotnull(['vercel.projectName']) and ['vercel.environment'] == 'production'
+| where message startswith '{"event":"kilo_token_admission"'
+| where isnotnull(parse_json(message).boundary)
+| where tostring(['request.id']) in (dynamic(['POSITIVE_ID_1', 'POSITIVE_ID_2']))
+| summarize by request = tostring(['request.id'])
+| count
+```
+
+```kusto
+['cloudflare-logpush']
+| where _time between (datetime(START) .. datetime(END))
+| where ScriptName in ('WORKER_A', 'WORKER_B')
+| where tostring(['Event.RayID']) in (dynamic(['POSITIVE_RAY_1']))
+| mv-expand Logs
+| extend line = tostring(Logs.Message[0])
+| where line startswith '{"event":"kilo_token_admission"'
+| where isnotnull(parse_json(line).boundary)
+| summarize by ray = tostring(['Event.RayID'])
+| count
+```
+
+The count must equal the number of recorded ids; otherwise the day stays unmeasured. Then rerun the exact query with one more line after `extend m = parse_json(...)`: `| where tostring(['request.id']) !in (dynamic(['POSITIVE_ID_1', 'POSITIVE_ID_2']))` on Vercel, or `| where tostring(['Event.RayID']) !in (dynamic(['POSITIVE_RAY_1']))` on Logpush. The first-party count is the filtered result; a positive line whose id was not recorded, and every line without an id, stays in it.
+
+Source fields: `message`, `vercel.projectName`, `vercel.environment`, `vercel.deploymentId`, `request.id` (Vercel); `ScriptName`, `ScriptVersion.ID`, `Event.RayID`, `Logs[].Message[0]` (Logpush). The `deployment` and `version` columns are compared against the deployment history of rule 2. Confirm the field names and the production project and script names before running.
+
+**Sources.** From source configuration only; nothing here is measured coverage. The combined legacy issuers name only `kilo-api`, `kilo-gateway` and `session-ingest`, so only verifiers of those audiences can receive their tokens:
+
+| Class | Surfaces | Boundaries | Policy audiences |
+|---|---|---|---|
+| Affected: Vercel web | `apps/web` | `web_bearer`, `policy` | `kilo-api` (the Pages exchange's audiences are labelled `other`) |
+| Affected: Vercel gateway | `apps/ai-gateway` | `web_bearer` | `kilo-gateway` |
+| Affected Workers | `services/session-ingest`, `services/session-sync`, `services/cloud-agent-next`, `services/auto-routing` | `resource`, `policy`, `exact_audience` (only the `session-ingest` deletion check, labelled `other`) | `session-ingest`, `kilo-api`, `kilo-gateway` (`cloud-agent-next` also its own audience) |
+| Observable Workers on other audiences | `services/event-service`, `services/kilo-chat`, `services/user-data-export` | `resource`, `exact_audience` | their own audiences only |
+
+All seven Workers have `nodejs_compat`, a compatibility date from 2025-04-01 and `"logpush": true` in their configuration. The three on other audiences would write a line only for a multi-audience token naming their audience, which no current issuer mints, so they are optional and are not evidence about the combined issuers. Excluded and unmeasured until their configuration changes (rule 3): `ai-attribution` (compatibility date before 2025-04-01), `git-token-service` and `notifications` (no Logpush). `kiloclaw` runs the same shared verifier and could write lines once enabled, but it is outside phase 4 coverage: it is not a candidate and its flag stays off.
+
+**Cost.** No network call, SQL statement, Durable Object hop, database connection, audit row, queue message, scheduled job or new service. Over a window, let `M` be the shared-verifier passes of a multi-audience token, `W` the `web_bearer` decisions on a multi-audience token, and `B` the `kilo-api` presentations of an internal bot token. Lines written = `M + W + B`. Each line also carries the log pipeline's own metadata, `D` bytes per line (the Vercel drain's request and deployment fields, or the Logpush trace event around `Logs`), so bytes ≈ `(L + D) × (M + W + B)` for an event of `L` bytes. One request can pass more than one verifier; the exact queries count requests. Single-audience and audience-less human tokens write nothing.
+
+Until the Cloud Agent runtime issues per-audience tokens, `M + W` is dominated by runtime tokens, which name three audiences and pass a verifier on many runtime requests. It therefore grows with the number of clients that run Cloud Agent sessions, not only with bot traffic:
+
+- `M + W ≈ C × s × r × v`: `C` active clients, `s` the share running Cloud Agent sessions, `r` runtime requests per such client per day that reach a verifier, `v` verifier passes per request.
+- `B ≈ n × b`: `n` internal bots, `b` `kilo-api` calls per bot per day; independent of `C`.
+
+Hypothetical example, not a production measurement: with `s = 0.1`, `r = 200`, `v = 2`, `L + D = 1.25 KB` and `B` negligible:
+
+| `C` (hypothetical) | Lines per day | Bytes per day |
+|---:|---:|---:|
+| 10,000 | 400,000 | 0.5 GB |
+| 50,000 | 2,000,000 | 2.5 GB |
+| 200,000 | 8,000,000 | 10 GB |
+
+Replace `s`, `r`, `v` and `D` with staging measurements before approving a window.
+
+**Enablement.** No deploy beyond the consumers that already ship these packages, which pick up the code on their normal deploy. Turning the flag on, and again off, changes the environment of each surface, and each change creates a new serving version and cold starts: a Vercel project takes the value on its next deployment, and a Worker var change creates a new Worker version that restarts its isolates. The affected scope (two Vercel projects, four Workers) is twelve serving-version changes per on-and-off cycle; each optional Worker on another audience adds two. All four affected Workers, `event-service` and `kilo-chat` host Durable Objects, so their flag changes happen only off-peak, matching the off-peak rule for Worker deploys; `user-data-export` hosts none but still restarts its isolates. Enablement is bounded: no production enablement that incurs cost before an explicit approval based on the staging estimate; one surface class at a time; a fixed window that ends with the flag off; and an early stop when daily lines exceed twice the approved estimate. The queries run by hand; no monitor or scheduled query is created.
+
 ## Migration preconditions
 
 Before moving any resource from `allow-legacy` to `required`:

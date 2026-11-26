@@ -3,12 +3,13 @@ import * as z from 'zod';
 
 /**
  * The admin network allowlist: one environment value, one parser, one set of
- * edge path patterns. The in-app guard (`admin-network.ts`) and the Vercel
- * Firewall rule script both read from here, so the two layers cannot disagree
- * on what the list means or which paths it protects.
+ * edge path patterns. The in-app guard (`admin-network.ts`), the Vercel
+ * Firewall rule script and the pre-build deployment check all read from here,
+ * so the layers cannot disagree on what the list means or which paths it
+ * protects.
  *
- * Kept free of `server-only` and environment reads so the firewall rule
- * script can import it outside Next.js.
+ * Kept free of `server-only` and process environment reads so the scripts can
+ * import it outside Next.js.
  */
 
 export type AdminNetworkFamily = 'ipv4' | 'ipv6';
@@ -151,6 +152,42 @@ export function parseAdminAllowedNetworks(value: string | undefined): AdminAllow
   return { kind: 'invalid', message };
 }
 
+export type AdminAllowedNetworksDeploymentCheck =
+  | { kind: 'skipped' }
+  | { kind: 'valid' }
+  | { kind: 'refused'; message: string };
+
+/**
+ * The check `apps/web` runs before `next build`, so a deployment without a
+ * usable list fails its build instead of shipping a guard that refuses every
+ * admin. Only a Vercel deployment build is checked (`VERCEL` set, `VERCEL_ENV`
+ * `production` or `preview`; staging is a preview target): local, CI and
+ * `vercel build` development builds legitimately have no list. The message
+ * names the variable and entry positions only, never an entry, because build
+ * logs are widely readable.
+ */
+export function checkAdminAllowedNetworksForDeployment(
+  env: Readonly<Record<string, string | undefined>>
+): AdminAllowedNetworksDeploymentCheck {
+  if (!env.VERCEL || (env.VERCEL_ENV !== 'production' && env.VERCEL_ENV !== 'preview')) {
+    return { kind: 'skipped' };
+  }
+  const parsed = parseAdminAllowedNetworks(env.ADMIN_ALLOWED_NETWORKS);
+  if (parsed.kind === 'empty') {
+    return {
+      kind: 'refused',
+      message: `ADMIN_ALLOWED_NETWORKS is unset or empty for the ${env.VERCEL_ENV} environment; every admin request would be refused.`,
+    };
+  }
+  if (parsed.kind === 'invalid') {
+    return {
+      kind: 'refused',
+      message: `ADMIN_ALLOWED_NETWORKS is invalid (${parsed.message}); every admin request would be refused.`,
+    };
+  }
+  return { kind: 'valid' };
+}
+
 export function formatAdminNetworkEntry(entry: AdminNetworkEntry): string {
   return entry.prefix === null ? entry.address : `${entry.address}/${entry.prefix}`;
 }
@@ -171,10 +208,12 @@ export const ADMIN_ONLY_TRPC_NAMESPACES = [
 
 /**
  * Kilo-admin procedures inside mixed namespaces, matched by exact name. Each
- * is called only from admin UI. `privileged-inventory.test.ts` checks both
- * lists against the router in both directions.
+ * is called only by a Kilo admin, from admin UI or an admin-only control, and
+ * never batched with a non-admin call. `privileged-inventory.test.ts` checks
+ * both lists against the router in both directions.
  */
 export const ADMIN_ONLY_TRPC_PROCEDURES = [
+  'organizations.reviewAgent.triggerBitbucketCodeReview',
   'organizations.seatPurchases',
   'organizations.sso.clearSsoDomain',
   'organizations.sso.createConfig',

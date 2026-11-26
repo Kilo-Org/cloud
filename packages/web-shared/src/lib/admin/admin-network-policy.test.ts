@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   ADMIN_EDGE_PATH_PATTERNS,
   adminNetworkFirewallRule,
+  checkAdminAllowedNetworksForDeployment,
   isAdminEdgePath,
   normalizeClientAddress,
   parseAdminAllowedNetworks,
@@ -93,6 +94,59 @@ describe('parseAdminAllowedNetworks', () => {
   });
 });
 
+describe('checkAdminAllowedNetworksForDeployment', () => {
+  test.each([
+    ['a local build', {}],
+    ['a CI build', { CI: 'true', NODE_ENV: 'production' }],
+    ['a development vercel build', { VERCEL: '1', VERCEL_ENV: 'development' }],
+    ['VERCEL_ENV without VERCEL', { VERCEL_ENV: 'production' }],
+  ])('skips %s, even with no list', (_label, env) => {
+    expect(checkAdminAllowedNetworksForDeployment(env)).toEqual({ kind: 'skipped' });
+  });
+
+  test.each(['production', 'preview'])('accepts a valid list on a %s deployment', vercelEnv => {
+    expect(
+      checkAdminAllowedNetworksForDeployment({
+        VERCEL: '1',
+        VERCEL_ENV: vercelEnv,
+        ADMIN_ALLOWED_NETWORKS: '203.0.113.7,2001:db8::/32',
+      })
+    ).toEqual({ kind: 'valid' });
+  });
+
+  test.each([undefined, '', ' '])('refuses a deployment whose list is %j', networks => {
+    expect(
+      checkAdminAllowedNetworksForDeployment({
+        VERCEL: '1',
+        VERCEL_ENV: 'production',
+        ADMIN_ALLOWED_NETWORKS: networks,
+      })
+    ).toEqual({
+      kind: 'refused',
+      message: expect.stringContaining('ADMIN_ALLOWED_NETWORKS is unset or empty'),
+    });
+  });
+
+  test('refuses an invalid list by entry position, without echoing any entry', () => {
+    const check = checkAdminAllowedNetworksForDeployment({
+      VERCEL: '1',
+      VERCEL_ENV: 'preview',
+      ADMIN_ALLOWED_NETWORKS: '203.0.113.7,192.0.2.10/24,not-an-address',
+    });
+
+    expect(check).toEqual({
+      kind: 'refused',
+      message: expect.stringContaining(
+        'entry 2: host bits set; entry 3: not an IP address or CIDR range'
+      ),
+    });
+    const message = check.kind === 'refused' ? check.message : '';
+    expect(message).not.toContain('203.0.113.7');
+    expect(message).not.toContain('192.0.2.10');
+    expect(message).not.toContain('not-an-address');
+  });
+});
+
 describe('normalizeClientAddress', () => {
   test.each([
     ['192.0.2.10', { family: 'ipv4', address: '192.0.2.10' }],
@@ -138,6 +192,7 @@ describe('admin edge path patterns', () => {
     '/api/trpc/organizations.sso.generateAdminPortalLink?batch=1&input=%7B%7D',
     '/api/trpc/organizations.sso.generateAdminPortalLink,user.getMe',
     '/api/trpc/organizations.sso.generateAdminPortalLink%2Cuser.getMe',
+    '/api/trpc/organizations.reviewAgent.triggerBitbucketCodeReview?batch=1',
   ])('matches %s', pathname => {
     expect(isAdminEdgePath(pathname)).toBe(true);
   });
@@ -162,6 +217,7 @@ describe('admin edge path patterns', () => {
     '/api/trpc/user.getMe,organizations.sso.createConfigX',
     '/api/trpc/organizations.seatPurchasesSummary,user.getMe',
     '/api/trpc/user.getMe?input=organizations.updatePlan',
+    '/api/trpc/organizations.reviewAgent.getBitbucketReadiness,organizations.reviewAgent.getReviewConfig',
     '/api/trpc/user.admin',
     '/app-shell/api/trpc/admin.x',
     '/api/trpc-mobile/admin.users.list',

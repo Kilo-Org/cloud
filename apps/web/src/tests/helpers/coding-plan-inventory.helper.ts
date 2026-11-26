@@ -1,16 +1,15 @@
 import type { EncryptedData } from '@kilocode/db/schema-types';
 import { coding_plan_key_inventory } from '@kilocode/db/schema';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { legacyCiphertextDigest } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
-import {
-  encryptByokWithDataKey,
-  type ByokDataKey,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import type { ByokDataKey } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { TEST_BYOK_DATA_KEY } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
-import type { CodingPlanInventoryCredentialColumns } from '@/lib/coding-plans/inventory-credential-encryption';
+import {
+  sealCodingPlanInventoryCredential,
+  type CodingPlanInventoryCredentialColumns,
+} from '@/lib/coding-plans/inventory-credential-encryption';
 
 /** The data key the fake BYOK KMS service issues and returns. */
 export const TEST_INVENTORY_DATA_KEY: ByokDataKey = {
@@ -20,37 +19,27 @@ export const TEST_INVENTORY_DATA_KEY: ByokDataKey = {
   kms_key_version: '1',
 };
 
-export function legacyInventoryCredential(plaintext: string): EncryptedData {
+/** A static-key ciphertext of the kind written before the KMS migration. Nothing reads it any more. */
+export function staticKeyInventoryCredential(plaintext: string): EncryptedData {
   return encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY);
 }
 
-/** An envelope of `plaintext` recording `legacyDigest`, which need not match the row. */
-export function inventoryEnvelope(
-  plaintext: string,
-  legacyDigest: string
-): CodingPlanInventoryCredentialColumns['encrypted_api_key_envelope'] {
-  return {
-    ...encryptByokWithDataKey(plaintext, TEST_INVENTORY_DATA_KEY),
-    legacy_digest: legacyDigest,
-  };
+/** The credential columns a writer stores for `plaintext`: the placeholder and a KMS envelope. */
+export function sealedInventoryColumns(plaintext: string): CodingPlanInventoryCredentialColumns {
+  return sealCodingPlanInventoryCredential(plaintext, TEST_INVENTORY_DATA_KEY);
 }
 
 /**
- * Both stored forms of an inventory credential. `envelopePlaintext` differs from
- * `legacyPlaintext` to prove which form a reader used; the envelope is current for the
- * static-key copy it is stored with.
+ * Columns whose envelope holds `plaintext` next to a real static-key ciphertext of
+ * `staticKeyPlaintext`, which proves a reader used the envelope and not the static column.
  */
-export function dualWrittenInventoryColumns(
-  legacyPlaintext: string,
-  envelopePlaintext = legacyPlaintext
+export function sealedInventoryColumnsWithStaticKeyCopy(
+  plaintext: string,
+  staticKeyPlaintext: string
 ): CodingPlanInventoryCredentialColumns {
-  const legacy = legacyInventoryCredential(legacyPlaintext);
   return {
-    encrypted_api_key: legacy,
-    encrypted_api_key_envelope: inventoryEnvelope(
-      envelopePlaintext,
-      legacyCiphertextDigest(legacy)
-    ),
+    ...sealedInventoryColumns(plaintext),
+    encrypted_api_key: staticKeyInventoryCredential(staticKeyPlaintext),
   };
 }
 

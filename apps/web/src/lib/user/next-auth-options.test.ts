@@ -100,6 +100,7 @@ import {
   OPENAI_TOKEN_SHARING_SCOPE,
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
@@ -503,7 +504,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     });
   });
 
-  test('seals the delegated connection for the signing-in user and stores both forms', async () => {
+  test('seals the delegated connection for the signing-in user into the envelope and stores the placeholder in the obsolete column', async () => {
     const sub = `subject-${crypto.randomUUID()}`;
     const { user, email } = await seedOpenAiUser(sub);
 
@@ -518,10 +519,11 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
           isNull(openai_chatgpt_connections.organization_id)
         )
       );
-    for (const stored of [row?.encrypted_connection, row?.encrypted_connection_envelope]) {
-      expect(JSON.stringify(stored)).not.toContain('signin-access-token');
-      expect(JSON.stringify(stored)).not.toContain('signin-refresh-token');
-    }
+    expect(row?.encrypted_connection).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+    expect(JSON.stringify(row?.encrypted_connection_envelope)).not.toContain('signin-access-token');
+    expect(JSON.stringify(row?.encrypted_connection_envelope)).not.toContain(
+      'signin-refresh-token'
+    );
     expect(kms.requests.find(request => request.path === '/data-key')?.body).toMatchObject({
       owner_type: 'user',
       owner_id: user.id,

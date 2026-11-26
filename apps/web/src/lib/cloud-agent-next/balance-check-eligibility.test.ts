@@ -91,7 +91,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/connector', () => ({
   resolveConnectionConnector: (...args: unknown[]) => mockResolveConnectionConnector(...args),
 }));
 
-import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
 const PAID_MODEL = 'anthropic/claude-sonnet-4';

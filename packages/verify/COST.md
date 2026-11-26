@@ -27,6 +27,7 @@ share one call (owner and pollers).
 | STS token | 0 | Set older than 5 min: 1 key-set fetch, merged; the request waits for it, up to the 5 s timeout (an STS set never serves past its 5-minute lifetime). Unknown `kid`: at most 1 fetch per 5 min per set, cancelled requests included | 1 STS key-set fetch, in parallel with the UTS bootstrap when the service calls `warm` |
 | UTS token | 0 | UTS set older than 5 min: 1 key-set fetch, merged; the request waits at most 1 s when it holds a last good set with the `kid`, else up to the 5 s timeout. Unknown `kid` as for STS. Feed: when the signed head is over 30 s old, the request waits for one merged refresh (head, plus the list only when its hash changed), at most 1 s | 1 bootstrap call (UTS key set, head and list in one answer), merged, in parallel with the STS key set. Without a bootstrap port: key set, then head, then list, in series |
 | PAT | 0 on an in-instance hit | Instance miss: 1 shared-cache read, started in parallel with the key-set and feed reads; on a shared miss, 1 UTS lookup (merged per hash), then 1 shared-cache write after the response | Bootstrap (as above) in parallel with the hash and the shared-cache read, then the lookup path |
+| Record check (`checkBrowserSession`, `checkUtsTokenRecord`) | 0: validation, then set and map lookups on the held feed copy; no SQL, no signer call | Only the refreshes the PAT path already makes, merged with `verify`'s: the UTS key set as for a known `kid` (the feed head verifies under its keys), and the feed (a background head fetch 10 s after the last fetch; once the head is over 30 s old, one merged refresh the check waits for, at most 1 s). A malformed record makes none | As for a UTS token: the bootstrap call, or the UTS key set, then head and list |
 
 ## 3. Background fetches per isolate, and totals
 
@@ -197,9 +198,16 @@ Total under 8 MB, against the 128 MB Worker isolate limit.
   shared-cache read adds one HMAC verify, two JSON parses and one zod parse.
 - Per key-set refresh: about 34 Ed25519 key imports. Per changed list: one SHA-256 and one JSON
   parse of the list (about 1 ms at 140 KB), at most once per 10 s.
+- Record check: one zod parse of three or four fields, then at most three set lookups and one map
+  lookup. It holds no state of its own, so it adds no memory.
 
 ## 9. What this PR does not add
 
 No SQL statement, Durable Object hop, database connection, audit row, queue message or deploy.
 The library has no caller yet: the network calls above start when a service adopts it, through the
 ports phase 3 implements.
+
+The record checks add no I/O of their own: a warm check reads only the held feed copy, and its
+refreshes are the ones the feed and key-set caches already make for `verify`, merged with them.
+A cold handle `read` by the web app (1 SQL statement, no signer call) is phase 3's cost, not this
+library's.

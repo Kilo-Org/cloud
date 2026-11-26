@@ -5,9 +5,10 @@ import type {
   EncryptedData,
 } from '@kilocode/db/schema-types';
 import {
-  openDualWrittenCredential,
-  sealDualWrittenCredential,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+  OBSOLETE_STATIC_KEY_PLACEHOLDER,
+  openKmsCredential,
+  sealKmsCredential,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import {
   createByokDataKey,
   type ByokDataKey,
@@ -53,18 +54,24 @@ export type CodingPlanInventoryCredentialColumns = {
   encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope;
 };
 
-/** The credential columns a write of an inventory row sets: both stored forms together. */
+/**
+ * The credential columns a write of an inventory row sets. The obsolete static-key column
+ * gets a placeholder, which also replaces any static-key copy an earlier write left there.
+ */
 export function sealCodingPlanInventoryCredential(
   apiKey: string,
   dataKey: ByokDataKey
 ): CodingPlanInventoryCredentialColumns {
-  const sealed = sealDualWrittenCredential(apiKey, dataKey);
-  return { encrypted_api_key: sealed.legacy, encrypted_api_key_envelope: sealed.envelope };
+  return {
+    encrypted_api_key: OBSOLETE_STATIC_KEY_PLACEHOLDER,
+    encrypted_api_key_envelope: sealKmsCredential(apiKey, dataKey),
+  };
 }
 
 /**
  * The credential columns every revocation, termination and deletion path sets, so the
- * encrypted credential material is removed in both stored forms.
+ * encrypted credential material is removed, including a static-key copy written before the
+ * KMS migration that the obsolete column may still hold.
  */
 export const CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL = {
   encrypted_api_key: null,
@@ -72,17 +79,14 @@ export const CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL = {
 } as const;
 
 /**
- * Reads an inventory row's credential, preferring its KMS envelope. Null when the
- * credential was removed or its static-key copy does not decrypt; a KMS failure throws.
+ * Reads an inventory row's credential. Null when the credential was removed; a KMS failure
+ * throws a `CredentialKmsError`.
  */
 export async function openCodingPlanInventoryCredential(row: {
   id: string;
-  encrypted_api_key: EncryptedData | null;
   encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope | null;
 }): Promise<string | null> {
-  return await openDualWrittenCredential(
-    row.encrypted_api_key,
-    row.encrypted_api_key_envelope,
-    () => codingPlanInventoryKmsContext(row.id)
+  return await openKmsCredential(row.encrypted_api_key_envelope, () =>
+    codingPlanInventoryKmsContext(row.id)
   );
 }

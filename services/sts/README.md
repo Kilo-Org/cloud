@@ -531,7 +531,10 @@ Rules the loader enforces:
 - `jobWorkflowRefs` lists every workflow file whose jobs may use the policy, each as
   `<owner>/<repo>/.github/workflows/<file>@<ref>` with a ref from `refs`, all in the policy's own
   repository, with no wildcard. A called reusable workflow is its own entry: its jobs carry its own
-  `job_workflow_ref`, while `ref`, `event_name` and `environment` are the caller's.
+  `job_workflow_ref`, while `ref` and `event_name` come from the calling run. STS does not check the
+  caller (`workflow_ref`): any workflow on a listed ref that calls a listed reusable workflow, with
+  a listed event and in the policy's environment, gets the bundle, so list a reusable workflow only
+  when every caller on `main` may hold it.
 - `events` is an allowlist of `push`, `schedule`, `workflow_dispatch` and `workflow_run`. No event
   that a fork author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
   `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed, and a policy that

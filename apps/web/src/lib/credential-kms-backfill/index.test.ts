@@ -588,6 +588,57 @@ describe('backfillCredentialKmsEnvelopes', () => {
     expect(inventory.reachedEnd).toBe(false);
   });
 
+  test('starts at the given point of the keyspace and wraps around to the rows before it', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 6; i++) ids.push(await insertInventoryRow());
+    const sorted = [...ids].sort();
+    // Between the third and fourth ids in keyspace order.
+    const startId = sorted[2];
+
+    const [inventory] = await backfillCredentialKmsEnvelopes({
+      deadlineAt: Date.now() + 60_000,
+      batchSize: 2,
+      startId,
+    });
+
+    expect(summaryCounts(inventory)).toMatchObject({ migrated: 6, remaining: 0 });
+    expect(inventory.reachedEnd).toBe(true);
+    const order = kms.requests
+      .filter(request => request.path === '/data-key')
+      .map(request => request.body.key_id);
+    // Rows after the start come first, then the pass wraps around to the start inclusive.
+    expect(order).toEqual([...sorted.slice(3), ...sorted.slice(0, 3)]);
+  });
+
+  test('reaches healthy rows before failing rows that precede the start point', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) ids.push(await insertInventoryRow());
+    const sorted = [...ids].sort();
+    // The lowest ids always fail; a run starting just after them reaches the rest first.
+    const failing = new Set(sorted.slice(0, 2));
+    const fakeFetch = global.fetch;
+    global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (isFakeByokKmsRequest(input) && String(input).endsWith('/data-key')) {
+        const body = JSON.parse(String(init?.body)) as { key_id: string };
+        if (failing.has(body.key_id)) return new Response('{}', { status: 403 });
+      }
+      return fakeFetch(input, init);
+    };
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const [inventory] = await backfillCredentialKmsEnvelopes({
+      deadlineAt: Date.now() + 60_000,
+      batchSize: 1,
+      startId: sorted[1],
+    }).finally(() => errorSpy.mockRestore());
+
+    expect(inventory.migrated).toBe(2);
+    expect(inventory.failed.kms).toBe(2);
+    for (const id of sorted.slice(2)) {
+      expect((await readInventoryRow(id)).encrypted_api_key_envelope).not.toBeNull();
+    }
+  });
+
   test('pages through more rows than one batch', async () => {
     for (let i = 0; i < 5; i++) await insertInventoryRow();
 

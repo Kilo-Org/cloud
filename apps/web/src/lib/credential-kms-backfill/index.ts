@@ -8,6 +8,7 @@ import {
   gt,
   isNotNull,
   isNull,
+  lte,
   or,
   sql,
   type AnyColumn,
@@ -138,13 +139,24 @@ function logRowFailure(store: CredentialKmsBackfillStoreName, error: unknown): F
 
 type BackfillRow = { id: string };
 
+/** A slice of the id keyspace; null leaves that end open. */
+type KeysetRange = { after: string | null; through: string | null };
+
+function keysetWhere(column: AnyColumn, range: KeysetRange): SQL | undefined {
+  return and(
+    range.after === null ? undefined : gt(column, range.after),
+    range.through === null ? undefined : lte(column, range.through)
+  );
+}
+
 type CredentialStore<Row extends BackfillRow> = {
   name: CredentialKmsBackfillStoreName;
   /** Rows still needing work: an envelope to create, or an orphaned one to remove. */
   countRemaining(): Promise<number>;
   /** Removes envelopes whose credential was cleared, returning how many. */
   clearOrphanedEnvelopes?(): Promise<number>;
-  selectBatch(afterId: string | null, limit: number): Promise<Row[]>;
+  /** Candidate rows in id order, after `range.after` (exclusive) and up to `range.through`. */
+  selectBatch(range: KeysetRange, limit: number): Promise<Row[]>;
   /** Writes the row's envelope unless another writer changed the row since it was read. */
   migrateRow(row: Row): Promise<'migrated' | 'skipped'>;
 };
@@ -190,19 +202,14 @@ const codingPlanInventoryStore: CredentialStore<InventoryRow> = {
       .returning({ id: coding_plan_key_inventory.id });
     return cleared.length;
   },
-  async selectBatch(afterId, limit) {
+  async selectBatch(range, limit) {
     return await db
       .select({
         id: coding_plan_key_inventory.id,
         encrypted_api_key: coding_plan_key_inventory.encrypted_api_key,
       })
       .from(coding_plan_key_inventory)
-      .where(
-        and(
-          inventoryNeedsEnvelope,
-          afterId === null ? undefined : gt(coding_plan_key_inventory.id, afterId)
-        )
-      )
+      .where(and(inventoryNeedsEnvelope, keysetWhere(coding_plan_key_inventory.id, range)))
       .orderBy(asc(coding_plan_key_inventory.id))
       .limit(limit);
   },
@@ -272,7 +279,7 @@ const openAiChatGptConnectionsStore: CredentialStore<ConnectionRow> = {
       .where(connectionNeedsEnvelope);
     return row?.remaining ?? 0;
   },
-  async selectBatch(afterId, limit) {
+  async selectBatch(range, limit) {
     return await db
       .select({
         id: openai_chatgpt_connections.id,
@@ -282,12 +289,7 @@ const openAiChatGptConnectionsStore: CredentialStore<ConnectionRow> = {
         is_shared_services: openai_chatgpt_connections.is_shared_services,
       })
       .from(openai_chatgpt_connections)
-      .where(
-        and(
-          connectionNeedsEnvelope,
-          afterId === null ? undefined : gt(openai_chatgpt_connections.id, afterId)
-        )
-      )
+      .where(and(connectionNeedsEnvelope, keysetWhere(openai_chatgpt_connections.id, range)))
       .orderBy(asc(openai_chatgpt_connections.id))
       .limit(limit);
   },
@@ -342,7 +344,7 @@ function emptySummary(store: CredentialKmsBackfillStoreName): CredentialKmsBackf
 
 async function backfillStore<Row extends BackfillRow>(
   store: CredentialStore<Row>,
-  { deadlineAt, batchSize, concurrency }: BackfillOptions
+  { deadlineAt, batchSize, concurrency, startId }: BackfillOptions
 ): Promise<CredentialKmsBackfillStoreSummary> {
   const summary = emptySummary(store.name);
   try {
@@ -354,17 +356,24 @@ async function backfillStore<Row extends BackfillRow>(
     // An unconfigured KMS service would fail every row; fail the pass once instead.
     getByokKmsClientConfig();
 
-    let afterId: string | null = null;
+    // Each run starts at a random point of the id keyspace and wraps around to it, so rows
+    // that keep failing slowly near the start cannot use up every run's budget before the
+    // rows after them are reached. Ids are random UUIDs, so every row is reached first as
+    // often as any other, without keeping a cursor between runs.
+    const passes: KeysetRange[] = [
+      { after: startId, through: null },
+      { after: null, through: startId },
+    ];
+    let passIndex = 0;
+    let range = passes[0];
     let loggedFailures = 0;
     const limit = pLimit(concurrency);
     while (Date.now() < deadlineAt) {
-      const rows = await store.selectBatch(afterId, batchSize);
-      if (rows.length === 0) {
-        summary.reachedEnd = true;
-        break;
+      const rows = await store.selectBatch(range, batchSize);
+      if (rows.length > 0) {
+        // Keyset paging past this batch: a row that keeps failing cannot starve the ones after it.
+        range = { ...range, after: rows[rows.length - 1].id };
       }
-      // Keyset paging past this batch: a row that keeps failing cannot starve the ones after it.
-      afterId = rows[rows.length - 1].id;
 
       await Promise.all(
         rows.map(row =>
@@ -388,8 +397,12 @@ async function backfillStore<Row extends BackfillRow>(
         )
       );
       if (rows.length < batchSize) {
-        summary.reachedEnd = Date.now() < deadlineAt;
-        break;
+        passIndex += 1;
+        if (passIndex === passes.length) {
+          summary.reachedEnd = Date.now() < deadlineAt;
+          break;
+        }
+        range = passes[passIndex];
       }
     }
   } catch (error) {
@@ -410,6 +423,8 @@ type BackfillOptions = {
   deadlineAt: number;
   batchSize: number;
   concurrency: number;
+  /** Where in the id keyspace the pass starts before wrapping around. */
+  startId: string;
 };
 
 /**
@@ -428,10 +443,13 @@ export async function backfillCredentialKmsEnvelopes({
   deadlineAt,
   batchSize = DEFAULT_BATCH_SIZE,
   concurrency = DEFAULT_CONCURRENCY,
+  startId = crypto.randomUUID(),
 }: {
   deadlineAt: number;
   batchSize?: number;
   concurrency?: number;
+  /** For tests; a run otherwise starts at a random point of each keyspace. */
+  startId?: string;
 }): Promise<CredentialKmsBackfillStoreSummary[]> {
   const startedAt = Date.now();
   const firstDeadline = startedAt + Math.max(0, deadlineAt - startedAt) / 2;
@@ -440,7 +458,13 @@ export async function backfillCredentialKmsEnvelopes({
       deadlineAt: firstDeadline,
       batchSize,
       concurrency,
+      startId,
     }),
-    await backfillStore(openAiChatGptConnectionsStore, { deadlineAt, batchSize, concurrency }),
+    await backfillStore(openAiChatGptConnectionsStore, {
+      deadlineAt,
+      batchSize,
+      concurrency,
+      startId,
+    }),
   ];
 }

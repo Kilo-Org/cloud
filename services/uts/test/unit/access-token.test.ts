@@ -21,6 +21,7 @@ function minted(overrides: Partial<Minted> = {}): Minted {
   return {
     subjectId: 'oauth/user-1',
     orgId: null,
+    orgRole: null,
     authTime: new Date((NOW - 3600) * 1000),
     amr: ['passkey'],
     tokenIds: [crypto.randomUUID(), crypto.randomUUID()],

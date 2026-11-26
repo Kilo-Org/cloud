@@ -156,8 +156,11 @@ revoke and introspect, prints the audit rows (token ids only), checks that no to
 an audit row, and times the mint path. `scripts/pat-e2e.ts` (`UTS_E2E_BASE_URL`,
 `UTS_E2E_ADMIN_URL`) signs the CLI in, creates a PAT, uses it on the probe route, lists and
 revokes it and times until the probe refuses it, creates, lists and revokes an org bot key, shows
-the tier B refusal once the sign-in is 11 minutes old, and checks that no credential value or
-hash reached an audit row.
+the tier B refusal once the sign-in is 11 minutes old, refuses an owner-or-member scope to an org
+admin at `/authorize`, mints it for a member with the `org` claim and refuses its refresh once the
+member is an admin again (the development hand-off binds the `org` the request names), mints a
+5-minute scope for 300 seconds, checks each token's lifetime in the audit rows, and checks that no
+credential value or hash reached an audit row.
 
 ## OAuth endpoints
 
@@ -199,7 +202,8 @@ give the secret. A third-party client has only its PKCE verifier, so any second 
 of its code revokes the family (OAuth 2.1 section 4.1.2); a third-party client that lost its
 response authorizes again, and its consent stands, so it sees no consent screen. A consumed code
 with another client, redirect URI, verifier or key, or after its lifetime, still revokes the
-grant. The audit row of a mint lists the `jti` of each token the call is about to sign: after a
+grant. The audit row of a mint lists the `jti` of each token the call is about to sign, and each
+token's lifetime in the same order (`tokenLifetimeSeconds`, `uts.token_lifetimes`): after a
 failed signing no token carries those ids, and the retry's row (`token.issued`, `rotation`
 `code_retry`) lists the ids of the tokens it signs.
 
@@ -228,19 +232,26 @@ only). A PAT names no session, so it is refused there. Each action is one statem
 grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
 account fails at once, with no feed lookup.
 
-`/authorize` and `/token` check scope syntax and one registry field: a scope that needs the `org`
-claim is refused at `/authorize` without an organization (`invalid_scope`), and `/token` never signs
-it without `org` (`invalid_grant`). They do not apply the registry's allowed clients,
-third-party-safe flag or membership roles yet. Until they do, the client check above and the `sid`
-lookup (it finds first-party grants only) keep other clients' tokens off the account API.
+`/authorize` and `/token` check scope syntax and the registry's organization fields. A scope that
+needs the `org` claim is refused without an organization, and a scope limited to listed membership
+roles (`subjects.roles`) is refused when the caller's role is another: the code statement and the
+mint statements return the caller's role in the bound organization from the membership row they
+already read (migration 0005), and `orgScopeRefusal` (`src/scopes/policy.ts`) checks it before
+anything is signed. `/authorize` answers `invalid_scope` (the stored code is never handed out),
+`/token` answers `invalid_grant`. Each refresh reads the role again, so a member whose role changed
+gets no new token for such a scope. They do not apply the registry's allowed clients or
+third-party-safe flag yet. Until they do, the client check above and the `sid` lookup (it finds
+first-party grants only) keep other clients' tokens off the account API.
 
 Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`, or an origin of
 the environment's table in `UTS_RESOURCE_ORIGINS` (`@kilocode/uts-contracts`), which maps each
-origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`) and the
-`*.kiloapps.io` origins of ai-attribution, session-sync, notifications, events and chat; staging
-lists only `https://staging-app.kilo.ai` and its issuer; development lists loopback origins only.
-`protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table. Another
-environment's origin, a path, a trailing slash or a query answers `invalid_target`.
+origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`), the
+`*.kiloapps.io` origins of ai-attribution, session-sync, notifications, events and chat, and the
+`*.kilosessions.ai` origins of session ingest, data export, the git token service and the cloud
+agent; staging lists only `https://staging-app.kilo.ai` and its issuer; development lists loopback
+origins only. An origin in the table does not activate a service: the service proves its caller
+first. `protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table.
+Another environment's origin, a path, a trailing slash or a query answers `invalid_target`.
 
 | Route | Scope | Behaviour | SQL |
 |---|---|---|---|
@@ -290,14 +301,18 @@ environment's origin, a path, a trailing slash or a query answers `invalid_targe
   credential-changing or session-bound scope; a privileged scope needs a step-up and lives at most
   5 minutes; a scope needs the `org` claim exactly when its subjects are organization members, in
   any role or in listed roles; no delegated token carries a privileged, step-up, staff or
-  credential-changing scope). It lists the account API scopes (`uts:pats.manage`,
-  `uts:bot-keys.manage`, session-bound), `uts:probe.read`, `uts:security.read` (the web app's
-  security view, session-bound), `kilo-api:profile.read` (CLI and PATs), and the phase 4 service
-  scopes of session ingest, cloud agent, data export, the git token service, ai-attribution (org
-  owners and members), session sync, notifications, events and chat. The account API serves only
-  session-bound scopes, and refuses a token without `sid`. The mint gives each access token its
-  scope's registered maximum lifetime when shorter than 10 minutes (5 minutes for the export and
-  disconnect scopes).
+  credential-changing scope; a scope limited to listed roles is neither third-party-safe nor
+  PAT-eligible). It lists the account API scopes (`uts:pats.manage`, `uts:bot-keys.manage`,
+  session-bound), `uts:probe.read`, `uts:security.read` (the web app's security view,
+  session-bound), `kilo-api:profile.read` (CLI and PATs), the CLI's Kilo API route scopes
+  (`kilo-api:notifications.read`, `organizations.read`, `auto-routing.read`; session-bound
+  `organizations.write` for organization members, `auto-routing.write`, `sessions.write`,
+  `shell-security.analyze`, `feedback.write`, `credits.redeem`; no generic write scope), and the
+  phase 4 service scopes of session ingest, cloud agent, data export, the git token service,
+  ai-attribution (org owners and members), session sync, notifications, events and chat. The
+  account API serves only session-bound scopes, and refuses a token without `sid`. The mint gives
+  each access token its scope's registered maximum lifetime when shorter than 10 minutes (5
+  minutes for the export and disconnect scopes).
 - First-party clients are `UTS_FIRST_PARTY_CLIENTS` in `@kilocode/uts-contracts`: `kilo-cli` (public
   native, loopback `/callback`), `kilo-web`, the web BFF (confidential, `private_key_jwt`, redirect
   URIs `<app origin>/api/auth/uts/callback` per environment), and `kilo-mobile` (public native,

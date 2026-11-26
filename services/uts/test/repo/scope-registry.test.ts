@@ -17,7 +17,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { ORG_ROLES } from '../../src/db/enums';
 import { identifyClient } from '../../src/oauth/clients';
-import { credentialScopeCheck, scopeMissingOrg } from '../../src/scopes/policy';
+import { credentialScopeCheck, orgScopeRefusal } from '../../src/scopes/policy';
 import { firstPartyClientProblems, scopeRegistryProblems } from './scope-registry';
 
 /** The scope registry as code (design 5.3), checked against its rules. */
@@ -163,6 +163,55 @@ describe('the UTS scope registry', () => {
     }
   );
 
+  it.each([
+    ['kilo-api:notifications.read', false, false],
+    ['kilo-api:organizations.read', false, false],
+    ['kilo-api:auto-routing.read', false, false],
+    ['kilo-api:organizations.write', true, true],
+    ['kilo-api:auto-routing.write', true, false],
+    ['kilo-api:sessions.write', true, false],
+    ['kilo-api:shell-security.analyze', true, false],
+    ['kilo-api:feedback.write', true, false],
+    ['kilo-api:credits.redeem', true, false],
+  ] as const)(
+    'lists %s for the CLI only, session %s, org members %s, 10 minutes, and no PAT carries it',
+    (scope, requiresSession, orgMembers) => {
+      expect(utsScopeEntry(scope)).toEqual({
+        audience: 'kilo-api',
+        maxLifetimeSeconds: 600,
+        allowedClients: ['kilo-cli'],
+        subjects: orgMembers ? { kind: 'org_member', roles: 'any' } : { kind: 'any_user' },
+        thirdPartySafe: false,
+        stepUp: false,
+        patEligible: false,
+        privileged: false,
+        requiresSession,
+        requiresOrgClaim: orgMembers,
+        delegable: false,
+      });
+      expect(credentialScopeCheck(scope, null)).toEqual({ status: 'not_pat_eligible' });
+    }
+  );
+
+  it('lists exactly these Kilo API scopes, with no generic write scope', () => {
+    expect(
+      Object.keys(UTS_SCOPE_REGISTRY)
+        .filter(scope => scope.startsWith('kilo-api:'))
+        .sort()
+    ).toEqual([
+      'kilo-api:auto-routing.read',
+      'kilo-api:auto-routing.write',
+      'kilo-api:credits.redeem',
+      'kilo-api:feedback.write',
+      'kilo-api:notifications.read',
+      'kilo-api:organizations.read',
+      'kilo-api:organizations.write',
+      'kilo-api:profile.read',
+      'kilo-api:sessions.write',
+      'kilo-api:shell-security.analyze',
+    ]);
+  });
+
   it('names the membership roles of the identity store', () => {
     expect([...UTS_ORG_ROLES]).toEqual([...ORG_ROLES]);
   });
@@ -173,12 +222,28 @@ describe('the UTS scope registry', () => {
       .map(([scope]) => scope);
     expect(orgScopes).toContain('ai-attribution:identity.read');
     for (const scope of orgScopes) {
-      expect(scopeMissingOrg(['gateway:models.read', scope], null)).toBe(scope);
-      expect(scopeMissingOrg([scope], crypto.randomUUID())).toBeNull();
+      expect(orgScopeRefusal(['gateway:models.read', scope], null, null)).toBe(scope);
+      expect(orgScopeRefusal([scope], crypto.randomUUID(), 'owner')).toBeNull();
     }
-    expect(scopeMissingOrg(['session-sync:grants.exchange', 'gateway:unknown.read'], null)).toBe(
-      null
-    );
+    expect(
+      orgScopeRefusal(['session-sync:grants.exchange', 'gateway:unknown.read'], null, null)
+    ).toBeNull();
+  });
+
+  it('refuses a scope limited to listed roles to every other role and to a missing role', () => {
+    const org = crypto.randomUUID();
+    const scope = 'ai-attribution:attributions.write';
+    expect(orgScopeRefusal([scope], org, 'owner')).toBeNull();
+    expect(orgScopeRefusal([scope], org, 'member')).toBeNull();
+    expect(orgScopeRefusal([scope], org, 'admin')).toBe(scope);
+    expect(orgScopeRefusal([scope], org, 'billing_manager')).toBe(scope);
+    expect(orgScopeRefusal([scope], org, null)).toBe(scope);
+    // A scope open to every role of the organization passes any role.
+    for (const role of UTS_ORG_ROLES) {
+      expect(orgScopeRefusal(['git-token-service:bitbucket.repositories.read'], org, role)).toBe(
+        null
+      );
+    }
   });
 });
 
@@ -358,14 +423,36 @@ describe('the registry check', () => {
     [
       'no organization role',
       'gateway:models.read',
-      { subjects: { kind: 'org_member', roles: [] }, requiresOrgClaim: true },
+      { subjects: { kind: 'org_member', roles: [] }, requiresOrgClaim: true, patEligible: false },
       'organization roles',
     ],
     [
       'an organization role twice',
       'gateway:models.read',
-      { subjects: { kind: 'org_member', roles: ['owner', 'owner'] }, requiresOrgClaim: true },
+      {
+        subjects: { kind: 'org_member', roles: ['owner', 'owner'] },
+        requiresOrgClaim: true,
+        patEligible: false,
+      },
       'organization roles',
+    ],
+    [
+      'a PAT that carries a role-limited scope',
+      'gateway:models.read',
+      { subjects: { kind: 'org_member', roles: ['owner'] }, requiresOrgClaim: true },
+      'limited to listed roles but',
+    ],
+    [
+      'a role-limited scope for third parties',
+      'mcp:tools.read',
+      {
+        subjects: { kind: 'org_member', roles: ['member'] },
+        requiresOrgClaim: true,
+        patEligible: false,
+        allowedClients: ['third_party'],
+        thirdPartySafe: true,
+      },
+      'limited to listed roles but',
     ],
     [
       'a delegable credential scope',

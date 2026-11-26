@@ -83,7 +83,8 @@ export const UTS_BOT_KEYS_MANAGE_SCOPE = 'uts:bot-keys.manage';
 export const UTS_PROBE_READ_SCOPE = 'uts:probe.read';
 /**
  * Read the caller's own profile, balance and usage on the Kilo API (`GET /api/profile`,
- * `/api/profile/balance`, `/api/profile/usage`).
+ * `/api/profile/balance`, `/api/profile/usage`, and the `user.getMe` and `user.getBalance` tRPC
+ * reads). It does not cover `/api/user`, which stays on the legacy credential.
  */
 export const KILO_API_PROFILE_READ_SCOPE = 'kilo-api:profile.read';
 /** The user's security view on the web app: sessions, devices, sign-in methods, audit events. */
@@ -163,6 +164,30 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
     requiresOrgClaim: false,
     delegable: false,
   },
+  // The CLI's Kilo API routes (phase 4 caller map). Each route keeps its own authorization and
+  // resource checks; there is no generic write scope.
+  'kilo-api:notifications.read': firstPartyScope(KILO_API_AUDIENCE, [CLI], {
+    requiresSession: false,
+  }),
+  'kilo-api:organizations.read': firstPartyScope(KILO_API_AUDIENCE, [CLI], {
+    requiresSession: false,
+  }),
+  'kilo-api:auto-routing.read': firstPartyScope(KILO_API_AUDIENCE, [CLI], {
+    requiresSession: false,
+  }),
+  'kilo-api:organizations.write': firstPartyScope(KILO_API_AUDIENCE, [CLI], {
+    requiresSession: true,
+    orgRoles: 'any',
+  }),
+  'kilo-api:auto-routing.write': firstPartyScope(KILO_API_AUDIENCE, [CLI], {
+    requiresSession: true,
+  }),
+  'kilo-api:sessions.write': firstPartyScope(KILO_API_AUDIENCE, [CLI], { requiresSession: true }),
+  'kilo-api:shell-security.analyze': firstPartyScope(KILO_API_AUDIENCE, [CLI], {
+    requiresSession: true,
+  }),
+  'kilo-api:feedback.write': firstPartyScope(KILO_API_AUDIENCE, [CLI], { requiresSession: true }),
+  'kilo-api:credits.redeem': firstPartyScope(KILO_API_AUDIENCE, [CLI], { requiresSession: true }),
   // Phase 4 Batch B (2026-11-26): the caller's own sessions in session ingest.
   'session-ingest:sessions.read': firstPartyScope('session-ingest', [CLI, BFF], {
     requiresSession: false,

@@ -1,5 +1,6 @@
 import {
   UTS_RESOURCE_ORIGINS,
+  UTS_SCOPE_REGISTRY,
   audienceOfResource,
   protectedResourceMetadataFor,
 } from '@kilocode/uts-contracts';
@@ -158,6 +159,10 @@ describe('request parameters', () => {
     ['https://notifications.kiloapps.io', 'notifications'],
     ['https://events.kiloapps.io', 'event-service'],
     ['https://chat.kiloapps.io', 'kilo-chat'],
+    ['https://ingest.kilosessions.ai', 'session-ingest'],
+    ['https://user-data-export.kilosessions.ai', 'user-data-export'],
+    ['https://git-token-service.kilosessions.ai', 'git-token-service'],
+    ['https://cloud-agent-next.kilosessions.ai', 'cloud-agent-next'],
   ] as const)('map the production origin %s to %s and refuse it elsewhere', (origin, audience) => {
     expect(audienceOfResource(origin, 'production')).toBe(audience);
     expect(audienceOfResource(origin, 'staging')).toBeNull();
@@ -172,6 +177,10 @@ describe('request parameters', () => {
     ['http://localhost:8804', 'notifications'],
     ['http://localhost:8809', 'event-service'],
     ['http://localhost:8808', 'kilo-chat'],
+    ['http://localhost:8821', 'session-ingest'],
+    ['http://localhost:8818', 'user-data-export'],
+    ['http://localhost:8802', 'git-token-service'],
+    ['http://localhost:8794', 'cloud-agent-next'],
   ] as const)('map the loopback origin %s to %s in development only', (origin, audience) => {
     expect(audienceOfResource(origin, 'development')).toBe(audience);
     expect(audienceOfResource(origin, 'staging')).toBeNull();
@@ -188,6 +197,10 @@ describe('request parameters', () => {
         'https://notifications.kiloapps.io': 'notifications',
         'https://events.kiloapps.io': 'event-service',
         'https://chat.kiloapps.io': 'kilo-chat',
+        'https://ingest.kilosessions.ai': 'session-ingest',
+        'https://user-data-export.kilosessions.ai': 'user-data-export',
+        'https://git-token-service.kilosessions.ai': 'git-token-service',
+        'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
       },
       staging: {
         'https://staging-app.kilo.ai': 'kilo-api',
@@ -201,6 +214,10 @@ describe('request parameters', () => {
         'http://localhost:8804': 'notifications',
         'http://localhost:8809': 'event-service',
         'http://localhost:8808': 'kilo-chat',
+        'http://localhost:8821': 'session-ingest',
+        'http://localhost:8818': 'user-data-export',
+        'http://localhost:8802': 'git-token-service',
+        'http://localhost:8794': 'cloud-agent-next',
       },
     });
     for (const environment of ['production', 'staging'] as const) {
@@ -233,7 +250,9 @@ describe('request parameters', () => {
     expect(protectedResourceMetadataFor('staging', 'kilo-api', 'Kilo API')).toEqual({
       resource: 'https://staging-app.kilo.ai',
       authorization_servers: ['https://uts-staging.kiloapps.io'],
-      scopes_supported: ['kilo-api:profile.read'],
+      scopes_supported: Object.keys(UTS_SCOPE_REGISTRY).filter(scope =>
+        scope.startsWith('kilo-api:')
+      ),
       bearer_methods_supported: ['header'],
       resource_name: 'Kilo API',
     });

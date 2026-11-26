@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
-import { scopeMissingOrg } from '../scopes/policy';
+import { orgScopeRefusal } from '../scopes/policy';
 import { randomCredential, sha256 } from '../token/credentials';
 import { type FirstPartyClient, identifyClient, isLoopbackRedirect } from './clients';
 import { jktOfParameter } from './dpop';
@@ -220,7 +220,8 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   if (decision.status === 'interaction') return decision.response;
   if (decision.status === 'denied') return fail('access_denied', 'the user denied the request');
   const { approval } = decision;
-  if (scopeMissingOrg(scopes, approval.orgId) !== null) {
+  // Without an organization no organization scope can pass, so no code is stored for it.
+  if (approval.orgId === null && orgScopeRefusal(scopes, null, null) !== null) {
     return fail('invalid_scope', 'a requested scope needs an organization');
   }
 
@@ -260,7 +261,17 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       'the authorization could not be completed'
     );
   }
-  if (outcome === 'access_denied') return fail('access_denied', 'the account cannot authorize');
-  if (outcome === 'consent_required') return fail('access_denied', 'consent is required');
+  if (outcome.outcome !== 'issued') {
+    return fail(
+      'access_denied',
+      outcome.outcome === 'consent_required'
+        ? 'consent is required'
+        : 'the account cannot authorize'
+    );
+  }
+  // The code row exists but is never handed out; it expires unused within 60 seconds.
+  if (orgScopeRefusal(scopes, approval.orgId, outcome.orgRole) !== null) {
+    return fail('invalid_scope', 'a requested scope needs another role in the organization');
+  }
   return back({ code });
 }

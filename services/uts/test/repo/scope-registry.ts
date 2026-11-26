@@ -28,6 +28,8 @@ const PRIVILEGED_MAX_LIFETIME_SECONDS = 300;
  * - a scope that needs a session is never PAT-eligible, because a PAT names no session;
  * - a scope needs the `org` claim exactly when its subjects are the members of an organization,
  *   and the roles those subjects need are `any` or a non-empty list of distinct membership roles;
+ *   a scope limited to listed roles is neither third-party-safe nor PAT-eligible, because only
+ *   the first-party mint statements read the member's role;
  * - a privileged, step-up, staff-only or credential-changing scope is never delegable.
  */
 export function scopeRegistryProblems(registry: Readonly<Record<string, UtsScopeEntry>>): string[] {
@@ -86,6 +88,9 @@ export function scopeRegistryProblems(registry: Readonly<Record<string, UtsScope
         roles.some(role => !UTS_ORG_ROLES.includes(role))
       ) {
         problem('organization roles must be any or distinct membership roles');
+      }
+      if (entry.thirdPartySafe || entry.patEligible) {
+        problem('is limited to listed roles but third-party-safe or PAT-eligible');
       }
     }
   }

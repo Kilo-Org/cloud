@@ -8,7 +8,7 @@ import { z } from 'zod';
 import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
-import { scopeMissingOrg } from '../scopes/policy';
+import { orgScopeRefusal } from '../scopes/policy';
 import {
   firstPartyRefreshTokenOfExchange,
   grantIdOfCode,
@@ -153,11 +153,16 @@ async function completeMint(
   minted: Minted,
   refresh: { token: string; expiresAt: Date } | null
 ): Promise<Response> {
-  // A grant always binds the organization its scopes need (`/authorize` refuses otherwise); this
-  // keeps a token for an organization-member scope from ever being signed without `org`.
-  if (scopeMissingOrg(minted.scopes, minted.orgId) !== null) {
-    console.error(JSON.stringify({ event: 'uts.token.org_missing', client: clientId }));
-    return oauthError('invalid_grant', 400, 'the grant names no organization for its scopes');
+  // A grant binds the organization its scopes need and `/authorize` checked the role; the role is
+  // read again by the mint statement, so a member whose role changed gets no token for a scope
+  // limited to other roles, and no organization scope is ever signed without `org`.
+  if (orgScopeRefusal(minted.scopes, minted.orgId, minted.orgRole) !== null) {
+    console.error(JSON.stringify({ event: 'uts.token.org_scope_refused', client: clientId }));
+    return oauthError(
+      'invalid_grant',
+      400,
+      'the grant names no organization, or another role, for its scopes'
+    );
   }
   const nowMs = Date.now();
   const nowSeconds = Math.floor(nowMs / 1000);

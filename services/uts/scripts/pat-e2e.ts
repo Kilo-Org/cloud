@@ -2,13 +2,16 @@
  * Local end-to-end run of PATs and org bot keys against `wrangler dev --env local` and the local
  * identity store (README, "Local development"): sign in the CLI, create a PAT, use it on the probe
  * route, list it, revoke it and time how long until the probe refuses it; a create refused by the
- * tier B gate once the sign-in is 11 minutes old; an org bot key created, listed and revoked; then
- * the audit rows from the database, checked for credential values and hashes. Synthetic data only;
- * it prints ids and audit references, never a token, a PAT or a key.
+ * tier B gate once the sign-in is 11 minutes old; an org bot key created, listed and revoked; an
+ * owner-or-member scope refused to an org admin at `/authorize`, minted for a member with the
+ * `org` claim and refused at refresh once the member is an admin again; a 5-minute scope minted for
+ * 300 seconds; then the audit rows from the database, checked for credential values and hashes and
+ * for each token's lifetime. Synthetic data only; it prints ids and audit references, never a
+ * token, a PAT or a key.
  *
  *   UTS_E2E_BASE_URL   the mint Worker, such as http://127.0.0.1:8800
  *   UTS_E2E_ADMIN_URL  admin login to the identity-store database (loopback only), for the seed,
- *                      the stale-session step and the audit read
+ *                      the role and stale-session steps and the audit read
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -49,13 +52,57 @@ function expectThat(condition: boolean, step: string) {
 }
 
 const TokenSchema = z.looseObject({
-  issued_tokens: z.array(z.object({ access_token: z.string(), scope: z.string() })),
-  refresh_token: z.string(),
+  issued_tokens: z.array(
+    z.object({ access_token: z.string(), scope: z.string(), expires_in: z.number() }).loose()
+  ),
+  refresh_token: z.string().optional(),
 });
+const ErrorSchema = z.looseObject({ error: z.string() });
 
-async function signIn(): Promise<{ pats: string; botKeys: string; grantId: string }> {
+function claimsOf(accessToken: string) {
+  return z
+    .looseObject({ sid: z.uuid(), org: z.uuid().optional() })
+    .parse(JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString()));
+}
+
+/**
+ * Authorizes the CLI for `scope`, bound to `org` when given, and exchanges the code with a DPoP
+ * proof. `authorizeError` is the error the authorization endpoint redirected with, or null when it
+ * handed out a code; `refresh` mints again from the grant with a new proof of the same key.
+ */
+async function cliGrant(scope: string, org: string | null) {
   const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
   const jwk = await exportJWK(publicKey);
+  const proof = () =>
+    new SignJWT({
+      jti: randomUUID(),
+      htm: 'POST',
+      htu: `${issuer}/token`,
+      iat: Math.floor(Date.now() / 1000),
+    })
+      .setProtectedHeader({ alg: 'EdDSA', typ: 'dpop+jwt', jwk })
+      .sign(privateKey);
+  const post = async (form: Record<string, string>) => {
+    const response = await fetch(new URL('token', base), {
+      method: 'POST',
+      headers: { DPoP: await proof() },
+      body: new URLSearchParams({ client_id: 'kilo-cli', ...form }),
+    });
+    const body: unknown = await response.json();
+    const tokens = TokenSchema.safeParse(body).data;
+    if (tokens !== undefined) {
+      secrets.push(
+        ...(tokens.refresh_token === undefined ? [] : [tokens.refresh_token]),
+        ...tokens.issued_tokens.map(token => token.access_token)
+      );
+    }
+    return {
+      status: response.status,
+      tokens,
+      error: ErrorSchema.safeParse(body).data?.error ?? null,
+    };
+  };
+
   const verifier = randomBytes(32).toString('base64url');
   const url = new URL('authorize', base);
   for (const [name, value] of Object.entries({
@@ -64,45 +111,46 @@ async function signIn(): Promise<{ pats: string; botKeys: string; grantId: strin
     redirect_uri: CALLBACK,
     code_challenge: createHash('sha256').update(verifier).digest('base64url'),
     code_challenge_method: 'S256',
-    scope: 'uts:bot-keys.manage uts:pats.manage',
+    scope,
     dpop_jkt: await calculateJwkThumbprint(jwk, 'sha256'),
+    ...(org === null ? {} : { org }),
   })) {
     url.searchParams.set(name, value);
   }
   const authorized = await fetch(url, { redirect: 'manual' });
-  const code = new URL(authorized.headers.get('Location') ?? 'about:blank').searchParams.get(
-    'code'
-  );
-  if (code === null) throw new Error(`authorize answered ${authorized.status}`);
+  const location = new URL(authorized.headers.get('Location') ?? 'about:blank');
+  const code = location.searchParams.get('code');
+  if (code === null) {
+    return {
+      authorizeError: location.searchParams.get('error') ?? `status ${authorized.status}`,
+    } as const;
+  }
   secrets.push(code);
-  const proof = await new SignJWT({
-    jti: randomUUID(),
-    htm: 'POST',
-    htu: `${issuer}/token`,
-    iat: Math.floor(Date.now() / 1000),
-  })
-    .setProtectedHeader({ alg: 'EdDSA', typ: 'dpop+jwt', jwk })
-    .sign(privateKey);
-  const response = await fetch(new URL('token', base), {
-    method: 'POST',
-    headers: { DPoP: proof },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: CALLBACK,
-      client_id: 'kilo-cli',
-      code_verifier: verifier,
-    }),
+  const exchanged = await post({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: CALLBACK,
+    code_verifier: verifier,
   });
-  const body = TokenSchema.parse(await response.json());
-  secrets.push(body.refresh_token, ...body.issued_tokens.map(token => token.access_token));
-  const byScope = new Map(body.issued_tokens.map(token => [token.scope, token.access_token]));
+  const refreshToken = exchanged.tokens?.refresh_token;
+  const refresh = async () => {
+    if (refreshToken === undefined) throw new Error('the exchange returned no refresh token');
+    return await post({ grant_type: 'refresh_token', refresh_token: refreshToken });
+  };
+  return { authorizeError: null, exchanged, refresh } as const;
+}
+
+async function signIn(): Promise<{ pats: string; botKeys: string; grantId: string }> {
+  const grant = await cliGrant('uts:bot-keys.manage uts:pats.manage', null);
+  if (grant.authorizeError !== null) throw new Error(`authorize refused: ${grant.authorizeError}`);
+  const byScope = new Map(
+    (grant.exchanged.tokens?.issued_tokens ?? []).map(token => [token.scope, token.access_token])
+  );
   const pats = byScope.get('uts:pats.manage');
   const botKeys = byScope.get('uts:bot-keys.manage');
   if (pats === undefined || botKeys === undefined) throw new Error('missing account tokens');
-  const payload: unknown = JSON.parse(Buffer.from(pats.split('.')[1], 'base64url').toString());
-  const grantId = z.object({ sid: z.uuid() }).parse(payload).sid;
-  log('sign-in (code + PKCE + DPoP)', { status: response.status, grantId });
+  const grantId = claimsOf(pats).sid;
+  log('sign-in (code + PKCE + DPoP)', { status: grant.exchanged.status, grantId });
   return { pats, botKeys, grantId };
 }
 
@@ -248,6 +296,48 @@ async function main() {
     'gate refused'
   );
 
+  // Organization roles at mint: the attribution scope is for owners and members only.
+  const attribution = 'ai-attribution:identity.read';
+  const setRole = (role: string) =>
+    admin.query('UPDATE uts.org_memberships SET role = $3 WHERE org_id = $1 AND account_id = $2', [
+      ORG,
+      ACCOUNT,
+      role,
+    ]);
+  const asAdmin = await cliGrant(attribution, ORG);
+  log('authorize owner-or-member scope as admin', { error: asAdmin.authorizeError });
+  expectThat(asAdmin.authorizeError === 'invalid_scope', 'org admin refused at /authorize');
+  await setRole('member');
+  const asMember = await cliGrant(attribution, ORG);
+  const memberToken =
+    asMember.authorizeError === null ? asMember.exchanged.tokens?.issued_tokens[0] : undefined;
+  const memberOrg =
+    memberToken === undefined ? null : (claimsOf(memberToken.access_token).org ?? null);
+  log('authorize and exchange as member', {
+    authorizeError: asMember.authorizeError,
+    status: asMember.authorizeError === null ? asMember.exchanged.status : null,
+    orgClaimIsOrg: memberOrg === ORG,
+  });
+  expectThat(memberOrg === ORG, 'member gets the scope with the org claim');
+  await setRole('admin');
+  const demoted = asMember.authorizeError === null ? await asMember.refresh() : null;
+  log('refresh after the member became admin', {
+    status: demoted?.status ?? null,
+    error: demoted?.error ?? null,
+  });
+  expectThat(
+    demoted?.status === 400 && demoted.error === 'invalid_grant',
+    'refresh refused once the role is outside the scope'
+  );
+
+  // A 5-minute scope: the token lives 300 seconds and its audit row says so.
+  const exportScope = 'user-data-export:exports.dispatch';
+  const exported = await cliGrant(exportScope, null);
+  const exportToken =
+    exported.authorizeError === null ? exported.exchanged.tokens?.issued_tokens[0] : undefined;
+  log('exchange for a 5-minute scope', { expires_in: exportToken?.expires_in ?? null });
+  expectThat(exportToken?.expires_in === 300, 'short scope minted for 300 seconds');
+
   const rows = await admin.query<{
     id: string;
     event_type: string;
@@ -263,8 +353,9 @@ async function main() {
   console.log('\naudit rows:');
   for (const row of rows.rows) {
     const { patId, patRef, botKeyId, botKeyRef, gateChecks, action, reason } = row.attributes;
+    const { scopes, tokenLifetimeSeconds } = row.attributes;
     console.log(
-      `  #${row.id} ${row.event_type} ${row.outcome} ${JSON.stringify({ patId, patRef, botKeyId, botKeyRef, gateChecks, action, reason })}`
+      `  #${row.id} ${row.event_type} ${row.outcome} ${JSON.stringify({ patId, patRef, botKeyId, botKeyRef, gateChecks, action, reason, scopes, tokenLifetimeSeconds })}`
     );
   }
   const types = rows.rows.map(row => row.event_type);
@@ -277,6 +368,23 @@ async function main() {
   ]) {
     expectThat(types.includes(type), `audit row ${type}`);
   }
+  const lifetimesOf = (scope: string) =>
+    rows.rows
+      .filter(
+        row =>
+          row.event_type === 'ai.kilo.uts.grant.created' &&
+          JSON.stringify(row.attributes.scopes) === JSON.stringify([scope])
+      )
+      .map(row => row.attributes.tokenLifetimeSeconds);
+  log('audited token lifetimes', {
+    [exportScope]: lifetimesOf(exportScope),
+    [attribution]: lifetimesOf(attribution),
+  });
+  expectThat(
+    JSON.stringify(lifetimesOf(exportScope)) === JSON.stringify([['300']]) &&
+      JSON.stringify(lifetimesOf(attribution)) === JSON.stringify([['600']]),
+    'audit rows carry each token lifetime'
+  );
   const text = (
     await admin.query<{ text: string }>(
       "SELECT string_agg(event::text, ' ') AS text FROM uts.audit_events WHERE id > $1",

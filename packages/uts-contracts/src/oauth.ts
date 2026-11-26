@@ -35,11 +35,13 @@ export function resourceOfAudience(audience: string): string {
  *
  * - Production: the web app (`kilo-api`; the origin `resolveAppUrl` in
  *   `packages/web-shared/src/lib/constants.ts` uses), the UTS issuer (`uts`, the account API), and
- *   the Workers that accept UTS tokens on their own origins.
+ *   the Workers that accept UTS tokens on their own origins, from their route configs. An entry
+ *   here does not activate a service: the service proves its caller before it accepts the tokens.
  * - Staging: the staging web app and the staging issuer only. Another staging origin joins once a
  *   deployment of that Worker on it is confirmed.
  * - Development: loopback only: the local web app on its default port (`PORT` unset), the local
- *   issuer, and each Worker on its local development port.
+ *   issuer, and each Worker on its local development port (session ingest on 8821, since its
+ *   default port is the issuer's).
  */
 export const UTS_RESOURCE_ORIGINS: Readonly<
   Record<UtsEnvironment, Readonly<Record<string, string>>>
@@ -52,6 +54,10 @@ export const UTS_RESOURCE_ORIGINS: Readonly<
     'https://notifications.kiloapps.io': 'notifications',
     'https://events.kiloapps.io': 'event-service',
     'https://chat.kiloapps.io': 'kilo-chat',
+    'https://ingest.kilosessions.ai': 'session-ingest',
+    'https://user-data-export.kilosessions.ai': 'user-data-export',
+    'https://git-token-service.kilosessions.ai': 'git-token-service',
+    'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
   },
   staging: {
     'https://staging-app.kilo.ai': KILO_API_AUDIENCE,
@@ -65,6 +71,10 @@ export const UTS_RESOURCE_ORIGINS: Readonly<
     'http://localhost:8804': 'notifications',
     'http://localhost:8809': 'event-service',
     'http://localhost:8808': 'kilo-chat',
+    'http://localhost:8821': 'session-ingest',
+    'http://localhost:8818': 'user-data-export',
+    'http://localhost:8802': 'git-token-service',
+    'http://localhost:8794': 'cloud-agent-next',
   },
 };
 

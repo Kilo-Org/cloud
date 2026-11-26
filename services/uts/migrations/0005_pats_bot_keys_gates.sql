@@ -996,3 +996,684 @@ REVOKE INSERT, UPDATE, DELETE ON
   uts.org_bot_keys,
   uts.gate_passes
 FROM uts_app;
+
+-- The mint statements of 0004, changed in two ways and otherwise the same:
+-- * They return the caller's membership role in the bound organization (`org_role`), from the
+--   membership row they already read, so the Worker refuses, before signing, a scope that the
+--   scope registry limits to other roles (`subjects.roles`, design 5.3). A third-party refresh
+--   returns no role: no third-party-safe scope is limited to roles (`test/repo`), and a null role
+--   refuses such a scope.
+-- * The audit attribute `tokenLifetimeSeconds` lists each token's lifetime in seconds, in the
+--   order of `tokenRefs`, instead of one fixed 10 minutes. An audit attribute array holds strings
+--   only (`uts.is_audit_event`), so each lifetime is its decimal string.
+-- Their parameters stay the same. A new output column changes the return type, which
+-- `CREATE OR REPLACE` cannot do, so those functions are dropped and created again inside this
+-- migration's transaction, with their grant.
+
+-- The lifetime of each access token one mint signs, in seconds as decimal strings, in the order of
+-- `p_scopes`: 10 minutes, or the scope's shorter registered maximum. It mirrors
+-- `accessTokenLifetimeSeconds` and `UTS_SCOPE_REGISTRY`; `test/db/mint-roles.test.ts` checks that
+-- both agree for every registered scope.
+CREATE FUNCTION uts.token_lifetimes(p_scopes text[]) RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE PARALLEL SAFE
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT to_jsonb(ARRAY(
+    SELECT CASE item.scope
+      WHEN 'user-data-export:exports.dispatch' THEN '300'
+      WHEN 'user-data-export:exports.download' THEN '300'
+      WHEN 'git-token-service:github-user-authorizations.disconnect' THEN '300'
+      ELSE '600'
+    END
+    FROM unnest($1) WITH ORDINALITY AS item(scope, position)
+    ORDER BY item.position
+  ))
+$$;
+
+DROP FUNCTION uts.issue_authorization_code(
+  text, bytea, text, uts.client_kind, text, uuid, text, text[], text[], uuid, text, bytea,
+  timestamptz, text[], uuid
+);
+
+-- GET /authorize, after the hand-off approved: stores a 60-second code (PKCE S256, and the DPoP
+-- key thumbprint for a first-party client) and its audit row. Outcomes: `issued`, with the
+-- membership role in `p_org_id` (`org_role`, null without an organization); `access_denied` for an
+-- inactive account or an unmet org requirement; `consent_required` for a third-party client
+-- without an active consent that covers the scopes.
+CREATE FUNCTION uts.issue_authorization_code(
+  p_environment text,
+  p_code_hash bytea,
+  p_client_id text,
+  p_client_kind uts.client_kind,
+  p_account_id text,
+  p_browser_session_id uuid,
+  p_redirect_uri text,
+  p_resources text[],
+  p_scopes text[],
+  p_org_id uuid,
+  p_code_challenge text,
+  p_dpop_jkt bytea,
+  p_auth_time timestamptz,
+  p_amr text[],
+  p_consent_id uuid
+) RETURNS TABLE (outcome text, org_role uts.org_role)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  account_state uts.account_status;
+  membership_state uts.membership_status;
+  member_role uts.org_role;
+  enforcement uts.sso_enforcement;
+BEGIN
+  PERFORM uts.require_inputs('uts.issue_authorization_code',
+    p_environment IS NOT NULL AND p_code_hash IS NOT NULL AND p_client_id IS NOT NULL
+    AND p_client_kind IS NOT NULL AND p_account_id IS NOT NULL AND p_redirect_uri IS NOT NULL
+    AND p_resources IS NOT NULL AND p_scopes IS NOT NULL AND p_code_challenge IS NOT NULL
+    AND p_auth_time IS NOT NULL AND p_amr IS NOT NULL
+    AND (p_client_kind = 'first_party') = (p_dpop_jkt IS NOT NULL)
+    AND (p_client_kind = 'third_party') = (p_consent_id IS NOT NULL));
+  SELECT account.status INTO account_state FROM uts.accounts AS account WHERE account.id = p_account_id;
+  IF p_org_id IS NOT NULL THEN
+    SELECT membership.status, membership.role, policy.enforcement
+    INTO membership_state, member_role, enforcement
+    FROM uts.org_memberships AS membership
+    LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = membership.org_id
+    WHERE membership.org_id = p_org_id AND membership.account_id = p_account_id;
+  END IF;
+  IF account_state IS DISTINCT FROM 'active'
+    OR uts.org_requirement_met(p_org_id, membership_state, enforcement, p_amr::uts.auth_method[]) IS NOT TRUE
+  THEN
+    outcome := 'access_denied';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  IF p_client_kind = 'third_party' AND NOT EXISTS (
+    SELECT 1 FROM uts.third_party_consents AS consent
+    WHERE consent.id = p_consent_id
+      AND consent.account_id = p_account_id
+      AND consent.client_id = p_client_id
+      AND consent.org_id IS NOT DISTINCT FROM p_org_id
+      AND consent.status = 'active'
+      AND consent.scopes @> p_scopes
+  ) THEN
+    outcome := 'consent_required';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  INSERT INTO uts.authorization_codes (
+    code_hash, client_id, client_kind, account_id, browser_session_id, redirect_uri, resources,
+    scopes, org_id, code_challenge, dpop_jkt, auth_time, amr, expires_at, consent_id
+  ) VALUES (
+    p_code_hash, p_client_id, p_client_kind, p_account_id, p_browser_session_id, p_redirect_uri,
+    p_resources, p_scopes, p_org_id, p_code_challenge, p_dpop_jkt, p_auth_time,
+    p_amr::uts.auth_method[], now() + interval '60 seconds', p_consent_id
+  );
+  PERFORM uts.write_audit_event(
+    p_environment, 'ai.kilo.uts.authorization_code.issued', 6003, 1, 'success', NULL, p_account_id,
+    jsonb_build_object(
+      'clientId', uts.audit_client_id(p_client_id),
+      'clientKind', p_client_kind,
+      'codeRef', uts.credential_reference(p_code_hash),
+      'scopes', to_jsonb(p_scopes),
+      'audiences', to_jsonb(uts.scope_audiences(p_scopes)),
+      'org', p_org_id
+    )
+  );
+  outcome := 'issued';
+  org_role := member_role;
+  RETURN NEXT;
+END
+$$;
+
+DROP FUNCTION uts.exchange_authorization_code(
+  text, bytea, text, text, text, bytea, text, uuid, bytea, uts.client_class, text, text, inet,
+  integer, text, text, text[], text[]
+);
+
+-- POST /token with `authorization_code`: as in 0004 (consumes the code and creates the grant in
+-- one statement, with the same retry and reuse rules), plus the membership role (`org_role`) and
+-- each token's lifetime in the audit row.
+-- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `dpop_replay`.
+CREATE FUNCTION uts.exchange_authorization_code(
+  p_environment text,
+  p_code_hash bytea,
+  p_client_id text,
+  p_redirect_uri text,
+  p_code_challenge text,
+  p_dpop_jkt bytea,
+  p_dpop_jti text,
+  p_grant_id uuid,
+  p_refresh_token_hash bytea,
+  p_client_class uts.client_class,
+  p_device_label text,
+  p_device_platform text,
+  p_client_ip inet,
+  p_asn integer,
+  p_country text,
+  p_city text,
+  p_scopes text[],
+  p_resources text[]
+) RETURNS TABLE (
+  outcome text,
+  subject_id text,
+  bound_org_id uuid,
+  signed_in_at timestamptz,
+  sign_in_methods text[],
+  token_ids uuid[],
+  token_scopes text[],
+  refresh_expires_at timestamptz,
+  org_role uts.org_role
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  code uts.authorization_codes%ROWTYPE;
+  same_request boolean;
+  retry boolean;
+  chosen record;
+  account_state uts.account_status;
+  membership_state uts.membership_status;
+  member_role uts.org_role;
+  enforcement uts.sso_enforcement;
+  revoked_account text;
+  new_session_id uuid;
+  idle_window interval;
+  grant_state uts.grant_status;
+  stored_hash bytea;
+BEGIN
+  PERFORM uts.require_inputs('uts.exchange_authorization_code',
+    p_environment IS NOT NULL AND p_code_hash IS NOT NULL AND p_client_id IS NOT NULL
+    AND p_redirect_uri IS NOT NULL AND p_code_challenge IS NOT NULL AND p_grant_id IS NOT NULL
+    AND p_refresh_token_hash IS NOT NULL
+    -- A first-party exchange names its DPoP key, proof and client class; a third-party one none.
+    AND (p_dpop_jkt IS NULL) = (p_dpop_jti IS NULL)
+    AND (p_dpop_jkt IS NULL) = (p_client_class IS NULL));
+  SELECT * INTO code FROM uts.authorization_codes AS stored WHERE stored.code_hash = p_code_hash
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  same_request := code.expires_at > now()
+    AND code.client_id = p_client_id
+    AND code.redirect_uri = p_redirect_uri
+    AND code.code_challenge = p_code_challenge
+    AND code.dpop_jkt IS NOT DISTINCT FROM p_dpop_jkt
+    AND (code.client_kind = 'first_party') = (p_client_class IS NOT NULL);
+  retry := code.status = 'consumed';
+
+  IF retry AND (
+    same_request AND code.grant_id = p_grant_id AND code.client_kind = 'first_party'
+  ) IS NOT TRUE THEN
+    revoked_account := uts.end_grant(code.client_kind, code.grant_id, 'reuse_detected');
+    IF revoked_account IS NOT NULL THEN
+      PERFORM uts.write_audit_event(
+        p_environment, 'ai.kilo.uts.authorization_code.reused', 6003, 99, 'denied',
+        'grant revoked', revoked_account,
+        jsonb_build_object(
+          'clientId', uts.audit_client_id(code.client_id),
+          'codeRef', uts.credential_reference(p_code_hash),
+          'grantId', code.grant_id
+        )
+      );
+    END IF;
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  IF same_request IS NOT TRUE THEN
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  IF code.client_kind = 'first_party' THEN
+    INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+    VALUES (p_dpop_jkt, p_dpop_jti, now() + interval '121 seconds')
+    ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
+    IF NOT FOUND THEN
+      outcome := 'dpop_replay';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+  END IF;
+
+  SELECT * INTO chosen FROM uts.select_token_scopes(code.scopes, p_scopes, p_resources);
+  IF chosen.outcome <> 'ok' THEN
+    outcome := chosen.outcome;
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  SELECT account.status INTO account_state FROM uts.accounts AS account WHERE account.id = code.account_id;
+  IF code.org_id IS NOT NULL THEN
+    SELECT membership.status, membership.role, policy.enforcement
+    INTO membership_state, member_role, enforcement
+    FROM uts.org_memberships AS membership
+    LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = membership.org_id
+    WHERE membership.org_id = code.org_id AND membership.account_id = code.account_id;
+  END IF;
+  IF account_state IS DISTINCT FROM 'active'
+    OR uts.org_requirement_met(code.org_id, membership_state, enforcement, code.amr) IS NOT TRUE
+    OR (code.client_kind = 'third_party' AND NOT EXISTS (
+      SELECT 1 FROM uts.third_party_consents AS consent
+      JOIN uts.third_party_clients AS client ON client.client_id = consent.client_id
+      WHERE consent.id = code.consent_id AND consent.status = 'active' AND consent.scopes @> code.scopes
+        AND client.status = 'active'
+    ))
+  THEN
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  IF NOT retry THEN
+    UPDATE uts.authorization_codes AS stored
+    SET status = 'consumed', consumed_at = now(), grant_id = p_grant_id
+    WHERE stored.code_hash = p_code_hash;
+  END IF;
+
+  IF NOT retry AND code.client_kind = 'first_party' THEN
+    idle_window := CASE p_client_class WHEN 'desktop' THEN interval '30 days' ELSE interval '60 days' END;
+    INSERT INTO uts.device_sessions (
+      account_id, client_class, device_label, platform, auth_time, amr, client_ip, asn, country, city
+    ) VALUES (
+      code.account_id, p_client_class, p_device_label, p_device_platform, code.auth_time, code.amr,
+      p_client_ip, p_asn, p_country, p_city
+    ) RETURNING id INTO new_session_id;
+    INSERT INTO uts.refresh_grants (
+      id, account_id, device_session_id, client_id, client_class, token_hash, dpop_jkt,
+      allowed_scopes, org_id, idle_expires_at, expires_at
+    ) VALUES (
+      p_grant_id, code.account_id, new_session_id, code.client_id, p_client_class,
+      p_refresh_token_hash, p_dpop_jkt, code.scopes, code.org_id, now() + idle_window,
+      now() + CASE p_client_class WHEN 'desktop' THEN interval '180 days' ELSE interval '365 days' END
+    );
+    refresh_expires_at := now() + idle_window;
+  ELSIF NOT retry THEN
+    INSERT INTO uts.third_party_grant_families (
+      id, account_id, client_id, consent_id, scopes, org_id, auth_time, amr, expires_at
+    ) VALUES (
+      p_grant_id, code.account_id, code.client_id, code.consent_id, code.scopes, code.org_id,
+      code.auth_time, code.amr, now() + interval '90 days'
+    );
+    INSERT INTO uts.third_party_refresh_tokens (family_id, token_hash, idle_expires_at)
+    VALUES (p_grant_id, p_refresh_token_hash, now() + interval '30 days');
+    refresh_expires_at := now() + interval '30 days';
+  ELSE
+    SELECT grant_row.status, grant_row.token_hash,
+      least(grant_row.idle_expires_at, grant_row.expires_at)
+    INTO grant_state, stored_hash, refresh_expires_at
+    FROM uts.refresh_grants AS grant_row WHERE grant_row.id = p_grant_id;
+    IF grant_state IS DISTINCT FROM 'active' OR stored_hash IS DISTINCT FROM p_refresh_token_hash THEN
+      outcome := 'invalid_grant';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+  END IF;
+
+  token_ids := ARRAY(SELECT gen_random_uuid() FROM generate_series(1, cardinality(chosen.scopes)));
+  IF retry THEN
+    PERFORM uts.write_audit_event(
+      p_environment, 'ai.kilo.uts.token.issued', 6003, 1, 'success', NULL, code.account_id,
+      jsonb_build_object(
+        'grantType', 'authorization_code',
+        'clientId', uts.audit_client_id(code.client_id),
+        'clientKind', code.client_kind,
+        'grantId', p_grant_id,
+        'rotation', 'code_retry',
+        'codeRef', uts.credential_reference(p_code_hash),
+        'refreshRef', uts.credential_reference(p_refresh_token_hash),
+        'tokenRefs', to_jsonb(token_ids::text[]),
+        'scopes', to_jsonb(chosen.scopes),
+        'audiences', to_jsonb(uts.scope_audiences(chosen.scopes)),
+        'tokenLifetimeSeconds', uts.token_lifetimes(chosen.scopes),
+        'org', code.org_id
+      )
+    );
+  ELSE
+    PERFORM uts.write_audit_event(
+      p_environment, 'ai.kilo.uts.grant.created', 3002, 1, 'success', NULL, code.account_id,
+      jsonb_build_object(
+        'grantType', 'authorization_code',
+        'clientId', uts.audit_client_id(code.client_id),
+        'clientKind', code.client_kind,
+        'grantId', p_grant_id,
+        'codeRef', uts.credential_reference(p_code_hash),
+        'refreshRef', uts.credential_reference(p_refresh_token_hash),
+        'tokenRefs', to_jsonb(token_ids::text[]),
+        'scopes', to_jsonb(chosen.scopes),
+        'audiences', to_jsonb(uts.scope_audiences(chosen.scopes)),
+        'tokenLifetimeSeconds', uts.token_lifetimes(chosen.scopes),
+        'org', code.org_id
+      )
+    );
+  END IF;
+  outcome := 'issued';
+  subject_id := code.account_id;
+  bound_org_id := code.org_id;
+  signed_in_at := code.auth_time;
+  sign_in_methods := code.amr::text[];
+  token_scopes := chosen.scopes;
+  org_role := member_role;
+  RETURN NEXT;
+END
+$$;
+
+DROP FUNCTION uts.refresh_first_party(text, bytea, uuid, text, bytea, text, text[], text[]);
+DROP FUNCTION uts.read_refresh_grant(bytea);
+
+-- The mint and first-party refresh read of 0004, plus the membership role from the membership row
+-- it already joins: one probe of `refresh_grants_token_hash_key`, then primary-key probes of the
+-- device session, the account, the membership and the SSO policy.
+CREATE FUNCTION uts.read_refresh_grant(p_token_hash bytea)
+RETURNS TABLE (
+  id uuid,
+  account_id text,
+  device_session_id uuid,
+  client_id text,
+  client_class uts.client_class,
+  dpop_jkt bytea,
+  allowed_scopes text[],
+  org_id uuid,
+  created_at timestamptz,
+  last_used_at timestamptz,
+  idle_expires_at timestamptz,
+  expires_at timestamptz,
+  grant_status uts.grant_status,
+  session_status uts.session_status,
+  auth_time timestamptz,
+  amr uts.auth_method[],
+  account_status uts.account_status,
+  membership_status uts.membership_status,
+  sso_enforcement uts.sso_enforcement,
+  membership_role uts.org_role
+)
+LANGUAGE sql
+STABLE
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT grant_row.id, grant_row.account_id, grant_row.device_session_id, grant_row.client_id,
+    grant_row.client_class, grant_row.dpop_jkt, grant_row.allowed_scopes, grant_row.org_id,
+    grant_row.created_at, grant_row.last_used_at, grant_row.idle_expires_at, grant_row.expires_at,
+    grant_row.status,
+    session.status, session.auth_time, session.amr, account.status, membership.status,
+    policy.enforcement, membership.role
+  FROM uts.refresh_grants AS grant_row
+  JOIN uts.device_sessions AS session ON session.id = grant_row.device_session_id
+  JOIN uts.accounts AS account ON account.id = grant_row.account_id
+  LEFT JOIN uts.org_memberships AS membership
+    ON membership.org_id = grant_row.org_id AND membership.account_id = grant_row.account_id
+  LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = grant_row.org_id
+  WHERE grant_row.token_hash = $1
+$$;
+
+-- POST /token with `refresh_token` for a first-party client: as in 0004, plus the membership role
+-- (`org_role`) and each token's lifetime in the audit row.
+-- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `dpop_mismatch`,
+-- `dpop_replay`.
+CREATE FUNCTION uts.refresh_first_party(
+  p_environment text,
+  p_token_hash bytea,
+  p_grant_id uuid,
+  p_client_id text,
+  p_dpop_jkt bytea,
+  p_dpop_jti text,
+  p_scopes text[],
+  p_resources text[]
+) RETURNS TABLE (
+  outcome text,
+  subject_id text,
+  bound_org_id uuid,
+  signed_in_at timestamptz,
+  sign_in_methods text[],
+  token_ids uuid[],
+  token_scopes text[],
+  org_role uts.org_role
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  grant_row record;
+  chosen record;
+BEGIN
+  PERFORM uts.require_inputs('uts.refresh_first_party',
+    p_environment IS NOT NULL AND p_token_hash IS NOT NULL AND p_grant_id IS NOT NULL
+    AND p_client_id IS NOT NULL AND p_dpop_jkt IS NOT NULL AND p_dpop_jti IS NOT NULL);
+  SELECT * INTO grant_row FROM uts.read_refresh_grant(p_token_hash);
+  IF NOT FOUND
+    OR grant_row.id IS DISTINCT FROM p_grant_id
+    OR grant_row.client_id IS DISTINCT FROM p_client_id
+    OR grant_row.grant_status IS DISTINCT FROM 'active'
+    OR grant_row.session_status IS DISTINCT FROM 'active'
+    OR grant_row.account_status IS DISTINCT FROM 'active'
+    OR grant_row.expires_at <= now()
+    OR grant_row.idle_expires_at <= now()
+  THEN
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  IF grant_row.dpop_jkt IS DISTINCT FROM p_dpop_jkt THEN
+    IF uts.claim_denied_audit('first_party', grant_row.id) THEN
+      PERFORM uts.write_audit_event(
+        p_environment, 'ai.kilo.uts.token.denied', 6003, 1, 'denied', 'dpop key mismatch',
+        grant_row.account_id,
+        jsonb_build_object(
+          'grantType', 'refresh_token',
+          'clientId', uts.audit_client_id(grant_row.client_id),
+          'grantId', grant_row.id
+        )
+      );
+    END IF;
+    outcome := 'dpop_mismatch';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+  VALUES (grant_row.dpop_jkt, p_dpop_jti, now() + interval '121 seconds')
+  ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
+  IF NOT FOUND THEN
+    outcome := 'dpop_replay';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  IF uts.org_requirement_met(
+    grant_row.org_id, grant_row.membership_status, grant_row.sso_enforcement, grant_row.amr
+  ) IS NOT TRUE THEN
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  SELECT * INTO chosen FROM uts.select_token_scopes(grant_row.allowed_scopes, p_scopes, p_resources);
+  IF chosen.outcome <> 'ok' THEN
+    outcome := chosen.outcome;
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  -- At most once per grant per hour (fillfactor 90 keeps the update on its page).
+  IF grant_row.last_used_at < now() - interval '1 hour' THEN
+    UPDATE uts.refresh_grants AS stored
+    SET last_used_at = now(),
+      idle_expires_at = least(
+        stored.expires_at,
+        now() + CASE stored.client_class WHEN 'desktop' THEN interval '30 days' ELSE interval '60 days' END
+      )
+    WHERE stored.id = grant_row.id AND stored.last_used_at < now() - interval '1 hour';
+    UPDATE uts.device_sessions AS session
+    SET last_seen_at = now()
+    WHERE session.id = grant_row.device_session_id;
+  END IF;
+
+  token_ids := ARRAY(SELECT gen_random_uuid() FROM generate_series(1, cardinality(chosen.scopes)));
+  PERFORM uts.write_audit_event(
+    p_environment, 'ai.kilo.uts.token.issued', 6003, 1, 'success', NULL, grant_row.account_id,
+    jsonb_build_object(
+      'grantType', 'refresh_token',
+      'clientId', uts.audit_client_id(grant_row.client_id),
+      'clientKind', 'first_party',
+      'grantId', grant_row.id,
+      'tokenRefs', to_jsonb(token_ids::text[]),
+      'scopes', to_jsonb(chosen.scopes),
+      'audiences', to_jsonb(uts.scope_audiences(chosen.scopes)),
+      'tokenLifetimeSeconds', uts.token_lifetimes(chosen.scopes),
+      'org', grant_row.org_id
+    )
+  );
+  outcome := 'issued';
+  subject_id := grant_row.account_id;
+  bound_org_id := grant_row.org_id;
+  signed_in_at := grant_row.auth_time;
+  sign_in_methods := grant_row.amr::text[];
+  token_scopes := chosen.scopes;
+  org_role := grant_row.membership_role;
+  RETURN NEXT;
+END
+$$;
+
+-- POST /token with `refresh_token` for a third-party client: as in 0004, with each token's
+-- lifetime in the audit row. The return type is unchanged.
+-- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `reuse_detected`.
+CREATE OR REPLACE FUNCTION uts.refresh_third_party(
+  p_environment text,
+  p_token_hash bytea,
+  p_client_id text,
+  p_new_token_hash bytea,
+  p_scopes text[],
+  p_resources text[]
+) RETURNS TABLE (
+  outcome text,
+  subject_id text,
+  bound_org_id uuid,
+  signed_in_at timestamptz,
+  sign_in_methods text[],
+  token_ids uuid[],
+  token_scopes text[],
+  family_id uuid,
+  refresh_expires_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  presented record;
+  replaced record;
+  chosen record;
+BEGIN
+  PERFORM uts.require_inputs('uts.refresh_third_party',
+    p_environment IS NOT NULL AND p_token_hash IS NOT NULL AND p_client_id IS NOT NULL
+    AND p_new_token_hash IS NOT NULL);
+  SELECT * INTO presented FROM uts.read_third_party_refresh_token(p_token_hash);
+  IF NOT FOUND THEN
+    SELECT * INTO replaced FROM uts.read_rotated_third_party_token(p_token_hash);
+    IF FOUND
+      AND replaced.client_id IS NOT DISTINCT FROM p_client_id
+      AND replaced.family_status IS NOT DISTINCT FROM 'active'
+      AND replaced.family_expires_at > now()
+    THEN
+      PERFORM uts.end_grant('third_party', replaced.family_id, 'reuse_detected');
+      PERFORM uts.write_audit_event(
+        p_environment, 'ai.kilo.uts.refresh_token.reuse_detected', 6003, 99, 'denied',
+        'family revoked', replaced.account_id,
+        jsonb_build_object(
+          'clientId', uts.audit_client_id(replaced.client_id),
+          'grantId', replaced.family_id,
+          'refreshRef', uts.credential_reference(p_token_hash)
+        )
+      );
+      outcome := 'reuse_detected';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  IF presented.client_id IS DISTINCT FROM p_client_id
+    OR presented.family_status IS DISTINCT FROM 'active'
+    OR presented.family_expires_at <= now()
+    OR presented.token_idle_expires_at <= now()
+    OR presented.client_status IS DISTINCT FROM 'active'
+    OR presented.consent_status IS DISTINCT FROM 'active'
+    OR presented.account_status IS DISTINCT FROM 'active'
+    OR uts.org_requirement_met(
+      presented.org_id, presented.membership_status, presented.sso_enforcement, presented.amr
+    ) IS NOT TRUE
+  THEN
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  SELECT * INTO chosen FROM uts.select_token_scopes(presented.scopes, p_scopes, p_resources);
+  IF chosen.outcome <> 'ok' THEN
+    outcome := chosen.outcome;
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  INSERT INTO uts.third_party_rotated_tokens (token_key, family_id, family_expires_at)
+  VALUES (uts.rotated_token_key(p_token_hash), presented.family_id, presented.family_expires_at);
+  refresh_expires_at := least(now() + interval '30 days', presented.family_expires_at);
+  UPDATE uts.third_party_refresh_tokens AS token
+  SET token_hash = p_new_token_hash, issued_at = now(), idle_expires_at = refresh_expires_at
+  WHERE token.family_id = presented.family_id;
+
+  token_ids := ARRAY(SELECT gen_random_uuid() FROM generate_series(1, cardinality(chosen.scopes)));
+  PERFORM uts.write_audit_event(
+    p_environment, 'ai.kilo.uts.token.issued', 6003, 1, 'success', NULL, presented.account_id,
+    jsonb_build_object(
+      'grantType', 'refresh_token',
+      'clientId', uts.audit_client_id(presented.client_id),
+      'clientKind', 'third_party',
+      'grantId', presented.family_id,
+      'rotation', 'rotated',
+      'previousRefreshRef', uts.credential_reference(p_token_hash),
+      'refreshRef', uts.credential_reference(p_new_token_hash),
+      'tokenRefs', to_jsonb(token_ids::text[]),
+      'scopes', to_jsonb(chosen.scopes),
+      'audiences', to_jsonb(uts.scope_audiences(chosen.scopes)),
+      'tokenLifetimeSeconds', uts.token_lifetimes(chosen.scopes),
+      'org', presented.org_id
+    )
+  );
+  outcome := 'issued';
+  subject_id := presented.account_id;
+  bound_org_id := presented.org_id;
+  signed_in_at := presented.auth_time;
+  sign_in_methods := presented.amr::text[];
+  token_scopes := chosen.scopes;
+  family_id := presented.family_id;
+  RETURN NEXT;
+END
+$$;
+
+GRANT EXECUTE ON FUNCTION
+  uts.issue_authorization_code(
+    text, bytea, text, uts.client_kind, text, uuid, text, text[], text[], uuid, text, bytea,
+    timestamptz, text[], uuid
+  ),
+  uts.exchange_authorization_code(
+    text, bytea, text, text, text, bytea, text, uuid, bytea, uts.client_class, text, text, inet,
+    integer, text, text, text[], text[]
+  ),
+  uts.refresh_first_party(text, bytea, uuid, text, bytea, text, text[], text[])
+TO uts_app;

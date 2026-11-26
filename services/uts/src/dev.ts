@@ -18,9 +18,10 @@ import type { SignerAccess } from './token/mint';
  *
  * * `POST /__dev/sign` signs a caller-supplied claim set through the signer the grant picks.
  * * The development sign-in hand-off approves every authorization request for one synthetic
- *   account, `DEV_ACCOUNT_ID`, signed in by passkey now. `dev_decision=deny` on the authorization
- *   request denies it, and a third-party request names its consent in `dev_consent_id`. The
- *   account and any consent must exist in the local identity store.
+ *   account, `DEV_ACCOUNT_ID`, signed in by passkey now, bound to the organization the request
+ *   names in `org` (the identity store checks the membership). `dev_decision=deny` on the
+ *   authorization request denies it, and a third-party request names its consent in
+ *   `dev_consent_id`. The account and any consent must exist in the local identity store.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 
@@ -40,7 +41,7 @@ export const developmentHandoff: AuthorizationHandoff = async (request, pending)
     browserSessionId: null,
     authTime: new Date(),
     amr: ['passkey'] as const,
-    orgId: null,
+    orgId: pending.orgHint,
   };
   if (pending.client.kind === 'first_party') {
     return { status: 'approved', approval: { ...subject, clientKind: 'first_party' } };

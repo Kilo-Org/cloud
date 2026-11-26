@@ -4,6 +4,7 @@ import {
   IntrospectionResponseSchema,
   TokenResponseSchema,
   UtsAccessTokenClaimsSchema,
+  type UtsOrgRole,
   signerOfTokenKid,
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
@@ -267,13 +268,13 @@ describe('token endpoint: refresh_token', () => {
     expect((await verifiedClaims(body.access_token, 'gateway')).claims.sid).toBe(grant.grantId);
   });
 
-  it('signs a token for an organization-member scope only with the org claim', async () => {
-    const request = async (orgId: string | null) => {
+  it('signs a token for a role-limited organization scope only for an allowed role in the org', async () => {
+    const request = async (orgId: string | null, orgRole: UtsOrgRole | null) => {
       const grant = await firstParty();
       const grants = fakeGrants({
         refreshFirstParty: async () => ({
           outcome: 'issued',
-          ...minted({ scopes: ['ai-attribution:identity.read'], orgId }),
+          ...minted({ scopes: ['ai-attribution:identity.read'], orgId, orgRole }),
         }),
       });
       return await call(
@@ -290,15 +291,24 @@ describe('token endpoint: refresh_token', () => {
         oauthDeps(grants.access)
       );
     };
-    const refused = await request(null);
-    expect(refused.status).toBe(400);
-    expect(await errorOf(refused)).toBe('invalid_grant');
-
     const org = crypto.randomUUID();
-    const signed = await request(org);
-    expect(signed.status).toBe(200);
-    const body = TokenResponseSchema.parse(await signed.json());
-    expect((await verifiedClaims(body.access_token, 'ai-attribution')).claims.org).toBe(org);
+    for (const [orgId, role] of [
+      [null, null],
+      [org, 'admin'],
+      [org, 'billing_manager'],
+      [org, null],
+    ] as const) {
+      const refused = await request(orgId, role);
+      expect(refused.status).toBe(400);
+      expect(await errorOf(refused)).toBe('invalid_grant');
+    }
+
+    for (const role of ['owner', 'member'] as const) {
+      const signed = await request(org, role);
+      expect(signed.status).toBe(200);
+      const body = TokenResponseSchema.parse(await signed.json());
+      expect((await verifiedClaims(body.access_token, 'ai-attribution')).claims.org).toBe(org);
+    }
   });
 
   it('passes the proof jti to the grant statement and refuses a proof it recorded before', async () => {
@@ -571,7 +581,7 @@ describe('authorization endpoint', () => {
 
   it('issues a code bound to the DPoP key and returns it with state and iss', async () => {
     let pending: PendingAuthorization | undefined;
-    const grants = fakeGrants({ issueCode: async () => 'issued' });
+    const grants = fakeGrants({ issueCode: async () => ({ outcome: 'issued', orgRole: null }) });
     const response = await call(
       authorizeUrl({
         ...base,
@@ -677,7 +687,9 @@ describe('authorization endpoint', () => {
 
     const blocked = await call(
       authorizeUrl(base),
-      oauthDeps(fakeGrants({ issueCode: async () => 'access_denied' }).access, { handoff: approve })
+      oauthDeps(fakeGrants({ issueCode: async () => ({ outcome: 'access_denied' }) }).access, {
+        handoff: approve,
+      })
     );
     expect(redirectOf(blocked).searchParams.get('error')).toBe('access_denied');
 
@@ -707,9 +719,11 @@ describe('authorization endpoint', () => {
     expect(redirectOf(broken).searchParams.get('error')).toBe('server_error');
   });
 
-  it('refuses an organization-member scope when the approval binds no organization', async () => {
+  it('refuses an organization scope without an organization or with a role outside its roles', async () => {
+    const issuedAs = (orgRole: UtsOrgRole | null) => async () =>
+      ({ outcome: 'issued', orgRole }) as const;
     const scoped = { ...base, scope: 'ai-attribution:identity.read' };
-    const without = fakeGrants({ issueCode: async () => 'issued' });
+    const without = fakeGrants({ issueCode: issuedAs(null) });
     const refused = await call(
       authorizeUrl(scoped),
       oauthDeps(without.access, { handoff: approve })
@@ -718,20 +732,30 @@ describe('authorization endpoint', () => {
     expect(without.calls).toEqual([]);
 
     const org = crypto.randomUUID();
-    const withOrg = fakeGrants({ issueCode: async () => 'issued' });
-    const issued = await call(
-      authorizeUrl(scoped),
-      oauthDeps(withOrg.access, {
-        handoff: async (request, next) => {
-          const decision = await approve(request, next);
-          return decision.status === 'approved'
-            ? { ...decision, approval: { ...decision.approval, orgId: org } }
-            : decision;
-        },
-      })
-    );
-    expect(redirectOf(issued).searchParams.get('code')).not.toBeNull();
-    expect((withOrg.calls[0].input as IssueCodeInput).orgId).toBe(org);
+    const inOrg: AuthorizationHandoff = async (request, next) => {
+      const decision = await approve(request, next);
+      return decision.status === 'approved'
+        ? { ...decision, approval: { ...decision.approval, orgId: org } }
+        : decision;
+    };
+    for (const role of ['admin', 'billing_manager'] as const) {
+      const admin = await call(
+        authorizeUrl(scoped),
+        oauthDeps(fakeGrants({ issueCode: issuedAs(role) }).access, { handoff: inOrg })
+      );
+      expect(redirectOf(admin).searchParams.get('error')).toBe('invalid_scope');
+      expect(redirectOf(admin).searchParams.get('code')).toBeNull();
+    }
+
+    for (const role of ['owner', 'member'] as const) {
+      const withOrg = fakeGrants({ issueCode: issuedAs(role) });
+      const issued = await call(
+        authorizeUrl(scoped),
+        oauthDeps(withOrg.access, { handoff: inOrg })
+      );
+      expect(redirectOf(issued).searchParams.get('code')).not.toBeNull();
+      expect((withOrg.calls[0].input as IssueCodeInput).orgId).toBe(org);
+    }
   });
 
   it('authorizes a third-party client from its cached metadata with the consent the hand-off names', async () => {
@@ -741,7 +765,7 @@ describe('authorization endpoint', () => {
         name: 'Example',
         redirectUris: ['https://client.example.com/callback'],
       }),
-      issueCode: async () => 'issued',
+      issueCode: async () => ({ outcome: 'issued', orgRole: null }),
     });
     const response = await call(
       authorizeUrl({

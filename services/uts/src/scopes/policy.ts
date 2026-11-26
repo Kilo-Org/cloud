@@ -1,4 +1,4 @@
-import { utsScopeEntry } from '@kilocode/uts-contracts';
+import { type UtsOrgRole, utsScopeEntry } from '@kilocode/uts-contracts';
 
 /**
  * What the scope registry (`UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`, design 5.3) allows
@@ -22,13 +22,31 @@ export function credentialScopeCheck(scope: string, orgId: string | null): Crede
 }
 
 /**
- * The first of `scopes` whose registry entry needs the `org` claim (`requiresOrgClaim`) when no
- * organization is bound (`orgId` null), or null when every scope can be minted. The authorization
- * endpoint refuses such a request, and the mint refuses to sign such a token, so a token for an
- * organization-member scope always names its organization. The membership role a scope lists
- * (`subjects.roles`) is not checked here: the mint statements do not read the role.
+ * The first of `scopes` that cannot be minted for the bound organization, or null when every scope
+ * can: a scope whose registry entry needs the `org` claim (`requiresOrgClaim`) when no organization
+ * is bound (`orgId` null), or a scope limited to listed membership roles (`subjects.roles`) when
+ * the subject's role in that organization (`orgRole`, read by the mint statement) is not one of
+ * them. The authorization endpoint answers `invalid_scope` and the token endpoint `invalid_grant`,
+ * and neither signs, so a token for an organization scope always names an organization in which
+ * its subject holds an allowed role.
  */
-export function scopeMissingOrg(scopes: readonly string[], orgId: string | null): string | null {
-  if (orgId !== null) return null;
-  return scopes.find(scope => utsScopeEntry(scope)?.requiresOrgClaim === true) ?? null;
+export function orgScopeRefusal(
+  scopes: readonly string[],
+  orgId: string | null,
+  orgRole: UtsOrgRole | null
+): string | null {
+  for (const scope of scopes) {
+    const entry = utsScopeEntry(scope);
+    if (entry === null) continue;
+    if (entry.requiresOrgClaim && orgId === null) return scope;
+    const { subjects } = entry;
+    if (
+      subjects.kind === 'org_member' &&
+      subjects.roles !== 'any' &&
+      (orgRole === null || !subjects.roles.includes(orgRole))
+    ) {
+      return scope;
+    }
+  }
+  return null;
 }

@@ -1,7 +1,7 @@
-import type { UtsEnvironment } from '@kilocode/uts-contracts';
+import type { UtsEnvironment, UtsOrgRole } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { IdentityStore } from '../db/client';
-import { CLIENT_KINDS } from '../db/enums';
+import { CLIENT_KINDS, ORG_ROLES } from '../db/enums';
 
 /**
  * The OAuth grant statements (migration `0004_oauth_grants.sql`). Each call is one SQL statement:
@@ -37,7 +37,11 @@ export type IssueCodeInput = {
   authTime: Date;
   amr: readonly string[];
 };
-export type IssueCodeResult = 'issued' | 'access_denied' | 'consent_required';
+
+/** `orgRole`: the caller's role in `orgId` (`uts.org_role`), null without an organization. */
+export type IssueCodeResult =
+  | { outcome: 'issued'; orgRole: UtsOrgRole | null }
+  | { outcome: 'access_denied' | 'consent_required' };
 
 /** `scopes` and `resources` null mean "not named in the request". */
 type TokenSelection = { scopes: readonly string[] | null; resources: readonly string[] | null };
@@ -86,6 +90,11 @@ export type ThirdPartyRefreshInput = TokenSelection & {
 export type Minted = {
   subjectId: string;
   orgId: string | null;
+  /**
+   * The subject's membership role in `orgId`, read by the mint statement (migration 0005); null
+   * without an organization and for a third-party refresh, which reads no role.
+   */
+  orgRole: UtsOrgRole | null;
   authTime: Date;
   amr: string[];
   /** One `jti` per token, in the order of `scopes`. */
@@ -153,10 +162,16 @@ const MintedColumns = {
   token_scopes: z.array(z.string()).min(1),
 };
 
-function minted(row: z.output<z.ZodObject<typeof MintedColumns>>): Minted {
+const OrgRoleColumn = { org_role: z.enum(ORG_ROLES).nullable() };
+
+function minted(
+  row: z.output<z.ZodObject<typeof MintedColumns>>,
+  orgRole: UtsOrgRole | null
+): Minted {
   return {
     subjectId: row.subject_id,
     orgId: row.bound_org_id,
+    orgRole,
     authTime: row.signed_in_at,
     amr: row.sign_in_methods,
     tokenIds: row.token_ids,
@@ -167,17 +182,23 @@ function minted(row: z.output<z.ZodObject<typeof MintedColumns>>): Minted {
 const failure = <const Outcomes extends readonly [string, ...string[]]>(outcomes: Outcomes) =>
   z.object({ outcome: z.enum(outcomes) });
 
-const IssueCodeRowSchema = z.object({
-  outcome: z.enum(['issued', 'access_denied', 'consent_required']),
-});
+const IssueCodeRowSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('issued'), ...OrgRoleColumn }),
+  failure(['access_denied', 'consent_required']),
+]);
 
 const ExchangeRowSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('issued'), ...MintedColumns, refresh_expires_at: z.date() }),
+  z.object({
+    outcome: z.literal('issued'),
+    ...MintedColumns,
+    ...OrgRoleColumn,
+    refresh_expires_at: z.date(),
+  }),
   failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_replay']),
 ]);
 
 const FirstPartyRefreshRowSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('issued'), ...MintedColumns }),
+  z.object({ outcome: z.literal('issued'), ...MintedColumns, ...OrgRoleColumn }),
   failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_mismatch', 'dpop_replay']),
 ]);
 
@@ -262,7 +283,9 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         ],
         IssueCodeRowSchema
       );
-      return row.outcome;
+      return row.outcome === 'issued'
+        ? { outcome: 'issued', orgRole: row.org_role }
+        : { outcome: row.outcome };
     },
 
     async exchangeCode(input) {
@@ -293,7 +316,11 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         ExchangeRowSchema
       );
       if (row.outcome !== 'issued') return { outcome: row.outcome };
-      return { outcome: 'issued', refreshExpiresAt: row.refresh_expires_at, ...minted(row) };
+      return {
+        outcome: 'issued',
+        refreshExpiresAt: row.refresh_expires_at,
+        ...minted(row, row.org_role),
+      };
     },
 
     async refreshFirstParty(input) {
@@ -312,7 +339,7 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         FirstPartyRefreshRowSchema
       );
       if (row.outcome !== 'issued') return { outcome: row.outcome };
-      return { outcome: 'issued', ...minted(row) };
+      return { outcome: 'issued', ...minted(row, row.org_role) };
     },
 
     async refreshThirdParty(input) {
@@ -333,7 +360,7 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         outcome: 'issued',
         familyId: row.family_id,
         refreshExpiresAt: row.refresh_expires_at,
-        ...minted(row),
+        ...minted(row, null),
       };
     },
 

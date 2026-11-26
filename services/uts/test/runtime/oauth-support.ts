@@ -98,6 +98,7 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   return {
     subjectId: 'oauth/runtime-user',
     orgId: null,
+    orgRole: null,
     authTime: new Date(Date.now() - 60_000),
     amr: ['passkey'],
     tokenIds: [crypto.randomUUID()],

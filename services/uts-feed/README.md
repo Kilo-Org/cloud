@@ -10,11 +10,15 @@ near itself.
 (32 keys), plus, for 1 hour and 10 minutes after each rotation, the key that retired (48 keys right
 after the 16 signers rotate together).
 
-- `Cache-Control: max-age=300, stale-if-error=86400` (design 5.7) while the oldest keys in the set
-  were read from their signer object less than 10 seconds ago. An older set also carries `Age`, the
-  seconds since that read, and both limits shrink by it: `max-age=<max(0, 300 - Age)>,
-  stale-if-error=<max(0, 86400 - Age)>`. A verifier that counts `Age` therefore keeps no key longer
-  than 24 hours after its last good read (design 7, decision Q55).
+- `Cache-Control: max-age=300, stale-if-error=86400` (design 5.7), unchanged on every response,
+  with two ages in whole seconds beside it:
+  - `Age` (RFC 9111 section 5.1): the seconds since the newest keys in the set were read from their
+    signer object, which is when the set last got fresh keys. A verifier counts its 5-minute
+    lifetime from it, so one failing signer does not make every response arrive expired, and
+    verifiers that fetched at different times do not move in lockstep.
+  - `Kilo-Key-Set-Oldest-Age`: the seconds since the oldest keys in the set were read. A verifier
+    counts its 24-hour last-good limit from it, so it keeps no key longer than 24 hours after that
+    signer's last good read (design 7, decision Q55).
 - The keys come from the mint Worker's internal signer-keys route (`GET /internal/signer-keys`),
   fetched over the `UTS_MINT` service binding to the mint Worker's default entrypoint, so the read
   runs in the mint Worker's placed fetch handler. The binding carries this Worker's deployed name as

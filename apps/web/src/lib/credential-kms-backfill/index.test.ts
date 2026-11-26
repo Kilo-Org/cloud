@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from '@jest/globals';
+import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { coding_plan_key_inventory, openai_chatgpt_connections } from '@kilocode/db/schema';
 import type { EncryptedData } from '@kilocode/db/schema-types';
@@ -522,6 +522,34 @@ describe('backfillCredentialKmsEnvelopes', () => {
     const recovered = await runBackfill();
     expect(summaryCounts(recovered.inventory)).toMatchObject({ migrated: 1, remaining: 0 });
     expect(summaryCounts(recovered.connections)).toMatchObject({ migrated: 1, remaining: 0 });
+  });
+
+  test('logs a capped number of failed rows by category and error name, without identifiers', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 7; i++) ids.push(await insertInventoryRow());
+    failKmsRequests('/data-key');
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { inventory } = await runBackfill();
+
+      expect(inventory.failed.kms).toBe(7);
+      const rowFailures = errorSpy.mock.calls
+        .map(call => String(call[0]))
+        .filter(line => line.includes('credential_kms_backfill.row_failed'));
+      expect(rowFailures).toHaveLength(5);
+      expect(JSON.parse(rowFailures[0])).toEqual({
+        event: 'credential_kms_backfill.row_failed',
+        store: 'coding_plan_inventory',
+        category: 'kms',
+        exception_name: 'Error',
+        database_error_code: null,
+      });
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      for (const id of ids) expect(logged).not.toContain(id);
+      expect(logged).not.toContain('sk-inventory-');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test('counts a static-key copy that does not decrypt without asking KMS for a key', async () => {

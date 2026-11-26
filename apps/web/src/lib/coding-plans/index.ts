@@ -52,6 +52,7 @@ import {
 
 const logInfo = sentryLogger('coding-plans', 'info');
 const logError = sentryLogger('coding-plans', 'error');
+const logWarning = sentryLogger('coding-plans', 'warning');
 
 export class CodingPlanInventoryUploadError extends Error {
   constructor(message: string) {
@@ -171,14 +172,19 @@ async function prepareAvailableInventoryCredential(
       )
       .limit(1);
     if (!row) break;
-    let plaintext: string | null;
     try {
-      plaintext = await openCodingPlanInventoryCredential(row);
+      const plaintext = await openCodingPlanInventoryCredential(row);
+      if (plaintext !== null) return { candidate: { row, plaintext }, unreadableIds };
+      logWarning('Coding plan inventory credential skipped: it does not decrypt', {
+        inventoryKeyId: row.id,
+      });
     } catch (error) {
       if (!(error instanceof CredentialKmsError)) throw error;
-      plaintext = null;
+      logWarning('Coding plan inventory credential skipped: KMS did not open its envelope', {
+        inventoryKeyId: row.id,
+        error: error.causeName,
+      });
     }
-    if (plaintext !== null) return { candidate: { row, plaintext }, unreadableIds };
     unreadableIds.push(row.id);
   }
   return { candidate: null, unreadableIds };

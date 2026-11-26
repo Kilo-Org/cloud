@@ -21,6 +21,7 @@ import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gate
 import { openAiChatGptConnectorGone } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector';
 import {
   getOpenAiChatGptStoredConnection,
+  openAiChatGptOwnerKey,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -220,8 +221,13 @@ async function hasOpenAiChatGptByokForModel(params: {
     // A payload the KMS service cannot open counts as no usable connection, so the
     // ordinary balance check applies. A database failure still propagates.
     const stored = await getOpenAiChatGptStoredConnection(owner).catch((error: unknown) => {
-      if (error instanceof CredentialKmsError) return null;
-      throw error;
+      if (!(error instanceof CredentialKmsError)) throw error;
+      console.warn(
+        '[openai-chatgpt] balance check skips an unreadable stored connection: %s (%s)',
+        error.causeName,
+        openAiChatGptOwnerKey(owner)
+      );
+      return null;
     });
     if (!stored?.isEnabled || stored.connection.status !== 'connected') continue;
     // The shared row bills the organization only while the person who connected

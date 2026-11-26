@@ -251,7 +251,7 @@ async function readServableStoredConnection(
     if (!(error instanceof CredentialKmsError)) throw error;
     console.error(
       '[openai-chatgpt] stored connection unreadable: %s (%s)',
-      error instanceof Error ? error.name : 'UnknownError',
+      error.causeName,
       openAiChatGptOwnerKey(owner)
     );
     return null;

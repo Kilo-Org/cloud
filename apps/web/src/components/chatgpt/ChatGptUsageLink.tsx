@@ -14,8 +14,12 @@ export async function ChatGptUsageLink({ kiloUserId }: { kiloUserId: string }) {
     kiloUserId,
     organizationId: null,
   }).catch((error: unknown) => {
-    if (error instanceof CredentialKmsError) return null;
-    throw error;
+    if (!(error instanceof CredentialKmsError)) throw error;
+    console.warn(
+      '[openai-chatgpt] usage link hidden: stored connection unreadable: %s',
+      error.causeName
+    );
+    return null;
   });
   if (connection?.status !== 'connected') return null;
 

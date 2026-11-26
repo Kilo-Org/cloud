@@ -203,6 +203,10 @@ export async function openOpenAiChatGptConnectionForComparison(
     return await openOpenAiChatGptConnection(row);
   } catch (error) {
     if (!(error instanceof CredentialKmsError)) throw error;
+    console.warn(
+      '[openai-chatgpt] KMS could not open the stored payload; comparing against the static-key copy: %s',
+      error.causeName
+    );
     return openAiChatGptKmsOwnerOfRow(row)
       ? parseOpenAiChatGptConnection(openStaticKeyCopy(row.encrypted_connection))
       : null;

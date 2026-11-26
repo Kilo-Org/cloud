@@ -975,7 +975,8 @@ describe('checkOpenAiChatGptByok', () => {
 
       const [, logged] = await withLoggedErrors(() => checkOpenAiChatGptByok(routingInput()));
 
-      expect(logged).toContain('CredentialKmsError');
+      // The name of the underlying KMS failure, never its message.
+      expect(logged).toContain('"Error"');
       expect(logged).toContain(`${USER_ID}:personal`);
       expect(logged).not.toContain('stored-refresh-token');
       expect(logged).not.toContain('/decrypt');

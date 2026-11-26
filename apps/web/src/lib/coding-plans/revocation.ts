@@ -18,7 +18,10 @@ import {
 } from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
+
+const logError = sentryLogger('coding-plans', 'error');
 
 export type ManualRevocationStatus = 'revocation_pending' | 'revocation_failed';
 
@@ -228,7 +231,11 @@ export async function replaceManualCredentialRevocation(
   let dataKey: ByokDataKey;
   try {
     dataKey = await createCodingPlanInventoryDataKey(inventoryKeyId, adminUserId);
-  } catch {
+  } catch (error) {
+    logError('Coding plan revocation replacement could not create a data key', {
+      inventoryKeyId,
+      error: error instanceof Error ? error.name : 'UnknownError',
+    });
     throw replacementError('Unable to create an encryption key for the credential. Try again.');
   }
 

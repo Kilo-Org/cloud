@@ -623,7 +623,14 @@ export async function markOpenAiChatGptNotEligible(
   const sealingKey = await createOpenAiChatGptConnectionSealingKey(
     owner,
     OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR
-  ).catch(() => null);
+  ).catch((error: unknown) => {
+    console.error(
+      '[openai-chatgpt] no data key for the refusal; recording it without an envelope: %s (%s)',
+      error instanceof Error ? error.name : 'UnknownError',
+      openAiChatGptOwnerKey(owner)
+    );
+    return null;
+  });
   // A KMS outage must not keep a refused account serving requests: the refusal is then
   // recorded without an envelope, which the errored payload's cleared tokens allow.
   await withConnectionHoldingToken(owner, refusedAccessToken, (tx, connection) =>

@@ -32,6 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connection-encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 import { createCodingPlanInventoryDataKey } from '@/lib/coding-plans/inventory-credential-encryption';
 
 /** Recorded by the KMS service as the actor of every data key this backfill creates. */
@@ -83,28 +84,56 @@ function needsEnvelope(legacy: AnyColumn, envelope: AnyColumn): SQL {
   ) as SQL;
 }
 
-/** Sealed with a step so a failure is reported by category, never by its message. */
+/** Row failures logged per store and run; the rest are only counted, so an outage is a few lines. */
+const MAX_LOGGED_ROW_FAILURES = 5;
+
+/**
+ * Sealed with a step so a failure is reported by category and the name of its cause, never
+ * by its message.
+ */
 class BackfillStepError extends Error {
-  constructor(readonly category: FailureCategory) {
-    super(`credential KMS backfill ${category} failure`);
+  readonly causeName: string;
+
+  constructor(
+    readonly category: FailureCategory,
+    cause: unknown
+  ) {
+    super(`credential KMS backfill ${category} failure`, { cause });
     this.name = 'BackfillStepError';
+    this.causeName = sanitizedExceptionName(cause);
   }
 }
 
 function openLegacyCiphertext(legacy: EncryptedData): string {
   try {
     return decryptApiKey(legacy, BYOK_ENCRYPTION_KEY);
-  } catch {
-    throw new BackfillStepError('legacy_unreadable');
+  } catch (error) {
+    throw new BackfillStepError('legacy_unreadable', error);
   }
 }
 
 async function createDataKey<T>(create: () => Promise<T>): Promise<T> {
   try {
     return await create();
-  } catch {
-    throw new BackfillStepError('kms');
+  } catch (error) {
+    throw new BackfillStepError('kms', error);
   }
+}
+
+/** One structured line for a failed row: category and error names only, no identifiers. */
+function logRowFailure(store: CredentialKmsBackfillStoreName, error: unknown): FailureCategory {
+  const category = error instanceof BackfillStepError ? error.category : 'database';
+  console.error(
+    JSON.stringify({
+      event: 'credential_kms_backfill.row_failed',
+      store,
+      category,
+      exception_name:
+        error instanceof BackfillStepError ? error.causeName : sanitizedExceptionName(error),
+      database_error_code: getPostgresErrorCode(error),
+    })
+  );
+  return category;
 }
 
 type BackfillRow = { id: string };
@@ -326,6 +355,7 @@ async function backfillStore<Row extends BackfillRow>(
     getByokKmsClientConfig();
 
     let afterId: string | null = null;
+    let loggedFailures = 0;
     const limit = pLimit(concurrency);
     while (Date.now() < deadlineAt) {
       const rows = await store.selectBatch(afterId, batchSize);
@@ -345,7 +375,14 @@ async function backfillStore<Row extends BackfillRow>(
               if ((await store.migrateRow(row)) === 'migrated') summary.migrated += 1;
               else summary.skippedConcurrentWrite += 1;
             } catch (error) {
-              summary.failed[error instanceof BackfillStepError ? error.category : 'database'] += 1;
+              const category =
+                loggedFailures < MAX_LOGGED_ROW_FAILURES
+                  ? logRowFailure(store.name, error)
+                  : error instanceof BackfillStepError
+                    ? error.category
+                    : 'database';
+              loggedFailures += 1;
+              summary.failed[category] += 1;
             }
           })
         )

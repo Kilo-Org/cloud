@@ -41,9 +41,13 @@ export function legacyCiphertextDigestSql(column: AnyColumn): SQL<string> {
  * database. The cause is kept for debugging and never carries the plaintext.
  */
 export class CredentialKmsError extends Error {
+  /** The name of the underlying failure, safe to log; its message is not. */
+  readonly causeName: string;
+
   constructor(cause: unknown) {
     super('The BYOK KMS service did not open the credential envelope', { cause });
     this.name = 'CredentialKmsError';
+    this.causeName = cause instanceof Error ? cause.name : 'UnknownError';
   }
 }
 

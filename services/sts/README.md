@@ -975,11 +975,13 @@ create tokens or manage members could make a credential that outlives its hour. 
 the ids of the token, member, role and account-settings groups; it is filled in at setup step 3
 and is empty until then. While it is empty and `CF_DEPLOY_ACCOUNT_ID` is set, `DeployTokenDO`
 refuses every mint with `denied` `not_configured` (403, not retryable) and calls nothing, so setup
-step 5 cannot take effect before step 3. The minting member's role does not stop such a group:
-the role must include API token provisioning to mint at all, and Cloudflare lets a member give a
-token any subset of its own rights, token provisioning included. So the pinned ids and the runtime
-check of the returned token are what keep token provisioning out of a minted token; the role only
-bounds the deploy rights.
+step 5 cannot take effect before step 3. The minting token's own policy does not stop such a
+group: it must hold `Account API Tokens Write` to mint at all, and Cloudflare documents no rule
+that limits what an account token may grant to the tokens it creates (the subset rule on
+https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/ is written
+for members). So the pinned ids and the runtime check of the returned token are what keep token
+provisioning out of a minted token; the minting token's fixed policy is expected to bound the
+deploy rights, and setup check 6 confirms it.
 
 **Calling it.** The job asks with no body and revokes in an `always()` step:
 
@@ -1059,9 +1061,13 @@ meanwhile. Once a day, and once more after a creation whose outcome STS does not
 also sweeps the account's token list (`GET /accounts/<account>/tokens`, 50 a page, 2 pages per
 alarm) and deletes every expired token whose name starts with `sts-<environment>-` and for which
 STS holds no row. It never touches another environment's tokens, an unexpired token, or a token
-named otherwise. When Cloudflare answers 401 or 403 to the minting credential on a delete or a
-list, or 401 on a token creation (a 403 there can refuse just that request, such as a group
-outside the member's role), the object drops the credential and stores a hold: until it ends,
+named otherwise. The list asks for expired tokens too (`include_expired=true`): Cloudflare leaves
+them out otherwise, and lists them only while recently expired
+(https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/list/), so a
+lost creation's token is swept 2 minutes after its expiry. When Cloudflare answers 401 or 403 to
+the minting credential on a list, or 401 on a delete or a token creation (a 403 there can refuse
+just that request: a group outside the minting token's own policy, or a token an earlier minting
+token created, see "Rotation"), the object drops the credential and stores a hold: until it ends,
 the alarm makes no Cloudflare call and reads no credential (deletes, the window check and the
 sweep all wait for it, the sweep's next run included). The hold starts at 1 minute and doubles
 with each refusal up to 1 hour; a call Cloudflare accepts ends it. A mint or revoke a caller asks
@@ -1111,8 +1117,8 @@ from the token's creation to its deletion or expiry, widened by 2 minutes on eac
   name the acting API token (`actor.token_id`, `actor.token_name`) and are kept 18 months
   (https://developers.cloudflare.com/fundamentals/account/account-security/audit-logs/), so
   filtered to the minted token they would also show deletions and route changes. STS does not use
-  them yet: they need `Audit Logs Read` (or Account Settings Read) on the minting member and token;
-  the API documents only exclusion filters for the token id; the docs cover "about 95 % of
+  them yet: they need `Audit Logs Read` (or Account Settings Read) on the minting token; the API
+  documents only exclusion filters for the token id; the docs cover "about 95 % of
   products" without naming the Workers endpoints, state no ingestion delay and no per-plan
   availability; and without one real entry for a `wrangler deploy`, a check cannot tell a
   script upload from other actions. It is recorded as the stronger option in design Q65, with the
@@ -1154,23 +1160,30 @@ their reason, the token id for a revoke, and the caller's stable claims.
 **Setup, per environment (staging first). Needs Igor's approval before any step runs.** No step
 is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
 
-1. **Dedicated account member.** Add one Cloudflare account member per environment, for example
-   `cf-deploy-minter-staging@<kilo domain>` and `cf-deploy-minter-production@<kilo domain>`, with
-   two-factor sign-in and its password in the break-glass vault. Its role grants only API token
-   provisioning and the deploy permissions CI needs: `Workers Scripts Write` and `Containers Write`
-   on the account, and `Workers Routes Write` on the `kiloapps.io` zone. It gets no Super
-   Administrator, no Secrets Store, no DNS, no member or account settings rights. Cloudflare lets a
-   member grant a token only a subset of its own permissions
-   (https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/), so this
-   role bounds the deploy rights of every token STS mints with its credential. It does not keep
-   token provisioning out of a minted token, because the member holds it; the pinned ids of step 3
-   and the runtime check do. Both members act in the one account staging and production share.
-2. **Minting token.** Signed in as that member, create an account API token `sts-minting-<env>`
-   with `Account API Tokens Write` plus exactly the groups of step 1, the same resources, and an
-   expiry of 90 days.
-3. **Permission-group ids.** With the minting token, `GET
-   /accounts/<account>/tokens/permission_groups` lists every group with its id and name; copy the
-   ids and Cloudflare's exact names of the step-1 groups into the policy. Copy into
+1. **Creator.** The minting credential is an account-owned API token, not a person or a dedicated
+   member: account tokens "act as service principals with their own specific set of permissions"
+   (https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/). Only a
+   member with API Token Provisioning or a Super Administrator can create one (same page); Igor, a
+   Super Administrator, does steps 2 and 3 in his own dashboard session. No mailbox, invite or
+   member role is needed. Every Super Administrator of the account (8 today) can see and manage
+   every account token, so each of them can delete or roll the minting token
+   (`PUT /accounts/<account>/tokens/<id>/value`,
+   https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/value/methods/update/)
+   and so obtain a working value; the value itself is shown once, at creation. Both environments'
+   tokens act in the one account staging and production share.
+2. **Minting token.** In **Manage account > Account API tokens > Create Token**, create
+   `sts-minting-<env>` (`sts-minting-staging`, `sts-minting-production`) with exactly these
+   permissions: on the account (`Kilo Code`, `e115e769bcdd4c3d66af59d3332cb394`) `Account API
+   Tokens` Edit, `Workers Scripts` Edit and `Containers` Edit; on the zone `kiloapps.io` `Workers
+   Routes` Edit. No other permission, zone or account; no IP filter (Workers have no fixed egress
+   address); expiry 90 days from creation. The dashboard's Edit is the API's Write. This fixed
+   policy replaces the member role: it is what the deploy rights of every minted token are
+   expected to stay within, and setup check 6 confirms Cloudflare enforces it.
+3. **Permission-group ids.** In the same dashboard session (Super Administrator), read `GET
+   /accounts/<account>/tokens/permission_groups`, which lists every group with its id and name
+   (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/permission_groups/methods/list/);
+   copy the ids and Cloudflare's exact names of the deploy groups of step 2 (`Workers Scripts
+   Write`, `Containers Write`, `Workers Routes Write`) into the policy. Copy into
    `CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS` (`src/constants.ts`) the ids of every group that
    reads or writes API tokens, members, roles or account settings (for example `Account API
    Tokens Write`, `API Tokens Write`, `Account Settings Write`, `Memberships Write`), and deploy.
@@ -1183,27 +1196,38 @@ is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
    `/sts-deploy` only.
 5. **STS.** Set `CF_DEPLOY_ACCOUNT_ID` in that environment's block of `wrangler.jsonc` and deploy;
    then add the policy (`ci-deploy-bouncer`) with its grant and deploy again.
-6. **Checks in staging.** A staging deploy job gets a token and deploys with it; asking Cloudflare
-   for a group outside the member's role with the minting token is refused (the ceiling holds); a
-   minted token cannot create a token (`POST /accounts/<account>/tokens` with it answers 403); a
-   minted token that the job did not revoke is gone from the account's token list about an hour
-   later; the sweep lists the account's tokens with the minting token (Cloudflare shows a member
-   only the account tokens it created, so a rotated minting token of the same member must still
-   list and delete the earlier token's children); the window check's script list and the zone's
-   route list answer 200 with the minting token; and which rate-limit budget the calls draw from:
-   read the `Ratelimit` header (remaining quota) of a call made with the minting token, run a
-   deploy with a minted token, then read it again. If the deploy's calls lowered it, the minting
-   token and its minted tokens share one budget (the member's); if not, each token has its own.
-   Record the answer in the cost paragraph below. Finally, while the account is shared, confirm in
-   each deploying repository's settings that the GitHub environment a staging `cloudflare-deploy`
-   policy binds carries the same protection rules as production's (required reviewers, deployment
-   branch `main`, no self-review): a staging token reaches production Workers.
+6. **Checks in staging.** A staging deploy job gets a token and deploys with it. Asking Cloudflare
+   with the minting token for a group outside its own policy (for example `DNS Read`) is refused,
+   so its policy is the ceiling; if it is not, the pinned ids and the returned-grant check are the
+   only limit and Q65 is reopened. A minted token cannot create a token (`POST
+   /accounts/<account>/tokens` with it answers 403). The minting token cannot list, roll or delete
+   an account token it did not create: have a Super Administrator create a throwaway canary account
+   token, try each with the minting token, then delete the canary; if any succeeds, the minting
+   token reaches every account token's rights and Q65 is reopened. A minted token that the job did
+   not revoke is gone from the account's token list about an hour later. The sweep's list with
+   `include_expired=true` returns a token that expired a few minutes ago. Whether a rotated minting
+   token still lists and deletes its predecessor's tokens: the list API gives a caller with
+   `list_self` only the tokens it created, and the docs do not say which an account token gets; the
+   answer only changes the rotation step below, not the code. The window check's script list and
+   the zone's route list answer 200 with the minting token. Which rate-limit budget the calls draw
+   from: read the `Ratelimit` header (remaining quota) of a call made with the minting token, run a
+   deploy with a minted token, then read it again; if the deploy's calls lowered it, the minting
+   token and its minted tokens share one budget, if not, each token has its own. Record the answers
+   in the cost paragraph below and Q65. Finally, while the account is shared, confirm in each
+   deploying repository's settings that the GitHub environment a staging `cloudflare-deploy` policy
+   binds carries the same protection rules as production's (required reviewers, deployment branch
+   `main`, no self-review): a staging token reaches production Workers.
 
-**Rotation (every 90 days, or at once on a leak).** Create the new minting token as in step 2, put
-it into `/ci/minting`, wait 5 minutes (STS reads it within 4), then delete the old minting token in
-the dashboard. Tokens already minted stay valid until they expire, at most 1 hour, and the reaper
-deletes them with the new credential. On a leak of a minted token, delete it in the dashboard; it
-expires within the hour anyway.
+**Rotation (every 90 days, or at once on a leak).** A Super Administrator creates the new minting
+token as in step 2, puts it into `/ci/minting`, and waits 5 minutes (STS reads it within 4). Then
+they wait 1 hour and 5 minutes more, so every token the old credential minted has expired and its
+deletion or sweep has run, and look in **Account API tokens** (a Super Administrator sees every
+account token) for any `sts-<env>-` token still there: STS's deletes with the new credential may be
+refused for tokens the old one created (Cloudflare documents no rule either way; such a 403 fails
+that deletion alone, which STS retries up to hourly). Delete each by hand (STS's next retry then
+finds it gone), then delete the old minting token. On a leak of the minting token, delete it at
+once instead and clear its `sts-<env>-` children by hand the same way; on a leak of a minted token,
+delete it in the dashboard; it expires within the hour anyway.
 
 **Cost.** Per deploy (one token for both of bouncer's deploy steps, revoked by the job): 2 STS
 requests, 2 `DeployTokenDO` calls, 2 Cloudflare API calls (create and delete; a token the job does
@@ -1226,18 +1250,19 @@ window check repeats its list calls on each retry, at most 3 times per window, a
 minutes per user, counted together across the dashboard, API keys and API tokens; its table lists
 the same 1,200 per 5 minutes for "Client API per user/account token"
 (https://developers.cloudflare.com/fundamentals/api/reference/limits/). The page does not say
-whether an account-owned token's calls count against the member that created it; until staging
-check 6 answers it, assume the worst case: STS's minting calls and every minted token's own
-`wrangler deploy` calls draw from one budget, the dedicated member's (one member per environment,
-and no person signs in as it, so no dashboard traffic shares it). STS's own share: 43 deploys
-inside one 5-minute window make 172 calls (14 %; the window checks come 2 minutes after each
-revoke, so they may fall into the next window); deletion retries add at most 5 deletes and 2
-list calls per 30 seconds (70 per 5 minutes), and every call stops for a 429's `Retry-After`, so
+which budget an account-owned token's calls count against (the token's own, or the creator's);
+until staging check 6 answers it, assume the worst case: STS's minting calls and every minted
+token's own `wrangler deploy` calls draw from one budget (no person uses these tokens, so no
+dashboard traffic shares it). STS's own share: 43 deploys inside one 5-minute window make 172
+calls (14 %; the window checks come 2 minutes after each revoke, so they may fall into the next
+window); deletion retries add at most 5 deletes and 2 list calls per 30 seconds (70 per 5
+minutes), and every call stops for a 429's `Retry-After`, so
 STS stays under 21 % of the budget even in a burst during a Cloudflare outage. The rest is the
 deploys' own calls, which are the same calls the stored deploy token makes today. When Cloudflare
-refuses the minting credential (401 or 403), the credential hold stops the alarm after its first
-refused call: a revoked minting token costs 1 login, 1 `SignerDO` call, 1 Infisical read and 1
-Cloudflare call per hold, at 1, 2, 4, ... minutes up to 1 hour (6 in the first hour, then 1 an
+refuses the minting credential (a 401, or a 403 on a list), the credential hold stops the alarm
+after its first refused call: a revoked minting token costs 1 login, 1 `SignerDO` call, 1
+Infisical read and 1 Cloudflare call per hold, at 1, 2, 4, ... minutes up to 1 hour (6 in the
+first hour, then 1 an
 hour) until someone replaces it. STS holds at most `maxActive` unexpired tokens per policy (3 at
 most), so the 500-token cap is out of reach while the reaper runs. Volume does not grow with
 clients or Vercel instances: only GitHub deploy jobs with this grant mint.

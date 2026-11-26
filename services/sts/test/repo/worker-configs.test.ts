@@ -16,6 +16,7 @@ import {
   stsVarProblems,
   parseWorkerConfig,
   trackedPaths,
+  workerBindingPolicyProblems,
   workerConfigPaths,
   workerConfigProblems,
 } from './worker-configs';
@@ -132,6 +133,10 @@ describe('repository Worker configs', () => {
 
   it('set every var STS reads in each STS deployment, with the issuer verifiers expect', () => {
     expect(stsVarProblems(repoConfigs())).toEqual([]);
+  });
+
+  it('bind STS as every worker-binding policy, unless its Worker is listed as external', () => {
+    expect(workerBindingPolicyProblems(repoConfigs(), shippedPolicies())).toEqual([]);
   });
 });
 
@@ -551,6 +556,23 @@ describe('worker config rules', () => {
     ]);
   });
 
+  it('refuses a config deploying under the name of a workload whose config lives elsewhere', () => {
+    const impostor = parseWorkerConfig('services/impostor/wrangler.jsonc', {
+      name: 'bouncer-watch',
+      ...NO_TRACES,
+      services: [stsBinding('sts', { props: { caller: 'bouncer-watch' } })],
+    });
+    const renamed = consumer({ env: { x: { name: 'bouncer-watch' } } });
+    const policies = [
+      workerBindingPolicy('consumer'),
+      workerBindingPolicy('bouncer-watch', ['production']),
+    ];
+    expect(workerConfigProblems([impostor, renamed], policies)).toEqual([
+      'services/impostor/wrangler.jsonc (top level) deploys as bouncer-watch, whose config lives in Kilo-Org/bouncer',
+      `${PATH} (env.x) deploys as bouncer-watch, whose config lives in Kilo-Org/bouncer`,
+    ]);
+  });
+
   it('refuses unsafe bindings in any block', () => {
     const unsafe = {
       bindings: [{ type: 'durable_object_namespace', class_name: 'SignerDO', script_name: 'sts' }],
@@ -805,6 +827,32 @@ describe('deployment lists', () => {
     });
     expect(internalWorkerProblems([stsConfig('staging'), relay])).toEqual([
       'services/audit-relay/wrangler.jsonc deploys audit-relay, audit-relay-dev, audit-relay-staging; AUDIT_RELAY_DEPLOYMENTS lists audit-relay, audit-relay-local, audit-relay-staging',
+    ]);
+  });
+
+  it('ties every worker-binding policy to a config here that binds STS, or to a listed external workload', () => {
+    const bound = consumer({ services: [stsBinding('sts')] });
+    const unbound = parseWorkerConfig('services/other/wrangler.jsonc', { name: 'other' });
+    const fly = PolicySchema.parse({
+      workload: 'flyer',
+      environments: ALL_ENVIRONMENTS,
+      identity: { kind: 'fly-oidc', org: 'kilo', orgId: '10', app: 'flyer', appId: '20' },
+      secrets: [],
+    });
+    const policies = [
+      workerBindingPolicy('consumer'),
+      workerBindingPolicy('other'),
+      workerBindingPolicy('absent'),
+      workerBindingPolicy('bouncer-watch', ['production']),
+      fly,
+    ];
+    const hint = 'list it in EXTERNAL_WORKLOADS if another repository holds its config';
+    expect(workerBindingPolicyProblems([bound, unbound], policies)).toEqual([
+      `policy other has no config here that binds STS as other; ${hint}`,
+      `policy absent has no config here that binds STS as absent; ${hint}`,
+    ]);
+    expect(workerBindingPolicyProblems([bound], [workerBindingPolicy('consumer')])).toEqual([
+      'EXTERNAL_WORKLOADS lists bouncer-watch (Kilo-Org/bouncer), which has no worker-binding policy',
     ]);
   });
 });

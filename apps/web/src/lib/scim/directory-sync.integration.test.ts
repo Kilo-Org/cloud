@@ -5,6 +5,7 @@ import {
   organization_membership_removals,
   organization_memberships,
   organizations,
+  transactional_email_log,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -12,6 +13,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { deleteTransactionalEmailLogForUsers } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { createOrUpdateUser } from '@/lib/user';
@@ -122,10 +124,27 @@ afterEach(async () => {
     createdOrganizationIds.length = 0;
   }
   if (createdUserIds.length > 0) {
+    // A takeover links WorkOS over the account's other sign-in methods, which
+    // sends the owner a security notice whose outbox row references the user.
+    await deleteTransactionalEmailLogForUsers(createdUserIds);
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, createdUserIds));
     createdUserIds.length = 0;
   }
 });
+
+/** The security notices claimed for a user, by their outbox keys. */
+async function securityNoticeKeys(userId: string): Promise<(string | null)[]> {
+  const rows = await db
+    .select({ key: transactional_email_log.idempotency_key })
+    .from(transactional_email_log)
+    .where(
+      and(
+        eq(transactional_email_log.user_id, userId),
+        eq(transactional_email_log.email_type, 'security_notice')
+      )
+    );
+  return rows.map(row => row.key);
+}
 
 async function seedOrganization(): Promise<string> {
   const result = await upsertDirectoryOrganization(directoryId, {
@@ -498,6 +517,9 @@ describe('upsertDirectoryUser', () => {
     // `createOrUpdateUser` owns this, so a directory user is billable like any
     // other account rather than carrying a placeholder.
     expect(row.stripe_customer_id).toBeTruthy();
+    // A brand-new account has no other sign-in method for the link to replace,
+    // and no owner yet to warn, so provisioning sends no security notice.
+    expect(await securityNoticeKeys(userId)).toEqual([]);
   });
 
   test('creates a user at a second domain the organization verified through DNS', async () => {
@@ -775,6 +797,11 @@ describe('upsertDirectoryUser', () => {
       .from(user_auth_provider)
       .where(eq(user_auth_provider.kilo_user_id, taken.id));
     expect(providers.map(provider => provider.provider)).toEqual(['workos']);
+
+    // The owner is told that the SSO link replaced their other sign-in methods.
+    const noticeKeys = await securityNoticeKeys(taken.id);
+    expect(noticeKeys).toHaveLength(1);
+    expect(noticeKeys[0]).toMatch(/^sign_in_method_linked:/);
   });
 
   test('refuses to take over an account whose domain the organization never captured', async () => {

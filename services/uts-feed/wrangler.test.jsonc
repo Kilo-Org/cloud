@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration for vitest-pool-workers. The tests pass their own signer-keys binding.
+  "name": "uts-feed-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": false },
+  },
+  "vars": {
+    "UTS_ENVIRONMENT": "development",
+  },
+}

@@ -8,16 +8,20 @@
 import { init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
 import {
+  dropTraceTransactionName,
   scrubSentryBreadcrumb,
   scrubSentryEvent,
 } from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
 
 if (process.env.NODE_ENV !== 'development') {
-  init({
+  const client = init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
     // Tracing is fully disabled.
     tracesSampleRate: 0,
+    // The same tracing lock as initServerSentry.
+    tracesSampler: () => 0,
+    ignoreSpans: [/.*/],
 
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
@@ -35,4 +39,5 @@ if (process.env.NODE_ENV !== 'development') {
     beforeSend: scrubSentryEvent,
     beforeBreadcrumb: scrubSentryBreadcrumb,
   });
+  client?.on('createDsc', dropTraceTransactionName);
 }

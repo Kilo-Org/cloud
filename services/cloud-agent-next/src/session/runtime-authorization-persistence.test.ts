@@ -1,8 +1,10 @@
 import { logger } from '../logger.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import jwt from 'jsonwebtoken';
 import type {
   RuntimeAuthorization,
+  RuntimeTokenAudienceMode,
   RuntimeTokenDestination,
   RuntimeTokens,
 } from '@kilocode/worker-utils/runtime-authorization-contract';
@@ -20,6 +22,7 @@ import {
   runtimeTokenAudienceMode,
   runtimeTokenAuth,
   runtimeTokenFitsDestination,
+  RuntimeTokenDestinationRequiredError,
 } from './runtime-authorization-persistence.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 
@@ -63,7 +66,14 @@ const sameTokens = (token: string): RuntimeTokens => ({
   'session-ingest': token,
 });
 
-const request = { audienceMode: 'per-destination', destination: 'kilo-api' } as const;
+const request = {
+  audienceMode: (): RuntimeTokenAudienceMode => 'per-destination',
+  destination: 'kilo-api',
+} as const;
+
+/** A mistyped deployment value: reading it throws, as at every mint site. */
+const invalidMode = () =>
+  runtimeTokenAudienceMode({ RUNTIME_TOKEN_AUDIENCE_MODE: 'per-destinaton' });
 
 describe('runtime authorization persistence', () => {
   it('leaves legacy tokens unchanged and reports legacy without a private record', async () => {
@@ -321,17 +331,26 @@ describe('per-destination runtime tokens', () => {
 
   async function serve(input: {
     stored: SessionMetadata;
-    audienceMode: 'combined' | 'per-destination';
+    audienceMode: RuntimeTokenAudienceMode | 'invalid';
     destination: RuntimeTokenDestination | undefined;
     renewed?: RuntimeTokens;
+    authorization?: RuntimeAuthorization;
+    renew?: (authorization: RuntimeAuthorization, mode: RuntimeTokenAudienceMode) => unknown;
   }) {
     let stored = input.stored;
-    const renew = vi.fn(async () => ({ tokens: input.renewed ?? perDestinationTokens() }));
+    const renew = vi.fn(
+      async (authorization: RuntimeAuthorization, audienceMode: RuntimeTokenAudienceMode) => {
+        input.renew?.(authorization, audienceMode);
+        return { tokens: input.renewed ?? perDestinationTokens() };
+      }
+    );
+    const mode = input.audienceMode;
+    const readMode = vi.fn(() => (mode === 'invalid' ? invalidMode() : mode));
     const token = await renewStoredRuntimeAuthorization({
       metadata: stored,
-      audienceMode: input.audienceMode,
+      audienceMode: readMode,
       destination: input.destination,
-      getAuthorization: async () => record,
+      getAuthorization: async () => input.authorization ?? record,
       putAuthorization: async () => {},
       getMetadata: async () => stored,
       putMetadata: async value => {
@@ -340,7 +359,7 @@ describe('per-destination runtime tokens', () => {
       renew,
       now,
     });
-    return { token, renew, stored };
+    return { token, renew, readMode, stored };
   }
 
   it('serves each destination only its own stored token', async () => {
@@ -389,7 +408,7 @@ describe('per-destination runtime tokens', () => {
       destination: 'kilo-gateway',
       renewed,
     });
-    expect(result.renew).toHaveBeenCalledTimes(1);
+    expect(result.renew).toHaveBeenCalledExactlyOnceWith(record, 'per-destination');
     expect(result.token).toBe(renewed['kilo-gateway']);
     expect(result.stored.auth).toEqual({
       kilocodeToken: renewed['kilo-api'],
@@ -410,7 +429,7 @@ describe('per-destination runtime tokens', () => {
       destination: 'session-ingest',
       renewed: sameTokens(combined),
     });
-    expect(result.renew).toHaveBeenCalledTimes(1);
+    expect(result.renew).toHaveBeenCalledExactlyOnceWith(record, 'combined');
     expect(result.token).toBe(combined);
     expect(result.stored.auth).toEqual({ kilocodeToken: combined });
   });
@@ -435,33 +454,135 @@ describe('per-destination runtime tokens', () => {
     }
   });
 
-  it('serves a caller without a destination only the exact combined token', async () => {
+  it('serves a caller without a destination only the exact combined token in combined mode', async () => {
     const combined = signed(combinedAudience);
-    for (const audienceMode of ['combined', 'per-destination'] as const) {
-      const result = await serve({
-        stored: metadata(combined),
-        audienceMode,
-        destination: undefined,
-      });
-      expect(result.token).toBe(combined);
-      expect(result.renew).not.toHaveBeenCalled();
-    }
+    const served = await serve({
+      stored: metadata(combined),
+      audienceMode: 'combined',
+      destination: undefined,
+    });
+    expect(served.token).toBe(combined);
+    expect(served.renew).not.toHaveBeenCalled();
     const tokens = perDestinationTokens();
-    await expect(
-      serve({
-        stored: metadata(tokens['kilo-api'], tokens),
-        audienceMode: 'per-destination',
-        destination: undefined,
-      })
-    ).rejects.toThrow('Runtime token destination required');
     const renewed = await serve({
       stored: metadata(tokens['kilo-api'], tokens),
       audienceMode: 'combined',
       destination: undefined,
       renewed: sameTokens(combined),
     });
-    expect(renewed.renew).toHaveBeenCalledTimes(1);
+    expect(renewed.renew).toHaveBeenCalledExactlyOnceWith(record, 'combined');
     expect(renewed.token).toBe(combined);
+  });
+
+  it.each([
+    [
+      'split',
+      'per-destination',
+      RuntimeTokenDestinationRequiredError,
+      'Runtime token destination required',
+    ],
+    ['invalid', 'invalid', ZodError, undefined],
+  ] as const)(
+    'refuses a caller without a destination under %s configuration, even from a reusable combined token',
+    async (_label, audienceMode, errorClass, message) => {
+      const tokens = perDestinationTokens();
+      for (const stored of [
+        metadata(signed(combinedAudience)),
+        metadata(signed(combinedAudience, dueMs)),
+        metadata(tokens['kilo-api'], tokens),
+      ]) {
+        const renew = vi.fn();
+        const refused = serve({ stored, audienceMode, destination: undefined, renew });
+        await expect(refused).rejects.toBeInstanceOf(errorClass);
+        if (message) await expect(refused).rejects.toThrow(message);
+        expect(renew).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('keeps serving a reusable stored token to an explicit destination under an invalid issuer mode', async () => {
+    const tokens = perDestinationTokens();
+    const combined = signed(combinedAudience);
+    for (const destination of destinations) {
+      for (const stored of [metadata(tokens['kilo-api'], tokens), metadata(combined)]) {
+        const result = await serve({ stored, audienceMode: 'invalid', destination });
+        expect(result.token).toBe(stored.auth.runtimeTokens?.[destination] ?? combined);
+        expect(result.readMode).not.toHaveBeenCalled();
+        expect(result.renew).not.toHaveBeenCalled();
+      }
+    }
+  });
+
+  it('keeps a legacy session without a destination unchanged under an invalid issuer mode', async () => {
+    const stored = metadata('legacy-token');
+    const readMode = vi.fn(invalidMode);
+    await expect(
+      renewStoredRuntimeAuthorization({
+        metadata: stored,
+        audienceMode: readMode,
+        destination: undefined,
+        getAuthorization: async () => undefined,
+        putAuthorization: async () => {},
+        getMetadata: async () => stored,
+        putMetadata: async () => {},
+        renew: async () => ({ tokens: sameTokens('unexpected') }),
+      })
+    ).resolves.toBe('legacy-token');
+    expect(readMode).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['due for renewal', dueMs],
+    ['expired', -60_000],
+  ])('refuses to mint under an invalid issuer mode for a token %s', async (_label, expiresIn) => {
+    const tokens: RuntimeTokens = {
+      'kilo-api': signed('kilo-api', expiresIn),
+      'kilo-gateway': signed('kilo-gateway', expiresIn),
+      'session-ingest': signed('session-ingest', expiresIn),
+    };
+    for (const stored of [
+      metadata(tokens['kilo-api'], tokens),
+      metadata(signed(combinedAudience, expiresIn)),
+    ]) {
+      for (const destination of destinations) {
+        const renew = vi.fn();
+        await expect(
+          serve({ stored, audienceMode: 'invalid', destination, renew })
+        ).rejects.toBeInstanceOf(ZodError);
+        expect(renew).not.toHaveBeenCalled();
+      }
+    }
+  });
+
+  it('checks revocation and the delegation deadline before reusing a token under an invalid issuer mode', async () => {
+    const tokens = perDestinationTokens();
+    for (const stored of [
+      metadata(tokens['kilo-api'], tokens),
+      metadata(signed(combinedAudience)),
+    ]) {
+      for (const destination of ['kilo-api', undefined] as const) {
+        await expect(
+          serve({
+            stored,
+            audienceMode: 'invalid',
+            destination,
+            authorization: { ...record, state: 'revoked' },
+          })
+        ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
+        await expect(
+          serve({
+            stored,
+            audienceMode: 'invalid',
+            destination,
+            authorization: {
+              ...record,
+              issuedAt: new Date(now - 60 * 60_000).toISOString(),
+              delegationExpiresAt: new Date(now).toISOString(),
+            },
+          })
+        ).rejects.toBeInstanceOf(RuntimeAuthorizationExpiredError);
+      }
+    }
   });
 
   it('stores a combined issuance in the earlier single-token layout', () => {
@@ -641,6 +762,42 @@ describe('runtime authorization diagnostics', () => {
       expect(JSON.stringify(fields.mock.calls)).not.toContain(record.bindings.userPepperDigest);
     }
   );
+  it('reports a missing destination once as a permanent refusal without renewing', async () => {
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const record = authorization('00000000-0000-4000-8000-000000000012');
+    const token = jwt.sign(
+      {
+        runtimeAuthorization: { id: record.id },
+        aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
+        exp: Math.floor((Date.UTC(2026, 0, 1) + 30 * 60_000) / 1000),
+      },
+      'private-secret',
+      { noTimestamp: true }
+    );
+    const putAuthorization = vi.fn();
+    const renew = vi.fn();
+    await expect(
+      renewStoredRuntimeAuthorization({
+        ...request,
+        destination: undefined,
+        metadata: metadata(token),
+        getAuthorization: async () => record,
+        putAuthorization,
+        getMetadata: async () => metadata(token),
+        putMetadata: async () => {},
+        renew,
+        now: Date.UTC(2026, 0, 1),
+      })
+    ).rejects.toBeInstanceOf(RuntimeTokenDestinationRequiredError);
+    expect(fields.mock.calls).toEqual([
+      [{ sessionId: 'agent_1', stage: 'renewal', reason: 'destination_required' }],
+    ]);
+    expect(JSON.stringify(fields.mock.calls)).not.toContain('private-');
+    expect(putAuthorization).not.toHaveBeenCalled();
+    expect(renew).not.toHaveBeenCalled();
+  });
+
   it.each(['invalid', 'revoked'] as const)('distinguishes %s stored recovery state', async kind => {
     const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
     vi.spyOn(logger, 'warn').mockImplementation(() => {});

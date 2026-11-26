@@ -1200,6 +1200,105 @@ describe('server runtime credential proxy', () => {
     }
   });
 
+  it('selects the catalog destination from the decoded path and admits no new alias', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const runtimeAuthorization = {
+      userId: 'usr_proxy',
+      authorizationId: '11111111-1111-4111-8111-111111111111',
+      resourceId: 'workspace_proxy',
+    };
+    const resolve = vi.fn(
+      async (_handle: string, _originProof: string | undefined, destination: string) => ({
+        token: jwt.sign(
+          { version: 3, kiloUserId: 'usr_proxy', apiTokenPepper: null, aud: destination },
+          secret,
+          { algorithm: 'HS256' }
+        ),
+        organizationId: 'org_proxy',
+        runtimeAuthorization,
+      })
+    );
+    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn(async (_request: Request) => new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const authorization = `Bearer ${await handle()}`;
+      const catalog = '/api/openrouter/organizations/org_proxy/models';
+      const equivalent = [
+        `/api/runtime-credential-proxy/provider${catalog}`,
+        '/api/runtime-credential-proxy/provider/api/openrouter/organizations/org%5Fproxy/models',
+        '/api/runtime-credential-proxy/provider/api/gateway/%61pi/organizations/org_proxy/models',
+        catalog,
+        '/api/openrouter/organizations/org_proxy/mod%65ls',
+      ];
+      for (const path of equivalent) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, { headers: { Authorization: authorization } }),
+          env
+        );
+        expect(response.status).toBe(200);
+        expect(resolve.mock.lastCall?.[2]).toBe('kilo-api');
+        const forwarded = upstream.mock.lastCall?.[0];
+        expect(new URL(forwarded?.url ?? 'about:blank').pathname).toMatch(
+          /\/organizations\/org_proxy\/models$/
+        );
+        const bearer = forwarded?.headers.get('authorization')?.slice('Bearer '.length) ?? '';
+        expect(jwt.decode(bearer)).toMatchObject({ aud: 'kilo-api' });
+        await expect(
+          verifyRuntimeProxyAttestation({
+            value: forwarded?.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+            secret,
+            audience: 'kilo-api',
+            ...runtimeAuthorization,
+            bearer,
+          })
+        ).resolves.toBe(true);
+      }
+      const forwardedUrls = upstream.mock.calls.map(([request]) => (request as Request).url);
+      expect(new Set(forwardedUrls).size).toBe(1);
+      expect(upstream).toHaveBeenCalledTimes(equivalent.length);
+
+      resolve.mockClear();
+      upstream.mockClear();
+      for (const path of [
+        '/api/runtime-credential-proxy/provider/api/openrouter/organizations/org_proxy%2fx/models',
+        '/api/runtime-credential-proxy/provider/api/openrouter/organizations/org_proxy%5cx/models',
+        '/api/runtime-credential-proxy/provider/api/openrouter/organizations/org%255Fproxy/models',
+        '/api/runtime-credential-proxy/provider/api/openrouter/organizations/org_proxy/mod%E0%A4%A',
+        '/api/openrouter/organizations/org_proxy%2fx/models',
+      ]) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, { headers: { Authorization: authorization } }),
+          env
+        );
+        expect(response.status).toBe(404);
+      }
+      expect(resolve).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+
+      // Session creation keeps its literal-path body admission: only the exact
+      // path is forwarded, and an encoded alias is still refused.
+      const create = (path: string) =>
+        fetchWorker(
+          new Request(`https://worker.test/api/runtime-credential-proxy/ingest${path}`, {
+            method: 'POST',
+            headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+            body: '{"sessionId":"kilo_proxy"}',
+          }),
+          env
+        );
+      expect((await create('/api/session')).status).toBe(200);
+      expect(resolve.mock.lastCall?.[2]).toBe('session-ingest');
+      expect(upstream).toHaveBeenCalledOnce();
+      for (const alias of ['/api/sessio%6e', '/api/%73ession', '/api/session%2f']) {
+        expect((await create(alias)).status).toBe(404);
+      }
+      expect(upstream).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('removes every adjacent prohibited header before injecting runtime credentials', async () => {
     const env = createEnv();
     env.SANDBOX_SESSION.get.mockReturnValue({

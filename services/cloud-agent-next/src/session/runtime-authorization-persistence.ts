@@ -69,6 +69,18 @@ function runtimeAuthorizationId(value: unknown): string | null {
   return typeof value.id === 'string' ? value.id : null;
 }
 
+/**
+ * A permanent refusal: a caller without a destination asked for a runtime token
+ * while the configured issuer mode is not `combined`. No retry or other member
+ * of the scope can serve it, so the runtime credential proxy denies it.
+ */
+export class RuntimeTokenDestinationRequiredError extends Error {
+  constructor() {
+    super('Runtime token destination required');
+    this.name = 'RuntimeTokenDestinationRequiredError';
+  }
+}
+
 export const RUNTIME_TOKEN_AUDIENCE_MODE_ENV = 'RUNTIME_TOKEN_AUDIENCE_MODE';
 
 /**
@@ -206,12 +218,20 @@ export async function renewStoredRuntimeAuthorization(input: {
   getMetadata: () => Promise<SessionMetadata | null>;
   putMetadata: (metadata: SessionMetadata) => Promise<void>;
   beforeRenew?: () => Promise<boolean>;
-  renew: (authorization: RuntimeAuthorization) => Promise<{ tokens: RuntimeTokens }>;
-  /** The issuer mode of the next renewal; a stored token of either form stays readable. */
-  audienceMode: RuntimeTokenAudienceMode;
+  renew: (
+    authorization: RuntimeAuthorization,
+    audienceMode: RuntimeTokenAudienceMode
+  ) => Promise<{ tokens: RuntimeTokens }>;
+  /**
+   * Reads the issuer mode. A call with a destination reads it only when a token
+   * must be minted, so an invalid configuration refuses issuance without
+   * blocking a stored token of either form that is still reusable.
+   */
+  audienceMode: () => RuntimeTokenAudienceMode;
   /**
    * The service that receives the token. Only a caller from an earlier Worker
-   * version omits it; it is served only the exact combined token.
+   * version omits it; it is served only the exact combined token, and only
+   * while the configured mode is `combined`.
    */
   destination: RuntimeTokenDestination | undefined;
   now?: number;
@@ -258,6 +278,18 @@ export async function renewStoredRuntimeAuthorization(input: {
     logRuntimeAuthorizationDiagnostic(metadata.identity.sessionId, 'renewal', 'delegation_expired');
     throw new RuntimeAuthorizationExpiredError();
   }
+  // A caller without a destination is served only under the known combined
+  // mode, even from a reusable combined token: split or unknown configuration
+  // refuses it. A caller with a destination reads the mode only to mint.
+  const destinationlessMode = input.destination === undefined ? input.audienceMode() : undefined;
+  if (destinationlessMode !== undefined && destinationlessMode !== 'combined') {
+    logRuntimeAuthorizationDiagnostic(
+      metadata.identity.sessionId,
+      'renewal',
+      'destination_required'
+    );
+    throw new RuntimeTokenDestinationRequiredError();
+  }
   const auth = metadata.auth;
   // Metadata without `runtimeTokens` holds one token for every destination: a
   // combined issuance, or one stored before per-destination tokens existed.
@@ -281,13 +313,11 @@ export async function renewStoredRuntimeAuthorization(input: {
   ) {
     return token ?? null;
   }
-  if (input.destination === undefined && input.audienceMode !== 'combined') {
-    throw new Error('Runtime token destination required');
-  }
+  const audienceMode = destinationlessMode ?? input.audienceMode();
   if (input.beforeRenew && !(await input.beforeRenew())) return null;
   let postRenewalStateChanged = false;
   try {
-    const renewed = await input.renew(authorization.data);
+    const renewed = await input.renew(authorization.data, audienceMode);
     const currentAuthorization = RuntimeAuthorizationSchema.safeParse(
       await input.getAuthorization()
     );

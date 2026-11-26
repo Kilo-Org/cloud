@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { ZodError } from 'zod';
 import {
   CLOUD_AGENT_STACK_TARGET_DENIED,
   CloudAgentAuthoritySchema,
@@ -127,6 +128,7 @@ type Fixture = {
   seed: { current: WorkspaceAuthoritySeed | null };
   exportSeed: ReturnType<typeof vi.fn>;
   getMetadata: ReturnType<typeof vi.fn<(sessionId: string) => Promise<SessionMetadata | null>>>;
+  env: Record<string, unknown>;
 };
 
 function fixture(options: { name?: string } = {}): Fixture {
@@ -157,7 +159,14 @@ function fixture(options: { name?: string } = {}): Fixture {
     id: { name: options.name ?? `${ownerId}:${workspaceSessionId}` },
     storage,
   } as unknown as DurableObjectState;
-  return { workspace: new CloudAgentWorkspaceDO(ctx, env), storage, seed, exportSeed, getMetadata };
+  return {
+    workspace: new CloudAgentWorkspaceDO(ctx, env),
+    storage,
+    seed,
+    exportSeed,
+    getMetadata,
+    env: env as unknown as Record<string, unknown>,
+  };
 }
 
 function childMetadata(sessionId: string, parentId = workspaceSessionId): SessionMetadata {
@@ -405,6 +414,34 @@ describe('workspace authority revocation', () => {
     await expect(workspace.assertAuthority(scopeOf(issued?.token))).rejects.toThrow(
       'database unavailable'
     );
+    await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
+  });
+
+  it('checks authority under an invalid issuer mode but refuses every token it would sign', async () => {
+    const { workspace, env } = fixture();
+    const issued = await workspace.issueMcpGrant(binding);
+    const authority = CloudAgentAuthoritySchema.parse(scopeOf(issued?.token));
+    env.RUNTIME_TOKEN_AUDIENCE_MODE = 'per-destinaton';
+    renew.mockClear();
+    checkOnly.mockClear();
+    singleToken.mockClear();
+
+    await expect(workspace.assertAuthority(authority)).resolves.toBeUndefined();
+    await expect(workspace.assertStackTarget(authority, worktreeId)).resolves.toBeUndefined();
+    expect(checkOnly).toHaveBeenCalledTimes(2);
+    expect(renew).toHaveBeenCalledTimes(2);
+
+    await expect(workspace.issueMcpGrant(binding)).rejects.toBeInstanceOf(ZodError);
+    await expect(workspace.getSpawnContext(authority)).rejects.toBeInstanceOf(ZodError);
+    await expect(
+      workspace.authorizeChild({ authority, childSessionId: siblingSessionId })
+    ).rejects.toBeInstanceOf(ZodError);
+    await expect(
+      workspace.authorizeChat({ chatSessionId: siblingSessionId })
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(singleToken).not.toHaveBeenCalled();
+    // Only the authorizeChild authority check ran; nothing was signed.
+    expect(renew).toHaveBeenCalledTimes(3);
     await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
   });
 

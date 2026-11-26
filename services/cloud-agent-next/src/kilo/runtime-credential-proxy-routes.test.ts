@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifyRuntimeCredentialProxyPath,
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyRoute,
-  runtimeProxyAttestationAudience,
+  type RuntimeCredentialProxyRoute,
 } from './runtime-credential-proxy-routes.js';
 
 const targets = {
@@ -49,7 +50,7 @@ describe('runtime organization facade routes', () => {
       const route = inferRuntimeCredentialProxyRoute(pathname);
       expect(route).not.toBeNull();
       if (route === null) throw new Error('Missing facade route');
-      expect(runtimeProxyAttestationAudience(route, pathname)).toBe('kilo-api');
+      expect(classifyRuntimeCredentialProxyPath(route, pathname)?.audience).toBe('kilo-api');
       const input = {
         targets,
         route,
@@ -119,5 +120,84 @@ describe('runtime organization facade routes', () => {
         organizationId,
       })
     ).toBeNull();
+  });
+});
+
+describe('runtime facade path classification', () => {
+  const resolve = (route: RuntimeCredentialProxyRoute, pathname: string) =>
+    resolveRuntimeCredentialProxyRoute({
+      targets,
+      route,
+      method: 'GET',
+      pathname,
+      search: '',
+      kiloSessionId: 'ses_root',
+      organizationId,
+    })?.toString();
+
+  // Each encoded form decodes to an allowed catalog route. The audience and the
+  // upstream must both come from that decoded route.
+  it.each([
+    [
+      '/api/openrouter/organizations/org%2Dsession/models',
+      `/api/openrouter/organizations/${organizationId}/models`,
+    ],
+    [
+      `/api/gateway/organizations/${organizationId}/mod%65ls`,
+      `/api/gateway/organizations/${organizationId}/models`,
+    ],
+    [
+      `/api/gateway/%61pi/organizations/${organizationId}/models`,
+      `/api/gateway/api/organizations/${organizationId}/models`,
+    ],
+    [
+      `/api/%6Fpenrouter/api/organizations/${organizationId}/models`,
+      `/api/openrouter/api/organizations/${organizationId}/models`,
+    ],
+  ])('selects the catalog audience for the decoded form of %s', (encoded, canonical) => {
+    const classified = classifyRuntimeCredentialProxyPath('provider', encoded);
+    expect(classified).toEqual({ path: canonical, audience: 'kilo-api' });
+    expect(classifyRuntimeCredentialProxyPath('provider', canonical)).toEqual(classified);
+    if (classified === null) throw new Error('Missing classification');
+    // The resolvers check the decoded path again; that check returns it unchanged.
+    expect(classifyRuntimeCredentialProxyPath('provider', classified.path)).toEqual(classified);
+    expect(resolve('provider', classified.path)).toBe(
+      `${targets.providerBaseUrl}/organizations/${organizationId}/models`
+    );
+    expect(resolve('provider', encoded)).toBe(resolve('provider', canonical));
+  });
+
+  it.each([
+    'api/openrouter/models',
+    `/api/openrouter/organizations/${organizationId}%2fother/models`,
+    `/api/openrouter/organizations/${organizationId}%2Fother/models`,
+    `/api/openrouter/organizations/${organizationId}%5cother/models`,
+    `/api/openrouter/organizations/${organizationId}\\other/models`,
+    `/api/openrouter/organizations/${organizationId}%252fother/models`,
+    '/api/openrouter/organizations/org%252Dsession/models',
+    `/api/openrouter/organizations/${organizationId}/%2e%2e/models`,
+    `/api/openrouter/organizations/${organizationId}/../models`,
+    `/api/openrouter/organizations/${organizationId}//models`,
+    `/api/openrouter/organizations/${organizationId}/mod%E0%A4%A`,
+  ])('refuses the invalid pathname %s', pathname => {
+    expect(classifyRuntimeCredentialProxyPath('provider', pathname)).toBeNull();
+    expect(resolve('provider', pathname)).toBeUndefined();
+  });
+
+  it.each([
+    ['provider', '/api/openrouter/models', 'kilo-gateway'],
+    ['provider', '/api/openrouter/chat/completions', 'kilo-gateway'],
+    ['provider', '/api/gateway/v1/chat/completions', 'kilo-gateway'],
+    ['provider', '/api/gateway/v1/responses', 'kilo-gateway'],
+    ['backend', '/api/profile', 'kilo-api'],
+    ['backend', `/api/organizations/${organizationId}/models`, 'kilo-api'],
+    ['exa', '/api/exa/search', 'kilo-gateway'],
+    ['ingest', '/api/session', 'session-ingest'],
+    ['ingest', '/api/session/ses_root/ingest', 'session-ingest'],
+  ] as const)('keeps the %s route %s on %s', (route, pathname, audience) => {
+    expect(classifyRuntimeCredentialProxyPath(route, pathname)).toEqual({
+      path: pathname,
+      audience,
+    });
   });
 });

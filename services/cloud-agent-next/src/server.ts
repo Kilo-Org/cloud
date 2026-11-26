@@ -71,10 +71,10 @@ import {
 } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
+  classifyRuntimeCredentialProxyPath,
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
-  runtimeProxyAttestationAudience,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
 import { runtimeTokenFitsDestination } from './session/runtime-authorization-persistence.js';
@@ -593,7 +593,7 @@ async function forwardRuntimeCredentialProxy(
   handle: string,
   claims: RuntimeProxyHandleClaims,
   route: RuntimeCredentialProxyRoute,
-  path: string
+  pathname: string
 ): Promise<Response> {
   if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
   const correlation = { sessionId: claims.sessionId, kiloSessionId: claims.kiloSessionId };
@@ -601,7 +601,7 @@ async function forwardRuntimeCredentialProxy(
     runtimeProxyRequestShape({
       route,
       method: c.req.method,
-      path,
+      path: pathname,
       organizationId,
       kiloSessionId: claims.kiloSessionId,
     });
@@ -615,14 +615,18 @@ async function forwardRuntimeCredentialProxy(
     });
     return c.text('Not found', 404);
   };
+  // Decode the path once. The destination below and every route allowlist read
+  // this decoded path, so the token audience always matches the upstream.
+  const classified = classifyRuntimeCredentialProxyPath(route, pathname);
+  if (!classified) return rejectRoute(undefined);
+  const { path, audience: destination } = classified;
   let bodyText: string | undefined;
-  if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
+  // Session creation reads its body only on the literal path, as before. An
+  // encoded alias gets no body, so every create allowlist refuses it.
+  if (route === 'ingest' && pathname === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
     if (bodyText === undefined) return rejectRoute(undefined);
   }
-  // The upstream service that verifies the bearer and the attestation. Its own
-  // runtime token is the only one this request may carry.
-  const destination = runtimeProxyAttestationAudience(route, path);
   let credential: {
     token: string;
     organizationId?: string;

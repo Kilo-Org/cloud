@@ -82,12 +82,12 @@ async function enqueueGdprRemoval(
   if (!userId) {
     return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
   }
-  setAdminAuditTarget(userActionTarget(userId));
 
   const user = await findUserById(userId);
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
+  setAdminAuditTarget(userActionTarget(user.id));
 
   try {
     const [result] = await enqueueUserDeletionTargets({

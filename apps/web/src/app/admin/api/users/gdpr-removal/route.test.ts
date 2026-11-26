@@ -258,6 +258,28 @@ describe('/admin/api/users/gdpr-removal', () => {
       expect(mockedEnqueueUserDeletionTargets).not.toHaveBeenCalled();
     });
 
+    test('records a 404 failure row without a target', async () => {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, ADMIN_ID));
+      mockedFindUserById.mockResolvedValue(undefined);
+
+      expect((await POST(postRequest())).status).toBe(404);
+
+      const rows = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, ADMIN_ID));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'user.gdpr_removal.enqueue',
+          outcome: 'failure',
+          target_type: null,
+          target_id: null,
+        }),
+      ]);
+    });
+
     test('returns 500 and reports unexpected errors to Sentry', async () => {
       const failure = new Error('worker unavailable');
       mockedEnqueueUserDeletionTargets.mockRejectedValue(failure);

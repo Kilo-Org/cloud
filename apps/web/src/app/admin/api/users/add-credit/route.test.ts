@@ -628,4 +628,28 @@ describe('POST /admin/api/users/add-credit', () => {
       }),
     ]);
   });
+
+  it('records a debit failure row when a debit is refused with a 400', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipient = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null });
+
+    const response = await POST(
+      request({ email: recipient.google_user_email, credit_category: 'custom', amount_usd: -2 })
+    );
+
+    expect(response.status).toBe(400);
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'user.credit.debit',
+        target_type: 'user',
+        target_id: recipient.id,
+        metadata: { adjustment: 'user.credit.debit', errorCode: '400' },
+      }),
+    ]);
+  });
 });

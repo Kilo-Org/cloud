@@ -924,7 +924,9 @@ export type OrganizationElevationAudit =
  * getAuthorizedOrgContext / ensureOrganizationAccess, directly or through a
  * helper, with how a Kilo admin's elevated write is audited: the actions the
  * handler records through runElevatedOrganizationWrite, or why it records
- * nothing. `route` is the App Router path, as in the REST inventory.
+ * nothing. Every GET handler behind such a guard is listed too, since a GET
+ * can write (an OAuth callback); one that only reads is skipped with that
+ * reason. `route` is the App Router path, as in the REST inventory.
  */
 export type OrganizationElevationWriteSite = {
   route: string;
@@ -934,6 +936,8 @@ export type OrganizationElevationWriteSite = {
 
 const STATE_ONLY_CONNECT =
   'starts the OAuth flow: signs state and reserves the attempt; the callback records the connection';
+
+const READ_ONLY_GET = 'reads organization data only; writes nothing';
 
 export const organizationElevationWriteSites: readonly OrganizationElevationWriteSite[] = [
   {
@@ -1071,6 +1075,41 @@ export const organizationElevationWriteSites: readonly OrganizationElevationWrit
       kind: 'skipped',
       reason: 'membership-only guard (ensureMemberOrganizationAccess) with no admin bypass',
     },
+  },
+  {
+    route: '/api/auto-routing/mode',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/code-indexing/enabled',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/integrations/google/disconnect',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: 'redirects with method_not_allowed; writes nothing' },
+  },
+  {
+    route: '/api/organizations/[id]/browser-policy',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/organizations/[id]/defaults',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/organizations/[id]/guardrails',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
+  },
+  {
+    route: '/api/organizations/[id]/modes',
+    method: 'GET',
+    audit: { kind: 'skipped', reason: READ_ONLY_GET },
   },
 ];
 

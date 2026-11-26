@@ -171,14 +171,18 @@ const server = createServer((request, response) => {
       return json({ success: true, result: { id } });
     }
     if (request.method === 'GET' && path === tokensPath) {
+      // As Cloudflare: expired tokens only with include_expired=true.
+      const withExpired = url.searchParams.get('include_expired') === 'true';
       return json({
         success: true,
-        result: [...tokens].map(([id, token]) => ({
-          id,
-          name: token.name,
-          status: 'active',
-          expires_on: token.expiresOn,
-        })),
+        result: [...tokens]
+          .filter(([, token]) => withExpired || Date.parse(token.expiresOn) > Date.now())
+          .map(([id, token]) => ({
+            id,
+            name: token.name,
+            status: Date.parse(token.expiresOn) > Date.now() ? 'active' : 'expired',
+            expires_on: token.expiresOn,
+          })),
       });
     }
     if (request.method === 'GET' && path === `/accounts/${ACCOUNT}/workers/scripts`) {

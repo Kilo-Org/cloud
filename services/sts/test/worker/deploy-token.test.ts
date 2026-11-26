@@ -293,12 +293,16 @@ function installFakes(github: TestProvider): FakeCloudflare {
       if (listStatus !== 200) return new Response('refused', { status: listStatus });
       const page = Number(url.searchParams.get('page'));
       const perPage = Number(url.searchParams.get('per_page'));
-      const all = [...tokens].map(([id, token]) => ({
-        id,
-        name: token.name,
-        status: 'active',
-        expires_on: token.expiresOn,
-      }));
+      // As Cloudflare: expired tokens only with include_expired=true.
+      const withExpired = url.searchParams.get('include_expired') === 'true';
+      const all = [...tokens]
+        .filter(([, token]) => withExpired || Date.parse(token.expiresOn) > Date.now())
+        .map(([id, token]) => ({
+          id,
+          name: token.name,
+          status: Date.parse(token.expiresOn) > Date.now() ? 'active' : 'expired',
+          expires_on: token.expiresOn,
+        }));
       return Response.json({
         success: true,
         result: all.slice((page - 1) * perPage, page * perPage),
@@ -1208,7 +1212,7 @@ describe('reaper', () => {
     issued((await mint()).result);
     await sqlInObject(`UPDATE deploy_token SET expires_at = ${Date.now() - 1000}`);
     await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
-    cloudflare.setDeleteStatus(403);
+    cloudflare.setDeleteStatus(401);
     const readsBefore = cloudflare.manager.reads.length;
     const holdState = async () =>
       await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) => ({
@@ -1259,6 +1263,24 @@ describe('reaper', () => {
     expect(
       cloudflare.calls.filter(call => call.method === 'GET' && call.path.includes('/tokens?'))
     ).toHaveLength(1);
+  });
+
+  it('fails only that deletion on a 403, with no hold, and goes on with the next one', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    issued((await mint()).result);
+    issued((await mint()).result);
+    await sqlInObject(`UPDATE deploy_token SET expires_at = ${Date.now() - 1000}`);
+    // A token an earlier minting token created may refuse deletion by this one alone.
+    cloudflare.setDeleteStatus(403);
+    const readsBefore = cloudflare.manager.reads.length;
+    await alarmNow();
+    expect(cloudflare.deletes()).toHaveLength(2);
+    expect(cloudflare.manager.reads.length - readsBefore).toBe(0);
+    expect(await credentialHold()).toBeUndefined();
+    const reaped = (await deployTokenEvents('reaped')).map(event => event.data.attributes.result);
+    expect(reaped).toEqual(['delete_failed', 'delete_failed']);
+    expect(cloudflare.tokens.size).toBe(2);
   });
 
   it('ends a creation an earlier instance left pending, audits it, and brings the sweep forward', async () => {

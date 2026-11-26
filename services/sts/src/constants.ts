@@ -190,9 +190,9 @@ export const LEASE_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 export const MINTING_FOLDER = '/ci/minting';
 
 /**
- * The Cloudflare account API token that creates deploy tokens: `Account API Tokens Write` plus the
- * deploy permission groups, owned by the dedicated account member (README "Cloudflare deploy
- * tokens").
+ * The account-owned Cloudflare API token that creates deploy tokens (`sts-minting-<environment>`,
+ * created by a Super Administrator): `Account API Tokens Write` plus exactly the deploy permission
+ * groups (README "Cloudflare deploy tokens").
  */
 export const CLOUDFLARE_MINTING_TOKEN_SECRET = 'CLOUDFLARE_MINTING_TOKEN';
 

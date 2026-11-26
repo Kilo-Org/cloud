@@ -7,12 +7,28 @@ import { AudienceSchema, ScopeSchema, scopeAudience } from './token';
 export type StsScopeRegistry = Readonly<Record<string, { readonly scopes: readonly string[] }>>;
 
 /**
+ * The STS canary's denied probe: a scope no policy can ever grant. The web app's canary route asks
+ * STS for it every run; STS identifies the function and refuses the token by policy, which it
+ * records as an `ai.kilo.sts.token.denied` row (services/usage-ingest README, "STS canary").
+ */
+export const STS_DENIED_PROBE = { audience: 'canary', scope: 'canary:denied-probe' } as const;
+
+/**
+ * Registered scopes no policy may grant: the STS policy loader refuses a policy that lists one,
+ * or lists its audience. Being registered, a request for one passes the registry check and is
+ * refused as an audience no policy lists (`audience_not_allowed`), never as `unknown_scope`.
+ */
+export const STS_RESERVED_SCOPES: readonly string[] = [STS_DENIED_PROBE.scope];
+
+/**
  * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
- * usage-ingest back, each with a token of the other's canary scope.
+ * usage-ingest back, each with a token of the other's canary scope. `canary` holds only the
+ * reserved denied probe.
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   web: { scopes: ['web:sts.canary'] },
   'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
+  [STS_DENIED_PROBE.audience]: { scopes: [STS_DENIED_PROBE.scope] },
 };
 
 /** Whether `scope` is registered under `audience`. Inherited object keys never match. */

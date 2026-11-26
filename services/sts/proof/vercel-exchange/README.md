@@ -94,7 +94,9 @@ Vercel workload, and it passed.**
 7. Everyone else, and an exchanger that got 429, polls the cache with backoff (50 ms doubling to
    800 ms, with jitter) and never exchanges again while a marker exists. When the marker expires
    without a token, one poller claims again: at most one exchange per 10 seconds per key.
-8. No token after 20 seconds: the request fails, and the caller's STS call fails with it.
+8. No token after 20 seconds: the request fails, and the caller's STS call fails with it. Every
+   cache call, wait and exchange ends at that deadline; one still running is abandoned (the
+   exchange is aborted), so no token arrives later than it.
 
 **Degraded mode (cache down).** When the marker does not read back (the Runtime Cache throws or
 keeps nothing), the request exchanges itself, once per request; on a 429 in that mode it fails at

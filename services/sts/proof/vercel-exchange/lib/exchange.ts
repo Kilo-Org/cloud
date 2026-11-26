@@ -92,8 +92,14 @@ function rateLimitHeaders(headers: Headers): RateLimitHeaders | undefined {
   return Object.keys(found).length > 0 ? found : undefined;
 }
 
-/** One exchange with a fresh `jti`, so no cache on either side can answer it. */
-export async function exchangeOnce(input: ExchangeInput): Promise<ExchangeResult> {
+/**
+ * One exchange with a fresh `jti`, so no cache on either side can answer it. It gives up after
+ * 10 seconds, or earlier when `signal` aborts.
+ */
+export async function exchangeOnce(
+  input: ExchangeInput,
+  signal?: AbortSignal
+): Promise<ExchangeResult> {
   const started = performance.now();
   const elapsed = () => Math.round((performance.now() - started) * 10) / 10;
   let response: Response;
@@ -102,7 +108,10 @@ export async function exchangeOnce(input: ExchangeInput): Promise<ExchangeResult
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ token: input.baseToken, aud: input.audience, jti: randomUUID() }),
-      signal: AbortSignal.timeout(EXCHANGE_TIMEOUT_MS),
+      signal:
+        signal === undefined
+          ? AbortSignal.timeout(EXCHANGE_TIMEOUT_MS)
+          : AbortSignal.any([AbortSignal.timeout(EXCHANGE_TIMEOUT_MS), signal]),
     });
   } catch (error) {
     const timedOut = error instanceof DOMException && error.name === 'TimeoutError';

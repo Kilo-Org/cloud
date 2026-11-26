@@ -315,4 +315,26 @@ describe('initServerSentry through the real SDK pipeline', () => {
     expect(JSON.stringify(event)).not.toContain(FAKE_SECRET);
     expect(JSON.stringify(event)).not.toContain(FAKE_DB_INPUT);
   });
+
+  test('omits bound values from query error extras and keeps unrelated params', async () => {
+    const query = 'select * from items where id = $1';
+    const cause = Object.assign(new Error(`Invalid input: ${FAKE_DB_INPUT}`), {
+      code: '22P02',
+    });
+    captureMessage('lookup failed', {
+      extra: {
+        error: new DrizzleQueryError(query, [FAKE_SECRET], cause),
+        diagnostics: { query, params: ['test-mode'] },
+      },
+    });
+
+    const [event] = await sentEvents();
+    expect(event?.extra).toMatchObject({
+      error: { query, message: `Failed query: ${query}` },
+      diagnostics: { query, params: ['test-mode'] },
+    });
+    const serializedEvent = JSON.stringify(event);
+    expect(serializedEvent.includes(FAKE_SECRET)).toBe(false);
+    expect(serializedEvent.includes(FAKE_DB_INPUT)).toBe(false);
+  });
 });

@@ -316,13 +316,31 @@ function isSensitiveWords(words: string[]): boolean {
   return SENSITIVE_KEY_WORDS.has(last) || SENSITIVE_KEY_PAIRS.has(words.slice(-2).join(' '));
 }
 
+// Sentry normalizes error extras into objects, including Drizzle's query and params.
+function isDrizzleQueryErrorMetadata(value: object): boolean {
+  return (
+    'query' in value &&
+    typeof value.query === 'string' &&
+    'params' in value &&
+    Array.isArray(value.params) &&
+    'message' in value &&
+    typeof value.message === 'string' &&
+    value.message.startsWith(`Failed query: ${value.query}\nparams: `)
+  );
+}
+
 function scrubObject(
   value: object,
   depth: number,
   ancestors: WeakSet<object>
 ): Record<string, unknown> {
+  const isQueryError = isDrizzleQueryErrorMetadata(value);
   const scrubbed: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value).slice(0, MAX_ENTRIES)) {
+    // The database driver can include input values in its error details too.
+    if (isQueryError && (key === 'params' || key === 'cause')) {
+      continue;
+    }
     scrubbed[key] = isSensitiveEntry(key, entry)
       ? FILTERED_VALUE
       : scrubValue(entry, depth + 1, ancestors);

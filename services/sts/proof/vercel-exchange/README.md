@@ -129,6 +129,7 @@ it at deploy. `pnpm typecheck` and `pnpm lint` in `services/sts` check this dire
 | `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline and budget scope), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. Shared mode salts each run with a fresh `run` id. |
 | `inspect-env-token.ts` | Pulls `VERCEL_OIDC_TOKEN` with `vercel env pull` per environment of the proof project, exchanges it for `https://sts-proof.invalid`, and prints for both tokens `environment`, `custom_environment_id`, whether `user_id` is present, the `act` shape and `scope`, plus the gate outcome. Never a token. |
 | `vercel.json` | `fluid: false`, so concurrent invocations land on separate instances, as cold instances would. |
+| `.vercelignore` | The deploy allowlist: `api/`, `lib/`, `package.json`, `tsconfig.json`, `vercel.json`. |
 
 Every function refuses a request without `x-proof-key` equal to the project's `PROOF_SHARED_SECRET`
 (at least 32 characters), and refuses everything while it is unset. The audience is
@@ -148,6 +149,7 @@ project of the team is linked, pulled or changed.
 ```sh
 WORK=$(mktemp -d) && rsync -a --exclude node_modules --exclude .vercel \
   services/sts/proof/vercel-exchange/ "$WORK/" && cd "$WORK"   # keep .vercel out of the repo
+KEYS=$(mktemp -d)   # 0700 and outside the deploy root: nothing in it is uploaded
 PROJECT=sts-proof-vercel-exchange-$(date +%Y%m%d)
 TEAM=team_ItxRShuUkJaEd9GmXMEEgunb
 vercel project add "$PROJECT" --scope kilocode
@@ -155,23 +157,28 @@ vercel link --yes --scope kilocode --project "$PROJECT"
 PROJECT_ID=$(node -e 'console.log(require("./.vercel/project.json").projectId)')
 ```
 
+`.vercelignore` is an allowlist: a deploy uploads only `api/`, `lib/`, `package.json`,
+`tsconfig.json` and `vercel.json`. A project without a framework serves the other root files as
+static files, so the proof key, the API inputs and every run output stay in `$KEYS` or on the VM,
+never in `$WORK`.
+
 On that project only: OIDC federation on in team issuer mode, deployment protection off (team
 default protects `*.vercel.app`), Node 24, and a custom environment `staging` for step 3:
 
 ```sh
-printf '%s' '{"oidcTokenConfig":{"enabled":true,"issuerMode":"team"},"ssoProtection":null,"passwordProtection":null,"nodeVersion":"24.x"}' > patch.json
-vercel api "/v9/projects/$PROJECT_ID?teamId=$TEAM" -X PATCH --input patch.json
-printf '%s' '{"slug":"staging","description":"proof run 3"}' > staging.json
-vercel api "/v9/projects/$PROJECT_ID/custom-environments?teamId=$TEAM" -X POST --input staging.json
-openssl rand -hex 32 | tr -d '\n' > proof-key && chmod 600 proof-key
-vercel env add PROOF_SHARED_SECRET production --scope kilocode --yes < proof-key
+printf '%s' '{"oidcTokenConfig":{"enabled":true,"issuerMode":"team"},"ssoProtection":null,"passwordProtection":null,"nodeVersion":"24.x"}' > "$KEYS/patch.json"
+vercel api "/v9/projects/$PROJECT_ID?teamId=$TEAM" -X PATCH --input "$KEYS/patch.json"
+printf '%s' '{"slug":"staging","description":"proof run 3"}' > "$KEYS/staging.json"
+vercel api "/v9/projects/$PROJECT_ID/custom-environments?teamId=$TEAM" -X POST --input "$KEYS/staging.json"
+openssl rand -hex 32 | tr -d '\n' > "$KEYS/proof-key" && chmod 600 "$KEYS/proof-key"
+vercel env add PROOF_SHARED_SECRET production --scope kilocode --yes < "$KEYS/proof-key"
 vercel deploy --prod --yes --scope kilocode     # prints https://$PROJECT.vercel.app
 ```
 
 Leave `PROOF_AUDIENCE` unset (default `https://sts-proof.invalid`). Note the function region the
 deployment reports (`region` in every answer).
 
-### 2. Run (from the VM, with `drive.ts`, `lib/pass-rule.ts` and `proof-key` copied there)
+### 2. Run (from the VM, with `drive.ts`, `lib/pass-rule.ts` and `$KEYS/proof-key` copied there)
 
 Each shared run carries its own `run` salt, so no run reads an earlier run's token. A no-claim run
 still goes to a fresh deployment, so its instances start cold.
@@ -203,7 +210,7 @@ node drive.ts --mode warm --url "$URL" --interval-s 60 --duration-s 9000 > warm.
 ### 3. Person tokens (on the Mac, from `$WORK`, which is linked to the proof project)
 
 ```sh
-node inspect-env-token.ts --cwd "$WORK" preview production staging > env-tokens.jsonl
+node inspect-env-token.ts --cwd "$WORK" preview production staging > "$KEYS/env-tokens.jsonl"
 ```
 
 The pull writes the proof project's own (dummy) values to a 0700 temp directory, removed at once.
@@ -245,6 +252,6 @@ The fan-out (run a) is binding for the limit; the burst (run d) is for latency o
 ```sh
 vercel project rm "$PROJECT" --scope kilocode   # deletes the project, its deployments, env vars and custom environments
 vercel project ls --scope kilocode 2>&1 | grep "$PROJECT"   # no output
-cd / && rm -rf "$WORK"                            # proof-key, patch.json, staging.json and .vercel go with it
+cd / && rm -rf "$WORK" "$KEYS"                    # proof-key, patch.json, staging.json, env-tokens.jsonl and .vercel go with them
 # VM: rm -f proof-key drive.ts lib/pass-rule.ts *.json *.jsonl
 ```

@@ -1,3 +1,4 @@
+export { UtsKeySetDO } from './dos/UtsKeySetDO';
 export { UtsSignerDO } from './dos/UtsSignerDO';
 export { SignerKeys } from './signer-keys';
 

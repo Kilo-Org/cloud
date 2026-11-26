@@ -5,16 +5,18 @@ import {
   type UtsPublicJwk,
 } from '@kilocode/uts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
 import type { PublicKeysResult } from '../../src/dos/UtsSignerDO';
 import {
   combineSignerKeys,
-  resetSignerKeysIsolate,
+  newSignerKeysCache,
   SIGNER_KEYS_COPY_MS,
   SIGNER_READ_DEADLINE_MS,
   signerKeysAnswer,
   type HeldSignerKeys,
   type ReadSigners,
   type SignerAnswers,
+  type SignerKeysCache,
 } from '../../src/signer-keys';
 
 const T0 = 1_800_000_000_000;
@@ -59,16 +61,17 @@ function reader(answers: () => Promise<SignerAnswers>): ReadSigners & { reads: n
 async function answerAt(at: number, readSigners: ReadSigners) {
   const clock = vi.spyOn(Date, 'now').mockReturnValue(at);
   try {
-    return await signerKeysAnswer('development', readSigners);
+    return await signerKeysAnswer(cache, readSigners);
   } finally {
     clock.mockRestore();
   }
 }
 
 let errors: MockInstance<typeof console.error>;
+let cache: SignerKeysCache;
 
 beforeEach(() => {
-  resetSignerKeysIsolate();
+  cache = newSignerKeysCache();
   errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -143,14 +146,14 @@ describe('signerKeysAnswer', () => {
     expect(read.reads).toEqual([T0, T0 + SIGNER_KEYS_COPY_MS]);
   });
 
-  it('makes one read for concurrent requests in an isolate', async () => {
+  it('makes one read for concurrent requests to a shard', async () => {
     const { promise: release, resolve } = Promise.withResolvers<void>();
     const read = reader(async () => {
       await release;
       return all();
     });
     vi.spyOn(Date, 'now').mockReturnValue(T0);
-    const pending = Array.from({ length: 8 }, () => signerKeysAnswer('development', read));
+    const pending = Array.from({ length: 8 }, () => signerKeysAnswer(cache, read));
     resolve();
     const answers = await Promise.all(pending);
     expect(new Set(answers).size).toBe(1);
@@ -176,9 +179,9 @@ describe('signerKeysAnswer', () => {
     await answerAt(T0, read);
     hang = true;
     const clock = vi.spyOn(Date, 'now').mockReturnValue(T0 + SIGNER_KEYS_COPY_MS);
-    void signerKeysAnswer('development', read);
+    void signerKeysAnswer(cache, read);
     clock.mockReturnValue(T0 + SIGNER_KEYS_COPY_MS + 1);
-    const waiting = signerKeysAnswer('development', read);
+    const waiting = signerKeysAnswer(cache, read);
     clock.mockReturnValue(T0 + SIGNER_KEYS_COPY_MS + SIGNER_READ_DEADLINE_MS);
     const answered = await waiting;
     expect(answered.signers.every(entry => entry.status === 'ok' && entry.readAt === T0)).toBe(
@@ -199,15 +202,39 @@ describe('signerKeysAnswer', () => {
       return all(1);
     });
     const clock = vi.spyOn(Date, 'now').mockReturnValue(T0);
-    const late = signerKeysAnswer('development', read);
+    const late = signerKeysAnswer(cache, read);
     clock.mockReturnValue(T0 + SIGNER_READ_DEADLINE_MS);
-    const newer = await signerKeysAnswer('development', read);
+    const newer = await signerKeysAnswer(cache, read);
     expect(newer.signers[0]).toMatchObject({ keys: keysOf(0, 1) });
     releaseOld();
     expect((await late).signers[0]).toMatchObject({ keys: keysOf(0, 1) });
     clock.mockReturnValue(T0 + SIGNER_READ_DEADLINE_MS + 1);
-    const copy = await signerKeysAnswer('development', read);
+    const copy = await signerKeysAnswer(cache, read);
     expect(copy.signers[0]).toMatchObject({ keys: keysOf(0, 1) });
     expect(read.reads).toEqual([T0, T0 + SIGNER_READ_DEADLINE_MS]);
+  });
+
+  it('reads the signers at most once per shard per 2 seconds, however many isolates ask', async () => {
+    const shards = Array.from({ length: KEY_SET_SHARD_COUNT }, () => ({
+      cache: newSignerKeysCache(),
+      read: reader(async () => all()),
+    }));
+    let now = T0;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    // 1,000 feed isolates, each asking once per 10 seconds on the shard its isolate drew: 100
+    // concurrent asks every 100 ms for 10 seconds.
+    for (let step = 0; step < 100; step += 1) {
+      now = T0 + step * 100;
+      await Promise.all(
+        Array.from({ length: 100 }, async (_, ask) => {
+          const shard = shards[(step * 100 + ask) % KEY_SET_SHARD_COUNT];
+          if (shard === undefined) throw new Error('no shard');
+          return await signerKeysAnswer(shard.cache, shard.read);
+        })
+      );
+    }
+    for (const { read } of shards) {
+      expect(read.reads).toEqual([0, 2000, 4000, 6000, 8000].map(offset => T0 + offset));
+    }
   });
 });

@@ -1,6 +1,14 @@
 import { UTS_ENDPOINTS, UTS_SIGNER_COUNT } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
-import { signerObjectName, signerOfObjectId, signerOfObjectName } from '../../src/dos/stubs';
+import {
+  KEY_SET_SHARD_COUNT,
+  keySetShardObjectName,
+  keySetShardOfObjectId,
+  keySetShardOfObjectName,
+  signerObjectName,
+  signerOfObjectId,
+  signerOfObjectName,
+} from '../../src/dos/stubs';
 import type { UtsConfig } from '../../src/env';
 import { signerForGrant } from '../../src/keys/signer-choice';
 
@@ -59,13 +67,10 @@ describe('signerOfObjectId', () => {
   it('gives a signer name in its environment and jurisdiction its index', () => {
     expect(
       signerOfObjectId(production, { name: 'production:signer:09', jurisdiction: 'eu' })
-    ).toEqual({
-      status: 'signer',
-      signer: 9,
-    });
+    ).toEqual({ status: 'accepted', index: 9 });
     expect(signerOfObjectId(development, { name: 'development:signer:00' })).toEqual({
-      status: 'signer',
-      signer: 0,
+      status: 'accepted',
+      index: 0,
     });
   });
 
@@ -88,6 +93,31 @@ describe('signerOfObjectId', () => {
     );
     expect(
       signerOfObjectId(production, { name: 'production:feed:00', jurisdiction: 'eu' })
+    ).toEqual(refused(NAME_REFUSAL));
+  });
+
+  it('gives a key-set shard name its index, and refuses the other names and jurisdictions', () => {
+    for (let shard = 0; shard < KEY_SET_SHARD_COUNT; shard += 1) {
+      const name = keySetShardObjectName('production', shard);
+      expect(keySetShardOfObjectName('production', name)).toBe(shard);
+      expect(keySetShardOfObjectName('staging', name)).toBeNull();
+      expect(keySetShardOfObjectId(production, { name, jurisdiction: 'eu' })).toEqual({
+        status: 'accepted',
+        index: shard,
+      });
+    }
+    expect(keySetShardObjectName('staging', 3)).toBe('staging:keyset:3');
+    expect(() => keySetShardObjectName('production', KEY_SET_SHARD_COUNT)).toThrow();
+    expect(keySetShardOfObjectName('production', 'production:keyset:8')).toBeNull();
+    const shardRefusal = 'key-set shard object was not created by its key-set shard name';
+    expect(
+      keySetShardOfObjectId(production, { name: 'production:signer:03', jurisdiction: 'eu' })
+    ).toEqual(refused(shardRefusal));
+    expect(keySetShardOfObjectId(production, { name: 'production:keyset:3' })).toEqual(
+      refused('key-set shard object is in jurisdiction none, not eu')
+    );
+    expect(
+      signerOfObjectId(production, { name: 'production:keyset:3', jurisdiction: 'eu' })
     ).toEqual(refused(NAME_REFUSAL));
   });
 });

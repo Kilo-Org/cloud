@@ -5,6 +5,7 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { UtsKeySetDO } from './dos/UtsKeySetDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 
 /**
@@ -31,6 +32,7 @@ export type Env = {
   UTS_ENVIRONMENT: string;
   DO_JURISDICTION: string;
   UTS_SIGNER_DO: DurableObjectNamespace<UtsSignerDO>;
+  UTS_KEY_SET_DO: DurableObjectNamespace<UtsKeySetDO>;
 };
 
 /** The mint Worker's deployed name in each environment. */

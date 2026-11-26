@@ -74,34 +74,42 @@ Each object:
 - logs each rotation and removal as `uts.signer.key_event` (`SignerKeyEvent`, public `kid`s only),
   the event the UTS audit pipeline will carry (design 8.3).
 
-### The SignerKeys entrypoint
+### The SignerKeys entrypoint and the key-set shards
 
 `signerKeys()` on the named entrypoint `SignerKeys` (`UTS_SIGNER_KEYS_ENTRYPOINT`, in
-`src/signer-keys.ts`) returns plain data (`SignerKeysReadSchema`): `{ status: 'refused' }`, or
+`src/signer-keys.ts`) returns plain data (`SignerKeysReadSchema`): `{ status: 'refused' }`,
+`{ status: 'misconfigured' }` when its key-set shard refused to load, or
 `{ status: 'answered', answer }` where `answer` is `{ signers }`, every signer exactly once
 (`SignerKeysAnswerSchema`): its keys with `readAt`, the time they were read from the signer
 object, or its failure, `misconfigured` (the object refused to load) or `unavailable` (the call
 failed after its retries). The feed Worker takes every signer that has keys.
 
-- Each isolate answers from a plain-data copy of its last answer for 2 seconds, with one read in
-  flight; a request that needs that read polls for it. The signer objects therefore see at most one
-  read per mint isolate per 2 seconds, however many feed isolates ask.
-- Every signer call of a read, retries included, ends within 5 seconds, so a hung object cannot
-  hold a read past the feed Worker's 10-second read guard.
-- Each isolate keeps every signer's last good keys. A signer whose call fails, or whose object
-  refuses to load, answers those keys with their own `readAt` while they are under 24 hours old,
-  and its failure after that; each failure is logged with the read time of the keys that stood in.
+The entrypoint does not read the signer objects itself. It asks one of 8 key-set shards,
+`UtsKeySetDO` (`src/dos/UtsKeySetDO.ts`), named `<environment>:keyset:<0-7>` and created in the
+`eu` jurisdiction with the `weur` hint, like the signer objects; a shard under another name or
+outside its jurisdiction answers `misconfigured`. Each isolate draws its shard at random once, so
+feed isolates spread evenly over the 8 shards. Each shard holds, as plain data in memory:
+
+- a copy of its last combined answer, served for 2 seconds, with one read in flight; a request
+  that needs that read polls for it. The 16 signer objects therefore see at most 8 reads per 2
+  seconds, however many feed isolates ask;
+- every signer's last good keys. A signer whose call fails, or whose object refuses to load,
+  answers those keys with their own `readAt` while they are under 24 hours old, and its failure
+  after that; each failure is logged with the read time of the keys that stood in.
+
+Every signer call of a read, retries included, ends within 5 seconds, and every entrypoint call to
+its shard, retries included, within 8 seconds, so a hung object cannot hold a read past the feed
+Worker's 10-second read guard. Each RPC result, from a signer and from a shard, is copied out and
+disposed. A shard stores nothing: a restarted shard reads the signers again.
 
 It answers only a service binding to this entrypoint whose `props.caller` is the feed Worker's
 deployed name for its own environment, and refuses every other binding, with another caller or
-without props. A service binding delivers `props` to a named entrypoint, as for the STS broker;
-a deployed mint Worker did not see them on its default entrypoint, either as a plain handler object
-or as a `WorkerEntrypoint` class. The default entrypoint's fetch handler serves no signer keys: a
-request to the old `/internal/signer-keys` path gets `404 not_found` like any unknown path.
-Placement does not apply to a named entrypoint, so a read and its 16 signer calls run where the
-feed Worker runs, not next to the signer objects. That adds latency to each read, with the same
-call counts; a key-set request waits for a read only when its isolate holds no keys under 17
-seconds old.
+without props, before any shard call. A service binding delivers `props` to a named entrypoint, as
+for the STS broker; a deployed mint Worker did not see them on its default entrypoint, either as a
+plain handler object or as a `WorkerEntrypoint` class. The default entrypoint's fetch handler
+serves no signer keys: a request to the old `/internal/signer-keys` path gets `404 not_found` like
+any unknown path. Placement does not apply to a named entrypoint, so the entrypoint runs where the
+feed Worker runs and makes one call to its shard in the EU per read.
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
 UTS Durable Object class or binds the mint Worker, any feed binding at an entrypoint other than
 `SignerKeys` or whose caller is not the feed block's own name, and any drift in the UTS configs
@@ -126,8 +134,9 @@ must name the development issuer.
   `wrangler.test.jsonc`): key lifecycle with time travel, signing and verification with `jose`, key
   persistence across restarts, rotation by alarm, an overdue rotation and a lost alarm, emergency
   removal by direct call, the RPC surface, the SignerKeys entrypoint over real service bindings
-  (its caller check, its 2-second copy, one read in flight, and the held keys of a failed signer),
-  metadata.
+  (its caller check) and the key-set shards (their names, their 2-second copy with one read in
+  flight, at most one signer read per shard per 2 seconds under many concurrent isolates, and the
+  held keys of a failed signer), metadata.
 - `pnpm test:repo`: the repository config check (`test/repo`), with no database.
 - `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
   tests (`test/db`, see "Local database and tests").
@@ -153,16 +162,20 @@ curl -sS https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server
 Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and metadata naming
 `https://uts-staging.kiloapps.io` and the feed key set.
 
-1. **`eu` jurisdiction and location hint together (design 5.7).** Each object logs
-   `uts.signer.bootstrapped` once, when it creates its keys, with its jurisdiction and the data
-   center it runs in; an object outside `eu` creates no keys and the key set answers 500:
+1. **`eu` jurisdiction and location hint together (design 5.7).** Each signer object logs
+   `uts.signer.bootstrapped` once, when it creates its keys, and each key-set shard logs
+   `uts.key_set_shard.started` once per start, both with the jurisdiction and the data center it
+   runs in; an object outside `eu` refuses, and the key set answers 500:
 
    ```sh
-   jq -r '.logs[]?.message[]? | select(type == "string" and contains("uts.signer.bootstrapped"))' /tmp/uts-staging-tail.json | jq -c '{signer, jurisdiction, colo}'
+   jq -r '.logs[]?.message[]? | select(type == "string" and (contains("uts.signer.bootstrapped") or contains("uts.key_set_shard.started")))' /tmp/uts-staging-tail.json | jq -c '{event, signer, shard, jurisdiction, colo}'
    ```
 
-   Expect 16 lines, each `"jurisdiction":"eu"` and a `colo` in western Europe (the `weur` hint),
-   such as `FRA`, `AMS` or `CDG`.
+   Expect 16 signer lines and a line for each shard the read reached (8 once enough feed isolates
+   have asked), each `"jurisdiction":"eu"` with a `colo` in the EU. The jurisdiction is enforced;
+   the `weur` hint is best effort, so an object can land in another EU data center
+   (https://developers.cloudflare.com/durable-objects/reference/data-location/#provide-a-location-hint).
+   Record every colo in the pull request.
 
 2. **Key persistence across real restarts (design 5.7).** A deploy restarts every object. Record
    the kids, redeploy the mint Worker, wait past the feed Worker's 17-second window, and compare;

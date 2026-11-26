@@ -14,9 +14,15 @@
     "DO_JURISDICTION": "none",
   },
   "durable_objects": {
-    "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+  ],
   // The mint Worker's SignerKeys entrypoint as the development feed Worker binds it, and as two
   // callers it refuses; and the default entrypoint with the feed Worker's props, which serves no
   // signer keys.

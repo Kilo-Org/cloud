@@ -42,11 +42,14 @@ export type KeySetFailure =
   /** The read failed or timed out, or every signer failed; a later read can succeed. */
   | { status: 'unavailable' }
   /**
-   * A deploy error: the mint Worker does not answer this caller (`refused`), a signer object
-   * refused to load and no other signer has keys (`signer_refused`), or the answer is not a valid
-   * signer-keys answer (`invalid_answer`).
+   * A deploy error: the mint Worker does not answer this caller (`refused`), its key-set shard
+   * refused to load (`shard_refused`), a signer object refused to load and no other signer has
+   * keys (`signer_refused`), or the answer is not a valid signer-keys answer (`invalid_answer`).
    */
-  | { status: 'misconfigured'; reason: 'refused' | 'signer_refused' | 'invalid_answer' };
+  | {
+      status: 'misconfigured';
+      reason: 'refused' | 'shard_refused' | 'signer_refused' | 'invalid_answer';
+    };
 
 /**
  * `ageMs`: how long ago the newest keys in `body` were read from their signer object, the
@@ -90,6 +93,16 @@ type MintRead =
 const GUARD_EXPIRED = Symbol('guard expired');
 
 /**
+ * Runs the RPC disposer of `result`, which workerd gives every object an RPC call returns. A
+ * result that is not an object, such as `null`, carries none.
+ */
+function disposeResult(result: unknown): void {
+  if (typeof result !== 'object' || result === null || !(Symbol.dispose in result)) return;
+  const dispose = result[Symbol.dispose];
+  if (typeof dispose === 'function') dispose.call(result);
+}
+
+/**
  * Reads every signer's keys from the mint Worker's `SignerKeys` entrypoint over the service
  * binding. A call that has not answered after the read guard is a failed read; its result, if it
  * still lands while this context lives, is disposed. The revocation-feed slice adds its two feed
@@ -101,7 +114,8 @@ async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
   const call = Promise.try(async () => await mint.signerKeys());
   const guard = Promise.withResolvers<typeof GUARD_EXPIRED>();
   const timer = setTimeout(() => guard.resolve(GUARD_EXPIRED), KEY_SET_READ_GUARD_MS);
-  let result: Awaited<typeof call> | typeof GUARD_EXPIRED;
+  // The call's result is unknown until validated, so it also covers the guard's symbol.
+  let result: unknown;
   try {
     result = await Promise.race([call, guard.promise]);
   } catch (error) {
@@ -112,16 +126,13 @@ async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
   }
   if (result === GUARD_EXPIRED) {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.timed_out' }));
-    void call.then(
-      late => late[Symbol.dispose]?.(),
-      () => undefined
-    );
+    void call.then(disposeResult, () => undefined);
     return { status: 'unavailable' };
   }
   // The parse copies the plain data out and never throws; the disposer is a symbol key, which it
   // leaves behind.
   const parsed = SignerKeysReadSchema.safeParse(result);
-  result[Symbol.dispose]?.();
+  disposeResult(result);
   if (!parsed.success) {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.invalid_answer' }));
     return { status: 'misconfigured', reason: 'invalid_answer' };
@@ -129,6 +140,10 @@ async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
   if (parsed.data.status === 'refused') {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.refused' }));
     return { status: 'misconfigured', reason: 'refused' };
+  }
+  if (parsed.data.status === 'misconfigured') {
+    console.error(JSON.stringify({ event: 'uts_feed.signer_keys.shard_refused' }));
+    return { status: 'misconfigured', reason: 'shard_refused' };
   }
   const { answer } = parsed.data;
   const failed = answer.signers.filter(entry => entry.status !== 'ok');

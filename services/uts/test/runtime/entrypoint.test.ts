@@ -3,8 +3,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
 import * as devEntry from '../../src/dev-index';
 import * as deployedEntry from '../../src/index';
-import { resetSignerKeysIsolate } from '../../src/signer-keys';
-import { readSignerKeys } from './support';
+import { readSignerKeys, resetKeySetShards } from './support';
 import { config, env } from './test-env';
 
 /**
@@ -20,7 +19,7 @@ describe('SignerKeys entrypoint', () => {
   });
 
   it("receives the feed binding's props and answers every signer", async () => {
-    resetSignerKeysIsolate();
+    await resetKeySetShards();
     const read = await readSignerKeys(env.FEED_MINT);
     if (read.status !== 'answered') throw new Error(`feed caller got ${read.status}`);
     expect(read.answer.signers.every(entry => entry.status === 'ok')).toBe(true);

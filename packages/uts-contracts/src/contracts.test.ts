@@ -137,7 +137,7 @@ describe('SignerKeysAnswerSchema', () => {
     expect(SignerKeysAnswerSchema.safeParse({ signers: withoutReadTime }).success).toBe(false);
   });
 
-  it('names the signer-keys entrypoint, holds keys 24 hours, and reads an answer or a refusal', () => {
+  it('names the signer-keys entrypoint, holds keys 24 hours, and reads an answer, a refusal or a misconfigured shard', () => {
     expect(UTS_SIGNER_KEYS_ENTRYPOINT).toBe('SignerKeys');
     expect(UTS_SIGNER_KEYS_HOLD_MS).toBe(24 * 60 * 60 * 1000);
     const answer = { signers: signers() };
@@ -146,6 +146,9 @@ describe('SignerKeysAnswerSchema', () => {
       answer,
     });
     expect(SignerKeysReadSchema.parse({ status: 'refused' })).toEqual({ status: 'refused' });
+    expect(SignerKeysReadSchema.parse({ status: 'misconfigured' })).toEqual({
+      status: 'misconfigured',
+    });
     expect(SignerKeysReadSchema.safeParse({ status: 'answered' }).success).toBe(false);
     expect(
       SignerKeysReadSchema.safeParse({ status: 'answered', answer: { signers: [] } }).success

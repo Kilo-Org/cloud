@@ -72,12 +72,14 @@ export type SignerKeysAnswer = z.infer<typeof SignerKeysAnswerSchema>;
 
 /**
  * The result of one `signerKeys()` call: the whole answer, which carries each signer's keys or
- * failure, or `refused` when the binding's `props.caller` is not the feed Worker of the mint
- * Worker's own environment.
+ * failure; `refused` when the binding's `props.caller` is not the feed Worker of the mint Worker's
+ * own environment; or `misconfigured` when the key-set shard that answers it refused to load
+ * under its name or jurisdiction, a deploy error that no retry fixes.
  */
 export const SignerKeysReadSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('answered'), answer: SignerKeysAnswerSchema }),
   z.strictObject({ status: z.literal('refused') }),
+  z.strictObject({ status: z.literal('misconfigured') }),
 ]);
 export type SignerKeysRead = z.infer<typeof SignerKeysReadSchema>;
 
@@ -85,7 +87,7 @@ export type SignerKeysRead = z.infer<typeof SignerKeysReadSchema>;
  * The `SignerKeys` entrypoint as the feed Worker's binding exposes it. The result crosses a
  * deploy boundary, so the caller validates it with `SignerKeysReadSchema`. workerd gives the
  * object an RPC call returns a disposer, and the call stays open until it runs, so the caller
- * disposes the result once it holds the validated copy (Partial: a test double has none).
+ * disposes the result once it holds the validated copy.
  * https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
  */
-export type SignerKeysBinding = { signerKeys(): Promise<object & Partial<Disposable>> };
+export type SignerKeysBinding = { signerKeys(): Promise<unknown> };

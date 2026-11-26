@@ -42,10 +42,14 @@ function signerEntry(signer: number, generation = 0, readAt = Date.now()): OkEnt
 const allSigners = (generation = 0, readAt = Date.now()): SignerKeysEntry[] =>
   Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => signerEntry(signer, generation, readAt));
 
-type MintResult = Record<string, unknown> & Partial<Disposable>;
+/** Whatever a `signerKeys()` call resolves to; the feed Worker validates it. */
+type MintResult = unknown;
 
 /** A `signerKeys()` result that carries `signers` as the mint Worker's answer. */
-const answered = (signers: unknown[]): MintResult => ({ status: 'answered', answer: { signers } });
+const answered = (signers: unknown[]): Record<string, unknown> => ({
+  status: 'answered',
+  answer: { signers },
+});
 
 const okAnswer = (generation = 0, readAt = Date.now()) => answered(allSigners(generation, readAt));
 
@@ -414,11 +418,24 @@ describe('failures', () => {
     expect(mint.calls).toBe(2);
   });
 
-  it('keeps no keys from a result that is not a signer-keys read', async () => {
-    for (const result of [{ status: 'answered' }, { signers: allSigners() }, { status: 'other' }]) {
+  it('keeps no keys from a result that is not a signer-keys read, null and undefined included', async () => {
+    const results = [
+      { status: 'answered' },
+      { signers: allSigners() },
+      { status: 'other' },
+      null,
+      undefined,
+    ];
+    for (const result of results) {
       resetIsolate();
       expect((await get(mintBinding(async () => result))).status).toBe(500);
     }
+  });
+
+  it('answers 500 when the key-set shard refused to load', async () => {
+    const response = await get(mintBinding(async () => ({ status: 'misconfigured' })));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'server_error' });
   });
 
   it('answers 503 when the mint Worker has keys for no signer', async () => {

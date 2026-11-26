@@ -37,9 +37,15 @@
     "DO_JURISDICTION": "eu",
   },
   "durable_objects": {
-    "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+  ],
   "env": {
     "staging": {
       "name": "uts-staging",
@@ -57,7 +63,10 @@
         "DO_JURISDICTION": "eu",
       },
       "durable_objects": {
-        "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+        "bindings": [
+          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+          { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+        ],
       },
     },
     // Local development only; no deploy workflow targets this name. Only this block uses the
@@ -73,7 +82,10 @@
         "DO_JURISDICTION": "none",
       },
       "durable_objects": {
-        "bindings": [{ "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" }],
+        "bindings": [
+          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+          { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+        ],
       },
     },
   },

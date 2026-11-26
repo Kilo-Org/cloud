@@ -5,29 +5,37 @@ import {
   type SignerKeysBinding,
   type SignerKeysEntry,
   type SignerKeysRead,
-  type UtsEnvironment,
   type UtsPublicJwk,
 } from '@kilocode/uts-contracts';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import type { KeySetShardResult } from './dos/UtsKeySetDO';
 import type { PublicKeysResult } from './dos/UtsSignerDO';
-import { getSignerStub } from './dos/stubs';
+import { getKeySetShardStub, getSignerStub, KEY_SET_SHARD_COUNT } from './dos/stubs';
 import { FEED_DEPLOYMENTS, readConfig, type Env, type UtsConfig } from './env';
 
 /**
- * An isolate answers from its copy of the last combined answer for this long after that read
- * started. The signer objects therefore see at most one read per mint isolate per 2 seconds,
- * however many feed isolates ask (design 3).
+ * A key-set shard answers from its copy of the last combined answer for this long after that read
+ * started. Each of the 8 shards therefore reads the 16 signer objects at most once per 2 seconds,
+ * whatever the number of feed isolates (design 3).
  */
 export const SIGNER_KEYS_COPY_MS = 2 * 1000;
 
 /**
  * Every signer call of one read, retries included, ends by this deadline, so a read settles
- * within it even when an object hangs. It is shorter than the feed Worker's 10-second read guard,
- * so the feed Worker still receives the answer built from the held keys.
+ * within it even when an object hangs. It is shorter than the shard call deadline, so the feed
+ * Worker still receives the answer built from the held keys.
  */
 export const SIGNER_READ_DEADLINE_MS = 5 * 1000;
+
+/**
+ * Every call from the `SignerKeys` entrypoint to its shard, retries included, ends by this
+ * deadline. A shard answers within the 5-second signer read deadline, and this is shorter than
+ * the feed Worker's 10-second read guard, so a failed shard call reaches the feed Worker as a
+ * failed call, not as its own timeout.
+ */
+export const KEY_SET_SHARD_DEADLINE_MS = 8 * 1000;
 
 const WAIT_STEP_MS = 20;
 
@@ -39,22 +47,27 @@ export type SignerAnswers = ReadonlyArray<PromiseSettledResult<PublicKeysResult>
 export type ReadSigners = (startedAt: number) => Promise<SignerAnswers>;
 
 /**
- * Isolate state, plain data only: a request never awaits a promise another request started
- * (design 7); it polls `read` instead. One state per environment, as in the feed Worker.
+ * One key-set shard's state, plain data only: a request never awaits a promise another request
+ * started (design 7); it polls `read` instead.
  */
-type SignerKeysIsolate = {
-  environment: UtsEnvironment;
+export type SignerKeysCache = {
   /** Each signer's last good keys, which stand in for its failed calls for 24 hours. */
   held: ReadonlyArray<HeldSignerKeys | null>;
   copy: { answer: SignerKeysAnswer; readAt: number } | null;
   read: { status: 'idle' } | { status: 'reading'; startedAt: number };
 };
 
-let isolate: SignerKeysIsolate | null = null;
+export function newSignerKeysCache(): SignerKeysCache {
+  return {
+    held: Array.from({ length: UTS_SIGNER_COUNT }, () => null),
+    copy: null,
+    read: { status: 'idle' },
+  };
+}
 
 const CallerPropsSchema = z.strictObject({ caller: z.string().min(1) });
 
-/** The caller a service binding's `props` name; null for a request that came from the internet. */
+/** The caller a service binding's `props` name; null when the binding carries no valid props. */
 function callerOf(props: unknown): string | null {
   const parsed = CallerPropsSchema.safeParse(props);
   return parsed.success ? parsed.data.caller : null;
@@ -127,66 +140,59 @@ export function combineSignerKeys(
   return { answer: { signers }, held: nextHeld };
 }
 
-function isolateFor(environment: UtsEnvironment): SignerKeysIsolate {
-  if (isolate === null || isolate.environment !== environment) {
-    isolate = {
-      environment,
-      held: Array.from({ length: UTS_SIGNER_COUNT }, () => null),
-      copy: null,
-      read: { status: 'idle' },
-    };
-  }
-  return isolate;
-}
-
 /**
  * Waits, without sharing its promise, for the read that started at `startedAt`. That read ends by
  * its deadline; a request that still finds no answer from it gets the held keys alone.
  */
-async function waitForRead(state: SignerKeysIsolate, startedAt: number): Promise<SignerKeysAnswer> {
+async function waitForRead(cache: SignerKeysCache, startedAt: number): Promise<SignerKeysAnswer> {
   const deadline = startedAt + SIGNER_READ_DEADLINE_MS;
-  while (state.read.status === 'reading' && Date.now() < deadline) {
+  while (cache.read.status === 'reading' && Date.now() < deadline) {
     await scheduler.wait(WAIT_STEP_MS);
   }
-  if (state.copy !== null && state.copy.readAt >= startedAt) return state.copy.answer;
+  if (cache.copy !== null && cache.copy.readAt >= startedAt) return cache.copy.answer;
   const now = Date.now();
   return {
-    signers: state.held.map((held, signer) => heldEntry(signer, held, now, 'unavailable')),
+    signers: cache.held.map((held, signer) => heldEntry(signer, held, now, 'unavailable')),
   };
 }
 
 /**
- * The answer for one request. A copy under 2 seconds old answers at once. Otherwise the request
- * waits for the read in flight, or starts the next read itself; a read that finishes late never
- * replaces a newer copy or newer held keys.
+ * The answer for one request to a shard. A copy under 2 seconds old answers at once. Otherwise
+ * the request waits for the read in flight, or starts the next read itself; a read that finishes
+ * late never replaces a newer copy or newer held keys. A read starts only when the copy is 2
+ * seconds old and no read is in flight, so `readSigners` runs at most once per 2 seconds.
  */
 export async function signerKeysAnswer(
-  environment: UtsEnvironment,
+  cache: SignerKeysCache,
   readSigners: ReadSigners
 ): Promise<SignerKeysAnswer> {
-  const state = isolateFor(environment);
   const now = Date.now();
-  if (state.copy !== null && now - state.copy.readAt < SIGNER_KEYS_COPY_MS) {
-    return state.copy.answer;
+  if (cache.copy !== null && now - cache.copy.readAt < SIGNER_KEYS_COPY_MS) {
+    return cache.copy.answer;
   }
-  if (state.read.status === 'reading' && now - state.read.startedAt < SIGNER_READ_DEADLINE_MS) {
-    return await waitForRead(state, state.read.startedAt);
+  if (cache.read.status === 'reading' && now - cache.read.startedAt < SIGNER_READ_DEADLINE_MS) {
+    return await waitForRead(cache, cache.read.startedAt);
   }
-  state.read = { status: 'reading', startedAt: now };
+  cache.read = { status: 'reading', startedAt: now };
   const answers = await readSigners(now);
-  const combined = combineSignerKeys(answers, state.held, now, Date.now());
-  state.held = combined.held;
-  if (state.copy === null || state.copy.readAt < now) {
-    state.copy = { answer: combined.answer, readAt: now };
+  const combined = combineSignerKeys(answers, cache.held, now, Date.now());
+  cache.held = combined.held;
+  if (cache.copy === null || cache.copy.readAt < now) {
+    cache.copy = { answer: combined.answer, readAt: now };
   }
-  if (state.read.status === 'reading' && state.read.startedAt === now) {
-    state.read = { status: 'idle' };
+  if (cache.read.status === 'reading' && cache.read.startedAt === now) {
+    cache.read = { status: 'idle' };
   }
   return combined.answer;
 }
 
-/** Every signer's published keys, read from the 16 signer objects in parallel. */
-async function readSignerObjects(
+/**
+ * Every signer's published keys, read from the 16 signer objects in parallel. Each result is
+ * copied out and its RPC disposer run: workerd gives every object an RPC call returns a disposer,
+ * and the call stays open until it runs. The keys are plain data, so the copy stays readable.
+ * https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
+ */
+export async function readSignerObjects(
   env: Env,
   config: UtsConfig,
   startedAt: number
@@ -199,7 +205,16 @@ async function readSignerObjects(
     Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) =>
       withDORetry(
         () => getSignerStub(env, config, signer),
-        async (stub): Promise<PublicKeysResult> => await stub.publicKeys(),
+        async (stub): Promise<PublicKeysResult> => {
+          // Partial: only a workerd RPC result carries a disposer.
+          const result: PublicKeysResult & Partial<Disposable> = await stub.publicKeys();
+          try {
+            // The disposer is non-enumerable, so the spread leaves it behind.
+            return { ...result };
+          } finally {
+            result[Symbol.dispose]?.();
+          }
+        },
         'uts.signer.publicKeys',
         retry
       )
@@ -208,43 +223,75 @@ async function readSignerObjects(
 }
 
 /**
- * One signer-keys read for the binding whose props are `props`. It answers only the feed Worker of
- * the mint Worker's own environment: a service binding carries `props.caller`, and only a deploy
- * in the account can set props, so the check is deploy-level trust, as for the STS broker
- * (design 6.4). Any other caller, or a binding without props, gets `refused`. The answer is plain
- * data, so it stays readable after the caller disposes the RPC result.
+ * The key-set shard this isolate asks, chosen at random once per isolate, so feed isolates
+ * spread evenly over the 8 shards. 2^32 is a multiple of 8, so each shard gets the same share.
+ * It is drawn at the first call, because a Worker cannot draw random values at startup.
+ */
+let isolateShard: number | null = null;
+
+function keySetShardOfIsolate(): number {
+  isolateShard ??= (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % KEY_SET_SHARD_COUNT;
+  return isolateShard;
+}
+
+/**
+ * One signer-keys read for the binding whose props are `props`, answered by key-set shard
+ * `shard`. It answers only the feed Worker of the mint Worker's own environment: a service binding
+ * carries `props.caller`, and only a deploy in the account can set props, so the check is
+ * deploy-level trust, as for the STS broker (design 6.4). Any other caller, or a binding without
+ * props, gets `refused` without a shard call. A shard that refused to load gives `misconfigured`.
+ * A shard call that fails until its deadline throws, and the feed Worker counts the read as
+ * failed. The answer is plain data, so it stays readable after the caller disposes the RPC result.
  */
 export async function signerKeysRead(
   env: Env,
   config: UtsConfig,
-  props: unknown
+  props: unknown,
+  shard: number
 ): Promise<SignerKeysRead> {
   const caller = callerOf(props);
   if (caller !== FEED_DEPLOYMENTS[config.environment]) {
     console.warn(JSON.stringify({ event: 'uts.signer_keys.refused', caller }));
     return { status: 'refused' };
   }
-  const answer = await signerKeysAnswer(config.environment, startedAt =>
-    readSignerObjects(env, config, startedAt)
+  const result = await withDORetry(
+    () => getKeySetShardStub(env, config, shard),
+    async (stub): Promise<KeySetShardResult> => {
+      // Partial: only a workerd RPC result carries a disposer.
+      const answered: KeySetShardResult & Partial<Disposable> = await stub.signerKeys();
+      try {
+        return { ...answered };
+      } finally {
+        answered[Symbol.dispose]?.();
+      }
+    },
+    'uts.key_set_shard.signerKeys',
+    { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt: Date.now() + KEY_SET_SHARD_DEADLINE_MS } }
   );
-  return { status: 'answered', answer };
+  if (result.status === 'misconfigured') {
+    console.error(
+      JSON.stringify({ event: 'uts.signer_keys.shard_misconfigured', shard, error: result.reason })
+    );
+    return { status: 'misconfigured' };
+  }
+  return { status: 'answered', answer: result.answer };
 }
 
 /**
  * The named entrypoint the feed Worker binds with its deployed name as `props.caller`
  * (`UTS_SIGNER_KEYS_ENTRYPOINT`). A service binding delivers `props` to a named entrypoint, as
- * for the STS broker. Placement does not apply to a named entrypoint, so the read and its 16
- * signer calls run where the feed Worker runs; the default entrypoint's fetch handler, which
- * placement covers, serves no signer keys. `test/repo` keeps every other config from binding the
- * mint Worker.
+ * for the STS broker. Placement does not apply to a named entrypoint, so it runs where the feed
+ * Worker runs, and asks its isolate's key-set shard in the EU; the default entrypoint's fetch
+ * handler, which placement covers, serves no signer keys. `test/repo` keeps every other config
+ * from binding the mint Worker.
  */
 export class SignerKeys extends WorkerEntrypoint<Env> implements SignerKeysBinding {
   async signerKeys(): Promise<SignerKeysRead> {
-    return await signerKeysRead(this.env, readConfig(this.env), this.ctx.props);
+    return await signerKeysRead(
+      this.env,
+      readConfig(this.env),
+      this.ctx.props,
+      keySetShardOfIsolate()
+    );
   }
-}
-
-/** Test seam: drops this isolate's copy, held keys and read state, as a new isolate starts. */
-export function resetSignerKeysIsolate(): void {
-  isolate = null;
 }

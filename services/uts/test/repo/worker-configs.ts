@@ -22,6 +22,7 @@ const UTS_CONFIGS = new Set([MINT_CONFIG, MINT_TEST_CONFIG, FEED_CONFIG, FEED_TE
 /** Every UTS Durable Object class and the configs that alone may bind it. */
 export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['UtsSignerDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
 ]);
 
 /** The placement region of the identity store's primary (Frankfurt). */
@@ -376,7 +377,8 @@ function expectedDeployments(names: Readonly<Record<UtsEnvironment, string>>): s
 /**
  * Problems inside the two UTS Workers' own configs: each deploys exactly its three names with
  * matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer objects hold
- * private keys; the mint Worker's deployed blocks keep the signer objects in the `eu` jurisdiction
+ * private keys; the mint Worker's deployed blocks keep the signer and key-set shard objects in the
+ * `eu` jurisdiction
  * (staging, production) and its fetch handler placed next to the identity store; the feed Worker
  * runs without placement and binds no Durable Object.
  */

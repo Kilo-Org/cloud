@@ -8,9 +8,8 @@ import {
   type SignerKeysRead,
   type UtsJwks,
 } from '@kilocode/uts-contracts';
-import { getSignerStub } from '../../src/dos/stubs';
+import { getKeySetShardStub, getSignerStub, KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
 import type { SignableClaims } from '../../src/keys/claims';
-import { resetSignerKeysIsolate } from '../../src/signer-keys';
 import { config, env } from './test-env';
 
 /** A claim set the development signer accepts. */
@@ -54,13 +53,25 @@ export async function resetAllSigners(): Promise<void> {
   for (let signer = 0; signer < UTS_SIGNER_COUNT; signer += 1) await resetSigner(signer);
 }
 
+/** Restarts every key-set shard, which drops its copy and held keys, as a deploy does. */
+export async function resetKeySetShards(): Promise<void> {
+  for (let shard = 0; shard < KEY_SET_SHARD_COUNT; shard += 1) {
+    await runInDurableObject(getKeySetShardStub(env, config, shard), (_instance, state) =>
+      state.abort('test restart')
+    ).catch(() => undefined);
+  }
+}
+
 /** One `signerKeys()` call through `binding`, validated and then disposed as the feed Worker does. */
 export async function readSignerKeys(
   binding: SignerKeysBinding = env.FEED_MINT
 ): Promise<SignerKeysRead> {
   const result = await binding.signerKeys();
   const read = SignerKeysReadSchema.parse(result);
-  result[Symbol.dispose]?.();
+  if (typeof result === 'object' && result !== null && Symbol.dispose in result) {
+    const dispose = result[Symbol.dispose];
+    if (typeof dispose === 'function') dispose.call(result);
+  }
   return read;
 }
 
@@ -73,10 +84,10 @@ export async function feedAnswer(): Promise<SignerKeysAnswer> {
 
 /**
  * The key set as the feed Worker builds it: every signer's keys over the SignerKeys entrypoint.
- * It drops the isolate copy first, so the answer reflects the signer objects now.
+ * It restarts the key-set shards first, so the answer reflects the signer objects now.
  */
 export async function keySet(): Promise<UtsJwks> {
-  resetSignerKeysIsolate();
+  await resetKeySetShards();
   const answer = await feedAnswer();
   return UtsJwksSchema.parse({
     keys: answer.signers.flatMap(entry => {

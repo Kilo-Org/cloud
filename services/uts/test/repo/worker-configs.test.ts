@@ -56,13 +56,15 @@ describe('repository Worker configs', () => {
 });
 
 describe('UTS Durable Object classes', () => {
-  it('fail a config outside the mint Worker that names the signer class', () => {
-    const problems = workerConfigProblems([
-      consumer({ durable_objects: { bindings: [{ name: 'SIGNER', class_name: 'UtsSignerDO' }] } }),
-    ]);
-    expect(problems).toEqual([
-      expect.stringContaining('names UTS Durable Object class UtsSignerDO'),
-    ]);
+  it('fail a config outside the mint Worker that names the signer or the key-set shard class', () => {
+    for (const className of ['UtsSignerDO', 'UtsKeySetDO']) {
+      const problems = workerConfigProblems([
+        consumer({ durable_objects: { bindings: [{ name: 'OBJECTS', class_name: className }] } }),
+      ]);
+      expect(problems).toEqual([
+        expect.stringContaining(`names UTS Durable Object class ${className}`),
+      ]);
+    }
   });
 
   it('fail a config that names the signer class in an env block or a preview', () => {

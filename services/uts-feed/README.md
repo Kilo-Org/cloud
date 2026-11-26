@@ -22,9 +22,12 @@ after the 16 signers rotate together).
 - The keys come from `signerKeys()` on the mint Worker's `SignerKeys` entrypoint, called over the
   `UTS_MINT` service binding. The binding carries this Worker's deployed name as `props.caller`;
   the mint Worker refuses any other caller. Placement does not apply to a named entrypoint, so the
-  read and its 16 signer calls run where this Worker runs. The answer lists each signer with its
-  keys and the time they were read from the signer object, or with its failure. This Worker
-  validates the result and then disposes it, so the call does not stay open.
+  entrypoint runs where this Worker runs and asks one of the mint Worker's 8 key-set shards in the
+  EU, which reads the 16 signer objects at most once per 2 seconds (`services/uts/README.md`). The
+  answer lists each signer with its keys and the time they were read from the signer object, or
+  with its failure. This Worker validates the result and then disposes it, so the call does not
+  stay open; a result that is not an object (`null`) has nothing to dispose and counts as an
+  invalid answer.
 - Each isolate holds every signer's keys separately, as plain data with their read time, and never
   shares a pending read between requests (`src/jwks.ts`):
   - while its newest keys are under 10 seconds old it serves the held set with no new read;

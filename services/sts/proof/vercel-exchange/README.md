@@ -77,10 +77,17 @@ Vercel workload, and it passed.**
 2. A cached entry is used only if its token decodes to the same five claims, `aud` equal to the
    audience and `exp` equal to the entry's, until `exp` minus 60 s, whichever base token the reader
    holds. A forged entry with matching claims can only make the caller's STS call fail (STS checks
-   the signature). The key is not secret: code that can write the same Runtime Cache partition
-   (other deployments of the project in the same scope; a custom environment may share the preview
-   partition) can stall a deployment's exchanges, never change which token it presents; production
-   has its own partition.
+   the signature). The key is not secret and the entry holds the whole exchanged token: code that
+   can use the same Runtime Cache partition (other deployments of the project in the same
+   environment) can read and present that token, and can stall a deployment's exchanges. Within one
+   environment that gains nothing, since every deployment there has the same STS identity (STS takes
+   no deployment claim). Vercel documents separate partitions for `preview` and `production` only,
+   so a custom environment such as `staging` may share the preview partition, and any preview
+   deployment could then read the staging token. The proof audience is not an STS issuer, so this
+   harness exposes nothing STS accepts. Before the phase 2 slice-4 client caches STS-audience
+   tokens of a custom environment, a proof run checks whether a preview deployment reads an entry
+   a custom-environment deployment wrote; if it does, the client encrypts the entry with a key that
+   only that environment holds.
 3. Instance memory, then the Runtime Cache: a hit is used. On a miss, a base token with under 60 s
    left fails the request at once: no exchange, no waiting.
 4. Miss: wait a random 0 to 500 ms, read again.

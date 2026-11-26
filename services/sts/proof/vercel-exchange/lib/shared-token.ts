@@ -16,8 +16,12 @@
  * 2. A cached token is used only when it decodes to the same five claims, `aud` equal to the
  *    audience, and `exp` equal to the entry's: code that can write the cache but holds another
  *    deployment's token cannot make this deployment present it. A forged entry can still fail
- *    the caller's STS call (STS checks the signature); code that writes this project's cache runs
- *    with the project's own trust.
+ *    the caller's STS call (STS checks the signature). The entry holds the whole token under a key
+ *    anyone can compute, so code that can use the same Runtime Cache partition can read and present
+ *    it. Vercel separates `preview` and `production`; a custom environment may share the preview
+ *    partition. Before this caches STS-audience tokens of a custom environment, a proof shows its
+ *    partition is separate or the entry is encrypted with a key only that environment holds
+ *    (README, "The shared-cache algorithm").
  * 3. Instance memory, then the shared cache: a hit is used. On a miss, a base token with under
  *    60 seconds left fails the request at once: no exchange, no waiting.
  * 4. Otherwise wait a random 0..`jitterMs` and read again, so a cold wave spreads out.

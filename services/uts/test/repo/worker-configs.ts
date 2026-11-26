@@ -338,9 +338,9 @@ function mintBindingProblems(path: string, block: Block, binding: ServiceBinding
   const environment = WRANGLER_ENVIRONMENTS.get(block.env);
   if (environment === undefined) return [`${where}: env.${block.env} is not a UTS environment`];
   const problems: string[] = [];
-  if (binding.service !== MINT_DEPLOYMENTS[environment]) {
+  if (binding.service !== UTS_MINT_DEPLOYMENTS[environment]) {
     problems.push(
-      `${where} binds ${binding.service}; this block must bind ${MINT_DEPLOYMENTS[environment]}`
+      `${where} binds ${binding.service}; this block must bind ${UTS_MINT_DEPLOYMENTS[environment]}`
     );
   }
   if (binding.entrypoint === undefined || !MINT_ENTRYPOINTS.includes(binding.entrypoint)) {
@@ -496,7 +496,7 @@ function devConfigProblems(dev: WorkerConfig): string[] {
   const { config } = dev;
   const problems: string[] = [];
   const deployed = deployments(dev);
-  const expected = expectedDeployments(MINT_DEPLOYMENTS, ['development']);
+  const expected = expectedDeployments(UTS_MINT_DEPLOYMENTS, ['development']);
   if (deployed !== expected) {
     problems.push(`${MINT_DEV_CONFIG} deploys ${deployed}; expected ${expected}`);
   }

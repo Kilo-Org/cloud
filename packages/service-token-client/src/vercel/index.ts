@@ -1,4 +1,5 @@
 import { getVercelOidcToken } from '@vercel/oidc';
+import type { IdentityTokenSource } from '../http';
 import {
   SharedExchangedToken,
   type Exchange,
@@ -89,16 +90,19 @@ export function vercelExchange(fetchFn: typeof fetch = fetch): Exchange {
  * 60 seconds before its own `exp`; on a miss a random wait and a re-read, then a claim marker so one
  * request exchanges; no second exchange after a 429 while the marker lives; a request with no token
  * after 20 seconds, or with a base token that has under 60 seconds left on a miss, fails.
+ * `invalidate` drops a token STS refused when it came from the shared cache (see
+ * `SharedExchangedToken.invalidate`); `createHttpServiceTokens` calls it.
  */
-export function vercelIdentity(options: VercelIdentityOptions): () => Promise<string> {
+export function vercelIdentity(options: VercelIdentityOptions): IdentityTokenSource {
   const shared = new SharedExchangedToken(options.cache, { settings: options.settings });
   const exchange = options.exchange ?? vercelExchange();
   const getBaseToken = options.getBaseToken ?? (() => getVercelOidcToken());
-  return async () => {
+  const get = async () => {
     const result = await shared.get(await getBaseToken(), options.stsAudience, exchange);
     if (result.status === 'failed') {
       throw new Error(`no Vercel token for the STS audience: ${result.detail}`);
     }
     return result.token;
   };
+  return Object.assign(get, { invalidate: (token: string) => shared.invalidate(token) });
 }

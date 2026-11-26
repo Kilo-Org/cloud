@@ -84,6 +84,25 @@ describe('createHttpServiceTokens', () => {
     expect(error).toMatchObject({ reason: 'denied', deniedReason: 'identity_rejected' });
   });
 
+  it('never follows a redirect: the mint is manual and a 3xx is unavailable', async () => {
+    const redirects: (RequestRedirect | undefined)[] = [];
+    const tokens = createHttpServiceTokens({
+      stsUrl: 'https://sts.test',
+      getIdentityToken: () => 'identity-token',
+      fetch: (async (_url: string, init?: RequestInit) => {
+        redirects.push(init?.redirect);
+        // A followed redirect would carry the identity token to the target and answer its body.
+        return init?.redirect === 'manual'
+          ? new Response(null, { status: 302, headers: { location: 'https://elsewhere.test/' } })
+          : Response.json(issued(JSON.parse(init?.body as string) as MintRequest));
+      }) as typeof fetch,
+    });
+    expect(await settle(tokens.get(WEB).catch((caught: unknown) => caught))).toMatchObject({
+      reason: 'unavailable',
+    });
+    expect(redirects).toEqual(['manual']);
+  });
+
   it('treats a failing identity provider and a status that disagrees with the body as unavailable', async () => {
     const failing = createHttpServiceTokens({
       stsUrl: 'https://sts.test',

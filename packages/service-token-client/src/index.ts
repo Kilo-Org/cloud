@@ -3,7 +3,7 @@ export type { ServiceTokenDeniedReason, ServiceTokenErrorDetail } from './errors
 export { createWorkerServiceTokens, WORKER_ATTEMPT_TIMEOUT_MS } from './worker';
 export type { MintBinding } from './worker';
 export { createHttpServiceTokens, HTTP_ATTEMPT_TIMEOUT_MS, STS_TOKEN_HTTP_PATH } from './http';
-export type { HttpServiceTokensOptions } from './http';
+export type { HttpServiceTokensOptions, IdentityTokenSource } from './http';
 export {
   DENIED_RECHECK_MS,
   HELD_TOKEN_MARGIN_SECONDS,

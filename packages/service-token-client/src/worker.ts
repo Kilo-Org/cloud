@@ -25,7 +25,8 @@ export function createWorkerServiceTokens(binding: MintBinding): ServiceTokens {
       // open: the request that made it does not finish, and STS's side ends as canceled when that
       // request finally does. The result is plain data, so it stays readable after disposal.
       // https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
-      (result as Partial<Disposable>)[Symbol.dispose]?.();
+      const dispose: unknown = Reflect.get(result, Symbol.dispose);
+      if (typeof dispose === 'function') Reflect.apply(dispose, result, []);
       return result;
     },
     { attemptTimeoutMs: WORKER_ATTEMPT_TIMEOUT_MS }

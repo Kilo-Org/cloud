@@ -4,6 +4,8 @@ import {
   DENIED_RECHECK_MS,
   HELD_TOKEN_MARGIN_SECONDS,
   MINT_BATCH_WINDOW_MS,
+  POLL_MAX_MS,
+  POLL_START_MS,
   createServiceTokens,
   type MintTransport,
 } from '../src/client';
@@ -300,5 +302,37 @@ describe('denials', () => {
     expect(await settle(tokens.get(WEB))).toBe('web:sts.canary#1');
     const error = await settleError(tokens.get(WEB));
     expect(error).toMatchObject({ reason: 'denied', deniedReason: 'audience_not_allowed' });
+  });
+});
+
+describe('waiting reads', () => {
+  it('a read that waits on a slow attempt polls from 25 ms, doubling up to 250 ms', async () => {
+    const answered = Promise.withResolvers<void>();
+    const answer = issueAll();
+    const { transport } = scripted(async request => {
+      await answered.promise;
+      return answer(request);
+    });
+    const tokens = client(transport);
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const reads = Promise.all([tokens.get(WEB), tokens.get(WEB)]);
+    await vi.advanceTimersByTimeAsync(ATTEMPT_TIMEOUT_MS / 2);
+    answered.resolve();
+    expect(await settle(reads, POLL_MAX_MS + 10)).toEqual(['web:sts.canary#1', 'web:sts.canary#1']);
+
+    const polls = setTimeoutSpy.mock.calls
+      .map(([, delay]) => delay ?? 0)
+      .filter(delay => delay > MINT_BATCH_WINDOW_MS && delay <= POLL_MAX_MS);
+    // Each of the two reads sleeps 25, 50, 100, 200, then 250 ms at most.
+    expect([...new Set(polls)]).toEqual([
+      POLL_START_MS,
+      POLL_START_MS * 2,
+      POLL_START_MS * 4,
+      POLL_START_MS * 8,
+      POLL_MAX_MS,
+    ]);
+    // Two reads over 5 s: about 2 x (4 + 5,000 / 250) wakes; a fixed 25 ms poll would be 400.
+    expect(polls.length).toBeLessThan(60);
   });
 });

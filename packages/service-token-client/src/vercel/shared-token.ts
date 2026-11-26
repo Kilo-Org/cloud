@@ -16,9 +16,11 @@
  *    missing one of those claims fails the request.
  * 2. A cached token is used only when it decodes to the same five claims, `aud` equal to the
  *    audience, and `exp` equal to the entry's: code that can write the cache but holds another
- *    deployment's token cannot make this deployment present it. A forged entry can still fail
- *    the caller's STS call (STS checks the signature); code that writes this project's cache runs
- *    with the project's own trust.
+ *    deployment's token cannot make this deployment present it. A forged or stale entry can
+ *    still fail the caller's STS call (STS checks the signature); the caller then calls
+ *    `invalidate`, which drops it from memory and the cache so the next request exchanges again
+ *    (once per STS refusal). Code that writes this project's cache runs with the project's own
+ *    trust.
  * 3. Instance memory, then the shared cache: a hit is used. On a miss, a base token with under
  *    60 seconds left fails the request at once: no exchange, no waiting.
  * 4. Otherwise wait a random 0..`jitterMs` and read again, so a cold wave spreads out.
@@ -48,6 +50,7 @@
 export type SharedCache = {
   get(key: string): Promise<unknown>;
   set(key: string, value: unknown, options: { ttl: number }): Promise<void>;
+  delete(key: string): Promise<void>;
 };
 
 /** One call to the exchange for the given base token and audience. */
@@ -201,7 +204,8 @@ async function cacheKey(keyPrefix: string, deployment: string, audience: string)
  * holds finished tokens only, never a pending exchange.
  */
 export class SharedExchangedToken {
-  private readonly memory = new Map<string, Entry & { untilMs: number }>();
+  /** `shared`: the token came from the Runtime Cache, not from this instance's own exchange. */
+  private readonly memory = new Map<string, Entry & { untilMs: number; shared: boolean }>();
   private readonly cache: SharedCache;
   private readonly settings: SharedTokenSettings;
   private readonly clock: Clock;
@@ -215,12 +219,38 @@ export class SharedExchangedToken {
     this.clock = options.clock ?? SYSTEM_CLOCK;
   }
 
-  private remember(key: string, entry: Entry, ttlSeconds: number): void {
+  private remember(key: string, entry: Entry, ttlSeconds: number, shared: boolean): void {
     const now = this.clock.now();
     for (const [stored, value] of this.memory) {
       if (value.untilMs <= now) this.memory.delete(stored);
     }
-    this.memory.set(key, { ...entry, untilMs: now + ttlSeconds * 1000 });
+    this.memory.set(key, { ...entry, untilMs: now + ttlSeconds * 1000, shared });
+  }
+
+  /**
+   * Drops `token` after STS refused it (`identity_rejected`), when this instance took it from the
+   * Runtime Cache: the entry in memory and, if it still holds that token, the one in the cache, so
+   * the next `get` reads or exchanges a fresh one. Returns whether it dropped it. A token this
+   * instance exchanged itself is kept and `false` returned: Vercel issued it for this deployment,
+   * so exchanging again would get the same refusal and spend the project's exchange budget.
+   */
+  async invalidate(token: string): Promise<boolean> {
+    const claims = claimsOf(token);
+    const deployment = deploymentOf(claims);
+    const audience = claims?.aud;
+    if (deployment === null || typeof audience !== 'string') return false;
+    const key = await cacheKey(this.settings.keyPrefix, deployment, audience);
+    const remembered = this.memory.get(key);
+    if (remembered?.token !== token || !remembered.shared) return false;
+    this.memory.delete(key);
+    try {
+      if (asEntry(await this.cache.get(key), deployment, audience)?.token === token) {
+        await this.cache.delete(key);
+      }
+    } catch {
+      // A cache that fails keeps the entry until its TTL; this instance no longer serves it.
+    }
+    return true;
   }
 
   async get(
@@ -295,7 +325,7 @@ export class SharedExchangedToken {
     }
     const keep = (source: TokenSource, entry: Entry): SharedTokenResult => {
       const ttl = cacheTtlSeconds(entry.exp, nowSeconds());
-      if (ttl !== null) this.remember(key, entry, ttl);
+      if (ttl !== null) this.remember(key, entry, ttl, true);
       return finish(source, entry);
     };
 
@@ -351,7 +381,7 @@ export class SharedExchangedToken {
           const ttl = cacheTtlSeconds(exchanged.exp, nowSeconds());
           if (ttl === null) return fail('the exchanged token expires within 60 seconds');
           await write(key, exchanged, ttl);
-          this.remember(key, exchanged, ttl);
+          this.remember(key, exchanged, ttl, false);
           return finish('exchanged', exchanged);
         }
       }

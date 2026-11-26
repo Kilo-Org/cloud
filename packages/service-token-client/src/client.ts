@@ -37,9 +37,11 @@ const BACKOFF_BASE_MS = 2_000;
 const BACKOFF_CAP_MS = 60_000;
 /**
  * How often a read that waits for another request's attempt checks the shared cache. It cannot
- * await that request's promise (see `Attempt`), so it looks again on its own timer.
+ * await that request's promise (see `Attempt`), so it looks again on its own timer: first after
+ * 25 ms, then doubling up to 250 ms, so a 30 s wait wakes about 125 times, not 1,200.
  */
-const POLL_MS = 25;
+export const POLL_START_MS = 25;
+export const POLL_MAX_MS = 250;
 
 /**
  * Delay before the attempt that follows the nth consecutive failure: 2 s doubling to 60 s, minus
@@ -246,12 +248,12 @@ export function createServiceTokens(
   }
 
   /**
-   * Sleeps one poll interval, or less when `deadline` comes first; an answer to one of this read's
-   * own attempts wakes it sooner. Its timer is cleared or has fired before it returns.
+   * Sleeps `pollMs`, or less when `deadline` comes first; an answer to one of this read's own
+   * attempts wakes it sooner. Its timer is cleared or has fired before it returns.
    */
-  async function waitFor(owned: Owned[], deadline: number): Promise<void> {
+  async function waitFor(owned: Owned[], deadline: number, pollMs: number): Promise<void> {
     const timer = Promise.withResolvers<void>();
-    const handle = setTimeout(timer.resolve, Math.max(0, Math.min(POLL_MS, deadline - Date.now())));
+    const handle = setTimeout(timer.resolve, Math.max(0, Math.min(pollMs, deadline - Date.now())));
     for (const own of owned) own.wake = timer.resolve;
     await timer.promise;
     clearTimeout(handle);
@@ -268,6 +270,7 @@ export function createServiceTokens(
     const arrivedAt = Date.now();
     /** The attempt this read started or joined; it waits for that one only. */
     let mine: Attempt | null = null;
+    let pollMs = POLL_START_MS;
     for (;;) {
       const at = Date.now();
       const { fetch, held } = entry;
@@ -316,7 +319,8 @@ export function createServiceTokens(
           new Error('no STS answer before this read gave up')
         );
       }
-      await waitFor(owned, Math.min(timesOutAt, giveUpAt));
+      await waitFor(owned, Math.min(timesOutAt, giveUpAt), pollMs);
+      pollMs = Math.min(pollMs * 2, POLL_MAX_MS);
     }
   }
 

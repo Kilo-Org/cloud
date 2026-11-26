@@ -1,4 +1,7 @@
+import type { MintRequest } from '@kilocode/sts-contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { DENIED_RECHECK_MS } from '../src/client';
+import { createHttpServiceTokens } from '../src/http';
 import {
   VERCEL_EXCHANGE_URL,
   vercelExchange,
@@ -36,6 +39,9 @@ function memoryCache(): SharedCache {
     },
     async set(key, value, { ttl }) {
       entries.set(key, { value: structuredClone(value), expiresAt: Date.now() + ttl * 1000 });
+    },
+    async delete(key) {
+      entries.delete(key);
     },
   };
 }
@@ -112,6 +118,116 @@ describe('vercelIdentity', () => {
     await expect(identity()).rejects.toThrow(
       'no Vercel token for the STS audience: the base token lacks a deployment claim'
     );
+  });
+});
+
+describe('a shared-cache identity STS refuses (identity_rejected)', () => {
+  const INGEST = { audience: 'usage-ingest', scope: 'usage-ingest:sts.canary' };
+
+  /** A cache that answers `poisoned` for the token key until that key is deleted. */
+  function poisonedCache(poisoned: string) {
+    const inner = memoryCache();
+    let entry: { token: string; exp: number } | null = {
+      token: poisoned,
+      exp: JSON.parse(Buffer.from(poisoned.split('.')[1], 'base64url').toString()).exp,
+    };
+    const cache: SharedCache = {
+      get: async key => (!key.endsWith(':claim') && entry !== null ? entry : await inner.get(key)),
+      set: async (key, value, options) => await inner.set(key, value, options),
+      delete: async key => {
+        if (!key.endsWith(':claim')) entry = null;
+        await inner.delete(key);
+      },
+    };
+    return cache;
+  }
+
+  /** STS stand-in: refuses the identity tokens `refuses` names, issues for every other one. */
+  function sts(refuses: (identity: string) => boolean) {
+    const presented: string[] = [];
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+      const identity =
+        new Headers(init?.headers).get('authorization')?.replace('Bearer ', '') ?? '';
+      presented.push(identity);
+      if (refuses(identity)) return Response.json({ status: 'identity_rejected' }, { status: 401 });
+      const request = JSON.parse(init?.body as string) as MintRequest;
+      return Response.json({
+        status: 'ok',
+        tokens: request.tokens.map(({ audience, scope }) => ({
+          status: 'issued',
+          audience,
+          scope,
+          token: `${scope}#${presented.length}`,
+          jti: `jti-${presented.length}`,
+          expiresAt: nowSeconds() + 300,
+        })),
+      });
+    });
+    return { fetchFn, presented };
+  }
+
+  function setup(refuses: (identity: string) => boolean) {
+    const base = unsignedJwt({ ...DEPLOYMENT, iat: nowSeconds(), exp: nowSeconds() + 7200 });
+    const poisoned = `${unsignedJwt({ ...DEPLOYMENT, aud: STS, iat: nowSeconds(), exp: nowSeconds() + 3600 }).slice(0, -'signature'.length)}forged`;
+    const { exchange, calls } = exchangeLikeVercel();
+    const { fetchFn, presented } = sts(identity => identity === poisoned || refuses(identity));
+    const tokens = createHttpServiceTokens({
+      stsUrl: STS,
+      getIdentityToken: vercelIdentity({
+        stsAudience: STS,
+        cache: poisonedCache(poisoned),
+        getBaseToken: async () => base,
+        exchange,
+        settings: { jitterMs: 1, settleMs: 1 },
+      }),
+      fetch: fetchFn as typeof fetch,
+    });
+    return { tokens, exchanges: calls, presented, poisoned };
+  }
+
+  async function settled<T>(promise: Promise<T>): Promise<T | unknown> {
+    const outcome = promise.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(1_000);
+    return await outcome;
+  }
+
+  it('drops the poisoned entry and exchanges once more in the same attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      const { tokens, exchanges, presented, poisoned } = setup(() => false);
+      expect(await settled(tokens.get(INGEST))).toBe('usage-ingest:sts.canary#2');
+      expect(exchanges).toEqual([STS]);
+      expect(presented).toHaveLength(2);
+      expect(presented[0]).toBe(poisoned);
+      expect(presented[1]).not.toBe(poisoned);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not loop: one re-exchange per refusal, then the denial holds until the recheck', async () => {
+    vi.useFakeTimers();
+    try {
+      const { tokens, exchanges, presented } = setup(() => true);
+      expect(await settled(tokens.get(INGEST))).toMatchObject({
+        reason: 'denied',
+        deniedReason: 'identity_rejected',
+      });
+      expect(exchanges).toEqual([STS]);
+      expect(presented).toHaveLength(2);
+
+      // Within the recheck window: no STS call, no exchange.
+      await settled(tokens.get(INGEST));
+      expect(presented).toHaveLength(2);
+
+      // The recheck presents the token this instance exchanged itself: refused, kept, not re-exchanged.
+      await vi.advanceTimersByTimeAsync(DENIED_RECHECK_MS);
+      expect(await settled(tokens.get(INGEST))).toMatchObject({ reason: 'denied' });
+      expect(presented).toHaveLength(3);
+      expect(exchanges).toEqual([STS]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -489,7 +489,7 @@ it beside `uts.maintain_oauth_rows()`:
 |---|---|---|
 | `webauthn_challenges`, `device_codes`, `tickets`, `step_ups` | 1 hour past their lifetime (5 minutes, 10 minutes, 60 seconds, 10 minutes), used or not | No statement accepts them after their lifetime |
 | `account_user_code_failures`, `network_user_code_failures` | 1 hour after the window's first wrong code | The next wrong code after the hour starts a new window anyway |
-| `browser_sessions` | 1 day after the session ended (idle end, absolute end or revocation), unless it holds a gate pass; cascades to its challenges, codes and step-ups | An ended session never answers again; a gate pass a credential refers to keeps its session, one per gated action |
+| `browser_sessions` | 1 day after the session ended (idle end, absolute end or revocation), unless a row still refers to one of its gate passes (a passkey, PAT, bot key, CI trust policy, third-party consent or device code); cascades to its challenges, codes, step-ups and passes | An ended session never answers again; a credential's foreign key would refuse the cascade, so only such a session stays, one per credential. A pass nothing refers to, such as a device approval's once its code is deleted, keeps nothing. A kept session gets `cleanup_kept_at` and is looked at again a day later, so a call reads about a 1,440th of the kept sessions rather than all of them |
 
 Row growth: with one sign-in per active client per 14 days, a session lives at most 31 days, so
 about 2.2 session rows (about 300 bytes each) per client: 7 MB at 10k clients, 33 MB at 50k and

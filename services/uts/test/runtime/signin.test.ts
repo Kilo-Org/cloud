@@ -464,6 +464,8 @@ describe('device verification page', () => {
     expect(html).toContain('BCDF-GHJK');
     expect(html).toContain('data-code-source="link"');
     expect(html).toContain('approving asks for your passkey');
+    // A user without a passkey goes to the empty entry page: a typed code passes on the sign-in.
+    expect(html).toContain('No passkey? <a id="type-code" href="/device">Type the code');
     expect(html).toContain('Kilo CLI');
     expect(html).toContain('Berlin, DE');
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
@@ -483,6 +485,7 @@ describe('device verification page', () => {
       const html = await (await handleDevicePage(posted, deviceDeps(store.deps))).text();
       expect(html).toContain('data-code-source="typed"');
       expect(html).not.toContain('approving asks for your passkey');
+      expect(html).not.toContain('id="type-code"');
     }
   });
 

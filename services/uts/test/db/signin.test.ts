@@ -99,8 +99,11 @@ async function browserSession(accountId: string, authMinutesAgo = 0) {
   return { value, hash: sha256(value), id: result.rows[0].id };
 }
 
-/** A stored passkey of `accountId` with signature counter `count`. */
-async function storedPasskey(accountId: string, count = 0) {
+/**
+ * A stored passkey of `accountId` with signature counter `count`, added under a pass of
+ * `sessionId` when given.
+ */
+async function storedPasskey(accountId: string, count = 0, sessionId?: string) {
   const credentialId = randomBytes(32);
   const userHandle = randomBytes(32);
   const result = await owner.query<{ id: string }>(
@@ -115,7 +118,7 @@ async function storedPasskey(accountId: string, count = 0) {
       count,
       RP_ID,
       userHandle,
-      await insertGatePass(owner, accountId, 'passkey_add'),
+      await insertGatePass(owner, accountId, 'passkey_add', sessionId),
     ]
   );
   return { id: result.rows[0].id, credentialId, userHandle };
@@ -653,9 +656,9 @@ describe('device grant', () => {
     );
     expect(counted.rows).toEqual([{ network: `${host(0)}/24`, failures: 30 }]);
     const networks = await owner.query<{ v4: string; v6: string; none: string | null }>(
-      `SELECT uts.user_code_network('192.0.2.77')::text AS v4,
-              uts.user_code_network('2001:db8:1:2::5')::text AS v6,
-              uts.user_code_network(NULL)::text AS none`
+      `SELECT uts.client_network('192.0.2.77')::text AS v4,
+              uts.client_network('2001:db8:1:2::5')::text AS v6,
+              uts.client_network(NULL)::text AS none`
     );
     expect(networks.rows).toEqual([{ v4: '192.0.2.0/24', v6: '2001:db8:1::/48', none: null }]);
   });
@@ -890,10 +893,14 @@ describe('device grant', () => {
   });
 });
 
-/** A first-party grant made through a code exchange (migration 0004), and how to present it. */
+/**
+ * A first-party grant made through a code exchange (migration 0004), and how to present it; bound
+ * to `orgId` when given, whose membership the caller inserted.
+ */
 async function firstPartyGrant(
   accountId: string,
-  scopes = ['gateway:models.read', 'kilo-chat:messages.read']
+  scopes = ['gateway:models.read', 'kilo-chat:messages.read'],
+  orgId: string | null = null
 ) {
   const code = token();
   const verifier = token();
@@ -909,7 +916,7 @@ async function firstPartyGrant(
       redirectUri: 'http://127.0.0.1:4100/callback',
       audiences: [...new Set(scopes.map(scope => scope.split(':')[0]))],
       scopes,
-      orgId: null,
+      orgId,
       codeChallenge: challengeValue,
       authTime: new Date(),
       amr: ['passkey'],
@@ -1064,6 +1071,60 @@ describe('one-time tickets', () => {
     );
     expect((await tickets.redeem(environment, sha256(live), 'gateway')).outcome).toBe('unknown');
   });
+
+  it('redeem an organization ticket only while the membership and SSO requirement still hold', async () => {
+    const mint = async (grant: { refreshToken: string; grantId: string; jkt: Buffer }) => {
+      const ticket = token();
+      const issued = await tickets.issue({
+        environment,
+        tokenHash: sha256(grant.refreshToken),
+        grantId: grant.grantId,
+        clientId: 'kilo-cli',
+        proof: { jkt: grant.jkt, jti: randomUUID() },
+        ticketHash: sha256(ticket),
+        purpose: 'stream',
+        audience: 'gateway',
+        resource: null,
+      });
+      expect(issued.outcome).toBe('issued');
+      return ticket;
+    };
+    const memberGrant = async () => {
+      const accountId = await insertAccount(owner);
+      const orgId = randomUUID();
+      await owner.query(
+        `INSERT INTO uts.org_memberships (org_id, account_id, role, event_version) VALUES ($1, $2, 'member', 1)`,
+        [orgId, accountId]
+      );
+      return { orgId, grant: await firstPartyGrant(accountId, ['gateway:models.read'], orgId) };
+    };
+
+    const removed = await memberGrant();
+    const before = await mint(removed.grant);
+    expect(await tickets.redeem(environment, sha256(before), 'gateway')).toMatchObject({
+      outcome: 'redeemed',
+      orgId: removed.orgId,
+    });
+    const afterRemoval = await mint(removed.grant);
+    await owner.query(
+      `UPDATE uts.org_memberships SET status = 'removed', removed_at = now() WHERE org_id = $1`,
+      [removed.orgId]
+    );
+    expect(await tickets.redeem(environment, sha256(afterRemoval), 'gateway')).toEqual({
+      outcome: 'unknown',
+    });
+
+    // The grant signed in with a passkey; an SSO requirement set after the mint refuses it.
+    const ssoRequired = await memberGrant();
+    const afterPolicy = await mint(ssoRequired.grant);
+    await owner.query(
+      `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, 'required', 1)`,
+      [ssoRequired.orgId]
+    );
+    expect(await tickets.redeem(environment, sha256(afterPolicy), 'gateway')).toEqual({
+      outcome: 'unknown',
+    });
+  });
 });
 
 describe('sign-in row maintenance', () => {
@@ -1105,14 +1166,15 @@ describe('sign-in row maintenance', () => {
     expect(left.rows[0].count).toBe(1);
   });
 
-  it('deletes a browser session a day after it ended, never a live one or one that holds a gate pass', async () => {
+  it('deletes a browser session a day after it ended unless a credential still refers to one of its passes', async () => {
     const accountId = await insertAccount(owner);
     const live = await browserSession(accountId);
     const ended = await browserSession(accountId);
-    const endedWithPass = await browserSession(accountId);
+    const endedWithPasskey = await browserSession(accountId);
+    const endedDeviceApproval = await browserSession(accountId);
     const revoked = await browserSession(accountId);
     // An idle end two days ago; the CHECK needs the idle end within 14 days of the last sight.
-    for (const session of [ended, endedWithPass]) {
+    for (const session of [ended, endedWithPasskey, endedDeviceApproval]) {
       await owner.query(
         `UPDATE uts.browser_sessions SET created_at = now() - interval '20 days',
                 last_seen_at = now() - interval '16 days', idle_expires_at = now() - interval '2 days',
@@ -1120,22 +1182,65 @@ describe('sign-in row maintenance', () => {
         [session.id]
       );
     }
-    await insertGatePass(owner, accountId, 'pat_create', endedWithPass.id);
+    const passkey = await storedPasskey(accountId, 0, endedWithPasskey.id);
+    // A device approval's pass, whose device code maintenance already deleted.
+    const approvalPass = await insertGatePass(
+      owner,
+      accountId,
+      'device_approve',
+      endedDeviceApproval.id
+    );
     await owner.query(
       `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now() - interval '25 hours',
               revoke_reason = 'sign_out' WHERE id = $1`,
       [revoked.id]
     );
     const app = await db.connect('uts_app_a');
-    const result = await app.query<{ kind: string; deleted: number }>(
-      'SELECT kind, deleted FROM uts.maintain_sign_in_rows()'
-    );
-    expect(result.rows.find(row => row.kind === 'browser_sessions')?.deleted).toBe(2);
+    await app.query('SELECT * FROM uts.maintain_sign_in_rows()');
     const left = await owner.query<{ id: string }>(
-      'SELECT id FROM uts.browser_sessions WHERE account_id = $1 ORDER BY id',
+      'SELECT id FROM uts.browser_sessions WHERE account_id = $1',
       [accountId]
     );
-    expect(left.rows.map(row => row.id).sort()).toEqual([live.id, endedWithPass.id].sort());
+    expect(left.rows.map(row => row.id).sort()).toEqual([live.id, endedWithPasskey.id].sort());
+    const passes = await owner.query('SELECT 1 FROM uts.gate_passes WHERE id = $1', [approvalPass]);
+    expect(passes.rows).toEqual([]);
+
+    // The kept session is stamped and left alone for a day; once its passkey is gone, the next
+    // look after that day deletes it.
+    const stamp = async () =>
+      (
+        await owner.query<{ kept: Date | null }>(
+          'SELECT cleanup_kept_at AS kept FROM uts.browser_sessions WHERE id = $1',
+          [endedWithPasskey.id]
+        )
+      ).rows[0]?.kept;
+    const first = await stamp();
+    expect(first).toBeInstanceOf(Date);
+    await owner.query('DELETE FROM uts.passkey_credentials WHERE id = $1', [passkey.id]);
+    await app.query('SELECT * FROM uts.maintain_sign_in_rows()');
+    expect(await stamp()).toEqual(first);
+    await owner.query(
+      `UPDATE uts.browser_sessions SET cleanup_kept_at = now() - interval '25 hours' WHERE id = $1`,
+      [endedWithPasskey.id]
+    );
+    await app.query('SELECT * FROM uts.maintain_sign_in_rows()');
+    expect(await stamp()).toBeUndefined();
+  });
+
+  it('probes every table whose foreign key refers to a gate pass', async () => {
+    // The session cleanup skips a session only for these; a new referring table must join them.
+    const referring = await owner.query<{ table: string }>(
+      `SELECT conrelid::regclass::text AS table FROM pg_constraint
+       WHERE contype = 'f' AND confrelid = 'uts.gate_passes'::regclass ORDER BY 1`
+    );
+    expect(referring.rows.map(row => row.table)).toEqual([
+      'uts.ci_trust_policies',
+      'uts.device_codes',
+      'uts.org_bot_keys',
+      'uts.passkey_credentials',
+      'uts.personal_access_tokens',
+      'uts.third_party_consents',
+    ]);
   });
 
   it('deletes wrong user-code counts whose hour has passed, and keeps a running one', async () => {
@@ -1171,17 +1276,36 @@ describe('sign-in row maintenance', () => {
 });
 
 describe('anonymous write limits', () => {
-  it('holds at most 5 pending device codes per client address', async () => {
-    const address = `198.51.100.${Math.floor(Math.random() * 200) + 20}`;
-    const create = () =>
-      signIn.createDeviceCode({
-        deviceCodeHash: sha256(token()),
-        userCodeHash: randomBytes(32),
-        clientId: 'kilo-cli',
-        scopes: ['gateway:models.read'],
-        network: { ...network, clientIp: address },
-      });
-    for (let index = 0; index < 5; index++) expect((await create()).outcome).toBe('created');
-    expect(await create()).toEqual({ outcome: 'too_many_pending' });
+  const create = (clientIp: string) =>
+    signIn.createDeviceCode({
+      deviceCodeHash: sha256(token()),
+      userCodeHash: randomBytes(32),
+      clientId: 'kilo-cli',
+      scopes: ['gateway:models.read'],
+      network: { ...network, clientIp },
+    });
+
+  it('holds at most 5 pending device codes per IPv4 /24', async () => {
+    const [first, second] = randomBytes(2);
+    const prefix = `172.${16 + (first % 16)}`;
+    for (let host = 1; host <= 5; host++) {
+      expect((await create(`${prefix}.${second}.${host}`)).outcome).toBe('created');
+    }
+    expect(await create(`${prefix}.${second}.200`)).toEqual({ outcome: 'too_many_pending' });
+    expect((await create(`${prefix}.${(second + 1) % 256}.1`)).outcome).toBe('created');
+  });
+
+  it('holds at most 5 pending device codes per IPv6 /48, whatever /64 each came from', async () => {
+    const site = `2001:db8:${randomBytes(2).toString('hex')}`;
+    for (let subnet = 0; subnet < 5; subnet++) {
+      expect((await create(`${site}:${subnet}::1`)).outcome).toBe('created');
+    }
+    expect(await create(`${site}:ffff:1:2:3:4`)).toEqual({ outcome: 'too_many_pending' });
+    const stored = await owner.query<{ network: string }>(
+      `SELECT DISTINCT client_network::text AS network FROM uts.device_codes
+       WHERE client_network = uts.client_network($1::inet)`,
+      [`${site}::1`]
+    );
+    expect(stored.rows).toHaveLength(1);
   });
 });

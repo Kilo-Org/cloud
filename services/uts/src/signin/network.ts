@@ -33,3 +33,31 @@ export function requestNetwork(request: Request): NetworkContext {
     city: city !== undefined && city.length > 0 && city.length <= 128 ? city : null,
   };
 }
+
+/**
+ * The client network of an address `requestNetwork` accepted, as `uts.client_network` defines it
+ * (migration 0008): its IPv4 /24 or IPv6 /48, written as those leading octets or hextets. Null
+ * without an address. One IPv6 subscriber holds a /64 or more, so a limit on exact addresses
+ * bounds nothing.
+ */
+export function clientNetwork(clientIp: string | null): string | null {
+  if (clientIp === null) return null;
+  if (!clientIp.includes(':')) return `${clientIp.split('.').slice(0, 3).join('.')}.0/24`;
+  // Expand `::` to the hextets it stands for; an IPv4 tail (`::ffff:192.0.2.1`) holds two.
+  const groups = (part: string) =>
+    part === ''
+      ? []
+      : part.split(':').flatMap(group => (group.includes('.') ? ['0', '0'] : [group]));
+  const [head, tail] = clientIp.split('::');
+  const leading = groups(head);
+  const trailing = tail === undefined ? [] : groups(tail);
+  const hextets = [
+    ...leading,
+    ...Array.from({ length: 8 - leading.length - trailing.length }, () => '0'),
+    ...trailing,
+  ];
+  return `${hextets
+    .slice(0, 3)
+    .map(group => Number.parseInt(group, 16).toString(16))
+    .join(':')}::/48`;
+}

@@ -170,7 +170,8 @@ describe('GET /api/cron/cleanup-admin-action-audit-logs', () => {
   });
 
   it('reports database failures without treating them as successful cleanup', async () => {
-    const select = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+    // Each batch runs in its own transaction.
+    const transaction = jest.spyOn(db, 'transaction').mockImplementationOnce(async () => {
       throw new Error('database unavailable');
     });
 
@@ -183,7 +184,7 @@ describe('GET /api/cron/cleanup-admin-action-audit-logs', () => {
         exception_name: 'Error',
       });
     } finally {
-      select.mockRestore();
+      transaction.mockRestore();
     }
   });
 });

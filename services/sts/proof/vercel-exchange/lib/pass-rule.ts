@@ -1,5 +1,6 @@
-// The proof run 3 pass rule for `drive.ts --mode shared` (design 4.4), kept apart from the driver so
-// `test/proof/pass-rule.test.ts` can check it. No imports: `node drive.ts` loads it as is.
+// The proof run 3 pass rules (design 4.4): the `drive.ts --mode shared` gate, the person-token gate
+// of `inspect-env-token.ts` and the chain refusal of `api/chain.ts`, kept apart so
+// `test/proof/pass-rule.test.ts` can check them. No imports: `node` loads it as is.
 
 /** About 100 exchanges per burst per project or team (proof runs 1 and 3): the hard limit. */
 export const BUDGET_EXCHANGES_PER_WAVE = 100;
@@ -34,6 +35,32 @@ export function tokenExpOk(answer: Readonly<Record<string, unknown>>): boolean {
   if (typeof exchangedExp !== 'number') return false;
   if (source === 'exchanged') return exchangedExp === baseExp;
   return typeof nowSeconds === 'number' && exchangedExp - nowSeconds >= MIN_REMAINING_SECONDS;
+}
+
+/**
+ * Whether an exchange status is Vercel refusing the request: a 4xx other than 408 and 429. A 408 or
+ * 429, a 5xx, a timeout, a network error or an unreadable body shows nothing about what Vercel
+ * would issue, so a check that rests on a refusal is inconclusive then.
+ */
+export function isDefinitiveRefusal(status: number | string): boolean {
+  return (
+    typeof status === 'number' && status >= 400 && status < 500 && status !== 408 && status !== 429
+  );
+}
+
+/**
+ * The person-token merge gate (README step 3) for a pulled token: it holds when the pulled token
+ * carries `user_id` and the exchange either refused it or issued a token that still carries it.
+ * `exchangedUserId` is `null` when no exchanged token was decoded.
+ */
+export function personTokenGate(
+  pulledUserId: boolean,
+  exchangeStatus: number | string,
+  exchangedUserId: boolean | null
+): 'holds' | 'stops' | 'inconclusive' {
+  if (exchangedUserId !== null) return pulledUserId && exchangedUserId ? 'holds' : 'stops';
+  if (!isDefinitiveRefusal(exchangeStatus)) return 'inconclusive';
+  return pulledUserId ? 'holds' : 'stops';
 }
 
 export type SharedRunFacts = {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isDefinitiveRefusal,
+  personTokenGate,
   sharedChecks,
   tokenExpOk,
   type SharedRunFacts,
@@ -74,5 +76,33 @@ describe('served token exp check', () => {
 
   it('fails a served answer without an exchanged exp', () => {
     expect(tokenExpOk({ source: 'cache', baseExp: now + 7200, exchangedExp: null, nowSeconds: now })).toBe(false);
+  });
+});
+
+describe('exchange refusals', () => {
+  it('counts only a 4xx other than 408 and 429 as a refusal', () => {
+    for (const status of [400, 401, 403]) expect(isDefinitiveRefusal(status)).toBe(true);
+    for (const status of [408, 429, 500, 502, 503, 'timeout', 'network_error', 'invalid_body']) {
+      expect(isDefinitiveRefusal(status)).toBe(false);
+    }
+  });
+});
+
+describe('person-token gate', () => {
+  it('holds when user_id survives the exchange or Vercel refuses it', () => {
+    expect(personTokenGate(true, 200, true)).toBe('holds');
+    expect(personTokenGate(true, 401, null)).toBe('holds');
+  });
+
+  it('stops when either token lacks user_id', () => {
+    expect(personTokenGate(true, 200, false)).toBe('stops');
+    expect(personTokenGate(false, 200, true)).toBe('stops');
+    expect(personTokenGate(false, 401, null)).toBe('stops');
+  });
+
+  it('is inconclusive when the exchange was unavailable or its answer unreadable', () => {
+    for (const status of [429, 500, 503, 'network_error', 'invalid_body']) {
+      expect(personTokenGate(true, status, null)).toBe('inconclusive');
+    }
   });
 });

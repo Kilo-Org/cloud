@@ -124,8 +124,8 @@ it at deploy. `pnpm typecheck` and `pnpm lint` in `services/sts` check this dire
 | `api/shared.ts` | `POST /api/shared`: one STS-audience token through the shared cache. Answers the source (`memory`, `cache`, `cache_after_jitter`, `exchanged`, `poll`), time to token, wait time, exchange attempts and 429s, whether it won the claim, cache reads and writes, the cache backend, the region, the base token's `iat`/`exp`, the clock and the token's `exp`. `?jitterMs=`, `?claim=0`, `?deadlineMs=` override the defaults; `?run=` salts the key. |
 | `api/cold.ts` | `POST /api/cold`: one exchange per invocation, no cache (run 1's mode), plus the base token's `iat`/`exp`, the clock, the exchanged `exp` and the rate-limit headers. |
 | `api/exchange.ts` | `POST /api/exchange?n=2500&c=50`: a burst from one instance. Its latency numbers are the ones to quote; the limit is measured only by a fan-out. |
-| `api/chain.ts` | `POST /api/chain`: exchanges for `https://example.invalid`, then exchanges that token again; `vercelRefusedChain` is true only for a non-429 refusal (`chainedRateLimited` marks a 429). |
-| `lib/pass-rule.ts` | The run-3 pass rule `drive.ts` applies. |
+| `api/chain.ts` | `POST /api/chain`: exchanges for `https://example.invalid`, then exchanges that token again; `vercelRefusedChain` is true only for a definitive refusal (a 4xx other than 408 and 429); `chainInconclusive` marks a 429, a 5xx, a timeout, a network error or an unreadable body, and `chainedRateLimited` a 429. |
+| `lib/pass-rule.ts` | The run-3 pass rule `drive.ts` applies, the person-token gate and what counts as a refusal. |
 | `drive.ts` | `--mode shared` (the gate), `--mode cold` (baseline and budget scope), `--mode warm` (header token age). `--dry-run` prints the plan and pass rule. Shared mode salts each run with a fresh `run` id. It takes only an `https` `--url` and follows no redirect, since every request carries the proof key. |
 | `inspect-env-token.ts` | Pulls `VERCEL_OIDC_TOKEN` with `vercel env pull` per environment of the proof project, exchanges it for `https://sts-proof.invalid`, and prints for both tokens `environment`, `custom_environment_id`, whether `user_id` is present, the `act` shape and `scope`, plus the gate outcome. Never a token. |
 | `vercel.json` | `fluid: false`, so concurrent invocations land on separate instances, as cold instances would. |
@@ -233,17 +233,18 @@ The pull writes the proof project's own (dummy) values to a 0700 temp directory,
   `instancesVsDesignPeak` reports the measured count next to the design's peak of about 2,200.
 
 **Person-token gate (step 3).** For every pulled environment, either Vercel issues no token, or both
-the pulled and the exchanged token carry `user_id` (`gate: "holds"`; a refused exchange counts as
-no exchanged token). Any `gate: "stops"` stops the merge until Igor decides: a team member could
-then pull, exchange and present a token STS accepts. `gate: "inconclusive"` (429 or network error)
-is rerun after 70 s.
+the pulled and the exchanged token carry `user_id` (`gate: "holds"`; a definitive refusal, a 4xx
+other than 408 and 429, counts as no exchanged token). Any `gate: "stops"` stops the merge until
+Igor decides: a team member could then pull, exchange and present a token STS accepts.
+`gate: "inconclusive"` (429, 408, 5xx, network error, or an answer without a decodable token) is
+rerun after 70 s.
 
 **Build tokens.** Record `scope` from `exchangedClaims` (run a) and from step 3. Proof run 3: `scope`
 equals `sub` for every token, so it does not tell a build token from a function token, and design
 6.2 states that build code is trusted like the deployment's own code.
 
 Record in the PR: `shared.json`, `shared-noclaim.json`, `chain.json` (`vercelRefusedChain`, both
-`act` shapes; counts only if `chainedRateLimited` is false), `burst.json`, `scope-*.json` (if run),
+`act` shapes; counts only if `chainInconclusive` is false), `burst.json`, `scope-*.json` (if run),
 `warm.json` (oldest header token, least time left, `headerTokensUnder60sLeft`, how often the base
 token changed) and `env-tokens.jsonl`.
 

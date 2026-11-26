@@ -304,6 +304,71 @@ about ceil(N / 5,000) cron cycles (about 20 at 100k); the operator path retries 
 rather than treating it as a failure. Once it succeeds, no family comes back. The batches write
 no audit row; the operator action that blocks or unblocks the client writes it.
 
+## Third-party clients, consent and the broker exchange
+
+Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata Document
+(`src/third-party/`); dynamic client registration stays off.
+
+- **Metadata** (`metadata.ts`, `clients.ts`): `/authorize` resolves the client from the
+  identity-store copy (`uts.third_party_clients`). A missing or stale copy is fetched first, a
+  stale one with `If-None-Match`. The fetch guards:
+  - HTTPS on the default port only; no IP literal, single label, `localhost` or private name space;
+  - no redirect; 200 or 304 only; a JSON body of at most 8 KiB; 5 seconds in all;
+  - a cache time of `max-age` bounded to 5 minutes to 24 hours (1 hour without one).
+
+  The document must name the same client id. It must not carry a client secret, and every
+  redirect URI must be HTTPS, HTTP loopback on `127.0.0.1` or `localhost` (never `[::1]`: the
+  confirm page's `form-action` cannot name an IPv6 literal), or a private-use scheme. A blocked
+  client is never served and keeps its status through a refresh. Each isolate runs one fetch per
+  client id at a time, and after a failure it waits 60 seconds before it fetches that id again. A
+  Worker cannot see the address a name resolves to, so a public name that resolves to a private
+  address relies on Workers not reaching private networks.
+- **Consent** (`consent.ts`): the sign-in hand-off sends a third-party request with a browser
+  session to the consent screen. An active consent of the account, client and organization that
+  covers the scopes approves at once. Otherwise the page shows the client name, the metadata URL,
+  the redirect, the organization and one tick box per consent line (`consentText` in
+  `UTS_SCOPE_REGISTRY`). Its form posts the authorization URL back from this origin.
+  `uts.grant_third_party_consent` writes the consumed tier B pass, the consent, the
+  `third_party_client_approved` notice and the audit row in one statement. A sign-in older than 10
+  minutes needs the passkey step-up, which the page runs before it submits. A request whose
+  redirect is not HTTPS (loopback or private-use scheme) never completes on a plain GET, even
+  under an existing consent: it shows the confirm page, whose same-origin POST approves (RFC 8252
+  section 8.6). The sign-in hand-off applies the same rule to the first-party clients, the CLI's
+  loopback redirect included.
+- **Apps page** (`GET`/`POST /signin/apps`): it lists the account's consents, and a same-origin
+  form POST withdraws one. `uts.withdraw_third_party_consent` revokes the consent and ends each
+  live family with a `third_party_family` feed entry. It never writes `revoked_before`. The page
+  publishes the entries before it answers, and a page answered 202 means only the backfill will
+  add them.
+- **Broker exchange** (`src/exchange/`, `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`
+  at `/token`): Kilo MCP authenticates with an STS bearer (audience `uts`, workload `kilo-mcp`,
+  scope `uts:token-exchange`). The STS token is checked through the `StsCallerVerifier` port. The
+  deployed entry wires none until `@kilocode/verify` is on this branch, so the grant answers
+  `unsupported_grant_type` there and the metadata does not list it. The development entry checks
+  tokens of a local fake STS key set (`DEV_STS_JWKS_URL`, `src/dev-clients.ts`).
+
+  The subject token is verified against signer keys held in isolate memory (`keys.ts`): a 5-minute
+  copy, a re-read for an unknown `kid` at most every 10 seconds, and a copy under 1 hour old kept
+  through failed reads. Its scope must list the requested scope in `delegatesTo`.
+
+  The result has `exp = min(now + 300, subject exp)`, refused with `invalid_grant` under 30 seconds
+  left. It carries `act: { sub: "kilo-mcp" }`, `req`, the subject's `sid` and `client_id`, and its
+  `org` only when present.
+
+  Cost per request: one statement (`uts.exchange_delegated_token`: grant or family, consent,
+  subject and `kid` revocations, `token.exchanged` audit row), then one `signMany` call. The
+  limits are attempt budgets, not success budgets. Each isolate allows 600 attempts a minute per
+  caller workload, counted once the STS token is verified, and 60 per subject `sid`, counted once
+  the subject token is verified. Both count refused attempts too, so a caller that retries a
+  refused subject spends the same budget. Above that it answers
+  `429 { error: "slow_down", limit: "subject" | "caller" }` with `Retry-After` of 1 to 60 seconds,
+  and a 429 itself counts nothing.
+
+The local run is `scripts/clients-e2e.ts`. Start the mint Worker with
+`--var DEV_CLIENT_METADATA_ORIGIN:http://127.0.0.1:9132 --var DEV_STS_JWKS_URL:http://127.0.0.1:9131/jwks.json`
+and set `track_functions = 'all'` on the local server, so the run can count the exchange
+statements. The run serves the metadata document and the fake STS key set itself.
+
 ## Account API, PATs and org bot keys
 
 Every account route takes a UTS access token for the `uts` audience with the route's scope and a

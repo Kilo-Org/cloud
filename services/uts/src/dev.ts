@@ -1,6 +1,7 @@
 import { UtsFeedIndexSchema } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { devMetadataFetcher, devStsCallers } from './dev-clients';
 import { handleDevNoticeRequest } from './dev-notices';
 import type { DevUtsFeedDO } from './dev-feed';
 import { getFeedStub, getSignerStub } from './dos/stubs';
@@ -43,6 +44,8 @@ import type { SignerAccess } from './token/mint';
  *   are synthetic local values), for the email end-to-end run.
  * * The notice routes under `/__dev/notices/` and the security view with a development caller
  *   check (`src/dev-notices.ts`).
+ * * The client metadata fetch of test domains and the stand-in STS token verifier of the broker
+ *   exchange, each when its var is set (`src/dev-clients.ts`).
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 export const DEV_FEED_STOP_PATH = '/__dev/feed/stop';
@@ -172,6 +175,8 @@ export async function handleDevRequest(
       signer,
       scopes: developmentScopes,
       mailer: recordingMailer,
+      metadataFetcher: devMetadataFetcher(env) ?? ((url, init) => fetch(url, init)),
+      stsCallers: devStsCallers(env),
     });
   }
   if (request.method !== 'POST') {

@@ -812,7 +812,7 @@ describe('migration 0010 baseline', () => {
     try {
       const admin = await empty.connect();
       const migrations = await loadMigrations();
-      // The schema as it stood before 0010: every earlier migration, none after it.
+      // Every migration before 0010, then all: a later migration may not sort before an applied one.
       await applyMigrations(
         admin,
         migrations.filter(migration => migration.name < '0010_notices.sql')

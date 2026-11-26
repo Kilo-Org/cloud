@@ -684,10 +684,12 @@ describe('functions', () => {
       { routine: 'end_long_transactions', grantee: 'uts_app' },
       { routine: 'end_web_session', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'exchange_delegated_token', grantee: 'uts_app' },
       { routine: 'exchange_device_code', grantee: 'uts_app' },
       { routine: 'exchange_web_code', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'finish_notice', grantee: 'uts_app' },
+      { routine: 'grant_third_party_consent', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
@@ -697,6 +699,7 @@ describe('functions', () => {
       { routine: 'keep_bot_key', grantee: 'uts_app' },
       { routine: 'list_bot_keys', grantee: 'uts_app' },
       { routine: 'list_pats', grantee: 'uts_app' },
+      { routine: 'list_third_party_consents', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
@@ -723,6 +726,7 @@ describe('functions', () => {
       { routine: 'start_email_sign_in', grantee: 'uts_app' },
       { routine: 'start_sign_in_flow', grantee: 'uts_app' },
       { routine: 'verify_email_code', grantee: 'uts_app' },
+      { routine: 'withdraw_third_party_consent', grantee: 'uts_app' },
     ]);
   });
 });

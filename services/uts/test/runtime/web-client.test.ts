@@ -23,6 +23,7 @@ import { webClientKeys } from '../../src/bff/client-auth';
 import type { LegacySsoAuthority, WebClientDeps } from '../../src/bff/deps';
 import type { WebSession, WebSessionAccess, WebSessionStore } from '../../src/bff/store';
 import type { PendingAuthorization } from '../../src/oauth/authorize';
+import { authorizationServerMetadata } from '../../src/metadata/authorization-server';
 import { handleOAuthRequest } from '../../src/oauth/routes';
 import { browserSessionHandleOfExchange, randomCredential } from '../../src/token/credentials';
 import { errorOf, fakeGrants, formRequest, oauthDeps, recordingPublisher } from './oauth-support';
@@ -819,5 +820,43 @@ describe('authorize for kilo-web', () => {
     }));
     expect(response.status).toBe(503);
     expect(response.headers.get('Location')).toBeNull();
+  });
+});
+
+describe('authorization-server metadata for kilo-web', () => {
+  const metadata = (web: Partial<WebClientDeps>, webClientReady: boolean) =>
+    authorizationServerMetadata(
+      config,
+      {
+        kind: 'ready',
+        deps: oauthDeps(fakeGrants().access, { web: webDeps(fakeSessions(), web) }),
+      },
+      webClientReady
+    );
+
+  it('lists private_key_jwt only while the key set is valid, and the exchange only with the bridge on', () => {
+    const unset = metadata({}, false);
+    expect(unset.token_endpoint_auth_methods_supported).toEqual(['none']);
+    expect(unset).not.toHaveProperty('token_endpoint_auth_signing_alg_values_supported');
+    expect(unset.grant_types_supported).not.toContain(
+      'urn:ietf:params:oauth:grant-type:token-exchange'
+    );
+
+    const ready = metadata({}, true);
+    expect(ready.token_endpoint_auth_methods_supported).toEqual(['none', 'private_key_jwt']);
+    expect(ready).toMatchObject({ token_endpoint_auth_signing_alg_values_supported: ['EdDSA'] });
+    expect(ready.grant_types_supported).not.toContain(
+      'urn:ietf:params:oauth:grant-type:token-exchange'
+    );
+
+    const authority: LegacySsoAuthority = async () => 'unverified';
+    const bridge: WebClientDeps['bridge'] = { status: 'on', authority };
+    expect(metadata({ bridge }, true).grant_types_supported).toContain(
+      'urn:ietf:params:oauth:grant-type:token-exchange'
+    );
+    // A bridge without a valid key set answers nothing, so it is not listed.
+    expect(metadata({ bridge }, false).grant_types_supported).not.toContain(
+      'urn:ietf:params:oauth:grant-type:token-exchange'
+    );
   });
 });

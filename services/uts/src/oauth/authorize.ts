@@ -11,6 +11,8 @@ import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
 import { type ScopeRegistry, clientScopeRefusal, orgScopeRefusal } from '../scopes/policy';
+import type { ThirdPartyClients } from '../third-party/clients';
+import { type ThirdPartyRedirectKind, thirdPartyRedirectKind } from '../third-party/metadata';
 import { randomCredential, sha256 } from '../token/credentials';
 import {
   type FirstPartyClient,
@@ -20,7 +22,7 @@ import {
   isRegisteredRedirect,
 } from './clients';
 import { jktOfParameter } from './dpop';
-import { classifyFailure, failureResponse, oauthError } from './errors';
+import { classifyFailure, oauthError, temporarilyUnavailable } from './errors';
 import { audiencesOfResources, paramsOf, parseScopes, targetMismatch } from './params';
 import { CodeChallengeSchema } from './pkce';
 
@@ -51,7 +53,16 @@ export type AuthorizingClient =
       /** How the client receives the code; a private-use scheme needs a fresh sign-in. */
       redirectKind: RedirectRule['kind'];
     }
-  | { kind: 'third_party'; clientId: string; name: string }
+  | {
+      kind: 'third_party';
+      clientId: string;
+      name: string;
+      /**
+       * How the client receives the code. Another app can claim a private-use scheme, so such a
+       * request completes only from a page the user posts (RFC 8252 section 8.6).
+       */
+      redirectKind: ThirdPartyRedirectKind;
+    }
   /**
    * The web BFF `kilo-web` (design 5.1): it receives its code on its exact HTTPS callback, with
    * PKCE S256 and no DPoP key, and authenticates at the token endpoint with a client assertion.
@@ -102,6 +113,8 @@ export type AuthorizeDeps = {
   grants: GrantsAccess;
   scopes: ScopeRegistry;
   handoff: AuthorizationHandoff;
+  /** Third-party clients by their Client ID Metadata Document (src/third-party/clients.ts). */
+  clients: ThirdPartyClients;
   /** `kilo-web`'s key set: the client is served only where it is configured. */
   web: Pick<WebClientDeps, 'keys'>;
 };
@@ -154,17 +167,19 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       redirectKind: identity.client.redirect.kind,
     };
   } else if (identity.kind === 'third_party') {
-    let record;
-    try {
-      record = await deps.grants(grants => grants.findThirdPartyClient(identity.clientId));
-    } catch (error) {
-      return failureResponse(error, 'authorize');
-    }
-    if (record === null) return directError('invalid_client', 'unknown client', 401);
+    const resolved = await deps.clients(identity.clientId);
+    if (resolved.kind === 'unavailable') return temporarilyUnavailable();
+    if (resolved.kind === 'refused') return directError('invalid_client', 'unknown client', 401);
+    const record = resolved.client;
     if (!record.redirectUris.includes(redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }
-    client = { kind: 'third_party', clientId: record.clientId, name: record.name };
+    client = {
+      kind: 'third_party',
+      clientId: record.clientId,
+      name: record.name,
+      redirectKind: thirdPartyRedirectKind(redirectUri),
+    };
   } else if (webClient?.kind === 'confidential_web') {
     if (!webClient.redirectUris[deps.config.environment].includes(redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');

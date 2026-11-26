@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { UTS_ENDPOINTS, type UtsEnvironment } from './environment';
-import { KILO_API_AUDIENCE, UTS_ACCOUNT_AUDIENCE } from './scopes';
+import { KILO_API_AUDIENCE, KILO_MCP_AUDIENCE, UTS_ACCOUNT_AUDIENCE } from './scopes';
 import { UTS_MAX_TOKENS_PER_CALL, UtsAudienceSchema, UtsScopeSchema } from './token';
 
 /** Paths of the mint Worker's OAuth endpoints on the issuer origin (design 5.4). */
@@ -39,11 +39,15 @@ export function resourceOfAudience(audience: string): string {
  *   `packages/web-shared/src/lib/constants.ts` uses), the UTS issuer (`uts`, the account API), and
  *   the Workers that accept UTS tokens on their own origins, from their route configs. An entry
  *   here does not activate a service: the service proves its caller before it accepts the tokens.
+ *   Kilo MCP is the one path-bearing entry: its resource is the exact URL
+ *   `https://mcp.kiloapps.io/mcp` (RFC 9728 resource of the MCP endpoint), matched exactly like
+ *   every other entry, so no other path, prefix or trailing slash of that origin names it.
+ *   `pages-dev` is the Pages deployment that authenticates against the production web app.
  * - Staging: the staging web app and the staging issuer only. Another staging origin joins once a
  *   deployment of that Worker on it is confirmed.
  * - Development: loopback only: the local web app on its default port (`PORT` unset), the local
- *   issuer, and each Worker on its local development port (session ingest on 8821, since its
- *   default port is the issuer's).
+ *   issuer, each Worker on its local development port (session ingest on 8821, since its default
+ *   port is the issuer's), and the local Kilo MCP endpoint `http://localhost:8815/mcp`.
  */
 export const UTS_RESOURCE_ORIGINS: Readonly<
   Record<UtsEnvironment, Readonly<Record<string, string>>>
@@ -60,6 +64,8 @@ export const UTS_RESOURCE_ORIGINS: Readonly<
     'https://user-data-export.kilosessions.ai': 'user-data-export',
     'https://git-token-service.kilosessions.ai': 'git-token-service',
     'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
+    'https://mcp.kiloapps.io/mcp': KILO_MCP_AUDIENCE,
+    'https://pages-dev.kiloapps.io': 'pages-dev',
   },
   staging: {
     'https://staging-app.kilo.ai': KILO_API_AUDIENCE,
@@ -77,6 +83,7 @@ export const UTS_RESOURCE_ORIGINS: Readonly<
     'http://localhost:8818': 'user-data-export',
     'http://localhost:8802': 'git-token-service',
     'http://localhost:8794': 'cloud-agent-next',
+    'http://localhost:8815/mcp': KILO_MCP_AUDIENCE,
   },
 };
 

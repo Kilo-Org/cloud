@@ -22,19 +22,25 @@ import { jsonResponse } from './responses';
 import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
 import type { SignInMailer } from './signin/email/mailer';
+import type { MetadataFetcher } from './third-party/metadata';
 import type { SignerAccess } from './token/mint';
+import type { StsCallerVerifier } from './exchange/endpoint';
 
 /**
  * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
- * signer for the local end-to-end run, the development fixture scopes on top of the scope registry
- * and a recording mail port for the email sign-in (src/dev.ts). The deployed options are the
- * sign-in pages, the grant's signer, the registry alone and no mail port.
+ * signer for the local end-to-end run, the development fixture scopes on top of the scope
+ * registry, a recording mail port for the email sign-in, a metadata fetch that serves the local
+ * end-to-end run's client documents, and a stand-in STS token verifier (src/dev.ts). The deployed
+ * options are the sign-in pages, the grant's signer, the registry alone, no mail port, the
+ * platform `fetch`, and no STS token verifier: the broker exchange waits for `@kilocode/verify`.
  */
 export type MintOptions = {
   authorizationHandoff: HandoffChoice | null;
   signer: SignerAccess | null;
   scopes: ScopeRegistry;
   mailer: SignInMailer | null;
+  metadataFetcher: MetadataFetcher;
+  stsCallers: StsCallerVerifier | null;
 };
 
 const DEPLOYED: MintOptions = {
@@ -42,6 +48,8 @@ const DEPLOYED: MintOptions = {
   signer: null,
   scopes: utsScopeEntry,
   mailer: null,
+  metadataFetcher: (url, init) => fetch(url, init),
+  stsCallers: null,
 };
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
@@ -95,20 +103,14 @@ export async function handleRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
-  const oauth = oauthService(
-    env,
-    ctx,
-    config,
-    options.authorizationHandoff,
-    options.signer,
-    options.scopes,
-    options.mailer
-  );
+  const oauth = oauthService(env, ctx, config, options);
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
     }
-    return jsonResponse(authorizationServerMetadata(config, oauth), 200, {
+    const webClientReady =
+      oauth.kind === 'ready' && (await oauth.deps.web.keys()).status === 'ready';
+    return jsonResponse(authorizationServerMetadata(config, oauth, webClientReady), 200, {
       'Cache-Control': 'public, max-age=300',
     });
   }

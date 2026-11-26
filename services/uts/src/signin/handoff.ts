@@ -1,3 +1,4 @@
+import type { ConsentStep } from '../third-party/consent';
 import type { AuthorizationHandoff } from '../oauth/authorize';
 import { classifyFailure } from '../oauth/errors';
 import { sha256 } from '../token/credentials';
@@ -23,19 +24,21 @@ export async function requestSession(
  * The authorization hand-off of the sign-in pages. Without a session the user sees the sign-in
  * page at the authorization URL, which reloads it once the user signed in. A first-party client is
  * approved for the session's account, with the organization it asked for (the identity store
- * checks the membership). A third-party client is denied until the consent screen serves it
- * (design 5.9).
+ * checks the membership). A third-party client goes on to the consent screen (`consent`,
+ * src/third-party/consent.ts, design 5.9); without one it is denied.
  *
- * RFC 8252 section 8.6: a client that receives its code on a private-use URI scheme cannot be
- * identified, because another app can claim the same scheme. Its request is approved only from
- * the confirm page's same-origin POST, so every such request shows the user a page (sign-in or
- * confirm) and a request another app started never completes without the user. The web BFF
- * `kilo-web` receives its code on its exact HTTPS callback, which no other app can claim, and
- * redeems it only with its client assertion, so its request never shows the confirm page.
+ * RFC 8252 section 8.6: a native client cannot be identified by its redirect. Another app can
+ * claim the same private-use scheme, and any local process can listen on a loopback port and start
+ * an authorization request that names it. So a native first-party request, whose redirect is always
+ * a loopback address or a private-use scheme, is approved only from the confirm page's same-origin
+ * POST, never a plain GET: every such request shows the user a page (sign-in or confirm), and a
+ * request another program started never completes without the user. The web BFF `kilo-web`
+ * receives its code on its exact HTTPS callback, which no other program can claim, and redeems it
+ * only with its client assertion, so its request never shows the confirm page.
  */
-export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
+export function signInHandoff(deps: SignInDeps, consent: ConsentStep | null): AuthorizationHandoff {
   return async (request, pending) => {
-    if (pending.client.kind === 'third_party') return { status: 'denied' };
+    if (pending.client.kind === 'third_party' && consent === null) return { status: 'denied' };
     let session: BrowserSession | null;
     try {
       session = await requestSession(request, deps);
@@ -51,6 +54,9 @@ export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
       const choices = signInChoices(deps.methods, returnPathOf(`${pathname}${search}`));
       return { status: 'interaction', response: signInPage(choices) };
     }
+    if (pending.client.kind === 'third_party') {
+      return consent === null ? { status: 'denied' } : await consent(request, pending, session);
+    }
     const approval = {
       clientKind: 'first_party',
       accountId: session.accountId,
@@ -59,8 +65,9 @@ export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
       amr: session.amr,
       orgId: pending.orgHint,
     } as const;
+    // The web BFF's exact HTTPS callback identifies it; it never shows the confirm page.
     if (pending.client.kind === 'confidential_web') return { status: 'approved', approval };
-    if (pending.client.redirectKind === 'private_use_scheme' && !isSameOriginPost(request)) {
+    if (!isSameOriginPost(request)) {
       return {
         status: 'interaction',
         response: confirmAppPage(pending.client.name, pending.redirectUri),

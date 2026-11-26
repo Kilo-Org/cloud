@@ -12,8 +12,10 @@ import type { Params } from './params';
 
 /**
  * Where a first-party client receives its code. A desktop app uses a loopback address (RFC 8252
- * section 7.3): any port, the host `127.0.0.1` or `[::1]` (never `localhost`, RFC 8252 section
- * 8.3), and a fixed path. A mobile app uses one private-use-scheme URI (RFC 8252 section 7.1).
+ * section 7.3): any port, the host `127.0.0.1` (never `localhost`, RFC 8252 section 8.3; never
+ * `[::1]`, because the confirm page's `form-action` cannot name an IPv6 literal origin, so the
+ * confirm POST could not redirect there), and a fixed path. A mobile app uses one
+ * private-use-scheme URI (RFC 8252 section 7.1).
  */
 export type RedirectRule =
   | { kind: 'loopback'; path: string }
@@ -117,7 +119,7 @@ export function requestFirstPartyClient(params: Params): FirstPartyClient | Resp
   return identity.client;
 }
 
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', '[::1]']);
+const LOOPBACK_HOSTS = new Set(['127.0.0.1']);
 
 /** True when `redirectUri` is a loopback redirect on any port with the rule's path. */
 function isLoopbackRedirect(path: string, redirectUri: string): boolean {

@@ -15,6 +15,7 @@ import { handleDeviceDecision, handleDevicePage } from '../../src/signin/device/
 import { signInHandoff } from '../../src/signin/handoff';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../../src/signin/passkey/ceremonies';
 import type { BrowserSession, DeviceCodeRead, DeviceExchangeResult } from '../../src/signin/store';
+import type { ConsentStep } from '../../src/third-party/consent';
 import { TICKET_REDEEMERS, handleTicketIssue, redeemTicket } from '../../src/tickets/routes';
 import { firstPartyRefreshToken, randomCredential } from '../../src/token/credentials';
 import { signerAccess } from '../../src/token/mint';
@@ -74,7 +75,7 @@ describe('sign-in hand-off', () => {
 
   it('shows the sign-in page without a session, and runs no statement', async () => {
     const store = fakeSignIn();
-    const result = await signInHandoff(store.deps)(new Request(authorizeUrl), pending());
+    const result = await signInHandoff(store.deps, null)(new Request(authorizeUrl), pending());
     if (result.status !== 'interaction') throw new Error('expected the sign-in page');
     expect(result.response.status).toBe(200);
     expect(result.response.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
@@ -85,13 +86,25 @@ describe('sign-in hand-off', () => {
     expect(store.calls).toEqual([]);
   });
 
-  it('approves a first-party loopback client for the session, whatever its sign-in age', async () => {
+  it('shows a first-party loopback request the confirm page on GET, then approves its same-origin POST for the session, whatever its sign-in age (RFC 8252 section 8.6)', async () => {
     const live = session(60);
     const store = fakeSignIn({ readSession: async () => live });
-    const result = await signInHandoff(store.deps)(withCookie(authorizeUrl), {
-      ...pending(),
-      orgHint: '0e6b1f0c-8d6d-4a51-9d63-1f7a4d2b9c11',
-    });
+    const handoff = signInHandoff(store.deps, null);
+    const cli = { ...pending(), orgHint: '0e6b1f0c-8d6d-4a51-9d63-1f7a4d2b9c11' };
+    const shown = await handoff(withCookie(authorizeUrl), cli);
+    if (shown.status !== 'interaction') throw new Error('expected the confirm page, not a code');
+    expect(await shown.response.text()).toContain('id="confirm-app"');
+    // `form-action` names the loopback origin itself, not every `http:` target.
+    expect(shown.response.headers.get('Content-Security-Policy')).toContain(
+      "form-action 'self' http://127.0.0.1:4100;"
+    );
+    const confirm = (origin: string) =>
+      new Request(authorizeUrl, {
+        method: 'POST',
+        headers: { Cookie: `__Host-uts_session=${COOKIE}`, Origin: origin },
+      });
+    expect((await handoff(confirm('https://evil.example'), cli)).status).toBe('interaction');
+    const result = await handoff(confirm(ORIGIN), cli);
     expect(result).toEqual({
       status: 'approved',
       approval: {
@@ -106,7 +119,7 @@ describe('sign-in hand-off', () => {
   });
 
   it('shows every private-use-scheme request a page, and approves only the confirm page POST (RFC 8252 section 8.6)', async () => {
-    const handoff = signInHandoff(fakeSignIn({ readSession: async () => session(0) }).deps);
+    const handoff = signInHandoff(fakeSignIn({ readSession: async () => session(0) }).deps, null);
     const mobile = pending('private_use_scheme');
     const shown = await handoff(withCookie(authorizeUrl), mobile);
     if (shown.status !== 'interaction') throw new Error('expected the confirm page');
@@ -126,7 +139,7 @@ describe('sign-in hand-off', () => {
 
   it('approves the web BFF on its exact HTTPS callback without the confirm page', async () => {
     const live = session(0);
-    const handoff = signInHandoff(fakeSignIn({ readSession: async () => live }).deps);
+    const handoff = signInHandoff(fakeSignIn({ readSession: async () => live }).deps, null);
     const result = await handoff(withCookie(authorizeUrl), {
       ...pending(),
       client: { kind: 'confidential_web', clientId: 'kilo-web', name: 'Kilo web app' },
@@ -147,18 +160,48 @@ describe('sign-in hand-off', () => {
     });
   });
 
-  it('denies a third-party client until the consent screen serves it', async () => {
+  it('denies a third-party client when no consent screen is wired, and runs no statement', async () => {
     const store = fakeSignIn();
-    const result = await signInHandoff(store.deps)(withCookie(authorizeUrl), {
+    const result = await signInHandoff(store.deps, null)(withCookie(authorizeUrl), {
       ...pending(),
       client: {
         kind: 'third_party',
         clientId: 'https://client.example.com/metadata',
         name: 'Example',
+        redirectKind: 'https',
       },
     });
     expect(result).toEqual({ status: 'denied' });
     expect(store.calls).toEqual([]);
+  });
+
+  it('hands a third-party client with a session to the consent screen, and one without to sign-in', async () => {
+    const live = session(60);
+    const thirdParty = {
+      ...pending(),
+      client: {
+        kind: 'third_party' as const,
+        clientId: 'https://client.example.com/metadata',
+        name: 'Example',
+        redirectKind: 'https' as const,
+      },
+    };
+    const seen: string[] = [];
+    const consent: ConsentStep = async (_request, next, signedIn) => {
+      seen.push(`${next.client.clientId} ${signedIn.sessionId}`);
+      return { status: 'denied' };
+    };
+    const withSession = fakeSignIn({ readSession: async () => live });
+    expect(
+      await signInHandoff(withSession.deps, consent)(withCookie(authorizeUrl), thirdParty)
+    ).toEqual({ status: 'denied' });
+    expect(seen).toEqual([`https://client.example.com/metadata ${live.sessionId}`]);
+    const signedOut = await signInHandoff(fakeSignIn().deps, consent)(
+      new Request(authorizeUrl),
+      thirdParty
+    );
+    expect(signedOut.status).toBe('interaction');
+    expect(seen).toHaveLength(1);
   });
 
   it('answers 503 with Retry-After when the session read fails and a retry can succeed', async () => {
@@ -167,7 +210,7 @@ describe('sign-in hand-off', () => {
         throw storeFailure('retryable');
       },
     });
-    const result = await signInHandoff(store.deps)(withCookie(authorizeUrl), pending());
+    const result = await signInHandoff(store.deps, null)(withCookie(authorizeUrl), pending());
     if (result.status !== 'interaction') throw new Error('expected the error page');
     expect(result.response.status).toBe(503);
     expect(result.response.headers.get('Retry-After')).toBe('2');

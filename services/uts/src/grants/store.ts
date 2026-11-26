@@ -151,16 +151,41 @@ export type IntrospectResult =
   | ({ outcome: 'active' } & ActiveRefreshToken)
   | { outcome: 'inactive' | 'dpop_replay' };
 
-export type ThirdPartyClientRecord = { clientId: string; name: string; redirectUris: string[] };
+/**
+ * The store step of the RFC 8693 broker exchange (migration 0012), after the Worker verified the
+ * caller and the subject token. `grantId` is the subject token's `sid`: a consent family for a
+ * third-party client, a refresh grant for a first-party one.
+ */
+export type DelegatedExchangeInput = {
+  environment: UtsEnvironment;
+  clientKind: (typeof CLIENT_KINDS)[number];
+  accountId: string;
+  clientId: string;
+  grantId: string;
+  orgId: string | null;
+  subjectScope: string;
+  subjectIssuedAt: Date;
+  subjectTokenId: string;
+  subjectKid: string;
+  scope: string;
+  /** The calling workload: `act.sub` and `req` of the new token. */
+  actor: string;
+  lifetimeSeconds: number;
+};
+
+/** `issued` names the one token the caller signs; nothing else was written but the audit row. */
+export type DelegatedExchangeResult =
+  | { outcome: 'issued'; tokenId: string }
+  | { outcome: 'invalid_grant' | 'invalid_scope' };
 
 export type GrantStore = {
-  findThirdPartyClient(clientId: string): Promise<ThirdPartyClientRecord | null>;
   issueCode(input: IssueCodeInput): Promise<IssueCodeResult>;
   exchangeCode(input: ExchangeCodeInput): Promise<ExchangeResult>;
   refreshFirstParty(input: FirstPartyRefreshInput): Promise<FirstPartyRefreshResult>;
   refreshThirdParty(input: ThirdPartyRefreshInput): Promise<ThirdPartyRefreshResult>;
   revoke(input: RevokeInput): Promise<RevokeResult>;
   introspect(input: IntrospectInput): Promise<IntrospectResult>;
+  exchangeDelegated(input: DelegatedExchangeInput): Promise<DelegatedExchangeResult>;
 };
 
 /** Runs `work` with the grant store of one request's identity-store connection. */
@@ -258,10 +283,10 @@ const IntrospectRowSchema = z.discriminatedUnion('outcome', [
   failure(['inactive', 'dpop_replay']),
 ]);
 
-const ThirdPartyClientRowSchema = z.object({
-  client_name: z.string(),
-  redirect_uris: z.array(z.string()),
-});
+const DelegatedExchangeRowSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('issued'), token_id: z.uuid() }),
+  failure(['invalid_grant', 'invalid_scope']),
+]);
 
 /** Every grant statement over one identity-store connection. */
 export function identityStoreGrants(store: IdentityStore): GrantStore {
@@ -276,20 +301,6 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
   }
 
   return {
-    async findThirdPartyClient(clientId) {
-      const row = await store.maybeOne(
-        {
-          text: `SELECT client_name, redirect_uris FROM uts.third_party_clients
-                 WHERE client_id = $1 AND status = 'active'`,
-          values: [clientId],
-        },
-        ThirdPartyClientRowSchema
-      );
-      return row === null
-        ? null
-        : { clientId, name: row.client_name, redirectUris: row.redirect_uris };
-    },
-
     async issueCode(input) {
       const row = await one(
         'SELECT * FROM uts.issue_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
@@ -419,6 +430,32 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         issuedAt: row.issued_at,
         expiresAt: row.expires_at,
       };
+    },
+
+    async exchangeDelegated(input) {
+      const row = await one(
+        `SELECT * FROM uts.exchange_delegated_token(
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          input.environment,
+          input.clientKind,
+          input.accountId,
+          input.clientId,
+          input.grantId,
+          input.orgId,
+          input.subjectScope,
+          input.subjectIssuedAt,
+          input.subjectTokenId,
+          input.subjectKid,
+          input.scope,
+          input.actor,
+          input.lifetimeSeconds,
+        ],
+        DelegatedExchangeRowSchema
+      );
+      return row.outcome === 'issued'
+        ? { outcome: 'issued', tokenId: row.token_id }
+        : { outcome: row.outcome };
     },
   };
 }

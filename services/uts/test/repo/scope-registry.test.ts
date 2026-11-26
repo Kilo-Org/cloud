@@ -1,5 +1,8 @@
 import {
+  KILO_API_MCP_READ_SCOPE,
   KILO_API_PROFILE_READ_SCOPE,
+  KILO_MCP_CATALOG_READ_SCOPE,
+  PAGES_DEV_TOOLS_USE_SCOPE,
   KILO_WEB_CALLBACK_PATH,
   UTS_ACCOUNT_AUDIENCE,
   UTS_BOT_KEYS_MANAGE_SCOPE,
@@ -44,6 +47,9 @@ const base: UtsScopeEntry = {
   requiresSession: false,
   requiresOrgClaim: false,
   delegable: false,
+  issuance: 'grant',
+  delegatesTo: [],
+  consentText: null,
 };
 /** One entry for `scope`, its audience taken from the scope unless `overrides` names another. */
 const check = (scope: string, overrides: Partial<UtsScopeEntry>) =>
@@ -86,6 +92,9 @@ describe('the UTS scope registry', () => {
       requiresSession: false,
       requiresOrgClaim: false,
       delegable: false,
+      issuance: 'grant',
+      delegatesTo: [],
+      consentText: null,
     });
     expect(scopeRegistryProblems({ [KILO_API_PROFILE_READ_SCOPE]: entry ?? base })).toEqual([]);
     expect(credentialScopeCheck(KILO_API_PROFILE_READ_SCOPE, null)).toEqual({ status: 'allowed' });
@@ -112,6 +121,9 @@ describe('the UTS scope registry', () => {
         requiresSession: true,
         requiresOrgClaim: false,
         delegable: false,
+        issuance: 'grant',
+        delegatesTo: [],
+        consentText: null,
       });
       expect(credentialScopeCheck(scope, null)).toEqual({ status: 'not_pat_eligible' });
       expect(UTS_CREDENTIAL_SCOPES).not.toContain(scope);
@@ -147,6 +159,9 @@ describe('the UTS scope registry', () => {
         requiresSession,
         requiresOrgClaim: orgClaim,
         delegable: false,
+        issuance: 'grant',
+        delegatesTo: [],
+        consentText: null,
       });
       expect(credentialScopeCheck(scope, null)).toEqual({ status: 'not_pat_eligible' });
     }
@@ -175,6 +190,9 @@ describe('the UTS scope registry', () => {
         requiresSession: true,
         requiresOrgClaim: roles !== null,
         delegable: false,
+        issuance: 'grant',
+        delegatesTo: [],
+        consentText: null,
       });
     }
   );
@@ -204,6 +222,9 @@ describe('the UTS scope registry', () => {
         requiresSession,
         requiresOrgClaim: orgMembers,
         delegable: false,
+        issuance: 'grant',
+        delegatesTo: [],
+        consentText: null,
       });
       expect(credentialScopeCheck(scope, null)).toEqual({ status: 'not_pat_eligible' });
     }
@@ -219,6 +240,7 @@ describe('the UTS scope registry', () => {
       'kilo-api:auto-routing.write',
       'kilo-api:credits.redeem',
       'kilo-api:feedback.write',
+      'kilo-api:mcp.read',
       'kilo-api:notifications.read',
       'kilo-api:organizations.read',
       'kilo-api:organizations.write',
@@ -226,6 +248,96 @@ describe('the UTS scope registry', () => {
       'kilo-api:sessions.write',
       'kilo-api:shell-security.analyze',
     ]);
+  });
+
+  it('lists the Kilo MCP catalog scope for third-party clients and the CLI, delegating only the Kilo API MCP read', () => {
+    expect(utsScopeEntry(KILO_MCP_CATALOG_READ_SCOPE)).toEqual({
+      audience: 'kilo-mcp',
+      maxLifetimeSeconds: 600,
+      allowedClients: ['third_party', 'kilo-cli'],
+      subjects: { kind: 'any_user' },
+      thirdPartySafe: true,
+      stepUp: false,
+      patEligible: false,
+      privileged: false,
+      requiresSession: false,
+      requiresOrgClaim: false,
+      delegable: false,
+      issuance: 'grant',
+      delegatesTo: ['kilo-api:mcp.read'],
+      consentText:
+        "Read your Kilo tool catalog and Kilo's global preferred models and model provider names through Kilo MCP",
+    });
+    expect(
+      Object.entries(UTS_SCOPE_REGISTRY)
+        .filter(([, entry]) => entry.delegatesTo.length > 0)
+        .map(([scope, entry]) => [scope, entry.delegatesTo])
+    ).toEqual([[KILO_MCP_CATALOG_READ_SCOPE, [KILO_API_MCP_READ_SCOPE]]]);
+    expect(credentialScopeCheck(KILO_MCP_CATALOG_READ_SCOPE, null)).toEqual({
+      status: 'not_pat_eligible',
+    });
+  });
+
+  it('lists the Kilo API MCP read as a 5-minute exchange scope that no grant mints', () => {
+    expect(utsScopeEntry(KILO_API_MCP_READ_SCOPE)).toEqual({
+      audience: 'kilo-api',
+      maxLifetimeSeconds: 300,
+      allowedClients: ['third_party', 'kilo-cli'],
+      subjects: { kind: 'any_user' },
+      thirdPartySafe: true,
+      stepUp: false,
+      patEligible: false,
+      privileged: false,
+      requiresSession: false,
+      requiresOrgClaim: false,
+      delegable: true,
+      issuance: 'token_exchange',
+      delegatesTo: [],
+      consentText: null,
+    });
+    // `/authorize`, the token endpoint and the device grant all refuse it.
+    for (const client of [
+      { kind: 'first_party', clientId: 'kilo-cli' },
+      { kind: 'third_party', clientId: 'https://client.example.com/oauth/client.json' },
+    ] as const) {
+      expect(clientScopeRefusal([KILO_API_MCP_READ_SCOPE], client, utsScopeEntry)).toBe(
+        KILO_API_MCP_READ_SCOPE
+      );
+    }
+    expect(
+      clientScopeRefusal(
+        [KILO_MCP_CATALOG_READ_SCOPE],
+        { kind: 'third_party', clientId: 'https://client.example.com/oauth/client.json' },
+        utsScopeEntry
+      )
+    ).toBeNull();
+  });
+
+  it('lists the pages-dev tool scope for the web app only, 5 minutes, with a session', () => {
+    expect(utsScopeEntry(PAGES_DEV_TOOLS_USE_SCOPE)).toEqual({
+      audience: 'pages-dev',
+      maxLifetimeSeconds: 300,
+      allowedClients: ['kilo-web'],
+      subjects: { kind: 'any_user' },
+      thirdPartySafe: false,
+      stepUp: false,
+      patEligible: false,
+      privileged: false,
+      requiresSession: true,
+      requiresOrgClaim: false,
+      delegable: false,
+      issuance: 'grant',
+      delegatesTo: [],
+      consentText: null,
+    });
+    expect(utsScopeEntry('pages:tools.use')).toBeNull();
+  });
+
+  it('gives a consent line exactly to the scopes a third-party client can ask for', () => {
+    const consentable = Object.entries(UTS_SCOPE_REGISTRY)
+      .filter(([, entry]) => entry.consentText !== null)
+      .map(([scope]) => scope);
+    expect(consentable).toEqual([KILO_MCP_CATALOG_READ_SCOPE]);
   });
 
   it('names the membership roles of the identity store', () => {
@@ -268,7 +380,7 @@ describe('the UTS scope registry', () => {
     }
   });
 
-  it('lets each first-party client mint exactly the scopes that list it, and third parties none yet', () => {
+  it('lets each client mint through a grant exactly the scopes that list it, and no exchange scope', () => {
     for (const [scope, entry] of Object.entries(UTS_SCOPE_REGISTRY)) {
       for (const client of UTS_FIRST_PARTY_CLIENTS) {
         const refused = clientScopeRefusal(
@@ -276,7 +388,11 @@ describe('the UTS scope registry', () => {
           { kind: 'first_party', clientId: client.clientId },
           utsScopeEntry
         );
-        expect(refused).toBe(entry.allowedClients.includes(client.clientId) ? null : scope);
+        expect(refused).toBe(
+          entry.allowedClients.includes(client.clientId) && entry.issuance === 'grant'
+            ? null
+            : scope
+        );
       }
       expect(
         clientScopeRefusal(
@@ -284,7 +400,7 @@ describe('the UTS scope registry', () => {
           { kind: 'third_party', clientId: 'https://client.example.com/metadata.json' },
           utsScopeEntry
         )
-      ).toBe(entry.thirdPartySafe ? null : scope);
+      ).toBe(entry.thirdPartySafe && entry.issuance === 'grant' ? null : scope);
     }
     expect(
       clientScopeRefusal(
@@ -418,7 +534,7 @@ describe('the registry check', () => {
     [
       'a third-party flag without third_party',
       'gateway:models.read',
-      { thirdPartySafe: true },
+      { thirdPartySafe: true, consentText: 'Read your models' },
       'disagree',
     ],
     [
@@ -435,6 +551,7 @@ describe('the registry check', () => {
         allowedClients: ['third_party'],
         thirdPartySafe: true,
         patEligible: false,
+        consentText: 'Read development data',
       },
       'third-party-safe but',
     ],
@@ -500,6 +617,7 @@ describe('the registry check', () => {
         patEligible: false,
         allowedClients: ['third_party'],
         thirdPartySafe: true,
+        consentText: 'Read your tools',
       },
       'limited to listed roles but',
     ],
@@ -521,9 +639,79 @@ describe('the registry check', () => {
       },
       'is delegable but',
     ],
+    [
+      'a scope that delegates to an unregistered scope',
+      'kilo-mcp:catalog.read',
+      { patEligible: false, delegatesTo: ['kilo-api:unknown.read'] },
+      'which is not a registered exchange scope',
+    ],
+    [
+      'a third-party scope without a consent line',
+      'mcp:tools.read',
+      { patEligible: false, allowedClients: ['third_party'], thirdPartySafe: true },
+      'has a consent line exactly when',
+    ],
+    [
+      'a first-party scope with a consent line',
+      'gateway:models.read',
+      { consentText: 'Read your models' },
+      'has a consent line exactly when',
+    ],
+    [
+      'a consent line with markup',
+      'mcp:tools.read',
+      {
+        patEligible: false,
+        allowedClients: ['third_party'],
+        thirdPartySafe: true,
+        consentText: 'Read <b>tools</b>',
+      },
+      'consent line must be one line of plain text',
+    ],
     ['an unregistered client', 'gateway:models.read', { allowedClients: ['kilo-tv'] }, 'kilo-tv'],
   ] as const)('fails %s', (_name, scope, overrides, message) => {
     expect(check(scope, overrides)).toEqual([expect.stringContaining(message)]);
+  });
+
+  it('fails an exchange scope that is not delegable, or that no scope or two scopes delegate to', () => {
+    const exchange = {
+      ...base,
+      audience: 'kilo-api',
+      patEligible: false,
+      delegable: true,
+      issuance: 'token_exchange',
+    } as const;
+    const source = {
+      ...base,
+      audience: 'kilo-mcp',
+      patEligible: false,
+      delegatesTo: ['kilo-api:mcp.read'],
+    };
+    expect(
+      scopeRegistryProblems({ 'kilo-mcp:catalog.read': source, 'kilo-api:mcp.read': exchange })
+    ).toEqual([]);
+    expect(
+      scopeRegistryProblems({
+        'kilo-mcp:catalog.read': source,
+        'kilo-api:mcp.read': { ...exchange, delegable: false },
+      })
+    ).toEqual([expect.stringContaining('is minted by the exchange but')]);
+    expect(scopeRegistryProblems({ 'kilo-api:mcp.read': exchange })).toEqual([
+      expect.stringContaining('exchange target of other than exactly one scope'),
+    ]);
+    expect(
+      scopeRegistryProblems({
+        'kilo-mcp:catalog.read': source,
+        'kilo-mcp:tools.read': source,
+        'kilo-api:mcp.read': exchange,
+      })
+    ).toEqual([expect.stringContaining('exchange target of other than exactly one scope')]);
+    expect(
+      scopeRegistryProblems({
+        'kilo-mcp:catalog.read': { ...source, delegable: true },
+        'kilo-api:mcp.read': exchange,
+      })
+    ).toEqual([expect.stringContaining('delegates but is itself delegable')]);
   });
 });
 

@@ -320,11 +320,9 @@ async function deviceGrant(clientId: 'kilo-cli' | 'kilo-mobile'): Promise<Device
   })) {
     url.searchParams.set(name, value);
   }
-  // A private-use redirect needs the confirm page's same-origin POST (RFC 8252 section 8.6).
-  const response =
-    clientId === 'kilo-cli'
-      ? await browse(url.toString())
-      : await browse(url.toString(), { method: 'POST', headers: { Origin: base } });
+  // A native redirect (loopback or private-use) needs the confirm page's same-origin POST
+  // (RFC 8252 section 8.6).
+  const response = await browse(url.toString(), { method: 'POST', headers: { Origin: base } });
   const location = new URL(response.headers.get('Location') ?? 'invalid:');
   check(response.status === 302, `${clientId} code redirect ${response.status}`);
   const code = keep(location.searchParams.get('code') ?? '');

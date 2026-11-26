@@ -6,11 +6,13 @@ import {
   STS_SCOPE_REGISTRY,
   ScopeSchema,
   ServiceTokenClaimsSchema,
+  StsEnvironmentSchema,
   TOKEN_CLOCK_SKEW_SECONDS,
   isRegisteredStsScope,
   scopeAudience,
   type AccessTokenClaims,
   type Actor,
+  type StsEnvironment,
   type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
@@ -56,6 +58,8 @@ export type UtsScopeRegistry = (audience: string, scope: string) => UtsScopeEntr
 export type VerifierConfig = {
   /** This service: the one audience it accepts. */
   audience: string;
+  /** The environment this service runs in: the one `env` claim it accepts, from either issuer. */
+  environment: StsEnvironment;
   /** RFC 9728 protected-resource metadata URL, sent in every 401 challenge. */
   resourceMetadataUrl: string;
   sts?: {
@@ -101,7 +105,10 @@ export type AcceptsPats<C> = 'uts' extends keyof C
 export type Route = {
   issuer: IssuerKind;
   scope: string;
-  /** The organization the request acts in, when the route is org-scoped. */
+  /**
+   * The organization the request acts in, when the route is org-scoped: the credential must name
+   * exactly this org. UTS only; STS tokens carry no org.
+   */
   org?: string;
   /** The route needs a live session (`sid`), whatever its scope's registry entry says; UTS only. */
   requiresSession?: boolean;
@@ -172,10 +179,17 @@ const IssuerUrlSchema = z.url().refine(value => {
 
 const ConfigSchema = z.object({
   audience: AudienceSchema,
+  environment: StsEnvironmentSchema,
   resourceMetadataUrl: z.url().refine(url => !/["\\]/.test(url), 'must not contain quotes'),
   sts: z.object({ issuer: IssuerUrlSchema }).optional(),
   uts: z.object({ issuer: IssuerUrlSchema }).optional(),
 });
+
+/**
+ * The longest `Authorization` value the verifier parses. A longer one is refused before any
+ * split, base64 decode or JSON parse; every Kilo credential is far shorter.
+ */
+export const MAX_AUTHORIZATION_LENGTH = 8_192;
 
 const BEARER = /^Bearer +([^\s]+) *$/i;
 
@@ -224,6 +238,7 @@ type UtsIssuer = {
 export function createVerifier<C extends VerifierConfig>(config: C): Verifier<AcceptsPats<C>> {
   ConfigSchema.parse(config);
   const audience = config.audience;
+  const environment = config.environment;
   const failures = createFailures(config.resourceMetadataUrl);
   const sts: StsIssuer | null =
     config.sts === undefined
@@ -265,6 +280,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     }
     if (route.issuer === 'sts' && route.requiresSession === true) {
       throw new Error('an STS route cannot require a session: STS tokens carry none');
+    }
+    if (route.issuer === 'sts' && route.org !== undefined) {
+      throw new Error('an STS route cannot be org-scoped: STS tokens carry no org');
     }
   }
 
@@ -322,8 +340,14 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     return { ok: true, kid, payload };
   }
 
-  /** Row 6: `exp` in the future, `iat` and `nbf` not in the future, with 60 s of skew. */
+  /**
+   * Row 6: a positive lifetime (`exp` after `iat` and after any `nbf`), then `exp` in the future,
+   * `iat` and `nbf` not in the future, with 60 s of skew.
+   */
   function timeFailure(claims: AccessTokenClaims): VerifyFailure | null {
+    if (claims.exp <= claims.iat || (claims.nbf !== undefined && claims.nbf >= claims.exp)) {
+      return failures.invalidToken('time');
+    }
     const now = Date.now() / 1000;
     if (claims.exp <= now - TOKEN_CLOCK_SKEW_SECONDS) return failures.invalidToken('expired');
     if (claims.iat > now + TOKEN_CLOCK_SKEW_SECONDS)
@@ -334,9 +358,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     return null;
   }
 
-  /** Row 9: a present org claim matches the request org on an org-scoped route. */
+  /** Row 9: on an org-scoped route the credential names exactly the request org. */
   function orgMatches(route: Route, org: string | null | undefined): boolean {
-    return route.org === undefined || org === undefined || org === null || org === route.org;
+    return route.org === undefined || org === route.org;
   }
 
   async function verifyStsToken(
@@ -351,8 +375,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     const parsed = ServiceTokenClaimsSchema.safeParse(signed.payload);
     if (!parsed.success) return failures.invalidToken(claimsReason(parsed.error));
     const claims = parsed.data;
-    // Row 3 on the verified claims.
+    // Row 3 on the verified claims, and the environment this service runs in.
     if (claims.iss !== issuer.issuer) return failures.invalidToken('issuer');
+    if (claims.env !== environment) return failures.invalidToken('environment');
     const late = timeFailure(claims);
     if (late !== null) return late;
 
@@ -365,7 +390,7 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
       return failures.insufficientScope('scope_mismatch', route.scope);
 
     // Rows 10, 11 and 13 do not apply: STS tokens name service subjects and are expiry-bound
-    // (decision Q4); row 9 cannot fail, as the profile refuses an `org` claim.
+    // (decision Q4); row 9 does not apply, as an STS route cannot be org-scoped.
     return {
       ok: true,
       credential: 'access_token',
@@ -388,8 +413,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     const parsed = AccessTokenClaimsSchema.safeParse(signed.payload);
     if (!parsed.success) return failures.invalidToken(claimsReason(parsed.error));
     const claims = parsed.data;
-    // Row 3 on the verified claims.
+    // Row 3 on the verified claims, and the environment this service runs in.
     if (claims.iss !== issuer.issuer) return failures.invalidToken('issuer');
+    if (claims.env !== environment) return failures.invalidToken('environment');
     const late = timeFailure(claims);
     if (late !== null) return late;
 
@@ -542,6 +568,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
         typeof input === 'string' || input === null ? input : input.headers.get('authorization');
       if (authorization === null || authorization.trim() === '') {
         return failures.missingCredential();
+      }
+      if (authorization.length > MAX_AUTHORIZATION_LENGTH) {
+        return failures.invalidToken('credential_too_long');
       }
       const match = BEARER.exec(authorization);
       if (match === null) {

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createVerifier, failureResponse, type Route, type VerifyResult } from '../src/index';
+import {
+  MAX_AUTHORIZATION_LENGTH,
+  createVerifier,
+  failureResponse,
+  type Route,
+  type VerifyResult,
+} from '../src/index';
 import {
   AUDIENCE,
   OTHER_SCOPE,
@@ -343,6 +349,57 @@ describe('row 6: exp in the future and iat not in the future with 60 s skew; nbf
       token: h => sign(h.sts, at(0, 301)),
       expected: invalid('time'),
     },
+    {
+      name: 'a UTS token with exp equal to iat is refused, though each passes the skew',
+      token: h => sign(h.uts, utsClaims({ iat: nowSeconds(), exp: nowSeconds() })),
+      route: uts,
+      expected: invalid('time'),
+    },
+    {
+      name: 'a UTS token with exp before iat is refused, though each passes the skew',
+      token: h => sign(h.uts, utsClaims({ iat: nowSeconds() + 30, exp: nowSeconds() + 20 })),
+      route: uts,
+      expected: invalid('time'),
+    },
+    {
+      name: 'a UTS token with nbf equal to exp is refused',
+      token: h =>
+        sign(
+          h.uts,
+          utsClaims({ iat: nowSeconds(), nbf: nowSeconds() + 30, exp: nowSeconds() + 30 })
+        ),
+      route: uts,
+      expected: invalid('time'),
+    },
+    {
+      name: 'a UTS token with nbf before exp is accepted',
+      token: h =>
+        sign(h.uts, utsClaims({ iat: nowSeconds(), nbf: nowSeconds(), exp: nowSeconds() + 30 })),
+      route: uts,
+      expected: OK,
+    },
+  ]);
+});
+
+describe('environment: the env claim equals the environment the verifier runs in', () => {
+  table([
+    {
+      name: 'an STS token of another environment is refused',
+      token: h => sign(h.sts, stsClaims({ env: 'staging' })),
+      expected: invalid('environment'),
+    },
+    {
+      name: 'a UTS token of another environment is refused',
+      token: h => sign(h.uts, utsClaims({ env: 'development' })),
+      route: uts,
+      expected: invalid('environment'),
+    },
+    {
+      name: 'a UTS token of this environment is accepted',
+      token: h => sign(h.uts, utsClaims()),
+      route: uts,
+      expected: OK,
+    },
   ]);
 });
 
@@ -445,6 +502,7 @@ describe('row 8: a registered scope of this audience, equal to the route scope',
   it('denies every STS scope with the shipped, empty registry', async () => {
     const verifier = createVerifier({
       audience: AUDIENCE,
+      environment: 'production',
       resourceMetadataUrl: RESOURCE_METADATA,
       sts: { issuer: STS_ISSUER, jwks: h.stsJwks.source },
     });
@@ -471,9 +529,15 @@ describe('row 8: a registered scope of this audience, equal to the route scope',
       )
     ).rejects.toThrow(/cannot require a session/);
   });
+
+  it('throws for an org-scoped STS route', async () => {
+    await expect(
+      h.verifier.verify(bearer('x.y.z'), { issuer: 'sts', scope: SCOPE, org: 'org-1' }, h.ctx)
+    ).rejects.toThrow(/cannot be org-scoped/);
+  });
 });
 
-describe('row 9: a present org claim equals the request org on an org-scoped route', () => {
+describe('row 9: on an org-scoped route the token names exactly the request org', () => {
   table([
     {
       name: 'a different org is refused',
@@ -488,10 +552,10 @@ describe('row 9: a present org claim equals the request org on an org-scoped rou
       expected: OK,
     },
     {
-      name: 'no org claim is accepted',
+      name: 'a token without an org claim is refused',
       token: h => sign(h.uts, utsClaims()),
       route: { ...uts, org: 'org-1' },
-      expected: OK,
+      expected: { status: 403, error: 'org_mismatch', reason: 'org_mismatch' },
     },
     {
       name: 'an org claim on a route without org is accepted',
@@ -697,6 +761,24 @@ describe('error responses', () => {
     expect(result).toMatchObject({ status: 401, error: 'invalid_token' });
   });
 
+  it(`refuses an Authorization value over ${MAX_AUTHORIZATION_LENGTH} characters before parsing it`, async () => {
+    const token = await sign(h.sts, stsClaims({ padding: 'a'.repeat(MAX_AUTHORIZATION_LENGTH) }));
+    const result = await h.verifier.verify(bearer(token), { issuer: 'sts', scope: SCOPE }, h.ctx);
+    expect(result).toMatchObject({
+      ok: false,
+      status: 401,
+      error: 'invalid_token',
+      reason: 'credential_too_long',
+    });
+    expect(h.stsJwks.calls).toBe(0);
+    // At the limit the value is parsed: this one is a malformed token, not a long one.
+    const atLimit = `Bearer ${'a'.repeat(MAX_AUTHORIZATION_LENGTH - 'Bearer '.length)}`;
+    expect(await h.verifier.verify(atLimit, { issuer: 'sts', scope: SCOPE }, h.ctx)).toMatchObject({
+      status: 401,
+      reason: 'malformed_token',
+    });
+  });
+
   it('turns each failure into its HTTP response without the token', async () => {
     const token = await sign(
       h.sts,
@@ -756,7 +838,11 @@ describe('error responses', () => {
 
   it('refuses a resource metadata URL that could break the challenge', () => {
     expect(() =>
-      createVerifier({ audience: AUDIENCE, resourceMetadataUrl: 'https://x.test/"a' })
+      createVerifier({
+        audience: AUDIENCE,
+        environment: 'production',
+        resourceMetadataUrl: 'https://x.test/"a',
+      })
     ).toThrow();
   });
 
@@ -771,6 +857,7 @@ describe('error responses', () => {
     try {
       createVerifier({
         audience: AUDIENCE,
+        environment: 'production',
         resourceMetadataUrl: RESOURCE_METADATA,
         sts: { issuer, jwks: h.stsJwks.source },
       });

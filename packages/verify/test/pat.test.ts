@@ -603,10 +603,10 @@ describe('PAT record checks', () => {
       { ok: true },
     ],
     [
-      'a PAT without an org on an org-scoped route is accepted',
+      'a PAT without an org on an org-scoped route is refused',
       () => record(),
       { org: 'org-1' },
-      { ok: true },
+      { status: 403, reason: 'org_mismatch' },
     ],
   ])('%s', async (_name, held, route, expected) => {
     lookup.records.set(await hashPat(pat), held());
@@ -662,6 +662,7 @@ describe('the client address', () => {
     };
     const withPats = createVerifier({
       audience: AUDIENCE,
+      environment: 'production',
       resourceMetadataUrl: RESOURCE_METADATA,
       uts: {
         ...uts,
@@ -670,6 +671,7 @@ describe('the client address', () => {
     });
     const tokensOnly = createVerifier({
       audience: AUDIENCE,
+      environment: 'production',
       resourceMetadataUrl: RESOURCE_METADATA,
       uts,
     });

@@ -19,6 +19,7 @@ import { createVerifier, failureResponse, httpJwksSource } from '@kilocode/verif
 
 const verifier = createVerifier({
   audience: 'session-ingest',
+  environment: 'production',
   resourceMetadataUrl: 'https://session-ingest.kiloapps.io/.well-known/oauth-protected-resource',
   sts: {
     issuer: STS_ISSUERS.production,
@@ -66,11 +67,12 @@ choose; pass `null` when the header is absent, and the library refuses any PAT w
 | Input | Meaning |
 |---|---|
 | `config.audience` | This service; the one `aud` it accepts |
+| `config.environment` | `development`, `staging` or `production`: the one `env` claim it accepts, from either issuer |
 | `config.resourceMetadataUrl` | RFC 9728 metadata URL sent in every 401 challenge |
 | `config.sts` | `{ issuer, jwks, scopeRegistry? }`; the registry defaults to `STS_SCOPE_REGISTRY` |
 | `config.uts` | `{ issuer, jwks, scopeRegistry, revocation, bootstrap?, pat? }` (ports below) |
-| `input` | A `Request`, its `Authorization` value, or `null` |
-| `route` | `{ issuer: 'sts' \| 'uts', scope, org?, requiresSession? }`: exactly one issuer and one scope |
+| `input` | A `Request`, its `Authorization` value, or `null`. A value over `MAX_AUTHORIZATION_LENGTH` (8,192) characters is refused with 401 `invalid_token` before it is parsed |
+| `route` | `{ issuer: 'sts' \| 'uts', scope, org?, requiresSession? }`: exactly one issuer and one scope. With `org`, the credential must name exactly that org; a credential without one is refused (UTS only) |
 | `ctx` | `{ waitUntil, clientAddress }`: the request's own `waitUntil`; the client address, required when the config has `uts.pat` |
 
 Issuers must be `https:` URLs; `http:` is accepted only on `localhost`, `127.0.0.1` and `[::1]`.
@@ -86,7 +88,8 @@ Issuers must be `https:` URLs; `http:` is accepted only on `localhost`, `127.0.0
 `caller` is `{ kind: 'service', workload }`, `{ kind: 'user', subject, clientId, org, sessionId,
 actor }` or `{ kind: 'pat', subject, patId, org }`. `verify` never throws for a bad credential or a
 failed dependency; it rejects only for a route the verifier cannot serve (a programming error: a
-scope of another audience, an issuer the config lacks, an STS route that requires a session).
+scope of another audience, an issuer the config lacks, an STS route that requires a session or
+names an org).
 Results and errors never carry the credential.
 
 `warm(ctx)` starts, without waiting, the fetches a cold instance needs: the UTS bootstrap (or the
@@ -149,13 +152,13 @@ Code is in `src/verifier.ts` unless named; tests are table-driven, one `describe
 |---|---|---|---|
 | 1 Algorithm | `EdDSA` only, header names a `kid`; no `crit` or `b64` | `verifySignedToken`, `jws.ts` | `rows.test.ts` row 1 |
 | 2 Signature | The JWKS key for that `kid`, Ed25519 only, over the bytes received (decoded once) | `verifySignedToken`, `jws.ts`, `jwks.ts` `importKeySet` | row 2; `jwks.test.ts` key-set validation |
-| 3 Issuer | Exact `iss`, checked again on the verified claims; key only from that issuer's set; no feed key | `verifySignedToken`, one `KeySetCache` per issuer, kid prefixes | row 3 |
+| 3 Issuer | Exact `iss`, checked again on the verified claims; key only from that issuer's set; no feed key; `env` equals `config.environment` | `verifySignedToken`, one `KeySetCache` per issuer, kid prefixes | row 3; environment |
 | 4 Audience | One string equal to this service; an array is refused | `AccessTokenClaimsSchema` (`sts-contracts`), `verifyStsToken`, `verifyUtsToken`, `verifyPat` | row 4; PAT record checks |
 | 5 Type | `typ` is `at+jwt` | `verifySignedToken` | row 5 |
-| 6 Time | `exp`, `iat`, `nbf` with 60 s skew | `timeFailure` | row 6 |
+| 6 Time | `exp` after `iat` and after any `nbf`; then `exp`, `iat`, `nbf` with 60 s skew | `timeFailure` | row 6 |
 | 7 Identity | `sub`, `jti`, `client_id`; STS profile | claim schemas, `claimsReason` | row 7 |
 | 8 Scope | Registered scope of this audience, equal to the route scope; PATs only for PAT-eligible scopes | `verifyStsToken`, `verifyUtsToken`, `verifyPat` | row 8; PAT record checks |
-| 9 Organization | A present org equals the route org | `orgMatches` | row 9; PAT record checks |
+| 9 Organization | On an org-scoped route, the credential's org equals the route org; none is refused. STS routes cannot be org-scoped | `orgMatches`, `assertRoute` | row 9; PAT record checks |
 | 10 Revocation | UTS: `revoked_before`, revoked `sid` and `kid`; STS: none (decision Q4) | `verifyUtsToken`, `revocation.ts` | row 10; `revocation.test.ts` |
 | 11 Session | A session-bound route or scope needs a live `sid`; a PAT never qualifies | `verifyUtsToken`, `verifyPat` | row 11; PAT record checks |
 | 12 PAT | Offline check, client address, two cache layers, feed override, fail-closed lookups | `pat-format.ts`, `pat.ts`, `verifyPat` | row 12; `pat.test.ts` |

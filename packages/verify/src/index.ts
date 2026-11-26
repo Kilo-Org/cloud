@@ -1,4 +1,5 @@
 export {
+  MAX_AUTHORIZATION_LENGTH,
   createVerifier,
   type AcceptsPats,
   type Caller,

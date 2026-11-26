@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
-import { SENTRY_ENVIRONMENT } from '@/lib/config';
+import { API_BASE_URL, SENTRY_ENVIRONMENT, WEB_BASE_URL } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { applySentryContext } from '@/lib/sentry-context';
@@ -13,6 +13,18 @@ import { scrubBreadcrumb } from '@/lib/telemetry/sentry-scrub';
 const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
+
+// An HTTP span keeps the request URL with its path and query, and a custom model
+// backend's path or query can hold a credential. Only a request to Kilo's own
+// API or web origin gets a span; a URL that does not parse gets none.
+export function isKiloRequestUrl(url: string): boolean {
+  try {
+    const origin = new URL(url).origin;
+    return origin === new URL(API_BASE_URL).origin || origin === new URL(WEB_BASE_URL).origin;
+  } catch {
+    return false;
+  }
+}
 
 /** Test-only extras: transport and transportOptions are forwarded into init
  *  so a transport spy can observe the Sentry pipeline (slice P3-AH-16a). */
@@ -136,10 +148,15 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
       // `turbo_module.*` tags at the start and end of every RNSentry call, and
       // the native SDK writes the scope to disk on each change (MetricKit
       // MXDiskWriteException, 1 GB in 24 h, KILO-APP-PT).
-      ...defaults.filter(
-        integration =>
-          integration.name !== 'HermesProfiling' && integration.name !== 'TurboModuleContext'
-      ),
+      ...defaults.flatMap(integration => {
+        if (integration.name === 'HermesProfiling' || integration.name === 'TurboModuleContext') {
+          return [];
+        }
+        // The same default tracing integration, limited to Kilo request spans.
+        return integration.name === 'ReactNativeTracing'
+          ? [Sentry.reactNativeTracingIntegration({ shouldCreateSpanForRequest: isKiloRequestUrl })]
+          : [integration];
+      }),
       ...userIntegrations,
     ],
     enableNativeFramesTracking: false,

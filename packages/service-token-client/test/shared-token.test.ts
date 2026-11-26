@@ -7,9 +7,9 @@ import {
   type SharedCache,
   type SharedTokenResult,
   type SharedTokenSettings,
-} from '../../proof/vercel-exchange/lib/shared-token';
+} from '../src/vercel/shared-token';
 
-// The D10 algorithm the proof-run harness (and later the Vercel client) uses, against stand-ins for
+// The D10 algorithm `vercelIdentity` and the proof-run harness use, against stand-ins for
 // the Runtime Cache and the exchange. Proof run 2 measures the real ones; this checks the logic.
 
 const AUDIENCE = 'https://sts.test';

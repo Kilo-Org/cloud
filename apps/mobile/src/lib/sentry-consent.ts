@@ -19,9 +19,10 @@ type SentryConsentOptions = {
   readonly profilesSampleRate: number;
   readonly attachScreenshot: boolean;
   readonly attachViewHierarchy: boolean;
-  // The error screenshot's own masking. The RN SDK and both native SDKs mask all
-  // text and images by default; it is pinned so a default change cannot unmask
-  // a screen that shows a secret.
+  // The error screenshot's own masking. The RN SDK masks all text and images by
+  // default: sentry-cocoa masks by default, and on Android, where the native SDK
+  // leaves masking off, the RN SDK turns it on. It is pinned so a default change
+  // cannot unmask a screen that shows a secret.
   readonly screenshot?: { readonly maskAllText: true; readonly maskAllImages: true };
 };
 

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The scrub module is replaced by throwing doubles. The real `scrubEvent` and
+// `scrubBreadcrumb` catch their own errors and return the input, so today these
+// cases cover only an error that reaches beforeSend from outside the scrub
+// module (the breadcrumb parse, the App Attest projection, or a future scrub
+// that rethrows). The scrub module change lands with #12856.
 const scrub = vi.hoisted(() => ({
   scrubEvent: vi.fn((event: unknown) => event),
   scrubBreadcrumb: vi.fn((breadcrumb: unknown) => breadcrumb),
@@ -21,13 +26,13 @@ function capturedEvent() {
   };
 }
 
-describe('beforeSendScrubbedEvent fails closed', () => {
+describe('beforeSendScrubbedEvent when an error reaches it from a scrub step', () => {
   beforeEach(() => {
     scrub.scrubEvent.mockImplementation(event => event);
     scrub.scrubBreadcrumb.mockImplementation(breadcrumb => breadcrumb);
   });
 
-  it('drops the event when the event scrub throws', () => {
+  it('drops the event when a scrub step throws', () => {
     scrub.scrubEvent.mockImplementation(() => {
       throw new Error('scrub failed');
     });

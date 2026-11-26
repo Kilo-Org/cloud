@@ -42,6 +42,7 @@ describe('bootstrap', () => {
     expect(state.next.publishedAt).toBe(T0);
     expect(state.next.activatesAt).toBe(T0 + 30 * DAY);
     expect(state.retired).toEqual([]);
+    expect(state.removed).toEqual([]);
     expect(kids(state)).toEqual([state.current.kid, state.next.kid]);
     expect(nextChangeAt(state)).toBe(T0 + 30 * DAY);
   });
@@ -149,6 +150,7 @@ describe('removeKey', () => {
       removedAt: T0 + DAY,
       revokeUntil: T0 + DAY + RETIRED_KEY_PUBLISHED_MS,
     });
+    expect(result.state.removed).toEqual([result.removal]);
     expect(result.event).toEqual({
       type: 'removed',
       signer: SIGNER,
@@ -200,6 +202,29 @@ describe('removeKey', () => {
   it('reports an unknown kid without a change', async () => {
     const start = await bootstrapState(SIGNER, T0, generate);
     expect(await removeKey(start, 'uts-token-03-unknown', T0, generate)).toEqual({
+      status: 'unknown_kid',
+    });
+  });
+
+  it('answers the stored receipt for a kid removed before, and changes nothing', async () => {
+    const start = await bootstrapState(SIGNER, T0, generate);
+    const first = await removed(start, start.current.kid, T0 + DAY);
+    expect(await removeKey(first.state, start.current.kid, T0 + DAY + 1000, generate)).toEqual({
+      status: 'already_removed',
+      removal: first.removal,
+    });
+  });
+
+  it('keeps a removal receipt until its revokeUntil, and wakes then to drop it', async () => {
+    const start = await bootstrapState(SIGNER, T0, generate);
+    const { state, removal } = await removed(start, start.next.kid, T0 + DAY);
+    expect(nextChangeAt(state)).toBe(removal.revokeUntil);
+    const before = await advance(state, removal.revokeUntil - 1, generate);
+    expect(before.state).toBe(state);
+    const after = await advance(state, removal.revokeUntil, generate);
+    expect(after.state.removed).toEqual([]);
+    expect(after.events).toEqual([]);
+    expect(await removeKey(after.state, start.next.kid, removal.revokeUntil, generate)).toEqual({
       status: 'unknown_kid',
     });
   });

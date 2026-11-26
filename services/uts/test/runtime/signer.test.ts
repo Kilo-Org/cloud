@@ -316,4 +316,47 @@ describe('emergency removal', () => {
     await restartSigner(SIGNER);
     expect(await publishedKids()).not.toContain(start.current.kid);
   });
+
+  it('answers a repeated removal with the stored entry and changes nothing, also after a restart', async () => {
+    const start = await storedState();
+    const first = await signer().removeKid(start.current.kid);
+    if (first.status !== 'removed') throw new Error(`answered ${first.status}`);
+    const removedState = await storedState();
+    expect(removedState.removed).toEqual([first.removal]);
+    expect(await signer().removeKid(start.current.kid)).toEqual(first);
+    await restartSigner(SIGNER);
+    expect(await signer().removeKid(start.current.kid)).toEqual(first);
+    expect(await storedState()).toEqual(removedState);
+  });
+
+  it('removes the key once when a retry follows a call that failed on its alarm write', async () => {
+    const start = await storedState();
+    // The failed alarm write throws inside the transition, which resets the object.
+    await expect(
+      runInDurableObject(signer(), async (instance: UtsSignerDO, object) => {
+        vi.spyOn(object.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
+        await instance.removeKid(start.current.kid);
+      })
+    ).rejects.toThrow('alarm write failed');
+    // The key change and its alarm commit together, so the failed call stored nothing.
+    expect(await storedState()).toEqual(start);
+    const retry = await signer().removeKid(start.current.kid);
+    if (retry.status !== 'removed') throw new Error(`answered ${retry.status}`);
+    const after = await storedState();
+    expect(after.current.kid).toBe(start.next.kid);
+    expect(after.removed).toEqual([retry.removal]);
+    expect(await storedAlarm()).toBe(retry.removal.revokeUntil);
+    expect(await signer().removeKid(start.current.kid)).toEqual(retry);
+  });
+
+  it('drops the stored entry by alarm at its revokeUntil', async () => {
+    const start = await storedState();
+    const first = await signer().removeKid(start.current.kid);
+    if (first.status !== 'removed') throw new Error(`answered ${first.status}`);
+    expect(await storedAlarm()).toBe(first.removal.revokeUntil);
+    const following = await alarmAt(first.removal.revokeUntil);
+    expect((await storedState()).removed).toEqual([]);
+    expect(following).toBe((await storedState()).next.activatesAt);
+    expect(await signer().removeKid(start.current.kid)).toEqual({ status: 'unknown_kid' });
+  });
 });

@@ -142,7 +142,10 @@ export class UtsSignerDO extends DurableObject<Env> {
   /**
    * Emergency removal of one `kid` from this signer's published keys. An internal operation: only
    * the mint Worker binds this namespace, and no route calls it until the operator route that
-   * audits and alerts on it exists. The result is the entry the revocation feed carries.
+   * audits and alerts on it exists. The result is the entry the revocation feed carries. The
+   * entry is stored with the key change, so a caller whose call failed after the change was stored
+   * (the alarm write failed, or the answer was lost) gets the same entry when it calls again, until
+   * the entry's `revokeUntil`.
    */
   async removeKid(kid: string): Promise<RemoveKidResult> {
     const target = KidSchema.parse(kid);
@@ -150,12 +153,18 @@ export class UtsSignerDO extends DurableObject<Env> {
     if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
     return await this.#transition<RemoveKidResult>(async (state, now) => {
       const removed = await removeKey(state, target, now, () => generateSigningKey(state.signer));
-      if (removed.status === 'unknown_kid') return { state, events: [], result: removed };
-      return {
-        state: removed.state,
-        events: [removed.event],
-        result: { status: 'removed', removal: removed.removal },
-      };
+      switch (removed.status) {
+        case 'unknown_kid':
+          return { state, events: [], result: removed };
+        case 'already_removed':
+          return { state, events: [], result: { status: 'removed', removal: removed.removal } };
+        case 'removed':
+          return {
+            state: removed.state,
+            events: [removed.event],
+            result: { status: 'removed', removal: removed.removal },
+          };
+      }
     });
   }
 

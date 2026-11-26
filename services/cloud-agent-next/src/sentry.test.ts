@@ -401,6 +401,26 @@ describe('Cloud Agent Worker SDK capture', () => {
     expect(SENTRY_ERROR_OPTIONS.beforeSend(unreadable)).toBeNull();
   });
 
+  // Reproducing the sampled trace through `withSentry` under the Node test runner
+  // sent no transaction even before the sampler, so this pins the options: the
+  // sampler outranks an incoming decision, and a built transaction is dropped.
+  it('samples no trace even when an incoming trace header asks for sampling', () => {
+    const options = cloudAgentSentryOptions(telemetryEnv);
+    expect(
+      options.tracesSampler?.({
+        name: 'send message',
+        parentSampled: true,
+        inheritOrSampleWith: () => 1,
+      } as Parameters<NonNullable<Sentry.CloudflareOptions['tracesSampler']>>[0])
+    ).toBe(0);
+    expect(
+      options.beforeSendTransaction?.(
+        { type: 'transaction' },
+        {} as Parameters<NonNullable<Sentry.CloudflareOptions['beforeSendTransaction']>>[1]
+      )
+    ).toBeNull();
+  });
+
   it.each([
     ['Network connection lost.', 0],
     ['Internal defect', 1],

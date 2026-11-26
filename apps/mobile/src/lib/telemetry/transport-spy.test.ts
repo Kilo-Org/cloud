@@ -59,6 +59,10 @@ const deeplinkIntegration = vi.fn();
 const hermesProfilingIntegration = vi.fn(() => ({ name: 'HermesProfiling' }));
 const expoRouterIntegration = vi.fn(() => ({ name: 'expo-router-integration' }));
 const extraErrorDataIntegration = vi.fn(() => ({ name: 'ExtraErrorData' }));
+const reactNativeTracingIntegration = vi.fn((options: Record<string, unknown>) => ({
+  name: 'ReactNativeTracing',
+  options,
+}));
 
 // This file's own transport-routing client shadows the shared one; the other
 // file-local doubles join it in one merge, so every `hoisted.<name>.*`
@@ -75,6 +79,7 @@ const hoisted = {
   hermesProfilingIntegration,
   expoRouterIntegration,
   extraErrorDataIntegration,
+  reactNativeTracingIntegration,
 };
 
 vi.mock('posthog-react-native', () => ({
@@ -106,6 +111,8 @@ vi.mock('@/lib/config', () => ({
   APPSFLYER_APP_ID: 'app-id',
   POSTHOG_API_KEY: 'test-key',
   SENTRY_ENVIRONMENT: 'test',
+  API_BASE_URL: 'https://api.kilo.test',
+  WEB_BASE_URL: 'https://app.kilo.test',
 }));
 
 vi.mock('@/lib/telemetry/posthog-storage', () => ({
@@ -149,6 +156,7 @@ vi.mock('@sentry/react-native', () => ({
   hermesProfilingIntegration: hoisted.hermesProfilingIntegration,
   expoRouterIntegration: hoisted.expoRouterIntegration,
   extraErrorDataIntegration: hoisted.extraErrorDataIntegration,
+  reactNativeTracingIntegration: hoisted.reactNativeTracingIntegration,
   setUser: vi.fn(),
   setTag: vi.fn(),
   captureException: vi.fn(),
@@ -452,6 +460,53 @@ describe('Sentry transport spy', () => {
     expect(SENTRY_NATIVE_OPTIONS.enableNdk).toBe(false);
     expect(SENTRY_NATIVE_OPTIONS.enableTombstone).toBe(true);
   });
+
+  it('keeps request URLs, screenshots and view trees out of native crash events', () => {
+    expect(SENTRY_NATIVE_OPTIONS).toMatchObject({
+      sendDefaultPii: false,
+      enableNetworkBreadcrumbs: false,
+      attachScreenshot: false,
+      attachViewHierarchy: false,
+    });
+  });
+
+  it.each([false, true])(
+    'keeps native request breadcrumbs and view trees off after JS init (consent %s)',
+    async optionalConsented => {
+      const { initSentry } = await loadSentryInit();
+
+      initSentry(optionalConsented);
+
+      expect(hoisted.sentryHolder.initOptions).toMatchObject({
+        enableNetworkBreadcrumbs: false,
+        attachViewHierarchy: false,
+      });
+    }
+  );
+
+  it.each([false, true])(
+    'creates HTTP spans only for Kilo origins (consent %s)',
+    async optionalConsented => {
+      const { initSentry } = await loadSentryInit();
+
+      initSentry(optionalConsented);
+      const integrations = hoisted.sentryHolder.initOptions?.integrations as (
+        defaults: { name: string }[]
+      ) => (
+        | { name: string; options?: { shouldCreateSpanForRequest?: (url: string) => boolean } }
+        | undefined
+      )[];
+      const tracing = integrations([{ name: 'ReactNativeTracing' }]).find(
+        integration => integration?.name === 'ReactNativeTracing'
+      );
+      const shouldCreateSpan = tracing?.options?.shouldCreateSpanForRequest;
+
+      expect(shouldCreateSpan?.('https://api.kilo.test/api/trpc/session.list?batch=1')).toBe(true);
+      expect(shouldCreateSpan?.('https://app.kilo.test/s/share')).toBe(true);
+      expect(shouldCreateSpan?.('https://models.example.com/v1/fake-key-in-path/chat')).toBe(false);
+      expect(shouldCreateSpan?.('not a url')).toBe(false);
+    }
+  );
 
   it('registers no replay and disables screenshots when optional consent is false', async () => {
     const { initSentry } = await loadSentryInit();

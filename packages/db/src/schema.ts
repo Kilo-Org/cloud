@@ -482,6 +482,10 @@ export type NewCreditCampaign = typeof credit_campaigns.$inferInsert;
  * When adding or removing PII/account-linked columns, update
  * softDeleteUser() in apps/web/src/lib/user/index.ts (and its index.test.ts) to
  * delete, anonymize, or reset the field.
+ *
+ * When adding a secret column (a pepper, token, or key), add it to the omit
+ * list of `toClientUser()` in apps/web/src/lib/user/client-user.ts so it never
+ * reaches a browser.
  */
 export const kilocode_users = pgTable(
   'kilocode_users',
@@ -5674,7 +5678,13 @@ export const magic_link_tokens = pgTable(
     purpose: text()
       .default('magic_link')
       .notNull()
-      .$type<'magic_link' | 'sign_in_code' | 'data_export_download'>(),
+      .$type<
+        | 'magic_link'
+        | 'sign_in_code'
+        | 'data_export_download'
+        | 'sign_in_method_change'
+        | 'passkey_enrollment'
+      >(),
     challenge_id: uuid(),
   },
   table => [
@@ -5690,7 +5700,7 @@ export const magic_link_tokens = pgTable(
     // without this constraint the union above is a compile-time fiction.
     check(
       'check_magic_link_tokens_purpose',
-      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download')`
+      sql`${table.purpose} IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change', 'passkey_enrollment')`
     ),
   ]
 );
@@ -7836,6 +7846,10 @@ export const app_shell_handoff_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     /** The allow-listed shell path this token opens, including its query. */
     target_path: text().notNull(),
+    // The account's web-session pepper when the token was minted. Any rotation
+    // (sign-out of browser sessions, an admin sign-out, account recovery)
+    // leaves an unconsumed token unusable. See `revokeWebSessions`.
+    web_session_pepper: text(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

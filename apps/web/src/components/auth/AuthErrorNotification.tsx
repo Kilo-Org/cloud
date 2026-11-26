@@ -1,10 +1,47 @@
 'use client';
 
 import React from 'react';
+import { signOut } from 'next-auth/react';
 import { BlockedNotification } from '@/components/auth/BlockedNotification';
 import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import { getProviderById } from '@/lib/auth/provider-metadata';
 import { parseSignupStepUpMethodsParam } from '@/lib/auth/redirect-urls';
+import {
+  SIGN_IN_METHOD_BROWSER_SESSION_REQUIRED_ERROR,
+  SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES,
+  SIGN_IN_METHOD_CODE_COOLDOWN_ERROR,
+  SIGN_IN_METHOD_CODE_INVALID_ERROR,
+  SIGN_IN_METHOD_CODE_LOCKED_ERROR,
+  SIGN_IN_METHOD_CODE_SEND_FAILED_ERROR,
+  SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR,
+  SIGN_IN_METHOD_SSO_REQUIRED_ERROR,
+} from '@/lib/auth/sign-in-method-change-codes';
+
+/**
+ * The title for a sign-in method change page error, or null for any other
+ * error. The message comes from the shared map, so every change error reads the
+ * same here as it does in a dialog.
+ */
+function signInMethodChangeErrorTitle(error: string): string | null {
+  switch (error) {
+    case SIGN_IN_METHOD_BROWSER_SESSION_REQUIRED_ERROR:
+      return 'Sign In from a Browser';
+    case SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR:
+      return 'Sign In Again';
+    case SIGN_IN_METHOD_SSO_REQUIRED_ERROR:
+      return 'Single Sign-on Required';
+    case SIGN_IN_METHOD_CODE_INVALID_ERROR:
+      return 'Code Not Accepted';
+    case SIGN_IN_METHOD_CODE_LOCKED_ERROR:
+      return 'Too Many Incorrect Codes';
+    case SIGN_IN_METHOD_CODE_COOLDOWN_ERROR:
+      return 'Code Already Sent';
+    case SIGN_IN_METHOD_CODE_SEND_FAILED_ERROR:
+      return 'Code Not Sent';
+    default:
+      return null;
+  }
+}
 
 export function AuthErrorNotification({
   error,
@@ -89,6 +126,34 @@ export function AuthErrorNotification({
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Account Linking Failed">
           Account linking failed. Please try again or contact support if the problem persists.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  const signInMethodChangeTitle = signInMethodChangeErrorTitle(error);
+  if (signInMethodChangeTitle)
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title={signInMethodChangeTitle}>
+          {SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[error]}
+          {error === SIGN_IN_METHOD_REAUTH_REQUIRED_ERROR && !shell && (
+            <>
+              {' '}
+              <button
+                type="button"
+                // A signed-in browser skips the sign-in page, so the old
+                // session ends first; the new sign-in returns to this page.
+                onClick={() =>
+                  void signOut({
+                    callbackUrl: `/users/sign_in?callbackPath=${encodeURIComponent(window.location.pathname)}`,
+                  })
+                }
+                className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
+              >
+                Sign in again
+              </button>
+            </>
+          )}
         </ErrorNotificationBox>
       </div>
     );

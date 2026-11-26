@@ -342,6 +342,49 @@ test('applies an explicit worker override even when root and existing dev vars d
   }
 });
 
+test('syncs the meter payer list to an empty list, whatever the local value', () => {
+  const meterDir = 'services/container-usage-meter';
+  const example = fs.readFileSync(
+    new URL('../../../services/container-usage-meter/.dev.vars.example', import.meta.url),
+    'utf-8'
+  );
+  const meterPlan = (envLocal: string, devVars: string) => {
+    const repo = createRepo({
+      '.env.local': envLocal,
+      [`${meterDir}/.dev.vars.example`]: example,
+      [`${meterDir}/.dev.vars`]: devVars,
+    });
+    try {
+      const meter = computePlan(repo.root, new Set(['container-usage-meter'])).devVarsChanges.find(
+        change => change.workerDir === meterDir
+      );
+      assert.ok(meter, 'expected a meter .dev.vars plan');
+      assert.equal(meter.isNew, false);
+      assert.ok(!meter.missingValues.includes('CONTAINER_BILLING_CLOUD_AGENT_USER_IDS'));
+      return meter.keyChanges.find(
+        change => change.key === 'CONTAINER_BILLING_CLOUD_AGENT_USER_IDS'
+      );
+    } finally {
+      repo.cleanup();
+    }
+  };
+
+  // An existing .dev.vars without the key gets it.
+  assert.deepEqual(meterPlan('', 'KILOCODE_BACKEND_BASE_URL=http://localhost:3000\n'), {
+    key: 'CONTAINER_BILLING_CLOUD_AGENT_USER_IDS',
+    oldValue: undefined,
+    newValue: '',
+  });
+  // A local enrolment is reset, and .env.local does not set one.
+  assert.deepEqual(
+    meterPlan(
+      'CONTAINER_BILLING_CLOUD_AGENT_USER_IDS=user-from-env-local\n',
+      'CONTAINER_BILLING_CLOUD_AGENT_USER_IDS=local-user\n'
+    ),
+    { key: 'CONTAINER_BILLING_CLOUD_AGENT_USER_IDS', oldValue: 'local-user', newValue: '' }
+  );
+});
+
 test('auto-creates blank shared callback secrets before syncing worker dev vars', () => {
   const repo = createRepo({
     '.env.local': 'CALLBACK_TOKEN_SECRET=\n',

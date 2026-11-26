@@ -22,7 +22,9 @@ describe('toClientUser', () => {
   it('keeps the remaining user columns', () => {
     const user = defineTestUser({ is_admin: true, kiloclaw_early_access: true });
 
-    expect(toClientUser(user)).toEqual(expect.objectContaining({ is_admin: true }));
+    expect(toClientUser(user)).toEqual(
+      expect.objectContaining({ is_admin: true, kiloclaw_early_access: true })
+    );
     expect(Object.keys(toClientUser(user))).toHaveLength(Object.keys(user).length - 3);
   });
 });

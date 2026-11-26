@@ -26,6 +26,12 @@ const NOT_MODIFIED: BundleResult = {
   fetchedAt: OK.fetchedAt,
 };
 
+/**
+ * How soon after the stand-in answers a waiting read must return: well under the 5 s attempt
+ * timeout the old code slept through, wide enough for a loaded CI runner.
+ */
+const ANSWER_MARGIN_MS = 2_500;
+
 type Step = { result: BundleResult; delayMs: number };
 type Call = {
   ifNoneMatch: string | null;
@@ -113,7 +119,7 @@ it('returns on its own answer when an ended request settled the attempt before i
   expect(failed).toMatchObject({ ifNoneMatch: null, status: 'unavailable' });
   expect(delivered).toMatchObject({ ifNoneMatch: null, status: 'ok' });
   // It returns when that answer lands, not when its 5 s attempt deadline passes.
-  expect(second.at! - delivered.answeredAt!).toBeLessThan(1_000);
+  expect(second.at! - delivered.answeredAt!).toBeLessThan(ANSWER_MARGIN_MS);
 
   await expectRevalidationWithEtag(2);
   expect((await calls()).filter(c => c.status === 'ok')).toHaveLength(1);
@@ -136,7 +142,7 @@ it('takes over a read whose request ended before STS answered, then revalidates'
   const [abandoned, delivered] = await calls();
   expect(abandoned).toMatchObject({ ifNoneMatch: null, answeredAt: null });
   expect(delivered).toMatchObject({ ifNoneMatch: null, status: 'ok' });
-  expect(second.at! - delivered.answeredAt!).toBeLessThan(1_000);
+  expect(second.at! - delivered.answeredAt!).toBeLessThan(ANSWER_MARGIN_MS);
 
   // Its answer reached the shared cache: the next STS call is a conditional one.
   await expectRevalidationWithEtag(2);
@@ -153,7 +159,7 @@ it('serves two live requests from one attempt', async () => {
   expect(delivered).toMatchObject({ ifNoneMatch: null, status: 'ok' });
   for (const reply of replies) {
     expect(reply).toMatchObject({ outcome: 'read', value: 'ae-token' });
-    expect(reply.at! - delivered.answeredAt!).toBeLessThan(1_000);
+    expect(reply.at! - delivered.answeredAt!).toBeLessThan(ANSWER_MARGIN_MS);
   }
   expectNoCrossRequestUse();
 }, 30_000);

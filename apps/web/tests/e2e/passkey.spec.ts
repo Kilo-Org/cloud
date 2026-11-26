@@ -1,3 +1,5 @@
+import { readdir, readFile, stat } from 'node:fs/promises';
+import path from 'node:path';
 import { test, expect } from '@chromatic-com/playwright';
 import type { Page } from '@playwright/test';
 
@@ -7,12 +9,45 @@ import type { Page } from '@playwright/test';
  *
  * The authenticator is the browser's own platform authenticator: a CDP virtual
  * authenticator is installed on the page, so the proof needs no phone, no
- * security key, and no committed credential fixture.
+ * security key, and no committed credential fixture. The enrollment code is
+ * read from the local email outbox that the Playwright web server writes
+ * (`LOCAL_EMAIL_OUTBOX_IN_AUTOMATED_TEST` in playwright.config.ts).
  */
 
 const AUTHENTICATE_ROUTE = '/api/auth/passkey/authenticate';
 const REGISTER_ROUTE = '/api/auth/passkey/register';
 const SIGN_IN_PATH = '/users/sign_in?signup=true';
+const PASSKEY_CODE_SUBJECT = 'Your Kilo code to add a passkey';
+// The web server runs in apps/web and writes to the workspace root's outbox.
+const OUTBOX_DIRECTORY = path.resolve(process.cwd(), '..', '..', 'dev', 'logs', 'emails');
+
+/**
+ * The code in the newest passkey enrollment email to `email` written at or
+ * after `sentAfterMs`, or null while none has arrived.
+ */
+async function readEnrollmentCode(email: string, sentAfterMs: number): Promise<string | null> {
+  const names = await readdir(OUTBOX_DIRECTORY).catch(() => []);
+  const candidates = await Promise.all(
+    names
+      .filter(name => name.endsWith('.html'))
+      .map(async name => {
+        const file = path.join(OUTBOX_DIRECTORY, name);
+        return { file, modifiedAt: (await stat(file)).mtimeMs };
+      })
+  );
+  const recent = candidates
+    .filter(candidate => candidate.modifiedAt >= sentAfterMs)
+    .sort((a, b) => b.modifiedAt - a.modifiedAt);
+  for (const { file } of recent) {
+    const html = await readFile(file, 'utf8');
+    if (!html.includes(`Intended recipient: ${email}`) || !html.includes(PASSKEY_CODE_SUBJECT)) {
+      continue;
+    }
+    const code = />\s*(\d{6})\s*<\/span>/.exec(html)?.[1];
+    if (code) return code;
+  }
+  return null;
+}
 
 /** The browser's platform authenticator, provisioned with a resident passkey. */
 async function installVirtualAuthenticator(page: Page): Promise<{
@@ -86,21 +121,31 @@ test('sign in with a passkey, and refuse a replayed or wrong challenge', async (
   // The registration boundary refuses a body that is not a WebAuthn attestation
   // as a bad request: it names a credential but no attestation object, so no
   // ceremony runs and nothing is stored.
-  const registerOptions = await page.request.post(REGISTER_ROUTE, { data: { action: 'options' } });
-  expect(registerOptions.ok()).toBe(true);
-  const { challengeId: registerChallengeId } = (await registerOptions.json()) as {
-    challengeId: string;
-  };
   const malformedAttestation = await page.request.post(REGISTER_ROUTE, {
     data: {
       action: 'verify',
-      challengeId: registerChallengeId,
+      challengeId: '11111111-1111-4111-8111-111111111111',
       response: { id: 'credential-1', rawId: 'credential-1', type: 'public-key', response: {} },
     },
   });
   expect(malformedAttestation.status()).toBe(400);
 
+  // Adding a passkey takes a code emailed to the account.
+  const sentAfter = Date.now() - 1000;
   await page.getByRole('button', { name: 'Add a passkey' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add a passkey' });
+  await expect(dialog.getByText(`We sent a 6-digit code to ${testEmail}`)).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect
+    .poll(() => readEnrollmentCode(testEmail ?? '', sentAfter), { timeout: 30_000 })
+    .not.toBeNull();
+  const code = await readEnrollmentCode(testEmail ?? '', sentAfter);
+  if (!code) throw new Error('the enrollment code email was not captured');
+  await page.screenshot({ path: testInfo.outputPath('passkey-code-step.png'), fullPage: true });
+  await dialog.getByLabel('Code').fill(code);
+  await dialog.getByRole('button', { name: 'Add passkey' }).click();
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
   const rows = page.getByRole('list', { name: 'Your passkeys' }).getByRole('listitem');
   await expect(rows).toHaveCount(1, { timeout: 30_000 });
   await expect(rows.first()).toContainText('Added');
@@ -176,4 +221,12 @@ test('sign in with a passkey, and refuse a replayed or wrong challenge', async (
   });
   await expect(passkeyButton).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Continue with Email' })).toBeVisible();
+});
+
+test('refuse a passkey enrollment without an emailed code', async ({ page }) => {
+  await page.goto('/connected-accounts');
+
+  const options = await page.request.post(REGISTER_ROUTE, { data: { action: 'options' } });
+  expect(options.status()).toBe(401);
+  expect(await options.json()).toEqual({ error: 'EMAIL_CODE_REQUIRED' });
 });

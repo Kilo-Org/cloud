@@ -1,11 +1,17 @@
 name: Cloud Agent E2E nightly
 
 on:
-  schedule:
-    # Deploys main HEAD to the e2e stack, then runs the full deployed suite.
-    # If HEAD's CI is red or still running, the deploy waits for the runtime
-    # publication (up to 45 minutes) and then fails.
-    - cron: '37 3 * * *'
+  # The schedule is paused. The e2e Workers verify control tokens and stream
+  # tickets with the development signing key (NEXTAUTH_SECRET_DEV), but this
+  # run targets https://api.kilo.ai, which signs them with the production key,
+  # so every run fails. A manual dispatch fails the same way. Restore the
+  # schedule once the run targets a backend that signs with NEXTAUTH_SECRET_DEV;
+  # see services/cloud-agent-next/test/e2e/deploy/README.md.
+  # schedule:
+  #   # Deploys main HEAD to the e2e stack, then runs the full deployed suite.
+  #   # If HEAD's CI is red or still running, the deploy waits for the runtime
+  #   # publication (up to 45 minutes) and then fails.
+  #   - cron: '37 3 * * *'
   workflow_dispatch:
     inputs:
       runtime_source_sha:

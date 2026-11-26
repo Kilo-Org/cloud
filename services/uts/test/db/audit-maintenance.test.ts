@@ -230,11 +230,13 @@ describe('expired DPoP proofs at volume', () => {
     const live = 75_000;
     const expired = 5_000;
     await owner.query(
-      `INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
-       SELECT gen_random_uuid(), md5(n::text), now() + (60 + n % 60) * interval '1 second'
+      `INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+       SELECT sha256(gen_random_uuid()::text::bytea), md5(n::text),
+         now() + (60 + n % 60) * interval '1 second'
        FROM generate_series(1, $1) AS n
        UNION ALL
-       SELECT gen_random_uuid(), md5(('x' || n)::text), now() - (1 + n % 60) * interval '1 second'
+       SELECT sha256(gen_random_uuid()::text::bytea), md5(('x' || n)::text),
+         now() - (1 + n % 60) * interval '1 second'
        FROM generate_series(1, $2) AS n`,
       [live, expired]
     );

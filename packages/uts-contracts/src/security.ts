@@ -11,7 +11,6 @@ import { z } from 'zod';
  * never as markup or a link.
  */
 export const UTS_SECURITY_PATH = '/account/security';
-export const UTS_SECURITY_READ_SCOPE = 'uts:security.read';
 
 /** The view lists at most this many sign-ins and this many notices, newest first. */
 export const UTS_SECURITY_LIST_LIMIT = 50;

@@ -64,7 +64,7 @@ export async function handleTicketIssue(request: Request, deps: TicketDeps): Pro
     return oauthError('invalid_request', 400, 'purpose is not a ticket purpose');
   const resourceParam = required(params, 'resource');
   if (resourceParam instanceof Response) return resourceParam;
-  const audience = audienceOfResource(resourceParam);
+  const audience = audienceOfResource(resourceParam, deps.config.environment);
   if (audience === null) return grantError('invalid_target');
   const resourceId = params.one('resource_id');
   if (resourceId.status === 'repeated')

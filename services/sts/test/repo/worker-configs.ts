@@ -114,10 +114,11 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
   ['sts-test', 'sts-test'],
   ['audit-relay-test', 'audit-relay-test'],
   // The UTS mint Worker holds an audit queue producer grant under these names, so only its own
-  // configs may deploy as them (services/uts/test/repo pins the rest of the UTS names).
+  // configs may deploy as them (services/uts/test/repo pins the rest of the UTS names):
+  // services/uts/wrangler.dev.jsonc is the `uts-local` config.
   ['uts', 'uts'],
   ['uts-staging', 'uts'],
-  ['uts-local', 'uts'],
+  ['uts-local', 'uts-local'],
   ['uts-test', 'uts-test'],
 ]);
 

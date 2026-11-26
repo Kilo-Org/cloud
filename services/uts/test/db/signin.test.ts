@@ -964,7 +964,7 @@ async function firstPartyGrant(
       authTime: new Date(),
       amr: ['passkey'],
     })
-  ).toBe('issued');
+  ).toEqual({ outcome: 'issued', orgRole: orgId === null ? null : expect.any(String) });
   const refreshToken = `kilo_rt_${token()}`;
   const grantId = randomUUID();
   const exchanged = await grants.exchangeCode({

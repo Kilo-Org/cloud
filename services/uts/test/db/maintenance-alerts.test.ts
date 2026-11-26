@@ -146,14 +146,12 @@ describe('cron maintenance alerts', () => {
 
   it('logs that OAuth maintenance fell behind when a kind still fills its batch on the last call', async () => {
     await owner.query(
-      `INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
-       SELECT gen_random_uuid(), md5(n::text), now() - interval '1 minute'
+      `INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+       SELECT sha256(gen_random_uuid()::text::bytea), md5(n::text), now() - interval '1 minute'
        FROM generate_series(1, 6000) AS n`
     );
 
-    const behind = await logLines(() =>
-      withStore(store => rowMaintenance(store, 'oauth_rows', 1))
-    );
+    const behind = await logLines(() => withStore(store => rowMaintenance(store, 'oauth_rows', 1)));
     expect(behind).toEqual([{ event: 'uts.oauth_rows.behind', kinds: ['dpop_proofs'] }]);
 
     // 1,000 remain, under one batch: the call catches up and logs nothing.

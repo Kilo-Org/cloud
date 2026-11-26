@@ -1094,8 +1094,8 @@ BEGIN
     END IF;
   END IF;
 
-  INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
-  VALUES (p_grant_id, p_dpop_jti, now() + interval '121 seconds')
+  INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+  VALUES (p_dpop_jkt, p_dpop_jti, now() + interval '121 seconds')
   ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
   IF NOT FOUND THEN
     outcome := 'dpop_replay';
@@ -1250,8 +1250,8 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  INSERT INTO uts.dpop_proofs (grant_id, jti, expires_at)
-  VALUES (grant_row.id, p_dpop_jti, now() + interval '121 seconds')
+  INSERT INTO uts.dpop_proofs (jkt, jti, expires_at)
+  VALUES (grant_row.dpop_jkt, p_dpop_jti, now() + interval '121 seconds')
   ON CONFLICT ON CONSTRAINT dpop_proofs_pkey DO NOTHING;
   IF NOT FOUND THEN
     outcome := 'dpop_replay';

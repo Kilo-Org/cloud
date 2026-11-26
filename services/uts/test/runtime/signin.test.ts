@@ -16,7 +16,7 @@ import { signInHandoff } from '../../src/signin/handoff';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../../src/signin/passkey/ceremonies';
 import type { BrowserSession, DeviceCodeRead, DeviceExchangeResult } from '../../src/signin/store';
 import { TICKET_REDEEMERS, handleTicketIssue, redeemTicket } from '../../src/tickets/routes';
-import { createFirstPartyRefreshToken, randomCredential } from '../../src/token/credentials';
+import { firstPartyRefreshToken, randomCredential } from '../../src/token/credentials';
 import { signerAccess } from '../../src/token/mint';
 import {
   dpopKey,
@@ -26,6 +26,7 @@ import {
   formRequest,
   oauthDeps,
   storeFailure,
+  testScopes,
 } from './oauth-support';
 import { ORIGIN, deviceDeps, fakeSignIn, fakeTickets, pageForm, pageJson } from './signin-support';
 import { config, env } from './test-env';
@@ -598,7 +599,10 @@ describe('device grant at the token endpoint', () => {
     const store = fakeSignIn({ exchangeDeviceCode: async () => result });
     return {
       store,
-      grant: deviceCodeGrant({ config, sign: signerAccess(env, config) }, store.deps.signIn),
+      grant: deviceCodeGrant(
+        { config, sign: signerAccess(env, config), scopes: testScopes },
+        store.deps.signIn
+      ),
     };
   };
   const call = async (request: Request, result: DeviceExchangeResult) => {
@@ -657,7 +661,7 @@ describe('device grant at the token endpoint', () => {
 
 describe('one-time tickets', () => {
   const grantId = crypto.randomUUID();
-  const refreshToken = createFirstPartyRefreshToken(grantId);
+  const refreshToken = firstPartyRefreshToken(grantId, randomCredential());
   const issueRequest = async (fields: Record<string, string> = {}, proof = true) =>
     formRequest(
       '/tickets',

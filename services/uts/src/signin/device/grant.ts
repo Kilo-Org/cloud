@@ -12,10 +12,12 @@ import {
   tokenEndpointUrl,
   tokenSelection,
 } from '../../oauth/token-endpoint';
+import type { MintClient } from '../../scopes/policy';
 import {
-  createFirstPartyRefreshToken,
+  firstPartyRefreshToken,
   grantIdOfCode,
   isRandomCredential,
+  randomCredential,
   sha256,
 } from '../../token/credentials';
 import type { SignInAccess } from '../store';
@@ -38,7 +40,7 @@ const PENDING_ERRORS = {
  * token while the device code's 10 minutes last.
  */
 export function deviceCodeGrant(
-  tokenDeps: Pick<TokenDeps, 'config' | 'sign'>,
+  tokenDeps: Pick<TokenDeps, 'config' | 'sign' | 'scopes'>,
   signIn: SignInAccess
 ): DeviceCodeGrant {
   return async (request: Request, params: Params): Promise<Response> => {
@@ -49,7 +51,8 @@ export function deviceCodeGrant(
     }
     const deviceCode = required(params, 'device_code');
     if (deviceCode instanceof Response) return deviceCode;
-    const selection = tokenSelection(params);
+    const mintClient: MintClient = { kind: 'first_party', clientId: client.clientId };
+    const selection = tokenSelection(params, tokenDeps, mintClient);
     if (selection instanceof Response) return selection;
     const device = deviceContext(request, params, client);
     if (device instanceof Response) return device;
@@ -58,7 +61,7 @@ export function deviceCodeGrant(
     if (proof instanceof Response) return proof;
 
     const grantId = await grantIdOfCode(deviceCode);
-    const refreshToken = createFirstPartyRefreshToken(grantId);
+    const refreshToken = firstPartyRefreshToken(grantId, randomCredential());
     const result = await signIn(async store =>
       store.exchangeDeviceCode({
         environment: tokenDeps.config.environment,
@@ -74,10 +77,17 @@ export function deviceCodeGrant(
     );
     switch (result.outcome) {
       case 'issued':
-        return await completeMint(tokenDeps, client.clientId, grantId, result, {
-          token: refreshToken,
-          expiresAt: result.refreshExpiresAt,
-        });
+        // `uts.exchange_device_code` binds no organization, so the subject holds no role to check.
+        return await completeMint(
+          tokenDeps,
+          mintClient,
+          grantId,
+          { ...result, orgRole: null },
+          {
+            token: refreshToken,
+            expiresAt: result.refreshExpiresAt,
+          }
+        );
       case 'authorization_pending':
       case 'slow_down':
       case 'access_denied':

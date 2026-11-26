@@ -8,7 +8,6 @@ import {
   TestDatabase,
   insertAccount,
   insertAudit,
-  insertBrowserSession,
   insertGatePass,
   loginPassword,
   randomHash,

@@ -69,15 +69,10 @@ describe('repository Worker configs', () => {
       development: 'uts-local',
     });
     const mint = z
-      .object({
-        name: z.string(),
-        env: z.object({
-          staging: z.object({ name: z.string() }),
-          local: z.object({ name: z.string() }),
-        }),
-      })
+      .object({ name: z.string(), env: z.object({ staging: z.object({ name: z.string() }) }) })
       .parse(configAt(MINT_CONFIG).config);
-    expect([mint.name, mint.env.staging.name, mint.env.local.name]).toEqual([
+    const dev = z.object({ name: z.string() }).parse(configAt(MINT_DEV_CONFIG).config);
+    expect([mint.name, mint.env.staging.name, dev.name]).toEqual([
       UTS_MINT_DEPLOYMENTS.production,
       UTS_MINT_DEPLOYMENTS.staging,
       UTS_MINT_DEPLOYMENTS.development,

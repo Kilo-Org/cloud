@@ -368,14 +368,28 @@ whether granted directly, through `PUBLIC` or through an inherited role.
 ### Audit outbox
 
 `uts.audit_events` is partitioned by UTC day. Each row records its transaction id (`xid8`) and its
-shard (`id % 8`). The relay advances `uts.audit_relay_watermarks` once the archive confirms a batch.
-Each shard publishes as its own audit stream, and `last_seq` numbers that stream's batches.
+shard (`id % 8`). Each shard publishes as its own audit stream, `uts:<environment>:<shard>`, and
+`last_seq` numbers that stream's batches.
 
-The relay read for one shard has this shape, and the relay keeps it (`RELAY_READ` in
-`test/db/harness.ts`; `test/db/audit-maintenance.test.ts` checks the plan):
+The relay (`src/audit/relay.ts`) is one Durable Object per shard (`UtsAuditRelayDO`, named
+`<environment>:audit-relay:<shard>`). Its alarm runs every 5 seconds: it reads up to 500 rows past
+the watermark, sends them as one gzipped `AuditBatch` to `AUDIT_QUEUE` (halving any batch the
+encoder refuses, so each message stays under 60 KB), and moves the watermark after each message the
+queue accepted, only from the `last_seq` it read. A run reads at most 10 times; one that reached
+that budget runs again at once. A failed run leaves the watermark in place and retries after 5
+seconds doubling to 60. A batch the queue took before a failure is sent again under the same
+sequence numbers, and the audit relay service dedupes it against its archive, so a shard has no
+gap and no lost row.
+
+There is no archive confirmation: UTS cannot bind the archive or the audit relay service. A
+partition is dropped only when every row in it is relayed and it is past the 7-day tier, which
+leaves the audit relay service days to retry on top of the queue's own retries.
+
+The relay read for one shard has this shape (`RELAY_READ` in `src/audit/outbox.ts`;
+`test/db/audit-maintenance.test.ts` checks the plan):
 
 ```sql
-SELECT event.*
+SELECT watermark.last_seq AS watermark_seq, event.*
 FROM uts.audit_relay_watermarks AS watermark
 CROSS JOIN LATERAL (
   SELECT candidate.*
@@ -393,6 +407,20 @@ ORDER BY event.txid, event.id
 The watermark drives the inner query, so the row comparison is the index condition on every
 partition's (`shard`, `txid`, `id`) index and the read never touches a relayed row. A join that
 filters on the watermark instead walks every relayed row of the shard on each read.
+
+The minute cron (`src/scheduled.ts`) arms the 8 relay objects and, on one connection, runs
+partition maintenance, OAuth row maintenance and the lag check. It does nothing while
+`IDENTITY_STORE` is unbound. Its error log lines are the alert signals for an Axiom monitor:
+
+| Log event | Meaning |
+|---|---|
+| `uts.audit_relay.lagging` | A shard's first unrelayed row is over 60 seconds old (`shard`, `ageSeconds`) |
+| `uts.audit_relay.failed` | A relay run failed (`stream`, `failure`, `failedRuns`, `retryInMs`) |
+| `uts.audit_relay.not_started` | The cron could not arm a shard's relay object |
+| `uts.audit_partitions.kept_unrelayed` | A partition past the 7-day tier still holds an unrelayed row |
+| `uts.audit_partitions.runway_short` | Fewer than today's and the next 7 days' partitions exist |
+| `uts.oauth_rows.behind` | A kind still deleted a full batch on the run's last maintenance call |
+| `uts.maintenance.failed` | A cron step failed (`step`, `sqlState`) |
 
 `uts.maintain_audit_partitions()` runs one step per call: it creates the first missing partition of
 the next 7 days. Otherwise it takes the first partition whose rows are all older than 7 days and all
@@ -453,11 +481,10 @@ refreshing every 8 minutes for 30 days:
 
 The app login cannot delete credential rows, so `uts.maintain_oauth_rows()` (SECURITY DEFINER)
 removes the rows no statement reads again. Each call deletes at most 5,000 rows of each kind and
-returns one `(kind, deleted)` row per kind. Like `uts.maintain_audit_partitions()`, it has no
-caller in this service yet: the UTS cron that slice 3.9 adds calls both, this one until every
-count is under 5,000. `uts_app` holds EXECUTE on it by choice until then; it takes no input and
-every delete is time-gated, so a caller can only remove dead rows sooner. Slice 3.9 moves it to a
-dedicated maintenance role. It deletes:
+returns one `(kind, deleted)` row per kind. The minute cron calls it until every count is under
+5,000 (at most 20 calls per run). `uts_app` holds EXECUTE on it; it takes no input and every
+delete is time-gated, so a caller can only remove dead rows sooner. A dedicated maintenance role
+needs its own login and Hyperdrive config, and is not provisioned yet. It deletes:
 
 | Rows | When | Why that is safe |
 |---|---|---|

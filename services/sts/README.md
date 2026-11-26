@@ -571,8 +571,11 @@ Preconditions on the GitHub side, which STS cannot check:
   exactly as the policy does.
 
 Denial rows carry `repository_id`, `repository_owner_id`, `repository`, `environment`, `ref`,
-`event_name`, `job_workflow_ref` and `sub`, never the token and never per-run claims such as
-`run_id` (they would make every refusal its own row). A delivery writes the usual
+`event_name`, `job_workflow_ref` and `sub_format`, never the token, the raw `sub`, or per-run
+claims such as `run_id` (they would make every refusal its own row). `sub_format` names the
+subject's shape: `immutable:` or `name-only:` followed by `environment`, `ref` or `pull_request`
+for GitHub's default forms, `custom` for a customized template (which can carry per-run claims),
+or `absent`. A delivery writes the usual
 `ai.kilo.sts.bundle.delivered` row for the policy's workload, plus the verified token's
 `jobWorkflowRef`, `runId` and, when present, `runAttempt` as flat string attributes (a run id or
 attempt that is not 1-20 decimal digits is left out). GitHub tokens carry no job claim, so the row
@@ -788,7 +791,8 @@ npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/
 The script signs a job token the way GitHub does and checks that the listed workflow's job gets its
 bundle (its `/ci/ci-e2e-release` value and its `/shared` value, not the `/workloads` or `/ci/minting`
 decoys), that the refresher read `/ci`, and that a job of another workflow file, a `pull_request`
-job and a name-only subject each get 401 `identity_rejected`. It then waits for the
-`bundle.delivered` row, which must carry the job's workflow file, run id and attempt, and for the
-`bundle.denied` rows that name the refused `job_workflow_ref`, `event_name` and `sub` and no run id,
-and checks that no audit row carries a value.
+job, a name-only subject and a customized subject carrying the run id each get 401
+`identity_rejected`. It then waits for the `bundle.delivered` row, which must carry the job's
+workflow file, run id and attempt, and for the `bundle.denied` rows that name the refused
+`job_workflow_ref`, `event_name` and `sub_format` and no run id or raw subject, and checks that no
+audit row carries a value.

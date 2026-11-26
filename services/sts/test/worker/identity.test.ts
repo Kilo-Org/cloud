@@ -297,19 +297,29 @@ describe('GitHub Actions identity', () => {
     [
       'the name-only subject of a repository without immutable subjects',
       'repo:acme/repo:environment:release',
+      'name-only:environment',
     ],
-    ['the ref form', 'repo:acme@456/repo@123:ref:refs/heads/main'],
-    ['another owner id', 'repo:acme@999/repo@123:environment:release'],
-    ['another environment', 'repo:acme@456/repo@123:environment:automation'],
-    ['a wildcard', 'repo:acme@456/repo@123:environment:*'],
-  ])('refuses a subject that is not the exact one: %s', async (_case, sub) => {
+    ['the ref form', 'repo:acme@456/repo@123:ref:refs/heads/main', 'immutable:ref'],
+    ['another owner id', 'repo:acme@999/repo@123:environment:release', 'immutable:environment'],
+    [
+      'another environment',
+      'repo:acme@456/repo@123:environment:automation',
+      'immutable:environment',
+    ],
+    ['a wildcard', 'repo:acme@456/repo@123:environment:*', 'immutable:environment'],
+    ['a customized template', 'repo:acme/repo:run_id:9001:actor:someone', 'custom'],
+  ])('refuses a subject that is not the exact one: %s', async (_case, sub, format) => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(GITHUB_ISSUER), { ...GITHUB_CLAIMS, sub });
-    expect(await verify(token)).toMatchObject({
+    const outcome = await verify(token);
+    expect(outcome).toMatchObject({
       status: 'denied',
       reason: 'identity_rejected',
-      subject: { actor: 'ci-release', claims: { sub } },
+      subject: { actor: 'ci-release', claims: { sub_format: format } },
     });
+    // Only the format: a customized subject can carry per-run claims.
+    expect(JSON.stringify(outcome)).not.toContain(sub);
+    expect(JSON.stringify(outcome)).not.toContain('9001');
   });
 
   it('refuses a ref the policy does not list', async () => {
@@ -460,7 +470,7 @@ describe('denial subjects', () => {
           ref: 'refs/heads/main',
           event_name: 'workflow_dispatch',
           job_workflow_ref: RELEASE_WORKFLOW,
-          sub: 'repo:acme@456/repo@123:environment:release',
+          sub_format: 'immutable:environment',
         },
       },
     });

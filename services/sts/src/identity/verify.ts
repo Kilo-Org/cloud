@@ -130,7 +130,8 @@ function providerFor(issuer: string): IdentityProvider {
 }
 
 const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
-  // `run_id` and the other per-run claims stay out: they would make each refusal its own row.
+  // `run_id` and the other per-run claims stay out: they would make each refusal its own row. So
+  // does `sub`, which a customized template can build from them; `sub_format` stands in for it.
   github: [
     'repository_id',
     'repository_owner_id',
@@ -139,13 +140,33 @@ const STABLE_CLAIMS: Record<IdentityProvider, readonly string[]> = {
     'ref',
     'event_name',
     'job_workflow_ref',
-    'sub',
   ],
   fly: ['org_id', 'org_name', 'app_id', 'app_name', 'machine_id'],
   // Ids only: team and project names can be renamed and never authorize. `user_id` names the
   // person whose `vercel env pull` or `vercel dev` token was refused.
   vercel: ['owner_id', 'project_id', 'environment', 'custom_environment_id', 'user_id'],
 };
+
+/** GitHub's default subject: a repository, then the job's environment, its ref, or a pull request. */
+const GITHUB_DEFAULT_SUBJECT = /^repo:([^:]+):(environment|ref|pull_request)(?::[^:]+)?$/;
+const GITHUB_IMMUTABLE_REPOSITORY = /^[A-Za-z0-9-]+@[0-9]+\/[A-Za-z0-9._-]+@[0-9]+$/;
+const GITHUB_NAME_ONLY_REPOSITORY = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+
+/**
+ * The shape of a GitHub token's `sub`, one of a fixed set (`immutable:environment`,
+ * `name-only:ref`, `custom`, ...), never the subject itself: a customized template can carry
+ * per-run claims such as `run_id`, which would make each refusal its own row.
+ */
+function githubSubjectFormat(subject: string | null): string {
+  if (subject === null) return 'absent';
+  const match = GITHUB_DEFAULT_SUBJECT.exec(subject);
+  const repository = match?.[1] ?? '';
+  const context = match?.[2];
+  if (context === undefined) return 'custom';
+  if (GITHUB_IMMUTABLE_REPOSITORY.test(repository)) return `immutable:${context}`;
+  if (GITHUB_NAME_ONLY_REPOSITORY.test(repository)) return `name-only:${context}`;
+  return 'custom';
+}
 
 function verifiedSubject(
   provider: IdentityProvider,
@@ -157,6 +178,7 @@ function verifiedSubject(
     const value = claim(payload, name);
     if (value !== null) claims[name] = value.slice(0, 200);
   }
+  if (provider === 'github') claims.sub_format = githubSubjectFormat(claim(payload, 'sub'));
   return { provider, actor: workload ?? providerId(provider, claims), claims };
 }
 

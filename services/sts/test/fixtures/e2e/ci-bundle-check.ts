@@ -162,6 +162,10 @@ const refusals: Array<[string, JWTPayload]> = [
     'a token with the name-only subject',
     { ...JOB_CLAIMS, sub: 'repo:kilo-e2e/ci-fixture:environment:release' },
   ],
+  [
+    'a token with a customized subject that carries the run id',
+    { ...JOB_CLAIMS, sub: 'repo:kilo-e2e/ci-fixture:run_id:424242' },
+  ],
 ];
 for (const [what, claims] of refusals) {
   const refused = await bundle(claims);
@@ -192,7 +196,8 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
   if (
     sawDenial('other.yml') &&
     sawDenial('event_name=pull_request') &&
-    sawDenial('sub=repo:kilo-e2e/')
+    sawDenial('sub_format=name-only:environment') &&
+    sawDenial('sub_format=custom')
   ) {
     break;
   }
@@ -214,7 +219,7 @@ check(
   !JSON.stringify(events.filter(event => event.type === 'ai.kilo.sts.bundle.denied')).includes(
     '424242'
   ),
-  'no denial row carries the run id'
+  'no denial row carries the run id, not even inside a customized subject'
 );
 check(
   sawDenial('job_workflow_ref=kilo-e2e/ci-fixture/.github/workflows/other.yml'),
@@ -222,8 +227,12 @@ check(
 );
 check(sawDenial('event_name=pull_request'), 'the pull_request job is audited with its event');
 check(
-  sawDenial('sub=repo:kilo-e2e/ci-fixture:environment:release'),
-  'the name-only subject is audited'
+  sawDenial('sub_format=name-only:environment') && sawDenial('sub_format=custom'),
+  'the name-only and customized subjects are audited by their format only'
+);
+check(
+  !JSON.stringify(events).includes('repo:kilo-e2e/ci-fixture'),
+  'no audit row carries a raw subject'
 );
 check(!JSON.stringify(events).includes('synthetic'), 'no audit row carries a secret value');
 console.log(

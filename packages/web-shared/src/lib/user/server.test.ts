@@ -43,6 +43,7 @@ import {
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
   getUserFromSessionForCredentialIssuanceOrRedirect,
+  getUserFromSessionForStepUp,
 } from './server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -61,6 +62,7 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import {
   signTestApiToken,
   signTestInternalServiceToken,
@@ -2107,6 +2109,200 @@ describe('binary step-up enforcement (REST)', () => {
 
     expect(evaluateStepUp).not.toHaveBeenCalled();
     expect(result.user?.id).toBe(admin.id);
+  });
+});
+
+describe('admin network allowlist (REST)', () => {
+  const originalVercel = process.env.VERCEL;
+  const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+
+  beforeEach(() => {
+    process.env.VERCEL = '1';
+    process.env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    resetAdminNetworkConfigForTest();
+  });
+
+  afterEach(() => {
+    const env: Record<string, string | undefined> = process.env;
+    for (const [key, value] of [
+      ['VERCEL', originalVercel],
+      ['ADMIN_ALLOWED_NETWORKS', originalNetworks],
+      ['ADMIN_STEP_UP_ENABLED', originalSwitch],
+    ] as const) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+    }
+    resetAdminNetworkConfigForTest();
+    mockHeaders.mockReset();
+    mockGetServerSession.mockReset();
+  });
+
+  async function sessionUser(isAdmin: boolean, clientAddress: string) {
+    const user = await insertTestUser({
+      google_user_email: `network-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: isAdmin,
+      web_session_pepper: 'network-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        'x-pathname': '/admin/api/users',
+        'x-vercel-forwarded-for': clientAddress,
+        'x-forwarded-for': '203.0.113.7',
+      })
+    );
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'network-session-pepper',
+      webSessionId: 'network-web-session',
+    });
+    return user;
+  }
+
+  async function bearerAdmin(
+    clientAddress: string | null,
+    extraHeaders: Record<string, string> = {}
+  ) {
+    const admin = await insertTestUser({
+      google_user_email: `network-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: 'network-bearer-pepper',
+    });
+    const token = signTestApiToken(admin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        'x-pathname': '/api/private/users',
+        ...(clientAddress === null ? {} : { 'x-vercel-forwarded-for': clientAddress }),
+        ...extraHeaders,
+      })
+    );
+    return admin;
+  }
+
+  it('refuses an off-network admin on Vercel with a retryable 403', async () => {
+    await sessionUser(true, '198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await (result.authFailedResponse as Response).json()).toMatchObject({
+      success: false,
+      error: expect.stringContaining('Cloudflare WARP'),
+    });
+  });
+
+  it('refuses an off-network admin session on the step-up route', async () => {
+    await sessionUser(true, '198.51.100.1');
+
+    const result = await getUserFromSessionForStepUp();
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
+  });
+
+  it('admits an admin inside the allowlist', async () => {
+    const admin = await sessionUser(true, '203.0.113.7');
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user?.id).toBe(admin.id);
+  });
+
+  it('keeps the non-admin refusal for a non-admin off the network', async () => {
+    await sessionUser(false, '198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.adminNetworkDenial).toBeUndefined();
+    expect(await (result.authFailedResponse as Response).json()).toMatchObject({
+      error: 'Access denied (nonadmin)',
+    });
+  });
+
+  it('does not check the network for a non-admin route', async () => {
+    const user = await sessionUser(false, '198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+  });
+
+  it('refuses an admin personal API key off-network', async () => {
+    await bearerAdmin('198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
+    expect((result.authFailedResponse as Response).status).toBe(403);
+  });
+
+  it('admits an admin personal API key from inside the allowlist', async () => {
+    const admin = await bearerAdmin('203.0.113.7');
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(result.user?.id).toBe(admin.id);
+  });
+
+  describe('audit events', () => {
+    let events: AdminAccessEvent[];
+
+    beforeEach(() => {
+      events = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+    });
+
+    afterEach(() => {
+      setAdminAccessSinkForTest(null);
+    });
+
+    it('emits exactly one denied privileged_access event for a refused bearer admin', async () => {
+      const admin = await bearerAdmin('198.51.100.1', { 'x-forwarded-for': '192.0.2.9' });
+
+      const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+      expect(result.adminNetworkDenial).toBe('outside-allowlist');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'privileged_access',
+        surface: 'rest',
+        credential: 'human_bearer',
+        outcome: 'denied',
+        kiloUserId: admin.id,
+        route: '/api/private/users',
+        method: 'GET',
+        wouldBlock: true,
+        ip: '198.51.100.1',
+      });
+    });
+
+    it('records a null address, not x-forwarded-for, when the trusted header is missing', async () => {
+      await bearerAdmin(null, { 'x-forwarded-for': '203.0.113.7' });
+
+      const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+      expect(result.adminNetworkDenial).toBe('no-client-address');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ outcome: 'denied', ip: null });
+    });
+
+    it('emits no admin_access event for a refused session admin', async () => {
+      await sessionUser(true, '198.51.100.1');
+
+      const result = await getUserFromAuth({ adminOnly: true });
+
+      expect(result.adminNetworkDenial).toBe('outside-allowlist');
+      expect(events).toEqual([]);
+    });
   });
 });
 

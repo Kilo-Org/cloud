@@ -8,7 +8,6 @@ import {
   CODESTRAL_FIM_MODEL_ID,
   findSupportedFimModel,
   injectSupportedFimModels,
-  MERCURY_EDIT_FIM_MODEL_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { buildModelIdToProviderSlugsIndex } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { createAllowPredicateFromProviderAllowList } from '@kilocode/web-shared/lib/model-allow.server';
@@ -27,7 +26,7 @@ function provider(slug: string): OpenRouterProvider {
 }
 
 function makeProviderModelData() {
-  return ['mistral', 'inception', 'other'].map(
+  return ['mistral', 'other'].map(
     (slug): { provider: OpenRouterProvider; models: OpenRouterModel[] } => ({
       provider: provider(slug),
       models: [],
@@ -56,9 +55,6 @@ describe('supported FIM models', () => {
     expect(snapshot.providers.find(item => item.slug === 'mistral')?.models).toEqual([
       expect.objectContaining({ slug: CODESTRAL_FIM_MODEL_ID }),
     ]);
-    expect(snapshot.providers.find(item => item.slug === 'inception')?.models).toEqual([
-      expect.objectContaining({ slug: MERCURY_EDIT_FIM_MODEL_ID }),
-    ]);
     expect(snapshot.providers.find(item => item.slug === 'other')?.models).toEqual([]);
   });
 
@@ -68,12 +64,12 @@ describe('supported FIM models', () => {
     injectSupportedFimModels(providerModelData);
     injectSupportedFimModels(providerModelData);
 
-    expect(providerModelData.flatMap(item => item.models)).toHaveLength(2);
+    expect(providerModelData.flatMap(item => item.models)).toHaveLength(1);
   });
 
   it('warns when a direct provider is missing from the upstream snapshot', () => {
     const providerModelData = makeProviderModelData().filter(
-      item => item.provider.slug !== 'inception'
+      item => item.provider.slug !== 'mistral'
     );
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
@@ -82,8 +78,8 @@ describe('supported FIM models', () => {
 
       expect(warn).toHaveBeenCalledWith(
         '[injectSupportedFimModels] Missing provider %s for supported FIM model %s',
-        'inception',
-        MERCURY_EDIT_FIM_MODEL_ID
+        'mistral',
+        CODESTRAL_FIM_MODEL_ID
       );
     } finally {
       warn.mockRestore();
@@ -118,33 +114,24 @@ describe('supported FIM models', () => {
     const index = buildModelIdToProviderSlugsIndex(makeSnapshot());
 
     expect(index.get(CODESTRAL_FIM_MODEL_ID)).toEqual(new Set(['mistral']));
-    expect(index.get(MERCURY_EDIT_FIM_MODEL_ID)).toEqual(new Set(['inception']));
     expect(index.has('codestral-2508')).toBe(false);
     expect(index.has('mistralai/codestral-2508:free')).toBe(false);
-    expect(index.has('inception/mercury-edit-latest')).toBe(false);
   });
 
   it('applies provider allow lists to each FIM model using its direct provider', async () => {
     const index = buildModelIdToProviderSlugsIndex(makeSnapshot());
     const providerLookup = async (modelId: string) => index.get(modelId) ?? new Set<string>();
     const mistralOnly = createAllowPredicateFromProviderAllowList([], ['mistral'], providerLookup);
-    const inceptionOnly = createAllowPredicateFromProviderAllowList(
-      [],
-      ['inception'],
-      providerLookup
-    );
+    const otherOnly = createAllowPredicateFromProviderAllowList([], ['other'], providerLookup);
 
     await expect(mistralOnly(CODESTRAL_FIM_MODEL_ID)).resolves.toBe(true);
-    await expect(mistralOnly(MERCURY_EDIT_FIM_MODEL_ID)).resolves.toBe(false);
-    await expect(inceptionOnly(CODESTRAL_FIM_MODEL_ID)).resolves.toBe(false);
-    await expect(inceptionOnly(MERCURY_EDIT_FIM_MODEL_ID)).resolves.toBe(true);
+    await expect(otherOnly(CODESTRAL_FIM_MODEL_ID)).resolves.toBe(false);
   });
 
   it('only resolves exact supported ids and never invents aliases', () => {
     expect(findSupportedFimModel(CODESTRAL_FIM_MODEL_ID)?.provider).toBe('mistral');
-    expect(findSupportedFimModel(MERCURY_EDIT_FIM_MODEL_ID)?.provider).toBe('inception');
     expect(findSupportedFimModel('codestral-2508')).toBeUndefined();
     expect(findSupportedFimModel('mistralai/codestral-2508:free')).toBeUndefined();
-    expect(findSupportedFimModel('inception/mercury-edit-latest')).toBeUndefined();
+    expect(findSupportedFimModel('inception/mercury-edit-2')).toBeUndefined();
   });
 });

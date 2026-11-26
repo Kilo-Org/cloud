@@ -8,7 +8,8 @@
       "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje",
       "securityUpdate": "Një kontroll sigurie ka një përditësim",
       "agentBriefing": "Raporti juaj i agjentit është gati",
-      "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim"
+      "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim",
+      "accountSecurity": "Pati aktivitet sigurie në llogarinë tënde"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Shkelje SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "U shtua një çelës hyrjeje në llogarinë tënde"
+      },
+      "passkeyRemoved": {
+        "title": "U hoq një çelës hyrjeje nga llogaria jote"
+      },
+      "signInMethodLinked": {
+        "title": "U shtua një metodë identifikimi në llogarinë tënde"
+      },
+      "signInMethodUnlinked": {
+        "title": "U hoq një metodë identifikimi nga llogaria jote"
+      },
+      "deviceSignInApproved": {
+        "title": "Identifikimi nga pajisja u miratua"
+      },
+      "apiKeyReset": {
+        "title": "Tokeni API u rivendos"
+      },
+      "browserSessionsRevoked": {
+        "title": "U çidentifikove nga të gjithë shfletuesit"
+      },
+      "deviceSessionRevoked": {
+        "title": "Një pajisje u çidentifikua nga llogaria jote"
+      },
+      "signInResetBySupport": {
+        "title": "Mbështetja e Kilo rivendosi identifikimin"
+      },
+      "newSignIn": {
+        "title": "Identifikim i ri në llogarinë tënde"
+      },
+      "body": {
+        "deviceAndLocation": "Nga {{device}} pranë {{location}}. Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
+        "device": "Nga {{device}}. Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
+        "location": "Pranë {{location}}. Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
+        "unknown": "Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
+        "selfNamedDevice": "Nga një pajisje që e quajti veten \"{{name}}\". Nuk ishe ti? Rishiko tani sigurinë e llogarisë tënde.",
+        "support": "U krye nga mbështetja e Kilo. Nëse nuk e ke kërkuar, kontakto mbështetjen."
+      }
     }
   },
   "sessionReady": {

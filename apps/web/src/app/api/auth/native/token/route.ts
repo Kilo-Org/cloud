@@ -66,6 +66,8 @@ import {
 } from '@/lib/auth/pending-link';
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { scheduleNewSignInCheck } from '@/lib/auth/new-sign-in-check';
+import { nativeSignInDevice } from '@/lib/auth/sign-in-context';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const posthogClient = PostHogClient();
@@ -159,6 +161,24 @@ async function userRateLimitResponse(request: Request, kiloUserId: string) {
     return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
   }
   return undefined;
+}
+
+/**
+ * Checks a sign-in whose credentials this response delivers for a new device
+ * on a new network. The check runs after the response and never fails it.
+ */
+function checkNativeSignIn(
+  request: Request,
+  user: User,
+  method: string,
+  admission: VerifyAdmissionOk
+) {
+  return scheduleNewSignInCheck({
+    user,
+    method,
+    device: nativeSignInDevice(admission),
+    headers: request.headers,
+  });
 }
 
 async function checkExistingProviderAccount(
@@ -436,6 +456,7 @@ async function runNativeTokenExchange(
         // the session committed — the email branch's ordering, so the link is
         // claimed by the request that owns the ticket.
         const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+        await checkNativeSignIn(request, user, 'passkey', admissionVerification);
 
         return NextResponse.json(
           {
@@ -459,6 +480,7 @@ async function runNativeTokenExchange(
       }
       sessionId = session;
       const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+      await checkNativeSignIn(request, user, 'passkey', admissionVerification);
 
       return legacyTokenResponse({
         user,
@@ -718,6 +740,7 @@ async function runNativeTokenExchange(
         posthogClient.capture(result.deferredSignInEvent);
       }
       const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
+      await checkNativeSignIn(request, result.user, 'email', admissionVerification);
 
       if (preparedCredentials) {
         return NextResponse.json(
@@ -845,6 +868,7 @@ async function runNativeTokenExchange(
     const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
 
     if (refreshCredentials) {
+      await checkNativeSignIn(request, result.user, data.provider, admissionVerification);
       return NextResponse.json(
         {
           token: refreshCredentials.token,
@@ -864,6 +888,7 @@ async function runNativeTokenExchange(
         user: result.user,
       });
       sessionId = credentials.sessionId;
+      await checkNativeSignIn(request, result.user, data.provider, admissionVerification);
       return NextResponse.json(
         {
           token: credentials.token,
@@ -880,6 +905,7 @@ async function runNativeTokenExchange(
       userId: result.user.id,
       userAgent: request.headers.get('user-agent') ?? undefined,
     });
+    await checkNativeSignIn(request, result.user, data.provider, admissionVerification);
     return legacyTokenResponse({
       user: result.user,
       deviceSessionId: sessionId,

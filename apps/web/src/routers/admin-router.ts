@@ -128,6 +128,7 @@ import {
   resetAccountToMagicLink,
   type MagicLinkRecoveryResult,
 } from '@/lib/user/account-recovery';
+import { scheduleSecurityNotice, supportSecurityNoticeRequest } from '@/lib/security-notices';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -137,6 +138,7 @@ import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-res
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { newPepperRotation } from '@kilocode/web-shared/lib/auth/pepper-rotation';
 import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   kilo_pass_issuances,
@@ -736,10 +738,24 @@ export const adminRouter = createTRPCRouter({
       .input(ResetAPIKeySchema)
       .mutation(async ({ input, ctx }) => {
         setAdminAuditTarget(userActionTarget(input.userId));
-        await db
+        const rotation = newPepperRotation();
+        const [target] = await db
           .update(kilocode_users)
-          .set({ api_token_pepper: crypto.randomUUID() })
-          .where(eq(kilocode_users.id, input.userId));
+          .set({ api_token_pepper: rotation.pepper })
+          .where(eq(kilocode_users.id, input.userId))
+          .returning({
+            id: kilocode_users.id,
+            google_user_email: kilocode_users.google_user_email,
+          });
+
+        // The owner learns that support reset the token, never from where.
+        if (target) {
+          await scheduleSecurityNotice(
+            target,
+            { type: 'api_key_reset', rotationId: rotation.rotationId },
+            supportSecurityNoticeRequest()
+          );
+        }
 
         await recordAdminAction(ctx, {
           action: 'user.api_key.reset',
@@ -755,7 +771,16 @@ export const adminRouter = createTRPCRouter({
       .input(ResetAPIKeySchema)
       .mutation(async ({ input, ctx }) => {
         setAdminAuditTarget(userActionTarget(input.userId));
-        await revokeWebSessions(input.userId);
+        // The recipient comes from the revoking update itself, so no read
+        // after the rotation can fail the action or skip the audit write.
+        const revocation = await revokeWebSessions(input.userId);
+        if (revocation) {
+          await scheduleSecurityNotice(
+            revocation.user,
+            { type: 'browser_sessions_revoked', rotationId: revocation.rotationId },
+            supportSecurityNoticeRequest()
+          );
+        }
 
         await recordAdminAction(ctx, {
           action: 'user.browser_sessions.revoke',
@@ -866,6 +891,14 @@ export const adminRouter = createTRPCRouter({
         if (!recovery) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
+
+        // One notice for the whole reset, scheduled before the audit write so
+        // an audit failure cannot drop it.
+        await scheduleSecurityNotice(
+          user,
+          { type: 'sign_in_reset_by_support', rotationId: recovery.rotationId },
+          supportSecurityNoticeRequest()
+        );
 
         await recordAdminAction(ctx, {
           action: 'user.login.reset_to_magic_link',

@@ -8,7 +8,8 @@
       "securityFinding": "En säkerhetsupptäckt kräver uppmärksamhet",
       "securityUpdate": "En säkerhetskontroll har en uppdatering",
       "agentBriefing": "Din agentrapport är klar",
-      "activeAgentsGlanceable": "Aktiva agenter har en uppdatering"
+      "activeAgentsGlanceable": "Aktiva agenter har en uppdatering",
+      "accountSecurity": "Det har förekommit säkerhetsaktivitet på ditt konto"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-brott"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Lösennyckel tillagd på ditt konto"
+      },
+      "passkeyRemoved": {
+        "title": "Lösennyckel borttagen från ditt konto"
+      },
+      "signInMethodLinked": {
+        "title": "Inloggningsmetod tillagd på ditt konto"
+      },
+      "signInMethodUnlinked": {
+        "title": "Inloggningsmetod borttagen från ditt konto"
+      },
+      "deviceSignInApproved": {
+        "title": "Inloggning från enhet godkänd"
+      },
+      "apiKeyReset": {
+        "title": "API-token återställd"
+      },
+      "browserSessionsRevoked": {
+        "title": "Utloggad från alla webbläsare"
+      },
+      "deviceSessionRevoked": {
+        "title": "Enhet utloggad från ditt konto"
+      },
+      "signInResetBySupport": {
+        "title": "Inloggning återställd av Kilos support"
+      },
+      "newSignIn": {
+        "title": "Ny inloggning på ditt konto"
+      },
+      "body": {
+        "deviceAndLocation": "Från {{device}} nära {{location}}. Var det inte du? Granska din kontosäkerhet nu.",
+        "device": "Från {{device}}. Var det inte du? Granska din kontosäkerhet nu.",
+        "location": "Nära {{location}}. Var det inte du? Granska din kontosäkerhet nu.",
+        "unknown": "Var det inte du? Granska din kontosäkerhet nu.",
+        "selfNamedDevice": "Från en enhet som kallade sig ”{{name}}”. Var det inte du? Granska din kontosäkerhet nu.",
+        "support": "Utfört av Kilos support. Om du inte bad om detta, kontakta supporten."
+      }
     }
   },
   "sessionReady": {

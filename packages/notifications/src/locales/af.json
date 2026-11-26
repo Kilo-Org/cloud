@@ -8,7 +8,8 @@
       "securityFinding": "'n Sekuriteitsbevinding benodig aandag",
       "securityUpdate": "'n Sekuriteitskontrole het 'n opdatering",
       "agentBriefing": "Jou agentverslag is gereed",
-      "activeAgentsGlanceable": "Aktiewe agente het 'n opdatering"
+      "activeAgentsGlanceable": "Aktiewe agente het 'n opdatering",
+      "accountSecurity": "Daar was sekuriteitsaktiwiteit op jou rekening"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-oortreding"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Wagwoordsleutel by jou rekening gevoeg"
+      },
+      "passkeyRemoved": {
+        "title": "Wagwoordsleutel van jou rekening verwyder"
+      },
+      "signInMethodLinked": {
+        "title": "Aanmeldmetode by jou rekening gevoeg"
+      },
+      "signInMethodUnlinked": {
+        "title": "Aanmeldmetode van jou rekening verwyder"
+      },
+      "deviceSignInApproved": {
+        "title": "Toestelaanmelding goedgekeur"
+      },
+      "apiKeyReset": {
+        "title": "API-token teruggestel"
+      },
+      "browserSessionsRevoked": {
+        "title": "Uit alle blaaiers afgemeld"
+      },
+      "deviceSessionRevoked": {
+        "title": "Toestel by jou rekening afgemeld"
+      },
+      "signInResetBySupport": {
+        "title": "Aanmelding deur Kilo-ondersteuning teruggestel"
+      },
+      "newSignIn": {
+        "title": "Nuwe aanmelding by jou rekening"
+      },
+      "body": {
+        "deviceAndLocation": "Vanaf {{device}} naby {{location}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
+        "device": "Vanaf {{device}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
+        "location": "Naby {{location}}. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
+        "unknown": "Nie jy nie? Hersien nou jou rekeningsekuriteit.",
+        "selfNamedDevice": "Vanaf 'n toestel wat homself \"{{name}}\" genoem het. Nie jy nie? Hersien nou jou rekeningsekuriteit.",
+        "support": "Gedoen deur Kilo-ondersteuning. As jy nie hierom gevra het nie, kontak ondersteuning."
+      }
     }
   },
   "sessionReady": {

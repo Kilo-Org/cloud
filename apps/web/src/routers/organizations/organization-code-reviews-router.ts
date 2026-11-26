@@ -1,4 +1,8 @@
-import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  adminProcedure,
+  baseProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -13,7 +17,10 @@ import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
-import { recordElevatedOrganizationAdminAction } from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import {
+  inputFieldTarget,
+  recordElevatedOrganizationAdminAction,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,
@@ -416,15 +423,18 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       };
     }),
 
-  triggerBitbucketCodeReview: baseProcedure
+  // Kilo admins only: the admin guard checks the role, the network and step-up;
+  // the organization check below still applies.
+  triggerBitbucketCodeReview: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.bitbucket.code_review.trigger',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
     .input(TriggerBitbucketCodeReviewInputSchema)
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user.is_admin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Admin access required',
-        });
-      }
       await ensureOrganizationAccess(ctx, input.organizationId);
 
       try {

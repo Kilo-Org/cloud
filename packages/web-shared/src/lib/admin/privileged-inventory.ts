@@ -201,6 +201,13 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
     write: 'support_write',
     target: 'organization',
   },
+  {
+    id: 'trpc.organizations.reviewAgent.triggerBitbucketCodeReview',
+    surface: 'trpc',
+    route: 'organizations.reviewAgent.triggerBitbucketCodeReview',
+    write: 'support_write',
+    target: 'organization',
+  },
   adminEntry('trpc.codeIndexing.admin', 'codeIndexing.admin.*', {
     read: 'platform_read',
     write: 'support_write',
@@ -841,7 +848,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/routers/organizations/organization-code-reviews-router.ts',
     actionClass: 'support_read',
     surface: 'trpc',
-    occurrences: 2,
+    occurrences: 1,
   },
   {
     id: 'internal.routers.organizationMembers',

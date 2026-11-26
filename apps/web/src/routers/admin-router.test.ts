@@ -16,7 +16,10 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { getAllUserProviders } from '@/lib/user';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
@@ -261,7 +264,7 @@ describe('admin action audit logging', () => {
     expect(notices.some(notice => notice.userId === admin.id)).toBe(false);
     // The outbox rows reference the user; a later suite in this worker that
     // deletes every user would hit them.
-    await db.delete(transactional_email_log).where(eq(transactional_email_log.user_id, user.id));
+    await deleteTransactionalEmailLogForUsers([user.id]);
   });
 });
 

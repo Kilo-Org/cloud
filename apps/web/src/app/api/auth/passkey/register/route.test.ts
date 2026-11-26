@@ -47,11 +47,13 @@ import {
   magic_link_tokens,
   passkey_credentials,
   passkey_management_authorizations,
-  transactional_email_log,
   type User,
 } from '@kilocode/db/schema';
-import { and, eq, inArray, sql } from 'drizzle-orm';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { and, eq, sql } from 'drizzle-orm';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { sendPasskeyEnrollmentCodeEmail } from '@kilocode/web-shared/lib/email';
 import { createPasskeyEnrollmentCode } from '@/lib/auth/passkey-enrollment-email-code';
@@ -153,13 +155,6 @@ async function insertUser(fields: Partial<User> = {}): Promise<User> {
   const created = await insertTestUser(fields);
   createdUserIds.push(created.id);
   return created;
-}
-
-async function deleteCreatedUsersNoticeRows(): Promise<void> {
-  if (createdUserIds.length === 0) return;
-  await db
-    .delete(transactional_email_log)
-    .where(inArray(transactional_email_log.user_id, createdUserIds));
 }
 
 describe('POST /api/auth/passkey/register', () => {
@@ -558,7 +553,7 @@ describe('POST /api/auth/passkey/register (native app)', () => {
   let user: User;
   let deviceSessionId: string;
 
-  afterAll(deleteCreatedUsersNoticeRows);
+  afterAll(() => deleteTransactionalEmailLogForUsers(createdUserIds));
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -822,7 +817,7 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
   const sessionPepper = 'browser-session-pepper';
   let user: User;
 
-  afterAll(deleteCreatedUsersNoticeRows);
+  afterAll(() => deleteTransactionalEmailLogForUsers(createdUserIds));
 
   function signIn(webSessionId: string, authenticatedAt = Math.floor(Date.now() / 1000)) {
     mockGetUserFromAuth.mockResolvedValue({

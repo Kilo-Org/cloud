@@ -22,13 +22,15 @@ import {
   organizations,
   passkey_credentials,
   session_step_up_proofs,
-  transactional_email_log,
   user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
@@ -106,11 +108,7 @@ async function insertNoticeRecipient(fields: Partial<User> = {}): Promise<User> 
 }
 
 afterEach(async () => {
-  if (noticeRecipientIds.length > 0) {
-    await db
-      .delete(transactional_email_log)
-      .where(inArray(transactional_email_log.user_id, noticeRecipientIds));
-  }
+  await deleteTransactionalEmailLogForUsers(noticeRecipientIds);
 });
 
 /** The security-notice pushes sent since the last clear, as (recipient, event, origin). */
@@ -2484,9 +2482,7 @@ describe('user router - device sessions', () => {
       .where(inArray(device_sessions.kilo_user_id, [owner.id, otherUser.id]));
     // Revoking a session sends the owner a notice, whose outbox row
     // references the user.
-    await db
-      .delete(transactional_email_log)
-      .where(inArray(transactional_email_log.user_id, [owner.id, otherUser.id]));
+    await deleteTransactionalEmailLogForUsers([owner.id, otherUser.id]);
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, [owner.id, otherUser.id]));
   });
 

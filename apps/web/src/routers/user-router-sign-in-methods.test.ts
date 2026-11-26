@@ -36,14 +36,13 @@ jest.mock('@kilocode/web-shared/lib/email', () => ({
 }));
 
 import { encode, type JWT } from 'next-auth/jwt';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
   device_sessions,
   magic_link_tokens,
   organization_audit_logs,
   organizations,
-  transactional_email_log,
   user_auth_provider,
   type User,
 } from '@kilocode/db/schema';
@@ -55,7 +54,10 @@ import {
   sendSignInMethodChangeCodeEmail,
   sendSignInMethodRemovedEmail,
 } from '@kilocode/web-shared/lib/email';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   createCallerForUser,
@@ -115,12 +117,7 @@ async function insertUser(fields: Partial<User> = {}) {
 // later suite in the same worker that deletes every user would hit them. The
 // rows go after each test, while the database connection is still open.
 afterEach(async () => {
-  const userIds = createdUserIds.splice(0);
-  if (userIds.length > 0) {
-    await db
-      .delete(transactional_email_log)
-      .where(inArray(transactional_email_log.user_id, userIds));
-  }
+  await deleteTransactionalEmailLogForUsers(createdUserIds.splice(0));
 });
 
 /** A user whose email domain an organization claims for SSO. */

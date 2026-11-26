@@ -17,7 +17,7 @@ jest.setTimeout(30_000);
 
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { createHash } from 'node:crypto';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { sendSignInResetBySupportEmail } from '@kilocode/web-shared/lib/email';
 import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
@@ -34,12 +34,14 @@ import {
   passkey_credentials,
   passkey_sign_in_tickets,
   session_step_up_proofs,
-  transactional_email_log,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   buildAuthenticationResponse,
   buildRegistrationResponse,
@@ -82,12 +84,9 @@ const mockSendResetEmail = jest.mocked(sendSignInResetBySupportEmail);
 // would block a later suite in the same worker that deletes every user. The
 // rows go after each test, while the database connection is still open.
 afterEach(async () => {
-  const recipientIds = mockDispatchPush.mock.calls.map(([push]) => push.recipientUserId);
-  if (recipientIds.length > 0) {
-    await db
-      .delete(transactional_email_log)
-      .where(inArray(transactional_email_log.user_id, recipientIds));
-  }
+  await deleteTransactionalEmailLogForUsers(
+    mockDispatchPush.mock.calls.map(([push]) => push.recipientUserId)
+  );
   mockDispatchPush.mockClear();
   mockSendResetEmail.mockClear();
 });

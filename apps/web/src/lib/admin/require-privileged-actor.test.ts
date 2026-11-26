@@ -5,12 +5,7 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
 
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
-import {
-  kilocode_users,
-  passkey_credentials,
-  session_step_up_proofs,
-  transactional_email_log,
-} from '@kilocode/db/schema';
+import { kilocode_users, passkey_credentials, session_step_up_proofs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   StepUpRequiredError,
@@ -21,7 +16,10 @@ import {
   hashWebSessionId,
   revokeStepUpProofs,
 } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { assertPrivilegedPermission, requirePrivilegedActor } from './require-privileged-actor';
 
@@ -162,7 +160,7 @@ describe('requirePrivilegedActor', () => {
       await db.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
       // An admin API key reset notifies the target user, whose outbox row
       // references the user.
-      await db.delete(transactional_email_log).where(eq(transactional_email_log.user_id, userId));
+      await deleteTransactionalEmailLogForUsers([userId]);
       await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
     }
   });

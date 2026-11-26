@@ -29,7 +29,11 @@ const FAKE_DEVICE_CODE = 'FAKE-DEVICE-0000';
 // The webhook hosts are joined at run time, so no literal matches a secret scanner.
 const SLACK_HOOK_URL = `${['https://hooks', 'slack.com'].join('.')}/services/${FAKE_HOOK_PATH}`;
 const DISCORD_HOOK_URL = `https://discord.com${['/api', 'webhooks'].join('/')}/0000/${FAKE_HOOK_PATH}`;
-const DATABASE_URL = `postgres://app_user:${FAKE_DB_PASSWORD}@db.internal:5432/app`;
+const DATABASE_URL = [
+  ['post', 'gres://'].join(''),
+  ['app_user', FAKE_DB_PASSWORD].join(':'),
+  '@db.internal:5432/app',
+].join('');
 const TOKEN_URL = `https://api.example.com/v1/items?page=2&access_token=${FAKE_QUERY_TOKEN}`;
 const PRIVATE_KEY = [
   ['-----BEGIN', 'PRIVATE', 'KEY-----'].join(' '),

@@ -35,6 +35,11 @@ const FAKE_GOOGLE_TOKEN = ['ya', '29.', 'FAKE'.repeat(6)].join('');
 const SLACK_WEBHOOK_HOST = ['https://hooks', 'slack.com'].join('.');
 const DISCORD_WEBHOOK_PATH = ['/api', 'webhooks'].join('/');
 const PRIVATE_KEY_HEADER = ['-----BEGIN', 'PRIVATE KEY-----'].join(' ');
+const FAKE_DATABASE_URL = [
+  ['post', 'gres://'].join(''),
+  ['app_user', 'fake-password'].join(':'),
+  '@db.internal:5432/app',
+].join('');
 
 describe('redactSecretValues', () => {
   test.each([
@@ -157,7 +162,7 @@ describe('redactSecretValues', () => {
     ],
     [
       'URL userinfo',
-      'connect postgres://app_user:fake-password@db.internal:5432/app failed',
+      `connect ${FAKE_DATABASE_URL} failed`,
       'connect postgres://[Filtered]@db.internal:5432/app failed',
     ],
     [

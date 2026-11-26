@@ -1,7 +1,6 @@
 import { withDORetry } from '@kilocode/worker-utils';
 import {
   BundleRequestSchema,
-  JWKS_CACHE_CONTROL,
   JWKS_PATH,
   STS_BUNDLE_HTTP_PATH,
   STS_FETCHED_AT_HEADER,
@@ -207,13 +206,15 @@ async function keySet(env: Env, config: StsConfig): Promise<Response> {
 
 /**
  * The service-token key set (design 5.7): the next, current and retired-in-grace keys of every
- * token signer shard. Each isolate serves it from memory for `TOKEN_JWKS_CACHE_MS`, the
- * response's max-age; a request that finds no fresh copy calls each shard itself, in parallel and
- * bounded like a mint, and stores the plain result only when every shard answered. Requests that
- * find the copy stale at the same moment each load it (no promise is shared across requests):
- * a few extra shard calls per isolate per 5 minutes, accepted. A kid listed in
- * `TOKEN_SIGNING_KIDS_REVOKED` is left out here as well as in the signer, so an emergency removal
- * never waits on the object, and a change of that list rebuilds the copy.
+ * token signer shard. Each isolate serves it from memory for `TOKEN_JWKS_CACHE_MS`; a request
+ * that finds no fresh copy calls each shard itself, in parallel and bounded like a mint, and
+ * stores the plain result only when every shard answered. Requests that find the copy stale at
+ * the same moment each load it (no promise is shared across requests): a few extra shard calls
+ * per isolate per 5 minutes, accepted. A kid listed in `TOKEN_SIGNING_KIDS_REVOKED` is left out
+ * here as well as in the signer, so an emergency removal never waits on the object, and a change
+ * of that list rebuilds the copy. The answer is `no-store`: a key-set removal is the only recall
+ * of an STS token (design Q50), so no HTTP cache may hold the set, nor serve it stale while STS
+ * answers 503; only the verifier's own 5-minute copy counts.
  */
 async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
   const cached = tokenJwksCache;
@@ -263,7 +264,7 @@ async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
     };
   }
   const keys = jwks.keys.filter(key => !config.revokedTokenKids.includes(key.kid));
-  return jsonResponse({ keys }, 200, JWKS_CACHE_CONTROL);
+  return jsonResponse({ keys }, 200, 'no-store');
 }
 
 /**

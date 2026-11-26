@@ -1,7 +1,6 @@
 import { SELF, createExecutionContext, runInDurableObject } from 'cloudflare:test';
 import {
   Ed25519PublicJwkSchema,
-  JWKS_CACHE_CONTROL,
   JWKS_PATH,
   ServiceTokenClaimsSchema,
   type MintRequest,
@@ -288,10 +287,11 @@ describe('token signer', () => {
 });
 
 describe('service-token key set route', () => {
-  it('serves the public keys with the design cache headers and no private material', async () => {
+  it('serves the public keys with no-store and no private material', async () => {
     const response = await SELF.fetch(`${config.issuer}${JWKS_PATH}`);
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe(JWKS_CACHE_CONTROL);
+    // No HTTP cache may hold the set or serve it stale; only the verifier's own 5-minute copy counts.
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('content-type')).toBe('application/json');
     const body = await response.json<{ keys: Array<Record<string, unknown>> }>();
     expect(body.keys.length).toBeGreaterThan(0);

@@ -126,7 +126,9 @@ call should the alarm be late:
 
 Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `created`, `published`,
 `activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys
-with `Cache-Control: public, max-age=300, stale-if-error=86400`. Each isolate serves it from memory
+with `Cache-Control: no-store`: removing a kid from this set is the only recall of an STS token
+(design 6.1), so no HTTP cache may hold it or serve it stale while STS answers 503; a verifier
+keeps its own copy for 5 minutes and never serves it longer. Each isolate serves it from memory
 for 5 minutes, together with the `TOKEN_SIGNING_KIDS_REVOKED` list it was built under; a request
 that finds no fresh copy, or a copy built under another list, calls the four shards itself, in
 parallel (each bounded at 5 s and retried like the manager key set), and stores the plain result
@@ -186,9 +188,10 @@ key out of service:
 5. Verify: `curl -s https://sts.kiloapps.io/.well-known/jwks.json` no longer lists the kid or its
    shard's old next kid, and a new token's header names another kid.
 
-Worst case for the removed key: a verifier keeps a removed kid until its key-set copy expires
-(max-age 300 s), and a token signed just before the removal lives up to 300 s, so the old key stops
-being accepted everywhere about 10 minutes after the deploy.
+Worst case for the removed key: a verifier keeps a removed kid until its own key-set copy expires
+(5 minutes; the response is `no-store`, so no HTTP cache adds to that), and a token signed just
+before the removal lives up to 300 s, so the old key stops being accepted everywhere about 10
+minutes after the deploy.
 
 Worst case for the fresh key: an isolate of the old version that is still serving during the
 rollout can answer with its copy of the old set for up to one isolate cache period (5 minutes);

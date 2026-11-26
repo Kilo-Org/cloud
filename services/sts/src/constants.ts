@@ -117,7 +117,7 @@ export const TOKEN_KEY_PUBLISH_AHEAD_MS = 7 * 24 * 60 * 60 * 1000;
 /** A retired key stays published this long after the last token it signed expires. */
 export const TOKEN_KEY_RETIRED_GRACE_MS = 10 * 60 * 1000;
 
-/** Each isolate serves the token key set from memory this long; the response's max-age matches. */
+/** Each isolate serves the token key set from memory this long; the response itself is no-store. */
 export const TOKEN_JWKS_CACHE_MS = 5 * 60 * 1000;
 
 /**

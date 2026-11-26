@@ -1127,6 +1127,28 @@ describe('SSO domain sync (migration 0015)', () => {
     ).toBe('23514');
   });
 
+  it('stores a punycode domain and refuses a label that starts or ends with a hyphen (migration 0016)', async () => {
+    const orgId = randomUUID();
+    const connection = `conn_${randomUUID()}`;
+    const punycode = `${randomBytes(4).toString('hex')}.xn--p1ai`;
+    expect((await syncSso(orgId, 'org_i', [connection], 1, [punycode])).outcome).toBe('applied');
+    expect(await ssoStart(punycode)).toEqual({
+      outcome: 'started',
+      workosConnectionId: connection,
+    });
+    for (const domain of [`-${newDomain()}`, `${randomBytes(4).toString('hex')}-.example.org`]) {
+      expect(
+        await sqlStateOf(() =>
+          owner.query(
+            `INSERT INTO uts.sso_domains (org_id, domain, status, verified_at)
+             VALUES ($1, $2, 'verified', now())`,
+            [randomUUID(), domain]
+          )
+        )
+      ).toBe('23514');
+    }
+  });
+
   it('answers retry_later and writes nothing when another organization takes a domain during the sync', async () => {
     const domain = newDomain();
     const [taker, syncing] = [randomUUID(), randomUUID()];

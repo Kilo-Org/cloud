@@ -295,13 +295,17 @@ export const MembershipSyncRequestSchema = z.strictObject({
 });
 
 /**
- * A domain an organization verified, as WorkOS lists it: lower-case labels of at most 63
- * characters, at most 253 characters in all. The app lower-cases each domain before it sends it.
+ * A domain an organization verified, as WorkOS lists it: lower-case labels of 1-63 letters, digits
+ * and hyphens that neither start nor end with a hyphen, at most 253 characters in all, and a last
+ * label of 2-63 letters or a punycode label (`xn--…`). The app lower-cases each domain before it
+ * sends it. One domain this refuses refuses the organization's whole sync (`400`).
  */
 export const SsoDomainSchema = z
   .string()
   .max(253)
-  .regex(/^(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/);
+  .regex(
+    /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{0,58}[a-z0-9])$/
+  );
 
 /**
  * An organization's SSO setup: the WorkOS organization whose `externalId` is this app
@@ -352,7 +356,7 @@ export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
 ]);
 
 /** Seconds an SSO sync waits for another organization to release a connection or a domain. */
-export const UTS_CONNECTION_CONFLICT_RETRY_SECONDS = 30;
+export const UTS_SSO_CONFLICT_RETRY_SECONDS = 30;
 export type AuthorityAnswer = z.infer<typeof AuthorityAnswerSchema>;
 
 /**

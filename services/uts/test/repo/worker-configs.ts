@@ -150,7 +150,10 @@ const BindingsShape = {
     .array(z.looseObject({ outbound: ServiceReferenceSchema.optional() }))
     .optional(),
   observability: z
-    .looseObject({ traces: z.looseObject({ enabled: z.boolean().optional() }).optional() })
+    .looseObject({
+      traces: z.looseObject({ enabled: z.boolean().optional() }).optional(),
+      redact_query_string: z.boolean().optional(),
+    })
     .optional(),
 };
 
@@ -607,7 +610,8 @@ function joseCompatibilityProblems({ path, config }: WorkerConfig): string[] {
  * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
  * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
  * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
- * its objects in the `eu` jurisdiction, and places its fetch handler next to the identity store;
+ * its objects in the `eu` jurisdiction, places its fetch handler next to the identity store, and
+ * keeps query strings (a provider callback's authorization code) out of its logs;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
  * without placement, binds no Durable Object, binds each mint entrypoint once, and turns its HTTPS
@@ -659,6 +663,14 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       if (block.placementRegion !== MINT_PLACEMENT_REGION) {
         problems.push(
           `${block.where}: placement.region resolves to ${String(block.placementRegion)}; expected ${MINT_PLACEMENT_REGION}`
+        );
+      }
+      // A provider callback's query carries its authorization code; no log may keep it.
+      const redacted = (block.block?.observability ?? mint.config.observability)
+        ?.redact_query_string;
+      if (redacted !== true) {
+        problems.push(
+          `${block.where}: observability.redact_query_string resolves to ${String(redacted)}; it must be true`
         );
       }
     }

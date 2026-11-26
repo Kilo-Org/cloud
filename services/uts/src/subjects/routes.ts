@@ -14,8 +14,8 @@ import {
   UTS_APP_EVENTS_SCOPE,
   UTS_AUTHORITY_PATH_PREFIX,
   UTS_AUTHORITY_SCOPE,
-  UTS_CONNECTION_CONFLICT_RETRY_SECONDS,
   UTS_INTERNAL_WORKLOADS,
+  UTS_SSO_CONFLICT_RETRY_SECONDS,
   UTS_SUBJECT_OPERATIONS,
   UTS_SUBJECT_OPERATIONS_PATH_PREFIX,
 } from '@kilocode/uts-contracts';
@@ -147,7 +147,7 @@ function authorityResponse(result: AuthorityResult): Response {
       return jsonResponse(result, 200);
     case 'retry_later':
       return jsonResponse(result, 409, {
-        'Retry-After': String(UTS_CONNECTION_CONFLICT_RETRY_SECONDS),
+        'Retry-After': String(UTS_SSO_CONFLICT_RETRY_SECONDS),
       });
     case 'refused':
       return jsonResponse(result, 409);

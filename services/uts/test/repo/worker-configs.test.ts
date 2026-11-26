@@ -311,12 +311,50 @@ describe('the UTS configs themselves', () => {
 
   it('fail traces enabled in any block', () => {
     const problems = utsConfigProblems(
-      mintWith(raw => ({ ...raw, observability: { enabled: true, traces: { enabled: true } } }))
+      mintWith(raw => ({
+        ...raw,
+        observability: { enabled: true, traces: { enabled: true }, redact_query_string: true },
+      }))
     );
     expect(problems.length).toBeGreaterThanOrEqual(2);
     expect(problems.every(problem => problem.includes('traces.enabled resolves to true'))).toBe(
       true
     );
+  });
+
+  it('fail a mint block whose logs keep query strings, where a callback carries its code', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({
+        ...raw,
+        observability: { enabled: true, traces: { enabled: false } },
+      }))
+    );
+    expect(problems).toEqual([
+      `${MINT_CONFIG} (top level): observability.redact_query_string resolves to undefined; it must be true`,
+      `${MINT_CONFIG} (env.staging): observability.redact_query_string resolves to undefined; it must be true`,
+    ]);
+    const staging = utsConfigProblems(
+      mintWith(raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        return {
+          ...raw,
+          env: {
+            ...env,
+            staging: {
+              ...env.staging,
+              observability: {
+                enabled: true,
+                traces: { enabled: false },
+                redact_query_string: false,
+              },
+            },
+          },
+        };
+      })
+    );
+    expect(staging).toEqual([
+      `${MINT_CONFIG} (env.staging): observability.redact_query_string resolves to false; it must be true`,
+    ]);
   });
 
   it('fail a deployed mint block without the eu jurisdiction or the Frankfurt placement', () => {

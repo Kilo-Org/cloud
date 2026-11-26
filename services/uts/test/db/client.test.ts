@@ -169,6 +169,22 @@ describe('identity-store client', () => {
     }
   });
 
+  it('reports a deadlock (40P01) as retryable, as an SSO sync that loses one answers 503', async () => {
+    // The SQLSTATE the server sends for the aborted side of a deadlock, raised in one statement.
+    const failure = await failureOf(() =>
+      run('uts_app_a', store =>
+        store.rows(
+          {
+            text: `DO $$ BEGIN RAISE EXCEPTION 'deadlock detected' USING ERRCODE = '40P01'; END $$`,
+            values: [],
+          },
+          z.unknown()
+        )
+      )
+    );
+    expect(failure).toMatchObject({ failure: 'retryable', sqlState: '40P01' });
+  });
+
   it('reports an unreachable database as retryable, with the system error code', async () => {
     const unreachable = new URL(db.url('uts_app_a'));
     unreachable.port = '55449';

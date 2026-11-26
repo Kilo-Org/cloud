@@ -50,7 +50,7 @@ const entry: FeedEntry = {
 type Stub = {
   operation?: OperationRow | Error;
   publish?: 'published' | 'unpublished';
-  sso?: SyncRow;
+  sso?: SyncRow | Error;
 };
 
 function deps(stub: Stub = {}): InternalDeps & {
@@ -75,6 +75,7 @@ function deps(stub: Stub = {}): InternalDeps & {
     },
     async syncSsoOrganization(input) {
       ssoSyncs.push(input);
+      if (stub.sso instanceof Error) throw stub.sso;
       return stub.sso ?? { outcome: 'already_applied', feedEntries: [] };
     },
     async readAppEvents(limit) {
@@ -351,11 +352,25 @@ describe('import, authority sync and app events', () => {
     expect(ssoDeps.ssoSyncs.map(input => input.verifiedDomains)).toEqual([
       ['example.com', 'eu.example.org'],
     ]);
+    // The aborted side of a deadlock between two organizations' syncs asks for a retry.
+    const deadlock = new IdentityStoreError('retryable', {
+      sqlState: '40P01',
+      constraint: undefined,
+      table: undefined,
+      systemCode: undefined,
+    });
+    expect(
+      await call(
+        post('/internal/authority/sso-organization', ssoBody, sync),
+        deps({ sso: deadlock })
+      )
+    ).toMatchObject({ status: 503, retryAfter: '2' });
     for (const invalid of [
       Object.fromEntries(Object.entries(ssoBody).filter(([key]) => key !== 'verified_domains')),
       { ...ssoBody, verified_domains: ['Example.com'] },
       { ...ssoBody, verified_domains: ['example.com', 'example.com'] },
       { ...ssoBody, verified_domains: ['localhost'] },
+      { ...ssoBody, verified_domains: ['-a.example.com'] },
     ]) {
       const refusedDeps = deps();
       expect(

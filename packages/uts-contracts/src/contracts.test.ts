@@ -29,6 +29,7 @@ import {
   AccountImportRequestSchema,
   AppUserCreatedEventSchema,
   reasonAllowed,
+  SsoDomainSchema,
   SsoOrganizationSyncRequestSchema,
   SubjectOperationRequestSchema,
   UTS_CREATED_ACCOUNT_ID,
@@ -680,6 +681,35 @@ describe('subject operation contracts', () => {
       expect(
         SsoOrganizationSyncRequestSchema.safeParse({ ...sync, verified_domains }).success
       ).toBe(false);
+    }
+  });
+
+  it('accept punycode domains and refuse a label that starts or ends with a hyphen', () => {
+    for (const domain of [
+      'example.xn--p1ai',
+      'xn--80ak6aa92e.com',
+      'a-b.example.com',
+      'a.bc',
+      `${'a'.repeat(63)}.example.com`,
+      `example.xn--${'a'.repeat(59)}`,
+      '0.example.org',
+    ]) {
+      expect(SsoDomainSchema.safeParse(domain).success, domain).toBe(true);
+    }
+    for (const domain of [
+      '-a.example.com',
+      'a-.example.com',
+      'example.-com',
+      'example.com-',
+      'example.xn--',
+      'example.xn--p1ai-',
+      `example.xn--${'a'.repeat(60)}`,
+      'example.c0m',
+      'example.b',
+      'a..example.com',
+      '.example.com',
+    ]) {
+      expect(SsoDomainSchema.safeParse(domain).success, domain).toBe(false);
     }
   });
 

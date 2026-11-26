@@ -590,7 +590,12 @@ refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`
 nonce to every OpenID Connect provider. Each spec's `idTokenNonce` says whether the ID token must
 carry it: `required` refuses a token without it; `if_present` (LinkedIn only, whose ID token has
 no `nonce`) accepts a token without it, and both refuse a token with another nonce. Without PKCE
-or a nonce, the state and the flow's binder cookie still stop a forged callback.
+or a nonce, the state and the flow's binder cookie still stop a forged callback. They do not stop
+a stolen LinkedIn code injected into the thief's own flow: LinkedIn accepts a code for 30 minutes
+(its authorization code lifetime), so that is the replay window of a code that leaks. The mint
+Worker's logs keep no query string (`observability.redact_query_string`, held by the repo check),
+so a callback's code never reaches the invocation logs, and the callback page sends
+`Referrer-Policy: same-origin`.
 
 | Provider | Protocol | PKCE | ID-token `nonce` | Client authentication | Scopes | Proof of the address |
 |---|---|---|---|---|---|---|
@@ -796,7 +801,7 @@ and the security view before and after `/revoke`.
 
 ## Subject operations and identity import
 
-Design 5.2 and 5.6, migrations 0014 and 0015. The web app keeps owning some account authority
+Design 5.2 and 5.6, migrations 0014 to 0016. The web app keeps owning some account authority
 until its cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
 enqueues each write in the same transaction as the app's own write, and its outbox sends it to UTS.
 Each call is one statement with its audit row (actor: the calling workload; the app's own actor
@@ -880,7 +885,9 @@ the WorkOS organization whose `externalId` is the app organization, its connecti
 verified domains (`verified_domains`: lower case, each once, at most 100), ordered by the
 organization's own version. The domain set replaces the organization's: a domain left out is
 deleted, so `POST /signin/sso/start` answers that SSO is not set up for it; the audit row counts the
-domains and names none (migration 0015). A connection active in another organization never moves
+domains and names none (migration 0015). Domains follow `SsoDomainSchema` in the contract and in
+the table check (migration 0016), and the sync inserts connections and domains in sorted order, so
+two organizations' syncs never deadlock. A connection active in another organization never moves
 (`409 retry_later connection_conflict`), nor does a domain verified by another organization
 (`409 retry_later domain_conflict`); both carry `Retry-After: 30`, write nothing, and apply also
 when another organization's sync takes the connection or domain during this one. A sync older than

@@ -13,11 +13,15 @@
   // feed Worker calls for signer keys, runs where the feed Worker runs.
   "placement": { "region": "aws:eu-central-1" },
   // Traces stay off: a trace records Durable Object storage calls and outbound requests, and the
-  // signer objects hold private keys. Every env block inherits this.
+  // signer objects hold private keys. Query strings stay out of the request URLs in logs and
+  // traces: a provider callback carries its authorization code there, and a LinkedIn code (no PKCE,
+  // no ID-token nonce) read from a log could be replayed while it lives. Every env block inherits
+  // this.
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "invocation_logs": true },
     "traces": { "enabled": false },
+    "redact_query_string": true,
   },
   "logpush": true,
   "routes": [

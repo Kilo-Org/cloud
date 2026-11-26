@@ -213,10 +213,12 @@ describe('openDualWrittenCredential', () => {
   it('throws when the KMS service refuses the decrypt, and does not fall back to the static-key copy', async () => {
     const { legacy, envelope } = sealDualWrittenCredential('sk-secret', dataKey);
     kms.fail('/decrypt');
+    // A binding no earlier test decrypted, so no cached data key answers in place of KMS.
+    const uncachedContext = { ...context, key_id: crypto.randomUUID() };
 
-    await expect(openDualWrittenCredential(legacy, envelope, contextFor)).rejects.toThrow(
-      '/decrypt'
-    );
+    await expect(
+      openDualWrittenCredential(legacy, envelope, () => uncachedContext)
+    ).rejects.toThrow('/decrypt');
   });
 
   it('reads a static-key copy that does not decrypt as null', async () => {

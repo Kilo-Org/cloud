@@ -401,7 +401,6 @@ export async function saveOpenAiChatGptConnection(
       set: {
         kilo_user_id: values.kilo_user_id,
         created_by: values.created_by,
-        encrypted_connection: columns.encrypted_connection,
         encrypted_connection_envelope: columns.encrypted_connection_envelope,
         is_enabled: true,
         ...NO_USAGE_LIMIT,

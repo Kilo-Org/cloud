@@ -1,4 +1,8 @@
-import { type OAuthErrorCode, audienceOfScope } from '@kilocode/uts-contracts';
+import {
+  type OAuthErrorCode,
+  UTS_MAX_TOKENS_PER_CALL,
+  audienceOfScope,
+} from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
@@ -18,8 +22,12 @@ import { CodeChallengeSchema } from './pkce';
  * authorization hand-off, which the sign-in and consent screens implement.
  */
 
-/** A canonical scope set holds at most 64 scopes (`uts.is_scope_set`). */
-const MAX_AUTHORIZED_SCOPES = 64;
+/**
+ * An authorization holds at most 8 scopes, the most one token call mints, so a token request that
+ * names no scope (every granted scope, RFC 6749 section 6) always fits one call. At most 8 scopes
+ * also means at most 8 audiences, the most a code stores.
+ */
+const MAX_AUTHORIZED_SCOPES = UTS_MAX_TOKENS_PER_CALL;
 /** `state` round-trips unchanged; a longer value is refused rather than cut. */
 const MAX_STATE_LENGTH = 1024;
 
@@ -166,7 +174,9 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   const scopeParam = params.one('scope');
   const requested =
     scopeParam.status === 'present' ? parseScopes(scopeParam.value, MAX_AUTHORIZED_SCOPES) : null;
-  if (requested === null) return fail('invalid_scope', 'scope must name UTS scopes once each');
+  if (requested === null) {
+    return fail('invalid_scope', 'scope must name at most 8 UTS scopes once each');
+  }
   const scopes = [...requested].sort();
 
   const resources = params.all('resource');

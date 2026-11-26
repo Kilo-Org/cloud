@@ -589,6 +589,19 @@ describe('authorization endpoint', () => {
     ['another response type', { response_type: 'token' }, 'unsupported_response_type'],
     ['a plain PKCE method', { code_challenge_method: 'plain' }, 'invalid_request'],
     ['no scope', { scope: '' }, 'invalid_scope'],
+    [
+      'nine scopes, so nine audiences',
+      { scope: Array.from({ length: 9 }, (_, index) => `service${index}:read`).join(' ') },
+      'invalid_scope',
+    ],
+    [
+      'nine resources',
+      {
+        scope: 'gateway:models.read',
+        resource: Array.from({ length: 9 }, (_, index) => `urn:kilo:service:service${index}`),
+      },
+      'invalid_target',
+    ],
     ['a resource no scope belongs to', { resource: 'urn:kilo:service:mcp' }, 'invalid_target'],
     ['no DPoP key for a first-party client', { dpop_jkt: '' }, 'invalid_request'],
     ['a repeated state', { state: ['a', 'b'] }, 'invalid_request'],

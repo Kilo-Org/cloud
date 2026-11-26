@@ -5,6 +5,7 @@ import {
   feedListHash,
   FeedReaderBootstrapSchema,
   FeedReaderHeadSchema,
+  FeedReaderJwksSchema,
   UtsBootstrapWireSchema,
   type FeedReaderBinding,
   type FeedReadsBinding,
@@ -14,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readConfig, type Env } from '../../src/env';
 import { handleRequest } from '../../src/http';
 import { resetIsolate } from '../../src/jwks';
+import { readerJwks } from '../../src/reader';
 import {
   FEED_FAILED_OBJECT_MS,
   FEED_HEAD_MAX_SERVED_AGE_MS,
@@ -356,6 +358,7 @@ describe('FeedReader entrypoint', () => {
   it('refuses a binding without a caller', async () => {
     expect(await readers.PROPLESS_READER.head()).toEqual({ status: 'refused' });
     expect(await readers.PROPLESS_READER.bootstrap()).toEqual({ status: 'refused' });
+    expect(await readers.PROPLESS_READER.jwks()).toEqual({ status: 'refused' });
   });
 
   it('answers a named caller, and unavailable with the 5-second wait when the feed cannot be read', async () => {
@@ -366,5 +369,58 @@ describe('FeedReader entrypoint', () => {
     expect(FeedReaderBootstrapSchema.parse(await readers.READER.bootstrap())).toMatchObject({
       status: 'unavailable',
     });
+    // The pool's feed Worker holds no signer keys, so its key set answers unavailable.
+    expect(FeedReaderJwksSchema.parse(await readers.READER.jwks())).toEqual({
+      status: 'unavailable',
+      retryAfterSeconds: 10,
+    });
+  });
+
+  it('answers jwks() with the held key set and its ages, and reads no feed object', async () => {
+    const now = Date.now();
+    const x = 'D'.repeat(43);
+    const keys = [
+      { kty: 'OKP', crv: 'Ed25519', x, kid: `uts-token-00-${x}`, alg: 'EdDSA', use: 'sig' },
+    ];
+    const answer = {
+      status: 'answered',
+      answer: {
+        signers: Array.from({ length: 16 }, (_, signer) =>
+          signer === 0
+            ? { signer, status: 'ok', keys, readAt: now - 120_000 }
+            : { signer, status: 'unavailable' }
+        ),
+      },
+    };
+    const objects = feedReads([], []);
+    const env: Env = {
+      UTS_ENVIRONMENT: 'development',
+      UTS_MINT: { signerKeys: async () => answer },
+      UTS_FEED_READS: objects.binding,
+      CF_VERSION_METADATA: VERSION,
+    };
+    const ctx = createExecutionContext();
+    const read = FeedReaderJwksSchema.parse(await readerJwks(env, ctx));
+    await waitOnExecutionContext(ctx);
+    expect(read).toEqual({ status: 'ok', jwks: { keys }, keyAges: { newest: 120, oldest: 120 } });
+    expect(objects.calls).toEqual([]);
+  });
+
+  it('answers jwks() unavailable, not a feed-keys-only set, when no signer key is held', async () => {
+    const answer = {
+      status: 'answered',
+      answer: {
+        signers: Array.from({ length: 16 }, (_, signer) => ({ signer, status: 'unavailable' })),
+      },
+    };
+    const env: Env = {
+      UTS_ENVIRONMENT: 'development',
+      UTS_MINT: { signerKeys: async () => answer },
+      UTS_FEED_READS: feedReads([], []).binding,
+      CF_VERSION_METADATA: VERSION,
+    };
+    const ctx = createExecutionContext();
+    expect(await readerJwks(env, ctx)).toEqual({ status: 'unavailable', retryAfterSeconds: 10 });
+    await waitOnExecutionContext(ctx);
   });
 });

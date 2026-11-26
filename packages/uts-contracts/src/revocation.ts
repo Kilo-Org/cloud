@@ -156,16 +156,38 @@ export const FeedReaderBootstrapSchema = z.discriminatedUnion('status', [
   Unavailable,
   Refused,
 ]);
+/** The key set with its two ages, from the feed Worker's held set; no feed object is read. */
+export const FeedReaderJwksSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('ok'),
+    jwks: z.record(z.string(), z.unknown()),
+    keyAges: KeySetAgesSchema,
+  }),
+  Unavailable,
+  Refused,
+]);
 export type FeedReaderHead = z.infer<typeof FeedReaderHeadSchema>;
 export type FeedReaderList = z.infer<typeof FeedReaderListSchema>;
 export type FeedReaderBootstrap = z.infer<typeof FeedReaderBootstrapSchema>;
+export type FeedReaderJwks = z.infer<typeof FeedReaderJwksSchema>;
 
 /** The `FeedReader` entrypoint as a verifier's binding exposes it; results are validated. */
 export type FeedReaderBinding = {
   head(): Promise<unknown>;
   list(listHash: string): Promise<unknown>;
   bootstrap(): Promise<unknown>;
+  jwks(): Promise<unknown>;
 };
+
+/**
+ * `@kilocode/verify`'s `JwksSource` for a UTS set, declared here with the same shape: the key-set
+ * body, `age` (the set's `Age`, `keyAges.newest`) and `oldestAge` (`Kilo-Key-Set-Oldest-Age`,
+ * `keyAges.oldest`), whole seconds. The library allows null ages only for an STS set; this source
+ * never answers them. Any rejection is a failed fetch.
+ */
+export type JwksSourcePort = (
+  signal: AbortSignal
+) => Promise<{ body: unknown; age: number; oldestAge: number }>;
 
 /**
  * `@kilocode/verify`'s `RevocationFeedSource`, declared here with the same shape so UTS can
@@ -236,8 +258,13 @@ function copyBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
   return new Uint8Array(bytes);
 }
 
-/** The feed and bootstrap ports over a `FeedReader` service binding, for Worker verifiers. */
-export function feedReaderSources(binding: FeedReaderBinding): UtsFeedSources {
+/**
+ * The feed, bootstrap and key-set ports over a `FeedReader` service binding, for Worker
+ * verifiers.
+ */
+export function feedReaderSources(
+  binding: FeedReaderBinding
+): UtsFeedSources & { jwks: JwksSourcePort } {
   return {
     feed: {
       async head(signal) {
@@ -260,6 +287,11 @@ export function feedReaderSources(binding: FeedReaderBinding): UtsFeedSources {
         head: read.head,
         list: copyBytes(read.list),
       };
+    },
+    async jwks(signal) {
+      const read = await rpcCall(() => binding.jwks(), FeedReaderJwksSchema, signal);
+      if (read.status !== 'ok') throw new Error(`key set ${read.status}`);
+      return { body: read.jwks, age: read.keyAges.newest, oldestAge: read.keyAges.oldest };
     },
   };
 }

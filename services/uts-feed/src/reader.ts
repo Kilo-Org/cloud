@@ -2,13 +2,36 @@ import type {
   FeedReaderBinding,
   FeedReaderBootstrap,
   FeedReaderHead,
+  FeedReaderJwks,
   FeedReaderList,
 } from '@kilocode/uts-contracts';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
 import { serveBootstrap } from './bootstrap';
 import { readConfig, type Env } from './env';
+import { KEY_SET_READ_GUARD_MS, serveKeySet } from './jwks';
 import { FEED_RETRY_AFTER_SECONDS, serveHead, serveList } from './revocation';
+
+/**
+ * The key set this isolate holds (reading the mint Worker's `SignerKeys` as the key-set route
+ * does) with its two ages, for `FeedReader.jwks()`. No feed object or list is read. With no
+ * signer key held the answer is `unavailable`, never a set that verifies no token. A deploy error
+ * also answers `unavailable` here; the HTTPS key-set route reports it as 500.
+ */
+export async function readerJwks(env: Env, ctx: ExecutionContext): Promise<FeedReaderJwks> {
+  const read = await serveKeySet(env.UTS_MINT, readConfig(env).environment, ctx);
+  if (read.status !== 'ok') {
+    return { status: 'unavailable', retryAfterSeconds: KEY_SET_READ_GUARD_MS / 1000 };
+  }
+  return {
+    status: 'ok',
+    jwks: z.record(z.string(), z.unknown()).parse(JSON.parse(read.body)),
+    keyAges: {
+      newest: Math.floor(read.ageMs / 1000),
+      oldest: Math.floor(read.oldestAgeMs / 1000),
+    },
+  };
+}
 
 /**
  * A caller names itself with its deployed Worker name, as STS names a workload. `test/repo`
@@ -33,6 +56,11 @@ export class FeedReader extends WorkerEntrypoint<Env> implements FeedReaderBindi
       console.warn(JSON.stringify({ event: 'uts_feed.reader.refused', method }));
     }
     return props.success;
+  }
+
+  async jwks(): Promise<FeedReaderJwks> {
+    if (!this.#admitted('jwks')) return { status: 'refused' };
+    return await readerJwks(this.env, this.ctx);
   }
 
   async head(): Promise<FeedReaderHead> {

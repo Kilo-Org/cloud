@@ -296,6 +296,11 @@ describe('revocation feed shapes', () => {
           },
           'boot'
         ),
+      jwks: async () =>
+        withDisposer(
+          { status: 'ok', jwks: { keys: [] }, keyAges: { newest: 2, oldest: 60 } },
+          'jwks'
+        ),
     };
     const sources = feedReaderSources(binding);
     const signal = new AbortController().signal;
@@ -308,7 +313,8 @@ describe('revocation feed shapes', () => {
       head: 'a.b.c',
       list: bytes,
     });
-    expect(disposed).toEqual(['head', 'list', 'list', 'boot']);
+    expect(await sources.jwks(signal)).toEqual({ body: { keys: [] }, age: 2, oldestAge: 60 });
+    expect(disposed).toEqual(['head', 'list', 'list', 'boot', 'jwks']);
 
     const refusing: FeedReaderBinding = {
       head: async () => ({ status: 'refused' }),
@@ -321,11 +327,26 @@ describe('revocation feed shapes', () => {
         head: 'a.b.c',
         list: new Uint8Array(),
       }),
+      jwks: async () => ({ status: 'unavailable', retryAfterSeconds: 10 }),
     };
     const refused = feedReaderSources(refusing);
     await expect(refused.feed.head(signal)).rejects.toThrow('refused');
     await expect(refused.feed.list('known', signal)).rejects.toThrow('unavailable');
     await expect(refused.bootstrap(signal)).rejects.toThrow();
+    await expect(refused.jwks(signal)).rejects.toThrow('unavailable');
+    await expect(
+      feedReaderSources({ ...refusing, jwks: async () => ({ status: 'refused' }) }).jwks(signal)
+    ).rejects.toThrow('refused');
+    // An ok arm without its ages, or with the newest older than the oldest, is refused.
+    for (const bad of [
+      { status: 'ok', jwks: { keys: [] } },
+      { status: 'ok', jwks: { keys: [] }, keyAges: { newest: 61, oldest: 60 } },
+      { status: 'ok', jwks: [], keyAges: { newest: 0, oldest: 0 } },
+    ]) {
+      await expect(
+        feedReaderSources({ ...refusing, jwks: async () => bad }).jwks(signal)
+      ).rejects.toThrow();
+    }
   });
 
   it('rejects a binding call once its signal aborts', async () => {
@@ -333,6 +354,7 @@ describe('revocation feed shapes', () => {
       head: () => new Promise(() => undefined),
       list: () => new Promise(() => undefined),
       bootstrap: () => new Promise(() => undefined),
+      jwks: () => new Promise(() => undefined),
     };
     const controller = new AbortController();
     const pending = feedReaderSources(hanging).feed.head(controller.signal);

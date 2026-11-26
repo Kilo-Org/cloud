@@ -794,8 +794,9 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
    here, 75 s, and its `maxDuration` is 90 s.
 4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
    `succeeded` only when every check passed, with `mint_result`, `web_status`, and
-   `<check>_result`/`_status`/`_detail` for `outbound`, `negative_wrong_audience`,
-   `negative_forged` and `negative_expired`. A failure carries `exception_name`:
+   `<check>_result`/`_status` for `outbound`, `negative_wrong_audience`, `negative_forged` and
+   `negative_expired`. The report's `detail` text is never copied: it comes from another service,
+   and the web route's own line carries it. A failure carries `exception_name`:
    `ServiceTokenError` (STS refused or failed the mint; `mint_detail` names the reason),
    `StsCanaryWebRefused` (the web route answered other than 200), `StsCanaryReportInvalid`,
    `StsCanaryCheckFailed` or `StsCanaryNotConfigured`. No token appears in any log line.
@@ -821,17 +822,26 @@ and consume invocation to Axiom.
 The Axiom signal is the web route's line instead. Every run the route answers logs one JSON line
 (`event` `sts_canary`, `step` `report`, `outcome` `succeeded` or `failed`, `run`, `caller`,
 `inbound`, `outbound` and `negatives` with each check's `result`, `status` and `detail`; never a
-token), and one with `step` `inbound` when it refuses the caller. The Vercel log drain carries
-them to the Axiom dataset `vercel` (`vercel.projectName` `kilocode-app`, `request.path`
-`/api/internal/sts-canary`, `request.host` `app.kilo.ai` or `staging-app.kilo.ai`; the line is
-in `message`). Page with two Axiom threshold monitors per environment, notifying the existing
-alert route:
+token). The route writes it only after it verified the caller's `web:sts.canary` token, so other
+traffic never produces it. A request the route refuses logs `event` `sts_canary_refused` (`run`,
+`status`, `error`, `reason`) instead, for diagnosis only: anyone can call the route, so no monitor
+reads it. The Vercel log drain carries both to the Axiom dataset `vercel` (`vercel.projectName`
+`kilocode-app`, `request.path` `/api/internal/sts-canary`, `request.host` `app.kilo.ai` or
+`staging-app.kilo.ai`; the line is in `message`). Page with two Axiom threshold monitors per
+environment on `sts_canary` lines, notifying the existing alert route:
 
 - no line with `outcome` `succeeded` in 15 minutes;
-- any line with `outcome` `failed`, or with `step` `inbound`, in 15 minutes.
+- any line with `outcome` `failed` in 15 minutes.
 
 A run whose call never reaches the web route (usage-ingest down, usage-ingest's own mint denied
-or failed, a network failure, a redirect) writes no web line, so it shows as a missing success.
+or failed, a network failure, a redirect) writes no web line, and a run the route refuses writes
+only `sts_canary_refused`; both show as a missing success.
+
+The expired-token check runs only when a run reaches a web instance that still holds a token
+from at least two runs earlier (past `exp` plus 60 s); a run on a fresh instance reports it
+`skipped` and still succeeds. A third monitor per environment tracks that the check still runs,
+and alerts the same route without paging: no `sts_canary` line whose `negatives.expired.result`
+is `ok` in 24 hours.
 
 ### Cost
 

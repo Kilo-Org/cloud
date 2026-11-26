@@ -97,6 +97,8 @@ async function call(run: (request: Request) => Promise<Response>, token: string 
 
 describe('STS canary route handler', () => {
   it('refuses a caller without a valid web:sts.canary token before doing anything else', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     const { fetchFn, presented } = usageIngest();
     const tokens = fakeTokens(async () => 'unused');
     const run = handler(tokens, fetchFn);
@@ -110,6 +112,16 @@ describe('STS canary route handler', () => {
     expect(wrongScope.status).toBe(403);
     expect(tokens.get).not.toHaveBeenCalled();
     expect(presented).toEqual([]);
+
+    // A refusal is not a canary run: its line never carries the `sts_canary` event the monitors
+    // page on.
+    const lines = [...warn.mock.calls, ...info.mock.calls].map(
+      ([line]) => JSON.parse(String(line)) as Record<string, unknown>
+    );
+    expect(lines.map(line => line.event)).toEqual(['sts_canary_refused', 'sts_canary_refused']);
+    expect(lines.map(line => line.status)).toEqual([401, 403]);
+    warn.mockRestore();
+    info.mockRestore();
   });
 
   it('verifies the caller, gets 204 for its own token and the refusals usage-ingest must answer', async () => {

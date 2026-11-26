@@ -908,6 +908,18 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       expect(logged).not.toContain('stored-refresh-token');
     });
 
+    it('fails without calling OpenAI when the KMS service issues a data key that cannot encrypt', async () => {
+      storedRow = encryptedRow(buildConnection());
+      // Non-empty, so the KMS client accepts it, but not a 32-byte AES key.
+      kms.issueDataKey(Buffer.alloc(8, 1).toString('base64'));
+      const logged = await resolveFailedAndCaptureLogs();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+      expect(markUpdateSetCalls).toHaveLength(0);
+      expect(logged).toContain('kms_unavailable');
+    });
+
     it('fails without calling OpenAI when the data key is first needed inside the lock and the KMS service refuses it', async () => {
       storedRow = encryptedRow(buildConnection());
       // The replica has not shown the row yet, so no data key was created before the lock.

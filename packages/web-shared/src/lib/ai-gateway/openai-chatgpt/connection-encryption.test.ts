@@ -7,12 +7,16 @@ import {
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { sealedOpenAiChatGptConnectionColumns } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
-import { legacyCiphertextDigest } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import {
+  CredentialKmsError,
+  legacyCiphertextDigest,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import {
   createOpenAiChatGptSealingKey,
   openAiChatGptKmsOwnerFor,
   openAiChatGptKmsOwnerOfRow,
   openOpenAiChatGptConnection,
+  openOpenAiChatGptConnectionForComparison,
   sealOpenAiChatGptConnection,
   type OpenAiChatGptConnectionOwnerColumns,
   type OpenAiChatGptKmsOwner,
@@ -287,4 +291,91 @@ describe('openOpenAiChatGptConnection', () => {
       },
     };
   }
+});
+
+describe('organization id spelling', () => {
+  const UPPERCASE_ORG_ID = 'ABCDEF00-0000-4000-8000-0000000000AB';
+
+  it('binds an organization written in uppercase to the lowercase form PostgreSQL returns', async () => {
+    const written = openAiChatGptKmsOwnerFor({
+      kind: 'member',
+      kiloUserId: USER_ID,
+      organizationId: UPPERCASE_ORG_ID,
+    });
+    const sharedWritten = openAiChatGptKmsOwnerFor({
+      kind: 'shared_services',
+      organizationId: UPPERCASE_ORG_ID,
+    });
+
+    expect(written).toEqual(
+      openAiChatGptKmsOwnerOfRow({ ...memberRow, organization_id: UPPERCASE_ORG_ID.toLowerCase() })
+    );
+    expect(sharedWritten).toEqual(
+      openAiChatGptKmsOwnerOfRow({ ...sharedRow, organization_id: UPPERCASE_ORG_ID.toLowerCase() })
+    );
+  });
+
+  it('decrypts a connection sealed for an uppercase organization id with the same context', async () => {
+    const sealingKey = await createOpenAiChatGptSealingKey(
+      openAiChatGptKmsOwnerFor({
+        kind: 'member',
+        kiloUserId: USER_ID,
+        organizationId: UPPERCASE_ORG_ID,
+      }),
+      USER_ID
+    );
+    const row = {
+      ...memberRow,
+      organization_id: UPPERCASE_ORG_ID.toLowerCase(),
+      ...sealOpenAiChatGptConnection(connection(), sealingKey),
+    };
+
+    await expect(openOpenAiChatGptConnection(row)).resolves.toEqual(connection());
+
+    const [dataKeyRequest, decryptRequest] = kms.requests;
+    const { actor_user_id: _actor, ...dataKeyContext } = dataKeyRequest.body;
+    expect(decryptRequest.body).toMatchObject(dataKeyContext);
+  });
+});
+
+describe('openOpenAiChatGptConnectionForComparison', () => {
+  it('reads the static-key copy when the KMS service refuses the current envelope', async () => {
+    const row = storedColumns(personalRow);
+    kms.refuseDecryptFor(row.encrypted_connection_envelope.key_id);
+
+    await expect(openOpenAiChatGptConnection(row)).rejects.toBeInstanceOf(CredentialKmsError);
+    await expect(openOpenAiChatGptConnectionForComparison(row)).resolves.toEqual(connection());
+  });
+
+  it('prefers the envelope while the KMS service answers', async () => {
+    const row = storedColumns(personalRow);
+
+    await expect(openOpenAiChatGptConnectionForComparison(row)).resolves.toEqual(connection());
+    expect(kms.requests.map(request => request.path)).toEqual(['/decrypt']);
+  });
+});
+
+describe('sealOpenAiChatGptConnection without a data key', () => {
+  it('writes only the static-key copy and clears the envelope', async () => {
+    const columns = sealOpenAiChatGptConnection(connection(), null);
+
+    expect(columns.encrypted_connection_envelope).toBeNull();
+    await expect(openOpenAiChatGptConnection({ ...personalRow, ...columns })).resolves.toEqual(
+      connection()
+    );
+    expect(kms.requests).toEqual([]);
+  });
+});
+
+describe('createOpenAiChatGptSealingKey with an unusable data key', () => {
+  it('throws before returning, so nothing is consumed that could not be stored', async () => {
+    kms.issueDataKey(Buffer.alloc(8, 1).toString('base64'));
+
+    await expect(
+      createOpenAiChatGptSealingKey(
+        openAiChatGptKmsOwnerFor({ kind: 'member', kiloUserId: USER_ID, organizationId: null }),
+        USER_ID
+      )
+    ).rejects.toThrow();
+  });
 });

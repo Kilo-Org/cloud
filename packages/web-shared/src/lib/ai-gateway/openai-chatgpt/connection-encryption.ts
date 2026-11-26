@@ -2,7 +2,10 @@ import 'server-only';
 
 import type { EncryptedData, OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
 import {
+  assertSealable,
+  CredentialKmsError,
   openDualWrittenCredential,
+  openStaticKeyCopy,
   sealDualWrittenCredential,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import {
@@ -10,6 +13,8 @@ import {
   type ByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 
 /** The prefix of the `provider_id` ChatGPT connection data keys are bound to; see `openAiChatGptKmsOwnerFor`. */
@@ -36,10 +41,12 @@ export function openAiChatGptKmsOwnerFor(
     | { kind: 'shared_services'; organizationId: string }
     | { kind: 'member'; kiloUserId: string; organizationId: string | null }
 ): OpenAiChatGptKmsOwner {
+  // Organization ids are UUIDs that callers may spell in either case, while PostgreSQL
+  // returns them lowercase; the binding uses the form a later read derives from the row.
   if (scope.kind === 'shared_services') {
     return {
       owner_type: 'organization',
-      owner_id: scope.organizationId,
+      owner_id: scope.organizationId.toLowerCase(),
       provider_id: `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:shared-services`,
     };
   }
@@ -49,7 +56,7 @@ export function openAiChatGptKmsOwnerFor(
     provider_id:
       scope.organizationId === null
         ? `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:personal`
-        : `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:organization:${scope.organizationId}`,
+        : `${OPENAI_CHATGPT_KMS_PROVIDER_ID}:organization:${scope.organizationId.toLowerCase()}`,
   };
 }
 
@@ -106,6 +113,9 @@ export async function createOpenAiChatGptSealingKey(
     context: openAiChatGptKmsContext(owner, keyId),
     actorUserId,
   });
+  // A refresh sends the rotating refresh token only after this returns, so a key that
+  // cannot seal must fail here rather than after OpenAI has spent the old token.
+  assertSealable(dataKey);
   return { keyId, dataKey };
 }
 
@@ -116,7 +126,32 @@ export function sealOpenAiChatGptConnection(
 ): {
   encrypted_connection: EncryptedData;
   encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope;
+};
+/**
+ * Without a data key only the static-key copy is written and the envelope is cleared, so
+ * readers use that copy until the backfill adds an envelope. Only for a payload without
+ * usable tokens, such as a refusal recorded while the KMS service is unavailable.
+ */
+export function sealOpenAiChatGptConnection(
+  connection: OpenAiChatGptConnection,
+  sealingKey: OpenAiChatGptSealingKey | null
+): {
+  encrypted_connection: EncryptedData;
+  encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope | null;
+};
+export function sealOpenAiChatGptConnection(
+  connection: OpenAiChatGptConnection,
+  sealingKey: OpenAiChatGptSealingKey | null
+): {
+  encrypted_connection: EncryptedData;
+  encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope | null;
 } {
+  if (sealingKey === null) {
+    return {
+      encrypted_connection: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
+      encrypted_connection_envelope: null,
+    };
+  }
   const sealed = sealDualWrittenCredential(JSON.stringify(connection), sealingKey.dataKey);
   return {
     encrypted_connection: sealed.legacy,
@@ -140,6 +175,10 @@ export async function openOpenAiChatGptConnection(
     row.encrypted_connection_envelope,
     envelope => openAiChatGptKmsContext(owner, envelope.key_id)
   );
+  return parseOpenAiChatGptConnection(plaintext);
+}
+
+function parseOpenAiChatGptConnection(plaintext: string | null): OpenAiChatGptConnection | null {
   if (plaintext === null) return null;
   let parsedJson: unknown;
   try {
@@ -148,4 +187,24 @@ export async function openOpenAiChatGptConnection(
     return null;
   }
   return OpenAiChatGptConnectionSchema.safeParse(parsedJson).data ?? null;
+}
+
+/**
+ * The stored payload for deciding whether a report still belongs to the row, such as a
+ * refusal or a usage limit naming the access token that produced it. While the KMS service
+ * cannot open the envelope, the static-key copy written with it answers instead: the
+ * decision only compares the token a caller already holds and never serves it, and a
+ * refused account must still be disabled during a KMS outage.
+ */
+export async function openOpenAiChatGptConnectionForComparison(
+  row: OpenAiChatGptEncryptedConnectionColumns
+): Promise<OpenAiChatGptConnection | null> {
+  try {
+    return await openOpenAiChatGptConnection(row);
+  } catch (error) {
+    if (!(error instanceof CredentialKmsError)) throw error;
+    return openAiChatGptKmsOwnerOfRow(row)
+      ? parseOpenAiChatGptConnection(openStaticKeyCopy(row.encrypted_connection))
+      : null;
+  }
 }

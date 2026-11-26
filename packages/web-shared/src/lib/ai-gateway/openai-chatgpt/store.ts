@@ -9,6 +9,7 @@ import {
   OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR,
   openAiChatGptKmsOwnerFor,
   openOpenAiChatGptConnection,
+  openOpenAiChatGptConnectionForComparison,
   sealOpenAiChatGptConnection,
   type OpenAiChatGptEncryptedConnectionColumns,
   type OpenAiChatGptKmsOwner,
@@ -484,7 +485,9 @@ async function withConnectionHoldingToken(
     if (!row) return;
     // Decrypting may wait on the KMS service while the lock is held; the data key cache
     // usually answers, since the request that produced this report read the same row.
-    const connection = await decryptOpenAiChatGptConnection(row);
+    // The payload is only compared with the token the caller holds, so a KMS outage falls
+    // back to the static-key copy written with the envelope.
+    const connection = await openOpenAiChatGptConnectionForComparison(row);
     if (!connection || connection.access_token !== accessToken) return;
     await write(tx, connection);
   });
@@ -579,14 +582,16 @@ export async function clearOpenAiChatGptUsageLimit(
  * through. The refresh path calls this inside the transaction that holds the
  * `SELECT ... FOR UPDATE` row lock, so a reconnect that lands between the
  * rejected token exchange and this write cannot be erased by a stale failure.
- * `sealingKey` is created before that lock is taken.
+ * `sealingKey` is created before that lock is taken. Null only when the KMS service could
+ * not create one: the errored payload carries no tokens, so it is then stored as a
+ * static-key copy alone, and the backfill adds its envelope later.
  */
 export async function markOpenAiChatGptConnectionErrored(
   fromDb: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
   connection: OpenAiChatGptConnection,
   message: string,
-  sealingKey: OpenAiChatGptSealingKey
+  sealingKey: OpenAiChatGptSealingKey | null
 ): Promise<void> {
   const { refresh_token: _refreshToken, ...withoutTokens } = connection;
   const errored: OpenAiChatGptConnection = {
@@ -619,16 +624,9 @@ export async function markOpenAiChatGptNotEligible(
     owner,
     OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR
   ).catch(() => null);
-  await withConnectionHoldingToken(owner, refusedAccessToken, async (tx, connection) => {
-    if (sealingKey) {
-      await markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey);
-      return;
-    }
-    // Without a data key the payload cannot be rewritten, but the refused account must still
-    // stop serving requests. The payload is left as it is, so its envelope stays current.
-    await tx
-      .update(openai_chatgpt_connections)
-      .set({ is_enabled: false })
-      .where(openAiChatGptOwnerWhere(owner));
-  });
+  // A KMS outage must not keep a refused account serving requests: the refusal is then
+  // recorded without an envelope, which the errored payload's cleared tokens allow.
+  await withConnectionHoldingToken(owner, refusedAccessToken, (tx, connection) =>
+    markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey)
+  );
 }

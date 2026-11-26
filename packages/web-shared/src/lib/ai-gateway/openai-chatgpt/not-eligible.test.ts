@@ -189,20 +189,44 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
       return row;
     }
 
-    it('still disables the refused connection and leaves both payload columns unchanged', async () => {
+    it('still records the refusal, as a static-key copy without tokens and without an envelope', async () => {
       await saveOpenAiChatGptConnection(owner, connection('kms-down'), owner.kiloUserId as string);
-      const before = await readPayloadColumns();
       kms.fail('/data-key');
 
       await expect(
         markOpenAiChatGptNotEligible(owner, 'kms-down', 'not eligible')
       ).resolves.toBeUndefined();
 
-      await expect(readPayloadColumns()).resolves.toEqual(before);
+      const after = await readPayloadColumns();
+      expect(after.envelope).toBeNull();
+      expect(JSON.stringify(after.legacy)).not.toContain('kms-down');
+      // Readers use the static-key copy, so the card shows the refusal.
       const stored = await getOpenAiChatGptStoredConnection(owner);
       expect(stored?.isEnabled).toBe(false);
-      // The payload still holds the credential; only the row flag stops it serving requests.
-      expect(stored?.connection).toMatchObject({ status: 'connected', access_token: 'kms-down' });
+      expect(stored?.connection).toMatchObject({
+        status: 'error',
+        error_message: 'not eligible',
+        access_token: '',
+      });
+      expect(stored?.connection.refresh_token).toBeUndefined();
+    });
+
+    it('records the refusal even when the KMS service cannot open the stored envelope either', async () => {
+      await saveOpenAiChatGptConnection(
+        owner,
+        connection('kms-fully-down'),
+        owner.kiloUserId as string
+      );
+      kms.fail('/data-key');
+      kms.fail('/decrypt');
+
+      await markOpenAiChatGptNotEligible(owner, 'kms-fully-down', 'not eligible');
+
+      const after = await readPayloadColumns();
+      expect(after.envelope).toBeNull();
+      const stored = await getOpenAiChatGptStoredConnection(owner);
+      expect(stored?.isEnabled).toBe(false);
+      expect(stored?.connection).toMatchObject({ status: 'error', access_token: '' });
     });
 
     it('leaves a connection made after the refused request untouched', async () => {

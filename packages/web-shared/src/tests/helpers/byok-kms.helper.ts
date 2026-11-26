@@ -25,6 +25,10 @@ export type FakeByokKms = {
   requests: FakeByokKmsRequest[];
   /** Answers every request to `path` with `status` for the rest of the test. */
   fail: (path: FakeByokKmsPath, status?: number) => void;
+  /** Refuses every `/decrypt` for this `key_id` with 403, as KMS does for a revoked binding. */
+  refuseDecryptFor: (keyId: string) => void;
+  /** Issues `dataKey` from `/data-key` instead of the test key, for example a malformed one. */
+  issueDataKey: (dataKey: string) => void;
 };
 
 export type FakeByokKmsRequest = { path: string; body: Record<string, unknown> };
@@ -79,6 +83,8 @@ export function useFakeByokKmsForSuite(): FakeByokKms {
 function createFakeByokKms() {
   const requests: FakeByokKmsRequest[] = [];
   const failures = new Map<string, number>();
+  const refusedKeyIds = new Set<string>();
+  let issuedDataKey = TEST_BYOK_DATA_KEY;
   const originalFetch = global.fetch;
   const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
   const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
@@ -86,6 +92,8 @@ function createFakeByokKms() {
   function reset() {
     requests.length = 0;
     failures.clear();
+    refusedKeyIds.clear();
+    issuedDataKey = TEST_BYOK_DATA_KEY;
   }
 
   function install() {
@@ -95,12 +103,16 @@ function createFakeByokKms() {
     global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       if (!isFakeByokKmsRequest(input)) return originalFetch(input, init);
       const url = requestUrl(input);
-      requests.push({ path: url.pathname, body: requestBodyObject(init?.body) });
+      const body = requestBodyObject(init?.body);
+      requests.push({ path: url.pathname, body });
       const failure = failures.get(url.pathname);
       if (failure !== undefined) return new Response('{}', { status: failure });
+      if (url.pathname === '/decrypt' && refusedKeyIds.has(String(body.key_id))) {
+        return new Response('{}', { status: 403 });
+      }
       if (url.pathname === '/data-key') {
         return Response.json({
-          data_key: TEST_BYOK_DATA_KEY,
+          data_key: issuedDataKey,
           wrapped_dek: 'wrapped',
           kms_key_id: 'alias/test',
           kms_key_version: '1',
@@ -123,6 +135,12 @@ function createFakeByokKms() {
     requests,
     fail: (path, status = 403) => {
       failures.set(path, status);
+    },
+    refuseDecryptFor: keyId => {
+      refusedKeyIds.add(keyId);
+    },
+    issueDataKey: dataKey => {
+      issuedDataKey = dataKey;
     },
   };
   return { kms, install, uninstall, reset };

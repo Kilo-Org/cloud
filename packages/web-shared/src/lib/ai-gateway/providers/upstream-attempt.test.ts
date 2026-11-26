@@ -507,8 +507,8 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     expect(result.type === 'success' && result.response.status).toBe(403);
     const stored = await getOpenAiChatGptStoredConnection(owner);
     expect(stored?.isEnabled).toBe(false);
-    // The payload is left as it was; the row flag alone stops the connection serving requests.
-    expect(stored?.connection.status).toBe('connected');
+    // The refusal is recorded without an envelope, so the card explains it.
+    expect(stored?.connection).toMatchObject({ status: 'error', access_token: '' });
   });
 
   it('keeps the connection on another 403', async () => {

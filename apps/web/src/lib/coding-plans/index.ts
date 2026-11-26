@@ -3,7 +3,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { addDays } from 'date-fns';
-import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, notInArray, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
 import type {
@@ -18,6 +18,7 @@ import {
   type ByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import {
   CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
   createCodingPlanInventoryDataKey,
@@ -117,39 +118,80 @@ type ClaimedInventoryCredential = {
 /** An available inventory credential decrypted before the claiming transaction. */
 type PreparedInventoryCredential = { row: ClaimedInventoryCredential; plaintext: string };
 
+type PreparedInventoryClaim = {
+  candidate: PreparedInventoryCredential | null;
+  /** Rows whose credential did not open; the claim skips them so healthy stock is used. */
+  unreadableIds: string[];
+};
+
+/** Rows tried before the claiming transaction when a credential does not open. */
+const MAX_PREPARED_INVENTORY_CANDIDATES = 3;
+/**
+ * A refusal for one row's binding answers quickly, so trying the next row is cheap. A KMS
+ * outage is slow to fail; once this much time has passed no further row is tried, and the
+ * claim's own decrypt reports the outage.
+ */
+const PREPARED_INVENTORY_BUDGET_MS = 2_000;
+
 /**
  * Decrypts one available credential of the plan before the claiming transaction, so the
  * KMS round trip does not run while the transaction holds the user, subscription and
  * inventory row locks. The claim prefers this row; when a concurrent claim took it, or it
- * changed, the claimed row is decrypted under the lock instead. A KMS failure here is not
- * final: the claim retries the decrypt under the lock, which decides.
+ * changed, the claimed row is decrypted under the lock instead. A row whose credential
+ * does not open is skipped, within a bound, and never read from its static-key copy.
  */
 async function prepareAvailableInventoryCredential(
   planId: string,
   providerId: string
-): Promise<PreparedInventoryCredential | null> {
-  const [row] = await db
-    .select({
-      id: coding_plan_key_inventory.id,
-      encrypted_api_key: coding_plan_key_inventory.encrypted_api_key,
-      encrypted_api_key_envelope: coding_plan_key_inventory.encrypted_api_key_envelope,
-    })
-    .from(coding_plan_key_inventory)
-    .where(
-      and(
-        eq(coding_plan_key_inventory.plan_id, planId),
-        eq(coding_plan_key_inventory.provider_id, providerId),
-        eq(coding_plan_key_inventory.status, 'available')
+): Promise<PreparedInventoryClaim> {
+  const unreadableIds: string[] = [];
+  const startedAt = Date.now();
+  for (
+    let attempt = 0;
+    attempt < MAX_PREPARED_INVENTORY_CANDIDATES &&
+    Date.now() - startedAt < PREPARED_INVENTORY_BUDGET_MS;
+    attempt++
+  ) {
+    const [row] = await db
+      .select({
+        id: coding_plan_key_inventory.id,
+        encrypted_api_key: coding_plan_key_inventory.encrypted_api_key,
+        encrypted_api_key_envelope: coding_plan_key_inventory.encrypted_api_key_envelope,
+      })
+      .from(coding_plan_key_inventory)
+      .where(
+        and(
+          eq(coding_plan_key_inventory.plan_id, planId),
+          eq(coding_plan_key_inventory.provider_id, providerId),
+          eq(coding_plan_key_inventory.status, 'available'),
+          unreadableIds.length > 0
+            ? notInArray(coding_plan_key_inventory.id, unreadableIds)
+            : undefined
+        )
       )
-    )
-    .limit(1);
-  if (!row) return null;
-  try {
-    const plaintext = await openCodingPlanInventoryCredential(row);
-    return plaintext === null ? null : { row, plaintext };
-  } catch {
-    return null;
+      .limit(1);
+    if (!row) break;
+    let plaintext: string | null;
+    try {
+      plaintext = await openCodingPlanInventoryCredential(row);
+    } catch (error) {
+      if (!(error instanceof CredentialKmsError)) throw error;
+      plaintext = null;
+    }
+    if (plaintext !== null) return { candidate: { row, plaintext }, unreadableIds };
+    unreadableIds.push(row.id);
   }
+  return { candidate: null, unreadableIds };
+}
+
+/** Raw SQL that keeps a claim off the rows `prepareAvailableInventoryCredential` skipped. */
+function excludeUnreadableInventory(unreadableIds: string[]) {
+  return unreadableIds.length > 0
+    ? sql`AND id NOT IN (${sql.join(
+        unreadableIds.map(id => sql`${id}::uuid`),
+        sql`, `
+      )})`
+    : sql``;
 }
 
 /**
@@ -158,15 +200,16 @@ async function prepareAvailableInventoryCredential(
  */
 async function openClaimedInventoryCredential(
   claimed: ClaimedInventoryCredential,
-  prepared: PreparedInventoryCredential | null
+  prepared: PreparedInventoryClaim
 ): Promise<string | null> {
+  const candidate = prepared.candidate;
   if (
-    prepared &&
-    claimed.id === prepared.row.id &&
-    isDeepStrictEqual(claimed.encrypted_api_key, prepared.row.encrypted_api_key) &&
-    isDeepStrictEqual(claimed.encrypted_api_key_envelope, prepared.row.encrypted_api_key_envelope)
+    candidate &&
+    claimed.id === candidate.row.id &&
+    isDeepStrictEqual(claimed.encrypted_api_key, candidate.row.encrypted_api_key) &&
+    isDeepStrictEqual(claimed.encrypted_api_key_envelope, candidate.row.encrypted_api_key_envelope)
   ) {
-    return prepared.plaintext;
+    return candidate.plaintext;
   }
   return await openCodingPlanInventoryCredential(claimed);
 }
@@ -404,7 +447,8 @@ export async function subscribeToCodingPlan(
         SELECT id FROM coding_plan_key_inventory
         WHERE plan_id = ${plan.planId}
           AND status = 'available'
-        ORDER BY (id = ${prepared?.row.id ?? null}::uuid) IS TRUE DESC
+          ${excludeUnreadableInventory(prepared.unreadableIds)}
+        ORDER BY (id = ${prepared.candidate?.row.id ?? null}::uuid) IS TRUE DESC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
@@ -600,9 +644,9 @@ export async function reassignSubscriptionCredential(
     .from(coding_plan_subscriptions)
     .where(eq(coding_plan_subscriptions.id, subscriptionId))
     .limit(1);
-  const prepared = preview
+  const prepared: PreparedInventoryClaim = preview
     ? await prepareAvailableInventoryCredential(preview.planId, preview.providerId)
-    : null;
+    : { candidate: null, unreadableIds: [] };
   let byokDataKey: ByokDataKey | null = null;
   if (preview?.installedByokKeyId) {
     try {
@@ -689,7 +733,8 @@ export async function reassignSubscriptionCredential(
           WHERE plan_id = ${subscription.planId}
             AND provider_id = ${subscription.providerId}
             AND status = 'available'
-          ORDER BY (id = ${prepared?.row.id ?? null}::uuid) IS TRUE DESC
+            ${excludeUnreadableInventory(prepared.unreadableIds)}
+          ORDER BY (id = ${prepared.candidate?.row.id ?? null}::uuid) IS TRUE DESC
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )

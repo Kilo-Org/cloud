@@ -1,4 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { eq } from 'drizzle-orm';
 
 import {
@@ -214,7 +215,7 @@ describe('openCodingPlanInventoryCredential', () => {
         id: crypto.randomUUID(),
         ...dualWrittenInventoryColumns('legacy-value', 'envelope-value'),
       })
-    ).rejects.toThrow('BYOK KMS /decrypt failed with status 403');
+    ).rejects.toBeInstanceOf(CredentialKmsError);
   });
 
   it("decrypts an envelope copied from another row with the reading row's context", async () => {
@@ -294,6 +295,39 @@ describe('claiming an inventory credential', () => {
     expect(await installedByokPlaintext(user.id)).toBe(
       await openCodingPlanInventoryCredential(claimed)
     );
+  });
+
+  it('subscribe skips a row whose envelope KMS refuses and installs healthy stock', async () => {
+    const user = await insertSubscribableUser();
+    const refused = await insertInventoryRow({
+      ...dualWrittenInventoryColumns('refused-legacy', 'refused-envelope'),
+    });
+    await insertInventoryRow({ ...dualWrittenInventoryColumns('healthy-secret') });
+    kms.refuseDecryptFor(refused.id);
+
+    await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'refused-row-subscribe');
+
+    // The refused row's static-key copy is never used in its place.
+    expect(await installedByokPlaintext(user.id)).toBe('healthy-secret');
+    expect((await selectInventory(refused.id)).status).toBe('available');
+  });
+
+  it('reassign skips a row whose envelope KMS refuses and installs healthy stock', async () => {
+    const { user, subscription } = await insertAssignedSubscription(
+      dualWrittenInventoryColumns('previous-secret')
+    );
+    const refused = await insertInventoryRow({
+      ...dualWrittenInventoryColumns('refused-legacy', 'refused-envelope'),
+    });
+    const healthy = await insertInventoryRow({ ...dualWrittenInventoryColumns('healthy-secret') });
+    kms.refuseDecryptFor(refused.id);
+
+    await expect(reassignSubscriptionCredential(subscription.id, ADMIN_USER_ID)).resolves.toEqual({
+      inventoryKeyId: healthy.id,
+    });
+
+    expect(await installedByokPlaintext(user.id)).toBe('healthy-secret');
+    expect((await selectInventory(refused.id)).status).toBe('available');
   });
 
   it('subscribe does not claim a row whose credential was cleared', async () => {

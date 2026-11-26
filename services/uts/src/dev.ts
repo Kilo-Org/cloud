@@ -1,6 +1,7 @@
 import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import { getSignerStub } from './dos/stubs';
+import { handleDevNoticeRequest } from './dev-notices';
 import type { SignResult } from './dos/UtsSignerDO';
 import { readConfig, type Env } from './env';
 import { handleRequest } from './http';
@@ -21,6 +22,8 @@ import type { SignerAccess } from './token/mint';
  *   account, `DEV_ACCOUNT_ID`, signed in by passkey now. `dev_decision=deny` on the authorization
  *   request denies it, and a third-party request names its consent in `dev_consent_id`. The
  *   account and any consent must exist in the local identity store.
+ * * The notice routes under `/__dev/notices/` and the security view with a development caller
+ *   check (`src/dev-notices.ts`).
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 
@@ -60,7 +63,10 @@ export async function handleDevRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   if (config.environment !== 'development') return await handleRequest(request, env, ctx);
-  if (new URL(request.url).pathname !== DEV_SIGN_PATH) {
+  const pathname = new URL(request.url).pathname;
+  const notices = await handleDevNoticeRequest(request, pathname, env, ctx);
+  if (notices !== null) return notices;
+  if (pathname !== DEV_SIGN_PATH) {
     // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant
     // statement, as a signer object that does not answer would, for the retry check of the local
     // end-to-end run.

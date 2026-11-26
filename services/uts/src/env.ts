@@ -38,6 +38,12 @@ export type Env = {
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.
    */
   IDENTITY_STORE?: Hyperdrive;
+  /**
+   * The identity store's read-replica Hyperdrive config (login `uts_reader`, views in `uts_read`),
+   * bound once the environment's identity store is provisioned; it serves read-only account views
+   * such as the security view (design 5.2).
+   */
+  IDENTITY_STORE_REPLICA?: Hyperdrive;
 };
 
 /** The mint Worker's deployed name in each environment. */

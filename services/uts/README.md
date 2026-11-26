@@ -189,6 +189,82 @@ grant. The audit row of a mint lists the `jti` of each token the call is about t
 failed signing no token carries those ids, and the retry's row (`token.issued`, `rotation`
 `code_retry`) lists the ids of the tokens it signs.
 
+## Security notices
+
+Design 5.13 and 8.4; migration `0010_notices.sql`, code in `src/notices/`.
+
+**Sign-in recording.** Every new session records a sign-in in the statement that creates it, by an
+`AFTER INSERT` trigger: on `uts.refresh_grants` for a device sign-in (the device is the grant's
+DPoP key, the network comes from its device session) and on `uts.browser_sessions` for a browser
+(the device is `device_key_hash`, which the web BFF sets from the browser's per-install key; NULL
+counts as a new device every time). The trigger upserts `uts.known_devices` and
+`uts.known_networks` and writes `uts.sign_ins`, which keeps the newest 50 sign-ins per account. A
+network is `as<number>` when the autonomous system is known, else the /24 (IPv4) or /48 (IPv6)
+prefix; a row unseen for 90 days counts as new again. The `new_device_network` notice fires only
+when both the device and the network are new: a new address in a known autonomous system, or a
+known device on a new network, fires nothing. The account's first sign-in sets the baseline and
+fires nothing, and a sign-in without network data fires nothing. "New" is decided by the upsert
+itself, so two concurrent sign-ins from one new device and network fire one notice.
+
+**Notices.** A `uts.notices` row is the in-app notice, which the security page always shows. Its
+producer writes it in the statement of the change (the PAT and bot key statements, the sign-in
+trigger, later the method, email, device, CI policy, consent and revoke statements); `details`
+holds the fields the text reads (`deviceLabel`, `platform`, `country`, `city`, `credential`,
+`method`, `change`, `clientName`, `actor`, `flaggedKeys`), never a link or an email address. An
+email change puts the replaced address in `old_email`, which is cleared when the notice finishes.
+
+| Kind | Channels, in order |
+|---|---|
+| `new_device_network`, `sign_in_method_changed`, `primary_email_changed`, `credential_created`, `device_sign_in_approved`, `ci_trust_policy_changed`, `third_party_client_approved`, `sessions_revoked`, `suspicious_sign_in`, `bot_key_flagged` | push, then email |
+| `sign_in_code_stopped` | push (sign-in emails are what the stop is about) |
+
+Email always follows push: a device that receives push may be one a thief signed in, while the
+address on file is the user's. An email change also goes to the previous address, in its own
+message. No channel carries a link: the text names the event, the time, the approximate network
+and the device, and points to the security page; `plainText` refuses anything a mail client or
+a phone could open as a link, and `producerValue` turns a producer's value into plain words.
+Email is plain text with Mailgun tracking off.
+
+**Delivery.** One delivery round is three steps, each its own statement or call, and the
+identity-store connection is not held while a provider answers:
+
+1. Claim (`uts.claim_notice`, `uts.claim_credential_notice`, `uts.claim_due_notices`): `pending`
+   to `sending` with a new claim id; rows another statement holds are skipped, so one round runs
+   once. A claim older than 5 minutes (its Worker stopped) can be claimed again.
+2. Send push, then email, skipping the channels an earlier round settled. Each answers `sent`,
+   `no_target`, `not_configured`, `retryable_failure` or `permanent_failure`; a provider that throws
+   or does not answer within 10 seconds is a retryable failure.
+3. Finish (`uts.finish_notice`) with the round's attempts, one `uts.notice_attempts` row each. The
+   notice is `pending` again (1 minute after round 1, 5 after round 2) while a planned channel only
+   failed retryably, else `delivered` when a channel sent it, else `failed`. A finish under a claim
+   that is no longer current changes nothing (`stale_claim`).
+
+A notice is tried in at most 3 rounds and for 24 hours; the in-app row stays whatever happens. The
+account API's `CredentialNotices` port (`src/notices/credential.ts`) claims the
+`credential_created` notice that the create statement wrote and delivers it at once;
+`sweepNotices` (at most 20 notices per pass) delivers every other due notice and the retries.
+
+| Channel | Provider | Adapter |
+|---|---|---|
+| Push | Expo push through the `notifications` Worker, which holds the users' Expo push tokens and the Expo access token; RPC `dispatchSecurityNotice` with no presence, preference or rate-limit suppression | `notificationsServicePush` |
+| Email | Mailgun messages API, plain text, tracking off, one message per address | `mailgunEmail` |
+
+Locally both channels use `fakeTransports` (`src/notices/fake-transports.ts`), which send nothing.
+
+**Security view.** `GET /account/security` (scope `uts:security.read`, contract
+`SecurityViewSchema`) is one statement on the read replica as `uts_reader`: it checks the caller's
+grant and its device session and, only for a live session, lists the newest 50 sign-ins, the live
+sessions, the passkeys, sign-in methods, live PATs, third-party consents and CI trust policies, and
+the newest 50 notices with their attempts and their text. The `uts_read` views leave out client
+addresses, device keys and `old_email`. The route needs the account API's bearer check, so the
+deployed entry serves it once that check is wired; the development entry serves it with a caller
+check from the `Kilo-Dev-Account` and `Kilo-Dev-Grant` headers.
+
+`scripts/notices-e2e.ts` runs the whole path against `wrangler dev --env local`: real code
+exchanges (baseline, new device on a new network, a second new device, the first one again),
+every notice kind through the development routes, a retried email through the background pass,
+and the security view before and after `/revoke`.
+
 ## Tests
 
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,

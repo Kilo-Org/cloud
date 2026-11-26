@@ -43,13 +43,14 @@ import { checkRateLimit } from '@vercel/firewall';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  auth_audit_logs,
   device_sessions,
   magic_link_tokens,
   passkey_credentials,
   passkey_management_authorizations,
   type User,
 } from '@kilocode/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import {
   deleteTransactionalEmailLogForUsers,
   insertTestUser,
@@ -1134,5 +1135,47 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     expect(await passkeyCount()).toBe(1);
     // One notice for the one enrollment; the refused second passkey sends none.
     expect(noticePushes()).toEqual([[user.id, 'passkey_added']]);
+  });
+
+  it('records each code send, failed send and wrong code, and the lockout once, as auth rows', async () => {
+    mockSendCodeEmail.mockResolvedValueOnce({ sent: false, reason: 'provider_not_configured' });
+    expect((await POST(createRequest({ action: 'send_code' }))).status).toBe(502);
+    const emailCode = await sendCode();
+    const wrong = { ...emailCode, code: wrongCode(emailCode.code) };
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await POST(createRequest({ action: 'options', emailCode: wrong }));
+    }
+    // While the account stays locked: a code check and a send are log lines only.
+    expect((await POST(createRequest({ action: 'options', emailCode: wrong }))).status).toBe(429);
+    expect((await POST(createRequest({ action: 'send_code' }))).status).toBe(429);
+
+    const rows = await db
+      .select()
+      .from(auth_audit_logs)
+      .where(eq(auth_audit_logs.user_id, user.id))
+      .orderBy(asc(auth_audit_logs.created_at));
+
+    const send = 'auth.passkey.enrollment_code.send';
+    const verify = 'auth.passkey.enrollment_code.verify';
+    const wrongCodeRow = [verify, 'failure', 'email_code_invalid', 'options'];
+    expect(
+      rows.map(row => [row.action, row.outcome, row.failure_reason, row.metadata?.step])
+    ).toEqual([
+      [send, 'failure', 'email_delivery_failed', 'send_code'],
+      [send, 'success', null, 'send_code'],
+      wrongCodeRow,
+      wrongCodeRow,
+      wrongCodeRow,
+      wrongCodeRow,
+      [verify, 'failure', 'email_code_locked', 'options'],
+    ]);
+    expect(rows.every(row => row.method === 'session' && row.subject_email_hash === null)).toBe(
+      true
+    );
+    const recorded = JSON.stringify(rows.map(row => [row.failure_reason, row.metadata]));
+    expect(recorded).not.toContain(emailCode.code);
+    expect(recorded).not.toContain(wrong.code);
+    expect(JSON.stringify(rows)).not.toContain(emailCode.emailCodeId);
+    expect(JSON.stringify(rows)).not.toContain(user.google_user_email);
   });
 });

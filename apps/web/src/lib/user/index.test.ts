@@ -6030,7 +6030,11 @@ describe('User', () => {
 
       await softDeleteUser(user.id);
 
-      const rows = await db.select().from(auth_audit_logs);
+      // Other tests in this file write auth rows of their own (a sign-in that
+      // links a method); only the rows inserted above are under test.
+      const rows = (await db.select().from(auth_audit_logs)).filter(
+        row => row.metadata?.marker !== undefined
+      );
       const byMarker = new Map(rows.map(row => [row.metadata?.marker, row]));
       expect(rows).toHaveLength(3);
       expect(byMarker.get('own-sign-in')).toMatchObject({

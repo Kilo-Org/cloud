@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import type * as FindUserById from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 // Keep the real PasskeyVerificationError (the route uses `instanceof` on it) and
 // only mock the ceremony functions.
@@ -9,6 +10,13 @@ jest.mock('@/lib/auth/passkey', () => ({
 }));
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
+// The real lookup, wrapped so one test can make it fail.
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => {
+  const actual = jest.requireActual<typeof FindUserById>(
+    '@kilocode/web-shared/lib/user/find-user-by-id'
+  );
+  return { ...actual, findUserById: jest.fn(actual.findUserById) };
+});
 
 import {
   createAuthenticationOptions,
@@ -17,12 +25,24 @@ import {
 } from '@/lib/auth/passkey';
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
+import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
+import { auth_audit_logs } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  authAuditEmailHash,
+  setAuthActionSinkForTest,
+  type AuthActionEvent,
+} from '@/lib/auth/auth-audit';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { POST } from './route';
 import { __test__ as rateLimitTest } from '@/lib/auth/firewall-rate-limit';
 
 const mockCreateAuthenticationOptions = jest.mocked(createAuthenticationOptions);
 const mockVerifyAuthentication = jest.mocked(verifyAuthentication);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
+const mockFindUserById = jest.mocked(findUserById);
 const mockCaptureMessage = jest.mocked(captureMessage);
 
 const challengeId = '22222222-2222-4222-8222-222222222222';
@@ -176,7 +196,11 @@ describe('POST /api/auth/passkey/authenticate', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ticket: 'one-time-ticket' });
-    expect(mockVerifyAuthentication).toHaveBeenCalledWith(challengeId, assertion);
+    expect(mockVerifyAuthentication).toHaveBeenCalledWith(
+      challengeId,
+      assertion,
+      expect.any(Function)
+    );
   });
 
   it('returns 400 for an invalid request', async () => {
@@ -226,7 +250,11 @@ describe('POST /api/auth/passkey/authenticate', () => {
     expect(response.status).toBe(200);
     // The verifier never reads extension outputs, so absence is normalized to
     // the empty set rather than handed on as undefined.
-    expect(mockVerifyAuthentication).toHaveBeenCalledWith(challengeId, assertion);
+    expect(mockVerifyAuthentication).toHaveBeenCalledWith(
+      challengeId,
+      assertion,
+      expect.any(Function)
+    );
   });
 
   it('returns 401 with the stable code when the assertion is refused', async () => {
@@ -238,5 +266,108 @@ describe('POST /api/auth/passkey/authenticate', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'UNKNOWN_CREDENTIAL' });
+  });
+});
+
+describe('POST /api/auth/passkey/authenticate audit', () => {
+  let events: AuthActionEvent[];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    rateLimitTest.resetReportThrottle();
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    events = [];
+    setAuthActionSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAuthActionSinkForTest(null);
+  });
+
+  function verify() {
+    return POST(createRequest({ action: 'verify', challengeId, response: assertion }));
+  }
+
+  it("stores a refused assertion of a known credential under its account and the account's email hash", async () => {
+    const owner = await insertTestUser({ google_user_email: `owner-${randomUUID()}@example.com` });
+    const userId = owner.id;
+    mockVerifyAuthentication.mockImplementation(async (_challengeId, _response, onOwner) => {
+      onOwner?.(userId);
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    });
+
+    expect((await verify()).status).toBe(401);
+
+    const rows = await db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        method: 'passkey',
+        failure_reason: 'verification_failed',
+        subject_email_hash: authAuditEmailHash(owner.google_user_email),
+        metadata: { step: 'verify' },
+      }),
+    ]);
+    const recorded = JSON.stringify({ rows, events });
+    expect(recorded).not.toContain(assertion.id);
+    expect(recorded).not.toContain(challengeId);
+    expect(recorded).not.toContain(owner.google_user_email);
+  });
+
+  it('answers the refusal unchanged and stores it without a hash when the owner read fails', async () => {
+    const userId = randomUUID();
+    mockFindUserById.mockRejectedValueOnce(new Error('database unavailable'));
+    mockVerifyAuthentication.mockImplementation(async (_challengeId, _response, onOwner) => {
+      onOwner?.(userId);
+      throw new PasskeyVerificationError('VERIFICATION_FAILED');
+    });
+
+    const response = await verify();
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'VERIFICATION_FAILED' });
+    const rows = await db.select().from(auth_audit_logs).where(eq(auth_audit_logs.user_id, userId));
+    expect(rows).toEqual([
+      expect.objectContaining({ failure_reason: 'verification_failed', subject_email_hash: null }),
+    ]);
+  });
+
+  it('logs an unknown credential without a row', async () => {
+    mockVerifyAuthentication.mockRejectedValue(new PasskeyVerificationError('UNKNOWN_CREDENTIAL'));
+
+    expect((await verify()).status).toBe(401);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        userId: null,
+        failureReason: 'unknown_credential',
+        stored: false,
+        route: '/api/auth/passkey/authenticate',
+      }),
+    ]);
+  });
+
+  it('logs a rate-limited verify without a row', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    expect((await verify()).status).toBe(429);
+
+    expect(events).toEqual([
+      expect.objectContaining({ failureReason: 'rate_limited', stored: false }),
+    ]);
+  });
+
+  it('records nothing for a verified assertion, whose ticket redemption records the sign-in', async () => {
+    mockVerifyAuthentication.mockImplementation(async (_challengeId, _response, onOwner) => {
+      onOwner?.(randomUUID());
+      return { ticket: 'one-time-ticket' };
+    });
+
+    expect((await verify()).status).toBe(200);
+
+    expect(events).toEqual([]);
   });
 });

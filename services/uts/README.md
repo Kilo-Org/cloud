@@ -207,17 +207,19 @@ only). A PAT names no session, so it is refused there. Each action is one statem
 grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
 account fails at once, with no feed lookup.
 
-`/authorize` and `/token` check scope syntax only; they do not apply the registry's allowed
-clients, third-party-safe flag or eligible subjects yet. Until they do, the client check above and
-the `sid` lookup (it finds first-party grants only) keep other clients' tokens off the account
-API.
+`/authorize` and `/token` check scope syntax and one registry field: a scope that needs the `org`
+claim is refused at `/authorize` without an organization (`invalid_scope`), and `/token` never signs
+it without `org` (`invalid_grant`). They do not apply the registry's allowed clients,
+third-party-safe flag or membership roles yet. Until they do, the client check above and the `sid`
+lookup (it finds first-party grants only) keep other clients' tokens off the account API.
 
-Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`; the environment's
-UTS issuer for `uts`, which the account API's RFC 9728 metadata names; and the environment's web
-app origin for `kilo-api` (`KILO_API_RESOURCES` in `@kilocode/uts-contracts`: `https://app.kilo.ai`,
-`https://staging-app.kilo.ai`, and `http://localhost:3000` in development only), which
-`kiloApiProtectedResourceMetadata` names. Another environment's origin, a path, a trailing slash or
-a query answers `invalid_target`.
+Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`, or an origin of
+the environment's table in `UTS_RESOURCE_ORIGINS` (`@kilocode/uts-contracts`), which maps each
+origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`) and the
+`*.kiloapps.io` origins of ai-attribution, session-sync, notifications, events and chat; staging
+lists only `https://staging-app.kilo.ai` and its issuer; development lists loopback origins only.
+`protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table. Another
+environment's origin, a path, a trailing slash or a query answers `invalid_target`.
 
 | Route | Scope | Behaviour | SQL |
 |---|---|---|---|
@@ -265,9 +267,25 @@ a query answers `invalid_target`.
 - The scope registry is `UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`; `test/repo` checks every
   entry against the rules of design 5.3 (no PAT carries a privileged, step-up, staff,
   credential-changing or session-bound scope; a privileged scope needs a step-up and lives at most
-  5 minutes). It lists `uts:pats.manage` and `uts:bot-keys.manage` (session-bound),
-  `uts:probe.read`, and `kilo-api:profile.read` (the Kilo API profile, balance and usage reads;
-  CLI and PATs). The account API serves only session-bound scopes, and refuses a token without `sid`.
+  5 minutes; a scope needs the `org` claim exactly when its subjects are organization members, in
+  any role or in listed roles; no delegated token carries a privileged, step-up, staff or
+  credential-changing scope). It lists the account API scopes (`uts:pats.manage`,
+  `uts:bot-keys.manage`, session-bound), `uts:probe.read`, `uts:security.read` (the web app's
+  security view, session-bound), `kilo-api:profile.read` (CLI and PATs), and the phase 4 service
+  scopes of session ingest, cloud agent, data export, the git token service, ai-attribution (org
+  owners and members), session sync, notifications, events and chat. The account API serves only
+  session-bound scopes, and refuses a token without `sid`. The mint gives each access token its
+  scope's registered maximum lifetime when shorter than 10 minutes (5 minutes for the export and
+  disconnect scopes).
+- First-party clients are `UTS_FIRST_PARTY_CLIENTS` in `@kilocode/uts-contracts`: `kilo-cli` (public
+  native, loopback `/callback`), `kilo-web`, the web BFF (confidential, `private_key_jwt`, redirect
+  URIs `<app origin>/api/auth/uts/callback` per environment), and `kilo-mobile` (public native,
+  private-use redirect, device attestation required). The authorization endpoint serves only the
+  clients in `src/oauth/clients.ts`: every OAuth endpoint treats `kilo-web` as unknown until the
+  token endpoint verifies a private-key JWT. `test/repo` holds each confidential client to
+  `private_key_jwt` and exact HTTPS redirect URIs with a path (a loopback origin in development
+  only), each desktop client to a loopback path, and each mobile client to one reverse-domain
+  private-use URI and attestation.
 
 ## Tests
 

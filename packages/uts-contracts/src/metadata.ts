@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { UTS_ENDPOINTS, type UtsEnvironment } from './environment';
-import { KILO_API_RESOURCES } from './oauth';
-import { KILO_API_AUDIENCE, UTS_SCOPE_REGISTRY } from './scopes';
+import { resourceOriginOf } from './oauth';
+import { UTS_SCOPE_REGISTRY } from './scopes';
 
 /**
  * RFC 8414 authorization-server metadata as UTS publishes it. Members are added as the endpoints
@@ -40,21 +40,27 @@ export const ProtectedResourceMetadataSchema = z.looseObject({
 export type ProtectedResourceMetadata = z.infer<typeof ProtectedResourceMetadataSchema>;
 
 /**
- * The Kilo API's RFC 9728 metadata in `environment`, which the web app serves at
- * `/.well-known/oauth-protected-resource`: the resource is the environment's app origin
- * (`KILO_API_RESOURCES`), the one resource indicator besides `urn:kilo:service:kilo-api` that UTS
- * accepts for the `kilo-api` audience, and the scopes are the registry's `kilo-api` scopes.
+ * The RFC 9728 metadata of `audience` in `environment`, which the resource serves at
+ * `/.well-known/oauth-protected-resource` on its origin: the resource is the audience's origin in
+ * `UTS_RESOURCE_ORIGINS` (the one resource indicator besides `urn:kilo:service:<audience>` that UTS
+ * accepts for it there), the authorization server is the environment's UTS issuer, and the scopes
+ * are the registry's scopes of that audience. Null when the table names no origin for the audience
+ * in the environment.
  */
-export function kiloApiProtectedResourceMetadata(
-  environment: UtsEnvironment
-): ProtectedResourceMetadata {
+export function protectedResourceMetadataFor(
+  environment: UtsEnvironment,
+  audience: string,
+  resourceName: string
+): ProtectedResourceMetadata | null {
+  const resource = resourceOriginOf(environment, audience);
+  if (resource === null) return null;
   return {
-    resource: KILO_API_RESOURCES[environment],
+    resource,
     authorization_servers: [UTS_ENDPOINTS[environment].issuer],
     scopes_supported: Object.entries(UTS_SCOPE_REGISTRY)
-      .filter(([, entry]) => entry.audience === KILO_API_AUDIENCE)
+      .filter(([, entry]) => entry.audience === audience)
       .map(([scope]) => scope),
     bearer_methods_supported: ['header'],
-    resource_name: 'Kilo API',
+    resource_name: resourceName,
   };
 }

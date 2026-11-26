@@ -20,3 +20,15 @@ export function credentialScopeCheck(scope: string, orgId: string | null): Crede
   if (entry.subjects.kind === 'org_member' && orgId === null) return { status: 'org_required' };
   return { status: 'allowed' };
 }
+
+/**
+ * The first of `scopes` whose registry entry needs the `org` claim (`requiresOrgClaim`) when no
+ * organization is bound (`orgId` null), or null when every scope can be minted. The authorization
+ * endpoint refuses such a request, and the mint refuses to sign such a token, so a token for an
+ * organization-member scope always names its organization. The membership role a scope lists
+ * (`subjects.roles`) is not checked here: the mint statements do not read the role.
+ */
+export function scopeMissingOrg(scopes: readonly string[], orgId: string | null): string | null {
+  if (orgId !== null) return null;
+  return scopes.find(scope => utsScopeEntry(scope)?.requiresOrgClaim === true) ?? null;
+}

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
+import { scopeMissingOrg } from '../scopes/policy';
 import {
   createFirstPartyRefreshToken,
   grantIdOfCode,
@@ -152,6 +153,12 @@ async function completeMint(
   minted: Minted,
   refresh: { token: string; expiresAt: Date } | null
 ): Promise<Response> {
+  // A grant always binds the organization its scopes need (`/authorize` refuses otherwise); this
+  // keeps a token for an organization-member scope from ever being signed without `org`.
+  if (scopeMissingOrg(minted.scopes, minted.orgId) !== null) {
+    console.error(JSON.stringify({ event: 'uts.token.org_missing', client: clientId }));
+    return oauthError('invalid_grant', 400, 'the grant names no organization for its scopes');
+  }
   const nowMs = Date.now();
   const nowSeconds = Math.floor(nowMs / 1000);
   const claims = accessTokenClaims(deps.config, clientId, grantId, minted, nowSeconds);

@@ -1,4 +1,5 @@
 export * from './account';
+export * from './clients';
 export * from './environment';
 export * from './jwks';
 export * from './metadata';

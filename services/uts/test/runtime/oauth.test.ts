@@ -264,6 +264,40 @@ describe('token endpoint: refresh_token', () => {
     expect((await verifiedClaims(body.access_token, 'gateway')).claims.sid).toBe(grant.grantId);
   });
 
+  it('signs a token for an organization-member scope only with the org claim', async () => {
+    const request = async (orgId: string | null) => {
+      const grant = await firstParty();
+      const grants = fakeGrants({
+        refreshFirstParty: async () => ({
+          outcome: 'issued',
+          ...minted({ scopes: ['ai-attribution:identity.read'], orgId }),
+        }),
+      });
+      return await call(
+        formRequest(
+          '/token',
+          {
+            grant_type: 'refresh_token',
+            refresh_token: grant.token,
+            client_id: 'kilo-cli',
+            scope: 'ai-attribution:identity.read',
+          },
+          { DPoP: await dpopProof(grant.key) }
+        ),
+        oauthDeps(grants.access)
+      );
+    };
+    const refused = await request(null);
+    expect(refused.status).toBe(400);
+    expect(await errorOf(refused)).toBe('invalid_grant');
+
+    const org = crypto.randomUUID();
+    const signed = await request(org);
+    expect(signed.status).toBe(200);
+    const body = TokenResponseSchema.parse(await signed.json());
+    expect((await verifiedClaims(body.access_token, 'ai-attribution')).claims.org).toBe(org);
+  });
+
   it('passes the proof jti to the grant statement and refuses a proof it recorded before', async () => {
     const grant = await firstParty();
     const recorded = new Set<string>();
@@ -668,6 +702,33 @@ describe('authorization endpoint', () => {
       )
     );
     expect(redirectOf(broken).searchParams.get('error')).toBe('server_error');
+  });
+
+  it('refuses an organization-member scope when the approval binds no organization', async () => {
+    const scoped = { ...base, scope: 'ai-attribution:identity.read' };
+    const without = fakeGrants({ issueCode: async () => 'issued' });
+    const refused = await call(
+      authorizeUrl(scoped),
+      oauthDeps(without.access, { handoff: approve })
+    );
+    expect(redirectOf(refused).searchParams.get('error')).toBe('invalid_scope');
+    expect(without.calls).toEqual([]);
+
+    const org = crypto.randomUUID();
+    const withOrg = fakeGrants({ issueCode: async () => 'issued' });
+    const issued = await call(
+      authorizeUrl(scoped),
+      oauthDeps(withOrg.access, {
+        handoff: async (request, next) => {
+          const decision = await approve(request, next);
+          return decision.status === 'approved'
+            ? { ...decision, approval: { ...decision.approval, orgId: org } }
+            : decision;
+        },
+      })
+    );
+    expect(redirectOf(issued).searchParams.get('code')).not.toBeNull();
+    expect((withOrg.calls[0].input as IssueCodeInput).orgId).toBe(org);
   });
 
   it('authorizes a third-party client from its cached metadata with the consent the hand-off names', async () => {

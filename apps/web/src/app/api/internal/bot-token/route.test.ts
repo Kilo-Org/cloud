@@ -5,7 +5,9 @@ import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 
 const mockConfig: { secret: string | undefined; modern: boolean } = {
   secret: 'mint-secret',
@@ -126,6 +128,13 @@ describe('POST /api/internal/bot-token', () => {
     { organizationId: ORG_ID },
     { userId: '', organizationId: ORG_ID },
     { userId: BOT_ID, organizationId: 'org-1' },
+    { ...validBody, audience: SESSION_INGEST_AUDIENCE },
+    { ...validBody, audience: 'unrelated-audience' },
+    { ...validBody, audience: `${KILO_API_AUDIENCE} ${KILO_GATEWAY_AUDIENCE}` },
+    { ...validBody, audience: [KILO_API_AUDIENCE] },
+    { ...validBody, audience: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE] },
+    { ...validBody, audience: '' },
+    { ...validBody, audience: null },
   ])('returns 400 when the body is %p', async body => {
     const res = await POST(createRequest(body));
     expect(res.status).toBe(400);
@@ -185,8 +194,29 @@ describe('POST /api/internal/bot-token', () => {
     }
   });
 
+  it('applies the same admission to a single-audience request', async () => {
+    mockUserRows.push(eligibleBot({ id: 'user-1' }));
+    mockMembershipRows.push(membership('member', { kilo_user_id: 'user-1' }));
+    const human = await POST(
+      createRequest({ userId: 'user-1', organizationId: ORG_ID, audience: KILO_API_AUDIENCE })
+    );
+    expect(human.status).toBe(403);
+
+    mockUserRows.length = 0;
+    mockUserRows.push(eligibleBot());
+    mockMembershipRows.length = 0;
+    mockMembershipRows.push(membership('billing_manager'));
+    const role = await POST(createRequest({ ...validBody, audience: KILO_GATEWAY_AUDIENCE }));
+    expect(role.status).toBe(403);
+
+    mockMembershipRows.length = 0;
+    mockMembershipRows.push(membership('owner', { organization_id: OTHER_ORG_ID }));
+    const otherOrg = await POST(createRequest({ ...validBody, audience: KILO_GATEWAY_AUDIENCE }));
+    expect(otherOrg.status).toBe(404);
+  });
+
   it.each(['owner', 'member'] as const)(
-    'issues a one-hour API and gateway token for an eligible %s bot',
+    'keeps the API and gateway token for a %s bot that names no audience',
     async role => {
       mockUserRows.push(eligibleBot());
       mockMembershipRows.push(membership(role));
@@ -222,6 +252,75 @@ describe('POST /api/internal/bot-token', () => {
       expect(
         validateAuthorizationHeader(headers, { expectedAudience: 'unrelated-audience' }).error
       ).toMatch(/^Invalid token/);
+    }
+  );
+
+  it.each([
+    [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+    [KILO_GATEWAY_AUDIENCE, KILO_API_AUDIENCE],
+  ] as const)(
+    'signs exactly the %s audience, which the %s and session-ingest verifiers refuse',
+    async (audience, otherAudience) => {
+      mockUserRows.push(eligibleBot());
+      mockMembershipRows.push(membership('member'));
+
+      const res = await POST(createRequest({ ...validBody, audience }));
+
+      expect(res.status).toBe(200);
+      const { token, expiresAt } = (await res.json()) as { token: string; expiresAt: string };
+      const claims = jwt.verify(token, 'bot-token-signing-secret', {
+        algorithms: ['HS256'],
+      }) as jwt.JwtPayload;
+      // One audience as a plain string: never an array, so no verifier can read a second one.
+      expect(claims.aud).toBe(audience);
+      expect(claims).toMatchObject({
+        kiloUserId: BOT_ID,
+        apiTokenPepper: 'pepper',
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        tokenSource: 'internal-bot',
+        organizationId: ORG_ID,
+        organizationRole: 'member',
+      });
+      expect(claims.exp! - claims.iat!).toBe(60 * 60);
+      expect(new Date(expiresAt).getTime()).toBe(claims.exp! * 1000);
+
+      const headers = new Headers({ authorization: `Bearer ${token}` });
+      expect(
+        validateAuthorizationHeader(headers, { expectedAudience: audience }).error
+      ).toBeUndefined();
+      expect(
+        validateAuthorizationHeader(headers, { expectedAudience: otherAudience }).error
+      ).toMatch(/^Invalid token/);
+
+      const secret = 'bot-token-signing-secret';
+      await expect(
+        verifyKiloTokenForResource(token, secret, { audience, mode: 'allow-legacy' })
+      ).resolves.toMatchObject({ kiloUserId: BOT_ID });
+      for (const refused of [otherAudience, SESSION_INGEST_AUDIENCE]) {
+        await expect(
+          verifyKiloTokenForResource(token, secret, { audience: refused, mode: 'allow-legacy' })
+        ).rejects.toThrow('Unexpected token audience');
+      }
+    }
+  );
+
+  it.each([KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE])(
+    'keeps the legacy token with no audience when %s is requested while the family flag is off',
+    async audience => {
+      mockConfig.modern = false;
+      mockUserRows.push(eligibleBot());
+      mockMembershipRows.push(membership('member'));
+
+      const res = await POST(createRequest({ ...validBody, audience }));
+
+      expect(res.status).toBe(200);
+      const { token } = (await res.json()) as { token: string };
+      const claims = jwt.verify(token, 'bot-token-signing-secret') as jwt.JwtPayload;
+      expect(claims).toMatchObject({ kiloUserId: BOT_ID, tokenSource: 'internal-bot' });
+      expect(claims).not.toHaveProperty('aud');
+      expect(claims).not.toHaveProperty('tokenPurpose');
+      expect(claims.exp! - claims.iat!).toBe(60 * 60);
     }
   );
 

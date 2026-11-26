@@ -1,6 +1,6 @@
 /**
- * Internal API: mint a short-lived, dual-audience token for an internal bot
- * user (`bot-internal-<slug>`), such as the bouncer watch or the auto-routing
+ * Internal API: mint a short-lived token for an internal bot user
+ * (`bot-internal-<slug>`), such as the bouncer watch or the auto-routing
  * benchmark. Each workload runs as its own bot user, so it gets its own
  * per-user gateway limits instead of sharing a human's.
  *
@@ -11,6 +11,13 @@
  * not blocked, a non-empty API-token pepper, and an owner or member role in
  * the requested organization. Humans and per-org product bots are refused.
  * The rules live in `@/lib/bot-users/eligibility`, shared with the catalog mint.
+ *
+ * Token shape:
+ * - Family flag off: the legacy token with no audience, whatever the body asks.
+ * - Family flag on, `audience` given: exactly that one audience.
+ * - Family flag on, `audience` omitted: both `kilo-api` and `kilo-gateway`, for
+ *   callers that still send one token to both. Strict multi-audience refusal
+ *   retires this shape once those callers mint per audience.
  *
  * URL: POST /api/internal/bot-token
  */
@@ -43,6 +50,7 @@ import {
 const RequestSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().uuid(),
+  audience: z.enum([KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE]).optional(),
 });
 
 const ONE_HOUR_IN_SECONDS = 60 * 60;
@@ -66,7 +74,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const { userId, organizationId } = parsed.data;
+  const { userId, organizationId, audience } = parsed.data;
 
   const [user] = await db
     .select()
@@ -120,7 +128,7 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       pepper: user.api_token_pepper,
       env: process.env.NODE_ENV,
-      audience: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+      audience: audience ?? [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
       issuedAt,
       expiresAt,
       tokenPurpose: 'delegated-workload',

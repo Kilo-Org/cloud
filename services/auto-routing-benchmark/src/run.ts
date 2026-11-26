@@ -22,6 +22,10 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { chunkArray } from '@kilocode/worker-utils/chunk-array';
+import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import * as z from 'zod';
 import { getBenchmarkConfig } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
@@ -176,7 +180,7 @@ import {
 import { settleProfileRunAttempts } from './profile-failure-history';
 import { pickClassifierWinner } from './winner';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
-import { fetchBenchmarkUserToken } from './benchmark-token';
+import { fetchBenchmarkUserToken, type BenchmarkTokenAudience } from './benchmark-token';
 import {
   PLATFORM_SUBSCRIPTION_OWNER,
   servingSubscriptionSnapshot,
@@ -3134,7 +3138,11 @@ async function caseInferenceProxy(
     rep: number;
     generation: number;
     startedAt: number;
-    kiloToken: string;
+    /**
+     * The CLI's `kilo-gateway` token, which the proxy forwards only to the gateway's catalog
+     * reads; `null` for a probe, which makes no catalog read through the proxy.
+     */
+    catalogToken: string | null;
     kiloApiUrl: string;
   }
 ): Promise<CaseInferenceProxy> {
@@ -3155,7 +3163,9 @@ async function caseInferenceProxy(
     authorization: issued.authorization,
     invocation: issued.invocationHeader,
     invocationHeader: BENCHMARK_CASE_HEADER,
-    catalog: { url: input.kiloApiUrl, authorization: `Bearer ${input.kiloToken}` },
+    ...(input.catalogToken === null
+      ? {}
+      : { catalog: { url: input.kiloApiUrl, authorization: `Bearer ${input.catalogToken}` } }),
   };
 }
 
@@ -3466,26 +3476,35 @@ async function processDeciderJob(
         throw new DeciderGraderRetryError('Decider judge client initialization failed');
       }
     }
-    // A short-lived user token is minted at most once per queue message and never
-    // logged. A CLI case warms its container before the paid ledger row exists, so the
-    // CLI's one-time sqlite migration never burns the first case's timeout and container
-    // capacity pressure defers the message with no ledger row written. Ordinary warmup
-    // failures are non-fatal: the first case absorbs whatever warmup work remains.
-    // Container capacity failures are infrastructure pressure, so the queue retries the
-    // message. Warmup waits for the first case that needs a CLI call, so rechecking
-    // awaited output stays in D1.
-    let minted: Promise<string> | undefined;
-    const mintedToken = () =>
-      (minted ??= (async () => {
-        // The bot-token mint requires an org. Only run rows written before the
-        // org snapshot existed lack one; checked here so chunks whose cases are
-        // all recorded still finish without a mint.
-        if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
-        return fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId);
-      })());
+    // Short-lived user tokens are minted at most once per audience per queue message and
+    // never logged. Each goes only to routes that verify its audience: `kilo-api` reads the
+    // organization catalog for a probe, and `kilo-gateway` is the CLI container's credential
+    // for its gateway catalog reads. A probe's inference carries only the case capability,
+    // so a probe never needs a gateway token. A CLI case warms its container before the paid
+    // ledger row exists, so the CLI's one-time sqlite migration never burns the first
+    // case's timeout and container capacity pressure defers the message with no ledger row
+    // written. Ordinary warmup failures are non-fatal: the first case absorbs whatever
+    // warmup work remains. Container capacity failures are infrastructure pressure, so the
+    // queue retries the message. Warmup waits for the first case that needs a CLI call, so
+    // rechecking awaited output stays in D1.
+    const minted = new Map<BenchmarkTokenAudience, Promise<string>>();
+    const mintedToken = (audience: BenchmarkTokenAudience) => {
+      let token = minted.get(audience);
+      if (token === undefined) {
+        token = (async () => {
+          // The bot-token mint requires an org. Only run rows written before the
+          // org snapshot existed lack one; checked here so chunks whose cases are
+          // all recorded still finish without a mint.
+          if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
+          return fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId, audience);
+        })();
+        minted.set(audience, token);
+      }
+      return token;
+    };
     let catalogForProbes: Promise<z.infer<typeof BenchmarkModelCatalogSchema>> | undefined;
     const probeCatalogEntry = async (model: string): Promise<CatalogModel> => {
-      catalogForProbes ??= mintedToken().then(token => {
+      catalogForProbes ??= mintedToken(KILO_API_AUDIENCE).then(token => {
         if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
         return fetchExecutableBenchmarkModelCatalog(
           env,
@@ -3514,12 +3533,12 @@ async function processDeciderJob(
       return entry;
     };
     let warmedUp = false;
-    const warmUpContainer = async (kiloToken: string) => {
+    const warmUpContainer = async (gatewayToken: string) => {
       if (warmedUp) return;
       await warmUpCliContainer(env, {
         instanceName,
         model: message.model,
-        kiloToken,
+        kiloToken: gatewayToken,
         kiloApiUrl: env.KILO_CLI_API_URL,
         orgId: benchmarkOrgId,
       }).catch(error => {
@@ -3585,8 +3604,18 @@ async function processDeciderJob(
         if (priorStartedAt !== null) {
           throw new AmbiguousBenchmarkExecutionError(priorStartedAt, { deliveryWindowMs });
         }
-        const kiloToken = await mintedToken();
-        if (!isProbeCase(benchCase)) await warmUpContainer(kiloToken);
+        // Mint before the paid start, so a mint failure never follows it. A probe needs only
+        // the `kilo-api` token for its catalog read; a CLI case's container needs the
+        // `kilo-gateway` token.
+        const launch = isProbeCase(benchCase)
+          ? { kind: 'probe' as const, benchCase, catalogToken: null }
+          : {
+              kind: 'cli' as const,
+              benchCase,
+              catalogToken: await mintedToken(KILO_GATEWAY_AUDIENCE),
+            };
+        if (launch.kind === 'probe') await mintedToken(KILO_API_AUDIENCE);
+        else await warmUpContainer(launch.catalogToken);
         let startedAt = Date.now();
         const start = await beginPaidCaseGeneration(env, {
           key: caseKey,
@@ -3640,61 +3669,18 @@ async function processDeciderJob(
           rep,
           generation,
           startedAt,
-          kiloToken,
+          catalogToken: launch.catalogToken,
           kiloApiUrl: env.KILO_CLI_API_URL,
         });
         // A probe goes straight to the gateway with the captured request template; every
         // other case keeps the CLI container, which owns the workspace and tool execution.
         // Both transports re-check the canonical live generation before they spend
         // anything (RunnerCancel's fence) and refuse a start that is not live.
-        const invokeCase = isProbeCase(benchCase)
-          ? async () =>
-              runCancellableProbeCase(env, {
-                instanceName,
-                execution: {
-                  ...execution,
-                  attemptStartedAt: startedAt,
-                  retried,
-                  priorCostUsd,
-                  priorUsage,
-                  canonicalGeneration,
-                  engineIdentity: state.engineIdentity,
-                },
-                model: message.model,
-                variant: cliVariant,
-                benchCase,
-                catalogModel: await probeCatalogEntry(message.model),
-                kiloToken,
-                kiloApiUrl: env.KILO_CLI_API_URL,
-                orgId: benchmarkOrgId,
-                inference,
-              }).catch((error: unknown) => {
-                // Terminal, known outcomes keep their own type so the outer handler can act
-                // on them: a pause (`BenchmarkCaseCancelledError`) must not be re-labelled as
-                // an uncertain paid attempt, and a pre-spawn refusal must not either.
-                if (
-                  error instanceof BenchmarkProbeFamilyError ||
-                  error instanceof BenchmarkCaseNotStartedError ||
-                  error instanceof BenchmarkCaseCancelledError
-                )
-                  throw error;
-                throw new AmbiguousBenchmarkExecutionError(startedAt, {
-                  cause: error,
-                  deliveryWindowMs,
-                });
-              })
-          : async () =>
-              runDeciderCaseViaCli(env, {
-                instanceName,
-                model: message.model,
-                benchCase,
-                kiloToken,
-                kiloApiUrl: env.KILO_CLI_API_URL,
-                orgId: benchmarkOrgId,
-                variant: cliVariant,
-                inferenceProxy: inference,
-                resultCallback: {
-                  url: env.BENCH_RESULT_URL,
+        const invokeCase =
+          launch.kind === 'probe'
+            ? async () =>
+                runCancellableProbeCase(env, {
+                  instanceName,
                   execution: {
                     ...execution,
                     attemptStartedAt: startedAt,
@@ -3704,16 +3690,59 @@ async function processDeciderJob(
                     canonicalGeneration,
                     engineIdentity: state.engineIdentity,
                   },
-                },
-              }).catch((error: unknown) => {
-                if (
-                  isRetryableContainerAvailabilityError(error) ||
-                  error instanceof BenchmarkCaseNotStartedError ||
-                  error instanceof BenchmarkCaseCancelledError
-                )
-                  throw error;
-                throw new AmbiguousBenchmarkExecutionError(startedAt, { cause: error });
-              });
+                  model: message.model,
+                  variant: cliVariant,
+                  benchCase: launch.benchCase,
+                  catalogModel: await probeCatalogEntry(message.model),
+                  kiloApiUrl: env.KILO_CLI_API_URL,
+                  orgId: benchmarkOrgId,
+                  inference,
+                }).catch((error: unknown) => {
+                  // Terminal, known outcomes keep their own type so the outer handler can act
+                  // on them: a pause (`BenchmarkCaseCancelledError`) must not be re-labelled as
+                  // an uncertain paid attempt, and a pre-spawn refusal must not either.
+                  if (
+                    error instanceof BenchmarkProbeFamilyError ||
+                    error instanceof BenchmarkCaseNotStartedError ||
+                    error instanceof BenchmarkCaseCancelledError
+                  )
+                    throw error;
+                  throw new AmbiguousBenchmarkExecutionError(startedAt, {
+                    cause: error,
+                    deliveryWindowMs,
+                  });
+                })
+            : async () =>
+                runDeciderCaseViaCli(env, {
+                  instanceName,
+                  model: message.model,
+                  benchCase: launch.benchCase,
+                  kiloToken: launch.catalogToken,
+                  kiloApiUrl: env.KILO_CLI_API_URL,
+                  orgId: benchmarkOrgId,
+                  variant: cliVariant,
+                  inferenceProxy: inference,
+                  resultCallback: {
+                    url: env.BENCH_RESULT_URL,
+                    execution: {
+                      ...execution,
+                      attemptStartedAt: startedAt,
+                      retried,
+                      priorCostUsd,
+                      priorUsage,
+                      canonicalGeneration,
+                      engineIdentity: state.engineIdentity,
+                    },
+                  },
+                }).catch((error: unknown) => {
+                  if (
+                    isRetryableContainerAvailabilityError(error) ||
+                    error instanceof BenchmarkCaseNotStartedError ||
+                    error instanceof BenchmarkCaseCancelledError
+                  )
+                    throw error;
+                  throw new AmbiguousBenchmarkExecutionError(startedAt, { cause: error });
+                });
         const first = await invokeCase();
         // A trusted Worker stop is authoritative and independent of prior calls, cost and
         // output: it is handled before the empty-output retry and before the user
@@ -3779,7 +3808,7 @@ async function processDeciderJob(
           rep,
           generation,
           startedAt,
-          kiloToken,
+          catalogToken: launch.catalogToken,
           kiloApiUrl: env.KILO_CLI_API_URL,
         });
         attemptStartedAt = startedAt;

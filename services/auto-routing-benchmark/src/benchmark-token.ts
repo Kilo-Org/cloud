@@ -1,6 +1,27 @@
 import * as z from 'zod';
+import type {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.string() });
+
+/**
+ * The one verifier a benchmark token is minted for. Each token goes only to routes that
+ * verify that audience:
+ * - `kilo-api`: the organization model catalog, `/api/organizations/<org>/models`.
+ * - `kilo-gateway`: the gateway catalog reads the case proxy forwards
+ *   (`/api/openrouter/models`, `/api/gateway/v1/models`) and the CLI container.
+ */
+export type BenchmarkTokenAudience = typeof KILO_API_AUDIENCE | typeof KILO_GATEWAY_AUDIENCE;
+
+/**
+ * The CLI run without the case proxy (`/admin/debug-cli`) sends its one key to the gateway
+ * and to any `kilo-api` setup route it calls, and it cannot hold one token per audience.
+ * That mint names no audience, so it keeps the shape every unsplit caller gets until
+ * strict multi-audience refusal, which waits for a CLI that exchanges per audience.
+ */
+export const UNSPLIT_CLI_TOKEN = 'unsplit-cli';
 
 // Calls apps/web's internal bot-token endpoint to mint a short-lived token for
 // the internal bot user the benchmark runs as. Never logs the token.
@@ -18,6 +39,7 @@ export async function fetchBenchmarkUserToken(
   env: Env,
   userId: string,
   organizationId: string,
+  audience: BenchmarkTokenAudience | typeof UNSPLIT_CLI_TOKEN,
   fetchImpl: typeof fetch = fetch
 ): Promise<string> {
   const secret = await env.BOT_TOKEN_MINT_SECRET.get();
@@ -27,7 +49,11 @@ export async function fetchBenchmarkUserToken(
       'content-type': 'application/json',
       authorization: `Bearer ${secret}`,
     },
-    body: JSON.stringify({ userId, organizationId }),
+    body: JSON.stringify(
+      audience === UNSPLIT_CLI_TOKEN
+        ? { userId, organizationId }
+        : { userId, organizationId, audience }
+    ),
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) throw new Error(`token mint failed: HTTP ${response.status}`);

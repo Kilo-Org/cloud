@@ -37,10 +37,12 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  *
  * Every entry is written to `admin_action_audit_logs` and emitted in an
  * `event:"admin_action"` structured log line (Axiom `vercel` dataset): one line
- * per single-entry call, one line per insert chunk for a bulk call (see
- * {@link AdminActionBulkEvent}). The table is browsable in the admin console
- * and pruned after the retention window; the log line carries request
- * metadata (IP, auth source) that the table deliberately does not store.
+ * per single-entry call, one line per stored insert chunk for a bulk call (see
+ * {@link AdminActionBulkEvent}), and one line per entry of a chunk that was not
+ * stored, so the log keeps everything the missing rows would hold. The table is
+ * browsable in the admin console and pruned after the retention window; the
+ * log line carries request metadata (IP, auth source) that the table
+ * deliberately does not store.
  *
  * Record after the action has resolved: a success entry once it succeeded, a
  * failure entry (with a stable `errorCode`, never an error message) once it
@@ -107,20 +109,24 @@ export type AdminActionEntryEvent = AdminActionEventAttribution & {
 };
 
 /**
- * The log line of a call that records several entries: one per insert chunk
- * and action/outcome pair, listing the row ids and target ids in entry order.
- * `targetType`, `message` and `metadata` are set when every listed entry shares
- * them and null otherwise; the rows hold each entry's own values.
+ * The log line of a call that records several entries: one per stored insert
+ * chunk and action/outcome pair, listing the row ids and target ids in entry
+ * order. `targetType`, `message` and `metadata` are set when every listed
+ * entry shares them and null otherwise; the rows hold each entry's own values.
+ * A failure line lists each entry's `errorCode` in `errorCodes`, aligned with
+ * `targetIds`; a success line has `errorCodes: null`. A chunk whose insert
+ * failed is logged one {@link AdminActionEntryEvent} per entry instead.
  */
 export type AdminActionBulkEvent = AdminActionEventAttribution & {
   event: 'admin_action';
   action: AdminActionAuditAction;
   outcome: AdminActionAuditOutcome;
   entryCount: number;
-  auditLogIds: (string | null)[];
-  persisted: boolean;
+  auditLogIds: string[];
+  persisted: true;
   targetType: AdminActionAuditTargetType | null;
   targetIds: (string | null)[];
+  errorCodes: string[] | null;
   message: string | null;
   metadata: Record<string, unknown> | null;
 };
@@ -128,7 +134,7 @@ export type AdminActionBulkEvent = AdminActionEventAttribution & {
 export type AdminActionEvent = AdminActionEntryEvent | AdminActionBulkEvent;
 
 // Stays well under PostgreSQL's 65,535 bind-parameter limit for bulk actions,
-// and keeps a bulk log line's two id arrays far below Vercel's 256 KB line limit.
+// and keeps a bulk log line's id and code arrays far below Vercel's 256 KB line limit.
 const INSERT_CHUNK_SIZE = 1_000;
 
 export type AdminActionSink = (event: AdminActionEvent) => void;
@@ -217,25 +223,22 @@ async function writeAdminActions(
 
   const attribution = eventAttribution(ctx);
   if (entries.length === 1) {
-    const [entry] = entries;
-    emit({
-      event: 'admin_action',
-      action: entry.action,
-      outcome: entry.outcome ?? 'success',
-      auditLogId: insertedIds[0] ?? null,
-      persisted: insertedIds.length === 1,
-      ...attribution,
-      targetType: entry.target?.type ?? null,
-      targetId: entry.target?.id ?? null,
-      message: entry.message,
-      metadata: storedMetadata(entry),
-    });
+    emit(entryEvent(attribution, entries[0], insertedIds[0] ?? null));
     return;
   }
 
   for (let start = 0; start < entries.length; start += INSERT_CHUNK_SIZE) {
+    const end = Math.min(start + INSERT_CHUNK_SIZE, entries.length);
+    // Chunks are inserted in order and the first failed insert stops the rest,
+    // so a chunk is stored exactly when its last entry has a row id.
+    if (end > insertedIds.length) {
+      for (let index = start; index < end; index++) {
+        emit(entryEvent(attribution, entries[index], null));
+      }
+      continue;
+    }
     const groups = new Map<string, number[]>();
-    for (let index = start; index < Math.min(start + INSERT_CHUNK_SIZE, entries.length); index++) {
+    for (let index = start; index < end; index++) {
       const entry = entries[index];
       const key = `${entry.action}\u0000${entry.outcome ?? 'success'}`;
       const group = groups.get(key);
@@ -246,6 +249,25 @@ async function writeAdminActions(
       emit(bulkEvent(attribution, entries, insertedIds, indexes));
     }
   }
+}
+
+function entryEvent(
+  attribution: AdminActionEventAttribution,
+  entry: AdminActionEntry,
+  auditLogId: string | null
+): AdminActionEntryEvent {
+  return {
+    event: 'admin_action',
+    action: entry.action,
+    outcome: entry.outcome ?? 'success',
+    auditLogId,
+    persisted: auditLogId !== null,
+    ...attribution,
+    targetType: entry.target?.type ?? null,
+    targetId: entry.target?.id ?? null,
+    message: entry.message,
+    metadata: storedMetadata(entry),
+  };
 }
 
 function bulkEvent(
@@ -266,11 +288,15 @@ function bulkEvent(
     action: first.action,
     outcome: first.outcome ?? 'success',
     entryCount: listed.length,
-    auditLogIds: indexes.map(index => insertedIds[index] ?? null),
-    persisted: indexes.every(index => index < insertedIds.length),
+    auditLogIds: indexes.map(index => insertedIds[index]),
+    persisted: true,
     ...attribution,
     targetType: shared(entry => entry.target?.type ?? null),
     targetIds: listed.map(entry => entry.target?.id ?? null),
+    errorCodes:
+      first.outcome === 'failure'
+        ? listed.flatMap(entry => (entry.outcome === 'failure' ? [entry.errorCode] : []))
+        : null,
     message: shared(entry => entry.message),
     metadata: shared(storedMetadata),
   };

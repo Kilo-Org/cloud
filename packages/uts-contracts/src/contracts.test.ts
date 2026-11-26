@@ -106,9 +106,7 @@ describe('the AI gateway resource', () => {
     for (const environment of ['production', 'staging', 'development'] as const) {
       expect(resourceOriginOf(environment, KILO_GATEWAY_AUDIENCE)).toBe(origins[environment]);
       expect(audienceOfResource(origins[environment], environment)).toBe('kilo-gateway');
-      expect(audienceOfResource('urn:kilo:service:kilo-gateway', environment)).toBe(
-        'kilo-gateway'
-      );
+      expect(audienceOfResource('urn:kilo:service:kilo-gateway', environment)).toBe('kilo-gateway');
       for (const other of ['production', 'staging', 'development'] as const) {
         if (other !== environment) {
           expect(audienceOfResource(origins[other], environment)).toBeNull();

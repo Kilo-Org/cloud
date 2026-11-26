@@ -107,6 +107,10 @@ export const PasskeyCredentialRowSchema = z.strictObject({
   name: z.string(),
   added_at: timestamp,
   last_used_at: timestamp.nullable(),
+  user_handle: bytes,
+  gate_pass_id: uuid,
+  gate_pass_action: z.enum(enums.GATED_ACTIONS),
+  denied_audited_at: timestamp.nullable(),
 });
 
 export const BrowserSessionRowSchema = z.strictObject({
@@ -124,6 +128,9 @@ export const BrowserSessionRowSchema = z.strictObject({
   status: z.enum(enums.SESSION_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  user_code_failures: z.number().int(),
+  user_code_window_started_at: timestamp.nullable(),
+  denied_audited_at: timestamp.nullable(),
 });
 
 export const DeviceSessionRowSchema = z.strictObject({
@@ -283,6 +290,10 @@ export const DeviceCodeRowSchema = z.strictObject({
   approved_at: timestamp.nullable(),
   denied_at: timestamp.nullable(),
   consumed_at: timestamp.nullable(),
+  auth_time: timestamp.nullable(),
+  amr: amr.nullable(),
+  grant_id: uuid.nullable(),
+  dpop_jkt: sha256.nullable(),
 });
 
 export const EmailCodeRowSchema = z.strictObject({
@@ -315,6 +326,23 @@ export const TicketRowSchema = z.strictObject({
   audience: z.string(),
   account_id: z.string(),
   resource: z.string().nullable(),
+  created_at: timestamp,
+  expires_at: timestamp,
+  status: z.enum(enums.CODE_STATUSES),
+  consumed_at: timestamp.nullable(),
+  grant_id: uuid,
+  client_id: z.string(),
+  org_id: uuid.nullable(),
+  denied_audited_at: timestamp.nullable(),
+});
+
+export const WebauthnChallengeRowSchema = z.strictObject({
+  challenge_hash: sha256,
+  ceremony: z.enum(enums.WEBAUTHN_CEREMONIES),
+  rp_id: z.string(),
+  account_id: z.string().nullable(),
+  browser_session_id: uuid.nullable(),
+  user_handle: bytes.nullable(),
   created_at: timestamp,
   expires_at: timestamp,
   status: z.enum(enums.CODE_STATUSES),
@@ -467,6 +495,7 @@ export const IDENTITY_STORE_TABLES = {
   email_codes: EmailCodeRowSchema,
   email_code_limits: EmailCodeLimitRowSchema,
   tickets: TicketRowSchema,
+  webauthn_challenges: WebauthnChallengeRowSchema,
   personal_access_tokens: PersonalAccessTokenRowSchema,
   org_bot_keys: OrgBotKeyRowSchema,
   ci_trust_policies: CiTrustPolicyRowSchema,

@@ -1,17 +1,16 @@
 import { UTS_AUTHORIZATION_SERVER_METADATA_PATH } from '@kilocode/uts-contracts';
 import { readConfig, type Env } from './env';
 import { authorizationServerMetadata } from './metadata/authorization-server';
-import type { AuthorizationHandoff } from './oauth/authorize';
-import { handleOAuthRequest, oauthService } from './oauth/routes';
+import { type HandoffChoice, handleOAuthRequest, oauthService } from './oauth/routes';
 import { jsonResponse } from './responses';
 import type { SignerAccess } from './token/mint';
 
 /**
- * What only the development entry adds: the development sign-in hand-off and a failing signer for
- * the local end-to-end run (src/dev.ts). Null is the deployed behaviour.
+ * What only the development entry adds: a choice of the synthetic sign-in hand-off and a failing
+ * signer for the local end-to-end run (src/dev.ts). Null is the deployed behaviour.
  */
 export type MintOptions = {
-  authorizationHandoff: AuthorizationHandoff | null;
+  authorizationHandoff: HandoffChoice | null;
   signer: SignerAccess | null;
 };
 
@@ -20,9 +19,9 @@ const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null };
 /**
  * The mint Worker's fetch handler. Placement runs it next to the identity store's primary, which
  * applies to fetch handlers only, not to RPC methods or named entrypoints (design 5.2). It serves
- * the issuer metadata and the OAuth endpoints once the identity store is bound
- * (src/oauth/routes.ts). Signer keys are served by the `SignerKeys` entrypoint
- * (src/signer-keys.ts), never by this handler.
+ * the issuer metadata, and the OAuth endpoints, the sign-in pages, the device grant and the
+ * tickets once the identity store is bound (src/oauth/routes.ts). Signer keys are served by the
+ * `SignerKeys` entrypoint (src/signer-keys.ts), never by this handler.
  */
 export async function handleRequest(
   request: Request,

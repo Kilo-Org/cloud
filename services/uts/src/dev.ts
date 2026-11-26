@@ -20,7 +20,9 @@ import type { SignerAccess } from './token/mint';
  * * The development sign-in hand-off approves every authorization request for one synthetic
  *   account, `DEV_ACCOUNT_ID`, signed in by passkey now. `dev_decision=deny` on the authorization
  *   request denies it, and a third-party request names its consent in `dev_consent_id`. The
- *   account and any consent must exist in the local identity store.
+ *   account and any consent must exist in the local identity store. An authorization request
+ *   with `dev_handoff=signin` uses the deployed sign-in pages instead, for the passkey
+ *   end-to-end run.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 
@@ -69,7 +71,10 @@ export async function handleDevRequest(
         ? async () => ({ status: 'unavailable' })
         : null;
     return await handleRequest(request, env, ctx, {
-      authorizationHandoff: developmentHandoff,
+      authorizationHandoff: signInPages => async (authorization, pending) =>
+        new URL(authorization.url).searchParams.get('dev_handoff') === 'signin'
+          ? await signInPages(authorization, pending)
+          : await developmentHandoff(authorization, pending),
       signer,
     });
   }

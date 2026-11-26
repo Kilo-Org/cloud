@@ -233,6 +233,8 @@ describe('identity-store client', () => {
 describe('PAT and bot key lookups', () => {
   it('find active credentials and skip revoked, expired, blocked or cut-off ones', async () => {
     const app = await db.connect('uts_app_a');
+    // Gate passes sit on a browser session, which only the sign-in functions write.
+    const fixtures = await db.connectAsOwner();
     const accountId = await insertAccount(app);
     const blockedAccountId = await insertAccount(app);
     await app.query(
@@ -254,7 +256,13 @@ describe('PAT and bot key lookups', () => {
                  now() - make_interval(days => $5) + interval '90 days',
                  $4::uts.credential_status, CASE WHEN $4::uts.credential_status = 'revoked' THEN now() END,
                  CASE WHEN $4::uts.credential_status = 'revoked' THEN 'user_revoke'::uts.revoke_reason END)`,
-        [owner, tokenHash, await insertGatePass(app, owner, 'pat_create'), status, createdDaysAgo]
+        [
+          owner,
+          tokenHash,
+          await insertGatePass(fixtures, owner, 'pat_create'),
+          status,
+          createdDaysAgo,
+        ]
       );
       return tokenHash;
     };
@@ -270,7 +278,7 @@ describe('PAT and bot key lookups', () => {
         [
           accountId,
           tokenHash,
-          await insertGatePass(app, accountId, 'bot_key_create'),
+          await insertGatePass(fixtures, accountId, 'bot_key_create'),
           status,
           flaggedDaysAgo,
           kept,

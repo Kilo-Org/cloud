@@ -20,6 +20,7 @@
     "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/uts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
+    "@simplewebauthn/server": "14.0.1",
     "jose": "catalog:",
     "pg": "8.23.1",
     "zod": "catalog:"
@@ -30,6 +31,7 @@
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
+    "playwright": "1.65.0",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

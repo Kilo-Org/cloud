@@ -106,14 +106,23 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   };
 }
 
+/** A store access that fails the request: a test that reaches it ran a statement it did not expect. */
+export const unexpectedStore = async (): Promise<never> => {
+  throw new Error('unexpected store call');
+};
+
 /** Endpoint dependencies with the real signer objects of the test pool. */
 export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
   return {
     config,
     grants,
     sign: signerAccess(env, config),
-    handoff: null,
-    deviceCodeGrant: null,
+    handoff: async () => {
+      throw new Error('unexpected hand-off');
+    },
+    device: null,
+    signIn: { config, signIn: unexpectedStore },
+    tickets: { config, tickets: unexpectedStore },
     ...overrides,
   };
 }

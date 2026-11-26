@@ -33,7 +33,10 @@ export function audienceOfResource(resource: string): string | null {
   return audience.success ? audience.data : null;
 }
 
-/** Error codes of RFC 6749 sections 4.1.2.1 and 5.2, RFC 7009, RFC 8707 and RFC 9449. */
+/**
+ * Error codes of RFC 6749 sections 4.1.2.1 and 5.2, RFC 7009, RFC 8628 section 3.5, RFC 8707 and
+ * RFC 9449.
+ */
 export const OAUTH_ERROR_CODES = [
   'invalid_request',
   'invalid_client',
@@ -48,6 +51,9 @@ export const OAUTH_ERROR_CODES = [
   'access_denied',
   'server_error',
   'temporarily_unavailable',
+  'authorization_pending',
+  'slow_down',
+  'expired_token',
 ] as const;
 export type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
 

@@ -35,6 +35,10 @@
     "UTS_ENVIRONMENT": "production",
     // Signer objects hold private keys, so production and staging pin them to the EU.
     "DO_JURISDICTION": "eu",
+    // Passkeys belong to the app host; the sign-in pages on the issuer origin use them as a
+    // WebAuthn related origin that the app host lists (design 5.14).
+    "WEBAUTHN_RP_ID": "app.kilo.ai",
+    "WEBAUTHN_ORIGINS": "https://uts.kiloapps.io",
   },
   "durable_objects": {
     "bindings": [
@@ -63,6 +67,8 @@
       "vars": {
         "UTS_ENVIRONMENT": "staging",
         "DO_JURISDICTION": "eu",
+        "WEBAUTHN_RP_ID": "staging-app.kilo.ai",
+        "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
       },
       "durable_objects": {
         "bindings": [
@@ -82,6 +88,9 @@
         "UTS_ENVIRONMENT": "development",
         // workerd enforces no data residency, so local development keeps objects unscoped.
         "DO_JURISDICTION": "none",
+        // A run on another port names its origin with `--var WEBAUTHN_ORIGINS:<origin>`.
+        "WEBAUTHN_RP_ID": "localhost",
+        "WEBAUTHN_ORIGINS": "http://localhost:8800",
       },
       "durable_objects": {
         "bindings": [

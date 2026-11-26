@@ -8,7 +8,12 @@ import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
 import { randomCredential, sha256 } from '../token/credentials';
-import { type FirstPartyClient, identifyClient, isLoopbackRedirect } from './clients';
+import {
+  type FirstPartyClient,
+  type RedirectRule,
+  identifyClient,
+  isRegisteredRedirect,
+} from './clients';
 import { jktOfParameter } from './dpop';
 import { classifyFailure, failureResponse, oauthError } from './errors';
 import { audiencesOfResources, paramsOf, parseScopes, targetMismatch } from './params';
@@ -37,6 +42,8 @@ export type AuthorizingClient =
       clientId: string;
       name: string;
       clientClass: FirstPartyClient['clientClass'];
+      /** How the client receives the code; a private-use scheme needs a fresh sign-in. */
+      redirectKind: RedirectRule['kind'];
     }
   | { kind: 'third_party'; clientId: string; name: string };
 
@@ -71,8 +78,8 @@ export type HandoffResult =
   | { status: 'interaction'; response: Response };
 
 /**
- * The sign-in and consent hand-off. The deployed entry wires none yet, so the authorization
- * endpoint is not served there; the sign-in slice provides it.
+ * The sign-in and consent hand-off: the sign-in pages' session (src/signin/handoff.ts) in a
+ * deployed entry.
  */
 export type AuthorizationHandoff = (
   request: Request,
@@ -115,7 +122,7 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   const identity = identifyClient(clientIdParam.value);
   let client: AuthorizingClient;
   if (identity.kind === 'first_party') {
-    if (!isLoopbackRedirect(identity.client, redirectUri)) {
+    if (!isRegisteredRedirect(identity.client, redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }
     client = {
@@ -123,6 +130,7 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       clientId: identity.client.clientId,
       name: identity.client.name,
       clientClass: identity.client.clientClass,
+      redirectKind: identity.client.redirect.kind,
     };
   } else if (identity.kind === 'third_party') {
     let record;

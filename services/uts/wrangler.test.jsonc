@@ -12,6 +12,8 @@
   "vars": {
     "UTS_ENVIRONMENT": "development",
     "DO_JURISDICTION": "none",
+    "WEBAUTHN_RP_ID": "localhost",
+    "WEBAUTHN_ORIGINS": "http://localhost:8800",
   },
   "durable_objects": {
     "bindings": [

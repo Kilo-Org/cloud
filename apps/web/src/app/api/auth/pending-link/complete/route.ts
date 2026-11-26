@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
+import { captureException } from '@sentry/nextjs';
 import type { PendingAuthLink, User } from '@kilocode/db/schema';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
@@ -150,11 +151,17 @@ async function attachPendingLink(request: Request, attempt: AuthAuditAttempt): P
   const session = await getUserFromSessionForCredentialIssuance();
   const sessionUser = session.user;
   // A refusal row hashes the email of the account the link names; the session
-  // already holds it when it is that account.
-  attempt.email =
-    sessionUser?.id === row.kilo_user_id
-      ? sessionUser.google_user_email
-      : ((await findUserById(row.kilo_user_id))?.google_user_email ?? null);
+  // already holds it when it is that account. A failed read leaves the hash
+  // out; the refusal is answered unchanged.
+  if (sessionUser?.id === row.kilo_user_id) {
+    attempt.email = sessionUser.google_user_email;
+  } else {
+    try {
+      attempt.email = (await findUserById(row.kilo_user_id))?.google_user_email ?? null;
+    } catch (error) {
+      captureException(error, { tags: { operation: 'pending_link_audit_email' } });
+    }
+  }
   if (!sessionUser) {
     return NextResponse.json({ error: 'SESSION_REQUIRED' }, { status: 401 });
   }

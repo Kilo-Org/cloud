@@ -1,4 +1,5 @@
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import type * as FindUserById from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 jest.mock('@/lib/auth/pending-link', () => ({
   clearPendingLinkCookie: jest.fn(),
@@ -17,6 +18,13 @@ jest.mock('@/lib/auth/sign-in-method-change', () => ({
 jest.mock('@/lib/auth/sign-in-method-change-email-code', () => ({
   consumeSignInMethodChangeCode: jest.fn(),
 }));
+// The real lookup, wrapped so one test can make it fail.
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => {
+  const actual = jest.requireActual<typeof FindUserById>(
+    '@kilocode/web-shared/lib/user/find-user-by-id'
+  );
+  return { ...actual, findUserById: jest.fn(actual.findUserById) };
+});
 
 import { GET, POST } from './route';
 import {
@@ -36,6 +44,7 @@ import { auth_audit_logs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { authAuditEmailHash } from '@/lib/auth/auth-audit';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const mockReadSecret = jest.mocked(readPendingLinkSecret);
 const mockGetPending = jest.mocked(getPendingLinkBySecret);
@@ -45,6 +54,7 @@ const mockIsLive = jest.mocked(isPendingLinkLive);
 const mockSession = jest.mocked(getUserFromSessionForCredentialIssuance);
 const mockAuthorize = jest.mocked(authorizeSignInMethodChange);
 const mockConsumeCode = jest.mocked(consumeSignInMethodChangeCode);
+const mockFindUserById = jest.mocked(findUserById);
 
 const liveRow = {
   id: 'pending-1',
@@ -314,6 +324,21 @@ describe('/api/auth/pending-link/complete', () => {
           failure_reason: 'wrong_account',
           subject_email_hash: authAuditEmailHash(owner.google_user_email),
         }),
+      ]);
+    });
+
+    it('answers the refusal unchanged and stores it without a hash when the email read fails', async () => {
+      const ownerId = `link-${randomUUID()}`;
+      mockGetPending.mockResolvedValue({ ...(liveRow as object), kilo_user_id: ownerId } as never);
+      mockSession.mockResolvedValue({ user: null } as never);
+      mockFindUserById.mockRejectedValueOnce(new Error('database unavailable'));
+
+      const response = await postComplete(codeProof);
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'SESSION_REQUIRED' });
+      expect(await rowsFor(ownerId)).toEqual([
+        expect.objectContaining({ failure_reason: 'session_required', subject_email_hash: null }),
       ]);
     });
   });

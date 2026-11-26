@@ -437,7 +437,7 @@ function scrubExceptions(exception: Record<string, unknown>, contexts: unknown):
  *   so a volatile build path, host, or port inside the message or the stack
  *   cannot split one defect into many issues.
  */
-export function scrubEvent<T>(event: T): T {
+export function scrubEvent<T>(event: T): T | null {
   try {
     if (event == null || typeof event !== 'object') {
       return event;
@@ -504,10 +504,11 @@ export function scrubEvent<T>(event: T): T {
     }
 
     return event;
-  } catch (error) {
-    // A failed scrub must not send the event unscrubbed: every caller drops an
-    // event whose scrub throws.
-    throw new Error('Sentry event scrub failed', { cause: error });
+  } catch {
+    // A failed scrub drops the event rather than sending it unscrubbed. It does
+    // not throw: a throw from a beforeSend hook makes the SDK capture an
+    // internal error event that skips these hooks.
+    return null;
   }
 }
 

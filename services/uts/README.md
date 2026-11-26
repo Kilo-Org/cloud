@@ -266,6 +266,12 @@ and the code are stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`. De
 no mail sender yet (`src/signin/email/mailer.ts`), so the email sign-in is offered only where one
 is wired; the development entry records each message (`GET /__dev/mail?to=`).
 
+Open item before a mail sender is wired: past the code cap every sign-in email still carries the
+link, so an address can be sent many emails. Wiring a sender needs first a per-network cap on
+unauthenticated `POST /signin/email/start` requests and a Turnstile check on the email start form
+(its secret is production configuration). A total cap per address is not used, because anyone
+could then spend the owner's emails and lock the owner out.
+
 ### Configuration
 
 A method is offered only when every value it needs is set; with some set and others missing it is

@@ -126,9 +126,9 @@ reached an audit row, and times the mint path.
 | Endpoint | Behaviour | SQL |
 |---|---|---|
 | `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
-| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A retry of the same request while the code's 60-second lifetime lasts gets the same grant and a new refresh token (below); any other second use of a code revokes the grant | `uts.exchange_authorization_code` |
-| `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation, 60-second grace, reuse after the grace revokes the family and writes a feed entry | `uts.refresh_first_party`, `uts.refresh_third_party` |
-| `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
+| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A first-party retry of the same request while the code's 60-second lifetime lasts gets the same grant and a new refresh token (below); any other second use of a code, a third-party one included, revokes the grant | `uts.exchange_authorization_code` |
+| `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation, 60-second grace, reuse after the grace revokes the family and writes a feed entry; a token rotated more than 30 days ago is deleted and then unknown | `uts.refresh_first_party`, `uts.refresh_third_party` |
+| `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; a token issued to another client answers 200 like an unknown token and writes a denied row (at most one per grant per minute); an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
 | `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
 
 Each call verifies at most one DPoP proof before the grant read. The grant statement records the
@@ -402,24 +402,41 @@ The relay reads only the newest rows, so the tier needs disk more than memory. T
 moves up one compute size when its buffer cache hit ratio stays below 99 percent for an hour at
 peak, and its disk grows before data and indexes pass 70 percent of it.
 
+Third-party refresh tokens are the other table that grows with traffic. A token row with its six
+indexes takes about 300 bytes. Each refresh rotates the token, and `uts.maintain_oauth_rows()`
+deletes a rotated token 30 days after its rotation (below), so a family keeps at most 30 days / 8
+minutes = 5,400 rotated tokens plus its current one. As an upper bound, with every family
+refreshing every 8 minutes for 30 days:
+
+| Active third-party families | Token rows | Table and indexes |
+| --- | --- | --- |
+| 10k | 54M | ~16 GB |
+| 50k | 270M | ~81 GB |
+| 200k | 1.08B | ~324 GB |
+
 ### OAuth row maintenance
 
-The app login cannot delete credential rows, so `uts.maintain_oauth_rows()` (SECURITY DEFINER,
-granted to `uts_app`) removes the rows no statement reads again. Each call deletes at most 5,000
-rows of each kind and returns one `(kind, deleted)` row per kind; the cron calls it until every
-count is under 5,000. It deletes:
+The app login cannot delete credential rows, so `uts.maintain_oauth_rows()` (SECURITY DEFINER)
+removes the rows no statement reads again. Each call deletes at most 5,000 rows of each kind and
+returns one `(kind, deleted)` row per kind. Like `uts.maintain_audit_partitions()`, it has no
+caller in this service yet: the UTS cron that slice 3.9 adds calls both, this one until every
+count is under 5,000. `uts_app` holds EXECUTE on it by choice until then; it takes no input and
+every delete is time-gated, so a caller can only remove dead rows sooner. Slice 3.9 moves it to a
+dedicated maintenance role. It deletes:
 
 | Rows | When | Why that is safe |
 | --- | --- | --- |
 | `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
-| `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end, newest first | Each such token fails anyway. While a family lives, every rotated token stays, so a reuse is detected however old the token is |
+| `third_party_refresh_tokens` | Every token of a family that is revoked or past its 90-day end, newest first | Each such token fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
+| `rotated_refresh_tokens` | A rotated token of a live family 30 days after its rotation, the longest idle window a token has | Reuse detection covers tokens rotated within 30 days; an older one is then unknown (`invalid_grant`) instead of revoking the family. A thief who rotates a stolen token is still caught when the real client next presents its own token, rotated minutes before. The oldest kept token's `parent_id` becomes NULL |
 | `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
 | `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
 
-It never deletes a grant, a family row, a live token, or a code within its lifetime
+It never deletes a grant, a family row, a family's current token, or a code within its lifetime
 (`test/db/oauth-grants.test.ts`). At one mint per active client every 8 minutes, the DPoP rows
 arrive at 21, 104 and 417 per second for 10k, 50k and 200k clients: 1,250, 6,250 and 25,000 per
-minute, so a cron that runs every minute makes 1 to 5 calls.
+minute, and rotated third-party tokens age out at the same rate per third-party family, so a cron
+that runs every minute makes 1 to 5 calls.
 
 ### Third-party grace window
 

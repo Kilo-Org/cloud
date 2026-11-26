@@ -240,7 +240,6 @@ export const ThirdPartyRefreshTokenRowSchema = z.strictObject({
   status: z.enum(enums.REFRESH_TOKEN_STATUSES),
   rotated_at: timestamp.nullable(),
   grace_until: timestamp.nullable(),
-  revoked_at: timestamp.nullable(),
 });
 
 export const AuthorizationCodeRowSchema = z.strictObject({

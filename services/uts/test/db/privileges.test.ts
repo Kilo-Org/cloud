@@ -129,6 +129,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     expect(maintenance.rows.map(row => row.kind)).toEqual([
       'authorization_codes',
       'third_party_refresh_tokens',
+      'rotated_refresh_tokens',
       'revocations',
       'dpop_proofs',
     ]);

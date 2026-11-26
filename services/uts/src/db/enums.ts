@@ -42,7 +42,7 @@ export const REVOKE_REASONS = [
 ] as const;
 export const SESSION_STATUSES = ['active', 'revoked'] as const;
 export const GRANT_STATUSES = ['active', 'revoked'] as const;
-export const REFRESH_TOKEN_STATUSES = ['active', 'rotated', 'revoked'] as const;
+export const REFRESH_TOKEN_STATUSES = ['active', 'rotated'] as const;
 export const CODE_STATUSES = ['issued', 'consumed'] as const;
 export const DEVICE_CODE_STATUSES = ['pending', 'approved', 'denied', 'consumed'] as const;
 export const EMAIL_CODE_PURPOSES = ['sign_in', 'tier_a'] as const;

@@ -269,8 +269,10 @@ AS $$
 $$;
 
 -- Revokes one grant and writes its feed entry. A first-party grant also ends its device session
--- once no active grant of that session is left; a third-party family revokes every token in it.
--- Returns the grant's account when this call revoked it, NULL when it was revoked already.
+-- once no active grant of that session is left. A third-party family's tokens keep their rows:
+-- every reader of a token checks its family's status, so revoking a family writes one row however
+-- many tokens it holds. Returns the grant's account when this call revoked it, NULL when it was
+-- revoked already.
 CREATE FUNCTION uts.end_grant(p_kind uts.client_kind, p_grant_id uuid, p_reason uts.revoke_reason)
 RETURNS text
 LANGUAGE plpgsql
@@ -307,9 +309,6 @@ BEGIN
     IF NOT FOUND THEN
       RETURN NULL;
     END IF;
-    UPDATE uts.third_party_refresh_tokens AS token
-    SET status = 'revoked', revoked_at = now()
-    WHERE token.family_id = p_grant_id AND token.status <> 'revoked';
     INSERT INTO uts.revocations (kind, subject_id, feed_expires_at)
     VALUES ('third_party_family', p_grant_id::text, now() + interval '20 minutes')
     ON CONFLICT (kind, subject_id) DO NOTHING;
@@ -798,7 +797,9 @@ $$;
 -- (design sections 5.3 and 5.4). The active token rotates to `p_new_token_hash`. A rotated token
 -- presented within its 60-second grace (a retry after a lost response) rotates the family's
 -- current token instead. A rotated token presented after its grace revokes the whole family,
--- writes the feed entry and a denied audit row, and fails.
+-- writes the feed entry and a denied audit row, and fails. `uts.maintain_oauth_rows()` deletes a
+-- token 30 days after its rotation, so a token rotated longer ago is unknown (`invalid_grant`)
+-- and revokes nothing.
 -- Outcomes: `issued`, `invalid_grant`, `invalid_scope`, `invalid_target`, `reuse_detected`.
 CREATE FUNCTION uts.refresh_third_party(
   p_environment text,
@@ -1090,19 +1091,27 @@ BEGIN
 END
 $$;
 
--- Every token of a family, for the family's revocation and for `uts.maintain_oauth_rows()`.
+-- Every token of a family, for `uts.maintain_oauth_rows()` on an ended family.
 CREATE INDEX third_party_refresh_tokens_family_idx ON uts.third_party_refresh_tokens (family_id);
+-- Rotated tokens by rotation time, for `uts.maintain_oauth_rows()`.
+CREATE INDEX third_party_refresh_tokens_rotated_idx ON uts.third_party_refresh_tokens (rotated_at)
+  WHERE status = 'rotated';
 
 -- Deletes OAuth rows that no statement reads again, at most 5,000 of each kind per call (README,
--- "OAuth row maintenance"). The UTS cron calls it through the app role until every count is under
--- 5,000; each call is one statement, so through Hyperdrive each batch is its own short
--- transaction. It never deletes a grant, a family, a live token, or a code within its lifetime:
+-- "OAuth row maintenance"). The UTS cron (slice 3.9) calls it until every count is under 5,000;
+-- each call is one statement, so through Hyperdrive each batch is its own short transaction. The
+-- app role holds it until that cron gets its own maintenance role. It never deletes a grant, a
+-- family, a family's current token, or a code within its lifetime:
 -- * authorization codes 1 hour past their 60-second lifetime, used or not (until then a second
 --   use of a used code still revokes its grant);
 -- * every refresh token of a third-party family that ended (revoked, or past its 90-day end):
---   such a token already fails, so no reuse check needs it. While a family lives, each rotated
---   token stays, so a reuse is detected however old the token is. Newest first, so a deleted
---   token never cascades to a child token outside the batch;
+--   such a token already fails, so no reuse check needs it. Newest first, so a deleted token
+--   leaves no child outside the batch whose `parent_id` must be cleared;
+-- * rotated refresh tokens of a live family 30 days after their rotation, the longest idle window
+--   a token has. Reuse detection covers a token rotated within the last 30 days; an older one is
+--   then unknown. A thief who rotates a stolen token is still caught when the real client next
+--   presents its token, which was rotated minutes before. The oldest kept token's `parent_id`
+--   becomes NULL;
 -- * revocation feed entries past `feed_expires_at`;
 -- * DPoP proof `jti`s past `expires_at`, which no clock accepts again.
 CREATE FUNCTION uts.maintain_oauth_rows()
@@ -1134,6 +1143,16 @@ BEGIN
     LIMIT batch
   );
   kind := 'third_party_refresh_tokens';
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN NEXT;
+
+  DELETE FROM uts.third_party_refresh_tokens AS token
+  WHERE token.id IN (
+    SELECT old.id FROM uts.third_party_refresh_tokens AS old
+    WHERE old.status = 'rotated' AND old.rotated_at < now() - interval '30 days'
+    LIMIT batch
+  );
+  kind := 'rotated_refresh_tokens';
   GET DIAGNOSTICS deleted = ROW_COUNT;
   RETURN NEXT;
 

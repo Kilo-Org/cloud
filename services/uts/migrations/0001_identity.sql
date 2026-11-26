@@ -71,7 +71,7 @@ CREATE TYPE uts.revoke_reason AS ENUM (
 );
 CREATE TYPE uts.session_status AS ENUM ('active', 'revoked');
 CREATE TYPE uts.grant_status AS ENUM ('active', 'revoked');
-CREATE TYPE uts.refresh_token_status AS ENUM ('active', 'rotated', 'revoked');
+CREATE TYPE uts.refresh_token_status AS ENUM ('active', 'rotated');
 CREATE TYPE uts.code_status AS ENUM ('issued', 'consumed');
 CREATE TYPE uts.device_code_status AS ENUM ('pending', 'approved', 'denied', 'consumed');
 CREATE TYPE uts.email_code_purpose AS ENUM ('sign_in', 'tier_a');
@@ -457,15 +457,18 @@ CREATE INDEX third_party_grant_families_consent_idx ON uts.third_party_grant_fam
 CREATE TABLE uts.third_party_refresh_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   family_id uuid NOT NULL REFERENCES uts.third_party_grant_families (id) ON DELETE CASCADE,
-  -- The token this one replaced; the chain runs back to the family's first token.
-  parent_id uuid UNIQUE REFERENCES uts.third_party_refresh_tokens (id) ON DELETE CASCADE,
+  -- The token this one replaced; the chain runs back to the oldest token the family keeps. NULL
+  -- for the family's first token, and once the replaced token is deleted: a rotated token is kept
+  -- 30 days (`uts.maintain_oauth_rows`), and its deletion must not take the live chain with it.
+  parent_id uuid UNIQUE REFERENCES uts.third_party_refresh_tokens (id) ON DELETE SET NULL,
   token_hash uts.sha256 NOT NULL,
   issued_at timestamptz NOT NULL DEFAULT now(),
   idle_expires_at timestamptz NOT NULL,
+  -- A revoked or ended family revokes its tokens without touching their rows: every reader checks
+  -- the family's status.
   status uts.refresh_token_status NOT NULL DEFAULT 'active',
   rotated_at timestamptz,
   grace_until timestamptz,
-  revoked_at timestamptz,
   CONSTRAINT third_party_refresh_tokens_token_hash_key UNIQUE (token_hash),
   CONSTRAINT third_party_refresh_tokens_lifetime CHECK (
     idle_expires_at > issued_at AND idle_expires_at <= issued_at + interval '30 days'
@@ -474,11 +477,7 @@ CREATE TABLE uts.third_party_refresh_tokens (
   -- time must compare as false.
   CONSTRAINT third_party_refresh_tokens_status_shape CHECK (
     grace_until IS NOT DISTINCT FROM rotated_at + interval '60 seconds'
-    AND CASE status
-      WHEN 'active' THEN rotated_at IS NULL AND revoked_at IS NULL
-      WHEN 'rotated' THEN rotated_at IS NOT NULL AND revoked_at IS NULL
-      ELSE revoked_at IS NOT NULL
-    END
+    AND (status = 'rotated') = (rotated_at IS NOT NULL)
   )
 );
 -- One live token per family.

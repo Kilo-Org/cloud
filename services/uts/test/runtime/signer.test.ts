@@ -124,6 +124,40 @@ describe('signer keys', () => {
     expect(result).toMatchObject({ status: 'ok', signer: 2 });
   });
 
+  it("refuses stored keys in any object but that signer's object of this environment", async () => {
+    const state = await storedState();
+    const reason = `stored state names signer ${SIGNER}, but this is not that signer's development object`;
+    // Another signer's object, and this signer's object of another environment.
+    try {
+      for (const name of ['development:signer:06', 'staging:signer:05']) {
+        const stub = () => env.UTS_SIGNER_DO.getByName(name);
+        await runInDurableObject(stub(), async (_instance, object) => {
+          await object.storage.deleteAlarm();
+          await object.storage.deleteAll();
+          await object.storage.put('signer-state', state);
+        });
+        await runInDurableObject(stub(), (_instance, object) => object.abort('test restart')).catch(
+          () => undefined
+        );
+        expect(await stub().publicKeys()).toEqual({ status: 'misconfigured', reason });
+        expect(await stub().sign(claims())).toEqual({ status: 'misconfigured', reason });
+        expect(await stub().removeKid(state.current.kid)).toEqual({
+          status: 'misconfigured',
+          reason,
+        });
+      }
+    } finally {
+      await resetSigner(6);
+    }
+  });
+
+  it('loads its stored keys when opened by its raw id, which carries no name, as an alarm does', async () => {
+    const before = await published();
+    const id = env.UTS_SIGNER_DO.idFromString(signer().id.toString());
+    await restartSigner(SIGNER);
+    expect(await env.UTS_SIGNER_DO.get(id).publicKeys()).toEqual(before);
+  });
+
   it('schedules its alarm for the next rotation', async () => {
     const state = await storedState();
     expect(await storedAlarm()).toBe(state.current.activatedAt + 30 * DAY);
@@ -183,6 +217,8 @@ describe('signing', () => {
       [claims({ iss: 'https://uts.kiloapps.io' }), 'issuer_mismatch'],
       [claims({ env: 'production' }), 'environment_mismatch'],
       [claims({ iat: now - 120, exp: now + 600 }), 'issued_at_out_of_range'],
+      [claims({ iat: now - 30, exp: now - 1 }), 'already_expired'],
+      [claims({ iat: now - 30, exp: now }), 'already_expired'],
       [claims({ iat: now + 59, exp: now + 3659 }), 'expires_too_late'],
     ] as const;
     for (const [input, reason] of cases) {
@@ -313,5 +349,48 @@ describe('emergency removal', () => {
     await signer().removeKid(start.current.kid);
     await restartSigner(SIGNER);
     expect(await publishedKids()).not.toContain(start.current.kid);
+  });
+
+  it('answers a repeated removal with the stored entry and changes nothing, also after a restart', async () => {
+    const start = await storedState();
+    const first = await signer().removeKid(start.current.kid);
+    if (first.status !== 'removed') throw new Error(`answered ${first.status}`);
+    const removedState = await storedState();
+    expect(removedState.removed).toEqual([first.removal]);
+    expect(await signer().removeKid(start.current.kid)).toEqual(first);
+    await restartSigner(SIGNER);
+    expect(await signer().removeKid(start.current.kid)).toEqual(first);
+    expect(await storedState()).toEqual(removedState);
+  });
+
+  it('removes the key once when a retry follows a call that failed on its alarm write', async () => {
+    const start = await storedState();
+    // The failed alarm write throws inside the transition, which resets the object.
+    await expect(
+      runInDurableObject(signer(), async (instance: UtsSignerDO, object) => {
+        vi.spyOn(object.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
+        await instance.removeKid(start.current.kid);
+      })
+    ).rejects.toThrow('alarm write failed');
+    // The key change and its alarm commit together, so the failed call stored nothing.
+    expect(await storedState()).toEqual(start);
+    const retry = await signer().removeKid(start.current.kid);
+    if (retry.status !== 'removed') throw new Error(`answered ${retry.status}`);
+    const after = await storedState();
+    expect(after.current.kid).toBe(start.next.kid);
+    expect(after.removed).toEqual([retry.removal]);
+    expect(await storedAlarm()).toBe(retry.removal.revokeUntil);
+    expect(await signer().removeKid(start.current.kid)).toEqual(retry);
+  });
+
+  it('drops the stored entry by alarm at its revokeUntil', async () => {
+    const start = await storedState();
+    const first = await signer().removeKid(start.current.kid);
+    if (first.status !== 'removed') throw new Error(`answered ${first.status}`);
+    expect(await storedAlarm()).toBe(first.removal.revokeUntil);
+    const following = await alarmAt(first.removal.revokeUntil);
+    expect((await storedState()).removed).toEqual([]);
+    expect(following).toBe((await storedState()).next.activatesAt);
+    expect(await signer().removeKid(start.current.kid)).toEqual({ status: 'unknown_kid' });
   });
 });

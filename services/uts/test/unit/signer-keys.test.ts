@@ -9,11 +9,14 @@ import { KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
 import type { PublicKeysResult } from '../../src/dos/UtsSignerDO';
 import {
   combineSignerKeys,
+  HELD_KEYS_STORE_MS,
+  heldKeysToStore,
   newSignerKeysCache,
   readThroughIsolateShard,
   SIGNER_KEYS_COPY_MS,
   SIGNER_READ_DEADLINE_MS,
   signerKeysAnswer,
+  StoredHeldKeysSchema,
   type HeldSignerKeys,
   type ReadSigners,
   type SignerAnswers,
@@ -237,6 +240,43 @@ describe('signerKeysAnswer', () => {
     for (const { read } of shards) {
       expect(read.reads).toEqual([0, 2000, 4000, 6000, 8000].map(offset => T0 + offset));
     }
+  });
+});
+
+describe('heldKeysToStore', () => {
+  it('stores nothing while no keys are held, then the first held keys', async () => {
+    expect(heldKeysToStore(cache, T0)).toBeNull();
+    await answerAt(
+      T0,
+      reader(async () => all())
+    );
+    expect(heldKeysToStore(cache, T0)).toBe(cache.held);
+  });
+
+  it('stores again when a signer changes its kids, or once the stored copy is 10 minutes old', async () => {
+    let answers = all();
+    const read = reader(async () => answers);
+    await answerAt(T0, read);
+    cache.stored = { held: cache.held, at: T0 };
+    await answerAt(T0 + SIGNER_KEYS_COPY_MS, read);
+    expect(heldKeysToStore(cache, T0 + SIGNER_KEYS_COPY_MS)).toBeNull();
+    expect(heldKeysToStore(cache, T0 + HELD_KEYS_STORE_MS)).toBe(cache.held);
+    answers = all();
+    answers[5] = answer(5, 1);
+    await answerAt(T0 + 2 * SIGNER_KEYS_COPY_MS, read);
+    expect(heldKeysToStore(cache, T0 + 2 * SIGNER_KEYS_COPY_MS)).toBe(cache.held);
+  });
+
+  it('accepts the stored form only with each kid under its own signer', async () => {
+    await answerAt(
+      T0,
+      reader(async () => all())
+    );
+    expect(StoredHeldKeysSchema.parse(cache.held)).toEqual(cache.held);
+    const swapped = [...cache.held];
+    [swapped[1], swapped[2]] = [swapped[2] ?? null, swapped[1] ?? null];
+    expect(StoredHeldKeysSchema.safeParse(swapped).success).toBe(false);
+    expect(StoredHeldKeysSchema.safeParse(cache.held.slice(1)).success).toBe(false);
   });
 });
 

@@ -48,15 +48,18 @@ Each object:
   `#`-private, and no RPC method returns or accepts a private key (`test/runtime/signer.test.ts`
   calls the other members through a stub and expects each call to fail);
 - refuses to create keys under any other name or in any other jurisdiction than its environment's,
-  and then answers every call with `misconfigured`, a deploy error that no retry fixes;
+  and refuses stored keys in any object but that signer's object of its environment: the id must
+  be the one the signer's name gives in the environment's jurisdiction, a check that needs no name
+  on the id, so it also holds when an alarm starts the object. A refused object answers every call
+  with `misconfigured`, a deploy error that no retry fixes;
 - publishes the public halves under `uts-token-<signer>-<RFC 7638 thumbprint>`;
 - signs with `sign(claims)`: a compact JWS with header `alg: EdDSA`, `typ: at+jwt`, `kid`. It refuses
-  a claim set with another issuer or environment, an `iat` more than 60 seconds from now, or an
-  `exp` more than 1 hour ahead, the longest UTS token lifetime. `src/keys/claims.ts` is the
-  signer's admission check; the published claim contract is phase 2's `AccessTokenClaimsSchema`
-  (`@kilocode/sts-contracts`), and every claim set the signer accepts also passes it. A mint signs
-  its 1 to 8 tokens in one `signMany(claims[])` call: each claim set passes the same check, one
-  refused set refuses the batch, and all tokens carry the same `kid`;
+  a claim set with another issuer or environment, an `iat` more than 60 seconds from now, an `exp`
+  at or before now, or an `exp` more than 1 hour ahead, the longest UTS token lifetime.
+  `src/keys/claims.ts` is the signer's admission check; the published claim contract is phase 2's
+  `AccessTokenClaimsSchema` (`@kilocode/sts-contracts`), and every claim set the signer accepts
+  also passes it. A mint signs its 1 to 8 tokens in one `signMany(claims[])` call: each claim set
+  passes the same check, one refused set refuses the batch, and all tokens carry the same `kid`;
 - rotates by alarm: a key signs for 30 days. Each rotation creates the next key at once, to sign
   30 days later, so every signer always publishes a current and a next key, and the next key is
   published at least 7 days before it signs (a new object publishes its first two keys at once, the
@@ -74,9 +77,12 @@ Each object:
   long between the two removals, and before the second one check that the public key set
   (`/.well-known/jwks.json` on the feed Worker) lists the signer's new next `kid`; removing at once
   leaves that signer's new tokens unverifiable for up to that time. The result is
-  the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The revocation feed
-  writes it once that feed exists. No route calls `removeKid` yet: it stays unreachable until the
-  revocation-feed slice adds the operator route, which audits and alerts on each removal;
+  the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The object stores the
+  entry with the key change and keeps it until `revokeUntil`, so a repeated call for the same `kid`
+  (after a lost answer, or an alarm write that failed behind a stored removal) answers the same
+  entry and changes nothing. The revocation feed writes it once that feed exists. No route calls
+  `removeKid` yet: it stays unreachable until the revocation-feed slice adds the operator route,
+  which audits and alerts on each removal;
 - logs each rotation and removal as `uts.signer.key_event` (`SignerKeyEvent`, public `kid`s only),
   the event the UTS audit pipeline will carry (design 8.3).
 
@@ -94,19 +100,25 @@ The entrypoint does not read the signer objects itself. It asks one of 8 key-set
 `UtsKeySetDO` (`src/dos/UtsKeySetDO.ts`), named `<environment>:keyset:<0-7>` and created in the
 `eu` jurisdiction with the `weur` hint, like the signer objects; a shard under another name or
 outside its jurisdiction answers `misconfigured`. Each isolate draws its shard at random once, so
-feed isolates spread evenly over the 8 shards. Each shard holds, as plain data in memory:
+feed isolates spread evenly over the 8 shards. Each shard holds:
 
-- a copy of its last combined answer, served for 2 seconds, with one read in flight; a request
-  that needs that read polls for it. The 16 signer objects therefore see at most 8 reads per 2
-  seconds, however many feed isolates ask;
-- every signer's last good keys. A signer whose call fails, or whose object refuses to load,
-  answers those keys with their own `readAt` while they are under 24 hours old, and its failure
-  after that; each failure is logged with the read time of the keys that stood in.
+- a copy of its last combined answer, in memory, served for 2 seconds, with one read in flight; a
+  request that needs that read polls for it. The 16 signer objects therefore see at most 8 reads
+  per 2 seconds, however many feed isolates ask;
+- every signer's last good keys, in memory and in its KV storage (public keys only). A signer whose
+  call fails, or whose object refuses to load, answers those keys with their own `readAt` while
+  they are under 24 hours old, and its failure after that; each failure is logged with the read
+  time of the keys that stood in. The shard stores them when a signer's kids change and otherwise
+  at most once per 10 minutes, so a restarted shard (a deploy, an eviction) still answers a failing
+  signer's keys, with a `readAt` at most 10 minutes earlier than their last good read: a restart
+  can shorten a hold, never lengthen it. A cold feed isolate whose shard also restarted therefore
+  never builds a key set without them. Only a shard that has never read a signer, which happens
+  only while a new deployment's shards make their first reads, has nothing to stand in for it.
 
 Every signer call of a read, retries included, ends within 5 seconds, and every entrypoint call to
 its shard, retries included, within 8 seconds, so a hung object cannot hold a read past the feed
 Worker's 10-second read guard. Each RPC result, from a signer and from a shard, is copied out and
-disposed. A shard stores nothing: a restarted shard reads the signers again.
+disposed.
 
 It answers only a service binding to this entrypoint whose `props.caller` is the feed Worker's
 deployed name for its own environment, and refuses every other binding, with another caller or
@@ -118,29 +130,33 @@ any unknown path. Placement does not apply to a named entrypoint, so the entrypo
 feed Worker runs and makes one call to its shard in the EU per read.
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
 UTS Durable Object class or binds the mint Worker, any feed binding at an entrypoint other than
-`SignerKeys` or whose caller is not the feed block's own name, and any drift in the UTS configs
-(names, `eu` jurisdiction, placement, traces).
+`SignerKeys` or whose caller is not the feed block's own name, any config but `wrangler.dev.jsonc`
+that runs the development entry, and any drift in the UTS configs (names, `eu` jurisdiction,
+placement, traces, the development config's deploy guard).
 
 ## Local development
 
 ```sh
-cd services/uts && pnpm exec wrangler dev --env local --persist-to ../../.wrangler-uts
+cd services/uts && pnpm exec wrangler dev -c wrangler.dev.jsonc --persist-to ../../.wrangler-uts
 cd services/uts-feed && pnpm exec wrangler dev --env local --persist-to ../../.wrangler-uts
 curl -s http://localhost:8801/.well-known/jwks.json
 ```
 
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
-only the `local` block runs (`test/repo` fails a deployed block that runs it), and the claim set
-must name the development issuer. The same entry wires the development sign-in hand-off
+only `wrangler.dev.jsonc` runs, and the claim set must name the development issuer. That config
+cannot be deployed: its build command, which Wrangler runs before `dev`, `deploy` and `versions
+upload` with `WRANGLER_COMMAND` set to the command, fails for every command but `dev`, and
+`test/repo` fails any other config that runs the development entry. `wrangler.jsonc` holds only the
+production and staging blocks. The same entry wires the development sign-in hand-off
 (`src/dev.ts`): it approves every authorization request for the synthetic account `dev:uts-local`.
 
-The local block binds the local identity store as `IDENTITY_STORE`. The UTS logins have no password
+The local config binds the local identity store as `IDENTITY_STORE`. The UTS logins have no password
 in the repository, so give `uts_app_a` one and pass the URL to wrangler:
 
 ```sh
 CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE=postgres://uts_app_a:<password>@127.0.0.1:55432/uts \
-  pnpm exec wrangler dev --env local
+  pnpm exec wrangler dev -c wrangler.dev.jsonc
 UTS_E2E_BASE_URL=http://127.0.0.1:8800/ UTS_E2E_ADMIN_URL=... UTS_E2E_APP_URL=... \
   pnpm exec tsx scripts/oauth-e2e.ts
 ```
@@ -243,8 +259,8 @@ jq '.keys | length' /tmp/jwks.json
 curl -sS https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server
 ```
 
-Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and metadata naming
-`https://uts-staging.kiloapps.io` and the feed key set.
+Expect `200`, `cache-control: max-age=300, stale-if-error=<86100 or less>`, `32`, and metadata
+naming `https://uts-staging.kiloapps.io` and the feed key set.
 
 1. **`eu` jurisdiction and location hint together (design 5.7).** Each signer object logs
    `uts.signer.bootstrapped` once, when it creates its keys, and each key-set shard logs
@@ -329,18 +345,24 @@ its Hyperdrive configs, and those configs run with caching disabled.
 
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
-| `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the credential tables except codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s, which it reads and writes only through the OAuth functions; INSERT on chosen audit columns and SELECT on audit rows; SELECT and UPDATE on relay watermarks; `uts.maintain_audit_partitions()` and `uts.maintain_oauth_rows()` |
+| `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations. Holds the privileges of every UTS login (no SET), so `uts.end_long_transactions()` can end their sessions |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the ungated credential tables; on gated rows (gate passes, PATs, org bot keys, CI trust policies, third-party consents, device approvals) SELECT, DELETE and UPDATE of lifecycle columns only; codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()` and `uts.end_long_transactions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
 Each group has two logins. UTS rotates the password of the idle login and then switches each
 Hyperdrive config to it, so the login in use never changes. Every login ends a transaction that
-stays idle for 10 seconds (`idle_in_transaction_session_timeout`) and cancels a statement that runs
-for 5 seconds (`statement_timeout`), so one stuck session or one long statement cannot hold back the
-audit relay. The database itself sets the same idle limit for every other session (admin,
-migration, dashboard). The relay's horizon is the oldest open transaction of the whole server, so
-the alert on an unrelayed row older than 60 seconds covers sessions in other databases.
+stays idle for 10 seconds (`idle_in_transaction_session_timeout`) or lasts 10 seconds
+(`transaction_timeout`), and cancels a statement that runs for 5 seconds (`statement_timeout`), so
+one stuck session or one long statement cannot hold back the audit relay. The database itself sets
+the same idle limit for every other session (admin, migration, dashboard). These are defaults that
+a session can change for itself, so they bound mistakes only. `uts.end_long_transactions()` bounds a
+session that changes them: it ends every session of a UTS login whose transaction started more than
+30 seconds ago, a limit the caller cannot change. The audit relay slice's minute cron and each of
+its relay runs will call it before they read; nothing calls it in this package yet, so that bound
+holds only once the relay lands (then about 35 seconds). The relay's horizon is the oldest open
+transaction of the whole server, so the alert on an unrelayed row older than 60 seconds covers
+sessions of other logins and in other databases.
 
 ### Platform roles
 
@@ -349,7 +371,10 @@ database but has no `TEMP`. Members of `pg_read_all_data` and `pg_write_all_data
 every table, so a deploy runs `pnpm db:check-access` (`scripts/check-platform-access.ts`) with the
 migration connection. It lists the members of both roles and fails when `anon`, `authenticated` or
 `service_role` holds any privilege on `uts`, `uts_read` or `uts_migrations`, or on anything in them,
-whether granted directly, through `PUBLIC` or through an inherited role.
+whether granted directly, through `PUBLIC` or through an inherited role. It checks every role a
+platform role can switch to with `SET ROLE` the same way, since a membership with `SET TRUE,
+INHERIT FALSE` passes on no privilege until the session switches, and reports such a privilege as
+`... through SET ROLE <role>`.
 
 ### Rules for statements
 
@@ -368,6 +393,30 @@ whether granted directly, through `PUBLIC` or through an inherited role.
   holds a constant `gate_pass_action` column, a foreign key on (pass, account, action) and a unique
   pass id. A pass is never swept while a credential refers to it: those foreign keys refuse the
   delete, and an org bot key lets go of its pass only once it is flagged, kept or revoked.
+- No login role writes a gate pass or a gated row. A tier B gate is decided inside the statement
+  that writes the credential: `uts.write_gated_pat` and `uts.write_gated_bot_key` compute the
+  checks the caller's session meets now (`uts.tier_b_checks`: a sign-in or a passkey step-up of
+  that session within 10 minutes), then write the pass already consumed and the credential that
+  names it in one statement. No statement takes a pass id from its caller, so an expired, used or
+  released pass can serve nothing. These write steps have no grant; the account API's SECURITY
+  DEFINER statements, which will call them and write the audit row and the notice in the same
+  statement, arrive in a later pull request of this stack. Only PATs and org bot keys have a write
+  step here: the write paths for CI trust policies, third-party consents and device approval also
+  arrive in later pull requests, and until then none of these flows has a write path.
+- A PAT bound to an organization, and every org bot key, needs an active membership (owner or
+  admin for a bot key). The write step locks the account row first, then holds the membership row
+  `FOR SHARE` until commit, so a member removal that runs at the same time waits for the new
+  credential. The removal sees it only if it updates the membership row in one statement and
+  revokes the member's org-bound PATs and flags the member's keys in later statements of a
+  VOLATILE function (each statement takes a fresh snapshot), or does that from a row trigger on
+  `uts.org_memberships`. A removal written as one statement, with data-modifying CTEs, keeps the
+  snapshot it took before the wait and misses the new credential. An account holds at most 100
+  live PATs and an organization at most 100 live bot keys, counted behind a lock.
+- The app login can still revoke, flag, keep, deny and record use of gated rows, through column
+  grants that leave out the holder, the hash, the scope, the lifetime and the pass, so an update
+  cannot turn a row into a different credential. A revoked PAT, bot key, CI trust policy or
+  consent, and a denied or consumed device code, keep their status; a flagged bot key becomes only
+  kept or revoked, and its `flagged_at` never changes once set (`uts.refuse_reopening`).
 - Every new org bot key needs a gate pass (a `BEFORE INSERT` trigger refuses one without). Deleting
   the creator's account flags the creator's active keys, as member removal does (design section
   5.8), so they stop after 7 days unless an org admin keeps them. `created_by` keeps the creator's
@@ -377,11 +426,14 @@ whether granted directly, through `PUBLIC` or through an inherited role.
 - The app login writes authorization codes, refresh grants, device sessions, third-party families
   and tokens, revocations and DPoP proof `jti`s only through the security-definer OAuth functions
   (migration 0004), which write the credential rows and their audit row together; it keeps SELECT
-  on those tables.
+  on those tables. It still writes the ungated credential tables directly.
   The account-deletion function will be one more such function: in the same statement, before the
   delete, it collects the active bot keys the account created (the keys the delete trigger is about
   to flag) and writes a bot-key-flagged audit row and the org-admin notices for each (design
   sections 5.8 and 8.1).
+- Time limits compare with `statement_timestamp()` where a statement can run late in a transaction
+  (the PAT and bot key lookups), and spell 7 days as 168 hours where the session's time zone could
+  stretch or shorten calendar days (the flagged bot key cutoff, partition maintenance).
 - `IdentityStoreError` keeps only the SQLSTATE, the constraint, the table, and for a failed
   connection the system error code (`ECONNREFUSED`, `ETIMEDOUT`, ...). The server's error detail can
   quote the refused row, so it never leaves `src/db/client.ts`.
@@ -389,8 +441,19 @@ whether granted directly, through `PUBLIC` or through an inherited role.
 ### Audit outbox
 
 `uts.audit_events` is partitioned by UTC day. Each row records its transaction id (`xid8`) and its
-shard (`id % 8`). The relay advances `uts.audit_relay_watermarks` once the archive confirms a batch.
-Each shard publishes as its own audit stream, and `last_seq` numbers that stream's batches.
+shard (`id % 8`). Each shard publishes as its own audit stream, and `last_seq` numbers that stream's
+batches. The watermark marks the newest row whose batch the audit queue accepted; nothing confirms
+that the archive stored it, because UTS cannot bind the archive or the audit relay service (design
+section 8.1). A partition is therefore dropped only once every row in it is relayed and it is past
+the 7-day tier, which leaves the audit relay service days to retry on top of the queue's own
+retries.
+
+The watermark moves only through `uts.advance_audit_watermark()` (SECURITY DEFINER); the app login
+has no UPDATE on the watermarks. The function locks the shard's row and accepts a move only from
+the current `last_seq`, forward, to a row of the shard below the oldest open transaction, and only
+when the sequence advances by exactly the count of the shard's rows it passes (1 to 500, one index
+range read). A login that moves a watermark without sending therefore leaves a sequence gap, which
+the audit relay service holds and pages on, rather than a silently skipped row.
 
 The relay read for one shard has this shape, and the relay keeps it (`RELAY_READ` in
 `test/db/harness.ts`; `test/db/audit-maintenance.test.ts` checks the plan):
@@ -416,13 +479,16 @@ partition's (`shard`, `txid`, `id`) index and the read never touches a relayed r
 filters on the watermark instead walks every relayed row of the shard on each read.
 
 `uts.maintain_audit_partitions()` runs one step per call: it creates the first missing partition of
-the next 7 days. Otherwise it takes the first partition whose rows are all older than 7 days and all
-relayed: it truncates it while it holds data, which locks only that partition (no insert reaches an
-old day), and drops it once it is empty. Every check (one index probe per shard on the partition)
-runs before the one CREATE, TRUNCATE or DROP. The DROP is the only step that takes the parent's
-`ACCESS EXCLUSIVE` lock, and it only removes empty files; a DDL that waits 200 ms for its lock gives
-up, and the next call retries. The cron calls it until it returns no `created`, `truncated` or
-`dropped` row. A partition whose name is not `audit_events_YYYYMMDD` is left alone.
+the next 7 days. Otherwise it takes the first partition whose upper bound, as attached, is at least
+168 hours old and whose rows are all relayed: it truncates it while it holds data, which locks only
+that partition (no insert reaches an old day), and drops it once it is empty. The age comes from
+the bound, never from the name, and the function runs in UTC with a fixed 168-hour cutoff, so
+neither a partition attached by hand under an older name nor a daylight-saving change shortens the
+tier. Every check (one index probe per shard on the partition) runs before the one CREATE, TRUNCATE
+or DROP. The DROP is the only step that takes the parent's `ACCESS EXCLUSIVE` lock, and it only
+removes empty files; a DDL that waits 200 ms for its lock gives up, and the next call retries. The
+cron calls it until it returns no `created`, `truncated` or `dropped` row. A partition whose name
+is not `audit_events_YYYYMMDD` is left alone.
 
 The `event` column holds an `AuditEvent` from `@kilocode/sts-contracts`. `uts.is_audit_event` checks
 it in the database as strictly as `AuditEventSchema` does, narrowed to UTS sources, UTS event types

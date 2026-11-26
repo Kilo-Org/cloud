@@ -93,14 +93,51 @@ export function keySetShardOfObjectId(
   return indexOfObjectId(config, id, 'key-set shard', keySetShardOfObjectName);
 }
 
+function signerNamespace(env: Env, config: UtsConfig): DurableObjectNamespace<UtsSignerDO> {
+  return config.jurisdiction === 'eu' ? env.UTS_SIGNER_DO.jurisdiction('eu') : env.UTS_SIGNER_DO;
+}
+
+/** The id of signer `signer`'s object in this environment, inside its jurisdiction. */
+function signerObjectId(env: Env, config: UtsConfig, signer: number): DurableObjectId {
+  return signerNamespace(env, config).idFromName(signerObjectName(config.environment, signer));
+}
+
+/**
+ * Checks that an object which already stores the state of signer `signer` is that signer's
+ * object in this environment and jurisdiction, before it imports the stored keys. It compares the
+ * object's id with the id the signer's name gives in this environment; an id carries its
+ * jurisdiction but not always its name (an object started by an alarm or opened by its raw id has
+ * none), so this check needs no name. A state copied to another object, or an object of another
+ * environment, is refused.
+ */
+export function storedSignerCheck(
+  env: Env,
+  config: UtsConfig,
+  id: DurableObjectId,
+  signer: number
+): ObjectIdCheck {
+  const jurisdiction = id.jurisdiction ?? 'none';
+  if (jurisdiction !== config.jurisdiction) {
+    return {
+      status: 'refused',
+      reason: `signer object is in jurisdiction ${jurisdiction}, not ${config.jurisdiction}`,
+    };
+  }
+  if (!id.equals(signerObjectId(env, config, signer))) {
+    return {
+      status: 'refused',
+      reason: `stored state names signer ${signer}, but this is not that signer's ${config.environment} object`,
+    };
+  }
+  return { status: 'accepted', index: signer };
+}
+
 export function getSignerStub(
   env: Env,
   config: UtsConfig,
   signer: number
 ): DurableObjectStub<UtsSignerDO> {
-  const namespace =
-    config.jurisdiction === 'eu' ? env.UTS_SIGNER_DO.jurisdiction('eu') : env.UTS_SIGNER_DO;
-  return namespace.get(namespace.idFromName(signerObjectName(config.environment, signer)), {
+  return signerNamespace(env, config).get(signerObjectId(env, config, signer), {
     locationHint: UTS_OBJECT_LOCATION_HINT,
   });
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // The UTS mint Worker. Top level is production; `wrangler dev --env local` uses the local block.
+  // The UTS mint Worker. Top level is production. Local development runs wrangler.dev.jsonc.
   "name": "uts",
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
@@ -8,10 +8,6 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
-  "dev": {
-    "port": 8800,
-    "local_protocol": "http",
-  },
   // The fetch handler runs next to the identity store's primary in Frankfurt (AWS eu-central-1).
   // Placement covers fetch handlers only; the SignerKeys entrypoint (src/signer-keys.ts), which the
   // feed Worker calls for signer keys, runs where the feed Worker runs.
@@ -70,35 +66,6 @@
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
         ],
       },
-    },
-    // Local development only; no deploy workflow targets this name. Only this block uses the
-    // development entry, which adds the local signing route (src/dev.ts).
-    "local": {
-      "name": "uts-local",
-      "main": "src/dev-index.ts",
-      "workers_dev": false,
-      "routes": [],
-      "vars": {
-        "UTS_ENVIRONMENT": "development",
-        // workerd enforces no data residency, so local development keeps objects unscoped.
-        "DO_JURISDICTION": "none",
-      },
-      "durable_objects": {
-        "bindings": [
-          { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
-          { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
-        ],
-      },
-      // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo:
-      // set CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE to a URL with the
-      // password you gave uts_app_a (README, "Local development").
-      "hyperdrive": [
-        {
-          "binding": "IDENTITY_STORE",
-          "id": "uts-local-identity-store",
-          "localConnectionString": "postgres://uts_app_a@127.0.0.1:55432/uts",
-        },
-      ],
     },
   },
 }

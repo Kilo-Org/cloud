@@ -11,8 +11,9 @@ import type { SignerAccess } from './token/mint';
 
 /**
  * Development-only routes and hooks, for the local end-to-end checks. Only `src/dev-index.ts`
- * reaches this module, and only the `local` block of `wrangler.jsonc` uses that entry (`test/repo`
- * fails a staging or production block that does), so no deployed bundle holds it. Each part also
+ * reaches this module, and only `wrangler.dev.jsonc` uses that entry: its build command fails every
+ * Wrangler command but `dev`, so no deploy or version upload can bundle it, and `test/repo` fails
+ * any other config that runs it. Each part also
  * stays off unless `UTS_ENVIRONMENT` is `development`, and a token minted here names the
  * development issuer, which no staging or production verifier accepts.
  *

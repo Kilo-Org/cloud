@@ -39,13 +39,19 @@ BEGIN
       END IF;
       EXECUTE format('GRANT %I TO %I WITH INHERIT TRUE, SET FALSE', group_role, login_role);
       -- One stuck session must not stall the audit relay (design section 8.1), and one long
-      -- statement must not hold back the relay's oldest-open-transaction horizon either.
+      -- statement or transaction must not hold back the relay's oldest-open-transaction horizon
+      -- either. A session can change these defaults for itself, so they bound mistakes only;
+      -- `uts.end_long_transactions()` (0002_audit_outbox.sql) bounds a session that does.
       EXECUTE format(
         'ALTER ROLE %I SET idle_in_transaction_session_timeout = %L',
         login_role,
         '10s'
       );
       EXECUTE format('ALTER ROLE %I SET statement_timeout = %L', login_role, '5s');
+      EXECUTE format('ALTER ROLE %I SET transaction_timeout = %L', login_role, '10s');
+      -- `uts.end_long_transactions()` runs as the owner and ends a login's session; PostgreSQL
+      -- lets a role signal only the sessions of roles whose privileges it has.
+      EXECUTE format('GRANT %I TO uts_owner WITH INHERIT TRUE, SET FALSE', login_role);
     END LOOP;
   END LOOP;
 

@@ -456,8 +456,10 @@ describe('the credential check on audit rows', () => {
 
 describe('relay batches', () => {
   it('split a 500-row read of realistic mint events into messages under 60 KB', async () => {
-    // Start shard 3 after the rows that earlier tests wrote.
-    await app.query(
+    // Start shard 3 after the rows that earlier tests wrote; only the owner moves a watermark
+    // outside `uts.advance_audit_watermark`.
+    const owner = await db.connectAsOwner();
+    await owner.query(
       `UPDATE uts.audit_relay_watermarks AS watermark
        SET last_txid = newest.txid, last_id = newest.id
        FROM (SELECT txid, id FROM uts.audit_events WHERE shard = 3
@@ -566,5 +568,96 @@ describe('relay batches', () => {
         events,
       })
     ).rejects.toThrow(AuditBatchTooLargeError);
+  });
+});
+
+describe('uts.advance_audit_watermark', () => {
+  const INVALID_PARAMETER = '22023';
+  const ADVANCE = `SELECT uts.advance_audit_watermark($1, $2, $3::text::xid8, $4, $5) AS advanced`;
+
+  async function insertIntoShard(shard: number, count: number) {
+    let inserted = 0;
+    while (inserted < count) {
+      if ((await insertAudit(app)).shard === shard) inserted++;
+    }
+  }
+
+  /**
+   * Every row of `shard` past its watermark, oldest first, once all of them are below the horizon.
+   * Earlier tests leave rows in every shard, so the count is read, not assumed.
+   */
+  async function finalRows(shard: number) {
+    return await vi.waitFor(
+      async () => {
+        const result = await app.query<{ txid: bigint; id: bigint; final: boolean }>(
+          `SELECT event.txid, event.id,
+             event.txid < pg_snapshot_xmin(pg_current_snapshot()) AS final
+           FROM uts.audit_relay_watermarks AS watermark
+           JOIN uts.audit_events AS event ON event.shard = watermark.shard
+             AND (event.txid, event.id) > (watermark.last_txid, watermark.last_id)
+           WHERE watermark.shard = $1
+           ORDER BY event.txid, event.id`,
+          [shard]
+        );
+        expect(result.rows.every(row => row.final)).toBe(true);
+        return result.rows;
+      },
+      { timeout: 30_000, interval: 200 }
+    );
+  }
+
+  async function advance(
+    shard: number,
+    fromSeq: number,
+    to: { txid: bigint; id: bigint },
+    toSeq: number
+  ) {
+    return await app.query<{ advanced: boolean }>(ADVANCE, [
+      shard,
+      fromSeq,
+      to.txid.toString(),
+      to.id,
+      toSeq,
+    ]);
+  }
+
+  it('refuse a move that skips a row, goes back, targets no final row or moves too far', async () => {
+    const shard = 6;
+    await insertIntoShard(shard, 3);
+    const [first, second, third] = await finalRows(shard);
+
+    // Past two rows numbered as one: the skipped row would never be sent.
+    expect(await sqlStateOf(() => advance(shard, 0, second, 1))).toBe(INVALID_PARAMETER);
+    // A row that does not exist in the shard.
+    expect(
+      await sqlStateOf(() => advance(shard, 0, { txid: third.txid, id: third.id + 1_000_000n }, 3))
+    ).toBe(INVALID_PARAMETER);
+    // More than one batch.
+    expect(await sqlStateOf(() => advance(shard, 0, third, 501))).toBe(INVALID_PARAMETER);
+
+    expect((await advance(shard, 0, first, 1)).rows).toEqual([{ advanced: true }]);
+    // Back to the old position, and a stale starting sequence.
+    expect(await sqlStateOf(() => advance(shard, 1, first, 2))).toBe(INVALID_PARAMETER);
+    expect((await advance(shard, 0, second, 2)).rows).toEqual([{ advanced: false }]);
+    expect((await advance(shard, 1, second, 2)).rows).toEqual([{ advanced: true }]);
+
+    const watermark = await app.query(
+      'SELECT last_txid, last_id, last_seq FROM uts.audit_relay_watermarks WHERE shard = $1',
+      [shard]
+    );
+    expect(watermark.rows).toEqual([{ last_txid: second.txid, last_id: second.id, last_seq: 2n }]);
+  }, 35_000);
+
+  it('refuse a row whose transaction is still open', async () => {
+    const shard = 7;
+    const open = await db.connect('uts_app_b');
+    await open.query('BEGIN');
+    try {
+      let row = await insertAudit(open);
+      while (row.shard !== shard) row = await insertAudit(open);
+      expect(await sqlStateOf(() => advance(shard, 0, row, 1))).toBe(INVALID_PARAMETER);
+    } finally {
+      await open.query('ROLLBACK');
+    }
   });
 });

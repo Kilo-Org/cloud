@@ -12,24 +12,45 @@ import { FEED_DEPLOYMENTS, MINT_DEPLOYMENTS } from '../../src/env';
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
-/** The two UTS Workers' configs; the test configs run only in the Workers test pool. */
+/**
+ * The two UTS Workers' configs; the mint Worker's development config, which only `wrangler dev`
+ * runs; and the test configs, which run only in the Workers test pool.
+ */
 export const MINT_CONFIG = 'services/uts/wrangler.jsonc';
+export const MINT_DEV_CONFIG = 'services/uts/wrangler.dev.jsonc';
 export const MINT_TEST_CONFIG = 'services/uts/wrangler.test.jsonc';
 export const FEED_CONFIG = 'services/uts-feed/wrangler.jsonc';
 export const FEED_TEST_CONFIG = 'services/uts-feed/wrangler.test.jsonc';
-const UTS_CONFIGS = new Set([MINT_CONFIG, MINT_TEST_CONFIG, FEED_CONFIG, FEED_TEST_CONFIG]);
+const UTS_CONFIGS = new Set([
+  MINT_CONFIG,
+  MINT_DEV_CONFIG,
+  MINT_TEST_CONFIG,
+  FEED_CONFIG,
+  FEED_TEST_CONFIG,
+]);
 
 /** Every UTS Durable Object class and the configs that alone may bind it. */
 export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ['UtsSignerDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
-  ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsSignerDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
 ]);
 
 /** The placement region of the identity store's primary (Frankfurt). */
 export const MINT_PLACEMENT_REGION = 'aws:eu-central-1';
 
-/** The entry every deployed mint block runs; `src/dev-index.ts` adds a local signing route. */
+/** The entry every deployed mint block runs. */
 const MINT_DEPLOYED_ENTRY = 'src/index.ts';
+
+/** The development entry, which adds the local signing route; only `MINT_DEV_CONFIG` runs it. */
+const MINT_DEV_ENTRY = 'src/dev-index.ts';
+const MINT_DEV_ENTRY_PATH = join(dirname(MINT_CONFIG), MINT_DEV_ENTRY);
+
+/**
+ * The development config's build command. Wrangler runs it before `dev`, `deploy` and
+ * `versions upload`, with `WRANGLER_COMMAND` set to the command, so it fails all but `dev`.
+ */
+export const MINT_DEV_BUILD_COMMAND =
+  'test "$WRANGLER_COMMAND" = dev || { echo \'wrangler.dev.jsonc runs only under wrangler dev; deploy wrangler.jsonc\' >&2; exit 1; }';
 
 /** Environment names in Wrangler (`env.<name>`) for each UTS environment; null is the top level. */
 const WRANGLER_ENVIRONMENTS: ReadonlyMap<string | null, UtsEnvironment> = new Map([
@@ -100,6 +121,8 @@ const EnvironmentSchema = z.looseObject({
   ...BindingsShape,
   name: z.string().optional(),
   main: z.string().optional(),
+  build: z.looseObject({ command: z.string().optional() }).optional(),
+  workers_dev: z.boolean().optional(),
   route: RouteSchema.optional(),
   routes: z.array(RouteSchema).optional(),
   placement: z
@@ -334,8 +357,8 @@ function routeProblems(path: string, block: Block): string[] {
 /**
  * Problems with how the repository's Worker configs reach UTS (design 5.7): only the mint Worker
  * binds the signer objects, only the feed Worker binds the mint Worker, no other config deploys
- * under a UTS name or routes a UTS hostname, and no config reaches a UTS class or handler by
- * script name.
+ * under a UTS name or routes a UTS hostname, no config reaches a UTS class or handler by script
+ * name, and only the development config runs the development entry.
  */
 export function workerConfigProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];
@@ -353,6 +376,16 @@ export function workerConfigProblems(configs: readonly WorkerConfig[]): string[]
           `${block.where} deploys as ${block.deployedName}; only the UTS configs deploy UTS names`
         );
       }
+      const main = block.preview ? undefined : (block.block?.main ?? worker.config.main);
+      if (
+        worker.path !== MINT_DEV_CONFIG &&
+        main !== undefined &&
+        join(dirname(worker.path), main) === MINT_DEV_ENTRY_PATH
+      ) {
+        problems.push(
+          `${block.where} runs ${MINT_DEV_ENTRY_PATH}; only ${MINT_DEV_CONFIG} may, and it cannot deploy`
+        );
+      }
     }
   }
   return problems;
@@ -367,20 +400,48 @@ function deployments(worker: WorkerConfig): string {
     .join(', ');
 }
 
-function expectedDeployments(names: Readonly<Record<UtsEnvironment, string>>): string {
-  return Object.entries(names)
-    .map(([environment, name]) => `${name}=${environment}`)
+function expectedDeployments(
+  names: Readonly<Record<UtsEnvironment, string>>,
+  environments: readonly UtsEnvironment[]
+): string {
+  return environments
+    .map(environment => `${names[environment]}=${environment}`)
     .sort()
     .join(', ');
 }
 
+/** Problems with the development config; `utsConfigProblems` lists its rules. */
+function devConfigProblems(dev: WorkerConfig): string[] {
+  const { config } = dev;
+  const problems: string[] = [];
+  const deployed = deployments(dev);
+  const expected = expectedDeployments(MINT_DEPLOYMENTS, ['development']);
+  if (deployed !== expected) {
+    problems.push(`${MINT_DEV_CONFIG} deploys ${deployed}; expected ${expected}`);
+  }
+  if (config.main !== MINT_DEV_ENTRY) {
+    problems.push(`${MINT_DEV_CONFIG}: main is ${String(config.main)}; expected ${MINT_DEV_ENTRY}`);
+  }
+  if (config.build?.command !== MINT_DEV_BUILD_COMMAND) {
+    problems.push(
+      `${MINT_DEV_CONFIG}: build.command must be the command that fails every Wrangler command but dev`
+    );
+  }
+  if (config.workers_dev !== false) problems.push(`${MINT_DEV_CONFIG}: workers_dev must be false`);
+  if (config.route !== undefined || (config.routes ?? []).length > 0) {
+    problems.push(`${MINT_DEV_CONFIG}: the development config has no routes`);
+  }
+  return problems;
+}
+
 /**
- * Problems inside the two UTS Workers' own configs: each deploys exactly its three names with
- * matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer objects hold
- * private keys; the mint Worker's deployed blocks keep the signer and key-set shard objects in the
- * `eu` jurisdiction
- * (staging, production) and its fetch handler placed next to the identity store; the feed Worker
- * runs without placement and binds no Durable Object.
+ * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
+ * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer objects hold
+ * private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps the signer and
+ * key-set shard objects in the `eu` jurisdiction, and places its fetch handler next to the
+ * identity store; the development config is one block that runs the development entry under the
+ * development name, unrouted, behind the build command that fails every command but `dev`; the
+ * feed Worker runs without placement and binds no Durable Object.
  */
 export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];
@@ -402,12 +463,10 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   }
   const mint = byPath.get(MINT_CONFIG);
   if (mint !== undefined) {
-    const expected = expectedDeployments(MINT_DEPLOYMENTS);
+    const expected = expectedDeployments(MINT_DEPLOYMENTS, ['production', 'staging']);
     if (deployments(mint) !== expected)
       problems.push(`${MINT_CONFIG} deploys ${deployments(mint)}; expected ${expected}`);
     for (const block of blocksOf(mint)) {
-      const environment = WRANGLER_ENVIRONMENTS.get(block.env);
-      if (environment === 'development') continue;
       const main = block.block?.main ?? mint.config.main;
       if (main !== MINT_DEPLOYED_ENTRY) {
         problems.push(
@@ -424,9 +483,15 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       }
     }
   }
+  const dev = byPath.get(MINT_DEV_CONFIG);
+  if (dev !== undefined) problems.push(...devConfigProblems(dev));
   const feed = byPath.get(FEED_CONFIG);
   if (feed !== undefined) {
-    const expected = expectedDeployments(FEED_DEPLOYMENTS);
+    const expected = expectedDeployments(FEED_DEPLOYMENTS, [
+      'production',
+      'staging',
+      'development',
+    ]);
     if (deployments(feed) !== expected)
       problems.push(`${FEED_CONFIG} deploys ${deployments(feed)}; expected ${expected}`);
     for (const block of blocksOf(feed)) {

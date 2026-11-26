@@ -1,9 +1,13 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { experimental_readRawConfig } from 'wrangler';
 import {
   FEED_CONFIG,
   MINT_CONFIG,
+  MINT_DEV_CONFIG,
   parseWorkerConfig,
   repoRoot,
   utsConfigProblems,
@@ -181,19 +185,21 @@ describe('UTS names and hostnames', () => {
 });
 
 describe('the UTS configs themselves', () => {
-  const mintWith = (edit: (raw: Record<string, unknown>) => Record<string, unknown>) => {
-    const configs = repoConfigs().filter(worker => worker.path !== MINT_CONFIG);
-    return [
-      ...configs,
-      parseWorkerConfig(MINT_CONFIG, edit(structuredClone(configAt(MINT_CONFIG).config))),
-    ];
-  };
+  const configWith = (
+    path: string,
+    edit: (raw: Record<string, unknown>) => Record<string, unknown>
+  ) => [
+    ...repoConfigs().filter(worker => worker.path !== path),
+    parseWorkerConfig(path, edit(structuredClone(configAt(path).config))),
+  ];
+  const mintWith = (edit: (raw: Record<string, unknown>) => Record<string, unknown>) =>
+    configWith(MINT_CONFIG, edit);
 
   it('fail traces enabled in any block', () => {
     const problems = utsConfigProblems(
       mintWith(raw => ({ ...raw, observability: { enabled: true, traces: { enabled: true } } }))
     );
-    expect(problems.length).toBeGreaterThanOrEqual(3);
+    expect(problems.length).toBeGreaterThanOrEqual(2);
     expect(problems.every(problem => problem.includes('traces.enabled resolves to true'))).toBe(
       true
     );
@@ -225,10 +231,90 @@ describe('the UTS configs themselves', () => {
     const problems = utsConfigProblems(
       mintWith(raw => ({ ...raw, vars: { UTS_ENVIRONMENT: 'staging', DO_JURISDICTION: 'eu' } }))
     );
-    expect(problems).toEqual([
-      expect.stringContaining('deploys uts-local=development, uts-staging=staging, uts=staging'),
+    expect(problems).toEqual([expect.stringContaining('deploys uts-staging=staging, uts=staging')]);
+  });
+
+  it('fail the development entry in any config but the development config', () => {
+    const local = {
+      name: 'uts-local',
+      main: 'src/dev-index.ts',
+      vars: { UTS_ENVIRONMENT: 'development', DO_JURISDICTION: 'none' },
+    };
+    const withLocal = mintWith(raw => ({
+      ...raw,
+      env: { staging: configAt(MINT_CONFIG).config.env?.staging, local },
+    }));
+    expect(workerConfigProblems(withLocal)).toEqual([
+      expect.stringContaining(
+        '(env.local) runs services/uts/src/dev-index.ts; only services/uts/wrangler.dev.jsonc may'
+      ),
+    ]);
+    expect(utsConfigProblems(withLocal)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'deploys uts-local=development, uts-staging=staging, uts=production'
+        ),
+        expect.stringContaining('(env.local): main resolves to src/dev-index.ts'),
+      ])
+    );
+    const other = consumer({ main: 'src/dev-index.ts' }, 'services/uts/wrangler.other.jsonc');
+    expect(workerConfigProblems([other])).toEqual([
+      expect.stringContaining('runs services/uts/src/dev-index.ts'),
     ]);
   });
+
+  it('fail a development config that could deploy, route, or run another entry', () => {
+    const devWith = (edit: (raw: Record<string, unknown>) => Record<string, unknown>) =>
+      utsConfigProblems(configWith(MINT_DEV_CONFIG, edit));
+    expect(devWith(({ build: _build, ...raw }) => raw)).toEqual([
+      expect.stringContaining('build.command must be the command that fails'),
+    ]);
+    expect(devWith(raw => ({ ...raw, workers_dev: true }))).toEqual([
+      expect.stringContaining('workers_dev must be false'),
+    ]);
+    expect(devWith(raw => ({ ...raw, routes: [{ pattern: 'dev.example.com/*' }] }))).toEqual([
+      expect.stringContaining('the development config has no routes'),
+    ]);
+    expect(devWith(raw => ({ ...raw, main: 'src/index.ts' }))).toEqual([
+      expect.stringContaining('main is src/index.ts; expected src/dev-index.ts'),
+    ]);
+    expect(
+      devWith(raw => ({
+        ...raw,
+        env: { staging: { name: 'uts-staging', vars: { UTS_ENVIRONMENT: 'staging' } } },
+      }))
+    ).toEqual([expect.stringContaining('deploys uts-local=development, uts-staging=staging')]);
+  });
+
+  it('lets Wrangler bundle the deployed config, and refuse to deploy or upload the development config', () => {
+    const outdir = mkdtempSync(join(tmpdir(), 'uts-dry-run-'));
+    const wrangler = (args: string[]) =>
+      spawnSync(join(repoRoot, 'services/uts/node_modules/.bin/wrangler'), args, {
+        cwd: join(repoRoot, 'services/uts'),
+        encoding: 'utf8',
+        env: { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_COMMAND: '' },
+      });
+    try {
+      const deployed = wrangler(['deploy', '--dry-run', '--outdir', outdir]);
+      expect(deployed.status, deployed.stderr).toBe(0);
+      for (const command of [['deploy'], ['versions', 'upload']]) {
+        const refused = wrangler([
+          ...command,
+          '--dry-run',
+          '-c',
+          'wrangler.dev.jsonc',
+          '--outdir',
+          outdir,
+        ]);
+        expect(refused.status).not.toBe(0);
+        expect(`${refused.stdout}${refused.stderr}`).toContain(
+          'wrangler.dev.jsonc runs only under wrangler dev; deploy wrangler.jsonc'
+        );
+      }
+    } finally {
+      rmSync(outdir, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   it('fail placement on the feed Worker', () => {
     const configs = repoConfigs().filter(worker => worker.path !== FEED_CONFIG);

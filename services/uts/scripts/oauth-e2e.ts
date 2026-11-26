@@ -1,6 +1,6 @@
 /**
- * Local end-to-end run of the OAuth endpoints against `wrangler dev --env local` and the local
- * identity store (README, "Local development"): code, token, refresh, a replayed DPoP proof, a
+ * Local end-to-end run of the OAuth endpoints against `wrangler dev -c wrangler.dev.jsonc` and the
+ * local identity store (README, "Local development"): code, token, refresh, a replayed DPoP proof, a
  * proof of one device key replayed at another grant of that key, a code exchange whose signing
  * fails and its retry, two concurrent exchanges of one code, a second use of a code, third-party
  * rotation, reuse (the family is revoked), a blocked third-party client, a streamed oversized

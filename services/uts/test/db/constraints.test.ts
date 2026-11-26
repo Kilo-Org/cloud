@@ -17,21 +17,26 @@ const GENERATED_ALWAYS = '428C9';
 const NOT_NULL_VIOLATION = '23502';
 
 let db: TestDatabase;
+// No login role writes a gate pass or a gated row (0003_access.sql); the owner builds those rows
+// directly, so these tests reach every CHECK, foreign key and trigger on them.
 let writer: pg.Client;
+// The app login writes grants, codes, device sessions and revocations only through the OAuth
+// functions (`oauth-grants.test.ts`), and `privileges.test.ts` covers who may write what. The
+// gated rows it may still change itself (a bot key's lifecycle columns) are changed as `app`
+// here, so the column grants are exercised on the real login.
+let app: pg.Client;
 let accountId: string;
 
-// The constraints hold for every writer, so this file writes as the owner: the app login writes
-// grants, codes, device sessions and revocations only through the OAuth functions
-// (`oauth-grants.test.ts`), and `privileges.test.ts` covers who may write what.
 beforeAll(async () => {
   db = await TestDatabase.create();
+  app = await db.connect('uts_app_a');
   writer = await db.connectAsOwner();
   accountId = await insertAccount(writer);
 });
 afterAll(() => db.drop());
 
-function rejects(statement: string, values: unknown[] = []) {
-  return sqlStateOf(() => writer.query(statement, values));
+function rejects(statement: string, values: unknown[] = [], client: pg.Client = writer) {
+  return sqlStateOf(() => client.query(statement, values));
 }
 
 describe('domains', () => {
@@ -50,6 +55,9 @@ describe('domains', () => {
     ['duplicated', '{gateway:chat.write,gateway:chat.write}'],
     ['malformed', '{Gateway:chat}'],
     ['empty', '{}'],
+    ['sorted but starting at index 0', '[0:1]={gateway:chat.write,gateway:models.read}'],
+    ['unsorted and starting at index 2', '[2:3]={gateway:models.read,gateway:chat.write}'],
+    ['duplicated and starting at index 2', '[2:3]={gateway:chat.write,gateway:chat.write}'],
   ])('reject a scope set that is %s', async (_name, scopes) => {
     const deviceSessionId = await insertDeviceSession(writer, accountId);
     expect(
@@ -445,7 +453,8 @@ describe('PATs and org bot keys', () => {
         `INSERT INTO uts.personal_access_tokens
            (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
          VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '366 days')`,
-        [accountId, randomHash(), await insertGatePass(writer, accountId, 'pat_create')]
+        [accountId, randomHash(), await insertGatePass(writer, accountId, 'pat_create')],
+        writer
       )
     ).toBe(CHECK_VIOLATION);
   });
@@ -484,7 +493,8 @@ describe('gate passes and step-ups', () => {
       await rejects(
         `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
          VALUES ($1, $2, 'a', 'passkey_add', '{recent_sign_in}', now() + interval '10 minutes')`,
-        [accountId, sessionId]
+        [accountId, sessionId],
+        writer
       )
     ).toBe(CHECK_VIOLATION);
   });
@@ -495,7 +505,8 @@ describe('gate passes and step-ups', () => {
       await rejects(
         `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
          VALUES ($1, $2, 'a', 'email_change', '{recent_sign_in,email_code}', now() + interval '10 minutes')`,
-        [accountId, sessionId]
+        [accountId, sessionId],
+        writer
       )
     ).toBe(CHECK_VIOLATION);
   });
@@ -506,14 +517,16 @@ describe('gate passes and step-ups', () => {
       await rejects(
         `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
          VALUES ($1, $2, 'b', 'method_remove', '{passkey}', now() + interval '10 minutes')`,
-        [accountId, sessionId]
+        [accountId, sessionId],
+        writer
       )
     ).toBe(CHECK_VIOLATION);
     expect(
       await rejects(
         `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
          VALUES ($1, $2, 'b', 'pat_create', '{passkey}', now() + interval '11 minutes')`,
-        [accountId, sessionId]
+        [accountId, sessionId],
+        writer
       )
     ).toBe(CHECK_VIOLATION);
   });
@@ -578,12 +591,12 @@ describe('org membership replica', () => {
 });
 
 describe('gate pass binding', () => {
-  function insertPat(owner: string, gatePassId: string) {
+  function insertPat(holder: string, gatePassId: string) {
     return writer.query(
       `INSERT INTO uts.personal_access_tokens
          (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
        VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')`,
-      [owner, randomHash(), gatePassId]
+      [holder, randomHash(), gatePassId]
     );
   }
 
@@ -645,18 +658,14 @@ describe('gate pass binding', () => {
       await insertGatePass(writer, creatorId, 'bot_key_create')
     );
     await writer.query(
-      `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = created_by
+      `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
        WHERE id = $1`,
       [revoked.rows[0].id]
     );
     // The creator also holds a PAT, which goes with the account.
-    await writer.query(
-      `INSERT INTO uts.personal_access_tokens
-         (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
-       VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')`,
-      [creatorId, randomHash(), await insertGatePass(writer, creatorId, 'pat_create')]
-    );
+    await insertPat(creatorId, await insertGatePass(writer, creatorId, 'pat_create'));
 
+    // The writer role deletes the account; the flag trigger runs with its column grants.
     await writer.query('DELETE FROM uts.accounts WHERE id = $1', [creatorId]);
 
     const keys = await writer.query(
@@ -734,6 +743,89 @@ describe('gate pass binding', () => {
       key.rows[0].id,
     ]);
     expect(after.rows).toEqual([{ gate_pass_id: null }]);
+  });
+
+  it('keep a revoked bot key revoked and a consumed device code consumed', async () => {
+    const key = await insertBotKeyFor(
+      accountId,
+      crypto.randomUUID(),
+      await insertGatePass(writer, accountId, 'bot_key_create')
+    );
+    await app.query(
+      `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
+       WHERE id = $1`,
+      [key.rows[0].id]
+    );
+    expect(
+      await rejects(
+        `UPDATE uts.org_bot_keys SET status = 'active', revoked_at = NULL, revoked_by = NULL
+         WHERE id = $1`,
+        [key.rows[0].id]
+      )
+    ).toBe(CHECK_VIOLATION);
+
+    const code = await writer.query<{ id: string }>(
+      `INSERT INTO uts.device_codes
+         (device_code_hash, user_code_hash, client_id, scopes, expires_at, status, account_id,
+          gate_pass_id, approved_at, consumed_at)
+       VALUES ($1, $2, 'kilo-cli', '{gateway:models.read}', now() + interval '10 minutes',
+               'consumed', $3, $4, now(), now())
+       RETURNING id`,
+      [
+        randomHash(),
+        randomHash(),
+        accountId,
+        await insertGatePass(writer, accountId, 'device_approve'),
+      ]
+    );
+    // A second exchange of one approval would need the code back in `approved`.
+    expect(
+      await rejects(
+        `UPDATE uts.device_codes SET status = 'approved', consumed_at = NULL WHERE id = $1`,
+        [code.rows[0].id]
+      )
+    ).toBe(CHECK_VIOLATION);
+  });
+
+  it('let a flagged bot key become only kept or revoked, with its flag time fixed', async () => {
+    const flaggedKey = async () => {
+      const key = await insertBotKeyFor(
+        accountId,
+        crypto.randomUUID(),
+        await insertGatePass(writer, accountId, 'bot_key_create')
+      );
+      await app.query(
+        `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() WHERE id = $1`,
+        [key.rows[0].id]
+      );
+      return key.rows[0].id;
+    };
+
+    const cleared = await flaggedKey();
+    expect(
+      await rejects(
+        `UPDATE uts.org_bot_keys SET status = 'active', flagged_at = NULL WHERE id = $1`,
+        [cleared]
+      )
+    ).toBe(CHECK_VIOLATION);
+    // Moving the flag time would move the key's 7-day cutoff.
+    expect(
+      await rejects(
+        `UPDATE uts.org_bot_keys SET flagged_at = flagged_at + interval '6 days' WHERE id = $1`,
+        [cleared]
+      )
+    ).toBe(CHECK_VIOLATION);
+
+    await app.query(
+      `UPDATE uts.org_bot_keys SET status = 'kept', kept_by = 'admin', kept_at = now()
+       WHERE id = $1`,
+      [await flaggedKey()]
+    );
+    await app.query(
+      `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
+       WHERE id = $1`,
+      [await flaggedKey()]
+    );
   });
 
   it('bind a device approval to the approving account and one code', async () => {

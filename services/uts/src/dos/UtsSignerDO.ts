@@ -23,7 +23,7 @@ import {
   type SignerState,
 } from '../keys/lifecycle';
 import { dataCenter } from './data-center';
-import { signerOfObjectId } from './stubs';
+import { signerOfObjectId, storedSignerCheck } from './stubs';
 
 /**
  * KV storage key of the whole signer state. Key material lives in KV storage, not in SQL rows: a
@@ -40,6 +40,7 @@ export type SignRefusal =
   | 'issuer_mismatch'
   | 'environment_mismatch'
   | 'issued_at_out_of_range'
+  | 'already_expired'
   | 'expires_too_late';
 
 /**
@@ -177,7 +178,10 @@ export class UtsSignerDO extends DurableObject<Env> {
   /**
    * Emergency removal of one `kid` from this signer's published keys. An internal operation: only
    * the mint Worker binds this namespace, and no route calls it until the operator route that
-   * audits and alerts on it exists. The result is the entry the revocation feed carries.
+   * audits and alerts on it exists. The result is the entry the revocation feed carries. The
+   * entry is stored with the key change, so a caller whose call failed after the change was stored
+   * (the alarm write failed, or the answer was lost) gets the same entry when it calls again, until
+   * the entry's `revokeUntil`.
    */
   async removeKid(kid: string): Promise<RemoveKidResult> {
     const target = KidSchema.parse(kid);
@@ -185,12 +189,18 @@ export class UtsSignerDO extends DurableObject<Env> {
     if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
     return await this.#transition<RemoveKidResult>(async (state, now) => {
       const removed = await removeKey(state, target, now, () => generateSigningKey(state.signer));
-      if (removed.status === 'unknown_kid') return { state, events: [], result: removed };
-      return {
-        state: removed.state,
-        events: [removed.event],
-        result: { status: 'removed', removal: removed.removal },
-      };
+      switch (removed.status) {
+        case 'unknown_kid':
+          return { state, events: [], result: removed };
+        case 'already_removed':
+          return { state, events: [], result: { status: 'removed', removal: removed.removal } };
+        case 'removed':
+          return {
+            state: removed.state,
+            events: [removed.event],
+            result: { status: 'removed', removal: removed.removal },
+          };
+      }
     });
   }
 
@@ -221,6 +231,9 @@ export class UtsSignerDO extends DurableObject<Env> {
     if (Math.abs(checked.iat - nowSeconds) > IAT_SKEW_SECONDS) {
       return { status: 'refused', reason: 'issued_at_out_of_range' };
     }
+    // An `iat` inside the backward skew allows an `exp` after `iat` that is already past; a
+    // verifier would refuse that token at once, so the signer does not sign it.
+    if (checked.exp <= nowSeconds) return { status: 'refused', reason: 'already_expired' };
     if (checked.exp > nowSeconds + UTS_MAX_TOKEN_LIFETIME_SECONDS) {
       return { status: 'refused', reason: 'expires_too_late' };
     }
@@ -257,16 +270,26 @@ export class UtsSignerDO extends DurableObject<Env> {
     const now = Date.now();
     const stored: unknown = await this.ctx.storage.get(STATE_KEY);
     if (stored !== undefined) {
-      await this.#scheduleAlarm(await this.#advanceStored(SignerStateSchema.parse(stored), now));
+      const state = SignerStateSchema.parse(stored);
+      const owner = storedSignerCheck(this.env, this.#config, this.ctx.id, state.signer);
+      if (owner.status === 'refused') {
+        this.#refuse(owner.reason);
+        return;
+      }
+      await this.#scheduleAlarm(await this.#advanceStored(state, now));
       return;
     }
     const id = signerOfObjectId(this.#config, this.ctx.id);
     if (id.status === 'refused') {
-      console.error(JSON.stringify({ event: 'uts.signer.refused', reason: id.reason }));
-      this.#phase = id;
+      this.#refuse(id.reason);
       return;
     }
     await this.#scheduleAlarm(await this.#bootstrap(id.index, now));
+  }
+
+  #refuse(reason: string): void {
+    console.error(JSON.stringify({ event: 'uts.signer.refused', reason }));
+    this.#phase = { status: 'refused', reason };
   }
 
   async #advanceStored(stored: SignerState, now: number): Promise<SignerState> {

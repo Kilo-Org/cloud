@@ -34,6 +34,20 @@ const KeyMaterialShape = {
   privateJwk: PrivateJwkSchema,
 };
 
+/**
+ * What an emergency removal leaves for the revocation feed (design 5.7): verifiers must reject
+ * tokens under `kid` until `revokeUntil`, the time the last token it can have signed has been
+ * expired for 10 minutes. The revocation feed writes this entry; until it exists, removal takes
+ * the key out of the published set only.
+ */
+const KidRemovalSchema = z.strictObject({
+  kid: z.string().min(1),
+  signer: UtsSignerIndexSchema,
+  removedAt: TimestampSchema,
+  revokeUntil: TimestampSchema,
+});
+export type KidRemoval = z.infer<typeof KidRemovalSchema>;
+
 /** Everything a signer object keeps: one record in its KV storage (see `README.md`). */
 export const SignerStateSchema = z.strictObject({
   signer: UtsSignerIndexSchema,
@@ -54,6 +68,12 @@ export const SignerStateSchema = z.strictObject({
       publishedUntil: TimestampSchema,
     })
   ),
+  /**
+   * The receipt of each emergency removal, stored with the key change it made and kept until its
+   * `revokeUntil`, so a repeated removal of that `kid` answers the same entry. A state without a
+   * removal may leave the list out.
+   */
+  removed: z.array(KidRemovalSchema).default([]),
 });
 export type SignerState = z.infer<typeof SignerStateSchema>;
 
@@ -104,18 +124,26 @@ export async function bootstrapState(
     current: { ...current, activatedAt: now },
     next: nextKey(next, now, now + ROTATION_INTERVAL_MS),
     retired: [],
+    removed: [],
   };
 }
 
-/** The time the state next changes on its own: a rotation or a retired key leaving. */
+/**
+ * The time the state next changes on its own: a rotation, a retired key leaving, or a removal
+ * receipt ending.
+ */
 export function nextChangeAt(state: SignerState): number {
-  return Math.min(state.next.activatesAt, ...state.retired.map(key => key.publishedUntil));
+  return Math.min(
+    state.next.activatesAt,
+    ...state.retired.map(key => key.publishedUntil),
+    ...state.removed.map(removal => removal.revokeUntil)
+  );
 }
 
 /**
- * Applies every change due at `now`, in order: retired keys past their window leave, and a due
- * next key becomes current while a new next key is created to sign 30 days later. Returns the same
- * state object when nothing is due.
+ * Applies every change due at `now`, in order: retired keys past their window and removal
+ * receipts past their `revokeUntil` leave, and a due next key becomes current while a new next
+ * key is created to sign 30 days later. Returns the same state object when nothing is due.
  */
 export async function advance(
   state: SignerState,
@@ -126,6 +154,9 @@ export async function advance(
   const events: SignerKeyEvent[] = [];
   if (result.retired.some(key => key.publishedUntil <= now)) {
     result = { ...result, retired: result.retired.filter(key => key.publishedUntil > now) };
+  }
+  if (result.removed.some(removal => removal.revokeUntil <= now)) {
+    result = { ...result, removed: result.removed.filter(removal => removal.revokeUntil > now) };
   }
   if (now >= result.next.activatesAt) {
     const { kid, publicJwk, privateJwk } = result.next;
@@ -165,16 +196,10 @@ export function publishedKeys(state: SignerState): UtsPublicJwk[] {
   ];
 }
 
-/**
- * What an emergency removal leaves for the revocation feed (design 5.7): verifiers must reject
- * tokens under `kid` until `revokeUntil`, the time the last token it can have signed has been
- * expired for 10 minutes. The revocation feed writes this entry; until it exists, removal takes
- * the key out of the published set only.
- */
-export type KidRemoval = { kid: string; signer: number; removedAt: number; revokeUntil: number };
-
 export type RemoveKeyResult =
   | { status: 'removed'; state: SignerState; removal: KidRemoval; event: SignerKeyEvent }
+  /** `kid` was removed before; its stored receipt answers again, and nothing changes. */
+  | { status: 'already_removed'; removal: KidRemoval }
   | { status: 'unknown_kid' };
 
 /**
@@ -192,6 +217,8 @@ export async function removeKey(
   now: number,
   generate: GenerateKey
 ): Promise<RemoveKeyResult> {
+  const receipt = state.removed.find(removal => removal.kid === kid);
+  if (receipt !== undefined) return { status: 'already_removed', removal: receipt };
   let result: SignerState;
   let role: 'current' | 'next' | 'retired';
   if (state.retired.some(key => key.kid === kid)) {
@@ -215,15 +242,16 @@ export async function removeKey(
   } else {
     return { status: 'unknown_kid' };
   }
+  const removal: KidRemoval = {
+    kid,
+    signer: state.signer,
+    removedAt: now,
+    revokeUntil: now + RETIRED_KEY_PUBLISHED_MS,
+  };
   return {
     status: 'removed',
-    state: result,
-    removal: {
-      kid,
-      signer: state.signer,
-      removedAt: now,
-      revokeUntil: now + RETIRED_KEY_PUBLISHED_MS,
-    },
+    state: { ...result, removed: [...result.removed, removal] },
+    removal,
     event: {
       type: 'removed',
       signer: state.signer,

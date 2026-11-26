@@ -1,7 +1,9 @@
 import {
-  UTS_JWKS_CACHE_CONTROL,
+  UTS_JWKS_MAX_AGE_SECONDS,
   UTS_JWKS_OLDEST_AGE_HEADER,
   UTS_JWKS_PATH,
+  UTS_JWKS_STALE_IF_ERROR_SECONDS,
+  UTS_SIGNER_KEYS_HOLD_MS,
 } from '@kilocode/uts-contracts';
 import { readConfig, type Env } from './env';
 import { KEY_SET_READ_GUARD_MS, serveKeySet } from './jwks';
@@ -17,15 +19,22 @@ function errorResponse(
 /**
  * Headers for a key set whose newest keys were read from their signer objects `ageMs` ago and
  * whose oldest keys `oldestAgeMs` ago, both sent in whole seconds. `Age` (RFC 9111 section 5.1)
- * beside the unchanged cache limits gives the 5-minute lifetime from the last fresh keys, so one
- * failing signer does not expire the set; the oldest age gives the 24-hour last-good limit, so no
- * verifier keeps a key past 24 hours after its last good signer read (design 5.7, 7).
+ * gives the 5-minute lifetime from the last fresh keys, so one failing signer does not expire the
+ * set; the oldest age gives the verifier's 24-hour last-good limit (design 5.7, 7). A standard HTTP
+ * cache reads only `Age` and `Cache-Control`: it serves the response fresh until `max-age` minus
+ * `Age` after it arrived, and on error for `stale-if-error` more (RFC 5861). So both limits are cut
+ * to end, from arrival, no later than the oldest keys' hold, counted down to whole seconds; no
+ * cache can then keep a key past 24 hours after its last good read.
  */
 function keySetHeaders(ageMs: number, oldestAgeMs: number): Record<string, string> {
+  const age = Math.floor(ageMs / 1000);
+  const holdLeft = Math.floor((UTS_SIGNER_KEYS_HOLD_MS - oldestAgeMs) / 1000);
+  const maxAge = Math.min(UTS_JWKS_MAX_AGE_SECONDS, age + holdLeft);
+  const staleIfError = Math.min(UTS_JWKS_STALE_IF_ERROR_SECONDS, holdLeft - (maxAge - age));
   return {
     'Content-Type': 'application/json',
-    'Cache-Control': UTS_JWKS_CACHE_CONTROL,
-    Age: String(Math.floor(ageMs / 1000)),
+    'Cache-Control': `max-age=${maxAge}, stale-if-error=${staleIfError}`,
+    Age: String(age),
     [UTS_JWKS_OLDEST_AGE_HEADER]: String(Math.floor(oldestAgeMs / 1000)),
   };
 }

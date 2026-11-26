@@ -101,12 +101,24 @@ async function xsOf(response: Response, signer: number): Promise<string[]> {
 const xs = (signer: number, generation: number) =>
   signerEntry(signer, generation, T0).keys.map(key => key.x);
 
-/** The standard cache limits, with `Age` from the newest keys and the oldest keys' age beside it. */
-function expectKeySetHeaders(response: Response, age: string, oldestAge: string): void {
-  expect(response.headers.get('Cache-Control')).toBe('max-age=300, stale-if-error=86400');
+/**
+ * `Age` from the newest keys, the oldest keys' age beside it, and the cache limits. `max-age` is
+ * at most 300 and `stale-if-error` at most 86400, and `max-age` minus `Age` plus `stale-if-error`
+ * never passes the hold left, 86400 minus the oldest age: no window outlasts the oldest keys.
+ */
+function expectKeySetHeaders(
+  response: Response,
+  age: string,
+  oldestAge: string,
+  cacheControl: string
+): void {
+  expect(response.headers.get('Cache-Control')).toBe(cacheControl);
   expect(response.headers.get('Age')).toBe(age);
   expect(response.headers.get('Kilo-Key-Set-Oldest-Age')).toBe(oldestAge);
 }
+
+/** The limits while the oldest keys are as old as the newest: 300 - Age + 86100 + Age = 86400. */
+const SAME_AGE_LIMITS = 'max-age=300, stale-if-error=86100';
 
 beforeEach(() => {
   resetIsolate();
@@ -118,9 +130,12 @@ afterEach(() => {
 
 describe('key set endpoint', () => {
   it('serves the 32 keys of the 16 signers with the key-set cache header and both ages at 0', async () => {
-    const response = await get(mintBinding(async () => okAnswer()));
+    const response = await get(
+      mintBinding(async () => okAnswer()),
+      T0
+    );
     expect(response.status).toBe(200);
-    expectKeySetHeaders(response, '0', '0');
+    expectKeySetHeaders(response, '0', '0', SAME_AGE_LIMITS);
     expect(response.headers.get('Content-Type')).toBe('application/json');
     expect(await keysOf(response)).toHaveLength(32);
   });
@@ -201,11 +216,12 @@ describe('reads', () => {
     generation = 1;
     const stale = await get(mint, T0 + KEY_SET_FRESH_MS);
     expect(await xsOf(stale, 0)).toEqual(xs(0, 0));
-    expectKeySetHeaders(stale, '10', '10');
+    expectKeySetHeaders(stale, '10', '10', SAME_AGE_LIMITS);
     expect(mint.calls).toBe(2);
     const refreshed = await get(mint, T0 + KEY_SET_FRESH_MS + 1);
     expect(await xsOf(refreshed, 0)).toEqual(xs(0, 1));
-    expectKeySetHeaders(refreshed, '0', '0');
+    // 1 ms after the read: the hold left rounds down to 86399 seconds.
+    expectKeySetHeaders(refreshed, '0', '0', 'max-age=300, stale-if-error=86099');
     expect(mint.calls).toBe(2);
   });
 
@@ -224,7 +240,7 @@ describe('reads', () => {
     await get(mint, T0 + KEY_SET_FRESH_MS - 2000);
     expect(mint.calls).toBe(1);
     const response = await get(mint, T0 + KEY_SET_READ_GUARD_MS);
-    expectKeySetHeaders(response, '12', '12');
+    expectKeySetHeaders(response, '12', '12', SAME_AGE_LIMITS);
     expect(mint.calls).toBe(2);
   });
 
@@ -305,7 +321,7 @@ describe('signers', () => {
     expect(await xsOf(response.clone(), 3)).toEqual(xs(3, 1));
     expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
     expect(await keysOf(response.clone())).toHaveLength(32);
-    expectKeySetHeaders(response, '0', '20');
+    expectKeySetHeaders(response, '0', '20', 'max-age=300, stale-if-error=86080');
   });
 
   it('keeps Age from the healthy signers past the 5-minute lifetime while one signer fails, and its oldest age grows', async () => {
@@ -318,13 +334,18 @@ describe('signers', () => {
     });
     await get(mint, T0);
     failing = true;
-    expectKeySetHeaders(await get(mint, T0 + 20_000), '0', '20');
+    expectKeySetHeaders(
+      await get(mint, T0 + 20_000),
+      '0',
+      '20',
+      'max-age=300, stale-if-error=86080'
+    );
     const late = await get(mint, T0 + 400_000);
-    expectKeySetHeaders(late, '0', '400');
+    expectKeySetHeaders(late, '0', '400', 'max-age=300, stale-if-error=85700');
     expect(await xsOf(late, 7)).toEqual(xs(7, 0));
     expect(mint.calls).toBe(3);
     const held = await get(mint, T0 + 405_000);
-    expectKeySetHeaders(held, '5', '405');
+    expectKeySetHeaders(held, '5', '405', 'max-age=300, stale-if-error=85700');
     expect(mint.calls).toBe(3);
   });
 
@@ -336,7 +357,25 @@ describe('signers', () => {
     });
     const response = await get(mint, T0);
     expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
-    expectKeySetHeaders(response, '0', '3600');
+    expectKeySetHeaders(response, '0', '3600', 'max-age=300, stale-if-error=82500');
+  });
+
+  it("ends both HTTP cache windows when the oldest keys' 24-hour hold ends", async () => {
+    for (const [heldFor, cacheControl] of [
+      [86_100, 'max-age=300, stale-if-error=0'],
+      [86_300, 'max-age=100, stale-if-error=0'],
+      [86_399, 'max-age=1, stale-if-error=0'],
+    ] as const) {
+      resetIsolate();
+      const mint = mintBinding(async () => {
+        const signers = allSigners(0);
+        signers[7] = signerEntry(7, 0, Date.now() - heldFor * 1000);
+        return answered(signers);
+      });
+      const response = await get(mint, T0);
+      expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
+      expectKeySetHeaders(response, '0', String(heldFor), cacheControl);
+    }
   });
 
   it("keeps its own newer keys for a signer over the mint Worker's older held ones", async () => {
@@ -380,10 +419,10 @@ describe('failures', () => {
     fail = true;
     const held = await get(mint, T0 + 60_000);
     expect(held.status).toBe(200);
-    expectKeySetHeaders(held, '60', '60');
+    expectKeySetHeaders(held, '60', '60', SAME_AGE_LIMITS);
     const last = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS - 1000);
     expect(last.status).toBe(200);
-    expectKeySetHeaders(last, '86399', '86399');
+    expectKeySetHeaders(last, '86399', '86399', SAME_AGE_LIMITS);
     const expired = await get(mint, T0 + UTS_SIGNER_KEYS_HOLD_MS + KEY_SET_READ_GUARD_MS);
     expect(expired.status).toBe(503);
   });

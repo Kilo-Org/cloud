@@ -26,12 +26,15 @@ SET search_path = pg_catalog, pg_temp
 RETURN value ~ '^[a-z][a-z0-9-]{0,62}:[a-z][a-z0-9_.-]{0,62}$';
 
 -- A canonical scope set: 1 to 64 scopes, strictly ascending in byte order, so equal sets have one
--- spelling (consent is per scope set, design section 5.9).
+-- spelling (consent is per scope set, design section 5.9). PostgreSQL arrays can start at any
+-- index, and array equality compares the bounds too, so the set must also start at 1: the order
+-- check reads `value[position - 1]` with `position` counted from 1.
 CREATE FUNCTION uts.is_scope_set(value text[]) RETURNS boolean
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
 SET search_path = pg_catalog, pg_temp
 RETURN cardinality(value) BETWEEN 1 AND 64
   AND array_ndims(value) = 1
+  AND array_lower(value, 1) = 1
   AND array_position(value, NULL) IS NULL
   AND NOT EXISTS (
     SELECT 1
@@ -274,7 +277,10 @@ CREATE INDEX device_sessions_account_idx ON uts.device_sessions (account_id)
 -- sign-in or a passkey check. A pass lasts at most 10 minutes and is consumed by one action.
 -- Each table that records a gated action carries that action as a constant `gate_pass_action`
 -- column, a foreign key on (pass, account, action) and a unique pass id, so a pass serves only
--- its own account, its own action and one row. A pass is never swept while a credential refers to
+-- its own account, its own action and one row. A tier B pass is written already consumed, in the
+-- same statement as the row it allows (`uts.write_gated_pat`, `uts.write_gated_bot_key`), and no
+-- login role can write a pass or a gated row itself (0003_access.sql), so no statement can name a
+-- pass that is open, expired or used before. A pass is never swept while a credential refers to
 -- it: those foreign keys refuse the delete, and an org bot key lets go of its pass only once it is
 -- flagged, kept or revoked. Deleting the account deletes its passes with its credentials.
 CREATE TABLE uts.gate_passes (
@@ -662,11 +668,14 @@ CREATE INDEX personal_access_tokens_account_idx ON uts.personal_access_tokens (a
 -- keys; a flagged key stops working 7 days after `flagged_at` unless an org admin keeps it (design
 -- section 5.8).
 --
--- Every new key needs a tier B gate pass of its creator (`uts.require_bot_key_gate_pass`). The
--- pass is deleted with the creator's account, and the foreign key then clears `gate_pass_id` only;
+-- Every new key needs a tier B gate pass of its creator (`uts.require_bot_key_gate_pass`), written
+-- consumed by `uts.write_gated_bot_key` in the statement that writes the key. The pass is deleted
+-- with the creator's account, and the foreign key then clears `gate_pass_id` only;
 -- `org_bot_keys_gate_pass_shape` refuses that for a key that is still active, so a pass is never
--- swept from under a live key. `gate_pass_action` is a constant with a CHECK rather than a generated
--- column, because PostgreSQL refuses ON DELETE SET NULL on a foreign key with a generated column.
+-- swept from under a live key. A cleared pass cannot serve another key: it was consumed, and no
+-- statement takes a pass id from its caller. `gate_pass_action` is a constant with a CHECK rather
+-- than a generated column, because PostgreSQL refuses ON DELETE SET NULL on a foreign key with a
+-- generated column.
 CREATE TABLE uts.org_bot_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id uuid NOT NULL,
@@ -784,6 +793,298 @@ CREATE TABLE uts.ci_trust_policies (
 CREATE INDEX ci_trust_policies_repository_idx ON uts.ci_trust_policies (repository_id)
   WHERE status = 'active';
 CREATE INDEX ci_trust_policies_account_idx ON uts.ci_trust_policies (account_id);
+
+-- Gated creates (design section 5.11). The tier B gate is decided inside the statement that
+-- writes the credential: the statement computes the checks the caller's session meets now, writes
+-- the pass already consumed, and writes the credential that names it, all at once. The write
+-- steps below are for the SECURITY DEFINER statements that also write the audit row and the
+-- notice; no login role can call them (0003_access.sql).
+
+-- The tier B checks that a session of `p_account_id` meets now: `recent_sign_in` for a sign-in
+-- within 10 minutes, `passkey` for a passkey step-up of that session within 10 minutes. NULL when
+-- the session is not a live session of the account (or not exactly one session id is given);
+-- empty when it meets neither check.
+CREATE FUNCTION uts.tier_b_checks(
+  p_account_id text,
+  p_browser_session_id uuid,
+  p_device_session_id uuid
+) RETURNS uts.gate_check[]
+LANGUAGE sql
+STABLE
+SET search_path = pg_catalog, pg_temp
+RETURN (
+  SELECT array_remove(ARRAY[
+    CASE
+      WHEN session.auth_time > now() - interval '10 minutes' AND session.auth_time <= now()
+      THEN 'recent_sign_in'::uts.gate_check
+    END,
+    CASE
+      WHEN EXISTS (
+        SELECT 1 FROM uts.step_ups AS step_up
+        WHERE step_up.account_id = p_account_id
+          AND step_up.completed_at > now() - interval '10 minutes'
+          AND step_up.purpose = 'gate'
+          AND step_up.browser_session_id IS NOT DISTINCT FROM p_browser_session_id
+          AND step_up.device_session_id IS NOT DISTINCT FROM p_device_session_id
+          AND step_up.expires_at > now()
+      )
+      THEN 'passkey'::uts.gate_check
+    END
+  ], NULL)
+  FROM (
+    SELECT browser.auth_time FROM uts.browser_sessions AS browser
+    WHERE browser.id = p_browser_session_id
+      AND browser.account_id = p_account_id
+      AND browser.status = 'active'
+      AND browser.idle_expires_at > now()
+      AND browser.expires_at > now()
+    UNION ALL
+    SELECT device.auth_time FROM uts.device_sessions AS device
+    WHERE device.id = p_device_session_id
+      AND device.account_id = p_account_id
+      AND device.status = 'active'
+  ) AS session
+  WHERE num_nonnulls(p_browser_session_id, p_device_session_id) = 1
+);
+
+-- The write step of creating a PAT (design sections 5.3 and 5.11). It locks the account row first
+-- (the order an account deletion takes too, so the two cannot deadlock). Outcomes, checked in
+-- order:
+-- * `invalid_session`: the device session is not a live session of the account;
+-- * `org_denied`: the PAT names an organization in which the account has no active membership.
+--   The membership row stays locked FOR SHARE until commit, so a removal of the member that runs
+--   at the same time waits for this statement to commit. The removal then sees the new PAT only
+--   if it updates the membership row in one statement and revokes the member's org-bound PATs in
+--   a later statement (each statement of a VOLATILE function takes a fresh snapshot), or revokes
+--   them from a row trigger on `uts.org_memberships`. A removal written as one statement keeps
+--   the snapshot it took before the wait and misses the new PAT;
+-- * `gate_required`: the session meets no tier B check;
+-- * `limit_reached`: the account holds 100 live PATs. Creates of one account run one after
+--   another behind the lock on the account row, so the count holds;
+-- * `created`: one statement wrote the consumed tier B pass and the PAT that names it.
+-- The audience is the scope's own (design 5.3). A lifetime outside 1 to 365 days raises 22023.
+CREATE FUNCTION uts.write_gated_pat(
+  p_account_id text,
+  p_device_session_id uuid,
+  p_name text,
+  p_token_hash bytea,
+  p_last_four text,
+  p_scope text,
+  p_org_id uuid,
+  p_lifetime_days integer
+) RETURNS TABLE (
+  outcome text,
+  new_pat_id uuid,
+  new_gate_pass_id uuid,
+  gate_checks uts.gate_check[],
+  pat_created_at timestamptz,
+  pat_expires_at timestamptz
+)
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF p_lifetime_days IS NULL OR p_lifetime_days NOT BETWEEN 1 AND 365 THEN
+    RAISE EXCEPTION 'a PAT lives 1 to 365 days' USING ERRCODE = '22023';
+  END IF;
+  gate_checks := uts.tier_b_checks(p_account_id, NULL, p_device_session_id);
+  IF gate_checks IS NULL THEN
+    outcome := 'invalid_session';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  PERFORM 1 FROM uts.accounts AS account WHERE account.id = p_account_id FOR NO KEY UPDATE;
+  IF p_org_id IS NOT NULL THEN
+    PERFORM 1 FROM uts.org_memberships AS membership
+    WHERE membership.org_id = p_org_id
+      AND membership.account_id = p_account_id
+      AND membership.status = 'active'
+    FOR SHARE;
+    IF NOT FOUND THEN
+      outcome := 'org_denied';
+      RETURN NEXT;
+      RETURN;
+    END IF;
+  END IF;
+  IF cardinality(gate_checks) = 0 THEN
+    outcome := 'gate_required';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  -- The account row is locked above, so concurrent creates of one account count one at a time.
+  IF (
+    SELECT count(*) FROM uts.personal_access_tokens AS pat
+    WHERE pat.account_id = p_account_id AND pat.status = 'active' AND pat.expires_at > now()
+  ) >= 100 THEN
+    outcome := 'limit_reached';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  WITH pass AS (
+    INSERT INTO uts.gate_passes (
+      account_id, device_session_id, tier, action, satisfied_by, expires_at, status, consumed_at
+    ) VALUES (
+      p_account_id, p_device_session_id, 'b', 'pat_create', gate_checks,
+      now() + interval '10 minutes', 'consumed', now()
+    )
+    RETURNING id
+  )
+  INSERT INTO uts.personal_access_tokens (
+    account_id, name, token_hash, last_four, audience, scope, org_id, gate_pass_id, expires_at
+  )
+  SELECT p_account_id, p_name, p_token_hash, p_last_four, split_part(p_scope, ':', 1), p_scope,
+    p_org_id, pass.id, now() + make_interval(days => p_lifetime_days)
+  FROM pass
+  RETURNING id, gate_pass_id, created_at, expires_at
+  INTO new_pat_id, new_gate_pass_id, pat_created_at, pat_expires_at;
+  outcome := 'created';
+  RETURN NEXT;
+END
+$$;
+
+-- The write step of creating an org bot key (design sections 5.3, 5.8 and 5.11). The key belongs
+-- to the organization and records its creator. It takes a key-share lock on the creator's account
+-- row first (the order an account deletion takes too, so the two cannot deadlock). Outcomes,
+-- checked in order:
+-- * `invalid_session`: the device session is not a live session of the account;
+-- * `not_org_admin`: the account is not an active owner or admin of the organization. The
+--   membership row stays locked FOR SHARE until commit, so a removal of the member that runs at
+--   the same time waits for this statement to commit. The removal then sees the new key only if
+--   it updates the membership row in one statement and flags the member's keys in a later
+--   statement of a VOLATILE function, or flags them from a row trigger on `uts.org_memberships`
+--   (see `uts.write_gated_pat`);
+-- * `gate_required`: the session meets no tier B check;
+-- * `limit_reached`: the organization holds 100 live keys (a flagged key is live until 7 days
+--   after it was flagged). Creates in one organization run one after another behind an advisory
+--   lock, so the count holds;
+-- * `created`: one statement wrote the consumed tier B pass and the key that names it.
+-- The audience is the scope's own (design 5.3). A lifetime outside 1 to 365 days raises 22023.
+CREATE FUNCTION uts.write_gated_bot_key(
+  p_account_id text,
+  p_device_session_id uuid,
+  p_org_id uuid,
+  p_name text,
+  p_token_hash bytea,
+  p_last_four text,
+  p_scope text,
+  p_lifetime_days integer
+) RETURNS TABLE (
+  outcome text,
+  new_key_id uuid,
+  new_gate_pass_id uuid,
+  gate_checks uts.gate_check[],
+  key_created_at timestamptz,
+  key_expires_at timestamptz
+)
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF p_lifetime_days IS NULL OR p_lifetime_days NOT BETWEEN 1 AND 365 THEN
+    RAISE EXCEPTION 'an org bot key lives 1 to 365 days' USING ERRCODE = '22023';
+  END IF;
+  gate_checks := uts.tier_b_checks(p_account_id, NULL, p_device_session_id);
+  IF gate_checks IS NULL THEN
+    outcome := 'invalid_session';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  PERFORM 1 FROM uts.accounts AS account WHERE account.id = p_account_id FOR KEY SHARE;
+  PERFORM 1 FROM uts.org_memberships AS membership
+  WHERE membership.org_id = p_org_id
+    AND membership.account_id = p_account_id
+    AND membership.status = 'active'
+    AND membership.role IN ('owner', 'admin')
+  FOR SHARE;
+  IF NOT FOUND THEN
+    outcome := 'not_org_admin';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  IF cardinality(gate_checks) = 0 THEN
+    outcome := 'gate_required';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('uts.org_bot_keys:' || p_org_id::text, 0));
+  IF (
+    SELECT count(*) FROM uts.org_bot_keys AS bot_key
+    WHERE bot_key.org_id = p_org_id
+      AND bot_key.expires_at > now()
+      AND (bot_key.status IN ('active', 'kept')
+        OR (bot_key.status = 'flagged' AND bot_key.flagged_at > now() - interval '168 hours'))
+  ) >= 100 THEN
+    outcome := 'limit_reached';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  WITH pass AS (
+    INSERT INTO uts.gate_passes (
+      account_id, device_session_id, tier, action, satisfied_by, expires_at, status, consumed_at
+    ) VALUES (
+      p_account_id, p_device_session_id, 'b', 'bot_key_create', gate_checks,
+      now() + interval '10 minutes', 'consumed', now()
+    )
+    RETURNING id
+  )
+  INSERT INTO uts.org_bot_keys (
+    org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at
+  )
+  SELECT p_org_id, p_account_id, p_name, p_token_hash, p_last_four, split_part(p_scope, ':', 1),
+    p_scope, pass.id, now() + make_interval(days => p_lifetime_days)
+  FROM pass
+  RETURNING id, gate_pass_id, created_at, expires_at
+  INTO new_key_id, new_gate_pass_id, key_created_at, key_expires_at;
+  outcome := 'created';
+  RETURN NEXT;
+END
+$$;
+
+-- A credential, consent or device code in a final state keeps it: an update cannot bring back a
+-- revoked PAT, bot key, CI trust policy or consent, nor reopen a denied or consumed device code,
+-- because each of those needs a new gate pass. A flagged org bot key becomes only kept or revoked,
+-- and its `flagged_at` never changes once set, so an update can neither clear a flag nor move its
+-- 7-day cutoff; keeping a key is a gated step of its own (design section 5.8). The trigger's
+-- argument names the column it guards.
+CREATE FUNCTION uts.refuse_reopening() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  RAISE EXCEPTION 'a % row cannot change % this way', TG_TABLE_NAME, TG_ARGV[0]
+    USING ERRCODE = 'check_violation', TABLE = TG_TABLE_NAME, COLUMN = TG_ARGV[0];
+END
+$$;
+CREATE TRIGGER personal_access_tokens_stay_revoked
+  BEFORE UPDATE ON uts.personal_access_tokens
+  FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE TRIGGER org_bot_keys_stay_revoked
+  BEFORE UPDATE ON uts.org_bot_keys
+  FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE TRIGGER org_bot_keys_flag_moves_on
+  BEFORE UPDATE ON uts.org_bot_keys
+  FOR EACH ROW WHEN (OLD.status = 'flagged' AND NEW.status NOT IN ('flagged', 'kept', 'revoked'))
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE TRIGGER org_bot_keys_flag_time_fixed
+  BEFORE UPDATE ON uts.org_bot_keys
+  FOR EACH ROW WHEN (OLD.flagged_at IS NOT NULL AND NEW.flagged_at IS DISTINCT FROM OLD.flagged_at)
+  EXECUTE FUNCTION uts.refuse_reopening('flagged_at');
+CREATE TRIGGER ci_trust_policies_stay_revoked
+  BEFORE UPDATE ON uts.ci_trust_policies
+  FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE TRIGGER third_party_consents_stay_revoked
+  BEFORE UPDATE ON uts.third_party_consents
+  FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE TRIGGER device_codes_stay_final
+  BEFORE UPDATE ON uts.device_codes
+  FOR EACH ROW WHEN (OLD.status IN ('denied', 'consumed') AND NEW.status <> OLD.status)
+  EXECUTE FUNCTION uts.refuse_reopening('status');
 
 -- Sandbox grants (design section 5.10): UTS mints delegated tokens only against one of these, and
 -- the grant ends with the sandbox session.

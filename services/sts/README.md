@@ -801,8 +801,9 @@ npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/
 The script signs a job token the way GitHub does and checks that the listed workflow's job gets its
 bundle (its `/ci/ci-e2e-release` value and its `/shared` value, not the `/workloads` or `/ci/minting`
 decoys), that the refresher read `/ci`, and that a job of another workflow file, a `pull_request`
-job, a name-only subject and a customized subject carrying the run id each get 401
+job, a name-only subject, a customized subject carrying the run id, and a run on the policy's
+second listed ref (`refs/heads/release`) calling the workflow pinned to `main` each get 401
 `identity_rejected`. It then waits for the `bundle.delivered` row, which must carry the job's
 workflow file, run id and attempt, and for the `bundle.denied` rows that name the refused
-`job_workflow_ref`, `event_name` and `sub_format` and no run id or raw subject, and checks that no
-audit row carries a value.
+`job_workflow_ref`, `event_name`, `ref` and `sub_format` and no run id or raw subject, and checks
+that no audit row carries a value.

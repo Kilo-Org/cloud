@@ -5,8 +5,9 @@
 // The script serves a fake GitHub issuer (a fresh RS256 key, its discovery document and key set)
 // and a fake manager on port 8830; the test build of STS sends its requests for both there. It
 // signs CI-shaped job tokens the way GitHub does, checks that the listed workflow's job gets its
-// bundle from /ci/<workload> and /shared, that another workflow file, a pull_request event and a
-// name-only subject are refused, and waits for the delivery and denial rows on the audit queue.
+// bundle from /ci/<workload> and /shared, that another workflow file, a pull_request event, a
+// name-only or customized subject, and a run on another listed ref calling the workflow pinned to
+// main are refused, and waits for the delivery and denial rows on the audit queue.
 // Every key, id and value is synthetic. Exits 1 on the first failure.
 import { BundleResultSchema, type BundleResult } from '@kilocode/sts-contracts';
 import { createServer } from 'node:http';
@@ -166,6 +167,12 @@ const refusals: Array<[string, JWTPayload]> = [
     'a token with a customized subject that carries the run id',
     { ...JOB_CLAIMS, sub: 'repo:kilo-e2e/ci-fixture:run_id:424242' },
   ],
+  // The policy lists refs/heads/release too, but its one workflow entry is pinned to main: a
+  // release run calling publish.yml@refs/heads/main as a reusable workflow is refused.
+  [
+    'a release run calling the workflow pinned to main',
+    { ...JOB_CLAIMS, ref: 'refs/heads/release' },
+  ],
 ];
 for (const [what, claims] of refusals) {
   const refused = await bundle(claims);
@@ -197,7 +204,8 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
     sawDenial('other.yml') &&
     sawDenial('event_name=pull_request') &&
     sawDenial('sub_format=name-only:environment') &&
-    sawDenial('sub_format=custom')
+    sawDenial('sub_format=custom') &&
+    sawDenial('ref=refs/heads/release')
   ) {
     break;
   }
@@ -229,6 +237,10 @@ check(sawDenial('event_name=pull_request'), 'the pull_request job is audited wit
 check(
   sawDenial('sub_format=name-only:environment') && sawDenial('sub_format=custom'),
   'the name-only and customized subjects are audited by their format only'
+);
+check(
+  sawDenial('ref=refs/heads/release'),
+  'the release run calling the workflow pinned to main is audited with its ref'
 );
 check(
   !JSON.stringify(events).includes('repo:kilo-e2e/ci-fixture'),

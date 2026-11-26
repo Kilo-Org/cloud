@@ -125,8 +125,13 @@ function verifyEnvironment(
   if (listed !== undefined) {
     return listed === environment.data ? { stsUrl: env.STS_URL, environment: listed } : null;
   }
-  if (environment.data !== 'development' || !URL.canParse(env.STS_URL)) return null;
-  const { hostname } = new URL(env.STS_URL);
+  if (environment.data !== 'development') return null;
+  let hostname: string;
+  try {
+    hostname = new URL(env.STS_URL).hostname;
+  } catch {
+    return null;
+  }
   return hostname === '127.0.0.1' || hostname === 'localhost'
     ? { stsUrl: env.STS_URL, environment: environment.data }
     : null;

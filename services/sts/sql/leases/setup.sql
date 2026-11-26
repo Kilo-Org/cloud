@@ -77,6 +77,26 @@ END
 $$;
 GRANT kilo_lease_replica_read TO kilo_lease_replica_admin WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 
+-- This login's creation statement carries each lease password as a literal (Infisical's PostgreSQL
+-- engine has no bind parameters). None of its statements reaches the server log, whatever the
+-- server-wide settings: these role settings are superuser-only parameters, which Supabase lets
+-- `postgres` set per role (supautils; https://supabase.com/docs/guides/database/postgres/postgres-log-config),
+-- and the login itself cannot change them. pgaudit and auto_explain get the same when loaded.
+-- setup-ci-migration.sql, run as a superuser, also hides its statements from pg_stat_activity.
+ALTER ROLE kilo_lease_replica_admin SET log_statement = 'none';
+ALTER ROLE kilo_lease_replica_admin SET log_min_duration_statement = -1;
+ALTER ROLE kilo_lease_replica_admin SET log_min_error_statement = 'panic';
+DO $$
+BEGIN
+  IF pg_catalog.current_setting('pgaudit.log', true) IS NOT NULL THEN
+    ALTER ROLE kilo_lease_replica_admin SET pgaudit.log = 'none';
+  END IF;
+  IF pg_catalog.current_setting('auto_explain.log_min_duration', true) IS NOT NULL THEN
+    ALTER ROLE kilo_lease_replica_admin SET auto_explain.log_min_duration = -1;
+  END IF;
+END
+$$;
+
 -- The lease statements' helpers. Each knows its caller's template by `session_user`, which a
 -- session cannot change without superuser rights: replica admin -> kilo_lease_replica_read and
 -- names `lease_rr_<20 of [a-z0-9]>`; migration admin -> kilo_lease_migration and `lease_cm_...`.
@@ -111,29 +131,58 @@ BEGIN
 END
 $$;
 
--- Ends, on this node, the sessions of `username` when it is a lease role of the caller's template,
--- the sessions of every lease role of that template whose VALID UNTIL has passed, and every session
--- whose role no longer exists (a login that landed while an earlier revocation committed). Such a
--- session holds no right of its own role, but a ci-migration one keeps acting as `postgres` with
--- owner rights (its `role` setting made `current_user` postgres at login, and that role still
--- exists) until the next revocation of any lease ends it. Nothing else: not a superuser, not an
--- admin login, not an application role. Runs as `postgres`, which
--- Supabase makes a member of pg_signal_backend. Returns the number of sessions signalled; they
--- exit right after. It drops the transaction's activity snapshot first, so a second call in the
--- same revocation sees the logins that landed since the first.
+-- Every lease role an admin login created, by OID, with its template; owned by `postgres`, and no
+-- login may write it except through kilo_lease.track_lease. A session whose role no longer exists is
+-- ended only when its OID is here, so a revocation never ends a session of a role that was never a
+-- lease (PostgreSQL leaves an ordinary role's sessions open when the role is dropped). A row goes
+-- once its role is gone and no session of it remains.
+CREATE TABLE kilo_lease.lease_role (
+  role oid PRIMARY KEY,
+  template regrole NOT NULL
+);
+
+-- Records `username`, a role the calling admin login just created in its template. Runs as
+-- `postgres`; refuses any other role.
+CREATE FUNCTION kilo_lease.track_lease(username text) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
+DECLARE
+  caller record;
+  lease oid;
+BEGIN
+  PERFORM kilo_lease.check_username(username);
+  SELECT * INTO caller FROM kilo_lease.caller_template();
+  SELECT r.oid INTO lease
+  FROM pg_catalog.pg_roles r
+  JOIN pg_catalog.pg_auth_members m ON m.member = r.oid AND m.roleid = caller.template AND NOT m.admin_option
+  WHERE r.rolname = username AND NOT r.rolsuper;
+  IF lease IS NULL THEN
+    RAISE EXCEPTION 'lease role % is not in %', username, caller.template;
+  END IF;
+  INSERT INTO kilo_lease.lease_role (role, template) VALUES (lease, caller.template)
+  ON CONFLICT (role) DO UPDATE SET template = EXCLUDED.template;
+END
+$$;
+
+-- Ends, on this node, the sessions of the lease roles of the caller's template (kilo_lease.lease_role)
+-- that are `username`, have no login (a revocation blocked them), have passed their VALID UNTIL, or
+-- no longer exist. Nothing else: not a superuser, not an admin login, not an application role, not
+-- a session of a dropped role that was never a lease. Runs as `postgres`, which Supabase makes a
+-- member of pg_signal_backend. Returns the number of sessions signalled; they exit right after. It
+-- drops the transaction's activity snapshot first, so a second call in the same revocation sees
+-- the logins that landed since the first, and it forgets the rows of roles that are gone with no
+-- session left.
 CREATE FUNCTION kilo_lease.end_sessions(username text) RETURNS integer
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
   SELECT pg_catalog.pg_stat_clear_snapshot();
   WITH caller AS (SELECT * FROM kilo_lease.caller_template()),
-  lease_roles AS (
-    SELECT r.oid
-    FROM pg_catalog.pg_auth_members m
-    JOIN pg_catalog.pg_roles r ON r.oid = m.member
-    JOIN caller ON m.roleid = caller.template
-    WHERE NOT m.admin_option
-      AND NOT r.rolsuper
-      AND starts_with(r.rolname, caller.prefix)
-      AND (r.rolname = username OR r.rolvaliduntil < pg_catalog.now())
+  leases AS (
+    SELECT l.role
+    FROM kilo_lease.lease_role l
+    JOIN caller ON l.template = caller.template
+    LEFT JOIN pg_catalog.pg_roles r ON r.oid = l.role
+    WHERE r.oid IS NULL
+      OR (NOT r.rolsuper
+        AND (r.rolname = username OR NOT r.rolcanlogin OR r.rolvaliduntil < pg_catalog.now()))
   ),
   -- Materialized, so the termination below runs on these sessions only.
   targets AS MATERIALIZED (
@@ -141,19 +190,25 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS 
     FROM pg_catalog.pg_stat_activity a
     WHERE a.pid <> pg_catalog.pg_backend_pid()
       AND a.backend_type = 'client backend'
-      AND (
-        a.usesysid IN (SELECT oid FROM lease_roles)
-        OR (a.usesysid IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.oid = a.usesysid))
-      )
+      AND a.usesysid IN (SELECT role FROM leases)
+  ),
+  forgotten AS (
+    DELETE FROM kilo_lease.lease_role l
+    USING caller
+    WHERE l.template = caller.template
+      AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.oid = l.role)
+      AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity a WHERE a.usesysid = l.role)
   )
   SELECT (count(*) FILTER (WHERE pg_catalog.pg_terminate_backend(pid)))::integer FROM targets
 $$;
 
 -- The creation statement (replica-read.create.sql, ci-migration.create.sql): the lease role, in the
--- caller's template, with its connection limit and settings. The CREATE ROLE runs here through
--- EXECUTE, so the statement Infisical sends is a SELECT: `log_statement = 'ddl'` does not log it,
--- and the password stays out of the server log (it is still logged under `log_statement = 'all'`,
--- pgaudit, `log_min_duration_statement`, or as the statement of an error). Runs as the admin login.
+-- caller's template, with its connection limit and settings, recorded in kilo_lease.lease_role. The
+-- CREATE ROLE runs here through EXECUTE, so the statement Infisical sends is a SELECT, and the
+-- admin login's role settings keep that SELECT out of the server log. A failed CREATE ROLE is
+-- raised again without its text, so the password is not in the error's context either; the
+-- transaction then rolls back, so a password in any error belongs to a role that never existed.
+-- Runs as the admin login.
 CREATE FUNCTION kilo_lease.create_lease(username text, password text, valid_until timestamptz) RETURNS void
 LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
@@ -161,29 +216,52 @@ DECLARE
 BEGIN
   PERFORM kilo_lease.check_username(username);
   SELECT * INTO caller FROM kilo_lease.caller_template();
+  BEGIN
+    EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L VALID UNTIL %L CONNECTION LIMIT %s IN ROLE %I',
+      username, password, valid_until, CASE WHEN caller.prefix = 'lease_rr_' THEN 4 ELSE 2 END,
+      caller.template);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'lease role % was not created: %', username, SQLERRM USING ERRCODE = SQLSTATE;
+  END;
   IF caller.prefix = 'lease_rr_' THEN
-    EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L VALID UNTIL %L CONNECTION LIMIT 4 IN ROLE %I',
-      username, password, valid_until, caller.template);
     EXECUTE format('ALTER ROLE %I SET default_transaction_read_only = on', username);
     EXECUTE format('ALTER ROLE %I SET statement_timeout = %L', username, '60s');
     EXECUTE format('ALTER ROLE %I SET idle_in_transaction_session_timeout = %L', username, '60s');
     EXECUTE format('ALTER ROLE %I SET idle_session_timeout = %L', username, '15min');
   ELSE
-    EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L VALID UNTIL %L CONNECTION LIMIT 2 IN ROLE %I',
-      username, password, valid_until, caller.template);
     EXECUTE format('ALTER ROLE %I SET role = %L', username, 'postgres');
   END IF;
+  PERFORM kilo_lease.track_lease(username);
 END
 $$;
 
--- The revocation statement (revoke.sql). In order: no new login (committed with the transaction),
--- end the sessions, take the lease role's rights for this transaction (DROP OWNED needs them; the
--- grant goes with the role), drop what the role owns and the rights it granted in this database,
--- end the sessions again (a login that landed meanwhile), drop the role. When the drop fails (an
--- object in another database, a right `postgres` granted to it), the grant is undone and the role
--- stays without login, its sessions ended, and report.sql lists it; the revocation still succeeds,
--- so the lease is never left with a usable role. A role that is already gone is a no-op, so a
--- repeated revocation succeeds.
+-- The revocation statement (revoke.sql) is two transactions in one Infisical call: it splits the
+-- text on ';' and runs the parts on one connection inside its own BEGIN and COMMIT, so the
+-- `COMMIT;BEGIN;` between the two calls commits the first.
+--
+-- 1. kilo_lease.block_lease: no new login (NOLOGIN, VALID UNTIL -infinity), committed before
+--    anything else, then end the sessions. From that commit on no login of the role can succeed.
+-- 2. kilo_lease.revoke_lease: refuses a role that still has its login (a revocation statement that
+--    skipped the first part), waits a second for a login that passed its checks before the block
+--    committed to show in pg_stat_activity, ends the sessions, takes the lease role's rights for
+--    this transaction (DROP OWNED needs them; the grant goes with the role), drops what the role
+--    owns and the rights it granted in this database, ends the sessions again, drops the role.
+--
+-- So the drop commits with no session of the role left. When the drop fails (an object in another
+-- database, a right `postgres` granted to it), the grant is undone and the role stays without
+-- login, its sessions ended, and report.sql lists it; the revocation still succeeds. A role that
+-- is already gone is a no-op, so a repeated revocation succeeds.
+CREATE FUNCTION kilo_lease.block_lease(username text) RETURNS void
+LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, pg_temp AS $$
+BEGIN
+  PERFORM kilo_lease.check_username(username);
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = username AND rolcanlogin) THEN
+    EXECUTE format('ALTER ROLE %I NOLOGIN VALID UNTIL %L', username, '-infinity');
+  END IF;
+  PERFORM kilo_lease.end_sessions(username);
+END
+$$;
+
 CREATE FUNCTION kilo_lease.revoke_lease(username text) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, pg_temp AS $$
 BEGIN
@@ -192,7 +270,10 @@ BEGIN
     PERFORM kilo_lease.end_sessions(username);
     RETURN true;
   END IF;
-  EXECUTE format('ALTER ROLE %I NOLOGIN VALID UNTIL %L', username, '-infinity');
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = username AND rolcanlogin) THEN
+    RAISE EXCEPTION 'lease role % still has its login: revoke.sql runs kilo_lease.block_lease and commits first', username;
+  END IF;
+  PERFORM pg_catalog.pg_sleep(1);
   PERFORM kilo_lease.end_sessions(username);
   BEGIN
     EXECUTE format('GRANT %I TO %I WITH INHERIT TRUE, SET FALSE', username, session_user);
@@ -210,8 +291,8 @@ $$;
 REVOKE ALL ON ALL ROUTINES IN SCHEMA kilo_lease FROM PUBLIC;
 GRANT USAGE ON SCHEMA kilo_lease TO kilo_lease_replica_admin;
 GRANT EXECUTE ON FUNCTION kilo_lease.caller_template(), kilo_lease.check_username(text),
-  kilo_lease.create_lease(text, text, timestamptz), kilo_lease.end_sessions(text),
-  kilo_lease.revoke_lease(text)
+  kilo_lease.track_lease(text), kilo_lease.create_lease(text, text, timestamptz),
+  kilo_lease.end_sessions(text), kilo_lease.block_lease(text), kilo_lease.revoke_lease(text)
   TO kilo_lease_replica_admin;
 
 COMMIT;

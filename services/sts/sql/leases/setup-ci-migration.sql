@@ -39,10 +39,30 @@ BEGIN
 END
 $$;
 GRANT kilo_lease_migration TO kilo_lease_migration_admin WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+-- Its creation statement carries lease passwords, as the replica login's does: none of its
+-- statements reaches the server log (setup.sql explains the settings).
+ALTER ROLE kilo_lease_migration_admin SET log_statement = 'none';
+ALTER ROLE kilo_lease_migration_admin SET log_min_duration_statement = -1;
+ALTER ROLE kilo_lease_migration_admin SET log_min_error_statement = 'panic';
+DO $$
+BEGIN
+  IF pg_catalog.current_setting('pgaudit.log', true) IS NOT NULL THEN
+    ALTER ROLE kilo_lease_migration_admin SET pgaudit.log = 'none';
+  END IF;
+  IF pg_catalog.current_setting('auto_explain.log_min_duration', true) IS NOT NULL THEN
+    ALTER ROLE kilo_lease_migration_admin SET auto_explain.log_min_duration = -1;
+  END IF;
+END
+$$;
+-- From here on a ci-migration lease runs as `postgres`, which reads every session's query text in
+-- pg_stat_activity (pg_read_all_stats). Neither admin login's statements are tracked there, so no
+-- lease can read another lease's password while it is being created. Only a superuser can set this.
+ALTER ROLE kilo_lease_migration_admin SET track_activities = off;
+ALTER ROLE kilo_lease_replica_admin SET track_activities = off;
 GRANT USAGE ON SCHEMA kilo_lease TO kilo_lease_migration_admin;
 GRANT EXECUTE ON FUNCTION kilo_lease.caller_template(), kilo_lease.check_username(text),
-  kilo_lease.create_lease(text, text, timestamptz), kilo_lease.end_sessions(text),
-  kilo_lease.revoke_lease(text)
+  kilo_lease.track_lease(text), kilo_lease.create_lease(text, text, timestamptz),
+  kilo_lease.end_sessions(text), kilo_lease.block_lease(text), kilo_lease.revoke_lease(text)
   TO kilo_lease_migration_admin;
 
 -- `postgres` created the replica-read login in setup.sql and so administers it: it could reset its

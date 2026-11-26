@@ -3,13 +3,18 @@ import { parse } from 'yaml';
 import { sha256Base64Url } from '../crypto/hash';
 import { PolicySchema, policyFileProblems, vercelEnvironmentKey, type Policy } from './schema';
 
+/**
+ * One policy as `RefresherDO` stores it to diff the next policy change against. A policy without
+ * token grants leaves out `audiences` and `scopes`, so its entry keeps the format of the version
+ * before token grants, whose strict parser a rollback would run on it.
+ */
 export type PolicySnapshotEntry = {
   workload: string;
   environments: string[];
   identity: string;
   secrets: string[];
-  audiences: string[];
-  scopes: string[];
+  audiences?: string[];
+  scopes?: string[];
 };
 
 export type PolicyIndex = {
@@ -114,8 +119,8 @@ export function loadPolicies(
     environments: [...policy.environments].sort(),
     identity: canonicalIdentity(policy),
     secrets: [...policy.secrets].sort(),
-    audiences: [...policy.audiences].sort(),
-    scopes: [...policy.scopes].sort(),
+    ...(policy.audiences.length > 0 ? { audiences: [...policy.audiences].sort() } : {}),
+    ...(policy.scopes.length > 0 ? { scopes: [...policy.scopes].sort() } : {}),
   }));
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 

@@ -65,7 +65,10 @@ function stubFetch(
 async function verifyWith(token: string | null, method = 'POST') {
   const headers: Record<string, string> =
     token === null ? {} : { authorization: `Bearer ${token}` };
-  return await handleStsCanaryVerify(new Request(VERIFY_URL, { method, headers }), { STS_URL });
+  return await handleStsCanaryVerify(new Request(VERIFY_URL, { method, headers }), {
+    STS_URL,
+    STS_ENVIRONMENT: 'production',
+  });
 }
 
 describe('POST /sts-canary/verify', () => {
@@ -110,13 +113,26 @@ describe('POST /sts-canary/verify', () => {
     expect(logged).not.toContain(webToken);
   });
 
-  it('answers 405 for another method and 503 without STS_URL', async () => {
+  it('refuses 401 a token of another STS environment', async () => {
+    stubFetch();
+    const staging = await verifyWith(await signToken(signer, ingestClaims({ env: 'staging' })));
+    expect(staging.status).toBe(401);
+  });
+
+  it('answers 405 for another method and 503 without STS_URL or a valid STS_ENVIRONMENT', async () => {
     expect((await verifyWith(null, 'GET')).status).toBe(405);
-    const unconfigured = await handleStsCanaryVerify(
-      new Request(VERIFY_URL, { method: 'POST' }),
-      {}
-    );
-    expect(unconfigured.status).toBe(503);
+    for (const env of [
+      {},
+      { STS_ENVIRONMENT: 'production' },
+      { STS_URL },
+      { STS_URL, STS_ENVIRONMENT: 'prod' },
+    ]) {
+      const unconfigured = await handleStsCanaryVerify(
+        new Request(VERIFY_URL, { method: 'POST' }),
+        env
+      );
+      expect(unconfigured.status).toBe(503);
+    }
   });
 });
 
@@ -232,10 +248,15 @@ describe('scheduled STS canary', () => {
       WEB_STS_CANARY_URL: WEB_URL,
     });
 
+    // A detail echoing a credential stays out of this Worker's logs.
+    const echoed = 'authorization echoed: minted.web.token';
     stubFetch(() =>
       Response.json({
         ...PASSING_REPORT,
-        negatives: { ...PASSING_REPORT.negatives, forged: { result: 'failed', status: 204 } },
+        negatives: {
+          ...PASSING_REPORT.negatives,
+          forged: { result: 'failed', status: 204, detail: echoed },
+        },
       })
     );
     await runStsCanary(CONTROLLER, env(binding(issue)), context());
@@ -275,6 +296,9 @@ describe('scheduled STS canary', () => {
         mint_detail: 'scope_not_allowed',
       }),
     ]);
+    const [checkFailed] = events(info, error);
+    expect(checkFailed).not.toHaveProperty('negative_forged_detail');
+    expect(JSON.stringify(events(info, error))).not.toContain(echoed);
   });
 
   it('never follows a redirect from the web route: the call is manual and a 3xx fails the run', async () => {

@@ -143,6 +143,25 @@ describe('heads and lists that do not count', () => {
     expect(await verify()).toMatchObject({ ok: true });
   });
 
+  it('keeps the held list when a head of the same second covers another list', async () => {
+    h.feed.headIssuedAt = Date.now();
+    h.feed.list = { ...emptyList(), revokedSids: new Set(['grant-1']) };
+    expect(await verify()).toMatchObject({ ok: false, reason: 'revoked_session' });
+    // The other feed object signed, in the same second, a list without that revocation.
+    h.feed.list = emptyList();
+    advance(FEED_REFRESH_AFTER_MS);
+    await verify();
+    await drain(h.background);
+    expect(h.feed.listsSent).toBe(2);
+    expect(await verify()).toMatchObject({ ok: false, reason: 'revoked_session' });
+    // A head of a later second decides, after the retry wait.
+    h.feed.headIssuedAt = null;
+    advance(FEED_RETRY_MS);
+    await verify();
+    await drain(h.background);
+    expect(await verify()).toMatchObject({ ok: true });
+  });
+
   it('answers 503 once a hung first fetch passes its 1 s timeout', async () => {
     h.feed.mode = 'hang';
     const pending = verify();

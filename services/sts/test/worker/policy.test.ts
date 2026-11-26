@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { policyChangedEvent } from '../../src/audit/events';
 import { resolveWorkloadSecrets } from '../../src/bundle/resolve';
 import { loadPolicies } from '../../src/policy/load';
@@ -120,6 +121,18 @@ scopes: ['o11y:alerts.read']
       addedSecrets: [],
       removedSecrets: [],
     });
+  });
+
+  it('stores a policy without token grants in the snapshot format of the version before grants', () => {
+    // The strict parser of the version before token grants: a rollback to it must read the snapshot.
+    const BaseSnapshotEntrySchema = z.strictObject({
+      workload: z.string(),
+      environments: z.array(z.string()),
+      identity: z.string(),
+      secrets: z.array(z.string()),
+    });
+    const [entry] = loadPolicies({ 'app-one.yaml': valid }).snapshot();
+    expect(BaseSnapshotEntrySchema.safeParse(entry).success).toBe(true);
   });
 });
 

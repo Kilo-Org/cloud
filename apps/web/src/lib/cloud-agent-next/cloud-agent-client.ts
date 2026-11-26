@@ -34,7 +34,7 @@ import type { EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import {
   cloudSessionMessagesPageInputSchema,
@@ -853,9 +853,9 @@ export class CloudAgentNextClient {
       links: [
         httpLink({
           url: `${CLOUD_AGENT_NEXT_API_URL}/trpc`,
-          headers: () => ({
+          headers: async () => ({
             ...baseHeaders,
-            'x-internal-api-key': INTERNAL_API_SECRET,
+            'x-internal-api-key': await readInternalApiSecret(),
           }),
         }),
       ],

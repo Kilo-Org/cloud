@@ -17,6 +17,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 // registry so the module under test reads the mocked values.
 jest.resetModules();
 
+import { installInternalApiSecretRead } from '@kilocode/web-shared/lib/internal-api-secret';
 import { ServiceFetchTimeoutError } from '../bounded-service-fetch';
 import {
   cleanupVercelSnapshotBuild,
@@ -209,6 +210,52 @@ describe('readCloudAgentWidgetApprovalKey', () => {
     expect(error).toBe(callerReason);
     expect(error).not.toBeInstanceOf(ServiceFetchTimeoutError);
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  describe('with the web app read installed', () => {
+    afterEach(() => {
+      globalThis.__kilocodeInternalApiSecretRead = undefined;
+    });
+
+    it('sends the installed secret under the same deadline', async () => {
+      const fetchMock = respond(new Response(JSON.stringify({ approvalKey: 'b'.repeat(64) })));
+      installInternalApiSecretRead(async () => 'sts-delivered-secret');
+
+      await readCloudAgentWidgetApprovalKey(input);
+
+      expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+        'content-type': 'application/json',
+        'x-internal-api-key': 'sts-delivered-secret',
+      });
+    });
+
+    it('lets the caller abort end a pending secret read and never sends afterwards', async () => {
+      const fetchMock = respond(new Response(JSON.stringify({ approvalKey: 'b'.repeat(64) })));
+      const secret = Promise.withResolvers<string>();
+      installInternalApiSecretRead(() => secret.promise);
+      const caller = new AbortController();
+      const callerReason = new Error('request went away');
+
+      const outcome = readCloudAgentWidgetApprovalKey(input, caller.signal).catch(
+        (error: unknown) => error
+      );
+      caller.abort(callerReason);
+
+      expect(await outcome).toBe(callerReason);
+      secret.resolve('late-secret');
+      await new Promise(resolve => setImmediate(resolve));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('ends a secret read that outlasts the widget budget without a request', async () => {
+      const fetchMock = respond(new Response(JSON.stringify({ approvalKey: 'b'.repeat(64) })));
+      installInternalApiSecretRead(() => new Promise<string>(() => undefined));
+
+      const error = await readCloudAgentWidgetApprovalKey(input).catch((cause: unknown) => cause);
+
+      expect((error as Error).name).toBe('TimeoutError');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });
 

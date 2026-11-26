@@ -3,6 +3,7 @@ import {
   OCSF_API_ACTIVITY,
   OCSF_CLASS,
   type AuditEvent,
+  type LeaseGrant,
   type SecretName,
   type StsEnvironment,
   type WorkloadName,
@@ -10,11 +11,21 @@ import {
 import type { PolicySnapshotEntry } from '../policy/load';
 import type { KeyRevocation, KeyRingChange } from '../tokens/key-ring';
 import type { GithubRun } from '../identity/verify';
-import type { BundleDenial, TokenDenial } from './denials';
+import type { BundleDenial, LeaseDenial, TokenDenial } from './denials';
 
 /** Attributes hold at most 256 values; longer lists are cut and flagged. */
 function attributeList(values: string[]): { values: string[]; truncated: boolean } {
   return { values: values.slice(0, 256), truncated: values.length > 256 };
+}
+
+/** A verified GitHub caller's workflow file, run id and attempt; nothing for any other caller. */
+function runAttributes(run: GithubRun | null): Record<string, string> {
+  if (run === null) return {};
+  return {
+    jobWorkflowRef: run.jobWorkflowRef,
+    runId: run.runId,
+    ...(run.runAttempt === undefined ? {} : { runAttempt: run.runAttempt }),
+  };
 }
 
 export function stsSource(environment: StsEnvironment): string {
@@ -51,13 +62,7 @@ export function bundleDeliveredEvent(input: {
         secretCount: input.secrets.length,
         secrets: input.secrets.map(secret => `${secret.name}:${secret.version}`),
         missing: [...input.missing],
-        ...(input.run === null
-          ? {}
-          : {
-              jobWorkflowRef: input.run.jobWorkflowRef,
-              runId: input.run.runId,
-              ...(input.run.runAttempt === undefined ? {} : { runAttempt: input.run.runAttempt }),
-            }),
+        ...runAttributes(input.run),
       },
     },
   });
@@ -142,10 +147,13 @@ export function managerReferenceRefusedEvent(input: {
   });
 }
 
-/** `workload:<value>` for every value of one grant list, such as `o11y:O11Y_CF_AE_API_TOKEN`. */
+/**
+ * `workload:<value>` for every value of one grant list, such as `o11y:O11Y_CF_AE_API_TOKEN`; a lease
+ * grant carries its limits, `bouncer-watch:replica-read:9000:3600:2`, so a changed limit shows.
+ */
 function grantKeys(
   snapshot: PolicySnapshotEntry[],
-  grant: 'secrets' | 'audiences' | 'scopes'
+  grant: 'secrets' | 'audiences' | 'scopes' | 'dynamic'
 ): Set<string> {
   return new Set(
     snapshot.flatMap(entry => entry[grant].map(value => `${entry.workload}:${value}`))
@@ -183,6 +191,7 @@ export function policyChangedEvent(input: {
     grantKeys(input.current, 'audiences')
   );
   const scopes = diff(grantKeys(input.previous, 'scopes'), grantKeys(input.current, 'scopes'));
+  const dynamic = diff(grantKeys(input.previous, 'dynamic'), grantKeys(input.current, 'dynamic'));
 
   return AuditEventSchema.parse({
     specversion: '1.0',
@@ -209,10 +218,13 @@ export function policyChangedEvent(input: {
         removedAudiences: audiences.removed,
         addedScopes: scopes.added,
         removedScopes: scopes.removed,
+        addedDynamic: dynamic.added,
+        removedDynamic: dynamic.removed,
         workloadsTruncated: workloads.truncated,
         secretsTruncated: secrets.truncated,
         audiencesTruncated: audiences.truncated,
         scopesTruncated: scopes.truncated,
+        dynamicTruncated: dynamic.truncated,
       },
     },
   });
@@ -381,6 +393,155 @@ export function tokenKeyRevokedEvent(input: {
         state: revocation.state,
         cause: revocation.cause,
         replacementKid: revocation.replacementKid ?? 'none',
+      },
+    },
+  });
+}
+
+/** Who asked for a lease: the policy workload, how it proved itself, and a CI caller's run. */
+export type LeaseAuditCaller = {
+  workload: WorkloadName;
+  /** `worker-binding`, or the OIDC provider. */
+  identity: string;
+  channel: 'worker-binding' | 'http';
+  run: GithubRun | null;
+};
+
+/**
+ * One lease STS handed to its caller (design 4.5): the grant, Infisical's lease id and expiry, and
+ * the lifetime it asked for. Never the role's name or password.
+ */
+export function leaseCreatedEvent(input: {
+  environment: StsEnvironment;
+  caller: LeaseAuditCaller;
+  grant: LeaseGrant;
+  leaseId: string;
+  ttlSeconds: number;
+  /** The lifetime the caller asked for; null when it took the policy default. */
+  requestedTtlSeconds: number | null;
+  clamped: boolean;
+  expiresAt: number;
+}): AuditEvent {
+  const { caller } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.lease.created',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.create,
+      outcome: 'success',
+      actor: { kind: 'workload', id: caller.workload },
+      attributes: {
+        workload: caller.workload,
+        environment: input.environment,
+        identity: caller.identity,
+        channel: caller.channel,
+        grant: input.grant,
+        leaseId: input.leaseId,
+        ttlSeconds: input.ttlSeconds,
+        ...(input.requestedTtlSeconds === null
+          ? {}
+          : { requestedTtlSeconds: input.requestedTtlSeconds }),
+        clamped: input.clamped,
+        expiresAt: new Date(input.expiresAt).toISOString(),
+        ...runAttributes(caller.run),
+      },
+    },
+  });
+}
+
+/**
+ * Why a lease was revoked: its caller asked (`caller`), or STS revoked one it could not hand over
+ * (`late`: the creation outlasted its budget; `expiry_mismatch`: Infisical's expiry is not the
+ * lifetime asked for; `audit_failed`: the creation row could not be written).
+ */
+export type LeaseRevokeCause = 'caller' | 'late' | 'expiry_mismatch' | 'audit_failed';
+
+export function leaseRevokedEvent(input: {
+  environment: StsEnvironment;
+  caller: LeaseAuditCaller;
+  grant: LeaseGrant;
+  leaseId: string;
+  cause: LeaseRevokeCause;
+  /** False when Infisical no longer had the lease (it had expired or was already revoked there). */
+  wasActive: boolean;
+}): AuditEvent {
+  const { caller } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.lease.revoked',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.delete,
+      outcome: 'success',
+      outcomeDetail: input.cause,
+      actor:
+        input.cause === 'caller'
+          ? { kind: 'workload', id: caller.workload }
+          : { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        workload: caller.workload,
+        environment: input.environment,
+        identity: caller.identity,
+        channel: caller.channel,
+        grant: input.grant,
+        leaseId: input.leaseId,
+        cause: input.cause,
+        wasActive: input.wasActive,
+        ...runAttributes(caller.run),
+      },
+    },
+  });
+}
+
+/** `count` identical refused lease or revoke requests in the minute starting at `windowStart`. */
+export function leaseDeniedEvent(input: {
+  environment: StsEnvironment;
+  denial: LeaseDenial;
+  count: number;
+  windowStart: string;
+  overflow: boolean;
+}): AuditEvent {
+  const { denial } = input;
+  const claims = Object.keys(denial.claims)
+    .sort()
+    .map(name => `${name}=${denial.claims[name]}`.slice(0, 256));
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.lease.denied',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId:
+        denial.leaseId === undefined ? OCSF_API_ACTIVITY.create : OCSF_API_ACTIVITY.delete,
+      outcome: 'denied',
+      outcomeDetail: denial.reason,
+      actor: {
+        kind: denial.channel === 'worker-binding' ? 'workload' : 'service',
+        id: denial.actor,
+      },
+      attributes: {
+        environment: input.environment,
+        channel: denial.channel,
+        reason: denial.reason,
+        workload: denial.actor,
+        ...(denial.grant === undefined ? {} : { grant: denial.grant }),
+        ...(denial.leaseId === undefined ? {} : { leaseId: denial.leaseId }),
+        count: input.count,
+        windowStart: input.windowStart,
+        overflow: input.overflow,
+        claims,
       },
     },
   });

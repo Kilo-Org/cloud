@@ -12,7 +12,7 @@ import {
   type Denial,
   type DenialCount,
 } from '../audit/denials';
-import { bundleDeniedEvent, tokenDeniedEvent } from '../audit/events';
+import { bundleDeniedEvent, leaseDeniedEvent, tokenDeniedEvent } from '../audit/events';
 import { AuditLog } from '../audit/log';
 import { RELAY_DELAY_MS, RELAY_RETRY_MS } from '../constants';
 import * as schema from '../db/denial-schema';
@@ -22,8 +22,8 @@ type DenialDatabase = DrizzleSqliteDODatabase<typeof schema>;
 
 /**
  * Distinct denials kept per minute. Further distinct ones in that minute only add to one overflow
- * row per kind and reason (3 bundle reasons, 7 token reasons), so a flood of varied valid tokens
- * writes at most `MAX_DISTINCT_PER_MINUTE + 10` audit events per minute.
+ * row per kind and reason (3 bundle reasons, 7 token reasons, 8 lease reasons), so a flood of
+ * varied valid tokens writes at most `MAX_DISTINCT_PER_MINUTE + 18` audit events per minute.
  */
 export const MAX_DISTINCT_PER_MINUTE = 100;
 
@@ -49,10 +49,11 @@ function errorName(error: unknown): string {
 }
 
 /**
- * One object per environment: the `sts:<environment>:denials` audit stream. Refused bundle reads
- * and refused tokens from identified callers arrive here, at most one call per request; identical
- * denials merge per minute into one event with a count, written by the alarm after the minute
- * ends (`ai.kilo.sts.bundle.denied` or `ai.kilo.sts.token.denied`).
+ * One object per environment: the `sts:<environment>:denials` audit stream. Refused bundle reads,
+ * tokens, leases and revokes from identified callers arrive here, at most one call per request;
+ * identical denials merge per minute into one event with a count, written by the alarm after the
+ * minute ends (`ai.kilo.sts.bundle.denied`, `ai.kilo.sts.token.denied` or
+ * `ai.kilo.sts.lease.denied`).
  */
 export class DenialDO extends DurableObject<Env> {
   private readonly config: StsConfig;
@@ -143,12 +144,15 @@ export class DenialDO extends DurableObject<Env> {
         windowStart: `${row.minute}:00.000Z`,
         overflow: row.key.startsWith('overflow:'),
       };
+      const denial = row.denial;
       try {
         await this.audit.append(
           this.stream,
-          row.denial.kind === 'token'
-            ? tokenDeniedEvent({ ...window, denial: row.denial })
-            : bundleDeniedEvent({ ...window, denial: row.denial })
+          denial.kind === 'token'
+            ? tokenDeniedEvent({ ...window, denial })
+            : denial.kind === 'lease'
+              ? leaseDeniedEvent({ ...window, denial })
+              : bundleDeniedEvent({ ...window, denial })
         );
       } catch (error) {
         console.error('sts: denial audit append failed; the row stays for the next alarm', {

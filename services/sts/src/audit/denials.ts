@@ -1,8 +1,13 @@
 import {
   AudienceSchema,
   BUNDLE_DENIED_REASONS,
+  LEASE_DENIED_REASONS,
+  LEASE_LIMITED_REASONS,
+  LeaseGrantSchema,
+  LeaseIdSchema,
   MINT_DENIED_REASONS,
   ScopeSchema,
+  type LeaseGrant,
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
 import { getDenialStub } from '../dos/stubs';
@@ -18,6 +23,19 @@ export const TOKEN_DENIED_REASONS = [
   'environment_mismatch',
 ] as const;
 export type TokenDeniedReason = (typeof TOKEN_DENIED_REASONS)[number];
+
+/**
+ * Why STS refused a lease or a revoke: the caller's answer (`denied` or `limited`), or, for a
+ * revoke the caller hears as `not_found`, whether the lease is another workload's (`not_owner`)
+ * or one STS never issued (`unknown_lease`).
+ */
+export const LEASE_DENIAL_REASONS = [
+  ...LEASE_DENIED_REASONS,
+  ...LEASE_LIMITED_REASONS,
+  'not_owner',
+  'unknown_lease',
+] as const;
+export type LeaseDenialReason = (typeof LEASE_DENIAL_REASONS)[number];
 
 type DenialBase = {
   channel: 'worker-binding' | 'http';
@@ -43,7 +61,15 @@ export type TokenDenial = DenialBase & {
   scope?: string;
 };
 
-export type Denial = BundleDenial | TokenDenial;
+/** A refused lease or revoke from an identified caller; a revoke names the lease id it asked for. */
+export type LeaseDenial = DenialBase & {
+  kind: 'lease';
+  reason: LeaseDenialReason;
+  grant?: LeaseGrant;
+  leaseId?: string;
+};
+
+export type Denial = BundleDenial | TokenDenial | LeaseDenial;
 
 const DenialBaseSchema = {
   channel: z.enum(['worker-binding', 'http']),
@@ -66,6 +92,13 @@ export const DenialSchema: z.ZodType<Denial> = z.union([
     audience: AudienceSchema.max(256).optional(),
     scope: ScopeSchema.max(256).optional(),
   }),
+  z.strictObject({
+    ...DenialBaseSchema,
+    kind: z.literal('lease'),
+    reason: z.enum(LEASE_DENIAL_REASONS),
+    grant: LeaseGrantSchema.optional(),
+    leaseId: LeaseIdSchema.optional(),
+  }),
 ]);
 
 /** Identical denials in one minute merge into one row; this is the identity they merge on. */
@@ -84,20 +117,38 @@ export function denialKey(denial: Denial): string {
       claims,
     ]);
   }
+  if (denial.kind === 'lease') {
+    return JSON.stringify([
+      'lease',
+      denial.channel,
+      denial.reason,
+      denial.actor,
+      denial.grant ?? null,
+      denial.leaseId ?? null,
+      claims,
+    ]);
+  }
   return JSON.stringify([denial.channel, denial.reason, denial.actor, claims]);
 }
 
 /** The row that counts a reason's denials past the per-minute distinct limit. */
 export function overflowKey(denial: Denial): string {
-  return denial.kind === 'token' ? `overflow:token:${denial.reason}` : `overflow:${denial.reason}`;
+  return denial.kind === undefined || denial.kind === 'bundle'
+    ? `overflow:${denial.reason}`
+    : `overflow:${denial.kind}:${denial.reason}`;
 }
 
 /** What an overflow row records: the kind, channel and reason, no actor details. */
 export function overflowDenial(denial: Denial): Denial {
   const base = { channel: denial.channel, actor: 'overflow', claims: {} };
-  return denial.kind === 'token'
-    ? { ...base, kind: 'token', reason: denial.reason }
-    : { ...base, reason: denial.reason };
+  switch (denial.kind) {
+    case 'token':
+      return { ...base, kind: 'token', reason: denial.reason };
+    case 'lease':
+      return { ...base, kind: 'lease', reason: denial.reason };
+    default:
+      return { ...base, reason: denial.reason };
+  }
 }
 
 /** Distinct denials one isolate sends per minute before it counts the rest as overflow. */

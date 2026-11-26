@@ -586,20 +586,24 @@ The endpoints are fixed in `src/signin/providers/specs.ts`, checked against each
 OpenID Connect discovery document or API reference; nothing is discovered per request. An ID
 token is verified against the provider's key set (signature, `iss`, `aud`, `exp`, `iat` and the
 flow's `nonce`); `jose` keeps each key set per isolate for 10 minutes (`cacheMaxAge`) and
-refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`).
+refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`). UTS sends the
+nonce to every OpenID Connect provider. Each spec's `idTokenNonce` says whether the ID token must
+carry it: `required` refuses a token without it; `if_present` (LinkedIn only, whose ID token has
+no `nonce`) accepts a token without it, and both refuse a token with another nonce. Without PKCE
+or a nonce, the state and the flow's binder cookie still stop a forged callback.
 
-| Provider | Protocol | PKCE | Client authentication | Scopes | Proof of the address |
-|---|---|---|---|---|---|
-| Google | OpenID Connect | S256 | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
-| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | `client_secret_basic` | `openid profile email` | `email_verified` |
-| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
-| Anaconda | OpenID Connect | S256 | `client_secret_post` | `openid profile email` | `email_verified` |
-| Apple | OpenID Connect, `response_mode=form_post` | none offered | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
-| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
-| GitLab | OpenID Connect | S256 | `client_secret_post` | `openid email` | `email_verified` |
-| Discord | OAuth 2; `/users/@me` | S256 | `client_secret_post` | `identify email` | `verified` |
-| LinkedIn | OpenID Connect | none offered | `client_secret_post` | `openid profile email` | `email_verified` |
-| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
+| Provider | Protocol | PKCE | ID-token `nonce` | Client authentication | Scopes | Proof of the address |
+|---|---|---|---|---|---|---|
+| Google | OpenID Connect | S256 | required | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
+| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | required | `client_secret_basic` | `openid profile email` | `email_verified` |
+| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | required | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
+| Anaconda | OpenID Connect | S256 | required | `client_secret_post` | `openid profile email` | `email_verified` |
+| Apple | OpenID Connect, `response_mode=form_post` | none offered | required | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
+| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | no ID token | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
+| GitLab | OpenID Connect | S256 | required | `client_secret_post` | `openid email` | `email_verified` |
+| Discord | OAuth 2; `/users/@me` | S256 | no ID token | `client_secret_post` | `identify email` | `verified` |
+| LinkedIn | OpenID Connect | none offered | if present | `client_secret_post` | `openid profile email` | `email_verified` |
+| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | no ID token | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
 
 ### Accounts and linking (design 5.2)
 

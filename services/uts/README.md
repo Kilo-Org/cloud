@@ -1058,6 +1058,28 @@ transaction ends within about 90 seconds (30 seconds plus the cron period). The 
 the oldest open transaction of the whole server, so the alert on an unrelayed row older than 60
 seconds covers sessions of other logins and in other databases.
 
+### Manager login for rotation copies
+
+After a rotation, UTS writes the new password to `/admin/identity-store` in the secrets manager as
+a new secret named `<login>_<YYYYMMDD>` (design 5.2). It logs in as `uts-rotation-<environment>`
+with Infisical JWT Auth, the way STS logs in as its own identity:
+
+- One object, `<environment>:manager-auth` in the `eu` jurisdiction (`src/dos/UtsManagerAuthDO.ts`),
+  holds an ECDSA P-256 login key. It generates the key at the first login and never exports the
+  private half. It is not a token signer key.
+- `GET /manager-auth/.well-known/jwks.json` on the issuer host serves the public half. Before the
+  first login the set is empty; while the object fails it answers 503, never 500.
+- A login JWT lives 2 minutes, with issuer `<issuer>/manager-auth`, subject
+  `uts:<environment>:rotation` and audience `https://eu.infisical.com/identities/<identity id>`.
+  The identity ids are in `src/manager/config.ts`.
+- `ManagerClient` (`src/manager/client.ts`) exchanges the JWT at
+  `/api/v1/auth/jwt-auth/login` and only creates and describes secrets in `/admin/identity-store`.
+  A create under the folder's change policy answers `approval_pending`.
+
+`pnpm exec tsx scripts/manager-auth-e2e.ts` runs the mint Worker under `wrangler dev` with a
+stand-in manager on loopback (`UTS_E2E_PORT`, default 9470, and +1, +2). The stand-in fetches the key
+set and verifies the login JWT against it, as Infisical does. The run uses no real manager.
+
 ### Platform roles
 
 The UTS role matrix does not cover the roles the platform brings. `PUBLIC` keeps `CONNECT` on the

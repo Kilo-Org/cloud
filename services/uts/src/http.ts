@@ -28,6 +28,8 @@ import { type ServiceTokenVerifier, noServiceTokenVerifier } from './subjects/se
 import type { MetadataFetcher } from './third-party/metadata';
 import type { SignerAccess } from './token/mint';
 import type { StsCallerVerifier } from './exchange/endpoint';
+import { MANAGER_JWKS_PATH } from './manager/config';
+import { managerKeySet } from './manager/key-set';
 
 /**
  * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
@@ -112,6 +114,12 @@ export async function handleRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
+  if (pathname === MANAGER_JWKS_PATH) {
+    if (request.method !== 'GET') {
+      return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
+    }
+    return await managerKeySet(env, config);
+  }
   const oauth = oauthService(env, ctx, config, options);
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {

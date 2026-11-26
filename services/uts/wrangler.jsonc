@@ -46,6 +46,9 @@
       // The two revocation-feed objects; only this Worker binds them (src/feed/UtsFeedDO.ts).
       { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
       { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
+      // The login key of the environment's `uts-rotation-<environment>` identity in the secrets
+      // manager; the key set is served at /manager-auth/.well-known/jwks.json (src/dos/UtsManagerAuthDO.ts).
+      { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
     ],
   },
   "migrations": [
@@ -53,6 +56,7 @@
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
     { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
     { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
+    { "tag": "v5", "new_sqlite_classes": ["UtsManagerAuthDO"] },
   ],
   // The audit outbox relay sends each shard's batches to the environment's UTS audit queue, which
   // services/audit-relay consumes; only UTS produces to it, so the consumer accepts only UTS
@@ -91,6 +95,7 @@
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
           { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
           { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
+          { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
         ],
       },
       "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },

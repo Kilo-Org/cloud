@@ -9,6 +9,7 @@ import type { Env, UtsConfig } from '../env';
 import type { UtsFeedDO } from '../feed/UtsFeedDO';
 import type { UtsAuditRelayDO } from './UtsAuditRelayDO';
 import type { UtsKeySetDO } from './UtsKeySetDO';
+import type { UtsManagerAuthDO } from './UtsManagerAuthDO';
 import type { UtsSignerDO } from './UtsSignerDO';
 
 /**
@@ -216,6 +217,34 @@ export function getKeySetShardStub(
   const namespace =
     config.jurisdiction === 'eu' ? env.UTS_KEY_SET_DO.jurisdiction('eu') : env.UTS_KEY_SET_DO;
   return namespace.get(namespace.idFromName(keySetShardObjectName(config.environment, shard)), {
+    locationHint: UTS_OBJECT_LOCATION_HINT,
+  });
+}
+
+/** The one manager login key object of an environment (src/dos/UtsManagerAuthDO.ts). */
+export function managerAuthObjectName(environment: UtsEnvironment): string {
+  return `${environment}:manager-auth`;
+}
+
+function managerAuthNamespace(
+  env: Env,
+  config: UtsConfig
+): DurableObjectNamespace<UtsManagerAuthDO> {
+  return config.jurisdiction === 'eu'
+    ? env.UTS_MANAGER_AUTH_DO.jurisdiction('eu')
+    : env.UTS_MANAGER_AUTH_DO;
+}
+
+/** The id the manager login key object has in this environment, inside its jurisdiction. */
+export function managerAuthObjectId(env: Env, config: UtsConfig): DurableObjectId {
+  return managerAuthNamespace(env, config).idFromName(managerAuthObjectName(config.environment));
+}
+
+export function getManagerAuthStub(
+  env: Env,
+  config: UtsConfig
+): DurableObjectStub<UtsManagerAuthDO> {
+  return managerAuthNamespace(env, config).get(managerAuthObjectId(env, config), {
     locationHint: UTS_OBJECT_LOCATION_HINT,
   });
 }

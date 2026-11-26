@@ -35,9 +35,10 @@ export async function getCollaboratorPermissionLevel(
   return 'write';
 }
 
-export async function resolveMergeHeadContent(_args: {
+export async function inspectReviewHead(_args: {
   appType: GitHubAppType;
-  baseSha: string;
+  baseSha?: string;
+  pullRequestRepository?: { owner: string; repo: string };
   headSha: string;
   installationId: string;
   owner: string;

@@ -1631,7 +1631,15 @@ export default {
             if (!parsed.success) {
               return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
             }
-            return Response.json(await service.getPullRequest({ owner, ...parsed.data }));
+            return Response.json(
+              await service.getPullRequest(
+                { owner, ...parsed.data },
+                {
+                  includeSourceCommitMessage:
+                    url.searchParams.get('includeSourceCommitMessage') === 'true',
+                }
+              )
+            );
           }
           case BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH: {
             const parsed = BitbucketEnsureWebhookHttpRequestSchema.safeParse(body);

@@ -152,6 +152,7 @@ const BitbucketPullRequestPayloadSchema = z.object({
 
 const BitbucketCommitPayloadSchema = z.object({
   hash: BitbucketFullCommitHashSchema,
+  message: z.string().optional(),
 });
 
 const BitbucketWebhookPayloadSchema = z.object({
@@ -194,6 +195,7 @@ export type BitbucketPullRequestProjection = {
     displayName: string;
   };
   source: BitbucketPullRequestSideProjection;
+  sourceCommitMessage?: string;
   destination: BitbucketPullRequestSideProjection;
   url: string;
 };
@@ -411,7 +413,10 @@ export class BitbucketCodeReviewService {
       options.authorizationService ?? new BitbucketWorkspaceAccessTokenAuthorizationService(env);
   }
 
-  async getPullRequest(input: BitbucketPullRequestRequest): Promise<BitbucketPullRequestResult> {
+  async getPullRequest(
+    input: BitbucketPullRequestRequest,
+    options?: { includeSourceCommitMessage: boolean }
+  ): Promise<BitbucketPullRequestResult> {
     const parsed = BitbucketPullRequestRequestSchema.safeParse(input);
     if (!parsed.success) return { success: false, reason: 'invalid_request' };
     if (!this.repositoryMatchesWorkspace(parsed.data)) {
@@ -444,16 +449,19 @@ export class BitbucketCodeReviewService {
     const destination = normalizePullRequestSide(pullRequest.data.destination, parsed.data);
     if (!source || !destination) return { success: false, reason: 'repository_mismatch' };
 
-    let resolvedSourceSha: string;
+    const accessToken = authorized.workspace.authorization.token;
+    const includeMessage =
+      options?.includeSourceCommitMessage &&
+      pullRequest.data.state === 'OPEN' &&
+      !pullRequest.data.draft;
+    let sourceCommit: { hash: string; message?: string };
     let resolvedDestinationSha: string;
     try {
-      [resolvedSourceSha, resolvedDestinationSha] = await Promise.all([
-        this.resolveCommitHash(parsed.data, source.sha, authorized.workspace.authorization.token),
-        this.resolveCommitHash(
-          parsed.data,
-          destination.sha,
-          authorized.workspace.authorization.token
-        ),
+      [sourceCommit, resolvedDestinationSha] = await Promise.all([
+        includeMessage
+          ? this.readCommit(parsed.data, source.sha, accessToken)
+          : this.resolveCommitHash(parsed.data, source.sha, accessToken).then(hash => ({ hash })),
+        this.resolveCommitHash(parsed.data, destination.sha, accessToken),
       ]);
     } catch (error) {
       return this.mapProviderFailure(error, authorized.workspace.authorization);
@@ -481,7 +489,10 @@ export class BitbucketCodeReviewService {
           uuid: authorUuid,
           displayName: pullRequest.data.author.display_name,
         },
-        source: { ...source, sha: resolvedSourceSha },
+        source: { ...source, sha: sourceCommit.hash },
+        ...(sourceCommit.message === undefined
+          ? {}
+          : { sourceCommitMessage: sourceCommit.message }),
         destination: { ...destination, sha: resolvedDestinationSha },
         url: expectedUrl,
       },
@@ -654,15 +665,22 @@ export class BitbucketCodeReviewService {
       return normalizedHash;
     }
 
+    return (await this.readCommit(target, normalizedHash, accessToken)).hash;
+  }
+
+  private async readCommit(
+    target: BitbucketPullRequestRequest,
+    normalizedHash: string,
+    accessToken: string
+  ): Promise<z.infer<typeof BitbucketCommitPayloadSchema>> {
     const repositorySlug = target.repositoryFullName.slice(target.workspaceSlug.length + 1);
     const endpoint = `${BITBUCKET_API_PREFIX}/repositories/${encodeURIComponent(target.workspaceSlug)}/${encodeURIComponent(repositorySlug)}/commit/${encodeURIComponent(normalizedHash)}`;
     const payload = await this.requestJson(endpoint, accessToken);
     const commit = BitbucketCommitPayloadSchema.safeParse(payload);
-    const fullHash = commit.success ? commit.data.hash.toLowerCase() : null;
-    if (!fullHash || !fullHash.startsWith(normalizedHash)) {
+    if (!commit.success || !commit.data.hash.toLowerCase().startsWith(normalizedHash)) {
       throw new BitbucketCodeReviewProviderError('invalid_response');
     }
-    return fullHash;
+    return { ...commit.data, hash: commit.data.hash.toLowerCase() };
   }
 
   private async authorizeWorkspace(

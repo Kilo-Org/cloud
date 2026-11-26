@@ -28,7 +28,7 @@ jest.mock('./app-selector', () => ({
   }),
 }));
 
-import { resolveMergeHeadContent } from './adapter';
+import { inspectReviewHead } from './adapter';
 
 const baseArgs = {
   appType: 'standard' as const,
@@ -47,16 +47,57 @@ function commitGraph(parentsBySha: Record<string, readonly string[]>) {
   });
 }
 
-describe('resolveMergeHeadContent', () => {
+describe('inspectReviewHead', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCompareCommits.mockResolvedValue({ data: { status: 'behind' } });
   });
 
+  it.each(['[ci-skip]', '[CI SKIP]', '[skip-ci]', '[skip ci]'])(
+    'skips a head with %s before checking merge parents',
+    async marker => {
+      mockGetCommit.mockResolvedValueOnce({
+        data: {
+          message: `Update metadata\n\n${marker}`,
+          parents: [{ sha: 'one' }, { sha: 'two' }],
+        },
+      });
+
+      await expect(inspectReviewHead(baseArgs)).resolves.toEqual({ kind: 'skip_directive' });
+      expect(mockCompareCommits).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reads a fork head by SHA through the pull request repository', async () => {
+    mockGetCommit.mockResolvedValueOnce({ data: { message: '[ci-skip]', parents: [] } });
+
+    await expect(
+      inspectReviewHead({ ...baseArgs, pullRequestRepository: { owner: 'base', repo: 'widgets' } })
+    ).resolves.toEqual({ kind: 'skip_directive' });
+    expect(mockGetCommit).toHaveBeenCalledWith({
+      owner: 'base',
+      repo: 'widgets',
+      commit_sha: baseArgs.headSha,
+    });
+  });
+
+  it('ignores a skip directive on an earlier commit carried by a merge', async () => {
+    mockGetCommit
+      .mockResolvedValueOnce({
+        data: { message: 'Merge main', parents: [{ sha: 'content-sha' }, { sha: 'base-parent' }] },
+      })
+      .mockResolvedValueOnce({ data: { message: '[ci-skip]', parents: [] } });
+
+    await expect(inspectReviewHead(baseArgs)).resolves.toEqual({
+      kind: 'review_content',
+      shas: ['head-sha', 'content-sha'],
+    });
+  });
+
   it('reports a head with one parent as no merge without comparing anything', async () => {
     commitGraph({ 'head-sha': ['content-sha'], 'content-sha': ['older-sha'] });
 
-    const content = await resolveMergeHeadContent(baseArgs);
+    const content = await inspectReviewHead(baseArgs);
 
     expect(content).toEqual({ kind: 'not_merge' });
     expect(mockCompareCommits).not.toHaveBeenCalled();
@@ -65,7 +106,7 @@ describe('resolveMergeHeadContent', () => {
   it('names the merge head and the branch commit it carries', async () => {
     commitGraph({ 'head-sha': ['content-sha', 'base-parent'], 'content-sha': ['older-sha'] });
 
-    const content = await resolveMergeHeadContent(baseArgs);
+    const content = await inspectReviewHead(baseArgs);
 
     expect(content).toEqual({
       kind: 'review_content',
@@ -86,7 +127,7 @@ describe('resolveMergeHeadContent', () => {
       'content-sha': ['older-sha'],
     });
 
-    const content = await resolveMergeHeadContent(baseArgs);
+    const content = await inspectReviewHead(baseArgs);
 
     expect(content).toEqual({
       kind: 'review_content',
@@ -101,7 +142,7 @@ describe('resolveMergeHeadContent', () => {
     });
     mockCompareCommits.mockResolvedValue({ data: { status: 'ahead' } });
 
-    const content = await resolveMergeHeadContent(baseArgs);
+    const content = await inspectReviewHead(baseArgs);
 
     expect(content).toEqual({ kind: 'unreviewed_content' });
   });
@@ -110,7 +151,7 @@ describe('resolveMergeHeadContent', () => {
     commitGraph({ 'head-sha': ['content-sha', 'base-parent'], 'content-sha': ['older-sha'] });
     mockCompareCommits.mockResolvedValue({ data: { status: 'identical' } });
 
-    const content = await resolveMergeHeadContent(baseArgs);
+    const content = await inspectReviewHead(baseArgs);
 
     expect(content).toEqual({ kind: 'review_content', shas: ['head-sha', 'content-sha'] });
   });
@@ -118,7 +159,7 @@ describe('resolveMergeHeadContent', () => {
   it('reports unreviewed content when a commit cannot be read', async () => {
     mockGetCommit.mockRejectedValue(new Error('github unavailable'));
 
-    const content = await resolveMergeHeadContent(baseArgs);
+    const content = await inspectReviewHead(baseArgs);
 
     expect(content).toEqual({ kind: 'unreviewed_content' });
   });
@@ -134,7 +175,7 @@ describe('resolveMergeHeadContent', () => {
     }
     commitGraph(graph);
 
-    const content = await resolveMergeHeadContent(baseArgs);
+    const content = await inspectReviewHead(baseArgs);
 
     expect(content).toEqual({ kind: 'unreviewed_content' });
   });

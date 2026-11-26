@@ -197,6 +197,25 @@ describe('shouldSkipUpdateForMergeCommit', () => {
 });
 
 describe('handleMergeRequestCodeReview', () => {
+  it('skips a marked head after canceling superseded reviews', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: { repository_selection_mode: 'selected', selected_repository_ids: [123] },
+    });
+    const payload = mergeRequestPayload();
+    payload.object_attributes.last_commit = { id: 'abc123', message: 'Adjust docs [Skip-CI]' };
+
+    const response = await handleMergeRequestCodeReview(payload, platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Skipped review by commit message' });
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalled();
+    expect(mockIsMergeCommit).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockSetCommitStatus).not.toHaveBeenCalled();
+  });
+
   it('cancels superseded DB rows, interrupts queued/running only, and creates the new review', async () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({

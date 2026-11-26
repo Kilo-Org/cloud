@@ -365,6 +365,29 @@ describe('BitbucketCodeReviewService.getPullRequest', () => {
     );
   });
 
+  it('reads the source commit message by exact SHA when requested', async () => {
+    const sourceCommitMessage = 'Update metadata [ci-skip]';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(pullRequestPayload()))
+      .mockResolvedValueOnce(jsonResponse({ hash: sourceSha, message: sourceCommitMessage }));
+    const { codeReviewService } = service(fetchMock);
+
+    const result = await codeReviewService.getPullRequest(pullRequestTarget, {
+      includeSourceCommitMessage: true,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pullRequest: { sourceCommitMessage, source: { sha: sourceSha.toLowerCase() } },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `https://api.bitbucket.org/2.0/repositories/acme/widgets/commit/${sourceSha.toLowerCase()}`,
+      expect.anything()
+    );
+  });
+
   it('accepts Bitbucket pull request repository payloads without workspace and resolves abbreviated hashes', async () => {
     const abbreviatedHeadSha = 'b2baee27adc2';
     const abbreviatedBaseSha = '50c3b1607dd8';

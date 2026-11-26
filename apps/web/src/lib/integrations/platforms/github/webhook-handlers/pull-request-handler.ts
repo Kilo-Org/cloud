@@ -33,7 +33,7 @@ import {
   createCheckRun,
   findLatestCheckRunId,
   getCheckRunConclusion,
-  resolveMergeHeadContent,
+  inspectReviewHead,
   updateCheckRun,
 } from '@/lib/integrations/platforms/github/adapter';
 import { isNonTerminalCodeReviewStatus } from '@/lib/code-reviews/dispatch/dispatch-constants';
@@ -172,6 +172,7 @@ export async function handlePullRequestCodeReview(
     } satisfies ReviewScope;
     const headFullName = checkoutRef.headRepoFullName ?? repository.full_name;
     const [headOwner, headRepoName] = headFullName.split('/');
+    const [repoOwner, repoName] = repository.full_name.split('/');
 
     // Skip merge commits on synchronize (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
@@ -180,14 +181,15 @@ export async function handlePullRequestCodeReview(
     // merges on branch commits no review has covered yet, or that takes code from outside the base
     // branch, must be reviewed here, or the pull request never gets a review at its head and a
     // repository that requires the Kilo check stays blocked.
-    const mergeHeadContent =
-      payload.action === GITHUB_ACTION.SYNCHRONIZE &&
-      !isBotPullRequestSkip &&
-      headOwner &&
-      headRepoName
-        ? await resolveMergeHeadContent({
+    const headContent =
+      !isBotPullRequestSkip && headOwner && headRepoName
+        ? await inspectReviewHead({
             appType,
-            baseSha: pull_request.base.sha,
+            baseSha:
+              payload.action === GITHUB_ACTION.SYNCHRONIZE ? pull_request.base.sha : undefined,
+            ...(checkoutRef.isForkPr && {
+              pullRequestRepository: { owner: repoOwner, repo: repoName },
+            }),
             headSha: pull_request.head.sha,
             installationId: integration.platform_installation_id as string,
             owner: headOwner,
@@ -196,8 +198,8 @@ export async function handlePullRequestCodeReview(
         : { kind: 'not_merge' as const };
 
     const coveringReview =
-      mergeHeadContent.kind === 'review_content'
-        ? await coveringReviewFor(reviewScope, mergeHeadContent.shas)
+      headContent.kind === 'review_content'
+        ? await coveringReviewFor(reviewScope, headContent.shas)
         : null;
 
     if (coveringReview !== null) {
@@ -238,7 +240,7 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
-    if (mergeHeadContent.kind !== 'not_merge') {
+    if (headContent.kind === 'review_content' || headContent.kind === 'unreviewed_content') {
       logExceptInTest('Reviewing merge commit whose content no review covers:', {
         pr_number: pull_request.number,
         repo: repository.full_name,
@@ -292,7 +294,6 @@ export async function handlePullRequestCodeReview(
           })
       );
 
-      const [repoOwner, repoName] = repository.full_name.split('/');
       await Promise.allSettled(
         cancelledReviews
           .filter(review => review.checkRunId != null && review.platform === 'github')
@@ -333,6 +334,10 @@ export async function handlePullRequestCodeReview(
         author: pull_request.user.login,
       });
       return NextResponse.json({ message: 'Skipped bot-authored PR' }, { status: 200 });
+    }
+
+    if (headContent.kind === 'skip_directive') {
+      return NextResponse.json({ message: 'Skipped review by commit message' }, { status: 200 });
     }
 
     const existingReview = await findExistingReview(reviewScope, pull_request.head.sha);
@@ -414,8 +419,6 @@ export async function handlePullRequestCodeReview(
     logExceptInTest(
       `Created code review ${reviewId} for ${repository.full_name}#${pull_request.number}`
     );
-
-    const [repoOwner, repoName] = repository.full_name.split('/');
 
     if (appType !== 'lite') {
       let checkRunId: number | undefined;

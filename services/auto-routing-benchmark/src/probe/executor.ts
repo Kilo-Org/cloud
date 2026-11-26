@@ -65,27 +65,33 @@ const DYNAMIC_HEADERS: Readonly<Record<string, HeaderSource>> = {
   'x-kilocode-machineid': 'machine',
 };
 
+/**
+ * The template's headers with this run's values. A `null` token means the transport
+ * authenticates the request itself (the runner's case capability), so no credential header
+ * is built at all.
+ */
 export function probeHeaders(
   template: ProbeTemplate,
-  values: { kiloToken: string; orgId: string | null; sessionId: string; machineId: string }
+  values: { kiloToken: string | null; orgId: string | null; sessionId: string; machineId: string }
 ): Record<string, string> {
   const headers: Record<string, string> = {};
+  const token = values.kiloToken;
   for (const [name, value] of Object.entries(template.headers)) {
     const source = DYNAMIC_HEADERS[name];
     // Transport headers are per connection (the capture records them empty); fetch sets them.
     if (source === undefined && value === '') continue;
+    if (source === 'authorization' || source === 'apiKey') {
+      if (token !== null) headers[name] = source === 'authorization' ? `Bearer ${token}` : token;
+      continue;
+    }
     headers[name] =
-      source === 'authorization'
-        ? `Bearer ${values.kiloToken}`
-        : source === 'apiKey'
-          ? values.kiloToken
-          : source === 'organization'
-            ? (values.orgId ?? '')
-            : source === 'session'
-              ? values.sessionId
-              : source === 'machine'
-                ? values.machineId
-                : value;
+      source === 'organization'
+        ? (values.orgId ?? '')
+        : source === 'session'
+          ? values.sessionId
+          : source === 'machine'
+            ? values.machineId
+            : value;
   }
   return headers;
 }
@@ -107,6 +113,9 @@ export type ProbeRunRequest = {
   fetchImpl?: typeof fetch;
   now?: number;
 };
+
+/** A probe request without its credential: the cancellable runner path sends none. */
+type ProbeRequestFields = Omit<ProbeRunRequest, 'kiloToken'>;
 
 function emptyTools() {
   return { calls: 0, names: [], steps: 0, finalFinishReason: null };
@@ -179,7 +188,7 @@ function isTimeout(error: unknown, signal: AbortSignal): boolean {
 
 function measuredReply(
   reply: ProbeReply,
-  request: ProbeRunRequest,
+  request: ProbeRequestFields,
   latencyMs: number,
   exitCode: number
 ): CliRunResult {
@@ -208,6 +217,13 @@ function measuredReply(
  * model's own next move after a tool result.
  */
 export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<CliRunResult> {
+  return runProbe(request, request.kiloToken);
+}
+
+async function runProbe(
+  request: ProbeRequestFields,
+  kiloToken: string | null
+): Promise<CliRunResult> {
   const family = probeFamily(request.catalogModel);
   const resolved = probeTemplate(family);
   if ('unsupportedReason' in resolved) {
@@ -241,7 +257,7 @@ export async function runProbeCaseViaGateway(request: ProbeRunRequest): Promise<
       method: 'POST',
       headers: {
         ...probeHeaders(template, {
-          kiloToken: request.kiloToken,
+          kiloToken,
           orgId: request.orgId,
           sessionId,
           machineId: probeMachineId(),
@@ -360,7 +376,7 @@ function abortable<T>(answer: Promise<T>, signal: AbortSignal | null | undefined
   return promise;
 }
 
-export type CancellableProbeRequest = ProbeRunRequest & {
+export type CancellableProbeRequest = ProbeRequestFields & {
   instanceName: string;
   execution: PaidLaunchExecutionKey;
   /** Same case-scoped transport the CLI proxy uses; no provider credential is passed. */
@@ -375,37 +391,41 @@ export type CancellableProbeRequest = ProbeRunRequest & {
  * aborts this exact request. `inference` is the capability envelope the scheduler issued
  * from the canonical claim (same issue path as the CLI), so the request is attributable to
  * the same generation and cap, and neither the executor's template headers nor any provider
- * token reach the gateway. The object checks the canonical paid generation before fetching,
- * failing closed. A cancelled probe throws `BenchmarkCaseCancelledError`; a probe whose
- * generation is no longer live, or whose admission cannot be verified, throws
- * `BenchmarkCaseNotStartedError` with no provider work. Both are terminal for the paid
- * start; a caller timeout still classifies as a timed-out probe.
+ * token reach the gateway; the probe holds no Kilo token at all. The object checks the
+ * canonical paid generation before fetching, failing closed. A cancelled probe throws
+ * `BenchmarkCaseCancelledError`; a probe whose generation is no longer live, or whose
+ * admission cannot be verified, throws `BenchmarkCaseNotStartedError` with no provider work.
+ * Both are terminal for the paid start; a caller timeout still classifies as a timed-out
+ * probe.
  */
 export async function runCancellableProbeCase(
   env: Env,
   params: CancellableProbeRequest
 ): Promise<CliRunResult> {
   const { instanceName, execution, inference, ...request } = params;
-  return runProbeCaseViaGateway({
-    ...request,
-    fetchImpl: async (input, init) => {
-      const url = new URL(
-        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-      );
-      const endpoint = probeEndpointForPath(url.pathname);
-      if (endpoint === null) throw new Error(`probe endpoint not allowed: ${url.pathname}`);
-      const body = init?.body;
-      if (typeof body !== 'string') throw new Error('probe body must be serialized JSON');
-      return abortable(
-        fetchProbeThroughRunner(env, {
-          instanceName,
-          execution,
-          endpoint,
-          inference,
-          body,
-        }),
-        init?.signal
-      );
+  return runProbe(
+    {
+      ...request,
+      fetchImpl: async (input, init) => {
+        const url = new URL(
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+        );
+        const endpoint = probeEndpointForPath(url.pathname);
+        if (endpoint === null) throw new Error(`probe endpoint not allowed: ${url.pathname}`);
+        const body = init?.body;
+        if (typeof body !== 'string') throw new Error('probe body must be serialized JSON');
+        return abortable(
+          fetchProbeThroughRunner(env, {
+            instanceName,
+            execution,
+            endpoint,
+            inference,
+            body,
+          }),
+          init?.signal
+        );
+      },
     },
-  });
+    null
+  );
 }

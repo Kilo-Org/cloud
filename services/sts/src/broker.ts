@@ -3,6 +3,9 @@ import {
   WorkloadNameSchema,
   type BundleRequest,
   type BundleResult,
+  type LeaseRequest,
+  type LeaseResult,
+  type LeaseRevokeResult,
   type MintRequest,
   type MintResult,
 } from '@kilocode/sts-contracts';
@@ -13,7 +16,9 @@ import { BUNDLE_OBJECT_DEADLINE_MS, BUNDLE_OBJECT_RETRY_AFTER_SECONDS } from './
 import { getBundleStub } from './dos/stubs';
 import { readConfig, type Env, type StsConfig } from './env';
 import type { GithubRun } from './identity/verify';
-import { policyExists, policyFor } from './policy';
+import { recordLeaseDenial, serveLease, serveLeaseRevoke, type LeaseCaller } from './leases/serve';
+import { policyIndex } from './policy';
+import type { PolicyIndex } from './policy/load';
 import { callWithDeadline } from './rpc';
 import { defaultMintAuthority, serveMint, type MintAuthority } from './tokens/mint';
 
@@ -72,6 +77,62 @@ export class SecretsBroker extends WorkerEntrypoint<Env, SecretsBrokerProps> {
       (this.constructor as typeof SecretsBroker).mintAuthority
     );
   }
+
+  /**
+   * A database lease for the caller named in props (design 6.1 job 3), checked against its own
+   * policy's `dynamic` grants. The answer holds the role's password: keep it in memory only.
+   */
+  async lease(request: LeaseRequest): Promise<LeaseResult> {
+    const policies = (this.constructor as typeof SecretsBroker).mintAuthority.policies;
+    const waitUntil: WaitUntil = promise => this.ctx.waitUntil(promise);
+    const entry = workerLeaseEntry(this.env, this.ctx.props, policies, waitUntil);
+    if (entry.status === 'denied') return entry;
+    const { config, caller } = entry;
+    return await serveLease(this.env, config, { caller, request, policies, waitUntil });
+  }
+
+  /** Revokes one of the caller's own leases; any other lease id answers `not_found`. */
+  async revokeLease(leaseId: string): Promise<LeaseRevokeResult> {
+    const policies = (this.constructor as typeof SecretsBroker).mintAuthority.policies;
+    const waitUntil: WaitUntil = promise => this.ctx.waitUntil(promise);
+    const entry = workerLeaseEntry(this.env, this.ctx.props, policies, waitUntil);
+    if (entry.status === 'denied') return entry;
+    const { config, caller } = entry;
+    return await serveLeaseRevoke(this.env, config, { caller, request: { leaseId }, waitUntil });
+  }
+}
+
+/**
+ * The props caller of a lease or revoke call, or why it is refused before its request is read
+ * (audited, except a binding without valid props, which names no caller: a deploy error).
+ */
+function workerLeaseEntry(
+  env: Env,
+  props: unknown,
+  policies: PolicyIndex,
+  waitUntil: WaitUntil
+):
+  | { status: 'ok'; config: StsConfig; caller: LeaseCaller }
+  | { status: 'denied'; reason: DeniedReason } {
+  const config = readConfig(env);
+  const parsed = CallerPropsSchema.safeParse(props);
+  if (!parsed.success) {
+    console.warn('sts: lease call refused: the binding carries no valid props.caller');
+    return { status: 'denied', reason: 'identity_rejected' };
+  }
+  const caller: LeaseCaller = {
+    workload: parsed.data.caller,
+    identity: 'worker-binding',
+    channel: 'worker-binding',
+    run: null,
+    claims: {},
+  };
+  const reason = workerRefusal(policies, config, caller.workload);
+  if (reason !== null) {
+    recordLeaseDenial(env, config, caller, waitUntil, reason);
+    return { status: 'denied', reason };
+  }
+  return { status: 'ok', config, caller };
 }
 
 /**
@@ -112,9 +173,17 @@ export async function serveWorkerMint(
   });
 }
 
-function refusalFor(config: StsConfig, caller: string): DeniedReason | null {
-  const policy = policyFor(config.environment, caller);
-  if (policy === null) return policyExists(caller) ? 'environment_mismatch' : 'unknown_workload';
+/**
+ * Why a Worker caller is refused before its request is read: no policy here (another
+ * environment's, or none at all), or a policy bound to another identity kind.
+ */
+function workerRefusal(
+  policies: PolicyIndex,
+  config: StsConfig,
+  caller: string
+): DeniedReason | null {
+  const policy = policies.get(config.environment, caller);
+  if (policy === null) return policies.has(caller) ? 'environment_mismatch' : 'unknown_workload';
   return policy.identity.kind === 'worker-binding' ? null : 'identity_rejected';
 }
 
@@ -126,7 +195,7 @@ export async function serveWorkerCall(
   request: BundleRequest,
   waitUntil: WaitUntil
 ): Promise<BundleResult> {
-  const reason = refusalFor(config, caller);
+  const reason = workerRefusal(policyIndex, config, caller);
   if (reason !== null) {
     const hop = recordDenial(env, config, {
       channel: 'worker-binding',

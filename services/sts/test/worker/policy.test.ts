@@ -4,7 +4,7 @@ import { policyChangedEvent } from '../../src/audit/events';
 import { resolveWorkloadSecrets } from '../../src/bundle/resolve';
 import { loadPolicies } from '../../src/policy/load';
 import { policyFor, policyIndex } from '../../src/policy';
-import { bundleFolder } from '../../src/policy/schema';
+import { PolicySnapshotSchema, bundleFolder } from '../../src/policy/schema';
 
 const REGISTRY = {
   gateway: { scopes: ['gateway:models.read', 'gateway:usage.write'] },
@@ -57,7 +57,7 @@ describe('policy token grants', () => {
     );
   });
 
-  it('refuses an audience equal to the workload, duplicates, and any dynamic grant', () => {
+  it('refuses an audience equal to the workload, duplicates, and a dynamic grant that is no lease', () => {
     expect(() =>
       loadPolicies(
         {
@@ -79,6 +79,10 @@ scopes: ['o11y:alerts.read']
       'audiences contains a duplicate'
     );
     expectGrantThrow(`dynamic: [ci_migration_role]\n`, 'does not match the policy schema');
+    expectGrantThrow(
+      `dynamic:\n  - grant: cloudflare-deploy-token\n    maxTtlSeconds: 3600\n    defaultTtlSeconds: 3600\n    maxActive: 1\n`,
+      'does not match the policy schema'
+    );
   });
 
   it('checks shipped policies against the shipped registry, which lists only the pilot scopes', () => {
@@ -691,5 +695,115 @@ secrets: [APP_TWO_SECRET]
     ]);
     expect(policyIndex.has('audit-relay')).toBe(true);
     expect(policyFor('production', 'not-a-workload')).toBeNull();
+  });
+});
+
+describe('policy lease grants', () => {
+  const grant = (name: string, max: number, fallback: number, active: number) =>
+    `  - grant: ${name}\n    maxTtlSeconds: ${max}\n    defaultTtlSeconds: ${fallback}\n    maxActive: ${active}\n`;
+  const worker = (dynamic: string) => `${valid}dynamic:\n${dynamic}`;
+  const github = (dynamic: string, environment = '\n  environment: migrations') => `
+workload: ci-migrate
+environments: [staging]
+identity:
+  kind: github-oidc
+  repository: acme/repo
+  repositoryId: '123'
+  repositoryOwnerId: '456'${environment}
+  jobWorkflowRefs: [acme/repo/.github/workflows/deploy.yml@refs/heads/main]
+  events: [push]
+secrets: []
+dynamic:
+${dynamic}`;
+
+  it('accepts replica-read on a worker binding and ci-migration on a GitHub job with an environment', () => {
+    const index = loadPolicies({
+      'app-one.yaml': worker(grant('replica-read', 9000, 3600, 2)),
+      'ci-migrate.yaml': github(grant('ci-migration', 3600, 3600, 1)),
+    });
+    expect(index.get('production', 'app-one')?.dynamic).toEqual([
+      { grant: 'replica-read', maxTtlSeconds: 9000, defaultTtlSeconds: 3600, maxActive: 2 },
+    ]);
+    expect(index.snapshot().map(entry => entry.dynamic)).toEqual([
+      ['replica-read:9000:3600:2'],
+      ['ci-migration:3600:3600:1'],
+    ]);
+  });
+
+  it('holds each grant to its own identity kind', () => {
+    expectThrow(
+      { 'app-one.yaml': worker(grant('ci-migration', 3600, 3600, 1)) },
+      'dynamic ci-migration is only for a github-oidc policy'
+    );
+    expectThrow(
+      { 'ci-migrate.yaml': github(grant('replica-read', 3600, 3600, 1)) },
+      'dynamic replica-read is only for a worker-binding policy'
+    );
+    expectThrow(
+      { 'ci-migrate.yaml': github(grant('ci-migration', 3600, 3600, 1), '') },
+      'a github-oidc policy with dynamic ci-migration must bind identity.environment'
+    );
+  });
+
+  it('keeps lifetimes and active leases within the grant ceilings', () => {
+    expectThrow(
+      { 'app-one.yaml': worker(grant('replica-read', 28_801, 3600, 2)) },
+      'dynamic replica-read: maxTtlSeconds is above 28800'
+    );
+    expectThrow(
+      { 'ci-migrate.yaml': github(grant('ci-migration', 3601, 3600, 1)) },
+      'dynamic ci-migration: maxTtlSeconds is above 3600'
+    );
+    expectThrow(
+      { 'app-one.yaml': worker(grant('replica-read', 3600, 7200, 2)) },
+      'defaultTtlSeconds is above maxTtlSeconds'
+    );
+    expectThrow(
+      { 'app-one.yaml': worker(grant('replica-read', 3600, 3600, 5)) },
+      'dynamic replica-read: maxActive is above 4'
+    );
+    expectThrow(
+      { 'app-one.yaml': worker(grant('replica-read', 3600, 60, 1)) },
+      'does not match the policy schema'
+    );
+    expectThrow(
+      {
+        'app-one.yaml': worker(
+          `${grant('replica-read', 3600, 3600, 1)}${grant('replica-read', 7200, 3600, 1)}`
+        ),
+      },
+      'dynamic lists a grant twice'
+    );
+  });
+
+  it('lists added and removed lease grants, with their limits, in the policy.changed event', () => {
+    const before = loadPolicies({ 'app-one.yaml': worker(grant('replica-read', 3600, 3600, 1)) });
+    const after = loadPolicies({ 'app-one.yaml': worker(grant('replica-read', 9000, 3600, 2)) });
+    const event = policyChangedEvent({
+      environment: 'production',
+      policyHash: 'after',
+      previousPolicyHash: 'before',
+      previous: before.snapshot(),
+      current: after.snapshot(),
+    });
+    expect(event.data.attributes).toMatchObject({
+      addedDynamic: ['app-one:replica-read:9000:3600:2'],
+      removedDynamic: ['app-one:replica-read:3600:3600:1'],
+      dynamicTruncated: false,
+    });
+  });
+
+  it('writes no dynamic field for a policy without lease grants, so a reader from before leases parses the snapshot', () => {
+    const plain = loadPolicies({ 'app-one.yaml': valid });
+    expect(plain.snapshot()[0]).not.toHaveProperty('dynamic');
+    // The strict snapshot reader of the stacked base: the same schema without `dynamic`.
+    const baseReader = PolicySnapshotSchema.element.omit({ dynamic: true }).array();
+    expect(baseReader.safeParse(JSON.parse(JSON.stringify(plain.snapshot()))).success).toBe(true);
+    const leasing = loadPolicies({ 'app-one.yaml': worker(grant('replica-read', 3600, 3600, 1)) });
+    expect(baseReader.safeParse(leasing.snapshot()).success).toBe(false);
+    // The reader fills the token-grant lists a policy without token grants leaves out.
+    expect(PolicySnapshotSchema.parse(JSON.parse(JSON.stringify(plain.snapshot())))).toEqual(
+      plain.snapshot().map(entry => ({ audiences: [], scopes: [], ...entry }))
+    );
   });
 });

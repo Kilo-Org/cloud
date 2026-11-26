@@ -1,11 +1,19 @@
-import { decodeAuditBatch, type MintResult } from '@kilocode/sts-contracts';
+import {
+  decodeAuditBatch,
+  type LeaseGrant,
+  type LeaseResult,
+  type LeaseRevokeResult,
+  type MintResult,
+} from '@kilocode/sts-contracts';
 import type { E2eSecretsBroker } from './sts';
 
 /**
- * Test-only probe Worker for the local end-to-end check; never deployed. `STS` binds the test
+ * Test-only probe Worker for the local end-to-end checks; never deployed. `STS` binds the test
  * build's broker entrypoint with `props.caller`, as a consumer binds `SecretsBroker`; `STS_HTTP`
  * forwards the probe's own non-probe paths to STS's HTTP routes, so the node script reaches both
- * Workers on one port. It also consumes the audit queue STS produces to and keeps every event.
+ * Workers on one port. `/probe/lease` and `/probe/revoke` call the broker's lease methods and answer
+ * with their result, synthetic credentials included. It also consumes the audit queue STS produces
+ * to and keeps every event.
  */
 type ProbeEnv = { STS: Service<E2eSecretsBroker>; STS_HTTP: Fetcher };
 
@@ -26,6 +34,20 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/probe/mint') {
       return await mint(env, (url.searchParams.get('audiences') ?? '').split(','));
+    }
+    if (url.pathname === '/probe/lease') {
+      const ttl = url.searchParams.get('ttl');
+      const result: LeaseResult = await env.STS.lease({
+        grant: (url.searchParams.get('grant') ?? '') as LeaseGrant,
+        ...(ttl === null ? {} : { ttlSeconds: Number(ttl) }),
+      });
+      return Response.json(result);
+    }
+    if (url.pathname === '/probe/revoke') {
+      const result: LeaseRevokeResult = await env.STS.revokeLease(
+        url.searchParams.get('leaseId') ?? ''
+      );
+      return Response.json(result);
     }
     if (url.pathname === '/probe/audit') return Response.json(seen);
     return await env.STS_HTTP.fetch(request);

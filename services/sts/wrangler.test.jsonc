@@ -22,10 +22,12 @@
     "STS_ISSUER": "https://sts.sts-test.invalid",
     "MANAGER_BASE_URL": "https://manager.sts-test.invalid",
     "MANAGER_PROJECT_ID": "test-project-id",
+    "MANAGER_PROJECT_SLUG": "test-project",
     "MANAGER_ENVIRONMENT_SLUG": "development",
     "MANAGER_IDENTITY_ID": "test-identity-id",
     "DO_JURISDICTION": "none",
     "TOKEN_SIGNING_KIDS_REVOKED": "",
+    "LEASE_CI_MIGRATION_TARGET": "db.sts-test.invalid:5432/postgres",
   },
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }],
@@ -37,11 +39,13 @@
       { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
       { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
       { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+      { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
     { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["LeaseDO"] },
   ],
 }

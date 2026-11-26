@@ -23,10 +23,6 @@ export function policyFor(environment: StsEnvironment, workload: string): Policy
   return policyIndex.get(environment, workload);
 }
 
-export function policyExists(workload: string): boolean {
-  return policyIndex.has(workload);
-}
-
 export function workloadPolicyHash(workload: string): Promise<string> {
   return policyIndex.workloadHash(workload);
 }

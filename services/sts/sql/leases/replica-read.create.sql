@@ -1,0 +1,1 @@
+SELECT kilo_lease.create_lease('{{username}}', '{{password}}', '{{expiration}}')

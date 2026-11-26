@@ -2,6 +2,7 @@ import { TOKEN_SIGNER_SHARDS } from '../constants';
 import type { Env, StsConfig } from '../env';
 import type { BundleDO } from './BundleDO';
 import type { DenialDO } from './DenialDO';
+import type { LeaseDO } from './LeaseDO';
 import type { RefresherDO } from './RefresherDO';
 import type { SignerDO } from './SignerDO';
 import type { TokenSignerDO } from './TokenSignerDO';
@@ -44,6 +45,12 @@ export function getSignerStub(env: Env, config: StsConfig): DurableObjectStub<Si
 
 export function getDenialStub(env: Env, config: StsConfig): DurableObjectStub<DenialDO> {
   const namespace = scoped(config, env.STS_DENIAL_DO);
+  return namespace.get(namespace.idFromName(config.environment));
+}
+
+/** The environment's lease object: its lease records and the `sts:<environment>:leases` stream. */
+export function getLeaseStub(env: Env, config: StsConfig): DurableObjectStub<LeaseDO> {
+  const namespace = scoped(config, env.STS_LEASE_DO);
   return namespace.get(namespace.idFromName(config.environment));
 }
 

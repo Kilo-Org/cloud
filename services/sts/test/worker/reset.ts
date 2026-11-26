@@ -47,3 +47,8 @@ export async function resetDenialObject(stub: DurableObjectStub): Promise<void> 
 export async function resetTokenSignerObject(stub: DurableObjectStub): Promise<void> {
   await resetObject(stub, [], ['token-key-ring']);
 }
+
+/** The aborted instance also forgets its manager access token. */
+export async function resetLeaseObject(stub: DurableObjectStub): Promise<void> {
+  await resetObject(stub, ['lease']);
+}

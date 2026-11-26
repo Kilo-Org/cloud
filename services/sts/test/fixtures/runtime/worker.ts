@@ -18,7 +18,7 @@ import type { MintAuthority } from '../../../src/tokens/mint';
 import type { FillResult } from '../../../src/types';
 import { createProvider, providerFetch, signToken } from '../../worker/support';
 
-export { BundleDO, DenialDO, TokenSignerDO } from '../../../src/index';
+export { BundleDO, DenialDO, LeaseDO, TokenSignerDO } from '../../../src/index';
 
 /**
  * Test-only Worker for test/runtime; never deployed. `BROKER` binds its own `ProbeBroker`

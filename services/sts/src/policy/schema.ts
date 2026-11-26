@@ -1,10 +1,14 @@
 import {
   AudienceSchema,
+  LEASE_GRANT_MAX_TTL_SECONDS,
+  LEASE_MIN_TTL_SECONDS,
+  LeaseGrantSchema,
   STS_SCOPE_REGISTRY,
   ScopeSchema,
   SecretNameSchema,
   StsEnvironmentSchema,
   WorkloadNameSchema,
+  type LeaseGrant,
   type StsEnvironment,
   isRegisteredStsScope,
   scopeAudience,
@@ -167,10 +171,26 @@ function hasDuplicates(values: readonly string[]): boolean {
 }
 
 /**
- * Dynamic credentials a workload may request (database leases, CI deploy tokens). The enum is
- * empty until those land (decisions Q5): the field fixes the policy shape, and any value fails.
+ * The most active leases a policy may allow per grant: `replica-read` covers bouncer-watch's hourly
+ * and daily runs, which overlap; a migration re-run may start before a failed run's lease ends.
  */
-const DynamicGrantSchema = z.never();
+export const LEASE_MAX_ACTIVE_CEILING: Readonly<Record<LeaseGrant, number>> = {
+  'replica-read': 4,
+  'ci-migration': 2,
+};
+
+/**
+ * One database lease grant (design 6.3 `dynamic`): the Infisical dynamic secret, the longest and
+ * the default lifetime a request gets, and how many leases of it the workload may hold at once.
+ */
+const DynamicGrantSchema = z.strictObject({
+  grant: LeaseGrantSchema,
+  maxTtlSeconds: z.number().int().min(LEASE_MIN_TTL_SECONDS),
+  defaultTtlSeconds: z.number().int().min(LEASE_MIN_TTL_SECONDS),
+  maxActive: z.number().int().min(1),
+});
+
+export type DynamicGrant = z.infer<typeof DynamicGrantSchema>;
 
 export const PolicySchema = z.strictObject({
   workload: WorkloadNameSchema,
@@ -181,7 +201,8 @@ export const PolicySchema = z.strictObject({
   audiences: z.array(AudienceSchema.max(63)).max(64).default([]),
   /** Scopes it may hold, each from `STS_SCOPE_REGISTRY` and under one of `audiences`. */
   scopes: z.array(ScopeSchema.max(127)).max(256).default([]),
-  dynamic: z.array(DynamicGrantSchema).max(0).default([]),
+  /** Database leases it may request, one entry per grant; empty requests none (default deny). */
+  dynamic: z.array(DynamicGrantSchema).max(LeaseGrantSchema.options.length).default([]),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;
@@ -195,9 +216,52 @@ export const PolicySnapshotEntrySchema = z.strictObject({
   // Left out for a policy without token grants, and in a snapshot stored before grants existed.
   audiences: z.array(z.string()).default([]),
   scopes: z.array(z.string()).default([]),
+  // Written only for a policy with lease grants, so a reader from before leases parses the rest.
+  dynamic: z.array(z.string()).optional(),
 });
 
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
+
+/**
+ * Lease grants (design 6.3): at most one entry per grant, lifetimes within the grant's ceiling, and
+ * each grant only for the identity it was built for. `replica-read` serves Workers in the account
+ * (bouncer-watch); `ci-migration` serves a GitHub job, and only one bound to a protected GitHub
+ * environment (production also needs `refs/heads/main`, checked with the other GitHub rules).
+ */
+function dynamicProblems(policy: Policy): string[] {
+  const problems: string[] = [];
+  if (hasDuplicates(policy.dynamic.map(entry => entry.grant))) {
+    problems.push('dynamic lists a grant twice');
+  }
+  for (const entry of policy.dynamic) {
+    const ceiling = LEASE_GRANT_MAX_TTL_SECONDS[entry.grant];
+    if (entry.maxTtlSeconds > ceiling) {
+      problems.push(`dynamic ${entry.grant}: maxTtlSeconds is above ${ceiling}`);
+    }
+    if (entry.defaultTtlSeconds > entry.maxTtlSeconds) {
+      problems.push(`dynamic ${entry.grant}: defaultTtlSeconds is above maxTtlSeconds`);
+    }
+    if (entry.maxActive > LEASE_MAX_ACTIVE_CEILING[entry.grant]) {
+      problems.push(
+        `dynamic ${entry.grant}: maxActive is above ${LEASE_MAX_ACTIVE_CEILING[entry.grant]}`
+      );
+    }
+    const { identity } = policy;
+    if (entry.grant === 'replica-read' && identity.kind !== 'worker-binding') {
+      problems.push('dynamic replica-read is only for a worker-binding policy');
+    }
+    if (entry.grant === 'ci-migration') {
+      if (identity.kind !== 'github-oidc') {
+        problems.push('dynamic ci-migration is only for a github-oidc policy');
+      } else if (identity.environment === undefined) {
+        problems.push(
+          'a github-oidc policy with dynamic ci-migration must bind identity.environment'
+        );
+      }
+    }
+  }
+  return problems;
+}
 
 /** Token grants: every scope registered and under a listed audience, every audience used. */
 function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
@@ -287,7 +351,7 @@ export function policyFileProblems(
   policy: Policy,
   registry: StsScopeRegistry = STS_SCOPE_REGISTRY
 ): string[] {
-  const problems: string[] = grantProblems(policy, registry);
+  const problems: string[] = [...grantProblems(policy, registry), ...dynamicProblems(policy)];
   if (hasDuplicates(policy.environments)) problems.push('environments contains a duplicate');
   if (hasDuplicates(policy.secrets)) problems.push('secrets contains a duplicate');
   for (const name of policy.secrets) {

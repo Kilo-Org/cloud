@@ -6,13 +6,14 @@ import { loadPolicies } from '../../../src/policy/load';
 import type { MintAuthority } from '../../../src/tokens/mint';
 import { E2E_SCOPES } from './scopes';
 
-export { DenialDO, SignerDO, TokenSignerDO } from '../../../src/index';
+export { DenialDO, LeaseDO, SignerDO, TokenSignerDO } from '../../../src/index';
 
 /**
  * Test-only build of STS for the local end-to-end checks (README "Tests"); never deployed. It runs
  * STS's own routes, broker and Durable Objects, with three changes: mints are checked against the
- * end-to-end registry; the policies are the probe's and one CI job's; and requests to GitHub's
- * issuer and to the manager go to the local fake that `ci-bundle-check.ts` serves on port 8830.
+ * end-to-end registry; the policies are the probe's and two CI jobs'; and requests to GitHub's
+ * issuer and to the manager go to the local fake that `ci-bundle-check.ts` or `lease-check.ts`
+ * serves on port 8830.
  */
 const E2E_POLICIES = loadPolicies(
   {
@@ -24,6 +25,11 @@ identity:
 secrets: []
 audiences: [e2e-alpha, e2e-beta]
 scopes: ['e2e-alpha:probe.read', 'e2e-beta:probe.read']
+dynamic:
+  - grant: replica-read
+    maxTtlSeconds: 9000
+    defaultTtlSeconds: 3600
+    maxActive: 2
 `,
     'ci-e2e-release.yaml': `
 workload: ci-e2e-release
@@ -39,6 +45,24 @@ identity:
   jobWorkflowRefs: [kilo-e2e/ci-fixture/.github/workflows/publish.yml@refs/heads/main]
   events: [workflow_dispatch]
 secrets: [E2E_RELEASE_KEY, E2E_SHARED_WEBHOOK]
+`,
+    'ci-e2e-migrate.yaml': `
+workload: ci-e2e-migrate
+environments: [development]
+identity:
+  kind: github-oidc
+  repository: kilo-e2e/ci-fixture
+  repositoryId: '1001'
+  repositoryOwnerId: '2002'
+  environment: migrations
+  jobWorkflowRefs: [kilo-e2e/ci-fixture/.github/workflows/deploy.yml@refs/heads/main]
+  events: [push]
+secrets: []
+dynamic:
+  - grant: ci-migration
+    maxTtlSeconds: 3600
+    defaultTtlSeconds: 3600
+    maxActive: 1
 `,
   },
   { scopeRegistry: E2E_SCOPES }

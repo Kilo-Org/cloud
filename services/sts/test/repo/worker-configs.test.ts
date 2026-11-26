@@ -286,10 +286,12 @@ describe('worker config rules', () => {
       STS_ISSUER: 'https://sts-staging.kiloapps.io',
       MANAGER_BASE_URL: 'https://eu.infisical.com',
       MANAGER_PROJECT_ID: 'project',
+      MANAGER_PROJECT_SLUG: '',
       MANAGER_ENVIRONMENT_SLUG: 'staging',
       MANAGER_IDENTITY_ID: 'identity',
       DO_JURISDICTION: 'eu',
       TOKEN_SIGNING_KIDS_REVOKED: '',
+      LEASE_CI_MIGRATION_TARGET: '',
     };
     const sts = (blockVars: Record<string, string>) =>
       parseWorkerConfig('services/sts/wrangler.jsonc', { name: 'sts', vars: blockVars });
@@ -304,6 +306,24 @@ describe('worker config rules', () => {
     expect(stsVarProblems([sts({ ...vars, TOKEN_SIGNING_KIDS_REVOKED: 'not-a-kid' })])).toEqual([
       expect.stringContaining('vars do not pass EnvVarsSchema'),
     ]);
+    expect(
+      stsVarProblems([
+        sts({
+          ...vars,
+          MANAGER_PROJECT_SLUG: 'kilo-project',
+          LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:5432/postgres',
+        }),
+      ])
+    ).toEqual([]);
+    for (const bad of [
+      { MANAGER_PROJECT_SLUG: 'Kilo Project' },
+      { LEASE_CI_MIGRATION_TARGET: 'postgres://user:secret@db.example.invalid/postgres' },
+      { LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:99999/postgres' },
+    ]) {
+      expect(stsVarProblems([sts({ ...vars, ...bad })]), JSON.stringify(bad)).toEqual([
+        expect.stringContaining('vars do not pass EnvVarsSchema'),
+      ]);
+    }
     expect(stsVarProblems([sts({ ...vars, STS_ISSUER: 'https://sts.kiloapps.io' })])).toEqual([
       'services/sts/wrangler.jsonc (top level): STS_ISSUER is https://sts.kiloapps.io, expected https://sts-staging.kiloapps.io',
     ]);

@@ -1,7 +1,13 @@
 import type { StsEnvironment, StsScopeRegistry } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
 import { sha256Base64Url } from '../crypto/hash';
-import { PolicySchema, policyFileProblems, vercelEnvironmentKey, type Policy } from './schema';
+import {
+  PolicySchema,
+  policyFileProblems,
+  vercelEnvironmentKey,
+  type DynamicGrant,
+  type Policy,
+} from './schema';
 
 /**
  * One policy as `RefresherDO` stores it to diff the next policy change against. A policy without
@@ -15,7 +21,17 @@ export type PolicySnapshotEntry = {
   secrets: string[];
   audiences?: string[];
   scopes?: string[];
+  /**
+   * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant; absent when the
+   * policy has none, so the snapshot and its hash stay what a reader without leases expects (a
+   * rollback to it then parses the stored snapshot).
+   */
+  dynamic?: string[];
 };
+
+function dynamicKey(entry: DynamicGrant): string {
+  return `${entry.grant}:${entry.maxTtlSeconds}:${entry.defaultTtlSeconds}:${entry.maxActive}`;
+}
 
 export type PolicyIndex = {
   all(): Policy[];
@@ -121,6 +137,7 @@ export function loadPolicies(
     secrets: [...policy.secrets].sort(),
     ...(policy.audiences.length > 0 ? { audiences: [...policy.audiences].sort() } : {}),
     ...(policy.scopes.length > 0 ? { scopes: [...policy.scopes].sort() } : {}),
+    ...(policy.dynamic.length > 0 ? { dynamic: policy.dynamic.map(dynamicKey).sort() } : {}),
   }));
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 

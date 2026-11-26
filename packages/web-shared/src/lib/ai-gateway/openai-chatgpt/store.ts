@@ -256,9 +256,9 @@ export function healthyOpenAiChatGptConnection(
 }
 
 /**
- * The payload columns a write of the owner's connection sets: the healthy
- * payload, encrypted in both stored forms, on an enabled row. One definition so a
- * reconnect and a token rotation cannot drift apart in which columns they leave alone.
+ * The payload columns a write of the owner's connection sets: the healthy payload,
+ * encrypted through the KMS service, on an enabled row. One definition so a reconnect and
+ * a token rotation cannot drift apart in which columns they leave alone.
  */
 function connectionWriteColumns(
   connection: OpenAiChatGptConnection,
@@ -665,6 +665,14 @@ export async function markOpenAiChatGptNotEligible(
 
     const deleteRefusedCredential = () =>
       tx.delete(openai_chatgpt_connections).where(openAiChatGptOwnerWhere(owner));
+
+    // The key id already names the refused credential, and without a data key the refusal
+    // cannot be sealed, so the row is deleted either way: decrypting it would only hold the
+    // row lock across another KMS round trip, which during an outage waits out its budget.
+    if (!sealingKey && refusal.credentialKeyId !== null) {
+      await deleteRefusedCredential();
+      return;
+    }
 
     let connection: OpenAiChatGptConnection | null;
     try {

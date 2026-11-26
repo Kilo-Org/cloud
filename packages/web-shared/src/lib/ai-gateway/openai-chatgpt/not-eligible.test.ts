@@ -222,6 +222,26 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
       await expect(getOpenAiChatGptConnection(owner)).resolves.toBeNull();
     });
 
+    it('deletes a credential the refusal names without decrypting it under the row lock', async () => {
+      const { credentialKeyId } = await saveOpenAiChatGptConnection(
+        owner,
+        connection('kms-down-no-decrypt'),
+        owner.kiloUserId as string
+      );
+      kms.fail('/data-key');
+      kms.requests.length = 0;
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await markOpenAiChatGptNotEligible(owner, refusal('kms-down-no-decrypt', credentialKeyId));
+      } finally {
+        consoleError.mockRestore();
+      }
+
+      expect(kms.requests.filter(request => request.path === '/decrypt')).toEqual([]);
+      await expect(readPayloadColumns()).resolves.toBeNull();
+    });
+
     it('leaves a connection made after the refused request untouched', async () => {
       const refused = await saveOpenAiChatGptConnection(
         owner,

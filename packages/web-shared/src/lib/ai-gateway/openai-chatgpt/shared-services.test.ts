@@ -18,6 +18,7 @@ import {
   clearOpenAiChatGptUsageLimit,
   getOpenAiChatGptStoredConnection,
   getOpenAiChatGptStoredConnectionFromPrimary,
+  openAiChatGptOwnerWhere,
   openAiChatGptSharedServicesOwner,
   readOpenAiChatGptConnectionRow,
   readOpenAiChatGptUsageLimit,
@@ -423,10 +424,15 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
 
     it('skips and logs clearing a recorded usage limit', async () => {
       const personalOwner = await connectedPerson('clear');
-      await recordOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN, {
-        code: null,
-        resetsAt: Date.now() + 60 * 60 * 1000,
-      });
+      // Recorded straight in the row: recording through the store would decrypt the payload
+      // first, and the data key it caches would answer in place of the failing KMS service.
+      await db
+        .update(openai_chatgpt_connections)
+        .set({
+          usage_limit_reached_at: new Date().toISOString(),
+          usage_limit_resets_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        })
+        .where(openAiChatGptOwnerWhere(personalOwner));
       kms.fail('/decrypt');
       const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
 

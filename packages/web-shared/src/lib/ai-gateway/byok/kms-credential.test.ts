@@ -102,8 +102,10 @@ describe('openKmsCredential when the KMS service fails', () => {
   it('throws a CredentialKmsError that names the cause and keeps the plaintext out of it', async () => {
     const envelope = sealKmsCredential('secret-value', dataKey);
     kms.fail('/decrypt', 403);
+    // A binding no earlier test decrypted, so no cached data key answers in place of KMS.
+    const uncachedContext = { ...context, key_id: crypto.randomUUID() };
 
-    const error = await openKmsCredential(envelope, () => context).catch((e: unknown) => e);
+    const error = await openKmsCredential(envelope, () => uncachedContext).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(CredentialKmsError);
     const kmsError = error as CredentialKmsError;

@@ -26,6 +26,8 @@ export const AUTH_METHODS = [
   'device_grant',
   'native',
   'access_code',
+  /** A browser session the legacy bridge created; never a fresh sign-in (migration 0013). */
+  'legacy_session',
 ] as const;
 export const CLIENT_CLASSES = ['desktop', 'mobile'] as const;
 export const CLIENT_KINDS = ['first_party', 'third_party'] as const;

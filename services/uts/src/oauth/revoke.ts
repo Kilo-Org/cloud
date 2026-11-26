@@ -12,8 +12,11 @@ import { readForm } from './params';
  * section 2.2). An access token answers `unsupported_token_type`: it lives 10 minutes, and its
  * grant is revoked through the refresh credential.
  *
- * A public client identifies by `client_id`; a token issued to another client is refused. No DPoP
- * proof is needed, so a device that lost its key can still sign out.
+ * A public client identifies by `client_id`. A token issued to another client changes nothing and
+ * answers 200 like an unknown token, so the answer does not tell which client holds a token; the
+ * statement's denied audit row records the attempt. No DPoP proof is needed, so a device that lost
+ * its key can still sign out; whoever holds a stolen first-party refresh token can therefore sign
+ * that device out, a denial of service and nothing more (design 5.6).
  */
 
 export type RevokeDeps = { config: UtsConfig; grants: GrantsAccess };
@@ -43,16 +46,14 @@ export async function handleRevoke(request: Request, deps: RevokeDeps): Promise<
     return revoked;
   }
   try {
-    const outcome = await deps.grants(async grants =>
+    // Every outcome answers 200: revoked, already revoked, unknown, or issued to another client.
+    await deps.grants(async grants =>
       grants.revoke({
         environment: deps.config.environment,
         tokenHash: await sha256(token.value),
         clientId: clientId.value,
       })
     );
-    if (outcome === 'client_mismatch') {
-      return oauthError('unauthorized_client', 400, 'the token was issued to another client');
-    }
     return revoked;
   } catch (error) {
     return failureResponse(error, 'revoke');

@@ -13,6 +13,9 @@
 --   (`uts.dpop_proofs`), so a proof is accepted once (RFC 9449 section 11.1, design 5.7).
 -- * An audit row never holds a token value: a JWT is named by its `jti`, an opaque value by the
 --   first 8 characters of the base64url SHA-256 hash (`uts.credential_reference`).
+-- * A refused attempt on a grant (a DPoP key that is not the grant's, a revoke by another client)
+--   writes at most one denied audit row per grant per minute (`uts.claim_denied_audit`, design
+--   8.1), so a caller that holds a token cannot grow the audit log at will.
 -- * A revocation writes its feed entry (`uts.revocations`) in the same statement. A `grant` or
 --   `third_party_family` entry stays 20 minutes: the last access token of the grant expires at
 --   most 10 minutes after the revocation, and the feed keeps an entry 10 minutes past that.
@@ -45,6 +48,10 @@ CREATE TABLE uts.dpop_proofs (
   CONSTRAINT dpop_proofs_pkey PRIMARY KEY (grant_id, jti)
 );
 GRANT SELECT ON uts.dpop_proofs TO uts_app;
+
+-- When the grant's last denied audit row was written (`uts.claim_denied_audit`).
+ALTER TABLE uts.refresh_grants ADD COLUMN denied_audited_at timestamptz;
+ALTER TABLE uts.third_party_grant_families ADD COLUMN denied_audited_at timestamptz;
 
 -- The audit reference of an opaque credential: the first 8 characters of the base64url SHA-256
 -- hash (design section 8.2). It is never a lookup key.
@@ -308,6 +315,29 @@ BEGIN
     ON CONFLICT (kind, subject_id) DO NOTHING;
   END IF;
   RETURN revoked_account;
+END
+$$;
+
+-- Whether a refused attempt on a grant writes its denied audit row: true for the first refusal in
+-- a minute, which claims that minute; false while the grant's last denied row is under a minute
+-- old, so refusals in between write no row.
+CREATE FUNCTION uts.claim_denied_audit(p_kind uts.client_kind, p_grant_id uuid) RETURNS boolean
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF p_kind = 'first_party' THEN
+    UPDATE uts.refresh_grants AS grant_row SET denied_audited_at = now()
+    WHERE grant_row.id = p_grant_id
+      AND (grant_row.denied_audited_at IS NULL
+        OR grant_row.denied_audited_at <= now() - interval '1 minute');
+  ELSE
+    UPDATE uts.third_party_grant_families AS family SET denied_audited_at = now()
+    WHERE family.id = p_grant_id
+      AND (family.denied_audited_at IS NULL
+        OR family.denied_audited_at <= now() - interval '1 minute');
+  END IF;
+  RETURN FOUND;
 END
 $$;
 
@@ -705,15 +735,17 @@ BEGIN
   END IF;
 
   IF grant_row.dpop_jkt <> p_dpop_jkt THEN
-    PERFORM uts.write_audit_event(
-      p_environment, 'ai.kilo.uts.token.denied', 6003, 1, 'denied', 'dpop key mismatch',
-      grant_row.account_id,
-      jsonb_build_object(
-        'grantType', 'refresh_token',
-        'clientId', uts.audit_client_id(grant_row.client_id),
-        'grantId', grant_row.id
-      )
-    );
+    IF uts.claim_denied_audit('first_party', grant_row.id) THEN
+      PERFORM uts.write_audit_event(
+        p_environment, 'ai.kilo.uts.token.denied', 6003, 1, 'denied', 'dpop key mismatch',
+        grant_row.account_id,
+        jsonb_build_object(
+          'grantType', 'refresh_token',
+          'clientId', uts.audit_client_id(grant_row.client_id),
+          'grantId', grant_row.id
+        )
+      );
+    END IF;
     outcome := 'dpop_mismatch';
     RETURN NEXT;
     RETURN;
@@ -916,7 +948,8 @@ $$;
 
 -- POST /revoke (RFC 7009) with a refresh token: revokes the first-party grant or the third-party
 -- family it belongs to, writes the feed entry and the audit row. Outcomes: `revoked`,
--- `already_revoked`, `unknown` (no such token), `client_mismatch` (issued to another client).
+-- `already_revoked`, `unknown` (no such token), `client_mismatch` (issued to another client; a
+-- denied `grant.revoked` row, at most one per grant per minute, records it).
 CREATE FUNCTION uts.revoke_refresh_token(p_environment text, p_token_hash bytea, p_client_id text)
 RETURNS TABLE (outcome text)
 LANGUAGE plpgsql
@@ -926,13 +959,16 @@ AS $$
 DECLARE
   grant_kind uts.client_kind;
   grant_ref uuid;
+  grant_account text;
   owner_client text;
   revoked_account text;
 BEGIN
-  SELECT 'first_party', grant_row.id, grant_row.client_id INTO grant_kind, grant_ref, owner_client
+  SELECT 'first_party', grant_row.id, grant_row.account_id, grant_row.client_id
+  INTO grant_kind, grant_ref, grant_account, owner_client
   FROM uts.refresh_grants AS grant_row WHERE grant_row.token_hash = p_token_hash;
   IF NOT FOUND THEN
-    SELECT 'third_party', family.id, family.client_id INTO grant_kind, grant_ref, owner_client
+    SELECT 'third_party', family.id, family.account_id, family.client_id
+    INTO grant_kind, grant_ref, grant_account, owner_client
     FROM uts.third_party_refresh_tokens AS token
     JOIN uts.third_party_grant_families AS family ON family.id = token.family_id
     WHERE token.token_hash = p_token_hash;
@@ -943,6 +979,25 @@ BEGIN
     RETURN;
   END IF;
   IF owner_client <> p_client_id THEN
+    IF uts.claim_denied_audit(grant_kind, grant_ref) THEN
+      -- The requesting client id is caller input, so the row names it by its SHA-256 only: a value
+      -- the audit row's credential check refuses must not fail the statement and so tell the caller
+      -- that the token exists.
+      PERFORM uts.write_audit_event(
+        p_environment, 'ai.kilo.uts.grant.revoked', 3002, 2, 'denied', 'client mismatch',
+        grant_account,
+        jsonb_build_object(
+          'clientId', uts.audit_client_id(owner_client),
+          'requestingClientRef', 'sha256:' || rtrim(
+            translate(encode(sha256(convert_to(p_client_id, 'UTF8')), 'base64'), '+/', '-_'), '='
+          ),
+          'clientKind', grant_kind,
+          'grantId', grant_ref,
+          'refreshRef', uts.credential_reference(p_token_hash),
+          'reason', 'sign_out'
+        )
+      );
+    END IF;
     outcome := 'client_mismatch';
     RETURN NEXT;
     RETURN;

@@ -733,7 +733,7 @@ describe('revocation endpoint', () => {
     expect(none.calls).toEqual([]);
   });
 
-  it('refuses an access token, another client and an unknown client', async () => {
+  it('refuses an access token and an unknown client', async () => {
     // A compact JWS shape; the endpoint refuses it before any lookup.
     const jwt = ['eyJhbGciOiJFZERTQSJ9', 'eyJzdWIiOiJ4In0', 'c2ln'].join('.');
     expect(
@@ -744,20 +744,25 @@ describe('revocation endpoint', () => {
         )
       )
     ).toBe('unsupported_token_type');
-    const mismatch = fakeGrants({ revoke: async () => 'client_mismatch' });
-    expect(
-      await errorOf(
-        await call(
-          formRequest('/revoke', { token: randomCredential(), client_id: THIRD_PARTY }),
-          oauthDeps(mismatch.access)
-        )
-      )
-    ).toBe('unauthorized_client');
     const unknown = await call(
       formRequest('/revoke', { token: randomCredential(), client_id: 'nobody' }),
       oauthDeps(fakeGrants().access)
     );
     expect(unknown.status).toBe(401);
+  });
+
+  it('answers a token of another client like an unknown token', async () => {
+    const answer = async (outcome: 'client_mismatch' | 'unknown') => {
+      const grants = fakeGrants({ revoke: async () => outcome });
+      const response = await call(
+        formRequest('/revoke', { token: randomCredential(), client_id: THIRD_PARTY }),
+        oauthDeps(grants.access)
+      );
+      expect(grants.calls).toHaveLength(1);
+      return { status: response.status, body: await response.text() };
+    };
+    expect(await answer('client_mismatch')).toEqual(await answer('unknown'));
+    expect(await answer('client_mismatch')).toEqual({ status: 200, body: '' });
   });
 
   it('answers 503 and 500 for store failures', async () => {

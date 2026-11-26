@@ -767,16 +767,25 @@ describe('first-party refresh', () => {
     expect(await lastUse()).toBe(moved);
   });
 
-  it('refuses another DPoP key and writes a denied audit row', async () => {
+  it('refuses another DPoP key and writes at most one denied audit row per grant per minute', async () => {
     const accountId = await insertAccount(owner);
     const grant = await firstPartyGrant(accountId);
-    expect(await refresh(grant, { proof: proofOf(randomBytes(32)) })).toEqual({
-      outcome: 'dpop_mismatch',
-    });
-    expect((await auditRows(accountId)).at(-1)).toMatchObject({
-      type: 'ai.kilo.uts.token.denied',
+    const stolen = () => refresh(grant, { proof: proofOf(randomBytes(32)) });
+    const deniedRows = async () =>
+      (await auditRows(accountId)).filter(row => row.type === 'ai.kilo.uts.token.denied');
+    expect(await stolen()).toEqual({ outcome: 'dpop_mismatch' });
+    expect((await deniedRows()).at(-1)).toMatchObject({
       event: { data: { outcome: 'denied', outcomeDetail: 'dpop key mismatch' } },
     });
+    expect(await stolen()).toEqual({ outcome: 'dpop_mismatch' });
+    expect(await stolen()).toEqual({ outcome: 'dpop_mismatch' });
+    expect(await deniedRows()).toHaveLength(1);
+    await owner.query(
+      `UPDATE uts.refresh_grants SET denied_audited_at = now() - interval '61 seconds' WHERE id = $1`,
+      [grant.grantId]
+    );
+    expect(await stolen()).toEqual({ outcome: 'dpop_mismatch' });
+    expect(await deniedRows()).toHaveLength(2);
   });
 
   it.each([
@@ -940,6 +949,13 @@ describe('revocation', () => {
     const revoke = (clientId = 'kilo-cli') =>
       grants.revoke({ environment, tokenHash: sha256(grant.refreshToken), clientId });
     expect(await revoke('kilo-other')).toBe('client_mismatch');
+    expect(await revoke('kilo-other')).toBe('client_mismatch');
+    // Caller input that the audit row's credential check would refuse is written as a hash only.
+    await owner.query(
+      `UPDATE uts.refresh_grants SET denied_audited_at = now() - interval '61 seconds' WHERE id = $1`,
+      [grant.grantId]
+    );
+    expect(await revoke(`https://evil.example/kilo_rt_${token()}`)).toBe('client_mismatch');
     expect(await revoke()).toBe('revoked');
     expect(await revoke()).toBe('already_revoked');
     expect(
@@ -962,8 +978,16 @@ describe('revocation', () => {
     const revokedRows = (await auditRows(accountId)).filter(
       row => row.type === 'ai.kilo.uts.grant.revoked'
     );
-    expect(revokedRows).toHaveLength(1);
+    expect(revokedRows.map(row => row.event.data.outcome)).toEqual(['denied', 'denied', 'success']);
     expect(revokedRows[0].event.data).toMatchObject({
+      outcomeDetail: 'client mismatch',
+      attributes: {
+        clientId: 'kilo-cli',
+        requestingClientRef: `sha256:${sha256('kilo-other').toString('base64url')}`,
+        grantId: grant.grantId,
+      },
+    });
+    expect(revokedRows[2].event.data).toMatchObject({
       classUid: OCSF_CLASS.authentication,
       activityId: 2,
       attributes: { grantId: grant.grantId, reason: 'sign_out' },

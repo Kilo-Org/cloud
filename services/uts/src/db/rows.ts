@@ -186,6 +186,7 @@ export const RefreshGrantRowSchema = z.strictObject({
   status: z.enum(enums.GRANT_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  denied_audited_at: timestamp.nullable(),
 });
 
 export const ThirdPartyClientRowSchema = z.strictObject({
@@ -226,6 +227,7 @@ export const ThirdPartyGrantFamilyRowSchema = z.strictObject({
   status: z.enum(enums.GRANT_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  denied_audited_at: timestamp.nullable(),
 });
 
 export const ThirdPartyRefreshTokenRowSchema = z.strictObject({

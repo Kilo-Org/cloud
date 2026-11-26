@@ -115,9 +115,7 @@ export type JustTheCostsUsageStats = {
 export type MicrodollarUsageStats = NotYetCostedUsageStats & JustTheCostsUsageStats;
 
 export type PromptInfo = {
-  system_prompt_prefix: string;
   system_prompt_length: number;
-  user_prompt_prefix: string;
 };
 
 /**

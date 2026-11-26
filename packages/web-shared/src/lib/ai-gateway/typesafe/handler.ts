@@ -358,7 +358,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     provider: route.provider.type,
     requested_model: requestedModel,
     is_free: isFree,
-    promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+    promptInfo: { system_prompt_length: 0 },
     isStreaming: false,
     status_code: statusCode,
     user_byok: isByok,

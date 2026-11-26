@@ -1,11 +1,11 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
+import { extractSystemPromptPrefix } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 
 export function determineFallbackFeature(
   requestBodyParsed: GatewayRequest,
   userAgent: string | null
 ): 'direct-gateway' | '' {
-  const { system_prompt_prefix } = extractPromptInfo(requestBodyParsed);
+  const system_prompt_prefix = extractSystemPromptPrefix(requestBodyParsed);
   if (
     userAgent?.startsWith('Kilo-Code/') ||
     system_prompt_prefix.includes('You are Kilo') ||

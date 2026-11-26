@@ -294,31 +294,17 @@ export function extractInputItemTextContent(
   return null;
 }
 
-export function extractResponsesPromptInfo(body: GatewayResponsesRequest): PromptInfo {
+export function extractResponsesSystemPromptText(body: GatewayResponsesRequest): string {
   const input = Array.isArray(body.input) ? body.input : [];
   const systemRoles = new Set(['system', 'developer']);
-  const userRoles = new Set(['user']);
-  const systemPrompt = [
+  return [
     typeof body.instructions === 'string' ? body.instructions : null,
     ...input.map(item => extractInputItemTextContent(item, systemRoles)),
   ]
     .filter((text): text is string => text !== null && text !== '')
     .join('\n');
+}
 
-  let userPrompt = '';
-  if (typeof body.input === 'string') {
-    userPrompt = body.input;
-  } else {
-    const lastUserText = input
-      .map(item => extractInputItemTextContent(item, userRoles))
-      .filter((t): t is string => t !== null)
-      .at(-1);
-    userPrompt = lastUserText ?? '';
-  }
-
-  return {
-    system_prompt_prefix: systemPrompt.slice(0, 100),
-    system_prompt_length: systemPrompt.length,
-    user_prompt_prefix: userPrompt.slice(0, 100),
-  };
+export function extractResponsesPromptInfo(body: GatewayResponsesRequest): PromptInfo {
+  return { system_prompt_length: extractResponsesSystemPromptText(body).length };
 }

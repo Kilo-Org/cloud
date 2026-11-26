@@ -166,11 +166,7 @@ const context: MicrodollarUsageContext = {
     http_x_vercel_ja4_digest: null,
     http_user_agent: null,
   },
-  promptInfo: {
-    system_prompt_prefix: 'synthetic-system',
-    system_prompt_length: 16,
-    user_prompt_prefix: 'synthetic-prompt',
-  },
+  promptInfo: { system_prompt_length: 16 },
   max_tokens: null,
   has_middle_out_transform: null,
   isStreaming: false,

@@ -101,7 +101,7 @@ function createRequest(
     requested_model: MODEL,
     is_free: false,
     custom_llm_pricing: null,
-    promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+    promptInfo: { system_prompt_length: 0 },
     max_tokens: null,
     has_middle_out_transform: null,
     isStreaming,

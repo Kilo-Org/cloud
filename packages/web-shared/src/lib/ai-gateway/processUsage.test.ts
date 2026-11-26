@@ -1007,11 +1007,7 @@ describe('usage accounting error reports', () => {
       kiloUserId: 'report-user',
       provider: 'openrouter',
       requested_model: 'anthropic/claude-3.7-sonnet',
-      promptInfo: {
-        system_prompt_prefix: contextSentinel.system_prompt_prefix,
-        system_prompt_length: contextSentinel.system_prompt_prefix.length,
-        user_prompt_prefix: contextSentinel.user_prompt_prefix,
-      },
+      promptInfo: { system_prompt_length: contextSentinel.system_prompt_prefix.length },
       fraudHeaders: getFraudDetectionHeaders(
         new Headers({ 'user-agent': 'zzq-agent', 'x-forwarded-for': '203.0.113.7' })
       ),
@@ -1237,11 +1233,7 @@ describe('logMicrodollarUsage', () => {
       requested_model: 'anthropic/claude-3.7-sonnet',
       is_free: false,
       custom_llm_pricing: null,
-      promptInfo: {
-        system_prompt_prefix: 'You are a helpful assistant',
-        system_prompt_length: 'You are a helpful assistant'.length,
-        user_prompt_prefix: 'Please help me with',
-      },
+      promptInfo: { system_prompt_length: 'You are a helpful assistant'.length },
       max_tokens: 200,
       has_middle_out_transform: true,
       status_code: 200,
@@ -1747,11 +1739,7 @@ describe('logMicrodollarUsage', () => {
       requested_model: 'openai/gpt-4.1',
       isStreaming: false,
       has_middle_out_transform: false,
-      promptInfo: {
-        system_prompt_prefix: '',
-        system_prompt_length: 0,
-        user_prompt_prefix: 'error test',
-      },
+      promptInfo: { system_prompt_length: 0 },
     };
 
     const usageIdentity = await logMicrodollarUsage(usageStats, usageContext);
@@ -1821,11 +1809,7 @@ describe('logMicrodollarUsage', () => {
     const usageContext1: MicrodollarUsageContext = {
       ...baseContext1,
       fraudHeaders: getFraudDetectionHeaders(new Headers(req1headers)),
-      promptInfo: {
-        system_prompt_prefix: 'You are helpful',
-        system_prompt_length: 'You are helpful'.length,
-        user_prompt_prefix: 'Test message',
-      },
+      promptInfo: { system_prompt_length: 'You are helpful'.length },
     };
 
     // Record 2: overlapping IP, country, and ja4 with record 1
@@ -1840,11 +1824,7 @@ describe('logMicrodollarUsage', () => {
           'x-vercel-ip-city': 'LA',
         })
       ),
-      promptInfo: {
-        system_prompt_prefix: 'You are helpful', // same system prompt as record 1
-        system_prompt_length: 'You are helpful'.length,
-        user_prompt_prefix: 'Test message',
-      },
+      promptInfo: { system_prompt_length: 'You are helpful'.length },
     };
 
     // Record 3: overlapping user-agent and city with record 1, different others
@@ -1860,11 +1840,7 @@ describe('logMicrodollarUsage', () => {
           'x-vercel-ja4-digest': 'digest2',
         })
       ),
-      promptInfo: {
-        system_prompt_prefix: 'You are an assistant', // different system prompt
-        system_prompt_length: 'You are an assistant'.length,
-        user_prompt_prefix: 'Test message',
-      },
+      promptInfo: { system_prompt_length: 'You are an assistant'.length },
     };
 
     await logMicrodollarUsage(usageStats1, usageContext1);
@@ -3261,11 +3237,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       requested_model: 'provider/requested-model',
       is_free: false,
       custom_llm_pricing: null,
-      promptInfo: {
-        system_prompt_prefix: 'sys-prefix',
-        system_prompt_length: 10,
-        user_prompt_prefix: 'usr-prefix',
-      },
+      promptInfo: { system_prompt_length: 10 },
       max_tokens: null,
       has_middle_out_transform: null,
       status_code: null,
@@ -3297,11 +3269,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     };
     const usageContext = makeUsageContext({
       requested_model: 'req\u0000model',
-      promptInfo: {
-        system_prompt_prefix: 'sys\u0000prefix',
-        system_prompt_length: 10,
-        user_prompt_prefix: 'usr\u0000prefix',
-      },
+      promptInfo: { system_prompt_length: 10 },
     });
 
     const { core, metadata } = await toInsertableDbUsageRecord(
@@ -3425,7 +3393,7 @@ describe('toInsertableDbUsageRecord header-derived metadata bounds', () => {
     requested_model: 'provider/requested-model',
     is_free: false,
     custom_llm_pricing: null,
-    promptInfo: { system_prompt_prefix: 'sys', system_prompt_length: 3, user_prompt_prefix: 'usr' },
+    promptInfo: { system_prompt_length: 3 },
     max_tokens: null,
     has_middle_out_transform: null,
     status_code: 200,

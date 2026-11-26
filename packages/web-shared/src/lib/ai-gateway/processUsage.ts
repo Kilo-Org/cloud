@@ -135,34 +135,23 @@ function promptExtractionReportFields(body: unknown) {
   return typeof model === 'string' ? { model: model.slice(0, REPORTED_MODEL_MAX_LENGTH) } : {};
 }
 
+export function extractSystemPromptText(body: OpenRouterChatCompletionRequest): string {
+  return (body.messages ?? [])
+    .filter(m => m.role === 'system' || m.role === 'developer')
+    .map(extractMessageTextContent)
+    .join('\n');
+}
+
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {
   try {
-    const messages = body.messages ?? [];
-
-    const systemPrompt = messages
-      .filter(m => m.role === 'system' || m.role === 'developer')
-      .map(extractMessageTextContent)
-      .join('\n');
-
-    const system_prompt_prefix = systemPrompt.slice(0, 100);
-    const system_prompt_length = systemPrompt.length;
-
-    const lastUserMessage =
-      messages
-        .filter(m => m.role === 'user')
-        .slice(-1)
-        .map(extractMessageTextContent)[0] ?? '';
-
-    const user_prompt_prefix = lastUserMessage.slice(0, 100);
-
-    return { system_prompt_prefix, system_prompt_length, user_prompt_prefix };
+    return { system_prompt_length: extractSystemPromptText(body).length };
   } catch (e) {
     captureException(e, {
       level: 'warning',
       tags: { source: 'prompt_extraction' },
       extra: promptExtractionReportFields(body),
     });
-    return { system_prompt_prefix: '', system_prompt_length: -1, user_prompt_prefix: '' };
+    return { system_prompt_length: -1 };
   }
 }
 
@@ -186,6 +175,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     ...usageContext.fraudHeaders,
     provider: usageContext.provider,
     ...usageContext.promptInfo,
+    user_prompt_prefix: null,
+    system_prompt_prefix: null,
     max_tokens: usageContext.max_tokens,
     has_middle_out_transform: usageContext.has_middle_out_transform,
     project_id: usageContext.project_id,
@@ -360,10 +351,6 @@ export async function toInsertableDbUsageRecord(
       provider,
     });
   }
-
-  // Prompt text is never recorded.
-  metadata.user_prompt_prefix = null;
-  metadata.system_prompt_prefix = null;
 
   // Strip NUL bytes before returning. Postgres `text` columns reject them
   // (error 22021) and crash the microdollar_usage CTE insert, leaving the

@@ -97,7 +97,7 @@ export type StsCanaryCheck = z.infer<typeof StsCanaryCheckSchema>;
  * negatives present tokens usage-ingest must refuse: the inbound `web` token (403
  * `insufficient_scope`), the outbound token's claims signed by a key STS never held (401), and an
  * earlier outbound token after its `exp` plus the verifier's skew (401; `skipped` while the
- * instance holds none that old). `stsDenied` is STS refusing the web app the denied probe
+ * deployment holds none that old). `stsDenied` is STS refusing the web app the denied probe
  * (`STS_DENIED_PROBE`; `ok` only for `STS_DENIED_PROBE_REASON`); it runs every run, so it never
  * skips. The report never carries a token.
  */

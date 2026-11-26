@@ -785,8 +785,8 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
    it unset). The web route verifies the token (`web:sts.canary`),
    mints `usage-ingest:sts.canary` with its Vercel identity, calls `POST /sts-canary/verify` here
    (expect 204), presents the `web` token it received (expect 403 `insufficient_scope`), the same
-   claims signed by a key STS never held (expect 401) and, when the instance holds one, an earlier
-   token past `exp` plus 60 s (expect 401, else `skipped`), and answers a report
+   claims signed by a key STS never held (expect 401) and, when the deployment holds one, an
+   earlier token past `exp` plus 60 s (expect 401, else `skipped`), and answers a report
    (`StsCanaryReportSchema` in `@kilocode/sts-contracts`; each `detail` at most 200 characters).
    Every call that carries a token or the bypass secret uses `redirect: 'manual'`: a 3xx fails
    the check (web side) or the run (`StsCanaryWebRefused` here), and is never followed.
@@ -859,11 +859,23 @@ A run whose call never reaches the web route (usage-ingest down, usage-ingest's 
 or failed, a network failure, a redirect) writes no web line, and a run the route refuses writes
 only `sts_canary_refused`; both show as a missing success.
 
-The expired-token check runs only when a run reaches a web instance that still holds a token
-from at least two runs earlier (past `exp` plus 60 s); a run on a fresh instance reports it
-`skipped` and still succeeds. A third monitor per environment tracks that the check still runs,
-and alerts the same route without paging: no `sts_canary` line whose `negatives.expired.result`
-is `ok` in 24 hours.
+The expired-token check reads the deployment's held tokens from the Vercel Runtime Cache
+(namespace `sts-canary`, key `held:<VERCEL_DEPLOYMENT_ID>`): at most the two latest `usage-ingest`
+tokens that usage-ingest accepted with 204, oldest first, written with a 15-minute TTL (a little
+over two runs). A token that failed any check is never kept. Each run presents the oldest one
+past `exp` plus 60 s (expect 401) and drops it, then adds its own. Because every instance of the
+deployment shares the entry, the check runs on every run from a deployment's third on, whichever
+instance serves it; it reports `skipped` only while no held token is that old (the first two
+runs of a deployment, or after runs stopped for longer than 15 minutes). A store that cannot be
+read or written fails the check. A third monitor per environment tracks that the check still
+runs, and alerts the same route without paging: no `sts_canary` line whose
+`negatives.expired.result` is `ok` in 24 hours.
+
+The entry holds live tokens for up to their 300 s. Each is a `usage-ingest:sts.canary` token,
+which only the verify route above accepts, and only to answer 204. Staging is a custom
+environment, which may share the preview Runtime Cache partition, so code of a preview deployment
+could read staging's entry; the deployment id in the key keeps deployments from overwriting each
+other, not from reading.
 
 The route sees STS's refusal, not the audit row STS writes after its answer. A fourth monitor per
 environment tracks that the row lands, and alerts the same route without paging when this query
@@ -891,20 +903,21 @@ reaches STS every run. Per run and environment:
 
 | Item | Per run | Per day (288 runs) |
 |---|---|---|
-| usage-ingest invocations | 1 scheduled + 3 verify-route calls (4 once the web instance holds a token past `exp` + 60 s) | 288 + 864 to 1,152 |
+| usage-ingest invocations | 1 scheduled + 4 verify-route calls (3 on a deployment's first two runs) | 288 + about 1,152 |
 | Web function invocations | 1 | 288 |
 | STS mint calls | 3: one RPC over the binding (usage-ingest), two `POST /v1/token` (web: its own mint and the denied mint). The two issuing calls each make one signer Durable Object request; the denied mint makes none, and one `DenialDO` request instead | 864 (576 signer and 288 `DenialDO` requests) |
 | STS audit rows | 2 `token.issued` and 1 `token.denied`; `DenialDO` merges identical denials per minute, so each run's refusal is one row with `count` 1 (a refusal of either side's own mint adds another) | 576 issued and 288 denied |
 | Audit queue messages | at most 3; the signers relay up to 500 events per message, so usually they share one with other rows, and `DenialDO`'s alarm relays the minute's merged denials of its own stream together | at most 864 |
 | STS key-set fetches | one per verifier isolate per 5 minutes: each usage-ingest isolate that serves a verify-route call and each web instance that serves the route fetches once when its copy is older than 5 minutes. The 3 or 4 verify calls and the scheduled run can land on different isolates, so a run can cost several. The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | at most (usage-ingest isolates + web instances) x 288 |
 | Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt. When STS refuses that fresh token too, the client writes a refusal marker for the deployment and audience that lives 60 s (`DENIED_RECHECK_MS`): until it expires no instance of the deployment drops a cached token or exchanges, each answers from its denied state. A deployment STS keeps refusing (a `web.yaml` naming the wrong project or environment) so costs at most 1 exchange per 60 s per audience and region, however many instances it runs; 17 such deployments spend about 17 of the project's roughly 100 exchanges a minute, a limit previews share with production, where without the marker each could spend about 6 | at most 288; in practice one per base-token renewal or new deployment |
-| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal. The denied mint shares the instance's identity source and starts after the run's own mint, so its identity token is normally an instance memory hit and adds no exchange or cache operation; only when the run's own exchange failed does the probe try one more exchange, so a run makes at most 2 | at most about 1,700 operations |
+| Vercel Runtime Cache | 1 read and 1 write for the held tokens of the expired-token check (the write is skipped when nothing changed). For the exchange: 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal. The denied mint shares the instance's identity source and starts after the run's own mint, so its identity token is normally an instance memory hit and adds no exchange or cache operation; only when the run's own exchange failed does the probe try one more exchange, so a run makes at most 2 | 576 for the held tokens, plus at most about 1,700 for the exchange |
 | Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
 
 Both environments together double each daily figure, except the Vercel rows: the web app's
 staging is a custom environment, whose client keeps the exchanged token in instance memory only
 (it may share the preview Runtime Cache partition). Staging therefore makes no Runtime Cache
-operation and one Vercel exchange per web instance per base-token renewal.
+operation for the exchange, only the held-token read and write, and one Vercel exchange per web
+instance per base-token renewal.
 
 The client's cost on a real caller does not grow with its request rate. A request that finds a
 usable token reads an in-memory entry and makes no network call. Each caller instance makes one

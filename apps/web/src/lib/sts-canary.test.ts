@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { SignJWT, exportJWK, generateKeyPair, type CryptoKey as JoseKey } from 'jose';
 import type { ServiceTokens } from '@kilocode/service-token-client';
 import { ServiceTokenError, createServiceTokens } from '@kilocode/service-token-client';
@@ -11,7 +11,7 @@ import {
   type MintResult,
   type StsCanaryReport,
 } from '@kilocode/sts-contracts';
-import { createStsCanaryHandler } from './sts-canary';
+import { createStsCanaryHandler, type HeldTokenStore } from './sts-canary';
 
 // The canary handler against a real verifier on both sides: the STS key set is a local key, the
 // usage-ingest stand-in verifies with @kilocode/verify exactly as the Worker route does, and the
@@ -98,17 +98,37 @@ function deniedTokens(): ServiceTokens {
   });
 }
 
+/** The Vercel Runtime Cache, in process: entries expire after their `ttl`, on the system clock. */
+function memoryStore() {
+  const entries = new Map<string, { value: unknown; until: number }>();
+  const writes: { key: string; ttl: number }[] = [];
+  return {
+    writes,
+    entries,
+    async get(key: string) {
+      const entry = entries.get(key);
+      return entry !== undefined && Date.now() < entry.until ? entry.value : undefined;
+    },
+    async set(key: string, value: unknown, options: { ttl: number }) {
+      writes.push({ key, ttl: options.ttl });
+      entries.set(key, { value: structuredClone(value), until: Date.now() + options.ttl * 1000 });
+    },
+  };
+}
+
 function handler(
   tokens: ServiceTokens,
   fetchFn: typeof fetch,
   now?: () => number,
-  newTokens: () => ServiceTokens = deniedTokens
+  newTokens: () => ServiceTokens = deniedTokens,
+  store: HeldTokenStore = memoryStore()
 ) {
   return createStsCanaryHandler({
     verifier: verifierFor('web'),
     tokens,
     newTokens,
     verifyUrl: VERIFY_URL,
+    held: { store, key: 'held:dpl_test' },
     waitUntil,
     fetch: fetchFn,
     now,
@@ -207,25 +227,102 @@ describe('STS canary route handler', () => {
     expect(presented).toEqual([RUN, RUN, RUN]);
   });
 
-  it('presents its earlier token once it is past exp plus the skew, and expects 401', async () => {
-    jest.useFakeTimers({
-      doNotFake: ['setTimeout', 'clearTimeout', 'setImmediate', 'nextTick', 'queueMicrotask'],
-    });
-    jest.setSystemTime(Date.UTC(2026, 10, 26, 12, 0, 0));
-    const { fetchFn } = usageIngest();
-    let current = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
-    const run = handler(
-      fakeTokens(async () => current),
-      fetchFn
-    );
+  describe('expired-token check', () => {
+    const at = (minutes: number, seconds = 0) => Date.UTC(2026, 10, 26, 12, minutes, seconds);
 
-    await call(run, await stsToken('usage-ingest', 'web', 'web:sts.canary'));
-    jest.setSystemTime(Date.UTC(2026, 10, 26, 12, 6, 30));
-    current = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
-    const later = await call(run, await stsToken('usage-ingest', 'web', 'web:sts.canary'));
-    const report = (await later.json()) as StsCanaryReport;
-    expect(report.outbound).toEqual({ result: 'ok', status: 204 });
-    expect(report.negatives.expired).toEqual({ result: 'ok', status: 401 });
+    beforeEach(() => {
+      jest.useFakeTimers({
+        doNotFake: ['setTimeout', 'clearTimeout', 'setImmediate', 'nextTick', 'queueMicrotask'],
+      });
+    });
+
+    /** One run on a fresh instance (a new handler) of the deployment that shares `store`. */
+    async function runOnNewInstance(
+      time: number,
+      store: HeldTokenStore,
+      fetchFn: typeof fetch = usageIngest().fetchFn
+    ): Promise<{ report: StsCanaryReport; own: string }> {
+      jest.setSystemTime(time);
+      const own = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
+      const response = await call(
+        handler(
+          fakeTokens(async () => own),
+          fetchFn,
+          undefined,
+          deniedTokens,
+          store
+        ),
+        await stsToken('usage-ingest', 'web', 'web:sts.canary')
+      );
+      return { report: (await response.json()) as StsCanaryReport, own };
+    }
+
+    it('presents a token past exp plus the skew on every run from the third, whatever instance serves it', async () => {
+      const store = memoryStore();
+      const runs = [];
+      for (const minute of [0, 5, 10, 15]) runs.push(await runOnNewInstance(at(minute), store));
+
+      expect(runs.map(({ report }) => report.negatives.expired)).toEqual([
+        'skipped',
+        'skipped',
+        { result: 'ok', status: 401 },
+        { result: 'ok', status: 401 },
+      ]);
+      // The store keeps the two latest tokens, for a little over two runs, under one key.
+      expect(store.entries.get('held:dpl_test')?.value).toEqual([
+        { token: runs[2].own, exp: Math.floor(at(10) / 1000) + 300 },
+        { token: runs[3].own, exp: Math.floor(at(15) / 1000) + 300 },
+      ]);
+      expect(store.writes).toEqual(
+        Array.from({ length: 4 }, () => ({ key: 'held:dpl_test', ttl: 900 }))
+      );
+      expect(JSON.stringify(runs.map(({ report }) => report))).not.toContain(runs[0].own);
+    });
+
+    it('never keeps a token usage-ingest did not accept', async () => {
+      const store = memoryStore();
+      const { fetchFn } = usageIngest();
+      const down: typeof fetch = async () => new Response(null, { status: 503 });
+      await runOnNewInstance(at(0), store, down);
+      await runOnNewInstance(at(5), store, fetchFn);
+      const third = await runOnNewInstance(at(10), store, fetchFn);
+      expect(third.report.negatives.expired).toBe('skipped');
+      const fourth = await runOnNewInstance(at(15), store, fetchFn);
+      expect(fourth.report.negatives.expired).toEqual({ result: 'ok', status: 401 });
+    });
+
+    it('skips again only once the store dropped the held tokens, and fails when the store does', async () => {
+      const store = memoryStore();
+      await runOnNewInstance(at(0), store);
+      // Past the 900 s the store keeps them: nothing old enough is left.
+      const late = await runOnNewInstance(at(16), store);
+      expect(late.report.negatives.expired).toBe('skipped');
+
+      const broken: HeldTokenStore = {
+        get: async () => {
+          throw new Error('runtime cache unavailable');
+        },
+        set: async () => {},
+      };
+      const unread = await runOnNewInstance(at(20), broken);
+      expect(unread.report.negatives.expired).toEqual({
+        result: 'failed',
+        status: null,
+        detail: 'could not read the held tokens',
+      });
+      const unwritable: HeldTokenStore = {
+        get: async () => undefined,
+        set: async () => {
+          throw new Error('runtime cache unavailable');
+        },
+      };
+      const unkept = await runOnNewInstance(at(25), unwritable);
+      expect(unkept.report.negatives.expired).toEqual({
+        result: 'failed',
+        status: null,
+        detail: 'could not keep the token for a later run',
+      });
+    });
   });
 
   it('reports a mint failure without a token and still checks the wrong audience', async () => {

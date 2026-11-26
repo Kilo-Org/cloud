@@ -27,9 +27,11 @@ let handler: ((request: Request) => Promise<Response>) | null = null;
 /**
  * Built on the first request, once per instance, so the verifier's key set, the token client's
  * tokens and the shared Vercel identity serve every later request; each run's denied mint gets a
- * new client over that same identity. A missing or invalid setting leaves it unbuilt and answers
- * 503; so does an `STS_URL` that is not one of `STS_ISSUERS`, since the environment the verifier
- * accepts is the one whose STS that is.
+ * new client over that same identity. The held tokens of the expired-token check live in the
+ * Runtime Cache under the deployment's id, so every instance of a deployment shares them and no
+ * other deployment reads them. A missing or invalid setting leaves it unbuilt and answers 503; so
+ * does an `STS_URL` that is not one of `STS_ISSUERS`, since the environment the verifier accepts
+ * is the one whose STS that is.
  */
 function canaryHandler(): ((request: Request) => Promise<Response>) | null {
   if (handler !== null) return handler;
@@ -55,6 +57,11 @@ function canaryHandler(): ((request: Request) => Promise<Response>) | null {
       tokens: createHttpServiceTokens({ stsUrl: STS_URL, getIdentityToken }),
       newTokens: () => createHttpServiceTokens({ stsUrl: STS_URL, getIdentityToken }),
       verifyUrl,
+      held: {
+        store: getCache({ namespace: 'sts-canary' }),
+        // A Vercel system variable at runtime; `next dev` has none and keeps one local entry.
+        key: `held:${process.env.VERCEL_DEPLOYMENT_ID ?? 'local'}`,
+      },
       waitUntil,
     });
   } catch (error) {

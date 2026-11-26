@@ -15,6 +15,7 @@ import {
 } from '@kilocode/sts-contracts';
 import { ServiceTokenError, type ServiceTokens } from '@kilocode/service-token-client';
 import { failureResponse, type Verifier } from '@kilocode/verify';
+import { z } from 'zod';
 
 /**
  * The web side of the STS canary (decision D6c). usage-ingest calls it every 5 minutes with a
@@ -36,12 +37,38 @@ export type StsCanaryDeps = {
   newTokens: () => ServiceTokens;
   /** usage-ingest's `POST /sts-canary/verify`. */
   verifyUrl: string;
+  /**
+   * Where the route keeps its earlier `usage-ingest` tokens between runs: the Vercel Runtime
+   * Cache, shared by every instance of the deployment, so the expired-token check does not depend
+   * on two runs reaching one instance.
+   */
+  held: { store: HeldTokenStore; key: string };
   waitUntil: (promise: Promise<unknown>) => void;
   fetch?: typeof fetch;
   now?: () => number;
 };
 
-type HeldToken = { token: string; exp: number };
+/** The part of the Vercel Runtime Cache (`getCache` of `@vercel/functions`) the route uses. */
+export type HeldTokenStore = {
+  get(key: string): Promise<unknown>;
+  set(key: string, value: unknown, options: { ttl: number }): Promise<void>;
+};
+
+/**
+ * How long the held tokens live in the store: a little over two 5-minute runs, so the token a run
+ * keeps is still there two runs later, when it is past `exp` (300 s) plus the 60 s skew.
+ */
+export const STS_CANARY_HELD_TTL_SECONDS = 15 * 60;
+/**
+ * Tokens kept, oldest first. Each run adds its own, so with two the oldest is past `exp` plus the
+ * skew on every run from the third on: a token is two runs (600 s) old when it is presented.
+ */
+const HELD_TOKENS_MAX = 2;
+
+const HeldTokensSchema = z
+  .array(z.strictObject({ token: z.string().min(1), exp: z.number().int().nonnegative() }))
+  .max(HELD_TOKENS_MAX);
+type HeldToken = z.infer<typeof HeldTokensSchema>[number];
 
 const ExpClaimSchema = AccessTokenClaimsSchema.pick({ exp: true });
 
@@ -87,10 +114,44 @@ export function createStsCanaryHandler(
   /** A throwaway key STS never held, made once per instance; it signs the forged token. */
   let forgeryKey: CryptoKey | null = null;
   /**
-   * An earlier `usage-ingest` token, plain data, kept until it is past `exp` plus the verifier's
-   * skew; then presented once as the expired-token check and replaced by the current token.
+   * The expired-token check over the deployment's held tokens (`deps.held`). The oldest token past
+   * `exp` plus the verifier's skew is presented, expecting 401; every such token then leaves the
+   * store, and `verified`, this run's own token once usage-ingest accepted it, joins it. `skipped`
+   * only while the store holds no token that old (the first two runs of a deployment, or after
+   * runs stopped for longer than the store keeps them). A store that cannot be read or written
+   * fails the check: the next runs would otherwise skip it unnoticed.
    */
-  let held: HeldToken | null = null;
+  async function checkExpired(
+    verified: string | null,
+    run: string
+  ): Promise<StsCanaryCheck | 'skipped'> {
+    let held: HeldToken[];
+    try {
+      const stored = HeldTokensSchema.safeParse(await deps.held.store.get(deps.held.key));
+      held = stored.success ? stored.data : [];
+    } catch {
+      return { result: 'failed', status: null, detail: 'could not read the held tokens' };
+    }
+    const cutoff = now() / 1000 - TOKEN_CLOCK_SKEW_SECONDS;
+    const [due] = held.filter(entry => entry.exp < cutoff);
+    const expired = due === undefined ? 'skipped' : check(await present(due.token, run), 401);
+
+    const kept = held.filter(entry => entry.exp >= cutoff);
+    const exp = verified === null ? null : expOf(verified);
+    if (verified !== null && exp !== null && !kept.some(entry => entry.token === verified)) {
+      kept.push({ token: verified, exp });
+    }
+    const next = kept.slice(-HELD_TOKENS_MAX);
+    const unchanged =
+      next.length === held.length && next.every((entry, index) => entry === held[index]);
+    if (unchanged) return expired;
+    try {
+      await deps.held.store.set(deps.held.key, next, { ttl: STS_CANARY_HELD_TTL_SECONDS });
+    } catch {
+      return { result: 'failed', status: null, detail: 'could not keep the token for a later run' };
+    }
+    return expired;
+  }
 
   /**
    * The request carries an STS token, so a redirect is never followed: a 3xx is the status of a
@@ -201,15 +262,8 @@ export function createStsCanaryHandler(
         ? { result: 'failed', status: null, detail: 'no token to forge from' }
         : check(await present(await forge(own), run), 401);
 
-    let expired: StsCanaryCheck | 'skipped' = 'skipped';
-    if (held !== null && now() / 1000 > held.exp + TOKEN_CLOCK_SKEW_SECONDS) {
-      expired = check(await present(held.token, run), 401);
-      held = null;
-    }
-    if (held === null && own !== null) {
-      const exp = expOf(own);
-      if (exp !== null) held = { token: own, exp };
-    }
+    // Only a token usage-ingest just accepted is kept for a later run.
+    const expired = await checkExpired(outbound.result === 'ok' ? own : null, run);
 
     const report: StsCanaryReport = {
       inbound: 'ok',

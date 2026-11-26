@@ -43,6 +43,50 @@ describe('request parameters', () => {
     expect(await form(`a=${'x'.repeat(16 * 1024)}`)).toMatchObject({ status: 'invalid' });
   });
 
+  it('cancel a body without a Content-Length once it passes 16 KiB, without reading the rest', async () => {
+    const chunk = new TextEncoder().encode(`a=${'x'.repeat(4094)}`);
+    let pulled = 0;
+    let cancelled = false;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const request = new Request('http://localhost/token', {
+      method: 'POST',
+      body: endless,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(request.headers.get('Content-Length')).toBeNull();
+    expect(await readForm(request)).toEqual({
+      status: 'invalid',
+      description: 'the body is too large',
+    });
+    expect(cancelled).toBe(true);
+    // Four 4 KiB chunks fit; the fifth passes the limit, and the stream is cancelled there.
+    expect(pulled).toBeLessThanOrEqual(6);
+  });
+
+  it('count UTF-8 bytes, not characters, against the 16 KiB limit', async () => {
+    // 6,000 characters of 3 UTF-8 bytes each: under 16 Ki characters, over 16 KiB.
+    const body = new TextEncoder().encode(`a=${'€'.repeat(6000)}`);
+    const request = new Request('http://localhost/token', {
+      method: 'POST',
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(body);
+          controller.close();
+        },
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(await readForm(request)).toMatchObject({ status: 'invalid' });
+  });
+
   it('parse a scope list of UTS scopes, each once, up to the limit', () => {
     expect(parseScopes('gateway:models.read mcp:tools.call', 8)).toEqual([
       'gateway:models.read',

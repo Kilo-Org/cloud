@@ -33,12 +33,44 @@ export function paramsOf(search: URLSearchParams): Params {
   };
 }
 
-/** A token request carries a handful of short parameters; a larger body is refused unread. */
+/** A token request carries a handful of short parameters; a larger body is refused. */
 const MAX_FORM_BYTES = 16 * 1024;
 
 export type FormRead =
   | { status: 'ok'; params: Params }
   | { status: 'invalid'; description: string };
+
+/**
+ * The body as UTF-8 text, read chunk by chunk with a byte count: null as soon as the count passes
+ * `max`, after the rest of the stream is cancelled, so a body without a `Content-Length` (or with
+ * a false one) is never held whole in memory.
+ */
+async function readBoundedText(
+  body: ReadableStream<Uint8Array> | null,
+  max: number
+): Promise<string | null> {
+  if (body === null) return '';
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    total += chunk.value.byteLength;
+    if (total > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(chunk.value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
 
 /** Reads an `application/x-www-form-urlencoded` POST body (RFC 6749 sections 4.1.3 and 6). */
 export async function readForm(request: Request): Promise<FormRead> {
@@ -49,10 +81,8 @@ export async function readForm(request: Request): Promise<FormRead> {
   if (Number(request.headers.get('Content-Length') ?? '0') > MAX_FORM_BYTES) {
     return { status: 'invalid', description: 'the body is too large' };
   }
-  const body = await request.text();
-  if (body.length > MAX_FORM_BYTES) {
-    return { status: 'invalid', description: 'the body is too large' };
-  }
+  const body = await readBoundedText(request.body, MAX_FORM_BYTES);
+  if (body === null) return { status: 'invalid', description: 'the body is too large' };
   return { status: 'ok', params: paramsOf(new URLSearchParams(body)) };
 }
 

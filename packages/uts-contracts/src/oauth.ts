@@ -13,6 +13,8 @@ export const UTS_GRANT_TYPES = {
   authorizationCode: 'authorization_code',
   refreshToken: 'refresh_token',
   deviceCode: 'urn:ietf:params:oauth:grant-type:device_code',
+  /** RFC 8693: the broker exchange of design 5.9 (`src/exchange/` in `services/uts`). */
+  tokenExchange: 'urn:ietf:params:oauth:grant-type:token-exchange',
 } as const;
 
 /** The DPoP proof algorithms UTS accepts (RFC 9449): asymmetric only. */
@@ -121,6 +123,10 @@ export const OAUTH_ERROR_CODES = [
   'authorization_pending',
   'slow_down',
   'expired_token',
+  /** The browser-session API (`browser-sessions.ts`): the handle names no live session. */
+  'invalid_session',
+  /** RFC 9470: the scope needs a fresher sign-in; `WWW-Authenticate` carries `max_age`. */
+  'insufficient_user_authentication',
 ] as const;
 export type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
 

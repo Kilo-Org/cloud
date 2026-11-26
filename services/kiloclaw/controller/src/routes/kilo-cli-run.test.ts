@@ -80,6 +80,7 @@ describe('/_kilo/cli-run routes', () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    vi.restoreAllMocks();
   });
 
   // ── Auth ────────────────────────────────────────────────────────────
@@ -155,20 +156,24 @@ describe('/_kilo/cli-run routes', () => {
   });
 
   it('starts a run successfully', async () => {
+    const prompt = 'fix the bug';
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const resp = await app.request('/_kilo/cli-run/start', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ prompt: 'fix the bug' }),
+      body: JSON.stringify({ prompt }),
     });
     expect(resp.status).toBe(200);
     const body = (await resp.json()) as Record<string, unknown>;
     expect(body.ok).toBe(true);
     expect(body.startedAt).toBeDefined();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Started: pid=12345'));
+    expect(JSON.stringify(log.mock.calls)).not.toContain(prompt);
 
     // RunState stores the original user prompt (for UI display)
     const run = _getActiveRun();
     expect(run).not.toBeNull();
-    expect(run?.prompt).toBe('fix the bug');
+    expect(run?.prompt).toBe(prompt);
     expect(run?.status).toBe('running');
 
     // spawn receives the expanded prompt with system context
@@ -176,7 +181,7 @@ describe('/_kilo/cli-run routes', () => {
     const spawnArgs = spawnMock.mock.calls[0][1] as string[];
     expect(spawnArgs[0]).toBe('run');
     expect(spawnArgs[1]).toBe('--auto');
-    expect(spawnArgs[2]).toContain('fix the bug');
+    expect(spawnArgs[2]).toContain(prompt);
     expect(spawnArgs[2]).toContain('/root/.openclaw/openclaw.json');
   });
 

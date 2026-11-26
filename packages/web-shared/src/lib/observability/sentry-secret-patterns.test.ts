@@ -429,8 +429,9 @@ describe('redactSecretValues', () => {
   //   rescans its input makes it about SIZE_FACTOR.
   // - One redaction of the large text.
   // - One redaction of plain prose of the same length. The cost ratio limits the
-  //   work per character, so a pattern that rescans a bounded window or
-  //   backtracks a lot on each fragment fails too, although its growth is linear.
+  //   work per character, so a pattern that rescans a window of a few thousand
+  //   characters or backtracks a lot on each fragment fails too, although its
+  //   growth is linear.
   // The spans are short and adjacent, so a slow or busy runner stretches them by
   // about the same factor. The median of several runs leaves out a run in which
   // pattern compilation, garbage collection or a change in load falls on one

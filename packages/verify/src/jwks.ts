@@ -208,9 +208,9 @@ export type KeySetCache = {
   cold(): boolean;
   /**
    * Takes a UTS set loaded elsewhere (the bootstrap), with the ages it was answered with and when
-   * its call started, unless the held set has newer keys or this one no longer serves.
+   * its call started, unless the held set has newer keys or this one no longer serves at `now`.
    */
-  install(keys: ImportedKeys, keyAges: KeySetAges, fetchedAt: number): void;
+  install(keys: ImportedKeys, keyAges: KeySetAges, fetchedAt: number, now: number): void;
   /** Starts a fetch when cold, idle and outside the retry wait, without waiting for it. */
   prefetch(scope: CallScope): void;
 };
@@ -465,8 +465,7 @@ export function createKeySetCache(source: JwksSource, kind: KeySetKind): KeySetC
       return set.feedKeys.get(kid) ?? null;
     },
     cold: () => set === null,
-    install(keys, keyAges, fetchedAt) {
-      const now = Date.now();
+    install(keys, keyAges, fetchedAt, now) {
       const loaded = load(keys, keyAges, fetchedAt, nextLoadId++);
       if (hold(loaded, now) && refresh.state === 'failed' && fresh(loaded, now)) {
         refresh = { state: 'idle' };

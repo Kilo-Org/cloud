@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BOOTSTRAP_FETCH_TIMEOUT_MS, BOOTSTRAP_RETRY_MS } from '../src/bootstrap';
+import { BOOTSTRAP_FETCH_TIMEOUT_MS, BOOTSTRAP_RETRY_MS, createBootstrap } from '../src/bootstrap';
 import { handOff, newCallScope } from '../src/flight';
 import {
   JWKS_FETCH_TIMEOUT_MS,
@@ -23,6 +23,8 @@ import {
   bearer,
   createIssuer,
   drain,
+  fakeBootstrap,
+  fakeFeed,
   fakeJwks,
   gate,
   harness,
@@ -33,6 +35,7 @@ import {
   type Harness,
   type Issuer,
 } from './helpers';
+import type { RevocationFeed } from '../src/revocation';
 
 // Design 5.7, 7 and Q55: the key-set ages. A UTS set counts its 5-minute lifetime and 4-minute
 // refresh from `Age` and its 24-hour last-good limit from `Kilo-Key-Set-Oldest-Age`; an STS set
@@ -320,7 +323,7 @@ describe('install (the bootstrap)', () => {
     const c = cache('uts', [100, 1_000], [key.jwk, feedA.jwk]);
     await lookup(c.keySet);
     const setB = await importKeySet({ keys: [key.jwk, feedB.jwk] }, 'uts');
-    c.keySet.install(setB, ages, Date.now() + startedMs);
+    c.keySet.install(setB, ages, Date.now() + startedMs, Date.now());
     expect(c.keySet.feedKey(feedA.kid, Date.now()) === null).toBe(replaced);
     expect(c.keySet.feedKey(feedB.kid, Date.now()) !== null).toBe(replaced);
   });
@@ -328,7 +331,7 @@ describe('install (the bootstrap)', () => {
   it('does not hold a set already past its 24-hour limit', async () => {
     const c = cache('uts', [0, 0]);
     const keys = await importKeySet({ keys: [key.jwk] }, 'uts');
-    c.keySet.install(keys, { newest: 0, oldest: 24 * HOUR_S }, Date.now());
+    c.keySet.install(keys, { newest: 0, oldest: 24 * HOUR_S }, Date.now(), Date.now());
     expect(c.keySet.cold()).toBe(true);
   });
 
@@ -344,7 +347,7 @@ describe('install (the bootstrap)', () => {
     async (_name, after, mode, status, calls) => {
       const c = cache('uts', [0, 0]);
       const keys = await importKeySet({ keys: [key.jwk] }, 'uts');
-      c.keySet.install(keys, { newest: 200, oldest: 3_000 }, Date.now() - 10_000);
+      c.keySet.install(keys, { newest: 200, oldest: 3_000 }, Date.now() - 10_000, Date.now());
       c.jwks.mode = mode;
       advance(after);
       expect(await lookup(c.keySet)).toBe(status);
@@ -407,6 +410,72 @@ describe('the UTS bootstrap', () => {
     advance(BOOTSTRAP_RETRY_MS);
     expect(await verifyUts()).toMatchObject({ ok: true });
     expect([h.bootstrap.calls, h.utsJwks.calls, h.feed.calls]).toEqual([2, 0, 0]);
+  });
+
+  it('applies nothing when the key set passes its 24-hour limit during the call', async () => {
+    // 1 s from the limit when the call starts, answered 2 s later.
+    h.bootstrap.ages = { newest: 0, oldest: 24 * HOUR_S - 1 };
+    const held = gate();
+    h.bootstrap.gate = held;
+    const pending = verifyUts();
+    await vi.waitFor(() => expect(h.bootstrap.calls).toBe(1));
+    advance(2_000);
+    held.release();
+    expect(await pending).toMatchObject({ status: 503, reason: 'bootstrap_unavailable' });
+    // Nothing was installed: the next cold request bootstraps again, with no separate fetch.
+    h.bootstrap.gate = null;
+    h.bootstrap.ages = { newest: 0, oldest: 0 };
+    advance(BOOTSTRAP_RETRY_MS);
+    expect(await verifyUts()).toMatchObject({ ok: true });
+    expect([h.bootstrap.calls, h.utsJwks.calls, h.feed.calls]).toEqual([2, 0, 0]);
+  });
+});
+
+describe('a late bootstrap success', () => {
+  it('does not clear the failure of a later attempt', async () => {
+    const feedSigner = await createIssuer(UTS_ISSUER, UTS_FEED_KID);
+    const jwks = fakeJwks([key.jwk, feedSigner.jwk]);
+    const source = fakeBootstrap(jwks, fakeFeed(feedSigner));
+    // Caches that stay cold after an install, so the bootstrap's own retry state stays visible.
+    let installs = 0;
+    const unused = () => {
+      throw new Error('not used by the bootstrap');
+    };
+    const keySet: KeySetCache = {
+      key: unused,
+      ready: unused,
+      feedKey: unused,
+      prefetch: unused,
+      cold: () => true,
+      install: () => {
+        installs++;
+      },
+    };
+    const feed: RevocationFeed = { read: unused, cold: () => true, install: () => true };
+    const bootstrap = createBootstrap(source.source, keySet, feed);
+
+    // Attempt 1 hangs past its timeout; attempt 2, after the retry wait, fails at once.
+    const late = gate();
+    source.gate = late;
+    const first = bootstrap.load(newCallScope());
+    await vi.waitFor(() => expect(source.calls).toBe(1));
+    advance(BOOTSTRAP_FETCH_TIMEOUT_MS);
+    expect(await first).toMatchObject({ status: 'unavailable' });
+    advance(BOOTSTRAP_RETRY_MS);
+    source.gate = null;
+    source.mode = 'fail';
+    expect(await bootstrap.load(newCallScope())).toMatchObject({ status: 'unavailable' });
+    expect(source.calls).toBe(2);
+
+    // Attempt 1 now answers: it installs, but attempt 2's retry wait still holds.
+    source.mode = 'ok';
+    late.release();
+    await vi.waitFor(() => expect(installs).toBe(1));
+    bootstrap.prefetch(newCallScope());
+    expect(source.calls).toBe(2);
+    advance(BOOTSTRAP_RETRY_MS);
+    bootstrap.prefetch(newCallScope());
+    expect(source.calls).toBe(3);
   });
 });
 

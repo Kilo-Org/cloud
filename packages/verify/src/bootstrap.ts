@@ -89,19 +89,22 @@ export function createBootstrap(
         const answer = await source(AbortSignal.timeout(BOOTSTRAP_FETCH_TIMEOUT_MS));
         const keyAges = parseKeySetAges(answer.keyAges);
         if (keyAges === null) throw new Error('bootstrap answer without valid key ages');
-        // The key set would not be held, so the answer would not apply whole.
-        if (keyAges.oldest * 1000 >= JWKS_MAX_STALE_MS) {
-          throw new Error('bootstrap key set past its 24-hour limit');
-        }
         const keys = await importKeySet(answer.jwks, 'uts');
         const head = await verifyFeedHead(answer.head, kid => keys.feedKeys.get(kid) ?? null);
         const list = await parseRevocationList(head.listHash, answer.list);
-        if (!feed.install({ head, list }, Date.now())) {
+        // Applies whole or not at all: a key set already past its 24-hour limit, counted from the
+        // call start, would not be held, so nothing of the answer is installed.
+        const now = Date.now();
+        if (started.startedAt - keyAges.oldest * 1000 + JWKS_MAX_STALE_MS <= now) {
+          throw new Error('bootstrap key set past its 24-hour limit');
+        }
+        if (!feed.install({ head, list }, now)) {
           throw new Error('bootstrap head does not count');
         }
-        keySet.install(keys, keyAges, started.startedAt);
+        keySet.install(keys, keyAges, started.startedAt, now);
         if (attempt?.id === started.id) attempt = null;
-        failure = null;
+        // Clears only this attempt's failure or an older one, never a later attempt's.
+        if (failure !== null && failure.attemptId <= started.id) failure = null;
       } catch {
         fail(started, Date.now());
       }

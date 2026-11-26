@@ -117,7 +117,7 @@ owner -c 'create function public.planted_definer() returns int language sql secu
   -c 'create function public.planted_reader() returns int language sql stable as $$ select 1 $$' >/dev/null
 super -c 'create schema net' -c 'grant usage on schema net to public' \
   -c 'create table net.http_request_queue (id bigint, headers text)' -c 'grant all on net.http_request_queue to public' \
-  -c 'create function net.http_get(url text) returns bigint language sql volatile as $$ select 1::bigint $$' \
+  -c "create function net.http_get(url text) returns text language internal volatile as 'timeofday'" \
   -c 'create schema extensions' -c 'create extension dblink schema extensions' >/dev/null
 
 if owner -c 'create role kilo_probe nologin' -c 'grant postgres to kilo_probe' >/dev/null 2>&1; then
@@ -163,15 +163,17 @@ grep -q '^catalog|advisory locks|' "$TMP/setup.out" || fail 'the report lists ad
 pass 'the setup report lists the PUBLIC reach: pg_net stand-in (writable, volatile), TEMP, other databases, large objects, advisory locks, dblink without usage'
 fn_ok() { super -c "select has_function_privilege('kilo_lease_replica_read', '$1', 'EXECUTE')"; }
 [ "$(fn_ok 'public.planted_definer()')" = f ] || fail 'PUBLIC lost EXECUTE on the SECURITY DEFINER function in public'
-[ "$(fn_ok 'public.planted_writer()')" = f ] || fail 'PUBLIC lost EXECUTE on the volatile function in public'
+[ "$(fn_ok 'public.planted_writer()')" = t ] || fail 'a volatile invoker function in public stays executable (it runs with the caller rights)'
 [ "$(fn_ok 'public.planted_reader()')" = t ] || fail 'a stable invoker function in public stays executable'
 owner -c 'create function public.later_definer() returns int language sql security definer as $$ select 1 $$' >/dev/null
 [ "$(fn_ok 'public.later_definer()')" = f ] || fail 'a function postgres creates after setup is not executable by PUBLIC'
-pass 'PUBLIC lost EXECUTE on SECURITY DEFINER and volatile functions in public, today and for later ones'
+pass 'PUBLIC lost EXECUTE on SECURITY DEFINER functions in public, today and for later ones; invoker functions keep it'
 super -c 'drop schema net cascade' >/dev/null
 report >"$TMP/report.out"
 grep -qxF 'summary|replica-read|create=0 writable=0 definer=0 volatile=0 outbound=0 member_of=0 leftover=0' "$TMP/report.out" ||
   fail "without pg_net the summary is all zero: $(cat "$TMP/report.out")"
+grep -qxF "volatile|planted_writer()|volatile, owner postgres, sql with the caller's rights" "$TMP/report.out" ||
+  fail "the report lists the SQL volatile function without counting it: $(cat "$TMP/report.out")"
 pass 'without pg_net the replica template can create nothing, write nothing and run no definer or volatile function'
 
 # replica-read.
@@ -194,6 +196,31 @@ pass 'replica-read creation makes a login role in kilo_lease_replica_read with a
 [ "$(sql "$RR1" "$RR1_PW" -c 'show default_transaction_read_only' -c 'show statement_timeout' -c 'show idle_in_transaction_session_timeout' | tr '\n' ' ')" = 'on 1min 1min ' ] ||
   fail 'replica lease defaults to read-only transactions and 60-second timeouts'
 pass 'the replica lease reads the table, in read-only transactions with 60-second timeouts by default'
+if replica_admin -c 'select 1 from public.accounts' >/dev/null 2>&1; then
+  fail 'replica admin reads nothing while a lease exists'
+fi
+pass 'the replica admin holds none of the lease role rights while the lease lives'
+
+# The password stays out of the server log under log_statement = ddl: Infisical sends a SELECT, and
+# the CREATE ROLE inside it is not a top-level statement. The old top-level CREATE ROLE shows that
+# the check sees a logged password.
+super -c "alter system set log_statement = 'ddl'" -c 'select pg_reload_conf()' >/dev/null
+sleep 1
+RR8=$(role_name rr)
+RR8_PW=$(secret)
+create_replica "$RR8" "$RR8_PW" "$(expires_in 300)"
+[ "$(sql "$RR8" "$RR8_PW" -c 'select 1')" = 1 ] || fail 'the lease made under log_statement = ddl logs in'
+echo "CREATE ROLE \"{{username}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}' IN ROLE kilo_lease_replica_read" >"$TMP/old.create.sql"
+RR9=$(role_name rr)
+RR9_PW=$(secret)
+infisical kilo_lease_replica_admin "$REPLICA_ADMIN_PW" "$TMP/old.create.sql" "$RR9" "$RR9_PW" "$(expires_in 300)"
+super -c "alter system reset log_statement" -c 'select pg_reload_conf()' >/dev/null
+docker logs "$NAME" >"$TMP/server.log" 2>&1
+grep -qF "$RR9_PW" "$TMP/server.log" || fail 'the old top-level CREATE ROLE puts its password in the server log (the check sees a logged password)'
+if grep -qF "$RR8_PW" "$TMP/server.log"; then fail 'the lease password is not in the server log under log_statement = ddl'; fi
+pass 'under log_statement = ddl the lease password stays out of the server log (a top-level CREATE ROLE puts it there)'
+revoke_replica "$RR8"
+revoke_replica "$RR9"
 if sql "$RR1" "$RR1_PW" -c 'set default_transaction_read_only = off' \
   -c "insert into public.accounts values (2, 'b@example.invalid')" >/dev/null 2>"$TMP/err"; then
   fail 'replica lease cannot insert with read-only mode off'
@@ -328,7 +355,8 @@ revoke_replica "$RR6"
 if can_login "$RR6" "$RR6_PW"; then fail 'the kept role cannot log in'; fi
 report >"$TMP/report.out"
 grep -qxF "leftover|$RR6|revoked lease role kept without login; drop it by hand" "$TMP/report.out" || fail "the report lists the kept role: $(cat "$TMP/report.out")"
-sql_in template1 kilo_lease_replica_admin "$REPLICA_ADMIN_PW" -c "drop owned by \"$RR6\"" >/dev/null
+sql_in template1 kilo_lease_replica_admin "$REPLICA_ADMIN_PW" \
+  -c "grant \"$RR6\" to kilo_lease_replica_admin with inherit true, set false" -c "drop owned by \"$RR6\"" >/dev/null
 revoke_replica "$RR6"
 [ "$(role_count "$RR6")" = 0 ] || fail 'the kept role drops once its object elsewhere is gone'
 pass 'a role with a large object in template1 is kept without login and listed, then dropped by hand'

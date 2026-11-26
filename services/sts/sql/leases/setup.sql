@@ -18,15 +18,16 @@
 
 BEGIN;
 
--- Functions `postgres` creates from now on are no longer executable by PUBLIC (a per-schema
--- default cannot remove PUBLIC's global one). Supabase's own defaults keep EXECUTE for `anon`,
--- `authenticated` and `service_role` on functions in `public`.
+-- Functions `postgres` creates from now on are no longer executable by PUBLIC. This default is
+-- database-wide: it covers every schema, not only `public` (a per-schema default cannot remove
+-- PUBLIC's global one), so a later function that PUBLIC must run needs its own GRANT. Supabase's
+-- own defaults keep EXECUTE for `anon`, `authenticated` and `service_role` on functions in `public`.
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
--- Today's functions in `public` that `postgres` owns and that could write or run with their
--- owner's rights (SECURITY DEFINER or VOLATILE), except an extension's own: PUBLIC loses EXECUTE.
--- `postgres` can revoke only the grants it made, so functions other roles own stay as they are;
--- report.sql lists what remains.
+-- Today's SECURITY DEFINER functions in `public` that `postgres` owns (they run with its rights),
+-- except an extension's own: PUBLIC loses EXECUTE. An invoker function runs with the caller's
+-- rights, so it stays. `postgres` can revoke only the grants it made, so functions other roles own
+-- stay as they are; report.sql lists what remains.
 DO $$
 DECLARE
   routine regprocedure;
@@ -36,7 +37,7 @@ BEGIN
     FROM pg_proc p
     WHERE p.pronamespace = 'public'::regnamespace
       AND p.proowner = 'postgres'::regrole
-      AND (p.prosecdef OR p.provolatile = 'v')
+      AND p.prosecdef
       AND NOT EXISTS (
         SELECT 1 FROM pg_depend d
         WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e'
@@ -58,8 +59,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT ON TABL
 -- makes a separate one for ci-migration, so a leaked replica login can never create a migration
 -- role). CREATEROLE lets it create, alter and drop the roles it created; ADMIN on its template
 -- role (without INHERIT or SET) lets it grant that membership and gives it none of the template's
--- rights. It cannot end another role's session: kilo_lease.end_sessions below ends only lease
--- sessions.
+-- rights. It holds no lease role's rights either: kilo_lease.revoke_lease grants it a lease role,
+-- for DROP OWNED, only inside the revocation that drops the role. It cannot end another role's
+-- session: kilo_lease.end_sessions below ends only lease sessions.
 CREATE ROLE kilo_lease_replica_admin LOGIN CREATEROLE CONNECTION LIMIT 4 PASSWORD :'replica_admin_password';
 GRANT kilo_lease_replica_read TO kilo_lease_replica_admin WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 
@@ -99,8 +101,11 @@ $$;
 
 -- Ends, on this node, the sessions of `username` when it is a lease role of the caller's template,
 -- the sessions of every lease role of that template whose VALID UNTIL has passed, and every session
--- whose role no longer exists (a login that landed while an earlier revocation committed). Nothing
--- else: not a superuser, not an admin login, not an application role. Runs as `postgres`, which
+-- whose role no longer exists (a login that landed while an earlier revocation committed). Such a
+-- session holds no right of its own role, but a ci-migration one keeps acting as `postgres` with
+-- owner rights (its `role` setting made `current_user` postgres at login, and that role still
+-- exists) until the next revocation of any lease ends it. Nothing else: not a superuser, not an
+-- admin login, not an application role. Runs as `postgres`, which
 -- Supabase makes a member of pg_signal_backend. Returns the number of sessions signalled; they
 -- exit right after. It drops the transaction's activity snapshot first, so a second call in the
 -- same revocation sees the logins that landed since the first.
@@ -132,12 +137,41 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS 
   SELECT (count(*) FILTER (WHERE pg_catalog.pg_terminate_backend(pid)))::integer FROM targets
 $$;
 
+-- The creation statement (replica-read.create.sql, ci-migration.create.sql): the lease role, in the
+-- caller's template, with its connection limit and settings. The CREATE ROLE runs here through
+-- EXECUTE, so the statement Infisical sends is a SELECT: `log_statement = 'ddl'` does not log it,
+-- and the password stays out of the server log (it is still logged under `log_statement = 'all'`,
+-- pgaudit, `log_min_duration_statement`, or as the statement of an error). Runs as the admin login.
+CREATE FUNCTION kilo_lease.create_lease(username text, password text, valid_until timestamptz) RETURNS void
+LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, pg_temp AS $$
+DECLARE
+  caller record;
+BEGIN
+  PERFORM kilo_lease.check_username(username);
+  SELECT * INTO caller FROM kilo_lease.caller_template();
+  IF caller.prefix = 'lease_rr_' THEN
+    EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L VALID UNTIL %L CONNECTION LIMIT 4 IN ROLE %I',
+      username, password, valid_until, caller.template);
+    EXECUTE format('ALTER ROLE %I SET default_transaction_read_only = on', username);
+    EXECUTE format('ALTER ROLE %I SET statement_timeout = %L', username, '60s');
+    EXECUTE format('ALTER ROLE %I SET idle_in_transaction_session_timeout = %L', username, '60s');
+    EXECUTE format('ALTER ROLE %I SET idle_session_timeout = %L', username, '15min');
+  ELSE
+    EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L VALID UNTIL %L CONNECTION LIMIT 2 IN ROLE %I',
+      username, password, valid_until, caller.template);
+    EXECUTE format('ALTER ROLE %I SET role = %L', username, 'postgres');
+  END IF;
+END
+$$;
+
 -- The revocation statement (revoke.sql). In order: no new login (committed with the transaction),
--- end the sessions, drop what the role owns and the rights it granted in this database, end the
--- sessions again (a login that landed meanwhile), drop the role. When the drop fails (an object in
--- another database, a right `postgres` granted to it), the role stays without login, its sessions
--- ended, and report.sql lists it; the revocation still succeeds, so the lease is never left with a
--- usable role. A role that is already gone is a no-op, so a repeated revocation succeeds.
+-- end the sessions, take the lease role's rights for this transaction (DROP OWNED needs them; the
+-- grant goes with the role), drop what the role owns and the rights it granted in this database,
+-- end the sessions again (a login that landed meanwhile), drop the role. When the drop fails (an
+-- object in another database, a right `postgres` granted to it), the grant is undone and the role
+-- stays without login, its sessions ended, and report.sql lists it; the revocation still succeeds,
+-- so the lease is never left with a usable role. A role that is already gone is a no-op, so a
+-- repeated revocation succeeds.
 CREATE FUNCTION kilo_lease.revoke_lease(username text) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, pg_temp AS $$
 BEGIN
@@ -149,6 +183,7 @@ BEGIN
   EXECUTE format('ALTER ROLE %I NOLOGIN VALID UNTIL %L', username, '-infinity');
   PERFORM kilo_lease.end_sessions(username);
   BEGIN
+    EXECUTE format('GRANT %I TO %I WITH INHERIT TRUE, SET FALSE', username, session_user);
     EXECUTE format('DROP OWNED BY %I', username);
     PERFORM kilo_lease.end_sessions(username);
     EXECUTE format('DROP ROLE %I', username);
@@ -163,7 +198,8 @@ $$;
 REVOKE ALL ON ALL ROUTINES IN SCHEMA kilo_lease FROM PUBLIC;
 GRANT USAGE ON SCHEMA kilo_lease TO kilo_lease_replica_admin;
 GRANT EXECUTE ON FUNCTION kilo_lease.caller_template(), kilo_lease.check_username(text),
-  kilo_lease.end_sessions(text), kilo_lease.revoke_lease(text)
+  kilo_lease.create_lease(text, text, timestamptz), kilo_lease.end_sessions(text),
+  kilo_lease.revoke_lease(text)
   TO kilo_lease_replica_admin;
 
 COMMIT;

@@ -72,16 +72,20 @@ findings AS (
   JOIN usable_schemas n ON n.oid = p.pronamespace, t
   WHERE p.prosecdef AND has_function_privilege(t.role, p.oid, 'EXECUTE')
 
-  -- Functions that may write, outside the system catalogs.
+  -- Functions that may write or reach outside the database, outside the system catalogs. One in SQL
+  -- or PL/pgSQL runs with the lease's own rights and so is listed, not counted; one in C (an
+  -- extension's, such as pg_net's) can do what its code does, and counts.
   UNION ALL
   SELECT 'volatile', p.oid::regprocedure::text,
     'volatile, owner ' || p.proowner::regrole::text
       || coalesce(', extension ' || (
         SELECT e.extname FROM pg_depend d JOIN pg_extension e ON e.oid = d.refobjid
         WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e'
-          AND d.refclassid = 'pg_extension'::regclass), ''),
-    'volatile'
+          AND d.refclassid = 'pg_extension'::regclass), '')
+      || CASE WHEN l.lanname IN ('sql', 'plpgsql') THEN ', ' || l.lanname || ' with the caller''s rights' ELSE '' END,
+    CASE WHEN l.lanname NOT IN ('sql', 'plpgsql') THEN 'volatile' END
   FROM pg_proc p
+  JOIN pg_language l ON l.oid = p.prolang
   JOIN usable_schemas n ON n.oid = p.pronamespace, t
   WHERE NOT p.prosecdef AND p.provolatile = 'v' AND p.prokind IN ('f', 'p')
     AND n.nspname NOT IN ('pg_catalog', 'information_schema')

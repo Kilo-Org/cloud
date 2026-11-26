@@ -32,7 +32,8 @@ CREATE ROLE kilo_lease_migration_admin LOGIN CREATEROLE CONNECTION LIMIT 4 PASSW
 GRANT kilo_lease_migration TO kilo_lease_migration_admin WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 GRANT USAGE ON SCHEMA kilo_lease TO kilo_lease_migration_admin;
 GRANT EXECUTE ON FUNCTION kilo_lease.caller_template(), kilo_lease.check_username(text),
-  kilo_lease.end_sessions(text), kilo_lease.revoke_lease(text)
+  kilo_lease.create_lease(text, text, timestamptz), kilo_lease.end_sessions(text),
+  kilo_lease.revoke_lease(text)
   TO kilo_lease_migration_admin;
 
 -- `postgres` created the replica-read login in setup.sql and so administers it: it could reset its

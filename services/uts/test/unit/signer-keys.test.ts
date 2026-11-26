@@ -268,7 +268,10 @@ describe('heldKeysToStore', () => {
   });
 
   it('accepts the stored form only with each kid under its own signer', async () => {
-    await answerAt(T0, reader(async () => all()));
+    await answerAt(
+      T0,
+      reader(async () => all())
+    );
     expect(StoredHeldKeysSchema.parse(cache.held)).toEqual(cache.held);
     const swapped = [...cache.held];
     [swapped[1], swapped[2]] = [swapped[2] ?? null, swapped[1] ?? null];

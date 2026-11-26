@@ -52,7 +52,7 @@ function verifierFor(audience: string) {
     audience,
     environment: 'production',
     resourceMetadataUrl: `https://${audience}.test/.well-known/oauth-protected-resource`,
-    sts: { issuer: STS, jwks: async () => jwks },
+    sts: { issuer: STS, jwks: async () => ({ body: jwks, age: null, oldestAge: null }) },
   });
 }
 

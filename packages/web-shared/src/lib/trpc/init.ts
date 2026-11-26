@@ -374,10 +374,12 @@ const controlPlaneBudgetMiddleware = t.middleware(({ path, type, ctx, next }) =>
 // `next({ ctx })` merges into the existing context, so nothing is dropped.
 // An admin caller also gets the step-up claim set of this one procedure call:
 // two calls in one HTTP batch never share a single-use proof, and an ordinary
-// caller allocates nothing.
+// caller allocates nothing. `user` is read optionally: every procedure runs
+// this before its own auth check, so an anonymous caller must reach that
+// check and its UNAUTHORIZED refusal rather than fail here.
 const auditContextMiddleware = t.middleware(({ ctx, path, type, next }) =>
   next({
-    ctx: ctx.user.is_admin
+    ctx: ctx.user?.is_admin
       ? { trpcPath: path, trpcType: type, stepUpClaims: new Set<string>() }
       : { trpcPath: path, trpcType: type },
   })

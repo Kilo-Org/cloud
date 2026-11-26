@@ -1104,7 +1104,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     reads: [
       {
         snippet:
-          'ctx.user.is_admin?{trpcPath:path,trpcType:type,stepUpClaims:new Set<string>()}:{trpcPath:path,trpcType:type}',
+          'ctx.user?.is_admin?{trpcPath:path,trpcType:type,stepUpClaims:new Set<string>()}:{trpcPath:path,trpcType:type}',
         use: 'guard',
       },
     ],

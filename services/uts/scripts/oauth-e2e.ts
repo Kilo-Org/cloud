@@ -168,7 +168,7 @@ async function seed(admin: pg.Client): Promise<string> {
   );
   const consent = await admin.query<{ id: string }>(
     `INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
-     VALUES ($1, $2, '{mcp:tools.read}', $3) RETURNING id`,
+     VALUES ($1, $2, '{fixture:read}', $3) RETURNING id`,
     [ACCOUNT, THIRD_PARTY, pass.rows[0].id]
   );
   return consent.rows[0].id;
@@ -197,7 +197,7 @@ async function main() {
     redirect_uri: CALLBACK,
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    scope: 'gateway:models.read kilo-chat:messages.read',
+    scope: 'kilo-api:profile.read uts:pats.manage',
     state: 'e2e',
     dpop_jkt: device.jkt,
   });
@@ -227,7 +227,7 @@ async function main() {
       grant_type: 'refresh_token',
       refresh_token: grant,
       client_id: 'kilo-cli',
-      scope: 'gateway:models.read',
+      scope: 'kilo-api:profile.read',
     },
     await device.proof('/token')
   );
@@ -249,7 +249,7 @@ async function main() {
     grant_type: 'refresh_token',
     refresh_token: grant,
     client_id: 'kilo-cli',
-    scope: 'gateway:models.read',
+    scope: 'kilo-api:profile.read',
   };
   const firstUse = await post('/token', refreshOnce, once);
   const replayed = await post('/token', refreshOnce, once);
@@ -266,7 +266,7 @@ async function main() {
     redirect_uri: CALLBACK,
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    scope: 'gateway:models.read',
+    scope: 'kilo-api:profile.read',
     state: 'e2e-retry',
     dpop_jkt: device.jkt,
   });
@@ -311,7 +311,7 @@ async function main() {
     redirect_uri: CALLBACK,
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    scope: 'gateway:models.read',
+    scope: 'kilo-api:profile.read',
     state: 'e2e-race',
     dpop_jkt: device.jkt,
   });
@@ -374,7 +374,7 @@ async function main() {
     redirect_uri: 'https://client.example.com/callback',
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    scope: 'mcp:tools.read',
+    scope: 'fixture:read',
     state: 'e2e-3p',
     dev_consent_id: consentId,
   });
@@ -429,7 +429,7 @@ async function main() {
     redirect_uri: 'https://client.example.com/callback',
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    scope: 'mcp:tools.read',
+    scope: 'fixture:read',
     state: 'e2e-3p-again',
     dev_consent_id: consentId,
   });
@@ -493,7 +493,7 @@ async function main() {
         grant_type: 'refresh_token',
         refresh_token: grant,
         client_id: 'kilo-cli',
-        scope: 'gateway:models.read',
+        scope: 'kilo-api:profile.read',
       },
       proof
     );
@@ -517,7 +517,7 @@ async function main() {
       'kilo-cli',
       Buffer.from(device.jkt, 'base64url'),
       randomUUID(),
-      ['gateway:models.read'],
+      ['kilo-api:profile.read'],
       null,
     ]);
     statement.push(performance.now() - started);

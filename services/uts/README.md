@@ -153,11 +153,12 @@ UTS_E2E_BASE_URL=http://127.0.0.1:8800/ UTS_E2E_ADMIN_URL=... UTS_E2E_APP_URL=..
 same device key), a code-exchange retry and two concurrent exchanges of one code, third-party
 rotation, reuse (the family is revoked), a blocked third-party client, a streamed oversized body,
 revoke and introspect, prints the audit rows (token ids only), checks that no token value reached
-an audit row, and times the mint path. It names fixture scopes (`gateway:models.read`,
-`kilo-chat:messages.read`, `mcp:tools.read`) that the scope registry does not list, so since the
-endpoints apply the registry it is refused at `/authorize`; it runs again once its first-party
-steps name `kilo-cli` scopes and the registry holds a third-party-safe scope for its third-party
-steps. `scripts/pat-e2e.ts` (`UTS_E2E_BASE_URL`,
+an audit row, and times the mint path. Its first-party steps use `kilo-cli` scopes
+(`kilo-api:profile.read`, `uts:pats.manage`); its third-party steps use `fixture:read`, a
+development fixture scope (`src/scopes/development-fixtures.ts`) that only the development entry
+adds on top of the registry, since the registry holds no third-party-safe scope yet. `test/repo`
+checks that the deployed entry's imports never reach the fixtures and that `UTS_SCOPE_REGISTRY`
+holds no `fixture:*` scope. `scripts/pat-e2e.ts` (`UTS_E2E_BASE_URL`,
 `UTS_E2E_ADMIN_URL`) signs the CLI in, creates a PAT, uses it on the probe route, lists and
 revokes it and times until the probe refuses it, creates, lists and revokes an org bot key, shows
 the tier B refusal once the sign-in is 11 minutes old, refuses a web-app-only scope to the CLI at
@@ -238,7 +239,8 @@ grant the `sid` names and its device session, so a revoked grant, an ended sessi
 account fails at once, with no feed lookup.
 
 `/authorize` and `/token` apply the scope registry (`src/scopes/policy.ts`; the endpoints take it
-as a dependency, `utsScopeEntry` in every deployed Worker):
+as a dependency: `utsScopeEntry` in every deployed Worker, plus the `fixture:*` scopes in the
+development entry only):
 
 - **Client:** a scope that is unregistered, whose `allowedClients` does not name the first-party
   client, or that is not third-party-safe for a third-party client is refused: at `/authorize`

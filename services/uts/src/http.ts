@@ -2,6 +2,7 @@ import {
   UTS_AUTHORIZATION_SERVER_METADATA_PATH,
   UTS_PAT_PROBE_PATH,
   UTS_PROTECTED_RESOURCE_METADATA_PATH,
+  utsScopeEntry,
 } from '@kilocode/uts-contracts';
 import { shardAccessTokenKeys } from './account/bearer';
 import { type AccountDeps, handleAccountRequest } from './account/routes';
@@ -17,18 +18,21 @@ import type { AddressWindows } from './pat/address-limit';
 import { identityStorePatLookup, lookupPatHash, patStoreBinding } from './pat/lookup';
 import { type PatProbeDeps, handlePatProbe } from './pat/probe';
 import { jsonResponse } from './responses';
+import type { ScopeRegistry } from './scopes/policy';
 import type { SignerAccess } from './token/mint';
 
 /**
- * What only the development entry adds: the development sign-in hand-off and a failing signer for
- * the local end-to-end run (src/dev.ts). Null is the deployed behaviour.
+ * What only the development entry adds: the development sign-in hand-off, a failing signer for
+ * the local end-to-end run, and the development fixture scopes on top of the scope registry
+ * (src/dev.ts). The deployed options are no hand-off, the grant's signer and the registry alone.
  */
 export type MintOptions = {
   authorizationHandoff: AuthorizationHandoff | null;
   signer: SignerAccess | null;
+  scopes: ScopeRegistry;
 };
 
-const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null };
+const DEPLOYED: MintOptions = { authorizationHandoff: null, signer: null, scopes: utsScopeEntry };
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
 const probeWindows: AddressWindows = new Map();
@@ -79,7 +83,14 @@ export async function handleRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
-  const oauth = oauthService(env, ctx, config, options.authorizationHandoff, options.signer);
+  const oauth = oauthService(
+    env,
+    ctx,
+    config,
+    options.authorizationHandoff,
+    options.signer,
+    options.scopes
+  );
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });

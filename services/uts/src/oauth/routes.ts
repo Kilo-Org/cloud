@@ -3,7 +3,6 @@ import {
   UTS_INTROSPECT_PATH,
   UTS_REVOKE_PATH,
   UTS_TOKEN_PATH,
-  utsScopeEntry,
 } from '@kilocode/uts-contracts';
 import type { Env, UtsConfig } from '../env';
 import { grantsAccess, identityStoreBinding } from '../grants/binding';
@@ -33,14 +32,16 @@ export type OAuthService = { kind: 'unprovisioned' } | { kind: 'ready'; deps: OA
 
 /**
  * `sign` null uses the grant's signer object; only the development entry passes another one, to
- * show a signing failure in the local end-to-end run (src/dev.ts).
+ * show a signing failure in the local end-to-end run (src/dev.ts). `scopes` is the scope registry
+ * (`utsScopeEntry`) in every deployed entry; the development entry adds its fixture scopes.
  */
 export function oauthService(
   env: Env,
   ctx: ExecutionContext,
   config: UtsConfig,
   handoff: AuthorizationHandoff | null,
-  sign: SignerAccess | null
+  sign: SignerAccess | null,
+  scopes: ScopeRegistry
 ): OAuthService {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return binding;
@@ -50,7 +51,7 @@ export function oauthService(
       config,
       grants: grantsAccess(binding.connectionString, ctx),
       sign: sign ?? signerAccess(env, config),
-      scopes: utsScopeEntry,
+      scopes,
       handoff,
       deviceCodeGrant: null,
     },

@@ -14,10 +14,18 @@ import {
   firstPartyClient,
   utsScopeEntry,
 } from '@kilocode/uts-contracts';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ORG_ROLES } from '../../src/db/enums';
 import { identifyClient } from '../../src/oauth/clients';
+import {
+  DEVELOPMENT_FIXTURE_SCOPES,
+  developmentScopes,
+} from '../../src/scopes/development-fixtures';
 import { clientScopeRefusal, credentialScopeCheck, orgScopeRefusal } from '../../src/scopes/policy';
+import { importClosure } from './import-graph';
 import { firstPartyClientProblems, scopeRegistryProblems } from './scope-registry';
 
 /** The scope registry as code (design 5.3), checked against its rules. */
@@ -508,5 +516,38 @@ describe('the registry check', () => {
     ['an unregistered client', 'gateway:models.read', { allowedClients: ['kilo-tv'] }, 'kilo-tv'],
   ] as const)('fails %s', (_name, scope, overrides, message) => {
     expect(check(scope, overrides)).toEqual([expect.stringContaining(message)]);
+  });
+});
+
+describe('the development fixture scopes', () => {
+  const sourceRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src');
+  const source = (path: string) => join(sourceRoot, path);
+  const FIXTURES = source('scopes/development-fixtures.ts');
+
+  it('are named fixture:*, follow the registry rules, and the registry holds none', () => {
+    const names = Object.keys(DEVELOPMENT_FIXTURE_SCOPES);
+    expect(names.length).toBeGreaterThan(0);
+    for (const scope of names) expect(scope).toMatch(/^fixture:[a-z][a-z0-9.-]*$/);
+    expect(scopeRegistryProblems(DEVELOPMENT_FIXTURE_SCOPES)).toEqual([]);
+    expect(Object.keys(UTS_SCOPE_REGISTRY).filter(scope => scope.startsWith('fixture:'))).toEqual(
+      []
+    );
+    expect(utsScopeEntry('fixture:read')).toBeNull();
+    expect(developmentScopes('fixture:read')).toEqual(DEVELOPMENT_FIXTURE_SCOPES['fixture:read']);
+    expect(developmentScopes(KILO_API_PROFILE_READ_SCOPE)).toEqual(
+      utsScopeEntry(KILO_API_PROFILE_READ_SCOPE)
+    );
+  });
+
+  it('are reached only from the development entry, never from the deployed entry', () => {
+    const deployed = importClosure(source('index.ts'));
+    expect(deployed.has(source('http.ts'))).toBe(true);
+    expect(deployed.has(source('oauth/routes.ts'))).toBe(true);
+    expect(deployed.has(FIXTURES)).toBe(false);
+    expect(deployed.has(source('dev.ts'))).toBe(false);
+    for (const file of deployed) {
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(/fixture:|development-fixtures/);
+    }
+    expect(importClosure(source('dev-index.ts')).has(FIXTURES)).toBe(true);
   });
 });

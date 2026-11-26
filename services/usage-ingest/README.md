@@ -773,15 +773,16 @@ deployments; no usage publish or consume code, queue or credential takes part in
 
 One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
 
-1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (default `"false"` in both
-   environments).
+1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (on in both environments;
+   set any other value to stop it).
 2. Gets a `web:sts.canary` token from `@kilocode/service-token-client` over the `STS` service
    binding (`SecretsBroker`, `props.caller: "usage-ingest"`; `sts` in production, `sts-staging` in
    staging). The token lives 300 s and renews at 240 s, so a warm isolate mints at most about once
    per run.
 3. Posts to `WEB_STS_CANARY_URL` with `Authorization: Bearer <token>` and `x-sts-canary-run:
-   <run id>`; staging adds `x-vercel-protection-bypass` from the optional
-   `USAGE_WRITER_PROTECTION_BYPASS` secret. The web route verifies the token (`web:sts.canary`),
+   <run id>`; it adds `x-vercel-protection-bypass` whenever the optional
+   `USAGE_WRITER_PROTECTION_BYPASS` secret is set, which only staging needs (production must leave
+   it unset). The web route verifies the token (`web:sts.canary`),
    mints `usage-ingest:sts.canary` with its Vercel identity, calls `POST /sts-canary/verify` here
    (expect 204), presents the `web` token it received (expect 403 `insufficient_scope`), the same
    claims signed by a key STS never held (expect 401) and, when the instance holds one, an earlier
@@ -814,7 +815,7 @@ the run id), never the token. The route works whether or not the flag is on.
 
 | Var | Production | Staging |
 |---|---|---|
-| `STS_CANARY_ENABLED` | `"false"` | `"false"` |
+| `STS_CANARY_ENABLED` | `"true"` | `"true"` |
 | `STS_URL` | `https://sts.kiloapps.io` | `https://sts-staging.kiloapps.io` |
 | `STS_ENVIRONMENT` | `"production"` | `"staging"` |
 | `WEB_STS_CANARY_URL` | `https://app.kilo.ai/api/internal/sts-canary` | `https://staging-app.kilo.ai/api/internal/sts-canary` |

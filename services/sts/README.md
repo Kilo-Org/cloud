@@ -898,14 +898,22 @@ deploy job proves itself with its GitHub OIDC token; STS creates the token with 
 credential that only STS reads, for the permission set the job's policy names, for at most 1 hour.
 Cloudflare does not federate GitHub OIDC, so this replaces a stored long-lived deploy token.
 
-**What the token can do, and what it cannot be limited to.** Cloudflare's API cannot limit an API
-token to named Workers: per-Worker scoping is a dashboard feature, the API refuses the resource
-type `com.cloudflare.edge.worker.script`, and Custom Domains have no per-Worker roles
-(https://developers.cloudflare.com/workers/authorization/workers/). So a token with `Workers
-Scripts Write` can change every Worker in the account for its hour, and a token with zone
-`Workers Routes Write` every route of its zones. This is the fallback that the bouncer integration
-design accepts (section 4): an account-wide deploy right, only for a job of one repository's
-protected GitHub environment on `main`, for 1 hour. While staging and production share one
+**What the token can do, and what it cannot be limited to.** STS cannot limit a minted token to
+named Workers. Cloudflare has documented tokens scoped to "Specified Workers" (the `Individual
+Workers Admin` and `Editor` groups, account-owned tokens) since 2026-09-15
+(https://developers.cloudflare.com/changelog/post/2026-09-15-granular-worker-permissions/), but
+creating one fails with `"com.cloudflare.edge.worker.script" is not a supported resource type`,
+in the dashboard as through the API (reports from 2026-09-28 to 2026-10-15, for example
+https://community.cloudflare.com/t/cannot-create-api-token-scoped-to-one-worker/963400), the
+create-token docs still name only the User, Account and Zone resource types
+(https://developers.cloudflare.com/fundamentals/api/how-to/create-via-api/), and no script
+resource key is published. Custom Domains have no per-Worker roles, and creating a new Worker
+needs product-level Admin (https://developers.cloudflare.com/workers/authorization/workers/).
+Setup check 6 tries such a token; until it works, a token with `Workers Scripts Write` can change
+every Worker in the account for its hour, and a token with zone `Workers Routes Write` every route
+of its zones. This is the fallback that the bouncer integration design accepts (section 4): an
+account-wide deploy right, only for a job of one repository's protected GitHub environment on
+`main`, for 1 hour. While staging and production share one
 account (below), the loader holds every `cloudflare-deploy` grant, in every environment, to
 `refs/heads/main` alone (`CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS` in `src/constants.ts`), so
 the gate is `main` whichever environment's policy minted the token. `main` is not the whole gate:
@@ -936,7 +944,9 @@ staging; that is an open owner decision (design Q65). The detective control is t
 below: about 2 minutes after each token's hour ends, STS lists the account's Worker scripts and
 its zones' Workers routes, and writes `deploy_token.unexpected_script` or
 `deploy_token.unexpected_route` for a change that no token live at the time intended. It cannot
-see a Worker created and deleted inside the window.
+see a Worker created and deleted inside the window. Nor can it see a change to the STS Worker of
+its own environment: a token that replaced STS also replaced the code that runs the check. A
+monitor outside STS covers that (setup step 7).
 
 **Policy.** A `github-oidc` policy bound to a GitHub environment lists one `cloudflare-deploy`
 entry in `dynamic`:
@@ -1015,7 +1025,7 @@ curl -sS -X POST https://sts.kiloapps.io/v1/ci/cloudflare-deploy-token/revoke \
 |---|---|---|
 | `ok` | 200 | `token` (`cfat_...`), `tokenId`, `expiresAt`, `ttlSeconds`, `permissionSet` |
 | `denied` | 401 or 403 | `identity_rejected` (401: another workflow, event, ref or GitHub environment, a fork's event, or a token without a run id), `unknown_workload`, `environment_mismatch`, `grant_not_allowed`, `not_configured` (STS's setup step 3 has not pinned the forbidden and allowed groups; no retry helps) |
-| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` unexpired tokens, one being made or one whose deletion failed included), `rate_limited` (`maxPerHour` mint requests in the last hour) or `account_limit` (this environment holds 100 tokens that may exist at Cloudflare: being made, unexpired, owed a deletion, or possibly left by a lost creation; two environments then hold at most 200 of the account's 500, 5 minutes) |
+| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` unexpired tokens, one being made or one whose deletion failed included), `rate_limited` (`maxPerHour` mint requests in the last hour) or `account_limit` (this environment holds 100 tokens that may exist at Cloudflare: being made, unexpired, owed a deletion, possibly left by a creation whose outcome is unknown (not one Cloudflare refused or that was never sent), or found by the sweep and not yet deleted; two environments then hold at most 200 of the account's 500, 5 minutes) |
 | `invalid_request` | 400 (413 above 1 KB) | A body other than empty or `{}` |
 | `unavailable` | 503, `Retry-After` | No minting credential, Cloudflare refused or failed (a 429's `Retry-After` is passed on), the object did not answer in 35 seconds, or the environment has no `CF_DEPLOY_ACCOUNT_ID` |
 
@@ -1074,16 +1084,26 @@ the row until it succeeds, also after expiry: the first failure writes a row wit
 than 30 seconds after the last attempt, doubling per failure up to 1 hour, or after Cloudflare's
 `Retry-After` when longer. One alarm makes at most 5 deletes, least recently tried first, and an
 alarm that retried waits 30 seconds before the next retry. A caller's revoke answers `unavailable`
-meanwhile. Once a day, and once more after a creation whose outcome STS does not know, the alarm
-also sweeps the account's token list (`GET /accounts/<account>/tokens`, 50 a page, 2 pages per
+meanwhile, with the time left; a revoke that arrives while the alarm is deleting that token joins
+that call and answers from its outcome. Once a day, and once more after a creation whose outcome
+STS does not know, the alarm also sweeps the account's token list (`GET
+/accounts/<account>/tokens`, 50 a page, 2 pages per
 alarm) and deletes every token whose name starts with `sts-<environment>-`, for which STS holds no
 row, and that has expired or carries no expiry (STS always sets one, so such a token is not one it
 handed over). It never touches another environment's tokens, an unexpired token, or a token
 named otherwise. The list asks for expired tokens too (`include_expired=true`): Cloudflare leaves
 them out otherwise, and lists them only while recently expired
 (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/list/), so a
-lost creation's token is swept 2 minutes after its expiry. When Cloudflare answers 401 or 403 to
-the minting credential on a list, or 401 on a delete or a token creation (a 403 there can refuse
+lost creation's token is swept 2 minutes after its expiry. A token the sweep cannot delete (a 403,
+a 5xx, no answer) does not hold the sweep up: it goes into `deploy_token_sweep_retry`, the sweep
+passes over it, finishes its pages and runs again a day later, and the alarm tries that token
+again by id, 30 seconds after the failure, doubling per failure up to a day. Its `delete_failed`
+row is written once, and its `deleted` (or `gone`) row once Cloudflare takes it. A 401 or a 429
+on a sweep delete stops the sweep as on any call (the hold or Cloudflare's wait below, then the
+same page again) and adds no wait of the token's own. A 429 without a readable `Retry-After`
+waits 1 minute. Until it is deleted, such a token counts against the environment's 100-token
+share (`account_limit`), as it does against the account's cap. When Cloudflare answers 401 or 403
+to the minting credential on a list, or 401 on a delete or a token creation (a 403 there can refuse
 just that request: a group outside the minting token's own policy, or a token an earlier minting
 token created, see "Rotation"), the object drops the credential and stores a hold: until it ends,
 the alarm makes no Cloudflare call and reads no credential (deletes, the window check and the
@@ -1111,8 +1131,9 @@ from the token's creation to its deletion or expiry, widened by 2 minutes on eac
   previous check and compares: a route added or changed since then (its pattern or its Worker)
   gets one `deploy_token.unexpected_route` row (with the previous Worker) unless a token with that
   zone live since the previous list intends both its Worker (`intendedScripts`) and its pattern
-  (`intendedRoutes`). So a deploy that widens or adds a pattern for its own Worker, sending another
-  host's traffic to it, is reported too. A zone's first list has nothing to compare with, so it
+  (`intendedRoutes`). One token must intend the pair, so one token's pattern pointed at another
+  token's Worker is reported, and so is a deploy that widens or adds a pattern for its own Worker,
+  sending another host's traffic to it. A zone's first list has nothing to compare with, so it
   reports every route outside the intended Workers and patterns (`firstListOfZone: true`); that is
   noise once per zone, chosen over silently trusting the first list. The list is stored with the
   windows' check mark, in one write.
@@ -1131,7 +1152,9 @@ from the token's creation to its deletion or expiry, widened by 2 minutes on eac
   Containers, Custom Domains, secrets and other Worker settings that leave `modified_on` alone are
   not listed. Listed scripts without a name or a time are left out; the check logs how many. A
   change by someone else in a window (the dashboard, another deploy credential, the other
-  environment's STS in the shared account) also shows.
+  environment's STS in the shared account) also shows. A change to the STS Worker of the same
+  environment is reported only by a check the changed STS still runs, so it is not a control for
+  that case (setup step 7).
 - **Why not Cloudflare's audit log.** Audit Logs v2
   (https://developers.cloudflare.com/api/resources/accounts/subresources/logs/subresources/audit/methods/list/)
   name the acting API token (`actor.token_id`, `actor.token_name`) and are kept 18 months
@@ -1218,7 +1241,12 @@ is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
    `/sts-deploy` only.
 5. **STS.** Set `CF_DEPLOY_ACCOUNT_ID` in that environment's block of `wrangler.jsonc` and deploy;
    then add the policy (`ci-deploy-bouncer`) with its grant and deploy again.
-6. **Checks in staging.** A staging deploy job gets a token and deploys with it. Asking Cloudflare
+6. **Checks in staging.** A staging deploy job gets a token and deploys with it. Try to create a
+   token scoped to one Worker ("Specified Workers", `Individual Workers Editor`), once in the
+   dashboard and once through `POST /accounts/<account>/tokens` with the minting token; record
+   both answers in Q65 before setup goes on. If either works, a follow-up switches minting to
+   per-Worker scope (the script resource key still to be confirmed) and reopens Q65; until then
+   the pins keep the account-wide groups of step 3. Asking Cloudflare
    with the minting token for a group outside its own policy (for example `DNS Read`) is refused,
    so its policy is the ceiling; if it is not, the pinned ids and the returned-grant check are the
    only limit and Q65 is reopened. A minted token cannot create a token (`POST
@@ -1239,6 +1267,12 @@ is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
    deploying repository's settings that the GitHub environment a staging `cloudflare-deploy` policy
    binds carries the same protection rules as production's (required reviewers, deployment branch
    `main`, no self-review): a staging token reaches production Workers.
+7. **Monitor of the STS Worker, outside STS.** The window check runs inside STS, so it cannot
+   report a change to the STS Worker of its own environment. Set up a scheduled job outside STS
+   (an Axiom monitor on Cloudflare's Workers deployment data, or a cron job with a read-only
+   token) that compares the STS Worker's `modified_on` or current deployment id, per environment,
+   with the runs of the STS deploy job, and alerts on any deployment no run made. This is setup
+   work for staging and production; STS does not build it.
 
 **Rotation (every 90 days, or at once on a leak).** A Super Administrator creates the new minting
 token as in step 2, puts it into `/ci/minting`, and waits 5 minutes (STS reads it within 4). Then
@@ -1266,10 +1300,16 @@ At 43 releases a day: 86 STS requests, 86 `DeployTokenDO` calls, 172 Cloudflare 
 rows, at most 86 Infisical reads and 43 logins (against Infisical's 600 requests a minute). The
 daily sweep adds, once a day: 1 login, 1 `SignerDO` call and 1 Infisical read (the cached
 credential has always lapsed by then) and 1 token list call while STS keeps the account clean (at
-most 10 at the 500-token cap). A failed creation adds 1 `deploy_token.mint_failed` row; a failed
-window check repeats its list calls on each retry, at most 3 times per window, and then writes 1
-`deploy_token.script_check_failed` row. Cloudflare's published limit is 1,200 requests per 5
-minutes per user, counted together across the dashboard, API keys and API tokens; its table lists
+most 10 at the 500-token cap). A token the sweep can never delete (a 403 that never clears, such
+as a predecessor's token after a rotation, or a lasting 5xx) costs, until someone deletes it by
+hand: 1 `delete_failed` row in all, 1 stored row, 1 delete call 30 seconds after the failure and
+then at doubling waits (12 calls in its first 34 hours), then 1 a day, sharing the alarm's 5
+deletes per 30 seconds; it holds one of the environment's 100 places and one of the account's
+500 for as long, and the sweep goes on past it. A failed creation adds 1
+`deploy_token.mint_failed` row; a failed window check repeats its list calls on each retry, at most
+3 times per window, and then writes 1 `deploy_token.script_check_failed` row. Cloudflare's
+published limit is 1,200 requests per 5 minutes per user, counted together across the dashboard,
+API keys and API tokens; its table lists
 the same 1,200 per 5 minutes for "Client API per user/account token"
 (https://developers.cloudflare.com/fundamentals/api/reference/limits/). The page does not say
 which budget an account-owned token's calls count against (the token's own, or the creator's);

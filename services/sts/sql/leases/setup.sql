@@ -100,6 +100,10 @@ $$;
 -- The lease statements' helpers. Each knows its caller's template by `session_user`, which a
 -- session cannot change without superuser rights: replica admin -> kilo_lease_replica_read and
 -- names `lease_rr_<20 of [a-z0-9]>`; migration admin -> kilo_lease_migration and `lease_cm_...`.
+-- `postgres` owns the schema, its table and its functions here; setup-ci-migration.sql moves them
+-- to kilo_lease_owner before any lease can act as `postgres`, so such a lease cannot replace them.
+-- With setup.sql alone no lease acts as `postgres`, and whoever holds `postgres` already holds
+-- every right a replica-read lease has.
 CREATE SCHEMA kilo_lease;
 
 -- The lease's template and name prefix for the calling admin login; an error for any other login.
@@ -131,8 +135,8 @@ BEGIN
 END
 $$;
 
--- Every lease role an admin login created, by OID, with its template; owned by `postgres`, and no
--- login may write it except through kilo_lease.track_lease. A session whose role no longer exists is
+-- Every lease role an admin login created, by OID, with its template; owned by the schema's owner,
+-- and no login may write it except through kilo_lease.track_lease. A session whose role no longer exists is
 -- ended only when its OID is here, so a revocation never ends a session of a role that was never a
 -- lease (PostgreSQL leaves an ordinary role's sessions open when the role is dropped). A row goes
 -- once its role is gone and no session of it remains.
@@ -141,8 +145,8 @@ CREATE TABLE kilo_lease.lease_role (
   template regrole NOT NULL
 );
 
--- Records `username`, a role the calling admin login just created in its template. Runs as
--- `postgres`; refuses any other role.
+-- Records `username`, a role the calling admin login just created in its template. Runs as the
+-- schema's owner; refuses any other role.
 CREATE FUNCTION kilo_lease.track_lease(username text) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
@@ -166,8 +170,9 @@ $$;
 -- Ends, on this node, the sessions of the lease roles of the caller's template (kilo_lease.lease_role)
 -- that are `username`, have no login (a revocation blocked them), have passed their VALID UNTIL, or
 -- no longer exist. Nothing else: not a superuser, not an admin login, not an application role, not
--- a session of a dropped role that was never a lease. Runs as `postgres`, which Supabase makes a
--- member of pg_signal_backend. Returns the number of sessions signalled; they exit right after. It
+-- a session of a dropped role that was never a lease. Runs as its owner, `postgres` (which Supabase
+-- makes a member of pg_signal_backend) or, after setup-ci-migration.sql, kilo_lease_owner (granted
+-- pg_signal_backend there). Returns the number of sessions signalled; they exit right after. It
 -- drops the transaction's activity snapshot first, so a second call in the same revocation sees
 -- the logins that landed since the first, and it forgets the rows of roles that are gone with no
 -- session left.
@@ -184,12 +189,13 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS 
       OR (NOT r.rolsuper
         AND (r.rolname = username OR NOT r.rolcanlogin OR r.rolvaliduntil < pg_catalog.now()))
   ),
-  -- Materialized, so the termination below runs on these sessions only.
+  -- Materialized, so the termination below runs on these sessions only. Selected by user id alone:
+  -- without pg_read_all_stats (kilo_lease_owner has none) pg_stat_activity shows another role's
+  -- pid and usesysid but no backend type, and every backend with a lease role's id is that lease's.
   targets AS MATERIALIZED (
     SELECT a.pid
     FROM pg_catalog.pg_stat_activity a
     WHERE a.pid <> pg_catalog.pg_backend_pid()
-      AND a.backend_type = 'client backend'
       AND a.usesysid IN (SELECT role FROM leases)
   ),
   forgotten AS (

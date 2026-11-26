@@ -167,6 +167,23 @@ for admin in kilo_lease_replica_admin kilo_lease_migration_admin; do
 done
 pass 'after setup-ci-migration.sql, postgres (and so a ci-migration lease) cannot reset either admin password'
 
+# setup-ci-migration.sql gave the kilo_lease schema, table and functions to kilo_lease_owner, so a
+# ci-migration lease acting as `postgres` cannot replace create_lease to record later passwords.
+[ "$(super -c "select count(*) from pg_proc where pronamespace = 'kilo_lease'::regnamespace and proowner <> 'kilo_lease_owner'::regrole")" = 0 ] ||
+  fail 'kilo_lease_owner owns every kilo_lease function'
+[ "$(super -c "select pg_has_role('postgres', 'kilo_lease_owner', 'member')")" = f ] || fail 'postgres is not a member of kilo_lease_owner'
+if owner -c 'create or replace function kilo_lease.create_lease(username text, password text, valid_until timestamptz) returns void language sql as $$ select $$' >/dev/null 2>"$TMP/err"; then
+  fail 'postgres cannot replace kilo_lease.create_lease'
+fi
+grep -qE 'must be owner|permission denied for schema kilo_lease' "$TMP/err" || fail "replace refused for ownership: $(cat "$TMP/err")"
+if owner -c 'create function kilo_lease.planted() returns int language sql as $$ select 1 $$' >/dev/null 2>&1; then
+  fail 'postgres cannot add a function to kilo_lease'
+fi
+if owner -c 'alter function kilo_lease.end_sessions(text) owner to postgres' >/dev/null 2>&1; then
+  fail 'postgres cannot take over a kilo_lease function'
+fi
+pass 'after setup-ci-migration.sql, postgres (and so a ci-migration lease) cannot replace, add or take over a kilo_lease function'
+
 # A ci-migration lease runs as `postgres`, which reads other sessions' query text. Neither admin
 # login's statements show there; another login's do.
 MARK=$(secret)
@@ -423,6 +440,11 @@ CM1_PW=$(secret)
 create_migration "$CM1" "$CM1_PW" "$(expires_in 300)"
 [ "$(sql "$CM1" "$CM1_PW" -c "select current_user || '/' || session_user")" = "postgres/$CM1" ] || fail 'migration lease runs as postgres'
 pass 'a ci-migration session runs as postgres and is logged in as its lease role'
+if sql "$CM1" "$CM1_PW" -c 'create or replace function kilo_lease.create_lease(username text, password text, valid_until timestamptz) returns void language sql as $$ select $$' >/dev/null 2>"$TMP/err"; then
+  fail 'a ci-migration lease cannot replace kilo_lease.create_lease'
+fi
+grep -qE 'must be owner|permission denied for schema kilo_lease' "$TMP/err" || fail "replace refused for ownership: $(cat "$TMP/err")"
+pass 'a ci-migration lease cannot replace kilo_lease.create_lease'
 sql "$CM1" "$CM1_PW" -c 'create extension if not exists pgcrypto' -c 'create table public.migrated (id int)' \
   -c 'alter table public.accounts add column note text' -c 'create index on public.accounts (email)' >/dev/null
 [ "$(super -c "select tableowner from pg_tables where tablename = 'migrated'")" = postgres ] || fail 'the new table belongs to postgres'

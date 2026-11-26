@@ -182,7 +182,8 @@ ${prefill}<label for="user-code">Code shown on your device</label>
 
 /**
  * A device sign-in waiting for the user (RFC 8628 section 5.4): what asks, from where. `source`
- * goes back with the decision: a code from a link needs a passkey check to approve.
+ * goes back with the decision: a code from a link needs a passkey check to approve, so the page
+ * tells a user without a passkey to type the code on the plain device page instead.
  */
 export function deviceApprovalPage(
   userCode: string,
@@ -194,7 +195,7 @@ export function deviceApprovalPage(
   const scopes = device.scopes.map(scope => `<li><code>${escapeHtml(scope)}</code></li>`).join('');
   const linkNotice =
     source === 'link'
-      ? '\n<p>This code came in a link, so approving asks for your passkey.</p>'
+      ? `\n<p>This code came in a link, so approving asks for your passkey. No passkey? <a id="type-code" href="${UTS_DEVICE_VERIFICATION_PATH}">Type the code from your device</a> instead.</p>`
       : '';
   return page(
     'Approve a device sign-in',

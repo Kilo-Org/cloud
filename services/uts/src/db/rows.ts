@@ -132,6 +132,7 @@ export const BrowserSessionRowSchema = z.strictObject({
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
   denied_audited_at: timestamp.nullable(),
+  cleanup_kept_at: timestamp.nullable(),
 });
 
 export const DeviceSessionRowSchema = z.strictObject({
@@ -295,6 +296,7 @@ export const DeviceCodeRowSchema = z.strictObject({
   amr: amr.nullable(),
   grant_id: uuid.nullable(),
   dpop_jkt: sha256.nullable(),
+  anonymous_writer: z.string().nullable(),
 });
 
 export const EmailCodeRowSchema = z.strictObject({

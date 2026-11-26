@@ -33,3 +33,31 @@ export function requestNetwork(request: Request): NetworkContext {
     city: city !== undefined && city.length > 0 && city.length <= 128 ? city : null,
   };
 }
+
+/**
+ * Who counts as one anonymous writer, as `uts.anonymous_writer` defines it (migration 0008), for
+ * an address `requestNetwork` accepted: the exact IPv4 address, so one host cannot use up an
+ * office /24, or the IPv6 /48 written as its leading hextets, since one IPv6 subscriber holds a
+ * /64 or more and an exact address would bound nothing. Null without an address.
+ */
+export function anonymousWriter(clientIp: string | null): string | null {
+  if (clientIp === null) return null;
+  if (!clientIp.includes(':')) return clientIp;
+  // Expand `::` to the hextets it stands for; an IPv4 tail (`::ffff:192.0.2.1`) holds two.
+  const groups = (part: string) =>
+    part === ''
+      ? []
+      : part.split(':').flatMap(group => (group.includes('.') ? ['0', '0'] : [group]));
+  const [head, tail] = clientIp.split('::');
+  const leading = groups(head);
+  const trailing = tail === undefined ? [] : groups(tail);
+  const hextets = [
+    ...leading,
+    ...Array.from({ length: 8 - leading.length - trailing.length }, () => '0'),
+    ...trailing,
+  ];
+  return `${hextets
+    .slice(0, 3)
+    .map(group => Number.parseInt(group, 16).toString(16))
+    .join(':')}::/48`;
+}

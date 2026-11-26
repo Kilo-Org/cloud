@@ -75,9 +75,31 @@ ALTER TABLE uts.passkey_credentials
     FOREIGN KEY (gate_pass_id, account_id, gate_pass_action)
     REFERENCES uts.gate_passes (id, account_id, action);
 
--- When the session's last denied audit row was written.
+-- The client network whose wrong user codes share one count: the address's IPv4 /24 or IPv6
+-- /48, or NULL without an address. It is wider than the anonymous writer below because it
+-- bounds guessing: spending it takes signed-in accounts, and a network that spends it only waits
+-- an hour to approve devices, while a guesser that gets past it can approve someone else's device.
+CREATE FUNCTION uts.client_network(p_client_ip inet) RETURNS inet
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog, pg_temp
+RETURN network(set_masklen(p_client_ip, CASE family(p_client_ip) WHEN 4 THEN 24 ELSE 48 END))::inet;
+
+-- Who counts as one anonymous writer (design 3, "Anonymous sign-in writes"): the exact IPv4
+-- address, so one host cannot use up an office /24, or the IPv6 /48, since one IPv6 subscriber
+-- holds a /64 or more and an exact address would bound nothing. NULL without an address.
+-- `anonymousWriter` in src/signin/network.ts computes the same key for the Worker's limiter.
+CREATE FUNCTION uts.anonymous_writer(p_client_ip inet) RETURNS inet
+LANGUAGE sql
+IMMUTABLE
+SET search_path = pg_catalog, pg_temp
+RETURN network(set_masklen(p_client_ip, CASE family(p_client_ip) WHEN 4 THEN 32 ELSE 48 END))::inet;
+
+-- When the session's last denied audit row was written, and when the session cleanup last found
+-- the ended session still kept by a credential (`uts.maintain_sign_in_rows`).
 ALTER TABLE uts.browser_sessions
-  ADD COLUMN denied_audited_at timestamptz;
+  ADD COLUMN denied_audited_at timestamptz,
+  ADD COLUMN cleanup_kept_at timestamptz;
 
 -- Wrong user codes entered on the device page in the hour that started with the first of them,
 -- counted per account (over all its browser sessions) and per client network (an IPv4 /24 or an
@@ -101,13 +123,15 @@ CREATE INDEX network_user_code_failures_window_idx
 
 -- An approval records when and how the user authenticated, which become the device session's
 -- `auth_time` and `amr`; a consumed code names the grant it created and the DPoP key that grant
--- is bound to, so a retry of the same poll gets that grant again.
+-- is bound to, so a retry of the same poll gets that grant again. `anonymous_writer` keys the cap
+-- on pending codes per writer (`uts.create_device_code`).
 ALTER TABLE uts.device_codes
   ADD COLUMN auth_time timestamptz,
   ADD COLUMN amr uts.auth_method[]
     CHECK (cardinality(amr) BETWEEN 1 AND 8 AND array_position(amr, NULL) IS NULL),
   ADD COLUMN grant_id uuid,
   ADD COLUMN dpop_jkt uts.sha256,
+  ADD COLUMN anonymous_writer inet GENERATED ALWAYS AS (uts.anonymous_writer(client_ip)) STORED,
   ADD CONSTRAINT device_codes_approval_shape CHECK (
     (status IN ('approved', 'consumed')) = (auth_time IS NOT NULL AND amr IS NOT NULL)
   ),
@@ -672,9 +696,10 @@ END
 $$;
 
 -- POST /device_authorization (RFC 8628 section 3.1): a pending 10-minute device code. It names
--- no account, so it writes no audit row. One client address holds at most 5 pending codes, so an
--- anonymous caller cannot fill the table (design 3, "Anonymous sign-in writes"). Outcomes:
--- `created`; `user_code_taken` (the caller draws another user code); `too_many_pending`.
+-- no account, so it writes no audit row. One anonymous writer (`uts.anonymous_writer`: an IPv4
+-- address or an IPv6 /48) holds at most 5 pending codes, so an anonymous caller cannot fill the
+-- table (design 3, "Anonymous sign-in writes"). Outcomes: `created`; `user_code_taken` (the
+-- caller draws another user code); `too_many_pending`.
 CREATE FUNCTION uts.create_device_code(
   p_device_code_hash bytea,
   p_user_code_hash bytea,
@@ -693,7 +718,9 @@ AS $$
 BEGIN
   IF p_client_ip IS NOT NULL AND (
     SELECT count(*) FROM uts.device_codes AS pending
-    WHERE pending.client_ip = p_client_ip AND pending.status = 'pending' AND pending.expires_at > now()
+    WHERE pending.anonymous_writer = uts.anonymous_writer(p_client_ip)
+      AND pending.status = 'pending'
+      AND pending.expires_at > now()
   ) >= 5 THEN
     outcome := 'too_many_pending';
     RETURN NEXT;
@@ -712,14 +739,6 @@ BEGIN
   RETURN NEXT;
 END
 $$;
-
--- The client network whose wrong user codes share one count: the address's IPv4 /24 or IPv6
--- /48, or NULL without an address.
-CREATE FUNCTION uts.user_code_network(p_client_ip inet) RETURNS inet
-LANGUAGE sql
-IMMUTABLE
-SET search_path = pg_catalog, pg_temp
-RETURN network(set_masklen(p_client_ip, CASE family(p_client_ip) WHEN 4 THEN 24 ELSE 48 END))::inet;
 
 -- Counts one wrong user code against the account and the client network; the first failure after
 -- an hour starts a new one.
@@ -791,7 +810,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   live record;
-  entry_network inet := uts.user_code_network(p_client_ip);
+  entry_network inet := uts.client_network(p_client_ip);
 BEGIN
   SELECT * INTO live FROM uts.live_browser_session(p_session_token_hash);
   IF NOT FOUND THEN
@@ -846,7 +865,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   live record;
-  entry_network inet := uts.user_code_network(p_client_ip);
+  entry_network inet := uts.client_network(p_client_ip);
   code uts.device_codes%ROWTYPE;
   step_up_time timestamptz;
   checks uts.gate_check[];
@@ -1399,10 +1418,14 @@ $$;
 -- `uts.maintain_oauth_rows()` does: WebAuthn challenges, device codes, tickets and step-ups 1
 -- hour past their lifetime, used or not, wrong user-code counts whose hour has passed, and
 -- browser sessions 1 day after they ended (idle, absolute or revoked). Deleting a session
--- cascades to its challenges, codes and step-ups. A session that holds a gate pass stays: a
--- credential's foreign key keeps the pass, and the pass keeps its session; those sessions number
--- at most one per gated action. The UTS cron calls both functions until every count is under
--- 5,000.
+-- cascades to its challenges, codes, step-ups and gate passes. A session stays while a row still
+-- refers to one of its passes (a passkey, PAT, bot key, CI trust policy, third-party consent or
+-- device code), whose foreign key would refuse the cascade: at most one session per such
+-- credential. A pass nothing refers to, such as that of a device approval whose code is gone,
+-- keeps nothing. A kept session is stamped `cleanup_kept_at` and looked at again a day later, so
+-- a call reads the newly ended sessions and about a 1,440th of the kept ones, not every kept one.
+-- Each look is a unique-index probe per referring table. The UTS cron calls both functions until
+-- every count is under 5,000.
 CREATE FUNCTION uts.maintain_sign_in_rows()
 RETURNS TABLE (kind text, deleted integer)
 LANGUAGE plpgsql
@@ -1472,25 +1495,47 @@ BEGIN
   GET DIAGNOSTICS deleted = ROW_COUNT;
   RETURN NEXT;
 
-  DELETE FROM uts.browser_sessions AS session
-  WHERE session.id IN (
-    SELECT ended.id FROM uts.browser_sessions AS ended
-    WHERE least(ended.idle_expires_at, ended.expires_at, coalesce(ended.revoked_at, 'infinity'))
-      < now() - interval '1 day'
-      AND NOT EXISTS (
-        SELECT 1 FROM uts.gate_passes AS pass WHERE pass.browser_session_id = ended.id
-      )
+  WITH due AS (
+    SELECT ended.id,
+      EXISTS (
+        SELECT 1 FROM uts.gate_passes AS pass
+        WHERE pass.browser_session_id = ended.id
+          AND (
+            EXISTS (SELECT 1 FROM uts.passkey_credentials AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.personal_access_tokens AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.org_bot_keys AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.ci_trust_policies AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.third_party_consents AS r WHERE r.gate_pass_id = pass.id)
+            OR EXISTS (SELECT 1 FROM uts.device_codes AS r WHERE r.gate_pass_id = pass.id)
+          )
+      ) AS kept
+    FROM uts.browser_sessions AS ended
+    WHERE greatest(
+        least(ended.idle_expires_at, ended.expires_at, coalesce(ended.revoked_at, 'infinity')),
+        coalesce(ended.cleanup_kept_at, '-infinity')
+      ) < now() - interval '1 day'
     LIMIT batch
-  );
+  ),
+  stamped AS (
+    UPDATE uts.browser_sessions AS session SET cleanup_kept_at = now()
+    FROM due WHERE session.id = due.id AND due.kept
+  )
+  DELETE FROM uts.browser_sessions AS session
+  USING due WHERE session.id = due.id AND NOT due.kept;
   kind := 'browser_sessions';
   GET DIAGNOSTICS deleted = ROW_COUNT;
   RETURN NEXT;
 END
 $$;
 CREATE INDEX step_ups_expires_idx ON uts.step_ups (expires_at);
--- The session cleanup reads ended sessions by their end, and its cascades find a session's rows.
-CREATE INDEX browser_sessions_end_idx
-  ON uts.browser_sessions (least(idle_expires_at, expires_at, coalesce(revoked_at, 'infinity')));
+-- The session cleanup reads sessions due a look (ended, and not found kept, a day ago), and its
+-- cascades find a session's rows.
+CREATE INDEX browser_sessions_cleanup_idx ON uts.browser_sessions (
+  greatest(
+    least(idle_expires_at, expires_at, coalesce(revoked_at, 'infinity')),
+    coalesce(cleanup_kept_at, '-infinity')
+  )
+);
 CREATE INDEX gate_passes_browser_session_idx ON uts.gate_passes (browser_session_id)
   WHERE browser_session_id IS NOT NULL;
 CREATE INDEX step_ups_browser_session_idx ON uts.step_ups (browser_session_id)
@@ -1498,7 +1543,8 @@ CREATE INDEX step_ups_browser_session_idx ON uts.step_ups (browser_session_id)
 CREATE INDEX authorization_codes_browser_session_idx ON uts.authorization_codes (browser_session_id)
   WHERE browser_session_id IS NOT NULL;
 -- The pending-code cap of `uts.create_device_code`.
-CREATE INDEX device_codes_pending_ip_idx ON uts.device_codes (client_ip) WHERE status = 'pending';
+CREATE INDEX device_codes_pending_writer_idx ON uts.device_codes (anonymous_writer)
+  WHERE status = 'pending';
 
 GRANT EXECUTE ON FUNCTION
   uts.read_browser_session(bytea),

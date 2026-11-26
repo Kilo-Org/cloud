@@ -104,7 +104,7 @@ async function issueFirstPartyCode(
     amr: ['passkey'],
     ...overrides,
   });
-  expect(outcome).toBe('issued');
+  expect(outcome).toMatchObject({ outcome: 'issued' });
   return { code, verifier, challenge, jkt };
 }
 
@@ -180,7 +180,7 @@ async function thirdPartyFamily(accountId: string) {
       authTime: new Date(),
       amr: ['oauth'],
     })
-  ).toBe('issued');
+  ).toEqual({ outcome: 'issued', orgRole: null });
   const refreshToken = token();
   const familyId = randomUUID();
   const exchange: ExchangeCodeInput = {
@@ -265,13 +265,15 @@ describe('authorization codes', () => {
       authTime: new Date(),
       amr: ['passkey'],
     } satisfies Partial<IssueCodeInput>;
-    expect(await grants.issueCode({ ...base, accountId: blocked, orgId: null })).toBe(
-      'access_denied'
-    );
+    expect(await grants.issueCode({ ...base, accountId: blocked, orgId: null })).toEqual({
+      outcome: 'access_denied',
+    });
 
     const member = await insertAccount(owner);
     const orgId = randomUUID();
-    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toBe('access_denied');
+    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toEqual({
+      outcome: 'access_denied',
+    });
     await owner.query(
       `INSERT INTO uts.org_memberships (org_id, account_id, role, event_version) VALUES ($1, $2, 'member', 1)`,
       [orgId, member]
@@ -280,7 +282,9 @@ describe('authorization codes', () => {
       `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, 'required', 1)`,
       [orgId]
     );
-    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toBe('access_denied');
+    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toEqual({
+      outcome: 'access_denied',
+    });
     expect(
       await grants.issueCode({
         ...base,
@@ -289,7 +293,7 @@ describe('authorization codes', () => {
         orgId,
         amr: ['sso'],
       })
-    ).toBe('issued');
+    ).toEqual({ outcome: 'issued', orgRole: 'member' });
   });
 
   it('needs an active consent that covers the scopes for a third-party client', async () => {
@@ -310,9 +314,12 @@ describe('authorization codes', () => {
         authTime: new Date(),
         amr: ['oauth'],
       });
-    expect(await issue(['mcp:tools.write'], consentId)).toBe('consent_required');
-    expect(await issue(['mcp:tools.read'], randomUUID())).toBe('consent_required');
-    expect(await issue(['mcp:tools.read'], consentId)).toBe('issued');
+    expect(await issue(['mcp:tools.write'], consentId)).toEqual({ outcome: 'consent_required' });
+    expect(await issue(['mcp:tools.read'], randomUUID())).toEqual({ outcome: 'consent_required' });
+    expect(await issue(['mcp:tools.read'], consentId)).toEqual({
+      outcome: 'issued',
+      orgRole: null,
+    });
   });
 });
 
@@ -372,7 +379,7 @@ describe('code exchange', () => {
         scopes: result.scopes,
         audiences: ['gateway', 'kilo-chat'],
         refreshRef: reference(input.refreshToken),
-        tokenLifetimeSeconds: 600,
+        tokenLifetimeSeconds: ['600', '600'],
       },
     });
     const text = await eventsText(accountId);
@@ -1205,7 +1212,7 @@ describe('a blocked third-party client', () => {
         authTime: new Date(),
         amr: ['oauth'],
       })
-    ).toBe('issued');
+    ).toEqual({ outcome: 'issued', orgRole: null });
 
     // The block is the status change alone: no family changes in that statement.
     await app.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [

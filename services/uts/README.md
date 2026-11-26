@@ -27,8 +27,10 @@ The issuer, key set URL and local ports of each environment live in
   not used: it places only after it has seen traffic from several locations, and it can leave a
   request where it arrived. Placement does not apply to RPC methods or named entrypoints, so token
   minting stays a fetch handler.
-- RFC 9728 protected-resource metadata is not served yet: UTS becomes a protected resource with the
-  account API, which publishes its own document at `/.well-known/oauth-protected-resource` then.
+- The account API for PATs and org bot keys and the PAT probe route (`src/account/`, `src/pat/`,
+  see "Account API, PATs and org bot keys") run in this fetch handler too, with RFC 9728
+  protected-resource metadata at `/.well-known/oauth-protected-resource`; PAT lookups for verifiers
+  run in the named entrypoint `PatLookup`.
 - Traces stay off in every block: a trace records Durable Object storage calls, and the signer
   objects hold private keys. Logs stay on.
 
@@ -151,8 +153,10 @@ upload` with `WRANGLER_COMMAND` set to the command, fails for every command but 
 production and staging blocks. The same entry wires the development sign-in hand-off
 (`src/dev.ts`): it approves every authorization request for the synthetic account `dev:uts-local`.
 
-The local config binds the local identity store as `IDENTITY_STORE`. The UTS logins have no password
-in the repository, so give `uts_app_a` one and pass the URL to wrangler:
+The local config binds the local identity store as `IDENTITY_STORE` (login `uts_app_a`) and
+`IDENTITY_STORE_PAT` (login `uts_pat_a`). The UTS logins have no password in the repository, so
+give both logins one and pass the URLs to wrangler
+(`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_PAT` for the second):
 
 ```sh
 CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE=postgres://uts_app_a:<password>@127.0.0.1:55432/uts \
@@ -165,7 +169,20 @@ UTS_E2E_BASE_URL=http://127.0.0.1:8800/ UTS_E2E_ADMIN_URL=... UTS_E2E_APP_URL=..
 same device key), a code-exchange retry and two concurrent exchanges of one code, third-party
 rotation, reuse (the family is revoked), a blocked third-party client, a streamed oversized body,
 revoke and introspect, prints the audit rows (token ids only), checks that no token value reached
-an audit row, and times the mint path.
+an audit row, and times the mint path. Its first-party steps use `kilo-cli` scopes
+(`kilo-api:profile.read`, `uts:pats.manage`); its third-party steps use `fixture:read`, a
+development fixture scope (`src/scopes/development-fixtures.ts`) that only the development entry
+adds on top of the registry, since the registry holds no third-party-safe scope yet. `test/repo`
+checks that the deployed entry's imports never reach the fixtures and that `UTS_SCOPE_REGISTRY`
+holds no `fixture:*` scope. `scripts/pat-e2e.ts` (`UTS_E2E_BASE_URL`,
+`UTS_E2E_ADMIN_URL`) signs the CLI in, creates a PAT, uses it on the probe route, lists and
+revokes it and times until the probe refuses it, creates, lists and revokes an org bot key, shows
+the tier B refusal once the sign-in is 11 minutes old, refuses a web-app-only scope to the CLI at
+`/authorize`, refuses an owner-or-member scope to an org admin at `/authorize`, mints it for a
+member with the `org` claim and refuses its refresh once the member is an admin again (neither
+refusal writes an audit row; the development hand-off binds the `org` the request names), checks
+each token's lifetime in the audit rows, and checks that no credential value or hash reached an
+audit row. It mints only scopes the registry allows `kilo-cli`.
 
 ## OAuth endpoints
 
@@ -207,7 +224,8 @@ give the secret. A third-party client has only its PKCE verifier, so any second 
 of its code revokes the family (OAuth 2.1 section 4.1.2); a third-party client that lost its
 response authorizes again, and its consent stands, so it sees no consent screen. A consumed code
 with another client, redirect URI, verifier or key, or after its lifetime, still revokes the
-grant. The audit row of a mint lists the `jti` of each token the call is about to sign: after a
+grant. The audit row of a mint lists the `jti` of each token the call is about to sign, and each
+token's lifetime in the same order (`tokenLifetimeSeconds`, `uts.token_lifetimes`): after a
 failed signing no token carries those ids, and the retry's row (`token.issued`, `rotation`
 `code_retry`) lists the ids of the tokens it signs.
 
@@ -226,6 +244,117 @@ about ceil(N / 5,000) cron cycles (about 20 at 100k); the operator path retries 
 rather than treating it as a failure. Once it succeeds, no family comes back. The batches write
 no audit row; the operator action that blocks or unblocks the client writes it.
 
+## Account API, PATs and org bot keys
+
+Every account route takes a UTS access token for the `uts` audience with the route's scope and a
+`sid` (`src/account/bearer.ts`): `EdDSA` under a `uts-token-` key that the isolate's key-set shard
+holds (one Durable Object call per request), `typ` `at+jwt`, the issuer, 60 seconds of skew and
+the claim profile, and a client that the scope registry allows for the scope (today `kilo-cli`
+only). A PAT names no session, so it is refused there. Each action is one statement that reads the
+grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
+account fails at once, with no feed lookup.
+
+`/authorize` and `/token` apply the scope registry (`src/scopes/policy.ts`; the endpoints take it
+as a dependency: `utsScopeEntry` in every deployed Worker, plus the `fixture:*` scopes in the
+development entry only):
+
+- **Client:** a scope that is unregistered, whose `allowedClients` does not name the first-party
+  client, or that is not third-party-safe for a third-party client is refused: at `/authorize`
+  with `invalid_scope` before the hand-off, so a code or grant only ever holds scopes its client
+  may hold; at `/token` with `invalid_scope` when requested (before the statement) and when
+  minted (before signing; only a registry change after the grant can reach this).
+- **Organization:** a scope that needs the `org` claim is refused at `/authorize` without an
+  organization, before a code is stored. A scope limited to listed membership roles
+  (`subjects.roles`) is refused inside the code and mint statements when the caller's role in the
+  bound organization is another (migration 0005, `uts.scope_org_roles` mirrors the registry and a
+  DB test holds them equal): the code statement and the exchange answer `invalid_scope` with no
+  code, session, grant or audit row (the exchange leaves the code unused), a first-party refresh
+  answers `invalid_scope` without touching the grant or writing a row, and a third-party refresh,
+  which reads no role, refuses every such scope. Each refresh reads the role again. The statements
+  also return the role, and `/token` checks both again before signing.
+
+Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`, or an origin of
+the environment's table in `UTS_RESOURCE_ORIGINS` (`@kilocode/uts-contracts`), which maps each
+origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`), the
+`*.kiloapps.io` origins of ai-attribution, session-sync, notifications, events and chat, and the
+`*.kilosessions.ai` origins of session ingest, data export, the git token service and the cloud
+agent; staging lists only `https://staging-app.kilo.ai` and its issuer; development lists loopback
+origins only. An origin in the table does not activate a service: the service proves its caller
+first. `protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table.
+Another environment's origin, a path, a trailing slash or a query answers `invalid_target`.
+
+| Route | Scope | Behaviour | SQL |
+|---|---|---|---|
+| `POST /account/pats` | `uts:pats.manage` | Tier B gate (a sign-in within 10 minutes, or a passkey step-up of the same session); the scope must be registered and PAT-eligible; 90 days unless `expires_in_days` (1 to 365) says otherwise; at most 100 live PATs per account; the PAT appears once in the answer. A gate refusal answers 401 with the RFC 9470 challenge (`insufficient_user_authentication`, `max_age="600"`) | `uts.create_pat` |
+| `GET /account/pats` | `uts:pats.manage` | The live PATs, newest first, with the last four characters | `uts.list_pats` |
+| `DELETE /account/pats/<id>` | `uts:pats.manage` | Revokes; writes a 15-minute feed entry; 204 also when already revoked | `uts.revoke_pat` |
+| `POST /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | An owner or admin of the organization; tier B gate; at most 100 live keys per organization (a key flagged within 7 days counts) | `uts.create_bot_key` |
+| `GET /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | The live keys; a flagged key shows when it stops | `uts.list_bot_keys` |
+| `DELETE /account/orgs/<org>/bot-keys/<id>` | `uts:bot-keys.manage` | Revokes; 15-minute feed entry | `uts.revoke_bot_key` |
+| `POST /account/orgs/<org>/bot-keys/<id>/keep` | `uts:bot-keys.manage` | Keeps a flagged key before its 7-day cutoff; tier B gate, since keeping restores long-lived access | `uts.keep_bot_key` |
+| `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per address per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
+
+- A create writes the credential, its gate pass (consumed by that one row), the owner's in-app
+  notice and the audit row in one statement. The push and email notice goes through the
+  `CredentialNotices` port after the statement; slice 3.8 (security notices) implements the port,
+  and until then only the in-app notice is written.
+- A create that names an organization, and a keep, lock the caller's membership row `FOR SHARE`
+  (`uts.lock_org_role`), so a concurrent `uts.remove_org_member` waits and then revokes or flags
+  the new credential, or the create waits for the removal and is refused. The 100-credential caps
+  hold under concurrent creates: the account's row lock orders PAT creates, a transaction advisory
+  lock per organization orders bot key creates.
+- Last use of PATs and bot keys is not written yet: `last_used_at` stays null until the lookup
+  carries the client network (design 5.3 hourly last use and new-network audit).
+- PATs and bot keys are `kilo_pat_` or `kilo_bot_` plus 32 random bytes in base64url plus a
+  6-character CRC-32 checksum (`src/pat/format.ts`, the format `@kilocode/verify` parses). The
+  identity store keeps the SHA-256 and the last four characters; audit rows name a credential by
+  its id and `uts.credential_reference` of the hash, never by its value, its hash or its name.
+- A refused gate writes at most one `ai.kilo.uts.gate.refused` row per grant per minute.
+- `uts.remove_org_member` applies a membership-removed event: it revokes the member's org-bound
+  PATs and grants, flags the bot keys the member created (they stop 7 days later unless an admin
+  keeps them) and gives each owner and admin one notice; a stale event changes nothing.
+- `uts.open_tier_a_gate_pass` opens a tier A pass for the sign-in method and email actions: a
+  sign-in within 10 minutes with the account's strongest method, the emailed code (and the code to
+  the new address for an email change, which must be another address), and no method added in the
+  last 24 hours for a removal or an email change. Each tier A code row records whether it went to
+  the primary address (`current`) or the new one (`new`), and each code counts only in its own
+  role. The service that sends a `current` code, and the caller of the gate, hash the account's
+  primary address itself, never an address from the request.
+- `PatLookup` (`src/pat/entrypoint.ts`) is the lookup port of `@kilocode/verify` for Worker
+  verifiers: the lowercase-hex SHA-256 in, `found`, `not_found`, `rate_limited` or `unavailable`
+  out (`UtsPatLookupResultSchema`). It answers only callers its environment lists
+  (`PAT_LOOKUP_CALLERS`), runs at most min(100, 3 × `PAT_LOOKUP_CONNECTIONS`) lookups at once per
+  isolate (see "Deploys"), and sends one statement through the PAT config. The probe route uses the
+  same cap.
+- The scope registry is `UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`; `test/repo` checks every
+  entry against the rules of design 5.3 (no PAT carries a privileged, step-up, staff,
+  credential-changing or session-bound scope; a privileged scope needs a step-up and lives at most
+  5 minutes; a scope needs the `org` claim exactly when its subjects are organization members, in
+  any role or in listed roles; no delegated token carries a privileged, step-up, staff or
+  credential-changing scope; a scope limited to listed roles is neither third-party-safe nor
+  PAT-eligible). It lists the account API scopes (`uts:pats.manage`, `uts:bot-keys.manage`,
+  session-bound), `uts:probe.read`, `uts:security.read` (the web app's security view,
+  session-bound), `uts:browser-session.read` (the web app's bootstrap at its code exchange,
+  session-bound, no account change), `kilo-api:profile.read` (CLI and PATs), the CLI's Kilo API
+  route scopes
+  (`kilo-api:notifications.read`, `organizations.read`, `auto-routing.read`; session-bound
+  `organizations.write` for organization members, `auto-routing.write`, `sessions.write`,
+  `shell-security.analyze`, `feedback.write`, `credits.redeem`; no generic write scope), and the
+  phase 4 service scopes of session ingest, cloud agent, data export, the git token service,
+  ai-attribution (org owners and members), session sync, notifications, events and chat. The
+  account API serves only session-bound scopes, and refuses a token without `sid`. The mint gives
+  each access token its scope's registered maximum lifetime when shorter than 10 minutes (5
+  minutes for the export and disconnect scopes).
+- First-party clients are `UTS_FIRST_PARTY_CLIENTS` in `@kilocode/uts-contracts`: `kilo-cli` (public
+  native, loopback `/callback`), `kilo-web`, the web BFF (confidential, `private_key_jwt`, redirect
+  URIs `<app origin>/api/auth/uts/callback` per environment), and `kilo-mobile` (public native,
+  private-use redirect, device attestation required). The authorization endpoint serves only the
+  clients in `src/oauth/clients.ts`: every OAuth endpoint treats `kilo-web` as unknown until the
+  token endpoint verifies a private-key JWT. `test/repo` holds each confidential client to
+  `private_key_jwt` and exact HTTPS redirect URIs with a path (a loopback origin in development
+  only), each desktop client to a loopback path, and each mobile client to one reverse-domain
+  private-use URI and attestation.
+
 ## Tests
 
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
@@ -234,12 +363,15 @@ no audit row; the operator action that blocks or unblocks the client writes it.
   removal by direct call, the RPC surface, the SignerKeys entrypoint over real service bindings
   (its caller check) and the key-set shards (their names, their 2-second copy with one read in
   flight, at most one signer read per shard per 2 seconds under many concurrent isolates, and the
-  held keys of a failed signer), metadata, DPoP proofs, the signer's batch signing, and every OAuth
-  endpoint against a recording grant store.
-- `pnpm test:repo`: the repository config check (`test/repo`), with no database.
+  held keys of a failed signer), metadata, DPoP proofs, the signer's batch signing, every OAuth
+  endpoint against a recording grant store, the PAT and bot key format against fixed vectors, every
+  account route against a recording account store with tokens from the real signers, the probe
+  route, the PAT lookup and its entrypoint over real service bindings.
+- `pnpm test:repo`: the repository config check and the scope registry check (`test/repo`), with
+  no database.
 - `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
-  tests (`test/db`, see "Local database and tests"), the OAuth grant functions and the DPoP `jti`
-  check included.
+  tests (`test/db`, see "Local database and tests"), the OAuth grant functions, the DPoP `jti`
+  check and the account functions (gates, PATs, bot keys, member removal) included.
 
 ## Staging proof run (before merge)
 
@@ -317,6 +449,14 @@ the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` dep
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
 order). A change to only one of them deploys in the matrix.
 
+Provisioning the identity store's Hyperdrive configs for an environment: the mint Worker's var
+`PAT_LOOKUP_CONNECTIONS` holds the PAT lookup config's (`IDENTITY_STORE_PAT`) connection limit, and
+each isolate runs at most min(100, 3 × `PAT_LOOKUP_CONNECTIONS`) PAT lookups at once
+(`patLookupsInFlight` in `src/env.ts`, design 3, "PAT lookups"). Staging sets 12 (cap 36);
+production sets 32 (cap 96), the PAT config's 20 percent of `max_connections` 160. A change to the
+config's connection limit changes the var in the same deploy. Staging and production refuse to
+start without a valid var; development may leave it out (cap 100).
+
 ## Identity store
 
 UTS keeps its credential state in a dedicated Postgres database, the identity store. Only UTS binds
@@ -346,7 +486,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations. Holds the privileges of every UTS login (no SET), so `uts.end_long_transactions()` can end their sessions |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the ungated credential tables; on gated rows (gate passes, PATs, org bot keys, CI trust policies, third-party consents, device approvals) SELECT, DELETE and UPDATE of lifecycle columns only; codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()` and `uts.end_long_transactions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, account API, audit relay | DML on the ungated credential tables; on gated rows (CI trust policies, third-party consents, device approvals) SELECT, DELETE and UPDATE of lifecycle columns only; PATs, org bot keys and gate passes SELECT only, written only through the account functions (migration 0005); codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()` and `uts.end_long_transactions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -425,8 +565,9 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
   every mint; the table leaves 10 percent of each page free (`fillfactor = 90`) for those updates.
 - The app login writes authorization codes, refresh grants, device sessions, third-party families
   and tokens, revocations and DPoP proof `jti`s only through the security-definer OAuth functions
-  (migration 0004), which write the credential rows and their audit row together; it keeps SELECT
-  on those tables. It still writes the ungated credential tables directly.
+  (migration 0004), and PATs, org bot keys and gate passes only through the security-definer
+  account functions (migration 0005), which write the credential rows and their audit row
+  together; it keeps SELECT on those tables. It still writes the ungated credential tables directly.
   The account-deletion function will be one more such function: in the same statement, before the
   delete, it collects the active bot keys the account created (the keys the delete trigger is about
   to flag) and writes a bot-key-flagged audit row and the org-admin notices for each (design

@@ -27,6 +27,7 @@
     "UTS_ENVIRONMENT": "development",
     // workerd enforces no data residency, so local development keeps objects unscoped.
     "DO_JURISDICTION": "none",
+    "PAT_LOOKUP_CONNECTIONS": "34",
   },
   "durable_objects": {
     "bindings": [
@@ -39,13 +40,19 @@
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
   ],
   // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo: set
-  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE to a URL with the password you
-  // gave uts_app_a (README, "Local development").
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE and
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_PAT to URLs with the passwords
+  // you gave uts_app_a and uts_pat_a (README, "Local development").
   "hyperdrive": [
     {
       "binding": "IDENTITY_STORE",
       "id": "uts-local-identity-store",
       "localConnectionString": "postgres://uts_app_a@127.0.0.1:55432/uts",
+    },
+    {
+      "binding": "IDENTITY_STORE_PAT",
+      "id": "uts-local-identity-store-pat",
+      "localConnectionString": "postgres://uts_pat_a@127.0.0.1:55432/uts",
     },
   ],
 }

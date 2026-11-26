@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { UTS_ENDPOINTS, type UtsEnvironment } from './environment';
+import { KILO_API_AUDIENCE, UTS_ACCOUNT_AUDIENCE } from './scopes';
 import { UTS_MAX_TOKENS_PER_CALL, UtsAudienceSchema, UtsScopeSchema } from './token';
 
 /** Paths of the mint Worker's OAuth endpoints on the issuer origin (design 5.4). */
@@ -26,8 +28,73 @@ export function resourceOfAudience(audience: string): string {
   return `${UTS_RESOURCE_PREFIX}${UtsAudienceSchema.parse(audience)}`;
 }
 
-/** The audience a resource indicator names, or null when it names no Kilo service. */
-export function audienceOfResource(resource: string): string | null {
+/**
+ * The HTTPS resource origins each environment accepts as RFC 8707 resource indicators, and the
+ * audience each names; RFC 9728 metadata names the same origin (`protectedResourceMetadataFor`).
+ * A table per environment, so an origin of another environment names nothing.
+ *
+ * - Production: the web app (`kilo-api`; the origin `resolveAppUrl` in
+ *   `packages/web-shared/src/lib/constants.ts` uses), the UTS issuer (`uts`, the account API), and
+ *   the Workers that accept UTS tokens on their own origins, from their route configs. An entry
+ *   here does not activate a service: the service proves its caller before it accepts the tokens.
+ * - Staging: the staging web app and the staging issuer only. Another staging origin joins once a
+ *   deployment of that Worker on it is confirmed.
+ * - Development: loopback only: the local web app on its default port (`PORT` unset), the local
+ *   issuer, and each Worker on its local development port (session ingest on 8821, since its
+ *   default port is the issuer's).
+ */
+export const UTS_RESOURCE_ORIGINS: Readonly<
+  Record<UtsEnvironment, Readonly<Record<string, string>>>
+> = {
+  production: {
+    'https://app.kilo.ai': KILO_API_AUDIENCE,
+    [UTS_ENDPOINTS.production.issuer]: UTS_ACCOUNT_AUDIENCE,
+    'https://ai-attribution.kiloapps.io': 'ai-attribution',
+    'https://session-sync.kiloapps.io': 'session-sync',
+    'https://notifications.kiloapps.io': 'notifications',
+    'https://events.kiloapps.io': 'event-service',
+    'https://chat.kiloapps.io': 'kilo-chat',
+    'https://ingest.kilosessions.ai': 'session-ingest',
+    'https://user-data-export.kilosessions.ai': 'user-data-export',
+    'https://git-token-service.kilosessions.ai': 'git-token-service',
+    'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
+  },
+  staging: {
+    'https://staging-app.kilo.ai': KILO_API_AUDIENCE,
+    [UTS_ENDPOINTS.staging.issuer]: UTS_ACCOUNT_AUDIENCE,
+  },
+  development: {
+    'http://localhost:3000': KILO_API_AUDIENCE,
+    [UTS_ENDPOINTS.development.issuer]: UTS_ACCOUNT_AUDIENCE,
+    'http://localhost:8787': 'ai-attribution',
+    'http://localhost:8817': 'session-sync',
+    'http://localhost:8804': 'notifications',
+    'http://localhost:8809': 'event-service',
+    'http://localhost:8808': 'kilo-chat',
+    'http://localhost:8821': 'session-ingest',
+    'http://localhost:8818': 'user-data-export',
+    'http://localhost:8802': 'git-token-service',
+    'http://localhost:8794': 'cloud-agent-next',
+  },
+};
+
+/** The resource origin of `audience` in `environment`, or null when the table names none. */
+export function resourceOriginOf(environment: UtsEnvironment, audience: string): string | null {
+  const found = Object.entries(UTS_RESOURCE_ORIGINS[environment]).find(
+    ([, named]) => named === audience
+  );
+  return found === undefined ? null : found[0];
+}
+
+/**
+ * The audience a resource indicator names in `environment`, or null when it names no Kilo service
+ * there. Two forms, each an exact string: `urn:kilo:service:<audience>`, and an origin of the
+ * environment's `UTS_RESOURCE_ORIGINS` table. Another environment's origin, a path, a trailing
+ * slash or a query names nothing.
+ */
+export function audienceOfResource(resource: string, environment: UtsEnvironment): string | null {
+  const origins = UTS_RESOURCE_ORIGINS[environment];
+  if (Object.hasOwn(origins, resource)) return origins[resource] ?? null;
   if (!resource.startsWith(UTS_RESOURCE_PREFIX)) return null;
   const audience = UtsAudienceSchema.safeParse(resource.slice(UTS_RESOURCE_PREFIX.length));
   return audience.success ? audience.data : null;

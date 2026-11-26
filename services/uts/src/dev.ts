@@ -7,6 +7,7 @@ import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
 import type { AuthorizationHandoff } from './oauth/authorize';
 import { jsonResponse } from './responses';
+import { developmentScopes } from './scopes/development-fixtures';
 import type { SignerAccess } from './token/mint';
 
 /**
@@ -19,9 +20,13 @@ import type { SignerAccess } from './token/mint';
  *
  * * `POST /__dev/sign` signs a caller-supplied claim set through the signer the grant picks.
  * * The development sign-in hand-off approves every authorization request for one synthetic
- *   account, `DEV_ACCOUNT_ID`, signed in by passkey now. `dev_decision=deny` on the authorization
- *   request denies it, and a third-party request names its consent in `dev_consent_id`. The
- *   account and any consent must exist in the local identity store.
+ *   account, `DEV_ACCOUNT_ID`, signed in by passkey now, bound to the organization the request
+ *   names in `org` (the identity store checks the membership). `dev_decision=deny` on the
+ *   authorization request denies it, and a third-party request names its consent in
+ *   `dev_consent_id`. The account and any consent must exist in the local identity store.
+ * * The OAuth endpoints apply the scope registry plus the development fixture scopes
+ *   (`fixture:*`, `src/scopes/development-fixtures.ts`), so the local run has a third-party-safe
+ *   scope.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 
@@ -41,7 +46,7 @@ export const developmentHandoff: AuthorizationHandoff = async (request, pending)
     browserSessionId: null,
     authTime: new Date(),
     amr: ['passkey'] as const,
-    orgId: null,
+    orgId: pending.orgHint,
   };
   if (pending.client.kind === 'first_party') {
     return { status: 'approved', approval: { ...subject, clientKind: 'first_party' } };
@@ -72,6 +77,7 @@ export async function handleDevRequest(
     return await handleRequest(request, env, ctx, {
       authorizationHandoff: developmentHandoff,
       signer,
+      scopes: developmentScopes,
     });
   }
   if (request.method !== 'POST') {

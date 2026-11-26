@@ -1168,6 +1168,7 @@ export const AdminActionAuditAction = z.enum([
   'security_advisor.content.upsert',
   'security_advisor.content.delete',
   'organization.bitbucket.code_review.trigger',
+  'code_index.delete_before_date',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;

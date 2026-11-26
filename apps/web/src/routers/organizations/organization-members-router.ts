@@ -24,16 +24,25 @@ import {
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   ensureOrganizationAccess,
+  observeMembershipRole,
   OrganizationIdInputSchema,
   organizationAdminMutationProcedure,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
+  requireLiveOrganization,
   requireOrganizationStaffAuthority,
+  resolveOrganizationAccess,
   type OrganizationAccessContext,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
+import {
+  organizationTarget,
+  recordKiloAdminElevation,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
@@ -146,6 +155,73 @@ async function getDirectOrganizationRole(
     .limit(1);
 
   return membership?.role ?? null;
+}
+
+/**
+ * The shared owner-or-billing-manager write guard: the role, then an active
+ * subscription or trial.
+ */
+async function requireBillingWriteAccess(
+  ctx: OrganizationAccessContext,
+  organizationId: string
+): Promise<void> {
+  await resolveOrganizationAccess(ctx, organizationId, { roles: ORGANIZATION_BILLING_ROLES });
+  await requireActiveSubscriptionOrTrial(organizationId);
+}
+
+type ChildMembershipTargets = { parentMemberEmail: string; childIds: string[] };
+
+/**
+ * What a child-membership update acts on: the target's parent membership and
+ * the parent's live direct children, sorted. Refuses a target that is not a
+ * human member of the parent, and a selection naming any other organization.
+ */
+async function readChildMembershipTargets(
+  organizationId: string,
+  memberId: string,
+  childOrganizationIds: readonly string[]
+): Promise<ChildMembershipTargets> {
+  const [parentMember] = await db
+    .select({
+      email: kilocode_users.google_user_email,
+      isBot: kilocode_users.is_bot,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
+      )
+    )
+    .limit(1);
+
+  if (!parentMember || parentMember.isBot) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'User is not a member of the parent organization',
+    });
+  }
+
+  const childOrganizations = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, organizationId),
+        isNull(organizations.deleted_at)
+      )
+    );
+  const childIds = new Set(childOrganizations.map(child => child.id));
+
+  if (childOrganizationIds.some(childOrganizationId => !childIds.has(childOrganizationId))) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Selected organizations must be direct child organizations',
+    });
+  }
+
+  return { parentMemberEmail: parentMember.email, childIds: [...childIds].sort() };
 }
 
 /**
@@ -335,21 +411,74 @@ export const organizationsMembersRouter = createTRPCRouter({
         }
       );
     }),
-  setChildMemberships: organizationBillingMutationProcedure
+  // Not on the billing builder: for staff without a billing role its guard
+  // would spend the operation proof before this resolver validates the request.
+  setChildMemberships: baseProcedure
     .input(SetChildMembershipsSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
       const { organizationId, memberId } = input;
       const childOrganizationIds = Array.from(new Set(input.childOrganizationIds));
 
+      // Everyone but legacy staff passes the shared billing guard before the
+      // direct-role read; legacy staff are first judged by their direct role.
+      const legacyStaff = user.is_admin && !isSupportAccessEnabled();
+      if (!legacyStaff) await requireBillingWriteAccess(ctx, organizationId);
       const directRole = await getDirectOrganizationRole(organizationId, user.id);
       const needsStaffGrant = !ORGANIZATION_BILLING_ROLES.some(role => role === directRole);
-      if (needsStaffGrant && (!user.is_admin || isSupportAccessEnabled())) {
+      if (needsStaffGrant && !legacyStaff) {
+        // A caller the billing guard admits through an inherited role still
+        // lacks the direct role this needs.
         throw new TRPCError({
           code: 'UNAUTHORIZED',
           message: 'You do not have the required organizational role to access this feature',
         });
       }
+      if (legacyStaff && !needsStaffGrant) await requireBillingWriteAccess(ctx, organizationId);
+
+      const validated: { targets: ChildMembershipTargets | null } = { targets: null };
+      if (needsStaffGrant) {
+        // Legacy staff: the role, session and network checks run first, then
+        // these, and the operation proof is spent only once they pass. The
+        // audited write below starts only after this admission.
+        const staff = await requireOrganizationStaffAuthority(
+          ctx,
+          organizationId,
+          'support_write',
+          async () => {
+            await requireLiveOrganization(organizationId);
+            await requireActiveSubscriptionOrTrial(organizationId);
+            validated.targets = await readChildMembershipTargets(
+              organizationId,
+              memberId,
+              childOrganizationIds
+            );
+          }
+        );
+        const { membershipRole } = await observeMembershipRole(() =>
+          loadEffectiveMembershipRows(staff.user.id, organizationId)
+        );
+        await recordKiloAdminElevation(
+          { ...ctx, user: staff.user },
+          {
+            reason: 'organization_access',
+            target: organizationTarget(organizationId),
+            membershipRole,
+            wouldPassWithoutAdmin: false,
+          }
+        );
+      } else {
+        validated.targets = await readChildMembershipTargets(
+          organizationId,
+          memberId,
+          childOrganizationIds
+        );
+      }
+      if (!validated.targets) {
+        throw new Error('Child membership targets were not validated');
+      }
+      const { parentMemberEmail, childIds } = validated.targets;
+      const selectedChildOrganizationIds = new Set(childOrganizationIds);
 
       return runElevatedOrganizationWrite(
         ctx,
@@ -363,59 +492,6 @@ export const organizationsMembersRouter = createTRPCRouter({
           metadata: { memberKiloUserId: memberId },
         },
         async () => {
-          const [parentMember] = await db
-            .select({
-              email: kilocode_users.google_user_email,
-              isBot: kilocode_users.is_bot,
-            })
-            .from(organization_memberships)
-            .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-            .where(
-              and(
-                eq(organization_memberships.organization_id, organizationId),
-                eq(organization_memberships.kilo_user_id, memberId)
-              )
-            )
-            .limit(1);
-
-          if (!parentMember || parentMember.isBot) {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'User is not a member of the parent organization',
-            });
-          }
-
-          const childOrganizations = await db
-            .select({
-              id: organizations.id,
-            })
-            .from(organizations)
-            .where(
-              and(
-                eq(organizations.parent_organization_id, organizationId),
-                isNull(organizations.deleted_at)
-              )
-            );
-          const childOrganizationsById = new Map(
-            childOrganizations.map(child => [child.id, child])
-          );
-
-          if (
-            childOrganizationIds.some(
-              childOrganizationId => !childOrganizationsById.has(childOrganizationId)
-            )
-          ) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Selected organizations must be direct child organizations',
-            });
-          }
-
-          // Spend the staff proof only once the request is otherwise valid.
-          if (needsStaffGrant) await requireOrganizationStaffAuthority(ctx, organizationId);
-
-          const childIds = childOrganizations.map(child => child.id).sort();
-          const selectedChildOrganizationIds = new Set(childOrganizationIds);
           const { added, removed } = await db.transaction(async tx => {
             // The audit rows name the parent organization, so read its display name
             // once here rather than repeating the parent id for every child.
@@ -470,10 +546,10 @@ export const organizationsMembersRouter = createTRPCRouter({
                   actor_name: user.google_user_name,
                   details: {
                     id: 'member.parentAdded',
-                    email: parentMember.email,
+                    email: parentMemberEmail,
                     parent: parentOrganizationName,
                   },
-                  message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
+                  message: `Added parent organization member ${parentMemberEmail} as a member from parent organization ${organizationId}`,
                   organization_id: childOrganizationId,
                   tx,
                 });
@@ -515,10 +591,10 @@ export const organizationsMembersRouter = createTRPCRouter({
                 actor_name: user.google_user_name,
                 details: {
                   id: 'member.parentRemoved',
-                  email: parentMember.email,
+                  email: parentMemberEmail,
                   parent: parentOrganizationName,
                 },
-                message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
+                message: `Removed parent organization member ${parentMemberEmail} from child organization via parent organization ${organizationId}`,
                 organization_id: childOrganizationId,
                 tx,
               });

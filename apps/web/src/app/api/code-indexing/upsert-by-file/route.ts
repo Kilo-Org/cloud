@@ -14,7 +14,10 @@ import { getIndexStorage } from '@/lib/code-indexing/storage';
 import type { ChunkWithMetadata } from '@/lib/code-indexing/types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { code_indexing_manifest } from '@kilocode/db/schema';
-import { getCodeIndexOrganizationId } from '@/routers/code-indexing/code-indexing-router';
+import {
+  getCodeIndexOrganizationId,
+  isCodeIndexingEntitlementDenial,
+} from '@/routers/code-indexing/code-indexing-router';
 import { trackCodeIndexingUpsert } from '@/lib/code-indexing/posthog-tracking';
 import { createFlexibleAIAttributionTracker } from '@/lib/ai-attribution-service';
 import {
@@ -280,6 +283,11 @@ export async function PUT(
     // it happens before any index write.
     if (error instanceof TRPCError && error.cause instanceof StaffRequestRefusal) {
       return error.cause.response;
+    }
+    // The documented refusal for an account or organization the index is not
+    // enabled for, also before any index write. It is not an internal error.
+    if (isCodeIndexingEntitlementDenial(error)) {
+      return NextResponse.json({ error: error.message, message: error.message }, { status: 403 });
     }
     // Outer catch for early failures (auth, form parsing, validation)
     // These don't need PostHog tracking as they're pre-processing failures

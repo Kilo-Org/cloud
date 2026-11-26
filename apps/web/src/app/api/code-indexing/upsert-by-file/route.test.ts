@@ -34,10 +34,10 @@ const mockedGetIndexStorage = jest.mocked(getIndexStorage);
 
 const ORGANIZATION_ID = '6f1c2b8e-0d3a-4b8e-9a51-1c2d3e4f5a6b';
 
-function upload(): NextRequest {
+function upload(organizationId: string | null = ORGANIZATION_ID): NextRequest {
   const form = new FormData();
   form.set('file', new File(['export const a = 1;\n'], 'a.ts'));
-  form.set('organizationId', ORGANIZATION_ID);
+  if (organizationId) form.set('organizationId', organizationId);
   form.set('projectId', 'acme/app');
   form.set('filePath', 'src/a.ts');
   form.set('fileHash', 'hash-1');
@@ -102,6 +102,62 @@ describe('PUT /api/code-indexing/upsert-by-file', () => {
       ORGANIZATION_ID,
       undefined
     );
+    expect(mockedGetIndexStorage).not.toHaveBeenCalled();
+  });
+
+  test('answers a staff bearer without the personal entitlement with the documented 403', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      authFailedResponse: null,
+      user: { id: 'admin-1', is_admin: true },
+      credential: 'human_bearer',
+    } as never);
+
+    const response = await PUT(upload(null));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Code indexing is not enabled for this account',
+      message: 'Code indexing is not enabled for this account',
+    });
+    expect(mockedGetIndexStorage).not.toHaveBeenCalled();
+  });
+
+  test('answers an organization with indexing switched off with the documented 403', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      authFailedResponse: null,
+      user: { id: 'member-1', is_admin: false },
+      credential: 'human_bearer',
+    } as never);
+    mockedEnsureOrganizationAccessAndFetchOrg.mockResolvedValue({
+      id: ORGANIZATION_ID,
+      settings: { code_indexing_enabled: false },
+    } as never);
+
+    const response = await PUT(upload());
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Code indexing is not enabled for this organization',
+      message: 'Code indexing is not enabled for this organization',
+    });
+    expect(mockedGetIndexStorage).not.toHaveBeenCalled();
+  });
+
+  test('keeps 500 for an unexpected failure', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      authFailedResponse: null,
+      user: { id: 'member-1', is_admin: false },
+      credential: 'human_bearer',
+    } as never);
+    mockedEnsureOrganizationAccessAndFetchOrg.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await PUT(upload());
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Internal Server Error',
+      message: 'database unavailable',
+    });
     expect(mockedGetIndexStorage).not.toHaveBeenCalled();
   });
 });

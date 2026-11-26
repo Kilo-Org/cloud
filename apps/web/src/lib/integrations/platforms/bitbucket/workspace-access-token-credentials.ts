@@ -82,6 +82,12 @@ export type DisconnectBitbucketWorkspaceAccessTokenInput = {
   actorUserId: string;
   integrationId: string;
   authority: BitbucketOrganizationManagerAuthority;
+  /**
+   * Effects that must precede the credential delete, such as disabling Code
+   * Reviewer. They run only after the actor's authority is confirmed and
+   * outside the credential transaction; the locked recheck still gates the delete.
+   */
+  beforeDisconnect?: () => Promise<void>;
 };
 
 export type BitbucketWorkspaceAccessTokenMutationResult = {
@@ -224,6 +230,7 @@ export async function disconnectBitbucketWorkspaceAccessToken(
 ): Promise<{ integrationId: string }> {
   const organizationId = canonicalizeOrganizationId(input.organizationId);
   await preauthorizeOrganizationManager(organizationId, input.actorUserId, input.authority);
+  await input.beforeDisconnect?.();
 
   return db.transaction(async tx => {
     await acquireOrganizationCredentialLock(tx, organizationId);

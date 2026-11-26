@@ -524,12 +524,13 @@ const restEntries: PrivilegedInventoryEntry[] = [
     write: 'support_write',
     target: 'organization',
   },
-  // The two code-index routes that still serve the index. Each entry names the
-  // personal branch, the only one that consults the staff guard with this
+  // The three code-index routes that still serve the index. Each entry names
+  // the personal branch, the only one that consults the staff guard with this
   // class (bound to the caller's own account). A request that names an
   // organization is classed at the organization admission instead, from its
-  // method: `support_read` for the GET, `support_write` for the PUT, bound to
-  // that organization. Neither route is on a support allowlist or the edge rule.
+  // method: `support_read` for the GET, `support_write` for the PUT and POST,
+  // bound to that organization. No route is on a support allowlist or the
+  // edge rule.
   {
     id: 'rest.codeIndexing.enabled',
     surface: 'rest',
@@ -541,6 +542,13 @@ const restEntries: PrivilegedInventoryEntry[] = [
     id: 'rest.codeIndexing.upsertByFile',
     surface: 'rest',
     route: '/api/code-indexing/upsert-by-file',
+    write: 'platform_write',
+    target: 'user',
+  },
+  {
+    id: 'rest.codeIndexing.delete',
+    surface: 'rest',
+    route: '/api/code-indexing/delete',
     write: 'platform_write',
     target: 'user',
   },
@@ -862,6 +870,18 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     ],
   },
   {
+    // A member below the editor roles may write an organization router only
+    // as staff: this check refuses everyone else, and the write then asks
+    // `ensureOrganizationAccess` for the billing roles, whose staff branch
+    // admits through `requireStaffAuthorityForRequest` with the request's own
+    // pathname and method.
+    id: 'internal.autoRouting.customRouters',
+    file: 'apps/web/src/lib/auto-routing-custom-routers.ts',
+    actionClass: 'support_write',
+    surface: 'rest',
+    reads: [{ snippet: 'if(!context.user.is_admin||!context.organization)', use: 'prefilter' }],
+  },
+  {
     id: 'internal.bitbucket.workspaceAccessTokenAuthorization',
     file: 'apps/web/src/lib/integrations/platforms/bitbucket/workspace-access-token-organization-authorization.ts',
     actionClass: 'support_write',
@@ -1025,7 +1045,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     surface: 'trpc',
     reads: [
       {
-        snippet: 'if(needsStaffGrant&&(!user.is_admin||isSupportAccessEnabled()))',
+        snippet: 'legacyStaff=user.is_admin&&!isSupportAccessEnabled()',
         use: 'grant',
         guard: 'requireOrganizationStaffAuthority',
       },

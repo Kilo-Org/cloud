@@ -57,6 +57,7 @@ import {
   ensureOrganizationAccess,
   organizationRestAccessContext,
   StaffRequestRefusal,
+  type OrganizationAccessContext,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 import { captureException } from '@sentry/nextjs';
@@ -104,9 +105,20 @@ function invalidRequest(error: z.ZodError): CustomRouterApiError {
 
 export type CustomRouterRequestContext = {
   user: User;
-  organization: { id: string; canEdit: boolean } | null;
+  /**
+   * `access` is this request's organization access context, so a write that
+   * needs an editor role it lacks can ask the shared admission for that role.
+   */
+  organization: { id: string; canEdit: boolean; access: OrganizationAccessContext } | null;
   headers: Headers;
 };
+
+/** The shared guard's staff refusal, which the route returns verbatim. */
+function staffRefusalResponse(error: unknown): NextResponse | null {
+  return error instanceof TRPCError && error.cause instanceof StaffRequestRefusal
+    ? error.cause.response
+    : null;
+}
 
 /** A staff refusal is the shared guard's response, returned verbatim. */
 async function resolveRequestContext(
@@ -135,25 +147,26 @@ async function resolveRequestContext(
     throw new CustomRouterApiError('invalid_request', 'Invalid organization ID');
   }
 
+  const access = organizationRestAccessContext(auth, {
+    headers: request.headers,
+    method: request.method,
+  });
   try {
     // Staff without a membership pass only the shared staff guard, with this
     // request's real credential, method and headers.
-    const role = await ensureOrganizationAccess(
-      organizationRestAccessContext(auth, { headers: request.headers, method: request.method }),
-      organizationId
-    );
+    const role = await ensureOrganizationAccess(access, organizationId);
     return {
       user: auth.user,
       organization: {
         id: organizationId,
         canEdit: ORGANIZATION_BILLING_ROLES.some(editorRole => editorRole === role),
+        access,
       },
       headers: request.headers,
     };
   } catch (error) {
-    if (error instanceof TRPCError && error.cause instanceof StaffRequestRefusal) {
-      return error.cause.response;
-    }
+    const refusal = staffRefusalResponse(error);
+    if (refusal) return refusal;
     if (error instanceof TRPCError) {
       throw new CustomRouterApiError('forbidden', 'You do not have access to this organization');
     }
@@ -176,9 +189,10 @@ export async function handleCustomRouterRequest(
 }
 
 /**
- * Runs a router write for the owner `scope` names, from the editor check on. Its refusals become
- * error responses here, so an organization write a Kilo admin makes through the admin bypass is
- * recorded with the status it answered.
+ * Runs a router write for the owner `scope` names. The editor check, with any staff admission it
+ * needs, answers first, so a write that never got permission is not audited. Every later refusal
+ * becomes an error response inside the audit, so an organization write a Kilo admin makes through
+ * the admin bypass is recorded with the status it answered.
  */
 async function runRouterWrite(
   context: CustomRouterRequestContext,
@@ -186,10 +200,15 @@ async function runRouterWrite(
   audit: { action: AdminActionAuditAction; message: string; slug: string },
   write: (owner: CustomRouterOwner) => Promise<NextResponse>
 ): Promise<NextResponse> {
-  const { owner } = resolveScopedOwner(context, scope);
+  const { owner, canEdit } = resolveScopedOwner(context, scope);
+  const editorRefusal =
+    owner.type === 'org' && !canEdit ? await admitOrganizationEditor(context, owner.id) : null;
+  if (editorRefusal instanceof NextResponse) return editorRefusal;
+  if (editorRefusal) return customRouterErrorResponse(editorRefusal);
   const run = async () => {
     try {
-      return await write(await resolveEditableOwner(context, scope));
+      if (owner.type === 'org') await requireWritableOrganization(owner.id);
+      return await write(owner);
     } catch (error) {
       if (error instanceof CustomRouterApiError) return customRouterErrorResponse(error);
       throw error;
@@ -282,26 +301,44 @@ function resolveScopedOwner(context: CustomRouterRequestContext, scope: OwnerTyp
   };
 }
 
-async function resolveEditableOwner(
+/**
+ * A staff member whose real membership lacks an editor role passed the request
+ * guard as that member, without a staff admission. This asks the shared
+ * admission for exactly the editor roles, once: null when it admitted them, the
+ * guard's refusal verbatim, or the ordinary editor refusal. A non-member was
+ * already admitted as staff by the request guard and never reaches it here.
+ */
+async function admitOrganizationEditor(
   context: CustomRouterRequestContext,
-  scope: OwnerType
-): Promise<CustomRouterOwner> {
-  const { owner, canEdit } = resolveScopedOwner(context, scope);
-  if (!canEdit) {
-    throw new CustomRouterApiError(
-      'forbidden',
-      'Only organization owners, admins, and billing managers can edit organization routers'
+  organizationId: string
+): Promise<CustomRouterApiError | NextResponse | null> {
+  const editorRequired = new CustomRouterApiError(
+    'forbidden',
+    'Only organization owners, admins, and billing managers can edit organization routers'
+  );
+  if (!context.user.is_admin || !context.organization) return editorRequired;
+  try {
+    await ensureOrganizationAccess(
+      context.organization.access,
+      organizationId,
+      ORGANIZATION_BILLING_ROLES
     );
+    return null;
+  } catch (error) {
+    const refusal = staffRefusalResponse(error);
+    if (refusal) return refusal;
+    if (error instanceof TRPCError) return editorRequired;
+    throw error;
   }
-  if (owner.type === 'org') {
-    try {
-      await requireActiveSubscriptionOrTrial(owner.id);
-    } catch (error) {
-      if (error instanceof TRPCError) throw new CustomRouterApiError('forbidden', error.message);
-      throw error;
-    }
+}
+
+async function requireWritableOrganization(organizationId: string): Promise<void> {
+  try {
+    await requireActiveSubscriptionOrTrial(organizationId);
+  } catch (error) {
+    if (error instanceof TRPCError) throw new CustomRouterApiError('forbidden', error.message);
+    throw error;
   }
-  return owner;
 }
 
 export function parseRouterParams(params: { scope: string; slug: string }): {

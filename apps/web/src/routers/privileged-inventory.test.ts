@@ -808,7 +808,8 @@ function discoverRESTRoutes(): DiscoveredRoute[] {
           source.includes('ensureOrganizationAccessAndFetchOrg('),
         staffAdmission:
           source.includes('getCodeIndexOrganizationId(') ||
-          source.includes('requireStaffAuthorityForRequest('),
+          source.includes('requireStaffAuthorityForRequest(') ||
+          source.includes('organizationRestAccessContext('),
       };
     });
 }
@@ -1267,10 +1268,18 @@ describe('privileged inventory covers discovered route handlers', () => {
       inventoryId: 'rest.codeIndexing.upsertByFile',
       targetKind: 'user',
     });
+    expect(
+      actionClassForRoute({ surface: 'rest', route: '/api/code-indexing/delete', method: 'POST' })
+    ).toEqual({
+      actionClass: 'platform_write',
+      inventoryId: 'rest.codeIndexing.delete',
+      targetKind: 'user',
+    });
     // Each entry serves only its route's method; retired siblings match none.
     for (const [route, access] of [
       ['/api/code-indexing/enabled', 'write'],
       ['/api/code-indexing/upsert-by-file', 'read'],
+      ['/api/code-indexing/delete', 'read'],
       ['/api/code-indexing/search', 'write'],
       ['/api/code-indexing/manifest', 'read'],
     ] as const) {
@@ -1283,10 +1292,68 @@ describe('privileged inventory covers discovered route handlers', () => {
       )
     ).toEqual([]);
     expect(
-      ['/api/code-indexing/enabled', '/api/code-indexing/upsert-by-file'].filter(route =>
-        isAdminEdgePath(route)
-      )
+      [
+        '/api/code-indexing/enabled',
+        '/api/code-indexing/upsert-by-file',
+        '/api/code-indexing/delete',
+      ].filter(route => isAdminEdgePath(route))
     ).toEqual([]);
+  });
+
+  test('a custom-router delete is classed by its own pathname and method, and stays audited', () => {
+    // The staff admission classes the request it sees; the concrete delete
+    // pathname and method resolve to an organization support write.
+    for (const route of [
+      '/api/auto-routing/custom-routers/organization/team',
+      '/api/auto-routing/custom-routers/organization/team/client-entries',
+    ]) {
+      expect(actionClassForRoute({ surface: 'rest', route, method: 'DELETE' })).toEqual({
+        actionClass: 'support_write',
+        inventoryId: 'rest.autoRouting',
+        targetKind: 'organization',
+      });
+      expect(isAdminEdgePath(route)).toBe(false);
+    }
+    expect(
+      actionClassForRoute({
+        surface: 'rest',
+        route: '/api/auto-routing/custom-routers/organization/team',
+        method: 'GET',
+      }).actionClass
+    ).toBe('support_read');
+    // Each write keeps its own recorded action; the delete and the
+    // client-entry removal stay distinct.
+    expect(
+      organizationElevationWriteSites
+        .filter(site => site.route.startsWith('/api/auto-routing/custom-routers'))
+        .map(site => [
+          site.route,
+          site.method,
+          site.audit.kind === 'recorded' ? site.audit.actions : site.audit.reason,
+        ])
+    ).toEqual([
+      ['/api/auto-routing/custom-routers', 'POST', ['organization.custom_router.create']],
+      [
+        '/api/auto-routing/custom-routers/[scope]/[slug]',
+        'PATCH',
+        ['organization.custom_router.update'],
+      ],
+      [
+        '/api/auto-routing/custom-routers/[scope]/[slug]',
+        'DELETE',
+        ['organization.custom_router.delete'],
+      ],
+      [
+        '/api/auto-routing/custom-routers/[scope]/[slug]/client-entries',
+        'POST',
+        ['organization.custom_router.client_entry.register'],
+      ],
+      [
+        '/api/auto-routing/custom-routers/[scope]/[slug]/client-entries',
+        'DELETE',
+        ['organization.custom_router.client_entry.remove'],
+      ],
+    ]);
   });
 
   test('wildcards stop at path-segment boundaries', () => {

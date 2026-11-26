@@ -99,7 +99,7 @@ const CodebaseIndexingSearchResponseSchema = z.array(
   })
 );
 
-const CodebaseIndexingDeleteRequestSchema = z.object({
+export const CodebaseIndexingDeleteRequestSchema = z.object({
   organizationId: z.uuid().nullable().optional(),
   projectId: z.string(),
   gitBranch: z.string().optional(),
@@ -213,10 +213,28 @@ async function admitStaffPersonalIndex(
   });
 }
 
+/**
+ * Cause of the documented refusal for an account or organization the code
+ * index is not enabled for, so a REST adapter can answer it with 403 instead of
+ * treating it as an unexpected failure.
+ */
+export class CodeIndexingNotEnabled extends Error {
+  constructor() {
+    super('Code indexing is not enabled');
+    this.name = 'CodeIndexingNotEnabled';
+  }
+}
+
+/** Whether an error is the documented code-index entitlement refusal. */
+export function isCodeIndexingEntitlementDenial(error: unknown): error is TRPCError {
+  return error instanceof TRPCError && error.cause instanceof CodeIndexingNotEnabled;
+}
+
 function accountNotEnabledError(): TRPCError {
   return new TRPCError({
     code: 'FORBIDDEN',
     message: 'Code indexing is not enabled for this account',
+    cause: new CodeIndexingNotEnabled(),
   });
 }
 
@@ -235,6 +253,7 @@ export async function getCodeIndexOrganizationId(
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Code indexing is not enabled for this organization',
+        cause: new CodeIndexingNotEnabled(),
       });
     }
     return input.organizationId;
@@ -249,6 +268,70 @@ export async function getCodeIndexOrganizationId(
   }
 
   throw accountNotEnabledError();
+}
+
+/**
+ * Deletes indexed files of one project, for `codeIndexing.delete` and for
+ * `POST /api/code-indexing/delete` with that route's own REST context. An
+ * ordinary failure answers `{ success: false }`; a staff refusal is rethrown
+ * so the transport answers with it.
+ */
+export async function deleteCodeIndexFiles(
+  ctx: CodeIndexContext,
+  input: z.infer<typeof CodebaseIndexingDeleteRequestSchema>
+): Promise<{ success: boolean; deletedFiles: number }> {
+  // Resolved once: a second resolution would ask a REST staff caller for a
+  // second proof and record a second elevation.
+  let organizationId: string | undefined;
+  try {
+    organizationId = await getCodeIndexOrganizationId(ctx, input, {
+      actionClass: 'platform_write',
+    });
+
+    const deletedFiles = await getStorage().delete({
+      organizationId,
+      projectId: input.projectId,
+      gitBranch: input.gitBranch,
+      filePaths: input.filePaths,
+    });
+
+    trackCodeIndexingDelete({
+      distinctId: ctx.user.google_user_email,
+      organizationId,
+      userId: ctx.user.id,
+      projectId: input.projectId,
+      gitBranch: input.gitBranch,
+      filePathsCount: input.filePaths?.length,
+      deletedFiles,
+      success: true,
+    });
+
+    return { success: true, deletedFiles };
+  } catch (e) {
+    // A staff guard refusal reaches the client as a typed error; the
+    // ordinary failures below keep returning `{ success: false }`.
+    if (isStaffAuthorityRefusal(e)) throw e;
+    if (e instanceof Error) {
+      errorLogger(e.message);
+    } else {
+      errorLogger('error deleting files');
+    }
+
+    if (organizationId !== undefined) {
+      trackCodeIndexingDelete({
+        distinctId: ctx.user.google_user_email,
+        organizationId,
+        userId: ctx.user.id,
+        projectId: input.projectId,
+        gitBranch: input.gitBranch,
+        filePathsCount: input.filePaths?.length,
+        deletedFiles: 0,
+        success: false,
+      });
+    }
+
+    return { success: false, deletedFiles: 0 };
+  }
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -370,62 +453,7 @@ export const codeIndexingRouter = createTRPCRouter({
     }),
   delete: codeIndexingProcedure
     .input(CodebaseIndexingDeleteRequestSchema)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const organizationId = await getCodeIndexOrganizationId(ctx, input, {
-          actionClass: 'platform_write',
-        });
-
-        const deletedFiles = await getStorage().delete({
-          organizationId,
-          projectId: input.projectId,
-          gitBranch: input.gitBranch,
-          filePaths: input.filePaths,
-        });
-
-        trackCodeIndexingDelete({
-          distinctId: ctx.user.google_user_email,
-          organizationId,
-          userId: ctx.user.id,
-          projectId: input.projectId,
-          gitBranch: input.gitBranch,
-          filePathsCount: input.filePaths?.length,
-          deletedFiles,
-          success: true,
-        });
-
-        return { success: true, deletedFiles };
-      } catch (e) {
-        // A staff guard refusal reaches the client as a typed error; the
-        // ordinary failures below keep returning `{ success: false }`.
-        if (isStaffAuthorityRefusal(e)) throw e;
-        if (e instanceof Error) {
-          errorLogger(e.message);
-        } else {
-          errorLogger('error deleting files');
-        }
-
-        try {
-          const organizationId = await getCodeIndexOrganizationId(ctx, input, {
-            actionClass: 'platform_write',
-          });
-          trackCodeIndexingDelete({
-            distinctId: ctx.user.google_user_email,
-            organizationId,
-            userId: ctx.user.id,
-            projectId: input.projectId,
-            gitBranch: input.gitBranch,
-            filePathsCount: input.filePaths?.length,
-            deletedFiles: 0,
-            success: false,
-          });
-        } catch {
-          // Ignore tracking errors
-        }
-
-        return { success: false, deletedFiles: 0 };
-      }
-    }),
+    .mutation(({ ctx, input }) => deleteCodeIndexFiles(ctx, input)),
   getManifest: codeIndexingProcedure
     .input(CodebaseIndexingManifestRequestSchema)
     .output(CodebaseIndexingManifestResponseSchema)

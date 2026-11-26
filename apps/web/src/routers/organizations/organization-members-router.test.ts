@@ -20,10 +20,15 @@ import {
   organization_memberships,
   organizations,
   external_side_effect_outbox,
+  passkey_credentials,
+  session_step_up_proofs,
   support_access_grants,
   type User,
   type Organization,
 } from '@kilocode/db/schema';
+import { TRPCError } from '@trpc/server';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
@@ -1163,6 +1168,146 @@ describe('organizations members trpc router', () => {
       }
     });
 
+    async function childMembershipAdminRows(actorId: string) {
+      return db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.actor_id, actorId),
+            eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+          )
+        );
+    }
+
+    describe('legacy staff operation proof', () => {
+      const webSessionId = 'child-memberships-web-session';
+      const originalStepUp = process.env.ADMIN_STEP_UP_ENABLED;
+
+      beforeEach(() => {
+        process.env.ADMIN_STEP_UP_ENABLED = 'true';
+      });
+      afterEach(() => {
+        if (originalStepUp === undefined) delete process.env.ADMIN_STEP_UP_ENABLED;
+        else process.env.ADMIN_STEP_UP_ENABLED = originalStepUp;
+      });
+
+      /** A proof minted for one child-membership write on the test organization. */
+      async function insertChildMembershipsProof(staffId: string): Promise<string> {
+        const [credential] = await db
+          .insert(passkey_credentials)
+          .values({
+            kilo_user_id: staffId,
+            credential_id: `child-memberships-${crypto.randomUUID()}`,
+            public_key: 'unused-public-key',
+          })
+          .returning();
+        const verifiedAt = new Date();
+        const [proof] = await db
+          .insert(session_step_up_proofs)
+          .values({
+            kilo_user_id: staffId,
+            session_id_hash: hashWebSessionId(webSessionId),
+            method: 'webauthn_uv',
+            passkey_credential_id: credential!.id,
+            purpose: 'operation',
+            action_binding_hash: hashStepUpBinding('support_write', {
+              surface: 'trpc',
+              route: 'organizations.members.setChildMemberships',
+              method: 'mutation',
+              target: { kind: 'organization', id: testOrganization.id },
+            }),
+            verified_at: verifiedAt.toISOString(),
+            expires_at: new Date(verifiedAt.getTime() + 5 * 60_000).toISOString(),
+          })
+          .returning({ id: session_step_up_proofs.id });
+        return proof!.id;
+      }
+
+      async function proofConsumedAt(proofId: string) {
+        const [row] = await db
+          .select({ consumedAt: session_step_up_proofs.consumed_at })
+          .from(session_step_up_proofs)
+          .where(eq(session_step_up_proofs.id, proofId));
+        return row?.consumedAt ?? null;
+      }
+
+      it('spends no proof on an invalid target and one on the valid write', async () => {
+        const childOwner = await insertTestUser({ is_admin: false });
+        const target = await insertTestUser({ is_admin: false });
+        const outsider = await insertTestUser({ is_admin: false });
+        const staff = await insertTestUser({ is_admin: true });
+        await addUserToOrganization(testOrganization.id, target.id, 'member');
+        const child = await createChildOrganization('Proof Child Members', childOwner.id);
+        const unrelated = await createOrganization('Proof Unrelated Members', childOwner.id);
+        const proofId = await insertChildMembershipsProof(staff.id);
+        const caller = await createSessionCallerForUser(staff.id, { webSessionId });
+        const input = { organizationId: testOrganization.id, memberId: target.id };
+
+        try {
+          await expect(
+            caller.organizations.members.setChildMemberships({
+              ...input,
+              memberId: outsider.id,
+              childOrganizationIds: [child.id],
+            })
+          ).rejects.toMatchObject({
+            code: 'NOT_FOUND',
+            message: 'User is not a member of the parent organization',
+          });
+          await expect(
+            caller.organizations.members.setChildMemberships({
+              ...input,
+              childOrganizationIds: [unrelated.id],
+            })
+          ).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+            message: 'Selected organizations must be direct child organizations',
+          });
+          expect(await proofConsumedAt(proofId)).toBeNull();
+
+          await expect(
+            caller.organizations.members.setChildMemberships({
+              ...input,
+              childOrganizationIds: [child.id],
+            })
+          ).resolves.toEqual({ success: true, added: [child.id], removed: [] });
+          expect(await proofConsumedAt(proofId)).not.toBeNull();
+          // Neither refused validation above wrote an admin-action row.
+          expect(await childMembershipAdminRows(staff.id)).toEqual([
+            expect.objectContaining({ outcome: 'success' }),
+          ]);
+
+          // The spent proof covers that one write only.
+          const replay = await caller.organizations.members
+            .setChildMemberships({ ...input, childOrganizationIds: [] })
+            .then(
+              () => null,
+              (rejection: unknown) => rejection
+            );
+          expect(
+            replay instanceof TRPCError && replay.cause instanceof StepUpRequiredError
+              ? replay.cause.code
+              : replay
+          ).toBe('MFA_REQUIRED');
+          const membership = await db.query.organization_memberships.findFirst({
+            where: and(
+              eq(organization_memberships.organization_id, child.id),
+              eq(organization_memberships.kilo_user_id, target.id)
+            ),
+          });
+          expect(membership?.role).toBe('member');
+          // The refused replay writes no admin-action row either.
+          expect(await childMembershipAdminRows(staff.id)).toEqual([
+            expect.objectContaining({ outcome: 'success' }),
+          ]);
+        } finally {
+          await cleanupChildOrganizations([child.id]);
+          await db.delete(organizations).where(eq(organizations.id, unrelated.id));
+        }
+      });
+    });
+
     it('refuses a Kilo admin without a direct billing role over a bearer credential', async () => {
       const childOwner = await insertTestUser({ is_admin: false });
       const target = await insertTestUser({ is_admin: false });
@@ -1187,6 +1332,7 @@ describe('organizations members trpc router', () => {
           ),
         });
         expect(membership).toBeUndefined();
+        expect(await childMembershipAdminRows(kiloAdmin.id)).toEqual([]);
       } finally {
         await cleanupChildOrganizations([child.id]);
       }

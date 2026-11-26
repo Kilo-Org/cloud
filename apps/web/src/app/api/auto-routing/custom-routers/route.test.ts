@@ -1885,5 +1885,74 @@ describe('/api/auto-routing/custom-routers', () => {
       expect((await deleteOrgRouter(organization.id)).status).toBe(404);
       expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
     });
+
+    test('a Kilo admin holding only a member role writes through the staff admission', async () => {
+      const organization = await orgRouter();
+      const admin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, admin.id, 'member');
+      signIn(admin);
+
+      expect((await deleteOrgRouter(organization.id)).status).toBe(204);
+      expect(jest.mocked(requireStaffAuthorityForRequest)).toHaveBeenCalledTimes(1);
+      const rows = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'organization.custom_router.delete',
+          outcome: 'success',
+          metadata: { slug: 'team', heldRoles: ['member'] },
+        }),
+      ]);
+    });
+
+    test.each([
+      {
+        refusal: 'the staff guard refusal',
+        refuse: (params: Parameters<typeof requireStaffAuthorityForRequest>[1]) =>
+          staffStepUpRefusal(params, '/api/auto-routing/custom-routers'),
+        body: { stepUp: { actionClass: 'support_write' } },
+      },
+      {
+        refusal: 'the editor refusal when support policy denies the admission',
+        refuse: () => {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Explicit support access is required for this organization',
+          });
+        },
+        body: {
+          error: {
+            code: 'forbidden',
+            message:
+              'Only organization owners, admins, and billing managers can edit organization routers',
+          },
+        },
+      },
+    ])(
+      'a Kilo admin holding only a member role gets $refusal, keeps the router and records no admin row',
+      async ({ refuse, body }) => {
+        const organization = await orgRouter();
+        const admin = await insertTestUser({ is_admin: true });
+        await addUserToOrganization(organization.id, admin.id, 'member');
+        signIn(admin);
+        jest
+          .mocked(requireStaffAuthorityForRequest)
+          .mockImplementation(async (_auth, params) => refuse(params));
+
+        const response = await deleteOrgRouter(organization.id);
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject(body);
+        expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
+        expect(
+          await db
+            .select()
+            .from(admin_action_audit_logs)
+            .where(eq(admin_action_audit_logs.actor_id, admin.id))
+        ).toEqual([]);
+      }
+    );
   });
 });

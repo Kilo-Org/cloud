@@ -279,16 +279,19 @@ export const organizationBitbucketRouter = createTRPCRouter({
               return { integrationId: disconnected.integrationId };
             }
 
-            await cleanupBitbucketCodeReviewerForIntegration({
-              organizationId: input.organizationId,
-              integrationId: input.integrationId,
-              workspace: integration.workspace,
-            });
+            // The boundary admits inherited roles, which the credential service
+            // refuses, so cleanup waits for the service to confirm authority.
             return await disconnectBitbucketWorkspaceAccessToken({
               organizationId: input.organizationId,
               actorUserId: ctx.user.id,
               integrationId: input.integrationId,
               authority: ctx.organizationAccess.kind === 'member' ? 'member' : 'staff',
+              beforeDisconnect: () =>
+                cleanupBitbucketCodeReviewerForIntegration({
+                  organizationId: input.organizationId,
+                  integrationId: input.integrationId,
+                  workspace: integration.workspace,
+                }),
             });
           } catch (error) {
             rethrowBitbucketMutationError(error);

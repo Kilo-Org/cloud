@@ -17,7 +17,7 @@ import {
   platform_access_token_credentials,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type * as OrganizationAuditLogsModule from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
@@ -161,6 +161,10 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     await db.delete(organization_audit_logs);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: null })
+      .where(isNotNull(organizations.parent_organization_id));
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -1143,6 +1147,67 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     ).resolves.toEqual([]);
   });
 
+  it('runs pre-disconnect effects only after a direct manager role is confirmed', async () => {
+    const parentOwner = await insertTestUser();
+    const inheritedManager = await insertTestUser();
+    const directManager = await insertTestUser();
+    const parent = await createTestOrganization('Inherited Parent', parentOwner.id, 0);
+    await db.insert(organization_memberships).values({
+      organization_id: parent.id,
+      kilo_user_id: inheritedManager.id,
+      role: 'billing_manager',
+    });
+    const organization = await createTestOrganization(
+      'Inherited Child Organization',
+      directManager.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, organization.id));
+    mockSuccessfulProviderValidation();
+    const connected = await connectBitbucketWorkspaceAccessToken({
+      organizationId: organization.id,
+      actorUserId: directManager.id,
+      accessToken: ACCESS_TOKEN,
+    });
+    const integrationRows = () =>
+      db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, connected.integrationId));
+    const beforeDisconnect = jest.fn(async (): Promise<void> => {
+      await expect(integrationRows()).resolves.toEqual([{ id: connected.integrationId }]);
+    });
+
+    // A parent-organization billing role passes the procedure boundary but is
+    // not a direct membership, so nothing may run before the refusal.
+    await expect(
+      disconnectBitbucketWorkspaceAccessToken({
+        organizationId: organization.id,
+        actorUserId: inheritedManager.id,
+        integrationId: connected.integrationId,
+        authority: 'member',
+        beforeDisconnect,
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized' });
+    expect(beforeDisconnect).not.toHaveBeenCalled();
+    await expect(integrationRows()).resolves.toEqual([{ id: connected.integrationId }]);
+
+    await expect(
+      disconnectBitbucketWorkspaceAccessToken({
+        organizationId: organization.id,
+        actorUserId: directManager.id,
+        integrationId: connected.integrationId,
+        authority: 'member',
+        beforeDisconnect,
+      })
+    ).resolves.toEqual({ integrationId: connected.integrationId });
+    expect(beforeDisconnect).toHaveBeenCalledTimes(1);
+    await expect(integrationRows()).resolves.toEqual([]);
+  });
+
   it('rechecks the staff role, not a membership, for a staff-admitted disconnect', async () => {
     const organizationOwner = await insertTestUser();
     const staff = await insertTestUser({ is_admin: true });
@@ -1157,6 +1222,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
       actorUserId: organizationOwner.id,
       accessToken: ACCESS_TOKEN,
     });
+    const beforeDisconnect = jest.fn(async (): Promise<void> => {});
 
     await expect(
       disconnectBitbucketWorkspaceAccessToken({
@@ -1164,6 +1230,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
         actorUserId: staff.id,
         integrationId: connected.integrationId,
         authority: 'member',
+        beforeDisconnect,
       })
     ).rejects.toMatchObject({ code: 'unauthorized' });
 
@@ -1174,8 +1241,10 @@ describe('Bitbucket Workspace Access Token credentials', () => {
         actorUserId: staff.id,
         integrationId: connected.integrationId,
         authority: 'staff',
+        beforeDisconnect,
       })
     ).rejects.toMatchObject({ code: 'unauthorized' });
+    expect(beforeDisconnect).not.toHaveBeenCalled();
 
     await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, staff.id));
     await expect(
@@ -1184,8 +1253,10 @@ describe('Bitbucket Workspace Access Token credentials', () => {
         actorUserId: staff.id,
         integrationId: connected.integrationId,
         authority: 'staff',
+        beforeDisconnect,
       })
     ).resolves.toEqual({ integrationId: connected.integrationId });
+    expect(beforeDisconnect).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an invalid organization ID before authority or provider access', async () => {

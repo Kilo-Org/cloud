@@ -1,6 +1,7 @@
-import type { TRPCError } from '@trpc/server';
+import { TRPCError } from '@trpc/server';
 import { CODE_INDEXING_ENABLED_USER_IDS } from '@kilocode/web-shared/lib/config.server';
 import { staffRefusalKind } from '@kilocode/web-shared/lib/admin/admin-guard';
+import { StaffRequestRefusal } from '@kilocode/web-shared/routers/organizations/utils';
 import type { User } from '@kilocode/db/schema';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { sql } from 'drizzle-orm';
@@ -43,11 +44,14 @@ export function personalIndexingNeedsStaffAuthority(
 
 /**
  * Whether an error is a staff guard refusal a handler must pass through: any
- * typed refusal except `not_staff`. A `not_staff` refusal means the primary
- * row is no longer an admin, so the caller gets the ordinary answer. A handler
- * that turns other failures into an ordinary answer must pass these through.
+ * typed tRPC refusal except `not_staff`, or any refusal of a REST staff
+ * admission ({@link StaffRequestRefusal}), which carries the adapter's own
+ * response. A tRPC `not_staff` refusal means the primary row is no longer an
+ * admin, so the caller gets the ordinary answer. A handler that turns other
+ * failures into an ordinary answer must pass these through.
  */
 export function isStaffAuthorityRefusal(error: unknown): error is TRPCError {
+  if (error instanceof TRPCError && error.cause instanceof StaffRequestRefusal) return true;
   const kind = staffRefusalKind(error);
   return kind !== null && kind !== 'not_staff';
 }

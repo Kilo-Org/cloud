@@ -544,8 +544,8 @@ for the related-origin check.
 | `GET /signin/oauth/<provider>/callback` (`POST` for Apple, `form_post`) | Exchanges the code, checks the identity, then consumes the flow and signs in or links | `uts.complete_provider_sign_in` |
 | `POST /signin/sso/start` | The address's domain picks the org's one active WorkOS connection | `uts.start_sign_in_flow` |
 | `GET /signin/sso/callback` | Buys the WorkOS profile; its connection and domain must be the flow's | `uts.complete_provider_sign_in` |
-| `POST /signin/email/start` | Stores the email (link hash, keyed code hash), then sends it through the mail port | `uts.start_email_sign_in` |
-| `POST /signin/email/code` | Checks the newest code for the address; the fifth wrong entry exhausts it | `uts.verify_email_code` |
+| `POST /signin/email/start` | With Mailgun: refuses an address outside the recipient rule, then checks the Turnstile token; stores the email (link hash, keyed code hash), then sends it through the mail port | `uts.start_email_sign_in` |
+| `POST /signin/email/code` | Checks the newest code for the address; the fifth wrong entry exhausts it; a network past 30 wrong codes an hour is refused | `uts.verify_email_code` |
 | `GET /signin/email/link` | A confirmation page only, so a mail scanner changes nothing | none |
 | `POST /signin/email/link` | Signs in with the link, once | `uts.complete_email_link` |
 
@@ -618,9 +618,40 @@ codes are stopped every code entry is refused (`codes_stopped`). The link page n
 (`p…@example.com`). The email start sets a binder cookie, like a flow's; a link opened in a browser
 without it says so and signs in only after a second confirmation, so a link someone else asked
 for cannot sign the reader into that person's account in one click. The address and the code are
-stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`. Deployed Workers wire no mail sender
-yet (`src/signin/email/mailer.ts`), so the email sign-in is offered only where one is wired; the
-development entry records each message (`GET /__dev/mail?to=`).
+stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`.
+
+A client network (an IPv4 /24 or an IPv6 /48) may enter 30 wrong sign-in codes an hour over all
+addresses (`uts.network_email_code_failures`, migration 0018), as for wrong device user codes. Past
+that, every code entry from the network is refused before any code is read (`network_limited`,
+429): nothing is counted and no audit row is written (decision Q56), and the email's link still
+works, so a network shared with the owner cannot lock the owner out.
+
+**Mail sender.** The email sign-in is offered only where a sender is wired
+(`src/signin/email/delivery.ts`):
+
+- Mailgun, where `SIGNIN_EMAIL_HASH_KEY` and every mail setting are set (Configuration below). The
+  sign-in page then carries Cloudflare Turnstile's widget in the email form (its CSP adds
+  `https://challenges.cloudflare.com` to `script-src` and `frame-src`), and the start, in this
+  order: takes one anonymous-write slot; outside production refuses an address that
+  `UTS_MAIL_ALLOWED_RECIPIENTS` does not list (403, no siteverify call, no row, no message); checks
+  the form's `cf-turnstile-response` once with siteverify (`src/signin/email/turnstile.ts`: the
+  token must pass for action `email-sign-in` on the issuer's host; a refused token answers 400, an
+  unanswered or failed siteverify 503, a refused secret 500); stores the email; and sends one
+  plain-text message (link, code, expiry; tracking off). A Mailgun 429 or 5xx answers 503, any
+  other refusal 502. Log lines carry outcomes, Cloudflare's error codes and setting names, never
+  the token, the key, the secret or the address.
+- The development entry's recording port (`GET /__dev/mail?to=`), when no mail setting is set. It
+  sends nothing, so it needs no Turnstile check.
+
+With neither, the routes answer 404 and the page does not offer email; with a partial or invalid
+mail setting they answer 500 and log `uts.signin.misconfigured` with the names.
+
+Cost per email start with Mailgun: one siteverify call and, once it passed, one
+`uts.start_email_sign_in` statement and one Mailgun `POST /v3/<domain>/messages`; no audit row and
+no queue message (an unauthenticated write names no account). A refusal by the recipient rule or
+the anonymous-write limit makes no network call and no statement. A code entry is still one
+`uts.verify_email_code` statement; the network count adds one primary-key probe, and one upsert
+on a wrong code. Neither route is on a section 3 hot path.
 
 Open items before deploy:
 
@@ -629,15 +660,13 @@ Open items before deploy:
   authorizations, and SSO starts 60 a minute in their own window, because an org's staff often
   share one egress address. A refused start answers the sign-in page's message page with 429 and
   `Retry-After`.
-- Before a mail sender is wired: past the code cap every sign-in email still carries the link, so
-  an address can be sent many emails. Wiring a sender needs first a Turnstile check on the email
-  start form (its secret is production configuration) and a per-network counter of wrong email
-  code entries (the per-address counter alone lets one network guess across many addresses). A
-  total cap per address is not used, because anyone could then spend the owner's emails and lock
+- Past the code cap every sign-in email still carries the link, so an address can be sent many
+  emails; the Turnstile check, the anonymous-write limit and the per-address code cap bound that.
+  A total cap per address is not used, because anyone could then spend the owner's emails and lock
   the owner out.
-- The UTS cron (slice 3.9) must call `uts.maintain_provider_sign_in_rows()` beside
-  `uts.maintain_sign_in_rows()` before any environment offers these methods; without it flow and
-  email rows grow without bound.
+- The minute cron calls `uts.maintain_provider_sign_in_rows()` beside
+  `uts.maintain_sign_in_rows()` (`src/audit/maintenance.ts`), so flow, email and network-count
+  rows do not grow without bound.
 
 ### Configuration
 
@@ -650,7 +679,20 @@ not offered and its routes answer 500 (`uts.signin.misconfigured` log line, name
 | Apple | `SIGNIN_APPLE_CLIENT_ID` (services id), `SIGNIN_APPLE_TEAM_ID`, `SIGNIN_APPLE_KEY_ID` | `SIGNIN_APPLE_PRIVATE_KEY` (P-256, PKCS #8 PEM) |
 | Anthropic | `SIGNIN_ANTHROPIC_CLIENT_ID`, `SIGNIN_ANTHROPIC_ASSERTION_{AUDIENCE,ISSUER,SUBJECT,KEY_ID}` | `SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY` (P-256) |
 | WorkOS SSO | `SIGNIN_WORKOS_CLIENT_ID` | `SIGNIN_WORKOS_API_KEY` |
-| Email | none | `SIGNIN_EMAIL_HASH_KEY` (32 bytes, base64url) |
+| Email | `UTS_MAILGUN_DOMAIN` (the sending domain), `UTS_MAIL_FROM` (`Name <local@domain>` on that domain), `UTS_TURNSTILE_SITE_KEY`; outside production also `UTS_MAIL_ALLOWED_RECIPIENTS` | `SIGNIN_EMAIL_HASH_KEY` (32 bytes, base64url), `UTS_MAILGUN_SENDING_KEY` (a Domain Sending Key: messages on that domain only), `UTS_TURNSTILE_SECRET_KEY` |
+
+The five mail settings (`UTS_MAILGUN_SENDING_KEY`, `UTS_MAILGUN_DOMAIN`, `UTS_MAIL_FROM`,
+`UTS_TURNSTILE_SITE_KEY`, `UTS_TURNSTILE_SECRET_KEY`) are one switch for the sign-in mail and the
+notice email: mail never leaves without the Turnstile check guarding the form that sends it. The
+sender must sit on the sending domain (SPF and DKIM alignment), and Mailgun is called on its US API
+host. `UTS_MAIL_ALLOWED_RECIPIENTS` is a comma-separated list of exact addresses
+(`tester@example.com`) and whole domains (`@example.com`, no subdomains); staging and development
+must set it, and production must not (either mistake makes the mail settings misconfigured). The
+three vars are the switch: the secrets alone turn nothing on, so set `SIGNIN_EMAIL_HASH_KEY`,
+`UTS_MAILGUN_SENDING_KEY` and `UTS_TURNSTILE_SECRET_KEY` with `wrangler secret put` first, then
+deploy the vars in `wrangler.jsonc`; vars without both secrets make the routes answer 500. The
+Turnstile widget lists the issuer host (`uts-staging.kiloapps.io`, `uts.kiloapps.io`) as its
+hostname.
 
 `SIGNIN_DEV_ENDPOINTS` (development only, loopback URLs only) points providers at local
 stand-ins. Each registration lists the callback of its environment's issuer:
@@ -739,10 +781,15 @@ rows of each kind): known devices and networks unseen for 90 days, and finished 
 their attempts 400 days after they were written.
 
 The minute cron (`src/scheduled.ts`) runs one `sweepNotices` pass after its maintenance steps.
-No deployed environment has a push or email provider wired yet, so the deployed cron passes no
-transports: each out-of-band channel settles as `not_configured`, every notice shows in-app, and
-the retention step runs. The account API's credential notice port stays null in the deployed entry
-until a real transport exists.
+No deployed environment has a push provider wired yet, so push settles as `not_configured`. Email
+goes through Mailgun where the mail settings are on (Configuration under "Sign-in providers, SSO
+and email"), behind the recipient rule: outside production an address that
+`UTS_MAIL_ALLOWED_RECIPIENTS` does not list is dropped without sending, and a message left with no
+address is `no_target` (`uts.mail.recipient_refused` log line, a count only). Without the mail
+settings email settles as `not_configured` too; every notice shows in-app, and the retention step
+runs. With the mail settings on, the account API's credential notice port delivers a created
+PAT's or bot key's notice at once (claim, one Mailgun call, finish, in `waitUntil`);
+without them it stays null and the cron delivers the notice.
 
 | Channel | Provider | Adapter |
 |---|---|---|

@@ -1,10 +1,11 @@
 # STS — the secrets broker and service-token service
 
-STS serves each workload one bundle of runtime secrets read from Infisical Cloud EU, and it mints
+STS serves each workload one bundle of runtime secrets read from Infisical Cloud EU, it mints
 short-lived service tokens (Ed25519 JWTs, one audience and one scope each) for the audiences a
-workload's policy grants. It records every delivery, mint and key change in audit logs that a queue
-relays to the audit pipeline. Database leases, CI deploy tokens and the audit queue consumer are not
-part of this Worker.
+workload's policy grants, and it brokers database leases from Infisical's dynamic PostgreSQL
+engine for the lease grants a policy lists. It records every delivery, mint, lease and key change
+in audit logs that a queue relays to the audit pipeline. CI deploy tokens and the audit queue
+consumer are not part of this Worker.
 
 ## How a read works
 
@@ -57,10 +58,11 @@ part of this Worker.
   Infisical request has an 8-second timeout, so a fill fits the secrets client's 25-second
   first-load window.
 
-Routes: `POST /v1/bundle`, `POST /v1/token` (service tokens), `GET /.well-known/jwks.json` (the
-service-token key set), `GET /manager-auth/.well-known/jwks.json` (the manager login key set),
-`POST /manager-webhook` (Infisical `secrets.modified`). Production is `https://sts.kiloapps.io`,
-staging is `https://sts-staging.kiloapps.io`.
+Routes: `POST /v1/bundle`, `POST /v1/token` (service tokens), `POST /v1/lease` and
+`POST /v1/lease/revoke` (database leases), `GET /.well-known/jwks.json` (the service-token key
+set), `GET /manager-auth/.well-known/jwks.json` (the manager login key set), `POST /manager-webhook`
+(Infisical `secrets.modified`). Production is `https://sts.kiloapps.io`, staging is
+`https://sts-staging.kiloapps.io`.
 
 ## Service tokens
 
@@ -235,14 +237,15 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 
 ### Internal Durable Objects
 
-`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO` and `TokenSignerDO` are internal. Their methods
-skip the policy check and the audit row that `SecretsBroker` performs (the token signer signs what
-STS's policy check allowed), so no other Worker may reach them: a
-`durable_objects.bindings[].script_name`, workflow `script_name`, migration `from_script` or export
-`transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe` binding, or an STS service
-binding at any entrypoint other than `SecretsBroker` fails `test/repo/worker-configs.test.ts`. A
-config outside `services/sts/` that binds a class named `BundleDO`, `RefresherDO`, `DenialDO` or
-`TokenSignerDO` fails too (`SignerDO` is also the audit relay's own class name).
+`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`, `TokenSignerDO` and `LeaseDO` are internal.
+Their methods skip the policy check and the audit row that `SecretsBroker` performs (the token
+signer signs what STS's policy check allowed, the lease object leases what it allowed), so no other
+Worker may reach them: a `durable_objects.bindings[].script_name`, workflow `script_name`, migration
+`from_script` or export `transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe`
+binding, or an STS service binding at any entrypoint other than `SecretsBroker` fails
+`test/repo/worker-configs.test.ts`. A config outside `services/sts/` that binds a class named
+`BundleDO`, `RefresherDO`, `DenialDO`, `TokenSignerDO` or `LeaseDO` fails too (`SignerDO` is also
+the audit relay's own class name).
 
 ## Configuration
 
@@ -255,18 +258,20 @@ at the start of each entry.
 | `STS_ISSUER` | Public base URL, `https://sts.kiloapps.io` in production. |
 | `MANAGER_BASE_URL` | Infisical Cloud base URL, `https://eu.infisical.com`. |
 | `MANAGER_PROJECT_ID` | The Infisical project `kilo`. |
+| `MANAGER_PROJECT_SLUG` | The same project's slug, which the lease API takes instead of its id. Empty: this environment has no lease, and every lease request answers `unavailable` ([Database leases](#database-leases)). |
 | `MANAGER_ENVIRONMENT_SLUG` | `development`, `staging` or `production`. |
 | `MANAGER_IDENTITY_ID` | The Infisical machine identity STS logs in as, one per environment. |
 | `DO_JURISDICTION` | `eu` in production and staging, `none` locally. |
 | `TOKEN_SIGNING_KIDS_REVOKED` | Comma list of service-token signing kids taken out of service; empty by default (runbook above). |
+| `LEASE_CI_MIGRATION_TARGET` | `<host>:<port>/<database>` of the primary's direct endpoint, returned with a `ci-migration` lease; empty returns no target. Plain values, never a credential. |
 
 Wrangler inherits no vars into an env block, so every block sets each var, and
 `test/repo/worker-configs.test.ts` checks that each STS block passes the same schema `readConfig`
 uses and that its `STS_ISSUER` equals `STS_ISSUERS` in `@kilocode/sts-contracts`.
 
 Bindings: `AUDIT_QUEUE` (queue producer), `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`,
-`STS_DENIAL_DO`, `STS_TOKEN_SIGNER_DO` (migration `v3`). Trigger: cron `*/5 * * * *` in production
-and staging, `[]` in the local block.
+`STS_DENIAL_DO`, `STS_TOKEN_SIGNER_DO` (migration `v3`), `STS_LEASE_DO` (migration `v4`). Trigger:
+cron `*/5 * * * *` in production and staging, `[]` in the local block.
 
 ## Policy
 
@@ -301,8 +306,8 @@ Token grants: `audiences` lists the services a workload may mint for and `scopes
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
 `STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`, empty until the first audience registers) and
 belong to a listed audience, every audience needs at least one scope, and no audience may be the
-workload itself. `dynamic` (database leases, CI deploy tokens) fixes the shape for later; its list
-of allowed values is empty, so any entry fails the load.
+workload itself. `dynamic` lists the database lease grants the workload may request
+([Database leases](#database-leases)); it defaults to empty, so a policy without it leases nothing.
 
 ```yaml
 audiences: [web]
@@ -573,6 +578,196 @@ has a GitHub policy (360 a day per environment; a 304 when nothing changed), and
 push per GitHub policy per refresh: with the 8 kilocode policies, 8 `BundleDO` calls every 4
 minutes, or 2,880 a day per environment.
 
+## Database leases
+
+STS brokers one PostgreSQL role per request from Infisical's dynamic PostgreSQL engine (design 4.5,
+6.1 job 3). The role exists only for its lease: Infisical creates it with a random password and a
+`VALID UNTIL` expiry, and runs the revocation statement (end the role's sessions, drop it) when the
+caller revokes it or the lease expires. STS never stores the username or the password; they pass
+through the lease object to the caller once.
+
+| Grant | Who may hold it | Infisical dynamic secret | Ceiling | The role | Target STS returns |
+|---|---|---|---|---|---|
+| `replica-read` | A `worker-binding` policy (bouncer-watch) | `replica-read` in `/dynamic/replica-read` | 8 hours, 4 active | Member of `kilo_lease_replica_read`: `SELECT` on `public`, nothing else | None: the consumer keeps its own replica host |
+| `ci-migration` | A `github-oidc` policy bound to a GitHub environment | `ci-migration` in `/dynamic/ci-migration` | 1 hour, 2 active | Member of `kilo_lease_migration`; its sessions run as `postgres` | `LEASE_CI_MIGRATION_TARGET` (the primary's direct endpoint) |
+
+Each dynamic secret sits alone in its folder because an Infisical `dynamic-secrets` permission is
+scoped by environment and folder and cannot name a secret.
+
+**Policy.** `dynamic` lists one entry per grant:
+
+```yaml
+workload: bouncer-watch
+environments: [staging, production]
+identity:
+  kind: worker-binding
+secrets: [BOUNCER_WATCH_AXIOM_QUERY_TOKEN]
+dynamic:
+  - grant: replica-read
+    maxTtlSeconds: 9000 # the daily run's 150 minutes
+    defaultTtlSeconds: 3600 # the hourly run's 60 minutes
+    maxActive: 2 # the hourly and daily runs overlap
+```
+
+The loader refuses an unknown grant or field, a grant listed twice, a `maxTtlSeconds` above the
+grant's ceiling (8 hours, 1 hour), a `defaultTtlSeconds` above `maxTtlSeconds` or below 5 minutes,
+a `maxActive` above the grant's ceiling (4, 2), `replica-read` on any identity but
+`worker-binding`, and `ci-migration` on any identity but a `github-oidc` one with an
+`environment` (a production policy also accepts only `refs/heads/main`, as every GitHub policy
+does). A policy without `dynamic` leases nothing.
+
+**Calling it.** A Worker calls its binding; the answer is `LeaseResultSchema` in
+`@kilocode/sts-contracts`:
+
+```ts
+const lease = await env.STS.lease({ grant: 'replica-read', ttlSeconds: 3600 });
+if (lease.status !== 'ok') throw new Error(`no lease: ${lease.status}`);
+try {
+  // lease.username, lease.password, lease.expiresAt; keep them in memory only
+} finally {
+  await env.STS.revokeLease(lease.leaseId);
+}
+```
+
+A CI job posts the same bodies with its GitHub OIDC token (audience: the STS issuer, as for
+`/v1/bundle`):
+
+```sh
+oidc() { curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://sts.kiloapps.io" | jq -r .value; }
+lease=$(curl -sS --fail-with-body -X POST https://sts.kiloapps.io/v1/lease \
+  -H "Authorization: Bearer $(oidc)" -H 'content-type: application/json' -d '{"grant":"ci-migration"}')
+# ::add-mask:: the username and password, build the connection URL from host, port and database,
+# run the migration; then, in an always() step, with a fresh OIDC token (a job token lives minutes):
+curl -sS -X POST https://sts.kiloapps.io/v1/lease/revoke -H "Authorization: Bearer $(oidc)" \
+  -H 'content-type: application/json' -d "{\"leaseId\":\"$(jq -r .leaseId <<<"$lease")\"}"
+```
+
+A `ci-migration` lease is the one STS credential that outlives its attestation (design 6.2): the
+GitHub token lives minutes, the lease up to an hour.
+
+| Answer | HTTP | Meaning |
+|---|---|---|
+| `ok` | 200 | `leaseId`, `grant`, `username`, `password`, `expiresAt`, `ttlSeconds`, `clamped` (the request asked for more than the policy maximum), and `host`, `port`, `database` for `ci-migration` when configured |
+| `denied` | 401 or 403 | `identity_rejected` (401), `unknown_workload`, `environment_mismatch`, `grant_not_allowed` |
+| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` of this grant, a creation in progress included) or `rate_limited` (4 creations by this workload in the last minute, whatever their outcome) |
+| `invalid_request` | 400 (413 above 1 KB) | Not `LeaseRequestSchema`: an unknown grant, a lifetime under 5 minutes or above a day |
+| `unavailable` | 503, `Retry-After` | Infisical refused or failed, the lease object failed or did not answer in 25 seconds, or the environment has no `MANAGER_PROJECT_SLUG` |
+
+Revoke answers `revoked` (200) for the caller's own lease, also when it already ended (no
+Infisical call then), and `not_found` (404) for any lease id STS did not hand to this workload,
+another workload's included.
+
+**How a lease is made.** The Worker checks the caller (props or provider token, as for bundles)
+and the policy grant, takes the request's lifetime or the policy default, and shortens it to the
+policy maximum. Then one call to `LeaseDO`, one object per environment, bounded at 25 seconds and
+never retried (a creation changes the database). The object:
+
+1. Refuses the request at the workload's limits. A creation in progress holds its slot as a
+   `pending` row, so concurrent requests cannot pass the limit together.
+2. Logs in to Infisical (the 10-minute access token is kept in the object) and calls
+   `POST /api/v1/dynamic-secrets/leases` with `dynamicSecretName`, `projectSlug`,
+   `environmentSlug`, `path` and `ttl` (https://infisical.com/docs/api-reference/endpoints/dynamic-secrets/create-lease).
+   The answer is checked with zod; the SQL provider returns `DB_USERNAME` and `DB_PASSWORD`.
+3. Revokes the lease at once and answers `unavailable` when it cannot hand it over: the creation
+   took more than 20 seconds (`late`), Infisical's expiry is more than 2 minutes off the lifetime
+   asked for (`expiry_mismatch`), or the `lease.created` row could not be written
+   (`audit_failed`). If that revocation fails too, the role ends at its expiry; its password never
+   left the object.
+4. Otherwise writes `lease.created` and marks the row active in the same output gate, and returns.
+
+A creation that times out may still have made a role at the database. Its password reached no one,
+and Infisical drops it at expiry. Rows are deleted a day after their lease ended.
+
+**Audit.** On the `sts:<environment>:leases` stream: `ai.kilo.sts.lease.created` (workload,
+identity, channel, grant, lease id, `ttlSeconds`, `requestedTtlSeconds` when given, `clamped`,
+`expiresAt`, and a GitHub caller's `jobWorkflowRef`, `runId`, `runAttempt`) and
+`ai.kilo.sts.lease.revoked` (`cause`: `caller`, `late`, `expiry_mismatch` or `audit_failed`;
+`wasActive` false when Infisical no longer had it). Refusals of an identified caller become
+`ai.kilo.sts.lease.denied` through the denial object, merged per minute: the answer's reason, or
+for a revoke the caller heard as `not_found`, `not_owner` (another workload's lease) or
+`unknown_lease`. No row carries a username or a password. Infisical's own audit log records each
+lease and revocation, the expiry revocation included.
+
+**Replica sessions (decision D13).** Infisical creates and drops the role on the primary, through
+its direct endpoint; no dynamic engine can write to a standby. The role reaches the replica through
+replication, so a consumer that logs in right after the lease is created may have to retry for the
+replication delay. The revocation statement ends the role's sessions on the primary only: a
+session on the replica runs on after a revocation or the expiry. What bounds it there is the
+consumer's own run deadline (bouncer-watch: 55 and 130 minutes, under the 60 and 150-minute
+leases), `VALID UNTIL` and the dropped role (no new login on either node), and the consumer's
+statement timeout. `check.sh` shows the same on one node: `VALID UNTIL` refuses new logins and
+leaves an open session alone.
+
+**Risks.**
+
+- A `ci-migration` lease is `postgres` for up to an hour: owner-level DDL, `CREATE EXTENSION` and
+  every row. What stands between a workflow and it: the GitHub environment's protection (branch
+  `main`, a required reviewer), the policy's exact workflow list and event allowlist, the 1-hour
+  expiry, `CONNECTION LIMIT 2`, and the revocation at the end of the job.
+- `kilo_lease_migration_admin` can create such a role, so its password is as strong as `postgres`.
+  It lives only in the Infisical dynamic secret's configuration; the break-glass owner enters it
+  once, and Terraform ignores the field (design 4.2).
+- Both role-creating logins hold `pg_signal_backend`, so either can end any non-superuser session,
+  the application's pools included. A leak of the replica login cannot create a write role, but can
+  disconnect the application.
+- A `replica-read` role is a cluster role: the same login works on the primary. It is read-only by
+  grant on both. `default_transaction_read_only` and `statement_timeout` are role defaults that a
+  session may change. It can still run any function `PUBLIC` may execute: review `SECURITY DEFINER`
+  functions in `public` before the first lease.
+- On PostgreSQL 16 and later, `GRANT postgres TO kilo_lease_migration` needs `ADMIN` on
+  `postgres`, which the Supabase `postgres` login may lack (`check.sh` prints the answer for a plain
+  non-superuser owner: it cannot). Until it succeeds on Supabase, `ci-migration` stays off.
+
+**Database setup, per environment (staging first).** On the primary's direct endpoint
+(`db.<project ref>.supabase.co:5432`, not Supavisor), PostgreSQL 16 or later, as `postgres`:
+
+```sh
+psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
+  -v replica_admin_password="$(openssl rand -base64 36)" \
+  -v migration_admin_password="$(openssl rand -base64 36)" \
+  -f services/sts/sql/leases/setup.sql
+```
+
+Generate the two passwords into the break-glass owner's session only (or into variables) and enter
+each into its dynamic secret below. The last query of `setup.sql` must print `f|0`.
+
+**Infisical setup, per environment (staging first).**
+
+1. Folders `/dynamic/replica-read` and `/dynamic/ci-migration` in the environment.
+2. Dynamic secret `replica-read` in `/dynamic/replica-read`: service PostgreSQL; host, port 5432
+   and database `postgres` of the primary's direct endpoint; user `kilo_lease_replica_admin` with
+   its password; the Supabase CA, SSL reject unauthorized on; default TTL `1h`; max TTL `8h`;
+   username template `lease_rr_{{random 20}}`; creation statement `sql/leases/replica-read.create.sql`,
+   revocation statement `sql/leases/revoke.sql`, renew statement `sql/leases/renew.sql`, pasted as
+   they are (Infisical splits each on `;`, so they hold no other semicolon).
+3. Dynamic secret `ci-migration` in `/dynamic/ci-migration`: the same, with user
+   `kilo_lease_migration_admin`, default and max TTL `1h`, username template
+   `lease_cm_{{random 20}}`, and creation statement `sql/leases/ci-migration.create.sql`.
+4. The STS identity's project role in that environment gains `dynamic-secrets` action `lease` with
+   the conditions `environment` equal to the environment and `secretPath` equal to
+   `/dynamic/replica-read` (one rule) and `/dynamic/ci-migration` (a second rule); nothing else on
+   `dynamic-secrets`, so STS cannot read or change the root credential. `lease` covers create,
+   renew and revoke.
+5. Network: if the Supabase project restricts addresses, allow Infisical Cloud EU's egress
+   addresses (https://infisical.com/docs/documentation/setup/networking).
+6. A lease from the Infisical dashboard (trial check 3): create, log in through the replica,
+   renew, then let one expire with a session open on the primary and see it ended and the role
+   dropped.
+7. STS: set `MANAGER_PROJECT_SLUG` (Infisical → project settings) and `LEASE_CI_MIGRATION_TARGET`
+   in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants.
+
+**Cost.** One lease is one `LeaseDO` call and one Infisical create, plus a login and one `SignerDO`
+call when the object's 10-minute token has lapsed (leases are sparse, so assume it has), and one
+`lease.created` row; one revocation is the same with a delete and one `lease.revoked` row. A
+refusal costs no Infisical call and at most one denial hop; a limit refusal also costs its
+`LeaseDO` call. At the database, a lease is one `CREATE ROLE` and its role settings, a revocation
+one `pg_stat_activity` scan and one `DROP ROLE`, all on the primary. bouncer-watch runs 24 hourly
+and 1 daily run a day; sized at twice that for retried runs, 48 and 2 leases, each revoked at the
+end of its run, it makes 100 `LeaseDO` calls, at most 200 Infisical requests (against 600 a
+minute), 100 `SignerDO` calls and 100 audit rows a day. CI: 2 `LeaseDO` calls, at most 4
+Infisical requests, 2 `SignerDO` calls and 2 audit rows per migration job.
+
 ## Infisical setup, per environment
 
 **Machine identity with JWT Auth** (https://infisical.com/docs/documentation/platform/identities/jwt-auth;
@@ -606,6 +801,9 @@ environment, the role also grants `readValue` on `/ci/**` there. Without that gr
 fails, which fails every refresh in that environment, so every bundle there goes stale until the
 grant is added. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
 `/ci/minting`. The STS deploy job's own token lives outside it, under `/sts-deploy` (design 4.2).
+Before the first lease in an environment, the role also grants `dynamic-secrets` `lease` on
+`/dynamic/replica-read` and `/dynamic/ci-migration` there ([Database leases](#database-leases));
+the lease object uses the same identity and login subject as the refresher.
 
 **Webhook.** One `secrets.modified` webhook per environment, scoped to that environment, of type
 General, to `https://sts.kiloapps.io/manager-webhook` (staging: `https://sts-staging.kiloapps.io/manager-webhook`),
@@ -725,7 +923,9 @@ environment), in this order:
 acceptance and outages per provider against locally generated key sets, policy schema and token
 grants, bundle delivery, ETags, policy narrowing, fills, relay and pruning, the refresher against a
 mocked Infisical: login, folder reads, resolution, references, backoff, webhooks; the key-ring
-timeline with an injected clock, the token signer, mint over both entry points and token denials)
+timeline with an injected clock, the token signer, mint over both entry points and token denials;
+leases over both entry points against a mocked Infisical lease API: lifetimes, clamping, the
+active and per-minute limits, owner-only revocation, undelivered leases, pruning, lease denials)
 and then the Node suites: `test/repo/` (policy files, the Worker config checks, and a check that
 every `wrangler.jsonc` under `services/` other than a service's own, a symlink included, sits under
 `test/fixtures/`, which the production deploy job skips, that no `wrangler.json` and no tracked
@@ -758,10 +958,10 @@ The script mints two tokens, verifies each with `@kilocode/verify` against the s
 checks that a forged token (same claims and kid, another key) and an expired token get 401 and a
 wrong-audience token 403, and waits for the issued and denied events on the queue.
 
-**Local end-to-end check of a CI bundle.** The same test build also carries one GitHub policy,
-`ci-e2e-release`, and sends its requests for GitHub's issuer and for the manager to a local fake on
-port 8830 that `ci-bundle-check.ts` serves (a fresh RS256 key with its discovery document and key
-set, and an Infisical stand-in with synthetic values):
+**Local end-to-end check of a CI bundle.** The same test build also carries two GitHub policies,
+`ci-e2e-release` and `ci-e2e-migrate`, and sends its requests for GitHub's issuer and for the
+manager to a local fake on port 8830 that `ci-bundle-check.ts` serves (a fresh RS256 key with its
+discovery document and key set, and an Infisical stand-in with synthetic values):
 
 ```sh
 cd services/sts
@@ -777,3 +977,32 @@ job and a name-only subject each get 401 `identity_rejected`. It then waits for 
 `bundle.delivered` row, which must carry the job's workflow file, run id and attempt, and for the
 `bundle.denied` rows that name the refused `job_workflow_ref`, `event_name` and `sub` and no run id,
 and checks that no audit row carries a value.
+
+**Local end-to-end check of database leases.** The probe policy also holds `replica-read`
+(maximum 9000 seconds, 2 active) and `ci-e2e-migrate` holds `ci-migration`. `lease-check.ts` serves
+the fake GitHub issuer and a fake Infisical lease API on port 8830, so it and `ci-bundle-check.ts`
+run one at a time:
+
+```sh
+cd services/sts
+../../node_modules/.bin/tsx test/fixtures/e2e/lease-check.ts
+# in another shell
+npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/wrangler.sts.jsonc
+```
+
+It checks that the probe gets a 60-minute `replica-read` lease over its binding (and the request
+Infisical received), that an 8-hour request is clamped to 9000 seconds, that a third concurrent
+lease is refused `too_many_active` with no Infisical call, that a GitHub job gets a 1-hour
+`ci-migration` lease with the primary target over `POST /v1/lease`, that neither caller can revoke
+the other's lease while each revokes its own, and that the `lease.created`, `lease.revoked` and
+`lease.denied` rows reach the queue with no username or password.
+
+**Local check of the lease SQL.** `sql/leases/check.sh` starts a throwaway PostgreSQL in Docker
+(`PG_IMAGE`, default `postgres:16`) shaped like Supabase (`postgres` a non-superuser owner of
+`public`), runs `setup.sql`, and runs each statement file the way Infisical does. It proves that a
+`replica-read` role reads and cannot write or create even with read-only mode turned off, that
+the role-creating logins hold no template right and cannot create a migration role or a
+superuser, that renewal moves `VALID UNTIL`, that an expired role cannot log in while its open
+session lives on, that revocation ends an open session and drops the role (and is idempotent),
+that a `ci-migration` session runs as `postgres` and its DDL (`CREATE EXTENSION` included) leaves
+nothing owned by the lease role, and that `DROP ROLE` alone would leave a session open and unnamed.

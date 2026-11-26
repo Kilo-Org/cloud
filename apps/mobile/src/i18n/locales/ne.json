@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "त्यो GitHub स्थापना अर्को Kilo खातासँग पहिले नै जडान भएको छ। पहिले त्यहाँको जडान हटाउनुहोस्।",
       "installationUnavailableMessage": "यो GitHub App स्थापना निलम्बित भएको छ वा अब उपलब्ध छैन। यसलाई GitHub मा पुनर्स्थापना गर्नुहोस् वा पुनः स्थापना गर्नुहोस्, त्यसपछि फेरि सुरु गर्नुहोस्।",
       "multipleInstallationsMessage": "यो Kilo संगठनले हाल एउटा GitHub संगठन मात्र जडान गर्न सक्छ।",
+      "blockedByExistingInstallationMessage": "यो संगठनमा यसको GitHub स्थापना पहिले नै रहेको छ। वेबको संगठन पृष्ठमा गएर त्यो स्थापना हटाउनुहोस्, त्यसपछि जडान फेरि सुरु गर्नुहोस्।",
       "didNotCompleteTitle": "स्थापना पूरा भएन",
       "didNotCompleteMessage": "GitHub एपको स्थापना पूरा भएन। एपबाट फेरि प्रयास गर्नुहोस्।"
     },

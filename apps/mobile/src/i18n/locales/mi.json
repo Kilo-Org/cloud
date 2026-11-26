@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "Kua hono kē taua tāutanga GitHub ki tētahi atu pūkete Kilo. Motuhia taua hononga i reira i te tuatahi.",
       "installationUnavailableMessage": "Kua whakatārewa, kua kore rānei e wātea tēnei tāutanga o te taupānga GitHub. Whakaorihia, tāutatia anō rānei i roto i a GitHub, kātahi ka tīmata anō.",
       "multipleInstallationsMessage": "I tēnei wā, e taea ana e tēnei rōpū Kilo te hono i tētahi rōpū GitHub noa iho.",
+      "blockedByExistingInstallationMessage": "Kua whai tāutanga GitHub kē tēnei rōpū. I te whārangi rōpū i te ipurangi, tangohia taua tāutanga, kātahi ka tīmata anō i te hononga.",
       "didNotCompleteTitle": "Kāore i oti te tāutanga",
       "didNotCompleteMessage": "Kāore i oti te tāutanga o te taupānga GitHub. Whakamātau anō i te taupānga Kilo."
     },

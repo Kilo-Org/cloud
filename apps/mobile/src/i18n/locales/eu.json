@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "GitHub instalazio hori jada beste Kilo kontu batekin konektatuta dago. Deskonektatu lehenengo han.",
       "installationUnavailableMessage": "GitHub App instalazio hau etenda dago edo jada ez dago erabilgarri. Berrezarri edo instalatu berriro GitHub-en, eta gero hasi berriro.",
       "multipleInstallationsMessage": "Kilo erakunde honek une honetan soilik GitHub erakunde bat konekta dezake.",
+      "blockedByExistingInstallationMessage": "Erakunde honek jada badu bere GitHub instalazioa. Webean erakundearen orrian instalazio hori kendu, eta gero hasi berriro konexioa.",
       "didNotCompleteTitle": "Instalazioa ez da osatu",
       "didNotCompleteMessage": "GitHub aplikazioaren instalazioa ez da osatu. Saiatu berriro aplikaziotik."
     },

@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "Daardie GitHub-installasie is reeds aan 'n ander Kilo-rekening gekoppel. Ontkoppel dit eers daar.",
       "installationUnavailableMessage": "Hierdie GitHub App-installasie is opgeskort of nie meer beskikbaar nie. Herstel of herinstalleer dit in GitHub en begin dan weer.",
       "multipleInstallationsMessage": "Hierdie Kilo-organisasie kan tans slegs een GitHub-organisasie koppel.",
+      "blockedByExistingInstallationMessage": "Hierdie organisasie het reeds sy GitHub-installasie. Verwyder daardie installasie op die organisasieblad op die web en begin dan weer die verbinding.",
       "didNotCompleteTitle": "Installasie is nie voltooi nie",
       "didNotCompleteMessage": "Die GitHub-toepinstallasie is nie voltooi nie. Probeer weer vanuit die toep."
     },

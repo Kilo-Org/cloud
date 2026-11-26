@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "ਉਹ GitHub ਸਥਾਪਨਾ ਪਹਿਲਾਂ ਹੀ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਕਨੈਕਟ ਹੈ। ਪਹਿਲਾਂ ਉੱਥੇ ਇਸਨੂੰ ਡਿਸਕਨੈਕਟ ਕਰੋ।",
       "installationUnavailableMessage": "ਇਹ GitHub App ਸਥਾਪਨਾ ਮੁਅੱਤਲ ਹੈ ਜਾਂ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸਨੂੰ GitHub ਵਿੱਚ ਬਹਾਲ ਕਰੋ ਜਾਂ ਦੁਬਾਰਾ ਸਥਾਪਿਤ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
       "multipleInstallationsMessage": "ਇਹ Kilo ਸੰਗਠਨ ਇਸ ਸਮੇਂ ਸਿਰਫ਼ ਇੱਕ GitHub ਸੰਗਠਨ ਨਾਲ ਕਨੈਕਟ ਹੋ ਸਕਦਾ ਹੈ।",
+      "blockedByExistingInstallationMessage": "ਇਸ ਸੰਗਠਨ ਕੋਲ ਪਹਿਲਾਂ ਹੀ ਇਸਦੀ GitHub ਸਥਾਪਨਾ ਹੈ। ਵੈੱਬ 'ਤੇ ਸੰਗਠਨ ਪੰਨੇ 'ਤੇ ਉਸ ਸਥਾਪਨਾ ਨੂੰ ਹਟਾਓ, ਫਿਰ ਕਨੈਕਸ਼ਨ ਦੁਬਾਰਾ ਸ਼ੁਰੂ ਕਰੋ।",
       "didNotCompleteTitle": "ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ",
       "didNotCompleteMessage": "GitHub ਐਪ ਦੀ ਸਥਾਪਨਾ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਐਪ ਤੋਂ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },

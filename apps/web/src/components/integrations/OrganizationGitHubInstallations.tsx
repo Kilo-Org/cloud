@@ -25,6 +25,7 @@ import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
+import { PENDING_REQUEST_EXPLANATION } from './github-app-outcome';
 import { INSTALLATION_LISTING_TOO_LARGE_MESSAGE } from './github-app-outcome';
 
 type OrganizationGitHubInstallationsProps = {
@@ -313,6 +314,14 @@ export function OrganizationGitHubInstallations({
                   ? 'All repositories'
                   : `${selectedCount} selected ${selectedCount === 1 ? 'repository' : 'repositories'}`;
               const accountName = installation.accountLogin ?? 'GitHub organization';
+              const pendingRequestExplanation =
+                installation.status !== 'pending'
+                  ? null
+                  : installation.pendingRequestState === 'blocked_by_existing_installation'
+                    ? PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation
+                    : installation.pendingRequestState === 'start_again'
+                      ? PENDING_REQUEST_EXPLANATION.start_again
+                      : null;
               return (
                 <Collapsible key={installation.id}>
                   <div className="space-y-4 px-4 py-4 sm:px-5">
@@ -341,6 +350,11 @@ export function OrganizationGitHubInstallations({
                           )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
+                        {pendingRequestExplanation && (
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {pendingRequestExplanation}
+                          </p>
+                        )}
                         {installation.connectionRole === 'agent_only' &&
                           (installation.status === 'connected' ? (
                             <p className="mt-1 text-sm text-muted-foreground">

@@ -1663,6 +1663,7 @@
       "alreadyClaimedMessage": "Bu GitHub kurulumu zaten başka bir Kilo hesabına bağlı. Önce o hesaptaki bağlantısını kes.",
       "installationUnavailableMessage": "Bu GitHub App kurulumu askıya alınmış veya artık kullanılamıyor. GitHub'da geri yükle veya yeniden yükle, sonra tekrar başla.",
       "multipleInstallationsMessage": "Bu Kilo organizasyonu şu anda yalnızca bir GitHub organizasyonuna bağlanabilir.",
+      "blockedByExistingInstallationMessage": "Bu organizasyonun GitHub kurulumu zaten mevcut. Web'deki organizasyon sayfasından bu kurulumu kaldırıp bağlantıyı yeniden başlatın.",
       "didNotCompleteTitle": "Kurulum tamamlanmadı",
       "didNotCompleteMessage": "GitHub uygulamasının kurulumu tamamlanmadı. Uygulamadan tekrar dene."
     },

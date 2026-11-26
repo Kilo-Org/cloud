@@ -2181,6 +2181,7 @@
       "alreadyClaimedMessage": "การติดตั้ง GitHub นั้นเชื่อมต่อกับบัญชี Kilo อื่นแล้ว ตัดการเชื่อมต่อที่นั่นก่อน",
       "installationUnavailableMessage": "การติดตั้ง GitHub App นี้ถูกระงับหรือไม่พร้อมใช้งานอีกต่อไป กู้คืนหรือติดตั้งใหม่ใน GitHub จากนั้นเริ่มอีกครั้ง",
       "multipleInstallationsMessage": "องค์กร Kilo นี้สามารถเชื่อมต่อองค์กร GitHub ได้เพียงหนึ่งองค์กรในขณะนี้",
+      "blockedByExistingInstallationMessage": "องค์กรนี้มีการติดตั้ง GitHub อยู่แล้ว บนหน้าองค์กรบนเว็บ ให้ลบการติดตั้งนั้นออก แล้วเริ่มการเชื่อมต่ออีกครั้ง",
       "didNotCompleteTitle": "การติดตั้งยังไม่เสร็จสมบูรณ์",
       "didNotCompleteMessage": "การติดตั้ง GitHub App ยังไม่เสร็จสมบูรณ์ ลองอีกครั้งจากแอป"
     },

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildAppReturnOutcomeView,
   INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
+  PENDING_REQUEST_EXPLANATION,
 } from './github-app-outcome';
 import {
   buildGitHubManagementInput,
@@ -82,6 +83,12 @@ describe('GitHub installation management input', () => {
 
 const mockMint = jest.fn();
 const mockButtons: Array<{ children?: React.ReactNode; onClick?: () => Promise<void> }> = [];
+// Installation row the component under test sees. Undefined means "no
+// installation" and keeps every existing test in this file on its current path.
+const mockInstallationData: { value: unknown } = { value: undefined };
+// The requester's own pending row, which is the only place a blocked request
+// is visible: the installation lookup returns the organization's live row.
+const mockPendingCheck: { value: unknown } = { value: undefined };
 
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({
@@ -98,18 +105,30 @@ jest.mock('@/lib/trpc/utils', () => ({
         'refreshInstallation',
         'updateModel',
         'mintInstallState',
-      ].map(name => [name, { queryOptions: () => ({}), mutationOptions: () => ({}) }])
+      ].map(name => [name, { queryOptions: () => ({ name }), mutationOptions: () => ({}) }])
     ),
   }),
 }));
 jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
-  useQuery: () => ({ data: undefined, isLoading: false, refetch: jest.fn() }),
+  useQuery: ({ name }: { name?: string } = {}) => ({
+    data:
+      name === 'getInstallation'
+        ? mockInstallationData.value
+        : name === 'checkUserPendingInstallation'
+          ? mockPendingCheck.value
+          : undefined,
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
   useMutation: () => ({ mutateAsync: mockMint, isPending: false }),
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 jest.mock('@/app/api/organizations/hooks', () => ({ useOrganizationWithMembers: () => ({}) }));
 jest.mock('@/lib/hooks/use-openrouter-models', () => ({ useModelSelectorList: () => ({}) }));
+jest.mock('@/components/shared/ModelCombobox', () => ({
+  ModelCombobox: () => null,
+}));
 jest.mock('@/components/ui/confirm', () => ({ useConfirm: () => jest.fn() }));
 jest.mock('./DevAddGitHubInstallationCard', () => ({ DevAddGitHubInstallationCard: () => null }));
 jest.mock('./OrganizationGitHubInstallations', () => ({
@@ -241,6 +260,186 @@ describe('GitHubIntegrationDetails installation setup recovery', () => {
   });
 });
 
+describe('GitHubIntegrationDetails pending approval state', () => {
+  // An app return path keeps this on the installation card rather than the
+  // identity card, whose client the other suites below already exercise.
+  function render(props: { fromApp?: boolean } = {}) {
+    return renderToStaticMarkup(
+      React.createElement(GitHubIntegrationDetails, {
+        organizationId: 'organization-1',
+        appReturnPath: '/cloud/sessions',
+        ...props,
+      })
+    );
+  }
+
+  function blockedPendingCheck() {
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingRequestState: 'blocked_by_existing_installation',
+    };
+  }
+
+  function startAgainPendingCheck() {
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingRequestState: 'start_again',
+    };
+  }
+
+  afterEach(() => {
+    mockInstallationData.value = undefined;
+    mockPendingCheck.value = undefined;
+  });
+
+  it('names the remedy from the requester pending row, not from the live installation row', () => {
+    // The organization holds its live installation, so the installation lookup
+    // reports that row; only the pending check carries the refusal.
+    mockInstallationData.value = {
+      installed: true,
+      installation: { id: 'live-integration', status: null },
+    };
+    blockedPendingCheck();
+
+    const html = render();
+
+    expect(html).toContain('This organization already has a GitHub installation.');
+    expect(html).toContain('To use this installation instead');
+    expect(html).toContain(
+      'an owner or admin removes that one in Kilo (Disconnect, or Uninstall GitHub App)'
+    );
+    expect(html).toContain('cancel this request and start the connection again');
+    expect(html).not.toContain('must remove that installation');
+    expect(html).toContain('Cancel Request');
+    expect(html).toContain('Existing installation blocks this request');
+    expect(html).not.toContain('Installation Pending Admin Approval');
+    expect(html).not.toContain('Waiting for organization admin approval');
+    expect(html).not.toContain('Install Kilo GitHub App');
+  });
+
+  it('tells the requester to start again without naming a removal step once the blocker is gone', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: null },
+    };
+    startAgainPendingCheck();
+
+    const html = render();
+
+    expect(html).toContain('This request is still pending.');
+    expect(html).toContain('Cancel it and start the connection again to complete it.');
+    expect(html).not.toContain('has since been removed');
+    expect(html).not.toContain('another installation was connected');
+    expect(html).not.toContain('Disconnect');
+    expect(html).not.toContain('Uninstall GitHub App');
+    expect(html).not.toContain('already has a GitHub installation');
+    expect(html).toContain('Cancel Request');
+    expect(html).toContain('Start the connection again');
+    expect(html).not.toContain('Installation Pending Admin Approval');
+  });
+
+  it('keeps the admin approval copy for a request still awaiting approval', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: 'awaiting_installation' },
+    };
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingRequestState: 'awaiting_approval',
+    };
+
+    const html = render();
+
+    expect(html).toContain(
+      'Your installation request has been submitted to the GitHub organization administrators.'
+    );
+    expect(html).toContain('Installation Pending Admin Approval');
+    expect(html).toContain('Waiting for organization admin approval');
+    expect(html).not.toContain('already has a GitHub installation');
+    expect(html).not.toContain('That installation has since been removed');
+    expect(html).not.toContain('Install Kilo GitHub App');
+  });
+
+  it('shows the blocked remedy in the app return card instead of the install card', () => {
+    // The organization's live installation is the row this lookup returns, so
+    // the outcome card must not report success for the blocked request.
+    mockInstallationData.value = {
+      installed: true,
+      installation: { id: 'live-integration', status: null },
+    };
+    blockedPendingCheck();
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('Existing installation blocks this request');
+    expect(html).toContain('already has a GitHub installation');
+    expect(html).toContain('error=github_installation_blocked');
+    expect(html).toContain('>Back<');
+    expect(html).not.toContain('github_pending_approval=true');
+    expect(html).not.toContain('GitHub App installed');
+    expect(html).not.toContain('Awaiting admin approval');
+    expect(html).not.toContain('Open GitHub setup');
+  });
+
+  it('heads the start-again app return card without claiming an existing installation blocks it', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: null },
+    };
+    startAgainPendingCheck();
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('Start the connection again');
+    expect(html).toContain('This request is still pending.');
+    expect(html).not.toContain('has since been removed');
+    expect(html).not.toContain('another installation was connected');
+    expect(html).not.toContain('Existing installation blocks this request');
+    expect(html).not.toContain('already has a GitHub installation');
+    expect(html).not.toContain('Disconnect');
+    expect(html).not.toContain('Uninstall GitHub App');
+    expect(html).not.toContain('GitHub App installed');
+  });
+
+  it('links the start-again app return card to the retryable restart outcome, not an approval wait', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: null },
+    };
+    startAgainPendingCheck();
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('error=github_installation_restart');
+    expect(html).not.toContain('github_pending_approval=true');
+  });
+
+  it('keeps the approval marker on the awaiting-approval app return card', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: 'awaiting_installation' },
+    };
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingRequestState: 'awaiting_approval',
+    };
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('github_pending_approval=true');
+    expect(html).not.toContain('github_installation_restart');
+    expect(html).not.toContain('github_installation_blocked');
+  });
+});
+
 describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
   it('success: Continue back to /cloud/sessions with github_install=success', () => {
     expect(buildAppReturnOutcomeView({ success: true })).toEqual({
@@ -270,6 +469,52 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
       cta: 'Try again',
       href: '/cloud/sessions?error=installation_failed',
     });
+  });
+
+  it('retryable restart: Try again for a pending request that only has to be started again', () => {
+    expect(buildAppReturnOutcomeView({ error: 'github_installation_restart' })).toEqual({
+      kind: 'retryable',
+      title: 'Start the connection again',
+      description: 'This request is still pending. Start the connection again to complete it.',
+      cta: 'Try again',
+      href: '/cloud/sessions?error=github_installation_restart',
+    });
+  });
+
+  it('retryable restart copy claims no removal or blocking installation', () => {
+    const view = buildAppReturnOutcomeView({
+      error: 'github_installation_restart',
+      organizationId: 'org-123',
+    });
+    expect(view.description).not.toContain('has since been removed');
+    expect(view.description).not.toContain('another installation was connected');
+    expect(view.href).toBe(
+      '/cloud/sessions?error=github_installation_restart&organizationId=org-123'
+    );
+  });
+
+  it('blocked existing installation: Back with the removal remedy, never an approval wait', () => {
+    expect(buildAppReturnOutcomeView({ error: 'github_installation_blocked' })).toEqual({
+      kind: 'blocked',
+      title: 'Existing installation blocks this request',
+      description: PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation,
+      cta: 'Back',
+      href: '/cloud/sessions?error=github_installation_blocked',
+    });
+  });
+
+  it('blocked existing installation copy names the removal remedy, not an approval wait', () => {
+    const view = buildAppReturnOutcomeView({
+      error: 'github_installation_blocked',
+      organizationId: 'org-123',
+    });
+    expect(view.description).not.toBe(
+      'An organization admin must approve the installation request.'
+    );
+    expect(view.description).toBe(PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation);
+    expect(view.href).toBe(
+      '/cloud/sessions?error=github_installation_blocked&organizationId=org-123'
+    );
   });
 
   it('retryable unknown error: keeps the raw code in the return href', () => {
@@ -355,7 +600,7 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.cta).toBe('Back');
     expect(view.title).toBe('Cannot complete installation');
     expect(view.description).toBe(
-      'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they can manage it in GitHub.'
+      'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they must remove that installation in Kilo first.'
     );
     expect(view.description).not.toContain('Try again');
     expect(view.href).toBe('/cloud/sessions?error=installation_start_refused');

@@ -1641,6 +1641,7 @@
       "alreadyClaimedMessage": "Instalasi aplikasi GitHub tersebut sudah terhubung ke akun Kilo lain. Putuskan koneksinya dari akun tersebut terlebih dahulu.",
       "installationUnavailableMessage": "Instalasi GitHub App ini ditangguhkan atau tidak lagi tersedia. Pulihkan atau pasang ulang di GitHub, lalu mulai lagi.",
       "multipleInstallationsMessage": "Organisasi Kilo ini saat ini hanya dapat menghubungkan satu organisasi GitHub.",
+      "blockedByExistingInstallationMessage": "Organisasi ini sudah memiliki instalasi GitHub-nya. Di halaman organisasi di web, hapus instalasi tersebut, lalu mulai lagi koneksinya.",
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan aplikasi GitHub belum selesai. Coba lagi dari aplikasi."
     },

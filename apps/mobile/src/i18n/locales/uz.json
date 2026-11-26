@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "Bu o'rnatilgan GitHub ilovasi allaqachon boshqa Kilo hisobiga ulangan. Avval o'sha hisobdagi ulanishni uzing.",
       "installationUnavailableMessage": "Ushbu GitHub App o'rnatilishi to'xtatib qo'yilgan yoki endi mavjud emas. Uni GitHub'da tiklang yoki qayta o'rnating, so'ngra qaytadan boshlang.",
       "multipleInstallationsMessage": "Ushbu Kilo tashkiloti hozirda faqat bitta GitHub tashkilotini ulay oladi.",
+      "blockedByExistingInstallationMessage": "Bu tashkilotda GitHub o'rnatilishi allaqachon mavjud. Veb-saytdagi tashkilot sahifasida o'sha o'rnatishni olib tashlang, so'ngra ulanishni qaytadan boshlang.",
       "didNotCompleteTitle": "O'rnatish yakunlanmadi",
       "didNotCompleteMessage": "GitHub ilovasini o'rnatish yakunlanmadi. Ilovadan qayta urinib ko'ring."
     },

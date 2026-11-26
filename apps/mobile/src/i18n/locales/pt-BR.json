@@ -1675,6 +1675,7 @@
       "alreadyClaimedMessage": "Essa instalação do GitHub já está conectada a outra conta do Kilo. Desconecte-a lá primeiro.",
       "installationUnavailableMessage": "Esta instalação do GitHub App está suspensa ou não está mais disponível. Restaure-a ou reinstale-a no GitHub e comece novamente.",
       "multipleInstallationsMessage": "No momento, esta organização do Kilo pode conectar apenas uma organização do GitHub.",
+      "blockedByExistingInstallationMessage": "Esta organização já possui a instalação do GitHub. Na página da organização na web, remova essa instalação e comece a conexão novamente.",
       "didNotCompleteTitle": "A instalação não foi concluída",
       "didNotCompleteMessage": "A instalação do aplicativo para GitHub não foi concluída. Tente novamente pelo app."
     },

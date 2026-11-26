@@ -9,7 +9,7 @@ import {
 } from '@/lib/integrations/platforms/github/app-selector';
 import { resolveAuthorizedOwner } from '@/lib/integrations/resolve-owner';
 import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
-import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { getOrganizationGitHubInstallationSlots } from '@/lib/integrations/db/predicates';
 import { createInstallState } from '@/lib/integrations/github/install-state';
 
 /**
@@ -30,24 +30,36 @@ export async function beginGitHubAppInstall(
   );
 
   if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
-    // The single-installation slot belongs to the organization's live
-    // workflow connection. Anything else still leaves the slot free to
-    // start an installation from: a pending request awaiting a GitHub
-    // organization admin's approval carries no installation id yet, and a
-    // suspended association is a connection GitHub will not serve until it
-    // is restored, so neither is a reason to refuse the install page. A
-    // locally disconnected row keeps relinquishing its slot, which the
-    // connection's health predicate already expresses.
-    const workflowConnection = await getPrimaryGitHubIntegrationForOrganization(owner.id);
-    if (workflowConnection) {
+    // An organization that is not entitled to multiple installations holds one
+    // installation slot, and every writer that makes a GitHub association the
+    // workflow connection refuses a second installation. Starting an install
+    // reads the same live associations, so an organization is not sent to
+    // install something the completion would refuse. A pending request carries
+    // no installation id yet, and a locally disconnected association has
+    // relinquished its slot, so neither blocks the page; a suspended or
+    // auth-invalid association still holds its slot until it is disconnected. A
+    // suspended, auth-invalid or GitHub-deleted association keeps the slot until
+    // an admin removes it in Kilo, which is why the refusal names that action.
+    // The list offers a local disconnect when connection management is enabled,
+    // and an uninstall of this app's own installation otherwise; both release
+    // the slot, so the refusal names the removal rather than one control.
+    //
+    // This read answers the common case before the install page opens. It is
+    // not the admission check for the rule: each writer applies the rule
+    // under the owner's installation slot lock, so the stored slot count
+    // follows the rule whatever order the requests arrive in.
+    const slots = await getOrganizationGitHubInstallationSlots(owner.id);
+    if (slots.some(slot => slot.installationId !== null)) {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'This organization already has a GitHub installation',
+        message:
+          'This organization already has a GitHub installation. An owner or admin must remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before starting another.',
       });
     }
   }
 
   const appType = await getGitHubAppTypeForOrganization(input.organizationId ?? null);
+
   const token = await createInstallState({
     kiloUserId: ctx.user.id,
     ownerType: owner.type,

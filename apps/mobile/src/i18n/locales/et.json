@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "See GitHubi rakenduse paigaldus on juba seotud teise Kilo kontoga. Katkesta esmalt ühendus sellel kontol.",
       "installationUnavailableMessage": "See GitHubi rakenduse paigaldus on peatatud või pole enam saadaval. Taasta või paigalda see GitHubis uuesti, seejärel alusta uuesti.",
       "multipleInstallationsMessage": "See Kilo organisatsioon saab praegu ühendada ainult ühe GitHubi organisatsiooni.",
+      "blockedByExistingInstallationMessage": "Sellel organisatsioonil on GitHubi rakenduse paigaldus juba olemas. Eemalda see paigaldus organisatsiooni veebilehel ja alusta seejärel ühenduse loomist uuesti.",
       "didNotCompleteTitle": "Installimine jäi pooleli",
       "didNotCompleteMessage": "GitHubi rakenduse installimine jäi pooleli. Proovi rakenduses uuesti."
     },

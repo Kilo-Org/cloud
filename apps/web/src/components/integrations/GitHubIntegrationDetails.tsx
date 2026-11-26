@@ -31,6 +31,7 @@ import {
   APP_RETURN_PATH,
   INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
   INSTALLATION_UNAVAILABLE_MESSAGE,
+  PENDING_REQUEST_EXPLANATION,
   appReturnBasePath,
   buildAppReturnHref,
   buildAppReturnOutcomeView,
@@ -307,6 +308,41 @@ function GitHubIntegrationDetailsContent({
     trpc.githubApps.checkUserPendingInstallation.queryOptions(input)
   );
 
+  const status = installationData?.installation?.status;
+  const isPendingApproval = status === 'awaiting_installation';
+  // A blocked or start-again request never reaches `installation.status`: the
+  // organization holds or held its live installation, and the installation
+  // lookup returns that row. The requester's own pending row is the only place
+  // the refusal is visible, and that lookup is user-scoped, so it only applies
+  // to the owner this view shows.
+  const pendingRequestState =
+    pendingCheck?.pendingOrganizationId === (organizationId ?? null)
+      ? pendingCheck.pendingRequestState
+      : null;
+  const isBlockedPending =
+    pendingRequestState === 'blocked_by_existing_installation' ||
+    pendingRequestState === 'start_again';
+  // A blocked or start-again request is still awaiting completion, so it keeps
+  // every waiting surface. The installation card below keeps describing the row
+  // it displays.
+  const isPendingRequest = isPendingApproval || isBlockedPending;
+  // Each pending state hands the app a different outcome: a retry, the removal
+  // remedy for an organization whose slot is already taken, or the approval
+  // wait. The blocked state must not send the app to the approval wait, which
+  // names no remedy.
+  const pendingReturnQuery =
+    pendingRequestState === 'start_again'
+      ? 'error=github_installation_restart'
+      : pendingRequestState === 'blocked_by_existing_installation'
+        ? 'error=github_installation_blocked'
+        : 'github_pending_approval=true';
+  const pendingReturnCta =
+    pendingRequestState === 'start_again'
+      ? 'Try again'
+      : pendingRequestState === 'blocked_by_existing_installation'
+        ? 'Back'
+        : 'Done';
+
   const uninstallApp = useMutation(
     trpc.githubApps.uninstallApp.mutationOptions({
       onSuccess: () => {
@@ -511,8 +547,12 @@ function GitHubIntegrationDetailsContent({
 
   const handleCancelPending = async () => {
     // Cancel exactly the pending row this view rendered; the id is required so
-    // the request cannot fall back to another pending request.
-    const pendingIntegrationId = installationData?.installation?.id;
+    // the request cannot fall back to another pending request. A blocked
+    // request is not the row the installation lookup returns, so it names its
+    // own row from the pending check.
+    const pendingIntegrationId = isBlockedPending
+      ? pendingCheck?.pendingIntegrationId
+      : installationData?.installation?.id;
     if (!pendingIntegrationId) return;
     if (
       await confirm({
@@ -579,8 +619,6 @@ function GitHubIntegrationDetailsContent({
 
   const installation = installationData?.installation;
   const managementInput = buildGitHubManagementInput(organizationId, installation?.id);
-  const status = installation?.status;
-  const isPendingApproval = status === 'awaiting_installation';
 
   // Non-app mismatch landing: show corrective copy when the callback
   // detected a user mismatch and redirects without fromApp=1.  The
@@ -607,7 +645,7 @@ function GitHubIntegrationDetailsContent({
     );
   }
 
-  if (appReturnPath && !isInstalled && !isPendingApproval && !hasAppOutcome) {
+  if (appReturnPath && !isInstalled && !isPendingRequest && !hasAppOutcome) {
     return (
       <section
         className="flex min-h-64 flex-col justify-between rounded-xl border border-border bg-surface-background p-6"
@@ -741,21 +779,37 @@ function GitHubIntegrationDetailsContent({
   return (
     <div className="space-y-6">
       {/* Pending Approval Alert */}
-      {isPendingApproval && (
+      {isPendingRequest && (
         <Alert>
           <AlertDescription>
             <div className="flex items-end justify-between gap-4">
               <div className="flex-1 space-y-3">
-                <h4 className="font-medium">Installation Pending Admin Approval</h4>
-                <p className="text-muted-foreground text-sm">
-                  Your installation request has been submitted to the GitHub organization
-                  administrators. You will receive a notification once an admin approves the
-                  installation.
-                </p>
-                <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
-                  <li>✓ Installation request submitted</li>
-                  <li>⏳ Waiting for organization admin approval</li>
-                </ul>
+                <h4 className="font-medium">
+                  {pendingRequestState === 'start_again'
+                    ? 'Start the connection again'
+                    : pendingRequestState === 'blocked_by_existing_installation'
+                      ? 'Existing installation blocks this request'
+                      : 'Installation Pending Admin Approval'}
+                </h4>
+                {isBlockedPending ? (
+                  <p className="text-muted-foreground text-sm">
+                    {pendingRequestState === 'start_again'
+                      ? PENDING_REQUEST_EXPLANATION.start_again
+                      : PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation}
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground text-sm">
+                      Your installation request has been submitted to the GitHub organization
+                      administrators. You will receive a notification once an admin approves the
+                      installation.
+                    </p>
+                    <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
+                      <li>✓ Installation request submitted</li>
+                      <li>⏳ Waiting for organization admin approval</li>
+                    </ul>
+                  </>
+                )}
               </div>
               <Button
                 variant="outline"
@@ -916,7 +970,7 @@ function GitHubIntegrationDetailsContent({
                 </ul>
               </div>
 
-              {!isPendingApproval && (
+              {!isPendingRequest && (
                 <>
                   {pendingCheck?.hasPending &&
                   pendingCheck.pendingOrganizationId !== organizationId ? (
@@ -989,11 +1043,11 @@ function GitHubIntegrationDetailsContent({
           route) but a server redirect does not always open the app.  This fallback
           stays visible so the user can tap the button — a user-initiated navigation
           reliably triggers the universal link. */}
-      {fromApp && (isInstalled || isPendingApproval || hasAppOutcome) && (
+      {fromApp && (isInstalled || isPendingRequest || hasAppOutcome) && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4 text-center">
-              {success || isInstalled ? (
+              {success || (isInstalled && !isBlockedPending) ? (
                 <>
                   <CheckCircle2 className="h-8 w-8 text-green-500" />
                   <div className="space-y-1">
@@ -1014,25 +1068,30 @@ function GitHubIntegrationDetailsContent({
                     </Link>
                   </Button>
                 </>
-              ) : pendingApproval || isPendingApproval ? (
+              ) : pendingApproval || isPendingRequest ? (
                 <>
                   <RefreshCw className="h-8 w-8 text-amber-500" />
                   <div className="space-y-1">
-                    <h3 className="text-lg font-semibold">Awaiting admin approval</h3>
+                    <h3 className="text-lg font-semibold">
+                      {pendingRequestState === 'start_again'
+                        ? 'Start the connection again'
+                        : isBlockedPending
+                          ? 'Existing installation blocks this request'
+                          : 'Awaiting admin approval'}
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      An organization admin must approve the installation request. Return to the
-                      Kilo App to check later.
+                      {pendingRequestState === 'start_again'
+                        ? PENDING_REQUEST_EXPLANATION.start_again
+                        : isBlockedPending
+                          ? PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation
+                          : 'An organization admin must approve the installation request. Return to the Kilo App to check later.'}
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">
                     <Link
-                      href={buildAppReturnHref(
-                        'github_pending_approval=true',
-                        organizationId,
-                        appBasePath
-                      )}
+                      href={buildAppReturnHref(pendingReturnQuery, organizationId, appBasePath)}
                     >
-                      Done
+                      {pendingReturnCta}
                     </Link>
                   </Button>
                 </>

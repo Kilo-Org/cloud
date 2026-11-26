@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "Rakibiddaas GitHub waxay mar hore ku xiran tahay akoon kale oo Kilo ah. Marka hore halkaas ka gooy xiriirka.",
       "installationUnavailableMessage": "Rakibidda GitHub App waa la hakiyay ama mar dambe lama heli karo. Ku soo celi ama dib ugu rakib GitHub, ka dibna mar kale bilow.",
       "multipleInstallationsMessage": "Ururkan Kilo hadda wuxuu kaliya ku xiri karaa hal urur oo GitHub ah.",
+      "blockedByExistingInstallationMessage": "Ururkan horeba wuxuu leeyahay rakibiddiisa GitHub. Bogga ururka ee shabakadda ka saar rakibiddaas, ka dibna mar kale bilow xiriirka.",
       "didNotCompleteTitle": "Rakibiddu ma dhammaystirmin",
       "didNotCompleteMessage": "Rakibidda barnaamijka GitHub ma dhammaystirmin. Mar kale ka isku day abka."
     },

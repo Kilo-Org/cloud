@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "د GitHub دا نصب لا دمخه له بل Kilo حساب سره نښلول شوی دی. لومړی هلته یې اړیکه پرې کړئ.",
       "installationUnavailableMessage": "د GitHub App دا نصب ځنډول شوی یا نور شتون نلري. په GitHub کې یې بحال یا بیا نصب کړئ، بیا بیا پیل کړئ.",
       "multipleInstallationsMessage": "د Kilo دا سازمان اوس مهال یوازې له یوه GitHub سازمان سره نښلېدای شي.",
+      "blockedByExistingInstallationMessage": "دا سازمان لا دمخه د GitHub نصب لري. په وېب کې د سازمان په پاڼه کې هغه نصب لرې کړئ، بیا اړیکه بیا پیل کړئ.",
       "didNotCompleteTitle": "نصب بشپړ نه شو",
       "didNotCompleteMessage": "د GitHub اپلیکیشن نصب بشپړ نه شو. له اپلیکیشن څخه بیا هڅه وکړئ."
     },

@@ -26,6 +26,7 @@ import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-att
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 import {
   effectiveAppTypeCondition,
+  getOrganizationGitHubInstallationSlots,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from '@/lib/integrations/db/predicates';
@@ -218,27 +219,14 @@ export async function connectVerifiedGitHubInstallation(
       await lockProviderOAuthOwnerRow(tx, participant[1]);
     }
     if (requiresOwnerCardinalityLock) {
-      const ownerIntegrations = await tx
-        .select({
-          installationId: platform_integrations.platform_installation_id,
-          appType: platform_integrations.github_app_type,
-        })
-        .from(platform_integrations)
-        .where(
-          and(
-            eq(platform_integrations.owned_by_organization_id, owner.id),
-            eq(platform_integrations.platform, PLATFORM.GITHUB),
-            // A locally disconnected connection has relinquished its slot; it
-            // must not block attaching a different installation. This is
-            // deliberately narrower than the holder rule the connection role
-            // uses (`getGitHubInstallationHolderRejectionReason`): this check
-            // decides how many installations the organization holds, and a
-            // suspended association is restored to active by
-            // `observeGitHubInstallationLifecycle`, so it must keep occupying
-            // the slot.
-            isNull(platform_integrations.github_disconnected_at)
-          )
-        );
+      // A locally disconnected connection has relinquished its slot; it must
+      // not block attaching a different installation. This is deliberately
+      // narrower than the holder rule the connection role uses
+      // (`getGitHubInstallationHolderRejectionReason`): this check decides how
+      // many installations the organization holds, and a suspended association
+      // is restored to active by `observeGitHubInstallationLifecycle`, so it
+      // must keep occupying the slot.
+      const ownerIntegrations = await getOrganizationGitHubInstallationSlots(owner.id, tx);
       const hasAnotherInstallation = ownerIntegrations.some(integration =>
         occupiesAnotherGitHubInstallationSlot(integration, {
           installationId: data.platformInstallationId,

@@ -2186,6 +2186,7 @@
       "alreadyClaimedMessage": "Ìfìsórí GitHub yẹn ti sopọ̀ mọ́ àkọọ́lẹ̀ Kilo mìíràn tẹ́lẹ̀. Kọ́kọ́ gé àsopọ̀ rẹ̀ níbẹ̀.",
       "installationUnavailableMessage": "Ìfìsórí GitHub App yìí ti daduro tàbí kò sí mọ́. Mú un padà bọ̀ sípò tàbí tún un ṣe ìfìsórí ní GitHub, kí o sì tún bẹ̀rẹ̀.",
       "multipleInstallationsMessage": "Àjọ Kilo yìí lè sopọ̀ mọ́ àjọ GitHub kan péré ṣo fún ìgbà yìí.",
+      "blockedByExistingInstallationMessage": "Àjọ yìí ti ní ìfìsórí GitHub rẹ̀ tẹ́lẹ̀. Lórí ààtò àjọ lórí wẹ́ẹ̀bù, yọ ìfìsórí yẹn kúrò, kí o sì tún bẹ̀rẹ̀ àsopọ̀ náà.",
       "didNotCompleteTitle": "Ìfìsórí kò parí",
       "didNotCompleteMessage": "A kò parí ìfìsórí ìṣàfilọ́lẹ̀ GitHub náà. Tún gbìyànjú láti inú ìṣàfilọ́lẹ̀."
     },

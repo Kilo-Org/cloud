@@ -2323,6 +2323,7 @@
       "alreadyClaimedMessage": "Táto inštalácia aplikácie pre GitHub je už pripojená k inému účtu Kilo. Najprv ju tam odpoj.",
       "installationUnavailableMessage": "Táto inštalácia aplikácie pre GitHub je pozastavená alebo už nie je dostupná. Obnov ju alebo znova nainštaluj v GitHube a potom začni odznova.",
       "multipleInstallationsMessage": "Táto organizácia Kilo môže mať momentálne pripojenú len jednu organizáciu GitHub.",
+      "blockedByExistingInstallationMessage": "Táto organizácia už má svoju inštaláciu GitHub. Na webovej stránke organizácie túto inštaláciu odstráň a potom pripojenie spusti znova.",
       "didNotCompleteTitle": "Inštalácia sa nedokončila",
       "didNotCompleteMessage": "Inštalácia aplikácie pre GitHub sa nedokončila. Skús to znova z aplikácie."
     },

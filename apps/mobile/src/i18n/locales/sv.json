@@ -2225,6 +2225,7 @@
       "alreadyClaimedMessage": "Den här GitHub-installationen är redan ansluten till ett annat Kilo-konto. Koppla från den där först.",
       "installationUnavailableMessage": "Den här installationen av GitHub App är avstängd eller inte längre tillgänglig. Återställ eller installera om den i GitHub och börja sedan om.",
       "multipleInstallationsMessage": "Den här Kilo-organisationen kan för närvarande bara ansluta en enda GitHub-organisation.",
+      "blockedByExistingInstallationMessage": "Den här organisationen har redan en GitHub-installation. Ta bort installationen på organisationens sida på webben och starta sedan anslutningen igen.",
       "didNotCompleteTitle": "Installationen slutfördes inte",
       "didNotCompleteMessage": "Installationen av GitHub-appen slutfördes inte. Försök igen från appen."
     },

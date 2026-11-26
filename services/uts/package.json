@@ -29,6 +29,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
+    "@kilocode/verify": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",

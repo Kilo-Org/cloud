@@ -12,6 +12,8 @@
  *   UTS_E2E_BASE_URL   the mint Worker, such as http://127.0.0.1:9220
  *   UTS_E2E_FEED_URL   the feed Worker, such as http://127.0.0.1:9222
  *   UTS_E2E_ADMIN_URL  admin login to the identity-store database (loopback only)
+ *   UTS_E2E_STS_PORT   loopback port of the run's stand-in STS (`scripts/fake-sts.ts`), whose
+ *                      tokens the feed Worker accepts with `--var STS_URL:http://127.0.0.1:<port>`
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -27,6 +29,7 @@ import { SignJWT, calculateJwkThumbprint, decodeJwt, exportJWK, generateKeyPair 
 import pg from 'pg';
 import { z } from 'zod';
 import { isLoopbackHost } from './connection';
+import { startFakeSts } from './fake-sts';
 
 const base = z.url().parse(process.env.UTS_E2E_BASE_URL);
 const feedUrl = z.url().parse(process.env.UTS_E2E_FEED_URL);
@@ -38,7 +41,8 @@ const issuer = UTS_ENDPOINTS.development.issuer;
 const ACCOUNT = 'dev:uts-local';
 const CLI_CALLBACK = 'http://127.0.0.1:4100/callback';
 const MOBILE_CALLBACK = 'com.kilocode.kiloapp:/oauth/callback';
-const sources = httpsFeedSources(feedUrl);
+const sts = await startFakeSts(z.coerce.number().int().parse(process.env.UTS_E2E_STS_PORT));
+const sources = httpsFeedSources(feedUrl, sts.fetcher('web'));
 const secrets: string[] = [];
 let failed = 0;
 let version = 0;
@@ -679,6 +683,7 @@ async function main() {
     leaked === 0
   );
   await admin.end();
+  await sts.close();
   log('result', { failed });
   if (failed > 0) process.exitCode = 1;
 }

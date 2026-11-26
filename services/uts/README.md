@@ -204,6 +204,20 @@ backfill adds an entry no publish carried, that the feed serves from feed object
 that the head stays under 20 seconds old, and that every head verifies under a feed key of the key
 set, over HTTPS and over the `FeedReader` binding.
 
+The HTTPS feed answers only an admitted STS workload (`services/uts-feed/README.md`,
+"Authenticated HTTPS feed"), so every run that reads it over HTTPS (`feed-e2e.ts`,
+`subjects-e2e.ts`, `feed-https-e2e.ts`) starts a stand-in STS (`scripts/fake-sts.ts`: a synthetic
+key set on `UTS_E2E_STS_PORT`) and reads as the `web` workload; the feed Worker runs with
+`--var STS_URL:http://127.0.0.1:<that port>`. `scripts/feed-https-e2e.ts` takes
+`UTS_E2E_FEED_URL`, `UTS_E2E_ADMIN_URL`, `UTS_E2E_STS_PORT` and, optionally,
+`UTS_E2E_FEED_OFF_URL` (a feed Worker run with `--var FEED_HTTPS_ENABLED:false`). It checks the
+refusals (no token 401; another workload, audience or scope 403; another environment, an expired
+token or an unknown key 401), the head, list and bootstrap for `web` and `kilo-gateway`, a 304
+for an unchanged head and a held list, `@kilocode/verify` running over the transport (one
+bootstrap per cold start, then the head and list calls of one minute while a revocation changes
+the list, and the revoked subject refused), the CPU of the caller check, and the 503 of the
+switched-off Worker.
+
 Two runs bring up their own Workers and a fresh identity-store database, so neither needs a
 `wrangler dev` server running: `scripts/keyset-e2e.ts` and `scripts/relay-e2e.ts`. Both take
 `UTS_E2E_ADMIN_URL`, the admin login of `scripts/local-db.sh up`, on a loopback host and without

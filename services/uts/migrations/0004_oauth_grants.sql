@@ -70,6 +70,22 @@ RETURN CASE
   ELSE 'sha256:' || rtrim(translate(encode(sha256(convert_to(p_client_id, 'UTF8')), 'base64'), '+/', '-_'), '=')
 END;
 
+-- Refuses a call whose required inputs are not all present. In SQL a comparison with NULL is
+-- NULL, and `IF NOT <comparison>` treats NULL like false, so a guard would let a NULL input
+-- through. Each grant function below calls this before its first read, with every input it
+-- needs; its guards also accept only a TRUE match (`IS DISTINCT FROM`, `IS NOT TRUE`).
+CREATE FUNCTION uts.require_inputs(p_function text, p_present boolean) RETURNS void
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF p_present IS NOT TRUE THEN
+    RAISE EXCEPTION '%: a required input is missing', p_function
+      USING ERRCODE = 'null_value_not_allowed';
+  END IF;
+END
+$$;
+
 -- The audience of each scope, in the same order (a scope is `<audience>:<permission>`).
 CREATE FUNCTION uts.scope_audiences(p_scopes text[]) RETURNS text[]
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
@@ -370,6 +386,13 @@ DECLARE
   membership_state uts.membership_status;
   enforcement uts.sso_enforcement;
 BEGIN
+  PERFORM uts.require_inputs('uts.issue_authorization_code',
+    p_environment IS NOT NULL AND p_code_hash IS NOT NULL AND p_client_id IS NOT NULL
+    AND p_client_kind IS NOT NULL AND p_account_id IS NOT NULL AND p_redirect_uri IS NOT NULL
+    AND p_resources IS NOT NULL AND p_scopes IS NOT NULL AND p_code_challenge IS NOT NULL
+    AND p_auth_time IS NOT NULL AND p_amr IS NOT NULL
+    AND (p_client_kind = 'first_party') = (p_dpop_jkt IS NOT NULL)
+    AND (p_client_kind = 'third_party') = (p_consent_id IS NOT NULL));
   SELECT account.status INTO account_state FROM uts.accounts AS account WHERE account.id = p_account_id;
   IF p_org_id IS NOT NULL THEN
     SELECT membership.status, policy.enforcement INTO membership_state, enforcement
@@ -492,6 +515,13 @@ DECLARE
   grant_state uts.grant_status;
   previous_hash bytea;
 BEGIN
+  PERFORM uts.require_inputs('uts.exchange_authorization_code',
+    p_environment IS NOT NULL AND p_code_hash IS NOT NULL AND p_client_id IS NOT NULL
+    AND p_redirect_uri IS NOT NULL AND p_code_challenge IS NOT NULL AND p_grant_id IS NOT NULL
+    AND p_refresh_token_hash IS NOT NULL
+    -- A first-party exchange names its DPoP key, proof and client class; a third-party one none.
+    AND (p_dpop_jkt IS NULL) = (p_dpop_jti IS NULL)
+    AND (p_dpop_jkt IS NULL) = (p_client_class IS NULL));
   SELECT * INTO code FROM uts.authorization_codes AS stored WHERE stored.code_hash = p_code_hash
   FOR UPDATE;
   IF NOT FOUND THEN
@@ -508,9 +538,9 @@ BEGIN
     AND (code.client_kind = 'first_party') = (p_client_class IS NOT NULL);
   retry := code.status = 'consumed';
 
-  IF retry AND NOT (
+  IF retry AND (
     same_request AND code.grant_id = p_grant_id AND code.client_kind = 'first_party'
-  ) THEN
+  ) IS NOT TRUE THEN
     revoked_account := uts.end_grant(code.client_kind, code.grant_id, 'reuse_detected');
     IF revoked_account IS NOT NULL THEN
       PERFORM uts.write_audit_event(
@@ -528,7 +558,7 @@ BEGIN
     RETURN;
   END IF;
 
-  IF NOT same_request THEN
+  IF same_request IS NOT TRUE THEN
     outcome := 'invalid_grant';
     RETURN NEXT;
     RETURN;
@@ -698,13 +728,16 @@ DECLARE
   grant_row record;
   chosen record;
 BEGIN
+  PERFORM uts.require_inputs('uts.refresh_first_party',
+    p_environment IS NOT NULL AND p_token_hash IS NOT NULL AND p_grant_id IS NOT NULL
+    AND p_client_id IS NOT NULL AND p_dpop_jkt IS NOT NULL AND p_dpop_jti IS NOT NULL);
   SELECT * INTO grant_row FROM uts.read_refresh_grant(p_token_hash);
   IF NOT FOUND
-    OR grant_row.id <> p_grant_id
-    OR grant_row.client_id <> p_client_id
-    OR grant_row.grant_status <> 'active'
-    OR grant_row.session_status <> 'active'
-    OR grant_row.account_status <> 'active'
+    OR grant_row.id IS DISTINCT FROM p_grant_id
+    OR grant_row.client_id IS DISTINCT FROM p_client_id
+    OR grant_row.grant_status IS DISTINCT FROM 'active'
+    OR grant_row.session_status IS DISTINCT FROM 'active'
+    OR grant_row.account_status IS DISTINCT FROM 'active'
     OR grant_row.expires_at <= now()
     OR grant_row.idle_expires_at <= now()
   THEN
@@ -713,7 +746,7 @@ BEGIN
     RETURN;
   END IF;
 
-  IF grant_row.dpop_jkt <> p_dpop_jkt THEN
+  IF grant_row.dpop_jkt IS DISTINCT FROM p_dpop_jkt THEN
     IF uts.claim_denied_audit('first_party', grant_row.id) THEN
       PERFORM uts.write_audit_event(
         p_environment, 'ai.kilo.uts.token.denied', 6003, 1, 'denied', 'dpop key mismatch',
@@ -829,13 +862,16 @@ DECLARE
   current_token_id uuid;
   rotation text;
 BEGIN
+  PERFORM uts.require_inputs('uts.refresh_third_party',
+    p_environment IS NOT NULL AND p_token_hash IS NOT NULL AND p_client_id IS NOT NULL
+    AND p_new_token_hash IS NOT NULL);
   SELECT * INTO presented FROM uts.read_third_party_refresh_token(p_token_hash);
   IF NOT FOUND
-    OR presented.client_id <> p_client_id
-    OR presented.family_status <> 'active'
+    OR presented.client_id IS DISTINCT FROM p_client_id
+    OR presented.family_status IS DISTINCT FROM 'active'
     OR presented.family_expires_at <= now()
-    OR presented.consent_status <> 'active'
-    OR presented.account_status <> 'active'
+    OR presented.consent_status IS DISTINCT FROM 'active'
+    OR presented.account_status IS DISTINCT FROM 'active'
   THEN
     outcome := 'invalid_grant';
     RETURN NEXT;
@@ -944,6 +980,8 @@ DECLARE
   owner_client text;
   revoked_account text;
 BEGIN
+  PERFORM uts.require_inputs('uts.revoke_refresh_token',
+    p_environment IS NOT NULL AND p_token_hash IS NOT NULL AND p_client_id IS NOT NULL);
   SELECT 'first_party', grant_row.id, grant_row.account_id, grant_row.client_id
   INTO grant_kind, grant_ref, grant_account, owner_client
   FROM uts.refresh_grants AS grant_row WHERE grant_row.token_hash = p_token_hash;
@@ -959,7 +997,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF owner_client <> p_client_id THEN
+  IF owner_client IS DISTINCT FROM p_client_id THEN
     IF uts.claim_denied_audit(grant_kind, grant_ref) THEN
       -- The requesting client id is caller input, so the row names it by its SHA-256 only: a value
       -- the audit row's credential check refuses must not fail the statement and so tell the caller
@@ -1030,14 +1068,17 @@ AS $$
 DECLARE
   grant_row record;
 BEGIN
+  PERFORM uts.require_inputs('uts.introspect_refresh_token',
+    p_token_hash IS NOT NULL AND p_client_id IS NOT NULL
+    AND (p_dpop_jkt IS NULL) = (p_dpop_jti IS NULL));
   IF p_dpop_jkt IS NOT NULL THEN
     SELECT * INTO grant_row FROM uts.read_refresh_grant(p_token_hash);
     IF NOT FOUND
-      OR grant_row.client_id <> p_client_id
-      OR grant_row.dpop_jkt <> p_dpop_jkt
-      OR grant_row.grant_status <> 'active'
-      OR grant_row.session_status <> 'active'
-      OR grant_row.account_status <> 'active'
+      OR grant_row.client_id IS DISTINCT FROM p_client_id
+      OR grant_row.dpop_jkt IS DISTINCT FROM p_dpop_jkt
+      OR grant_row.grant_status IS DISTINCT FROM 'active'
+      OR grant_row.session_status IS DISTINCT FROM 'active'
+      OR grant_row.account_status IS DISTINCT FROM 'active'
       OR grant_row.expires_at <= now()
       OR grant_row.idle_expires_at <= now()
       OR NOT uts.org_requirement_met(

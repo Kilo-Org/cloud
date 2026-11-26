@@ -13,7 +13,7 @@ import {
   type ProofBinding,
   identityStoreGrants,
 } from '../../src/grants/store';
-import { TestDatabase, insertAccount, insertGatePass } from './harness';
+import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
 
 /**
  * The OAuth grant functions (migration 0004) through the Worker's own statements
@@ -1136,6 +1136,95 @@ describe('introspection', () => {
     expect(await grants.introspect(input)).toMatchObject({ outcome: 'active' });
     expect(await grants.introspect(input)).toEqual({ outcome: 'dpop_replay' });
     expect(await auditRows(accountId)).toHaveLength(before);
+  });
+});
+
+describe('missing inputs', () => {
+  const NULL_VALUE_NOT_ALLOWED = '22004';
+
+  it('refuses a code exchange without its PKCE challenge, and leaves the code unused', async () => {
+    const accountId = await insertAccount(owner);
+    const fixture = await issueFirstPartyCode(accountId);
+    const input = exchangeInput(fixture);
+    if (input.binding.kind !== 'first_party') throw new Error('first-party binding expected');
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `SELECT * FROM uts.exchange_authorization_code(
+             $1, $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10, $11, NULL, NULL, NULL, NULL, NULL, NULL)`,
+          [
+            environment,
+            input.codeHash,
+            input.clientId,
+            input.redirectUri,
+            fixture.jkt,
+            input.binding.proof.jti,
+            input.grantId,
+            input.refreshTokenHash,
+            'desktop',
+            device.label,
+            device.platform,
+          ]
+        )
+      )
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    expect(await grants.exchangeCode(input)).toMatchObject({ outcome: 'issued' });
+  });
+
+  it('refuses a first-party refresh, revocation or introspection without the grant id or client', async () => {
+    const accountId = await insertAccount(owner);
+    const grant = await firstPartyGrant(accountId);
+    const before = (await auditRows(accountId)).length;
+    const tokenHash = sha256(grant.refreshToken);
+    const refused = (text: string, values: unknown[]) =>
+      sqlStateOf(() => app.query(text, values));
+    expect(
+      await refused(
+        'SELECT * FROM uts.refresh_first_party($1, $2, NULL, $3, $4, $5, NULL, NULL)',
+        [environment, tokenHash, 'kilo-cli', grant.jkt, randomUUID()]
+      )
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    expect(
+      await refused(
+        'SELECT * FROM uts.refresh_first_party($1, $2, $3, NULL, $4, $5, NULL, NULL)',
+        [environment, tokenHash, grant.grantId, grant.jkt, randomUUID()]
+      )
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    expect(
+      await refused('SELECT * FROM uts.revoke_refresh_token($1, $2, NULL)', [
+        environment,
+        tokenHash,
+      ])
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    expect(
+      await refused('SELECT * FROM uts.introspect_refresh_token($1, NULL, $2, $3)', [
+        tokenHash,
+        grant.jkt,
+        randomUUID(),
+      ])
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    expect(await auditRows(accountId)).toHaveLength(before);
+    const stored = await owner.query('SELECT status FROM uts.refresh_grants WHERE id = $1', [
+      grant.grantId,
+    ]);
+    expect(stored.rows).toEqual([{ status: 'active' }]);
+  });
+
+  it('refuses a third-party refresh without its client, and leaves the token current', async () => {
+    const accountId = await insertAccount(owner);
+    const family = await thirdPartyFamily(accountId);
+    expect(
+      await sqlStateOf(() =>
+        app.query('SELECT * FROM uts.refresh_third_party($1, $2, NULL, $3, NULL, NULL)', [
+          environment,
+          sha256(family.refreshToken),
+          sha256(token()),
+        ])
+      )
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    expect((await refreshThirdParty(family.clientId, family.refreshToken).result).outcome).toBe(
+      'issued'
+    );
   });
 });
 

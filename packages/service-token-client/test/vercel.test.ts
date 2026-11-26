@@ -327,4 +327,20 @@ describe('vercelExchange', () => {
       detail: 'the exchange answered no token',
     });
   });
+
+  it('never follows a redirect: the exchange is manual and a 3xx fails it', async () => {
+    const redirects: (RequestRedirect | undefined)[] = [];
+    const fetchFn = (async (_url: string, init?: RequestInit) => {
+      redirects.push(init?.redirect);
+      // A followed 307 would resend the body, the base token included, to the target.
+      return init?.redirect === 'manual'
+        ? new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/' } })
+        : Response.json({ token: 'exchanged' });
+    }) as typeof fetch;
+    expect(await vercelExchange(fetchFn)('base', STS)).toEqual({
+      kind: 'failed',
+      detail: 'the exchange answered 307',
+    });
+    expect(redirects).toEqual(['manual']);
+  });
 });

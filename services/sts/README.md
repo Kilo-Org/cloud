@@ -1477,6 +1477,18 @@ staging and production blocks of `wrangler.jsonc` (development stays empty).
    deploying repository's settings that the GitHub environment a staging `cloudflare-deploy` policy
    binds carries the same protection rules as production's (required reviewers, deployment branch
    `main`, no self-review): a staging token reaches production Workers.
+   **Answers, 2026-11-26 (staging minting token `sts-minting-staging`, by API at 23:07Z): Q65 is
+   reopened; setup stops here until Igor decides.** A token with `DNS Read` on `kiloapps.io`, a
+   group outside the minting token's policy, was created (200): its policy is not a ceiling. A
+   Super Administrator's canary token was read, rolled (a new value returned) and deleted (200
+   each): the minting token reaches every account token, including the value of each by rolling
+   it. So whoever reads `/ci/minting`, or replaces the STS Worker (which a minted deploy token
+   can, see above), controls every account token, not one hour of deploy rights. A token scoped
+   to one Worker (`Individual Workers Editor`, resource `com.cloudflare.edge.worker.script.<account>.<script>`)
+   was refused (400, code 1001). The minting token lists the tokens it did not create too (all
+   24), and created, listed and deleted its own child (200 each). The script list (200) and the
+   zone's route list (200) work. Its calls carry `Ratelimit: "default";r=1199;t=1` and
+   `Ratelimit-Policy: "default";q=1200;w=300`. `/ci/minting` holds no value.
 7. **Monitor of the STS Worker, outside STS.** The window check runs inside STS, so it cannot
    report a change to the STS Worker of its own environment. Set up a scheduled job outside STS
    (an Axiom monitor on Cloudflare's Workers deployment data, or a cron job with a read-only

@@ -48,8 +48,17 @@ function expOf(token: string): number | null {
   return parsed.success ? parsed.data.exp : null;
 }
 
-function log(level: 'info' | 'warn', fields: Record<string, unknown>): void {
-  console[level](JSON.stringify({ event: 'sts_canary', ...fields }));
+/**
+ * `sts_canary` lines are the canary's paging signal (services/usage-ingest README, "STS canary"):
+ * one report per run from a caller that holds a `web:sts.canary` token. Anyone can call the route,
+ * so a refused request logs `sts_canary_refused` instead, which no monitor pages on.
+ */
+function log(
+  level: 'info' | 'warn',
+  event: 'sts_canary' | 'sts_canary_refused',
+  fields: Record<string, unknown>
+): void {
+  console[level](JSON.stringify({ event, ...fields }));
 }
 
 export function createStsCanaryHandler(
@@ -124,9 +133,8 @@ export function createStsCanaryHandler(
     const presented = StsCanaryRunIdSchema.safeParse(request.headers.get(STS_CANARY_RUN_HEADER));
     const run = presented.success ? presented.data : crypto.randomUUID();
     if (!inbound.ok) {
-      log('warn', {
+      log('warn', 'sts_canary_refused', {
         run,
-        step: 'inbound',
         status: inbound.status,
         error: inbound.error,
         reason: inbound.reason,
@@ -172,7 +180,7 @@ export function createStsCanaryHandler(
     // One line per run with every check and no token: the Vercel log drain carries it to Axiom,
     // where the canary's monitors read `outcome` (services/usage-ingest README, "STS canary").
     const passed = stsCanaryPassed(report);
-    log(passed ? 'info' : 'warn', {
+    log(passed ? 'info' : 'warn', 'sts_canary', {
       run,
       step: 'report',
       outcome: passed ? 'succeeded' : 'failed',

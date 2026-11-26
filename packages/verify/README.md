@@ -19,6 +19,7 @@ import { createVerifier, failureResponse, httpJwksSource } from '@kilocode/verif
 
 const verifier = createVerifier({
   audience: 'session-ingest',
+  environment: 'production',
   resourceMetadataUrl: 'https://session-ingest.kiloapps.io/.well-known/oauth-protected-resource',
   sts: {
     issuer: STS_ISSUERS.production,
@@ -66,11 +67,12 @@ choose; pass `null` when the header is absent, and the library refuses any PAT w
 | Input | Meaning |
 |---|---|
 | `config.audience` | This service; the one `aud` it accepts |
+| `config.environment` | `development`, `staging` or `production`: the one `env` claim it accepts, from either issuer |
 | `config.resourceMetadataUrl` | RFC 9728 metadata URL sent in every 401 challenge |
 | `config.sts` | `{ issuer, jwks, scopeRegistry? }`; the registry defaults to `STS_SCOPE_REGISTRY` |
 | `config.uts` | `{ issuer, jwks, scopeRegistry, revocation, bootstrap?, pat? }` (ports below) |
-| `input` | A `Request`, its `Authorization` value, or `null` |
-| `route` | `{ issuer: 'sts' \| 'uts', scope, org?, requiresSession? }`: exactly one issuer and one scope |
+| `input` | A `Request`, its `Authorization` value, or `null`. A value over `MAX_AUTHORIZATION_LENGTH` (8,192) characters is refused with 401 `invalid_token` before it is parsed |
+| `route` | `{ issuer: 'sts' \| 'uts', scope, org?, requiresSession? }`: exactly one issuer and one scope. With `org`, the credential must name exactly that org; a credential without one is refused (UTS only) |
 | `ctx` | `{ waitUntil, clientAddress }`: the request's own `waitUntil`; the client address, required when the config has `uts.pat` |
 
 Issuers must be `https:` URLs; `http:` is accepted only on `localhost`, `127.0.0.1` and `[::1]`.
@@ -86,7 +88,8 @@ Issuers must be `https:` URLs; `http:` is accepted only on `localhost`, `127.0.0
 `caller` is `{ kind: 'service', workload }`, `{ kind: 'user', subject, clientId, org, sessionId,
 actor }` or `{ kind: 'pat', subject, patId, org }`. `verify` never throws for a bad credential or a
 failed dependency; it rejects only for a route the verifier cannot serve (a programming error: a
-scope of another audience, an issuer the config lacks, an STS route that requires a session).
+scope of another audience, an issuer the config lacks, an STS route that requires a session or
+names an org).
 Results and errors never carry the credential.
 
 `warm(ctx)` starts, without waiting, the fetches a cold instance needs: the UTS bootstrap (or the
@@ -104,7 +107,7 @@ data.
 | `RevocationFeedSource` `{ head(signal), list(listHash, signal) }` | Phase 3 (service binding on Workers, HTTPS on Vercel and Fly) | `head` returns the signed head as a compact JWS string; `list` returns the list bytes for that hash. The transport verifies nothing: the library verifies the head under a feed key and the list against the head hash (format below). Any rejection is a failed fetch |
 | `UtsBootstrapSource` `(signal) => Promise<{ jwks, keyAges, head, list }>` | Phase 3 (the bootstrap endpoint) | One call: the UTS key-set body, its ages `keyAges: KeySetAges` = `{ newest, oldest }` (whole seconds at the feed Worker, `0 <= newest <= oldest`; the HTTPS JSON `key_ages`), a head and its list bytes, in the same formats. Used only while neither the UTS key set nor the feed holds data; it applies whole or not at all, and an answer without valid `keyAges` is a failed call. The keys count their age from `keyAges` and the start of the call, and never replace a held set that has newer keys |
 | `PatLookup` `(hash, signal)` | Phase 3 | `hash` is the lowercase-hex SHA-256 of the PAT. Answers `found` (a `PatRecordSchema` record), `not_found` (unknown, revoked or expired), `rate_limited` or `unavailable` with `retryAfterSeconds` |
-| `SharedPatCache` `{ get, put }` | The service: Workers Cache API or Vercel Runtime Cache | Opaque strings; errors count as a miss |
+| `SharedPatCache` `{ get, put }` | The service: Workers Cache API or Vercel Runtime Cache | Opaque strings; errors count as a miss, and so does a read (with its key provider) that has not answered within `PAT_SHARED_CACHE_TIMEOUT_MS` (1 s) |
 | `PatConfig.cacheKeys` `(ctx) => Promise<{ current, previous? }>` | The service: two `Secrets.get` calls on its own bundle | Read on each shared-cache read and write, so a rotation reaches a running instance; `current` signs, `current` and `previous` verify; a rejection is a miss or a skipped write |
 
 ### Revocation feed format
@@ -116,9 +119,12 @@ data.
 - **List:** UTF-8 JSON (`RevocationListWireSchema`): `{ revoked_before: { <sub>: <seconds> },
   revoked_sids: [], revoked_kids: [], revoked_pat_ids: [], blocked_accounts: [] }`. Unknown fields
   are ignored.
-- The library rejects a head older than the one it holds, a head over 30 s old, and a head more
-  than 5 s in the future (the design 5.6 clock skew); a head up to 5 s ahead ages from its fetch
-  time. It fetches the list only when `list_hash` changes.
+- The library rejects a head older than the one it holds, a head signed in the same second as the
+  held one over another list (two feed objects sign heads, and `iat` has one-second resolution),
+  a head over 30 s old, and a head more than 5 s in the future (the design 5.6 clock skew); a head
+  up to 5 s ahead ages from its fetch time. It fetches the list only when `list_hash` changes.
+  An update signed in the held head's second therefore waits for the next head: a revocation in
+  it can arrive up to one re-sign later, still within the 30 s and 60 s head-age limits.
 
 ## PAT format
 
@@ -149,13 +155,13 @@ Code is in `src/verifier.ts` unless named; tests are table-driven, one `describe
 |---|---|---|---|
 | 1 Algorithm | `EdDSA` only, header names a `kid`; no `crit` or `b64` | `verifySignedToken`, `jws.ts` | `rows.test.ts` row 1 |
 | 2 Signature | The JWKS key for that `kid`, Ed25519 only, over the bytes received (decoded once) | `verifySignedToken`, `jws.ts`, `jwks.ts` `importKeySet` | row 2; `jwks.test.ts` key-set validation |
-| 3 Issuer | Exact `iss`, checked again on the verified claims; key only from that issuer's set; no feed key | `verifySignedToken`, one `KeySetCache` per issuer, kid prefixes | row 3 |
+| 3 Issuer | Exact `iss`, checked again on the verified claims; key only from that issuer's set; no feed key; `env` equals `config.environment` | `verifySignedToken`, one `KeySetCache` per issuer, kid prefixes | row 3; environment |
 | 4 Audience | One string equal to this service; an array is refused | `AccessTokenClaimsSchema` (`sts-contracts`), `verifyStsToken`, `verifyUtsToken`, `verifyPat` | row 4; PAT record checks |
 | 5 Type | `typ` is `at+jwt` | `verifySignedToken` | row 5 |
-| 6 Time | `exp`, `iat`, `nbf` with 60 s skew | `timeFailure` | row 6 |
+| 6 Time | `exp` after `iat` and after any `nbf`; then `exp`, `iat`, `nbf` with 60 s skew | `timeFailure` | row 6 |
 | 7 Identity | `sub`, `jti`, `client_id`; STS profile | claim schemas, `claimsReason` | row 7 |
 | 8 Scope | Registered scope of this audience, equal to the route scope; PATs only for PAT-eligible scopes | `verifyStsToken`, `verifyUtsToken`, `verifyPat` | row 8; PAT record checks |
-| 9 Organization | A present org equals the route org | `orgMatches` | row 9; PAT record checks |
+| 9 Organization | On an org-scoped route, the credential's org equals the route org; none is refused. Checked after the feed, so a revoked credential gets 401 whatever its org. STS routes cannot be org-scoped | `orgMatches`, `assertRoute` | row 9; PAT record checks |
 | 10 Revocation | UTS: `revoked_before`, revoked `sid` and `kid`; STS: none (decision Q4) | `verifyUtsToken`, `revocation.ts` | row 10; `revocation.test.ts` |
 | 11 Session | A session-bound route or scope needs a live `sid`; a PAT never qualifies | `verifyUtsToken`, `verifyPat` | row 11; PAT record checks |
 | 12 PAT | Offline check, client address, two cache layers, feed override, fail-closed lookups | `pat-format.ts`, `pat.ts`, `verifyPat` | row 12; `pat.test.ts` |
@@ -174,28 +180,30 @@ Fail-closed and caching rules:
 | JWKS: unknown `kid` refreshes at most once per 5 min per set, also when the requests are cancelled | `jwks.ts` | unknown kid |
 | Feed: background refresh 10 s after the last fetch, wait once the head is over 30 s old; 1 s fetch timeout | `revocation.ts` | `revocation.test.ts` request-driven revalidation |
 | Feed: the library verifies each head under a feed key and each new list against its hash | `revocation.ts` `verifyFeedHead`, `parseRevocationList` | heads and lists that do not count |
-| Feed: a head over 30 s old, more than 5 s in the future, or older than the held one counts as failed | `revocation.ts` | heads and lists that do not count; heads from the future |
+| Feed: a head over 30 s old, more than 5 s in the future, older than the held one, or of the held head's second over another list counts as failed | `revocation.ts` | heads and lists that do not count; heads from the future |
 | Feed: retry wait 5 s, doubling per failure up to 30 s while the copy still serves short tokens | `revocation.ts` | head-age limits while the feed is down |
 | Feed: tokens up to 10 min accept a 10-min head; longer credentials refuse past 60 s, even cached | `maxHeadAgeForLifetime` | head-age limits while the feed is down |
 | Cold start: one bootstrap call fills the UTS key set and the feed; `warm` starts it beside the STS key set | `bootstrap.ts`, `warm` | `bootstrap.test.ts` |
 | PAT: malformed is 401 with no cache write | `verifyPat` | `pat.test.ts` offline check |
 | PAT: no client address is 400 `invalid_request`, before any cache or feed read | `verifyPat` | the client address |
-| PAT: 60 s positive / 30 s negative in the instance and in the shared cache, by full hash; HMAC keys read per access (current and previous); workload in the key | `pat.ts` | two cache layers; shared-cache keys from the bundle |
+| PAT: 60 s positive / 30 s negative in the instance and in the shared cache, by full hash; HMAC keys read per access (current and previous); workload in the key; a shared read over 1 s is a miss | `pat.ts` | two cache layers; shared-cache keys from the bundle; a slow shared cache |
 | PAT: the hash and the shared-cache read run alongside the feed read | `verifyPat`, `pat.ts` `prefetch` | the shared-cache read on a cold instance |
-| PAT: feed entry overrides both layers | `verifyPat` | the feed entry for a PAT id overrides both layers |
+| PAT: feed entry overrides both layers; the decision reads the feed again after the lookup, so a revocation installed meanwhile counts and the head is still at most 60 s old | `verifyPat` | the feed entry for a PAT id overrides both layers |
 | PAT: lookup failure is 503; an expired entry serves stale up to 10 min, refreshed by at most one background lookup at a time, only with a head under 60 s | `pat.ts`, `verifyPat` | fail-closed lookups |
-| PAT: one lookup per hash; 429 above 20 uncached lookups/s per address, before the lookup; a 429 or 503 never evicts | `pat.ts` | merging and the per-address limit; fail-closed lookups |
-| PAT: bounded bookkeeping (10,000 instance entries, failures and pending lookups; 10,000 tracked addresses, oldest first) | `pat.ts` | bounded bookkeeping |
+| PAT: one lookup per hash; 429 above 20 uncached lookups/s per address, before the lookup; 503 above 1,000 pending lookups per instance, before the lookup; a 429 or 503 never evicts | `pat.ts` | merging and the per-address limit; fail-closed lookups; bounded bookkeeping |
+| PAT: bounded bookkeeping (10,000 instance entries and failure records, oldest first; 1,000 pending lookups; 10,000 tracked addresses, oldest first) | `pat.ts` | bounded bookkeeping |
 | No promise shared across requests: owner + pollers, `waitUntil` hand-off | `flight.ts` | `runtime.test.ts` (real workerd: concurrent cold requests, one call each; `warm`) |
 | A request cancelled mid-call does not stall others: after 1 s without its heartbeat, a key-set, feed or bootstrap call counts as failed (with its retry wait); a PAT lookup lets the next request make its own | `flight.ts` `abandoned` | `runtime.test.ts` races; the cancellation tests in each test file |
 
 Error responses: no credential is 401 with `WWW-Authenticate: Bearer resource_metadata="…"`;
-malformed, expired, revoked or wrong-issuer credentials, a missing `sid` on a session-bound route,
-and a PAT on a session-bound route are 401 `invalid_token`; wrong audience or unknown scope is 403
-`insufficient_scope` with the required scope in the body and the challenge; an org mismatch is 403
-`org_mismatch`; a PAT without a client address is 400 `invalid_request`; a failed dependency (key
-set, feed, bootstrap, PAT lookup, including a UTS 429 or 503) is 503 `temporarily_unavailable` with
-`Retry-After`; the per-address PAT lookup limit is 429 `too_many_requests` with `Retry-After`.
+malformed, over-long, expired, revoked, wrong-environment or wrong-issuer credentials, a missing
+`sid` on a session-bound route, and a PAT on a session-bound route are 401 `invalid_token`; wrong
+audience or unknown scope is 403 `insufficient_scope` with the required scope in the body and the
+challenge; an org mismatch, or no org on an org-scoped route, is 403 `org_mismatch`; a PAT without
+a client address is 400 `invalid_request`; a failed dependency (key set, feed, bootstrap, PAT
+lookup, including a UTS 429 or 503, or 1,000 PAT lookups already pending in the instance) is 503
+`temporarily_unavailable` with `Retry-After`; the per-address PAT lookup limit is 429
+`too_many_requests` with `Retry-After`.
 Every failure carries `Cache-Control: no-store`.
 
 ## Checks

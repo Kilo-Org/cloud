@@ -1,0 +1,8 @@
+# An allowlist: a deploy uploads only what the functions need. A project without a framework serves
+# root files as static files, so a proof key or run output left in the deploy root must never go up.
+/*
+!api
+!lib
+!package.json
+!tsconfig.json
+!vercel.json

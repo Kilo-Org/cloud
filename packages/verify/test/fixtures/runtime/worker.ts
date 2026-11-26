@@ -125,6 +125,7 @@ const bootstrap: UtsBootstrapSource = async () => {
 function config(cold: 'bootstrap' | 'separate') {
   return {
     audience: 'session-ingest',
+    environment: 'development',
     resourceMetadataUrl: 'https://session-ingest.runtime.test/.well-known/oauth-protected-resource',
     sts: {
       issuer: 'https://sts.runtime.test',

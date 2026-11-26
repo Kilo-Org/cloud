@@ -17,19 +17,25 @@ import {
 } from 'vitest';
 import { clearDenialBuffers } from '../../src/audit/denials';
 import {
-  CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
+  CLOUDFLARE_DEPLOY_PINS,
   CLOUDFLARE_MINTING_TOKEN_SECRET,
+  DEPLOY_TOKEN_ACCOUNT_LIMIT_RETRY_AFTER_SECONDS,
+  DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING,
   DEPLOY_TOKEN_CREDENTIAL_REFUSED_HOLD_MS,
   DEPLOY_TOKEN_DELETES_PER_ALARM,
+  DEPLOY_TOKEN_DELETE_RETRY_MS,
   DEPLOY_TOKEN_MINT_BUDGET_MS,
   DEPLOY_TOKEN_RETRY_AFTER_SECONDS,
   DEPLOY_TOKEN_ROUTES_PER_ZONE_MAX,
   DEPLOY_TOKEN_ROUTE_ZONES_PER_CHECK,
   DEPLOY_TOKEN_ROW_RETENTION_MS,
+  DEPLOY_TOKEN_SWEEP_INTERVAL_MS,
+  DEPLOY_TOKEN_SWEEP_PAGE_SIZE,
   DEPLOY_TOKEN_UNEXPECTED_ROUTE_EVENTS_PER_CHECK,
   DEPLOY_TOKEN_UNEXPECTED_SCRIPT_EVENTS_PER_CHECK,
   DEPLOY_TOKEN_WINDOW_CHECK_RETRY_MS,
   MINTING_FOLDER,
+  type CloudflareDeployPins,
 } from '../../src/constants';
 import {
   DeployTokenDO,
@@ -56,9 +62,24 @@ const SCRIPTS_GROUP = 'a'.repeat(32);
 const CONTAINERS_GROUP = 'b'.repeat(32);
 const ROUTES_GROUP = 'c'.repeat(32);
 const ZONE_ID = 'd'.repeat(32);
+/** Nine further zones of the development environment, for the zone bound of the window check. */
+const MORE_ZONES = Array.from({ length: 9 }, (_, index) =>
+  (index + 1).toString(16).padStart(32, '0')
+);
 const MINTING_CREDENTIAL = '[REDACTED by s1-secret-redact]';
 /** The forbidden permission group these tests pin, as setup step 3 pins the real ones. */
 const PINNED_GROUP = '7'.repeat(32);
+
+/** The pins setup step 3 fills in, for these tests. */
+const TEST_PINS: CloudflareDeployPins = {
+  forbiddenGroupIds: [PINNED_GROUP],
+  allowedGroups: [
+    { id: SCRIPTS_GROUP, scope: 'account' },
+    { id: CONTAINERS_GROUP, scope: 'account' },
+    { id: ROUTES_GROUP, scope: 'zone' },
+  ],
+  allowedZones: { development: [ZONE_ID, ...MORE_ZONES], staging: [], production: [ZONE_ID] },
+};
 
 const GROUP_NAMES: Record<string, string> = {
   [SCRIPTS_GROUP]: 'Workers Scripts Write',
@@ -88,6 +109,7 @@ dynamic:
       - { id: '${ROUTES_GROUP}', name: Workers Routes Write, scope: zone }
     zones: ['${ZONE_ID}']
     intendedScripts: [bouncer, bouncer-watch]
+    intendedRoutes: ['bouncer.example.invalid/*', 'watch.example.invalid/*']
     maxActive: 2
     maxPerHour: 4
 `;
@@ -95,16 +117,17 @@ dynamic:
 
 const authority: MintAuthority = {
   scopes: {},
-  policies: loadPolicies({
-    'ci-deploy-bouncer.yaml': deployPolicy('ci-deploy-bouncer', 'acme/bouncer', DEPLOY_WORKFLOW, [
-      '321',
-      '654',
-    ]),
-    'ci-deploy-other.yaml': deployPolicy('ci-deploy-other', 'acme/other', OTHER_WORKFLOW, [
-      '322',
-      '654',
-    ]),
-    'ci-bouncer-lint.yaml': `
+  policies: loadPolicies(
+    {
+      'ci-deploy-bouncer.yaml': deployPolicy('ci-deploy-bouncer', 'acme/bouncer', DEPLOY_WORKFLOW, [
+        '321',
+        '654',
+      ]),
+      'ci-deploy-other.yaml': deployPolicy('ci-deploy-other', 'acme/other', OTHER_WORKFLOW, [
+        '322',
+        '654',
+      ]),
+      'ci-bouncer-lint.yaml': `
 workload: ci-bouncer-lint
 environments: [development]
 identity:
@@ -117,7 +140,9 @@ identity:
   events: [push]
 secrets: []
 `,
-  }),
+    },
+    { cloudflareDeployPins: TEST_PINS }
+  ),
 };
 
 /** The caller STS passes the object for a run of the bouncer deploy job, for direct calls. */
@@ -163,6 +188,10 @@ type FakeCloudflare = {
   routes: Map<string, FakeRoute[]>;
   setCreateStatus: (status: number) => void;
   setDeleteStatus: (status: number) => void;
+  /** Answers a delete of these token ids with this status (no `Retry-After`), before any other. */
+  deleteStatusFor: Map<string, number>;
+  /** Deletes wait until the returned function is called. */
+  holdDeletes: () => () => void;
   setListStatus: (status: number) => void;
   setScriptsStatus: (status: number) => void;
   /** Adds this permission group (named) to every token the fake makes. */
@@ -170,6 +199,8 @@ type FakeCloudflare = {
   /** Changes the policies of every token the fake makes, as Cloudflare would return them. */
   editPolicies: (edit: ((policies: FakePolicy[]) => void) | null) => void;
   setExpirySkewMs: (ms: number) => void;
+  /** The next answers to a create leave out `expires_on`. */
+  setOmitExpiry: (on: boolean) => void;
   manager: { reads: URL[]; removeCredential: () => void };
 };
 
@@ -191,7 +222,10 @@ function installFakes(github: TestProvider): FakeCloudflare {
   let extraGroup: { id: string; name: string } | null = null;
   let editPolicies: ((policies: FakePolicy[]) => void) | null = null;
   let expirySkewMs = 0;
+  let omitExpiry = false;
   let credentialPresent = true;
+  const deleteStatusFor = new Map<string, number>();
+  let deleteGate: Promise<void> | null = null;
   let serial = 0;
   const issuer = providerFetch([github]).fetch;
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -273,19 +307,22 @@ function installFakes(github: TestProvider): FakeCloudflare {
           id,
           name: request.name,
           status: 'active',
-          expires_on: expiresOn,
+          ...(omitExpiry ? {} : { expires_on: expiresOn }),
           policies,
           value: `cfat_synthetic-deploy-token-${serial}`,
         },
       });
     }
     if (method === 'DELETE' && path.startsWith(`${tokensPath}/`)) {
+      if (deleteGate !== null) await deleteGate;
+      const id = path.split('/').pop() ?? '';
+      const ownStatus = deleteStatusFor.get(id);
+      if (ownStatus !== undefined) return new Response('refused', { status: ownStatus });
       if (deleteStatus !== 200) {
         const headers: Record<string, string> =
           deleteStatus === 429 ? { 'retry-after': '120' } : {};
         return new Response('refused', { status: deleteStatus, headers });
       }
-      const id = path.split('/').pop() ?? '';
       if (!tokens.delete(id)) return Response.json({ success: false }, { status: 404 });
       return Response.json({ success: true, result: { id } });
     }
@@ -293,12 +330,22 @@ function installFakes(github: TestProvider): FakeCloudflare {
       if (listStatus !== 200) return new Response('refused', { status: listStatus });
       const page = Number(url.searchParams.get('page'));
       const perPage = Number(url.searchParams.get('per_page'));
-      const all = [...tokens].map(([id, token]) => ({
-        id,
-        name: token.name,
-        status: 'active',
-        expires_on: token.expiresOn,
-      }));
+      // As Cloudflare: expired tokens only with include_expired=true.
+      const withExpired = url.searchParams.get('include_expired') === 'true';
+      const all = [...tokens]
+        .filter(
+          ([, token]) =>
+            withExpired || token.expiresOn === '' || Date.parse(token.expiresOn) > Date.now()
+        )
+        .map(([id, token]) => ({
+          id,
+          name: token.name,
+          status:
+            token.expiresOn === '' || Date.parse(token.expiresOn) > Date.now()
+              ? 'active'
+              : 'expired',
+          expires_on: token.expiresOn === '' ? null : token.expiresOn,
+        }));
       return Response.json({
         success: true,
         result: all.slice((page - 1) * perPage, page * perPage),
@@ -336,6 +383,15 @@ function installFakes(github: TestProvider): FakeCloudflare {
     setDeleteStatus: status => {
       deleteStatus = status;
     },
+    deleteStatusFor,
+    holdDeletes: () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      deleteGate = promise;
+      return () => {
+        deleteGate = null;
+        resolve();
+      };
+    },
     setListStatus: status => {
       listStatus = status;
     },
@@ -350,6 +406,9 @@ function installFakes(github: TestProvider): FakeCloudflare {
     },
     setExpirySkewMs: ms => {
       expirySkewMs = ms;
+    },
+    setOmitExpiry: on => {
+      omitExpiry = on;
     },
     manager: {
       reads,
@@ -541,6 +600,34 @@ async function credentialHold(): Promise<{ until: number; hold_ms: number } | un
   );
 }
 
+type SweepRetryRow = {
+  token_id: string;
+  retry_at: number;
+  attempts: number;
+  failure_audited: number;
+};
+
+/** The sweep's failed deletions the object tries again by id. */
+async function sweepRetries(): Promise<SweepRetryRow[]> {
+  return await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) =>
+    state.storage.sql
+      .exec<SweepRetryRow>(
+        'SELECT token_id, retry_at, attempts, failure_audited FROM deploy_token_sweep_retry ORDER BY token_id'
+      )
+      .toArray()
+  );
+}
+
+async function sweepState(): Promise<{ next_sweep_at: number; page: number | null }> {
+  return await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) =>
+    state.storage.sql
+      .exec<{ next_sweep_at: number; page: number | null }>(
+        'SELECT next_sweep_at, page FROM deploy_token_sweep'
+      )
+      .one()
+  );
+}
+
 async function deployTokenEvents(type: string): Promise<Event[]> {
   return (await tokenEvents()).filter(event => event.type === `ai.kilo.sts.deploy_token.${type}`);
 }
@@ -556,11 +643,11 @@ function consoleText(spies: MockInstance[]): string {
 
 beforeAll(async () => {
   github = await createProvider(GITHUB_ISSUER, config.issuer);
-  DeployTokenDO.forbiddenPermissionGroupIds = [PINNED_GROUP];
+  DeployTokenDO.cloudflareDeployPins = TEST_PINS;
 });
 
 afterAll(() => {
-  DeployTokenDO.forbiddenPermissionGroupIds = CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS;
+  DeployTokenDO.cloudflareDeployPins = CLOUDFLARE_DEPLOY_PINS;
 });
 
 beforeEach(async () => {
@@ -766,6 +853,7 @@ describe('mint', () => {
             ],
             zones: [],
             intendedScripts: ['bouncer'],
+            intendedRoutes: [],
             ttlSeconds: 3600,
             maxActive: 1,
             maxPerHour: 1,
@@ -780,17 +868,20 @@ describe('mint', () => {
     expect(cloudflare.calls).toEqual([]);
   });
 
-  it('refuses every mint, not retryable, while CF_DEPLOY_ACCOUNT_ID is set and the forbidden-id pin is empty', async () => {
+  it.each<[string, CloudflareDeployPins]>([
+    ['the forbidden-id pin is empty', { ...TEST_PINS, forbiddenGroupIds: [] }],
+    ['the allowed-group pin is empty', { ...TEST_PINS, allowedGroups: [] }],
+  ])('refuses every mint while CF_DEPLOY_ACCOUNT_ID is set and %s', async (_name, pins) => {
     const cloudflare = installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    DeployTokenDO.forbiddenPermissionGroupIds = [];
+    DeployTokenDO.cloudflareDeployPins = pins;
     try {
       const { status, result, response } = await mint();
       expect(status).toBe(403);
       expect(result).toEqual({ status: 'denied', reason: 'not_configured' });
       expect(response.headers.get('retry-after')).toBeNull();
     } finally {
-      DeployTokenDO.forbiddenPermissionGroupIds = [PINNED_GROUP];
+      DeployTokenDO.cloudflareDeployPins = TEST_PINS;
     }
     expect(cloudflare.calls).toEqual([]);
     expect(cloudflare.manager.reads).toEqual([]);
@@ -845,6 +936,83 @@ describe('mint', () => {
     expect((await tokenEvents()).map(event => event.data.attributes.cause)).toEqual([
       'expiry_mismatch',
     ]);
+  });
+
+  it('deletes a token whose expiry is later than asked for, even inside the tolerance', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    cloudflare.setExpirySkewMs(60_000);
+    expect((await mint()).result).toMatchObject({ status: 'unavailable' });
+    expect(cloudflare.tokens.size).toBe(0);
+    expect((await tokenEvents()).map(event => event.data.attributes.cause)).toEqual([
+      'expiry_mismatch',
+    ]);
+  });
+
+  it('deletes at once a token whose create answer names it but leaves out its expiry', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    cloudflare.setOmitExpiry(true);
+    expect((await mint()).result).toMatchObject({ status: 'unavailable' });
+    expect(cloudflare.deletes()).toHaveLength(1);
+    expect(cloudflare.tokens.size).toBe(0);
+    expect((await tokenEvents()).map(event => [event.type, event.data.attributes.cause])).toEqual([
+      ['ai.kilo.sts.deploy_token.revoked', 'grant_mismatch'],
+    ]);
+  });
+
+  it('refuses a mint while the environment holds its share of the account tokens, with no Cloudflare call', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Owed deletions of other workloads count: each token still holds a place at Cloudflare.
+    await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) => {
+      const now = Date.now();
+      for (let index = 0; index < DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING; index += 1) {
+        state.storage.sql.exec(
+          `INSERT INTO deploy_token (token_id, workload, caller, run_id, permission_set, state, created_at, expires_at, delete_cause, delete_retry_at, intended_scripts, intended_routes, zones) VALUES ('${index.toString(16).padStart(32, '9')}', 'ci-deploy-other', '${JSON.stringify({ ...CALLER, workload: 'ci-deploy-other' })}', '1', 'bouncer-deploy', 'failed', ${now - 7200_000}, ${now - 3600_000}, 'expired', ${now + 3600_000}, '[]', '[]', '[]')`
+        );
+      }
+    });
+    const { status, result } = await mint();
+    expect(status).toBe(429);
+    expect(result).toEqual({
+      status: 'limited',
+      reason: 'account_limit',
+      retryAfterSeconds: DEPLOY_TOKEN_ACCOUNT_LIMIT_RETRY_AFTER_SECONDS,
+    });
+    expect(cloudflare.creates()).toEqual([]);
+    // One deletion confirmed: a place frees up.
+    await sqlInObject(
+      `UPDATE deploy_token SET state = 'deleted', delete_cause = NULL WHERE token_id = '${'0'.padStart(32, '9')}'`
+    );
+    issued((await mint()).result);
+  });
+
+  it('counts a failed creation against the account share only while its outcome is unknown, and a token the sweep could not delete', async () => {
+    installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Creations Cloudflare refused, or that never reached it, made no token.
+    await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) => {
+      const now = Date.now();
+      for (let index = 0; index < DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING; index += 1) {
+        state.storage.sql.exec(
+          `INSERT INTO deploy_token (workload, caller, run_id, permission_set, state, created_at, expires_at, ended_at, intended_scripts, intended_routes, zones) VALUES ('ci-deploy-other', '${JSON.stringify({ ...CALLER, workload: 'ci-deploy-other' })}', '1', 'bouncer-deploy', 'failed', ${now - 60_000}, ${now - 30_000}, ${now - 30_000}, '[]', '[]', '[]')`
+        );
+      }
+    });
+    const token = issued((await mint()).result);
+    expect((await revoke(token.tokenId)).status).toBe(200);
+    // All but one lost their answer, so a token may exist for each; with one the sweep could not
+    // delete, the environment holds its share.
+    await sqlInObject(
+      'UPDATE deploy_token SET outcome_unknown = 1 WHERE token_id IS NULL AND slot > (SELECT min(slot) FROM deploy_token)'
+    );
+    await sqlInObject(
+      `INSERT INTO deploy_token_sweep_retry (token_id, token_name, expires_at, retry_at) VALUES ('${'1'.repeat(32)}', 'sts-development-ci-deploy-bouncer-1-9', 0, ${Date.now() + 3600_000})`
+    );
+    expect((await mint()).result).toMatchObject({ status: 'limited', reason: 'account_limit' });
+    await sqlInObject('DELETE FROM deploy_token_sweep_retry');
+    issued((await mint()).result);
   });
 
   it.each<[string, (policies: FakePolicy[]) => void]>([
@@ -904,11 +1072,28 @@ describe('mint', () => {
     ]);
   });
 
-  it('refuses to mint a grant that lists a pinned forbidden permission group, with no Cloudflare call', async () => {
+  it.each<[string, CloudflareDeployPins]>([
+    ['a pinned forbidden group', { ...TEST_PINS, forbiddenGroupIds: [CONTAINERS_GROUP] }],
+    [
+      'a permission group outside the allowed ones',
+      { ...TEST_PINS, allowedGroups: TEST_PINS.allowedGroups.slice(1) },
+    ],
+    [
+      'an allowed group under another scope',
+      {
+        ...TEST_PINS,
+        allowedGroups: TEST_PINS.allowedGroups.map(group => ({ ...group, scope: 'zone' as const })),
+      },
+    ],
+    [
+      'a zone outside its environment',
+      { ...TEST_PINS, allowedZones: { ...TEST_PINS.allowedZones, development: MORE_ZONES } },
+    ],
+  ])('refuses to mint a grant that lists %s, with no Cloudflare call', async (_name, pins) => {
     const cloudflare = installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     class PinnedDeployTokenDO extends DeployTokenDO {
-      static override forbiddenPermissionGroupIds = [CONTAINERS_GROUP];
+      static override cloudflareDeployPins = pins;
     }
     const result = await runInDurableObject(
       getDeployTokenStub(env, config),
@@ -933,7 +1118,7 @@ describe('mint', () => {
     for (const minutesAgo of [50, 40, 30, 20]) {
       const createdAt = now - minutesAgo * 60_000;
       await sqlInObject(
-        `INSERT INTO deploy_token (workload, caller, run_id, permission_set, state, created_at, expires_at, ended_at, intended_scripts, zones) VALUES ('ci-deploy-bouncer', '${JSON.stringify(CALLER)}', '1', 'bouncer-deploy', 'failed', ${createdAt}, ${createdAt + 30_000}, ${createdAt + 30_000}, '[]', '[]')`
+        `INSERT INTO deploy_token (workload, caller, run_id, permission_set, state, created_at, expires_at, ended_at, intended_scripts, intended_routes, zones) VALUES ('ci-deploy-bouncer', '${JSON.stringify(CALLER)}', '1', 'bouncer-deploy', 'failed', ${createdAt}, ${createdAt + 30_000}, ${createdAt + 30_000}, '[]', '[]', '[]')`
       );
     }
     const result = await getDeployTokenStub(env, config).mint({
@@ -1014,6 +1199,13 @@ describe('mint', () => {
       ['ai.kilo.sts.deploy_token.mint_failed', 'unknown'],
     ]);
     expect(events[0].data.attributes.slot).toEqual(expect.any(Number));
+    const row = await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) =>
+      state.storage.sql
+        .exec<{ outcome_unknown: number }>('SELECT outcome_unknown FROM deploy_token')
+        .one()
+    );
+    // It counts against the account share until such a token would have been swept.
+    expect(row.outcome_unknown).toBe(1);
     expect(events[0].data.attributes).not.toHaveProperty('httpStatus');
     expect(JSON.stringify(events)).not.toContain('cfat_');
   });
@@ -1072,7 +1264,14 @@ describe('revoke', () => {
       status: 'unavailable',
       retryAfterSeconds: DEPLOY_TOKEN_RETRY_AFTER_SECONDS,
     });
-    expect((await revoke(token.tokenId)).status).toBe(503);
+    // Before its retry time a second revoke makes no Cloudflare call and says how long to wait.
+    const again = await revoke(token.tokenId);
+    expect(again.status).toBe(503);
+    expect(again.body).toEqual({
+      status: 'unavailable',
+      retryAfterSeconds: DEPLOY_TOKEN_RETRY_AFTER_SECONDS,
+    });
+    expect(cloudflare.deletes()).toHaveLength(1);
     const failures = (await tokenEvents()).filter(
       event => event.type === 'ai.kilo.sts.deploy_token.revoked'
     );
@@ -1089,6 +1288,27 @@ describe('revoke', () => {
       .map(event => event.data.attributes.result);
     expect(results).toEqual(['delete_failed', 'deleted']);
     expect(consoleText([errors])).not.toContain(MINTING_CREDENTIAL);
+  });
+
+  it('joins a deletion of the token the alarm has in flight and answers revoked', async () => {
+    const cloudflare = installFakes(github);
+    const token = issued((await mint()).result);
+    await sqlInObject(`UPDATE deploy_token SET expires_at = ${Date.now() - 1000}`);
+    const release = cloudflare.holdDeletes();
+    const alarm = alarmNow();
+    await vi.waitFor(() => {
+      expect(cloudflare.deletes()).toHaveLength(1);
+    });
+    // The alarm's attempt set the row's retry time before its call; the revoke waits for it.
+    const revoking = revoke(token.tokenId);
+    await scheduler.wait(200);
+    release();
+    await alarm;
+    expect(await revoking).toEqual({
+      status: 200,
+      body: { status: 'revoked', tokenId: token.tokenId },
+    });
+    expect(cloudflare.deletes()).toHaveLength(1);
   });
 });
 
@@ -1157,9 +1377,17 @@ describe('reaper', () => {
       expiresOn: future,
     });
     cloudflare.tokens.set('4'.repeat(32), { name: 'someone-elses-token', expiresOn: past });
+    // A token of this environment's prefix without an expiry is never one STS handed over.
+    cloudflare.tokens.set('5'.repeat(32), {
+      name: 'sts-development-ci-deploy-bouncer-3-9',
+      expiresOn: '',
+    });
     await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
     await runDurableObjectAlarm(getDeployTokenStub(env, config));
-    expect(cloudflare.deletes().map(call => call.path.split('/').pop())).toEqual(['1'.repeat(32)]);
+    expect(cloudflare.deletes().map(call => call.path.split('/').pop())).toEqual([
+      '1'.repeat(32),
+      '5'.repeat(32),
+    ]);
     expect([...cloudflare.tokens.keys()].sort()).toEqual(
       [live.tokenId, '2'.repeat(32), '3'.repeat(32), '4'.repeat(32)].sort()
     );
@@ -1173,6 +1401,7 @@ describe('reaper', () => {
         tokenName: 'sts-development-ci-deploy-bouncer-1-9',
         result: 'deleted',
       }),
+      expect.objectContaining({ source: 'sweep', tokenId: '5'.repeat(32), result: 'deleted' }),
     ]);
     const next = await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) =>
       state.storage.sql
@@ -1208,7 +1437,7 @@ describe('reaper', () => {
     issued((await mint()).result);
     await sqlInObject(`UPDATE deploy_token SET expires_at = ${Date.now() - 1000}`);
     await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
-    cloudflare.setDeleteStatus(403);
+    cloudflare.setDeleteStatus(401);
     const readsBefore = cloudflare.manager.reads.length;
     const holdState = async () =>
       await runInDurableObject(getDeployTokenStub(env, config), (_instance, state) => ({
@@ -1261,26 +1490,188 @@ describe('reaper', () => {
     ).toHaveLength(1);
   });
 
+  it('fails only that deletion on a 403, with no hold, and goes on with the next one', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    issued((await mint()).result);
+    issued((await mint()).result);
+    await sqlInObject(`UPDATE deploy_token SET expires_at = ${Date.now() - 1000}`);
+    // A token an earlier minting token created may refuse deletion by this one alone.
+    cloudflare.setDeleteStatus(403);
+    const readsBefore = cloudflare.manager.reads.length;
+    await alarmNow();
+    expect(cloudflare.deletes()).toHaveLength(2);
+    expect(cloudflare.manager.reads.length - readsBefore).toBe(0);
+    expect(await credentialHold()).toBeUndefined();
+    const reaped = (await deployTokenEvents('reaped')).map(event => event.data.attributes.result);
+    expect(reaped).toEqual(['delete_failed', 'delete_failed']);
+    expect(cloudflare.tokens.size).toBe(2);
+  });
+
+  it('passes over an orphan Cloudflare refuses with 403, sweeps a deletable one on a later page, and ends the sweep', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const live = issued((await mint()).result);
+    const past = cloudflareIso(Date.now() - 60_000);
+    const stuck = '1'.repeat(32);
+    const later = '2'.repeat(32);
+    cloudflare.tokens.set(stuck, {
+      name: 'sts-development-ci-deploy-bouncer-1-9',
+      expiresOn: past,
+    });
+    // The rest of the first page: tokens the sweep leaves alone.
+    for (let index = 0; cloudflare.tokens.size < DEPLOY_TOKEN_SWEEP_PAGE_SIZE; index += 1) {
+      cloudflare.tokens.set(index.toString(16).padStart(32, 'c'), {
+        name: `someone-elses-token-${index}`,
+        expiresOn: past,
+      });
+    }
+    cloudflare.tokens.set(later, {
+      name: 'sts-development-ci-deploy-bouncer-2-9',
+      expiresOn: past,
+    });
+    // A token an earlier minting token created, which this one may not delete.
+    cloudflare.deleteStatusFor.set(stuck, 403);
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    advanceClock(0);
+    await alarmNow();
+    advanceClock(DEPLOY_TOKEN_DELETE_RETRY_MS + 1000);
+    await alarmNow();
+    expect(cloudflare.tokens.has(later)).toBe(false);
+    expect(cloudflare.tokens.has(stuck)).toBe(true);
+    expect(cloudflare.tokens.has(live.tokenId)).toBe(true);
+    const sweep = await sweepState();
+    expect(sweep.page).toBeNull();
+    expect(sweep.next_sweep_at).toBeGreaterThan(Date.now() + 23 * 3600_000);
+    // The stuck orphan was tried again by id after its wait, and audited once.
+    expect(cloudflare.deletes().filter(call => call.path.endsWith(`/${stuck}`))).toHaveLength(2);
+    const swept = (await deployTokenEvents('reaped')).map(event => [
+      event.data.attributes.tokenId,
+      event.data.attributes.result,
+    ]);
+    expect(swept).toEqual([
+      [stuck, 'delete_failed'],
+      [later, 'deleted'],
+    ]);
+  });
+
+  it('tries a stuck orphan again by id after a wait that doubles up to a day, and audits its failure once', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    issued((await mint()).result);
+    const stuck = '1'.repeat(32);
+    cloudflare.tokens.set(stuck, {
+      name: 'sts-development-ci-deploy-bouncer-1-9',
+      expiresOn: cloudflareIso(Date.now() - 60_000),
+    });
+    // A 5xx that never clears.
+    cloudflare.deleteStatusFor.set(stuck, 503);
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    advanceClock(0);
+    await alarmNow();
+    const stuckDeletes = () =>
+      cloudflare.deletes().filter(call => call.path.endsWith(`/${stuck}`)).length;
+    const waits: number[] = [];
+    for (let failures = 1; failures <= 14; failures += 1) {
+      const [retry] = await sweepRetries();
+      expect(retry).toMatchObject({ token_id: stuck, attempts: failures, failure_audited: 1 });
+      waits.push(retry.retry_at - Date.now());
+      expect(await currentAlarm()).toBeLessThanOrEqual(retry.retry_at);
+      // Not before its retry time, and the daily sweeps pass it over.
+      advanceClock(retry.retry_at - Date.now() - 1000);
+      await alarmNow();
+      expect(stuckDeletes()).toBe(failures);
+      advanceClock(1000);
+      await alarmNow();
+      expect(stuckDeletes()).toBe(failures + 1);
+    }
+    expect(waits).toEqual(
+      Array.from({ length: 14 }, (_, index) =>
+        Math.min(DEPLOY_TOKEN_SWEEP_INTERVAL_MS, DEPLOY_TOKEN_DELETE_RETRY_MS * 2 ** index)
+      )
+    );
+    const stuckResults = async () =>
+      (await deployTokenEvents('reaped'))
+        .filter(event => event.data.attributes.tokenId === stuck)
+        .map(event => event.data.attributes.result);
+    expect(await stuckResults()).toEqual(['delete_failed']);
+
+    // Cloudflare takes it at last: one more row, and it leaves the retry table.
+    cloudflare.deleteStatusFor.delete(stuck);
+    const [last] = await sweepRetries();
+    advanceClock(last.retry_at - Date.now());
+    await alarmNow();
+    expect(cloudflare.tokens.has(stuck)).toBe(false);
+    expect(await sweepRetries()).toEqual([]);
+    expect(await stuckResults()).toEqual(['delete_failed', 'deleted']);
+  });
+
+  it('stops the sweep after a 429 or a 401 on an orphan, as before, and adds no wait of the token’s own', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    issued((await mint()).result);
+    const past = cloudflareIso(Date.now() - 60_000);
+    const first = '1'.repeat(32);
+    const second = '2'.repeat(32);
+    cloudflare.tokens.set(first, {
+      name: 'sts-development-ci-deploy-bouncer-1-9',
+      expiresOn: past,
+    });
+    cloudflare.tokens.set(second, {
+      name: 'sts-development-ci-deploy-bouncer-2-9',
+      expiresOn: past,
+    });
+    // A 429 without Retry-After still asks STS to wait.
+    cloudflare.deleteStatusFor.set(first, 429);
+    await sqlInObject('UPDATE deploy_token_sweep SET next_sweep_at = 0');
+    advanceClock(0);
+    await alarmNow();
+    const deleted = () => cloudflare.deletes().map(call => call.path.split('/').pop());
+    expect(deleted()).toEqual([first]);
+    expect(await sweepRetries()).toEqual([
+      expect.objectContaining({ token_id: first, attempts: 0 }),
+    ]);
+    const waiting = await sweepState();
+    expect(waiting.page).toBe(1);
+    expect(waiting.next_sweep_at).toBeGreaterThanOrEqual(Date.now() + 60_000);
+
+    // After the wait, a 401 on the retry starts the credential hold and stops the alarm's calls.
+    cloudflare.deleteStatusFor.set(first, 401);
+    advanceClock(61_000);
+    await alarmNow();
+    expect(deleted()).toEqual([first, first]);
+    expect(await credentialHold()).toBeDefined();
+    expect(await sweepRetries()).toEqual([
+      expect.objectContaining({ token_id: first, attempts: 0 }),
+    ]);
+    expect(cloudflare.tokens.has(second)).toBe(true);
+    expect((await deployTokenEvents('reaped')).map(event => event.data.attributes.result)).toEqual([
+      'delete_failed',
+    ]);
+  });
+
   it('ends a creation an earlier instance left pending, audits it, and brings the sweep forward', async () => {
     installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const deadline = Date.now() - 1000;
     await sqlInObject(
-      `INSERT INTO deploy_token (slot, workload, caller, run_id, permission_set, state, created_at, expires_at, intended_scripts, zones) VALUES (41, 'ci-deploy-bouncer', '${JSON.stringify(CALLER)}', '1', 'bouncer-deploy', 'pending', ${deadline - 30_000}, ${deadline}, '["bouncer"]', '[]')`
+      `INSERT INTO deploy_token (slot, workload, caller, run_id, permission_set, state, created_at, expires_at, intended_scripts, intended_routes, zones) VALUES (41, 'ci-deploy-bouncer', '${JSON.stringify(CALLER)}', '1', 'bouncer-deploy', 'pending', ${deadline - 30_000}, ${deadline}, '["bouncer"]', '[]', '[]')`
     );
     await alarmNow();
     const state = await runInDurableObject(
       getDeployTokenStub(env, config),
       (_instance, storage) => ({
         row: storage.storage.sql
-          .exec<{ state: string }>('SELECT state FROM deploy_token WHERE slot = 41')
+          .exec<{ state: string; outcome_unknown: number }>(
+            'SELECT state, outcome_unknown FROM deploy_token WHERE slot = 41'
+          )
           .one(),
         sweep: storage.storage.sql
           .exec<{ next_sweep_at: number }>('SELECT next_sweep_at FROM deploy_token_sweep')
           .one(),
       })
     );
-    expect(state.row.state).toBe('failed');
+    expect(state.row).toEqual({ state: 'failed', outcome_unknown: 1 });
     // Such a token expires at most 1 hour after the budget ended; the sweep comes 2 minutes later.
     expect(state.sweep.next_sweep_at).toBe(deadline + 3600_000 + 120_000);
     const failed = await deployTokenEvents('mint_failed');
@@ -1451,6 +1842,75 @@ describe('window check', () => {
     });
   });
 
+  it('audits a route whose pattern changed or appeared outside intendedRoutes, even to an intended Worker', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    cloudflare.routes.set(ZONE_ID, [
+      { id: 'route-own', pattern: 'bouncer.example.invalid/*', script: 'bouncer' },
+    ]);
+    const first = issued((await mint()).result);
+    expect((await revoke(first.tokenId)).status).toBe(200);
+    advanceClock(3 * 60_000);
+    await alarmNow();
+    expect(await deployTokenEvents('unexpected_route')).toEqual([]);
+
+    // The next deploy widens its own route and adds one for another host, both to `bouncer`.
+    const second = issued((await mint()).result);
+    cloudflare.routes.set(ZONE_ID, [
+      { id: 'route-own', pattern: '*.example.invalid/*', script: 'bouncer' },
+      { id: 'route-new', pattern: 'admin.example.invalid/*', script: 'bouncer' },
+    ]);
+    expect((await revoke(second.tokenId)).status).toBe(200);
+    advanceClock(3 * 60_000);
+    await alarmNow();
+    const flagged = (await deployTokenEvents('unexpected_route')).map(
+      event => event.data.attributes
+    );
+    expect(flagged.map(route => [route.routeId, route.pattern, route.script])).toEqual([
+      ['route-own', '*.example.invalid/*', 'bouncer'],
+      ['route-new', 'admin.example.invalid/*', 'bouncer'],
+    ]);
+  });
+
+  it('audits a route that sends one token’s intended pattern to another token’s intended Worker', async () => {
+    const cloudflare = installFakes(github);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const grant = bouncerGrant();
+    const stub = getDeployTokenStub(env, config);
+    const tokenIds = await runInDurableObject(stub, async instance => {
+      const ids: string[] = [];
+      for (const name of ['alpha', 'beta']) {
+        const minted = await instance.mint({
+          environment: 'development',
+          caller: CALLER,
+          grant: {
+            ...grant,
+            intendedScripts: [name],
+            intendedRoutes: [`${name}.example.invalid/*`],
+          },
+          requestedAt: Date.now(),
+        });
+        if (minted.status !== 'minted') throw new Error(`expected a token, got ${minted.status}`);
+        ids.push(minted.tokenId);
+      }
+      return ids;
+    });
+    cloudflare.routes.set(ZONE_ID, [
+      { id: 'route-beta', pattern: 'beta.example.invalid/*', script: 'beta' },
+      { id: 'route-crossed', pattern: 'alpha.example.invalid/*', script: 'beta' },
+    ]);
+    await runInDurableObject(stub, async instance => {
+      for (const tokenId of tokenIds) {
+        await instance.revoke({ environment: 'development', caller: CALLER, tokenId });
+      }
+    });
+    advanceClock(3 * 60_000);
+    await alarmNow();
+    expect(
+      (await deployTokenEvents('unexpected_route')).map(event => event.data.attributes.routeId)
+    ).toEqual(['route-crossed']);
+  });
+
   it('writes a bounded number of route rows per check, and fails a check on a zone with too many routes', async () => {
     const cloudflare = installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -1485,9 +1945,7 @@ describe('window check', () => {
 
   it('lists at most 8 zones per check and leaves the windows with further zones for the next alarm', async () => {
     const cloudflare = installFakes(github);
-    const zoneIds = Array.from({ length: 9 }, (_, index) =>
-      (index + 1).toString(16).padStart(32, '0')
-    );
+    const zoneIds = MORE_ZONES;
     const stub = getDeployTokenStub(env, config);
     const tokenIds: string[] = [];
     for (const zones of [zoneIds.slice(0, 4), zoneIds.slice(4, 8), zoneIds.slice(8)]) {
@@ -1617,7 +2075,7 @@ dynamic:${value.grant}
   }
 
   function load(source: string) {
-    return loadPolicies({ 'ci-deploy-x.yaml': source });
+    return loadPolicies({ 'ci-deploy-x.yaml': source }, { cloudflareDeployPins: TEST_PINS });
   }
 
   it('loads a grant, defaults the lifetime to 1 hour, and snapshots it', () => {
@@ -1731,20 +2189,62 @@ secrets: [${CLOUDFLARE_MINTING_TOKEN_SECRET}]
     ).toThrow('is a minting credential');
   });
 
-  it('refuses a group whose id is pinned as forbidden, whatever its name, and loads with an empty pin', () => {
+  it('refuses a group whose id is pinned as forbidden, whatever its name', () => {
     expect(() =>
       loadPolicies(
         { 'ci-deploy-x.yaml': policyFile() },
-        { forbiddenPermissionGroupIds: [SCRIPTS_GROUP] }
+        { cloudflareDeployPins: { ...TEST_PINS, forbiddenGroupIds: [SCRIPTS_GROUP] } }
       )
     ).toThrow('is a forbidden group');
+    // Empty until setup step 3; every pinned value is a permission-group or zone id.
+    const pinned = [
+      ...CLOUDFLARE_DEPLOY_PINS.forbiddenGroupIds,
+      ...CLOUDFLARE_DEPLOY_PINS.allowedGroups.map(group => group.id),
+      ...Object.values(CLOUDFLARE_DEPLOY_PINS.allowedZones).flat(),
+    ];
+    expect(pinned.every(id => /^[0-9a-f]{32}$/.test(id))).toBe(true);
+  });
+
+  it.each<[string, CloudflareDeployPins, string]>([
+    [
+      'a group outside the allowed ones',
+      { ...TEST_PINS, allowedGroups: [] },
+      'is not an allowed deploy group',
+    ],
+    [
+      'an allowed group under another scope',
+      { ...TEST_PINS, allowedGroups: [{ id: SCRIPTS_GROUP, scope: 'zone' }] },
+      'is not an allowed deploy group',
+    ],
+  ])('refuses %s', (_name, pins, message) => {
     expect(() =>
-      loadPolicies({ 'ci-deploy-x.yaml': policyFile() }, { forbiddenPermissionGroupIds: [] })
+      loadPolicies({ 'ci-deploy-x.yaml': policyFile() }, { cloudflareDeployPins: pins })
+    ).toThrow(message);
+  });
+
+  it('refuses a zone that is not allowed in every environment the policy grants', () => {
+    const zoned = policyFile({
+      environments: ['production', 'staging'],
+      grant: `${base.grant.replace('scope: account', 'scope: zone')}\n    zones: ['${ZONE_ID}']`,
+    });
+    const pins: CloudflareDeployPins = {
+      ...TEST_PINS,
+      allowedGroups: [{ id: SCRIPTS_GROUP, scope: 'zone' }],
+    };
+    expect(() =>
+      loadPolicies({ 'ci-deploy-x.yaml': zoned }, { cloudflareDeployPins: pins })
+    ).toThrow(`zone ${ZONE_ID} is not an allowed staging zone`);
+    expect(() =>
+      loadPolicies(
+        { 'ci-deploy-x.yaml': zoned },
+        {
+          cloudflareDeployPins: {
+            ...pins,
+            allowedZones: { ...pins.allowedZones, staging: [ZONE_ID] },
+          },
+        }
+      )
     ).not.toThrow();
-    // Empty until setup step 3; every pinned value is a permission-group id.
-    expect(CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS.every(id => /^[0-9a-f]{32}$/.test(id))).toBe(
-      true
-    );
   });
 });
 

@@ -1,5 +1,5 @@
--- The `ci-migration` part of the lease setup (README "Database leases"), after setup.sql and only
--- once Igor has accepted design decision Q64. It must run as a superuser, on the primary's direct
+-- The `ci-migration` part of the lease setup (README "Database leases"), after setup.sql; Igor
+-- accepted design decision Q64 on 2026-11-26. It must run as a superuser, on the primary's direct
 -- endpoint:
 --
 --   psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
@@ -39,14 +39,54 @@ BEGIN
 END
 $$;
 GRANT kilo_lease_migration TO kilo_lease_migration_admin WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+-- Its creation statement carries lease passwords, as the replica login's does: none of its
+-- statements reaches the server log (setup.sql explains the settings).
+ALTER ROLE kilo_lease_migration_admin SET log_statement = 'none';
+ALTER ROLE kilo_lease_migration_admin SET log_min_duration_statement = -1;
+ALTER ROLE kilo_lease_migration_admin SET log_min_error_statement = 'panic';
+DO $$
+BEGIN
+  IF pg_catalog.current_setting('pgaudit.log', true) IS NOT NULL THEN
+    ALTER ROLE kilo_lease_migration_admin SET pgaudit.log = 'none';
+  END IF;
+  IF pg_catalog.current_setting('auto_explain.log_min_duration', true) IS NOT NULL THEN
+    ALTER ROLE kilo_lease_migration_admin SET auto_explain.log_min_duration = -1;
+  END IF;
+END
+$$;
+-- A ci-migration lease acts as `postgres`, a member of pg_monitor and so of pg_read_all_stats,
+-- which reads every session's query text in pg_stat_activity. With activity tracking off for both
+-- admin logins, pg_stat_activity holds no query text of theirs, so such a lease cannot read a
+-- password from a creation statement while it runs. Setting this parameter on a role takes a
+-- superuser, which is why it is here and not in setup.sql.
+ALTER ROLE kilo_lease_migration_admin SET track_activities = off;
+ALTER ROLE kilo_lease_replica_admin SET track_activities = off;
 GRANT USAGE ON SCHEMA kilo_lease TO kilo_lease_migration_admin;
 GRANT EXECUTE ON FUNCTION kilo_lease.caller_template(), kilo_lease.check_username(text),
-  kilo_lease.create_lease(text, text, timestamptz), kilo_lease.end_sessions(text),
-  kilo_lease.revoke_lease(text)
+  kilo_lease.track_lease(text), kilo_lease.create_lease(text, text, timestamptz),
+  kilo_lease.end_sessions(text), kilo_lease.block_lease(text), kilo_lease.revoke_lease(text)
   TO kilo_lease_migration_admin;
 
 -- `postgres` created the replica-read login in setup.sql and so administers it: it could reset its
 -- password, and so could a ci-migration lease. Only a superuser can remove that grant.
 REVOKE kilo_lease_replica_admin FROM postgres;
+
+-- `postgres` owns the kilo_lease schema, its table and its functions after setup.sql, so a
+-- ci-migration lease acting as it could replace kilo_lease.create_lease with one that records the
+-- passwords of later leases. They move to kilo_lease_owner: no login, created here by the
+-- superuser, so `postgres` neither is nor administers it, and a member of pg_signal_backend, which
+-- end_sessions runs with. The grants above stay; `postgres` can no longer replace, add or take
+-- over a function there (check.sh).
+CREATE ROLE kilo_lease_owner NOLOGIN;
+GRANT pg_signal_backend TO kilo_lease_owner;
+ALTER SCHEMA kilo_lease OWNER TO kilo_lease_owner;
+ALTER TABLE kilo_lease.lease_role OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.caller_template() OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.check_username(text) OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.track_lease(text) OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.end_sessions(text) OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.create_lease(text, text, timestamptz) OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.block_lease(text) OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.revoke_lease(text) OWNER TO kilo_lease_owner;
 
 COMMIT;

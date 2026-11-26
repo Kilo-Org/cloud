@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { policyChangedEvent } from '../../src/audit/events';
 import { resolveWorkloadSecrets } from '../../src/bundle/resolve';
 import { loadPolicies } from '../../src/policy/load';
 import { policyFor, policyIndex } from '../../src/policy';
-import { bundleFolder } from '../../src/policy/schema';
+import { PolicySnapshotSchema, bundleFolder } from '../../src/policy/schema';
 
 const REGISTRY = {
   gateway: { scopes: ['gateway:models.read', 'gateway:usage.write'] },
@@ -124,6 +125,18 @@ scopes: ['o11y:alerts.read']
       addedSecrets: [],
       removedSecrets: [],
     });
+  });
+
+  it('stores a policy without token grants in the snapshot format of the version before grants', () => {
+    // The strict parser of the version before token grants: a rollback to it must read the snapshot.
+    const BaseSnapshotEntrySchema = z.strictObject({
+      workload: z.string(),
+      environments: z.array(z.string()),
+      identity: z.string(),
+      secrets: z.array(z.string()),
+    });
+    const [entry] = loadPolicies({ 'app-one.yaml': valid }).snapshot();
+    expect(BaseSnapshotEntrySchema.safeParse(entry).success).toBe(true);
   });
 });
 
@@ -334,29 +347,46 @@ ${options.extra ?? ''}`;
 
     it('accepts workflow_run only as the one event of a policy', () => {
       expect(() =>
-        loadPolicies({ 'ci-release.yaml': github({ events: '[workflow_run]' }) })
+        loadPolicies({
+          'ci-release.yaml': github({ environments: '[staging]', events: '[workflow_run]' }),
+        })
       ).not.toThrow();
       expectThrow(
-        { 'ci-release.yaml': github({ events: '[workflow_run, push]' }) },
+        {
+          'ci-release.yaml': github({ environments: '[staging]', events: '[workflow_run, push]' }),
+        },
         'a github-oidc policy that accepts workflow_run accepts no other event'
       );
     });
 
-    it.each(['production', 'staging'])(
-      'requires identity.environment for a workflow_run policy in %s',
-      environment => {
-        expectThrow(
-          {
-            'ci-release.yaml': github({
-              environments: `[${environment}]`,
-              environment: null,
-              events: '[workflow_run]',
-            }),
-          },
-          'a github-oidc policy that accepts workflow_run must bind identity.environment'
-        );
-      }
-    );
+    it('refuses workflow_run for production, whose upstream run STS cannot see', () => {
+      expectThrow(
+        { 'ci-release.yaml': github({ events: '[workflow_run]' }) },
+        'a github-oidc policy that accepts workflow_run cannot grant production'
+      );
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            environments: '[staging, production]',
+            events: '[workflow_run]',
+          }),
+        },
+        'a github-oidc policy that accepts workflow_run cannot grant production'
+      );
+    });
+
+    it('requires identity.environment for a workflow_run policy', () => {
+      expectThrow(
+        {
+          'ci-release.yaml': github({
+            environments: '[staging]',
+            environment: null,
+            events: '[workflow_run]',
+          }),
+        },
+        'a github-oidc policy that accepts workflow_run must bind identity.environment'
+      );
+    });
 
     it('rejects the removed allowedEvents and environments fields', () => {
       expectThrow(
@@ -373,6 +403,11 @@ ${options.extra ?? ''}`;
       expectThrow(
         { 'release.yaml': github({ workload: 'release' }) },
         'a github-oidc workload is named ci-<job>'
+      );
+      // A ci-<job> name always means /ci, so a stored bundle never changes folder under one name.
+      expectThrow(
+        { 'ci-app.yaml': valid.replace('workload: app-one', 'workload: ci-app') },
+        'only a github-oidc workload is named ci-<job>'
       );
       const index = loadPolicies({ 'ci-release.yaml': github({}), 'app-one.yaml': valid });
       const ci = index.get('production', 'ci-release');
@@ -756,5 +791,19 @@ ${dynamic}`;
       removedDynamic: ['app-one:replica-read:3600:3600:1'],
       dynamicTruncated: false,
     });
+  });
+
+  it('writes no dynamic field for a policy without lease grants, so a reader from before leases parses the snapshot', () => {
+    const plain = loadPolicies({ 'app-one.yaml': valid });
+    expect(plain.snapshot()[0]).not.toHaveProperty('dynamic');
+    // The strict snapshot reader of the stacked base: the same schema without `dynamic`.
+    const baseReader = PolicySnapshotSchema.element.omit({ dynamic: true }).array();
+    expect(baseReader.safeParse(JSON.parse(JSON.stringify(plain.snapshot()))).success).toBe(true);
+    const leasing = loadPolicies({ 'app-one.yaml': worker(grant('replica-read', 3600, 3600, 1)) });
+    expect(baseReader.safeParse(leasing.snapshot()).success).toBe(false);
+    // The reader fills the token-grant lists a policy without token grants leaves out.
+    expect(PolicySnapshotSchema.parse(JSON.parse(JSON.stringify(plain.snapshot())))).toEqual(
+      plain.snapshot().map(entry => ({ audiences: [], scopes: [], ...entry }))
+    );
   });
 });

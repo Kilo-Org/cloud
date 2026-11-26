@@ -1,3 +1,4 @@
+import { TOKEN_CLOCK_SKEW_SECONDS } from '@kilocode/sts-contracts';
 import { describe, expect, it } from 'vitest';
 import {
   TOKEN_KEY_CURRENT_MS,
@@ -71,13 +72,16 @@ describe('token key ring rotation', () => {
     expect(recordSignedExp(published.ring, kid(1), lastExp)).toBe(true);
     expect(recordSignedExp(published.ring, kid(1), lastExp - 30)).toBe(false);
 
-    // Day 30: the next key signs, the old key is retired but stays published.
+    // Day 30: the next key signs; the old key is retired, keeps no private key, stays published.
     const switched = await ringAt(published.ring, switchAt, generate);
     expect(switched.changes).toEqual([{ change: 'activated', kid: kid(2), retiredKid: kid(1) }]);
     expect(states(switched.ring)).toEqual({ [kid(1)]: 'retired', [kid(2)]: 'current' });
+    expect(switched.ring.keys.map(key => key.pkcs8)).toEqual([null, 'pkcs8-2']);
     expect(publishedKeys(switched.ring).map(key => key.kid)).toEqual([kid(1), kid(2)]);
 
-    // It leaves the key set 10 minutes after its last token expires (rounded up to the minute).
+    // It leaves the key set once its last token (exp rounded up to the minute) is past the
+    // verifier clock skew.
+    expect(TOKEN_KEY_RETIRED_GRACE_MS).toBe(TOKEN_CLOCK_SKEW_SECONDS * 1000);
     const roundedExp = Math.ceil(lastExp / 60) * 60;
     const removeAt = roundedExp * 1000 + TOKEN_KEY_RETIRED_GRACE_MS;
     expect(keyRingDueAt(switched.ring, [], switchAt)).toBe(removeAt);
@@ -112,7 +116,7 @@ describe('token key ring rotation', () => {
     expect(states(woke.ring)).toEqual({ [kid(1)]: 'current', [kid(2)]: 'next' });
   });
 
-  it('removes a retired key that signed nothing 10 minutes after it retired', async () => {
+  it('removes a retired key that signed nothing a clock skew after it retired', async () => {
     const generate = keyFactory();
     const first = await ringAt({ keys: [] }, START, generate);
     const published = await ringAt(first.ring, START + 23 * DAY_MS, generate);

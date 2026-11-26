@@ -48,17 +48,20 @@ export type VercelIdentityOptions = {
 /**
  * One exchange: `{ token, aud }` to Vercel, which answers a token with the base token's `exp`, the
  * given `aud` and an `act` claim. Only the status reaches the caller on a failure: an error body
- * could echo the token.
+ * could echo the token. The body carries the base token, so a redirect is never followed: a 307 or
+ * 308 would resend it to the target, another origin included. A 3xx fails the exchange. It gives
+ * up after `EXCHANGE_TIMEOUT_MS`, or earlier when `signal` aborts (the shared-token deadline).
  */
 export function vercelExchange(fetchFn: typeof fetch = fetch): Exchange {
-  return async (baseToken, audience) => {
+  return async (baseToken, audience, signal) => {
     let response: Response;
     try {
       response = await fetchFn(VERCEL_EXCHANGE_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ token: baseToken, aud: audience }),
-        signal: AbortSignal.timeout(EXCHANGE_TIMEOUT_MS),
+        redirect: 'manual',
+        signal: AbortSignal.any([AbortSignal.timeout(EXCHANGE_TIMEOUT_MS), signal]),
       });
     } catch (error) {
       const name = error instanceof Error ? error.name : 'Error';
@@ -89,7 +92,9 @@ export function vercelExchange(fetchFn: typeof fetch = fetch): Exchange {
  * shared across the deployment's instances through the Runtime Cache (decision Q49): used until
  * 60 seconds before its own `exp`; on a miss a random wait and a re-read, then a claim marker so one
  * request exchanges; no second exchange after a 429 while the marker lives; a request with no token
- * after 20 seconds, or with a base token that has under 60 seconds left on a miss, fails.
+ * after 20 seconds, or with a base token that has under 60 seconds left on a miss, fails. A custom
+ * environment, which may share the preview Runtime Cache partition, keeps its token in instance
+ * memory only and exchanges once per instance per base-token renewal (`shared-token.ts` step 2b).
  * `invalidate` drops a token STS refused when it came from the shared cache, and writes a 60 s
  * refusal marker for the deployment when STS refused the instance's own exchanged token, so no
  * instance re-exchanges while STS refuses the deployment (see `SharedExchangedToken.invalidate`);

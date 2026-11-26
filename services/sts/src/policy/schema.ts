@@ -19,7 +19,8 @@ import {
 import { z } from 'zod';
 import {
   CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS,
-  CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS,
+  CLOUDFLARE_DEPLOY_PINS,
+  type CloudflareDeployPins,
   MINTING_FOLDER,
   MINTING_SECRET_NAMES,
 } from '../constants';
@@ -48,7 +49,8 @@ export const JobWorkflowRefSchema = z
  * author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
  * `pull_request_review`, `discussion`, `merge_group` and the rest) is in no list, so no policy can
  * accept it. `workflow_run` runs with the base repository's privileges after a run that a pull
- * request may have started, so a policy that accepts it accepts nothing else.
+ * request, even a fork's, may have started, and its token names the default branch whatever that
+ * run was, so a policy that accepts it accepts nothing else and grants no production.
  */
 export const GITHUB_EVENTS = ['push', 'schedule', 'workflow_dispatch', 'workflow_run'] as const;
 
@@ -211,9 +213,9 @@ export const CloudflareIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
 /**
  * A permission group no deploy token may hold, matched on the name the policy declares: a token
  * that can create API tokens or manage members can make a credential that outlives the 1-hour
- * bound. A name check only catches a mistake; the ids in `CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS`,
- * and the check that Cloudflare names each returned id as the policy does, catch a group listed
- * under another name.
+ * bound. A name check only catches a mistake; the pinned ids (`CLOUDFLARE_DEPLOY_PINS`), and the
+ * check that Cloudflare names each returned id as the policy does, catch a group listed under
+ * another name.
  */
 const FORBIDDEN_PERMISSION_GROUP_NAME = /api[ _-]?tokens?|member/i;
 
@@ -234,8 +236,9 @@ const CloudflarePermissionGroupSchema = z.strictObject({
 /**
  * One Cloudflare deploy-token grant (design 4.5, 6.3 `dynamic`): the permission set a GitHub
  * deploy job's token carries, its lifetime, and the workload's limits. `intendedScripts` names the
- * Workers the job deploys, for audit and review only: Cloudflare's API cannot limit an API token to
- * named Workers, so the token can change every Worker its permission groups reach in the account.
+ * Workers the job deploys and `intendedRoutes` the zone route patterns it may add or change, for
+ * audit and review only: Cloudflare's API cannot limit an API token to named Workers or routes, so
+ * the token can change every Worker and route its permission groups reach in the account.
  */
 export const CloudflareDeployGrantSchema = z.strictObject({
   grant: z.literal(CLOUDFLARE_DEPLOY_GRANT),
@@ -246,6 +249,7 @@ export const CloudflareDeployGrantSchema = z.strictObject({
     .array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/))
     .min(1)
     .max(16),
+  intendedRoutes: z.array(z.string().min(1).max(256)).max(16).default([]),
   ttlSeconds: z
     .number()
     .int()
@@ -311,11 +315,11 @@ export const PolicySnapshotEntrySchema = z.strictObject({
   environments: z.array(z.string()),
   identity: z.string(),
   secrets: z.array(z.string()),
-  // A snapshot stored before token grants existed has none.
+  // Left out for a policy without token grants, and in a snapshot stored before grants existed.
   audiences: z.array(z.string()).default([]),
   scopes: z.array(z.string()).default([]),
-  // A snapshot stored before leases existed has none.
-  dynamic: z.array(z.string()).default([]),
+  // Written only for a policy with lease grants, so a reader from before leases parses the rest.
+  dynamic: z.array(z.string()).optional(),
 });
 
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
@@ -326,14 +330,14 @@ export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
  * (bouncer-watch); `ci-migration` serves a GitHub job, and only one bound to a protected GitHub
  * environment (production also needs `refs/heads/main`, checked with the other GitHub rules).
  */
-function dynamicProblems(policy: Policy, forbiddenGroupIds: readonly string[]): string[] {
+function dynamicProblems(policy: Policy, pins: CloudflareDeployPins): string[] {
   const problems: string[] = [];
   if (hasDuplicates(policy.dynamic.map(entry => entry.grant))) {
     problems.push('dynamic lists a grant twice');
   }
   for (const entry of policy.dynamic) {
     if (!isLeaseDynamicGrant(entry)) {
-      problems.push(...cloudflareDeployProblems(policy, entry, forbiddenGroupIds));
+      problems.push(...cloudflareDeployProblems(policy, entry, pins));
       continue;
     }
     const ceiling = LEASE_GRANT_MAX_TTL_SECONDS[entry.grant];
@@ -369,14 +373,16 @@ function dynamicProblems(policy: Policy, forbiddenGroupIds: readonly string[]): 
  * A Cloudflare deploy-token grant serves only a GitHub job bound to a protected GitHub environment.
  * While staging and production share one Cloudflare account
  * (`CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS`), a staging token reaches production Workers, so
- * every such grant, in every environment, accepts `refs/heads/main` alone. Every zone-scoped group
- * needs a zone, every zone a zone-scoped group, and no group may administer tokens or members, by
- * its declared name or by an id in `forbiddenGroupIds`.
+ * every such grant, in every environment, accepts `refs/heads/main` alone. Every group must be one
+ * of `pins.allowedGroups` with the same scope, and none may administer tokens or members, by its
+ * declared name or by an id in `pins.forbiddenGroupIds`. Every zone must be in
+ * `pins.allowedZones` of every environment the policy grants; every zone-scoped group needs a zone,
+ * and every zone a zone-scoped group.
  */
 function cloudflareDeployProblems(
   policy: Policy,
   entry: CloudflareDeployGrant,
-  forbiddenGroupIds: readonly string[]
+  pins: CloudflareDeployPins
 ): string[] {
   const problems: string[] = [];
   const { identity } = policy;
@@ -419,16 +425,35 @@ function cloudflareDeployProblems(
   if (hasDuplicates(entry.intendedScripts)) {
     problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: intendedScripts contains a duplicate`);
   }
+  if (hasDuplicates(entry.intendedRoutes)) {
+    problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: intendedRoutes contains a duplicate`);
+  }
   for (const group of entry.permissionGroups) {
     if (FORBIDDEN_PERMISSION_GROUP_NAME.test(group.name)) {
       problems.push(
         `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permission group ${group.name} administers tokens or members`
       );
     }
-    if (forbiddenGroupIds.includes(group.id)) {
+    if (pins.forbiddenGroupIds.includes(group.id)) {
       problems.push(
-        `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permission group ${group.id} is a forbidden group (CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS)`
+        `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permission group ${group.id} is a forbidden group (CLOUDFLARE_DEPLOY_PINS)`
       );
+    }
+    if (
+      !pins.allowedGroups.some(allowed => allowed.id === group.id && allowed.scope === group.scope)
+    ) {
+      problems.push(
+        `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permission group ${group.id} (${group.scope}) is not an allowed deploy group (CLOUDFLARE_DEPLOY_PINS)`
+      );
+    }
+  }
+  for (const zone of entry.zones) {
+    for (const environment of policy.environments) {
+      if (!pins.allowedZones[environment].includes(zone)) {
+        problems.push(
+          `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: zone ${zone} is not an allowed ${environment} zone (CLOUDFLARE_DEPLOY_PINS)`
+        );
+      }
     }
   }
   const zoneScoped = entry.permissionGroups.some(group => group.scope === 'zone');
@@ -487,10 +512,15 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   if (identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }
-  // A workflow_run job follows a run a pull request may have started; only an environment's
-  // protection rules stand between it and the policy's values, in any STS environment.
+  // A workflow_run job follows a run a pull request may have started, and its token carries the
+  // default branch whatever that run was; only an environment's protection rules stand between it
+  // and the policy's values, in any STS environment. STS cannot see the upstream run, so no
+  // production policy accepts it.
   if (identity.events.includes('workflow_run') && identity.environment === undefined) {
     problems.push('a github-oidc policy that accepts workflow_run must bind identity.environment');
+  }
+  if (identity.events.includes('workflow_run') && policy.environments.includes('production')) {
+    problems.push('a github-oidc policy that accepts workflow_run cannot grant production');
   }
   const workflowPrefix = `${identity.repository}/.github/workflows/`;
   for (const entry of identity.jobWorkflowRefs) {
@@ -520,18 +550,15 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
 
 /**
  * Cross-field checks a single schema cannot express. Returns one message per problem. `registry`
- * is the scope registry the grants are checked against, and `forbiddenGroupIds` the Cloudflare
- * permission groups no deploy grant may list; tests pass their own.
+ * is the scope registry the grants are checked against, and `pins` the Cloudflare permission
+ * groups and zones deploy grants are checked against; tests pass their own.
  */
 export function policyFileProblems(
   policy: Policy,
   registry: StsScopeRegistry = STS_SCOPE_REGISTRY,
-  forbiddenGroupIds: readonly string[] = CLOUDFLARE_FORBIDDEN_PERMISSION_GROUP_IDS
+  pins: CloudflareDeployPins = CLOUDFLARE_DEPLOY_PINS
 ): string[] {
-  const problems: string[] = [
-    ...grantProblems(policy, registry),
-    ...dynamicProblems(policy, forbiddenGroupIds),
-  ];
+  const problems: string[] = [...grantProblems(policy, registry), ...dynamicProblems(policy, pins)];
   if (hasDuplicates(policy.environments)) problems.push('environments contains a duplicate');
   if (hasDuplicates(policy.secrets)) problems.push('secrets contains a duplicate');
   for (const name of policy.secrets) {
@@ -548,6 +575,10 @@ export function policyFileProblems(
   }
   if (policy.identity.kind === 'github-oidc') {
     problems.push(...githubProblems(policy, policy.identity));
+  } else if (policy.workload.startsWith(GITHUB_WORKLOAD_PREFIX)) {
+    // The name alone fixes the bundle folder, so a stored bundle can never move between `/ci` and
+    // `/workloads` while its workload keeps its name.
+    problems.push(`only a github-oidc workload is named ${GITHUB_WORKLOAD_PREFIX}<job>`);
   }
   if (policy.identity.kind === 'vercel-oidc') {
     const sources = policy.identity.environments;

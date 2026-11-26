@@ -58,6 +58,7 @@ export async function resetDeployTokenObject(stub: DurableObjectStub): Promise<v
   await resetObject(stub, [
     'deploy_token',
     'deploy_token_sweep',
+    'deploy_token_sweep_retry',
     'deploy_token_credential_hold',
     'deploy_token_route_zone',
     'deploy_token_route',

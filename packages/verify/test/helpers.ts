@@ -348,6 +348,7 @@ export async function harness(
   const background: Promise<unknown>[] = [];
   const verifier = createVerifier({
     audience: AUDIENCE,
+    environment: 'production',
     resourceMetadataUrl: RESOURCE_METADATA,
     sts: { issuer: STS_ISSUER, jwks: stsJwks.source, scopeRegistry: STS_REGISTRY },
     uts: {

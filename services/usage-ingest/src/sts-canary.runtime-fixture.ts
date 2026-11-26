@@ -8,7 +8,12 @@ import { serviceClaims, signToken } from './sts-canary.test-fixture';
  * `SecretsBroker` stand-in that its STS binding points at, so the canary mints over a real RPC
  * call. The stand-in signs as STS does, with a key the test generated and passes as a var.
  */
-type FixtureEnv = { STS_URL: string; TEST_SIGNING_JWK: string; TEST_SIGNING_KID: string };
+type FixtureEnv = {
+  STS_URL: string;
+  STS_ENVIRONMENT: string;
+  TEST_SIGNING_JWK: string;
+  TEST_SIGNING_KID: string;
+};
 
 export class SecretsBroker extends WorkerEntrypoint<FixtureEnv> {
   async mintTokens(request: MintRequest): Promise<MintResult> {
@@ -27,6 +32,7 @@ export class SecretsBroker extends WorkerEntrypoint<FixtureEnv> {
           workload: 'usage-ingest',
           audience,
           scope,
+          environment: this.env.STS_ENVIRONMENT,
         });
         return {
           status: 'issued' as const,

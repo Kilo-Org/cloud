@@ -12,8 +12,9 @@ import {
 } from './flight';
 
 /**
- * A key set lives 5 minutes (design 7, matching the issuer's `max-age=300`), counted from the read
- * of its newest keys: its fetch minus the response's `Age`.
+ * A key set lives 5 minutes (design 7): the UTS key set's `max-age=300`. STS answers its key set
+ * with `no-store`; the verifier still keeps an STS set for 5 minutes. Both count from the read of
+ * the set's newest keys: its fetch minus the response's `Age`.
  */
 export const JWKS_TTL_MS = 5 * 60_000;
 /** A request that finds the set older than 4 minutes (±20 %) starts a background refresh. */

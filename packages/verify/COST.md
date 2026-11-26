@@ -82,9 +82,10 @@ isolates while it recovers.
 **Added latency in an outage.** Each refresh attempt is bounded: a hanging UTS issuer delays
 requests that hold a last good set by at most 1 s per attempt (`JWKS_STALE_WAIT_MS`), once per
 retry wait, then the last good set serves; a hanging feed delays requests (only once the head is
-over 30 s old) by at most 1 s per attempt (`FEED_FETCH_TIMEOUT_MS`), once per retry wait. A request
-with no usable set (cold, or an STS set past 5 minutes) waits up to the 5 s key-set or bootstrap
-timeout, then gets 503.
+over 30 s old) by at most 1 s per attempt (`FEED_FETCH_TIMEOUT_MS`), once per retry wait; a PAT
+request reads the feed on each side of its lookup, so it can wait for two such attempts (at most
+2 s). A request with no usable set (cold, or an STS set past 5 minutes) waits up to the 5 s
+key-set or bootstrap timeout, then gets 503.
 
 ## 5. Vercel function time
 
@@ -113,13 +114,24 @@ in-flight work finishes and Active CPU only while code runs
   | 50,000 | 2,500 | 83/s |
   | 200,000 | 10,000 | 333/s |
 
-- **Worst case.** 20 uncached lookups per second per client address per instance, before UTS.
-  One address that reaches all 2,200 instances offers up to 44,000 lookups per second; UTS's
-  100-in-flight cap answers the excess with 429, which reaches clients as 503 and never evicts a
-  valid cached entry. A PAT that passes the checksum is cheap to make, so random PATs always miss
-  both caches; the per-address limit and the UTS cap are the bounds.
+- **Worst case.** 20 uncached lookups per second per client address per instance, before UTS,
+  and at most 1,000 lookups pending per instance whatever the addresses (above that, 503 with no
+  lookup). One address that reaches all 2,200 instances offers up to 44,000 lookups per second;
+  UTS's 100-in-flight cap answers the excess with 429, which reaches clients as 503 and never
+  evicts a valid cached entry. A PAT that passes the checksum is cheap to make, so random PATs
+  always miss both caches; the per-address limit, the per-instance pending bound and the UTS cap
+  are the bounds. The 1,000 pending bound is a shared availability budget: while UTS is slow,
+  random well-formed PATs from many addresses can fill it, and new uncached PATs then get 503,
+  while cached and stale entries keep working.
+- **Feed after the lookup.** The PAT decision reads the feed again after the lookup; that read is
+  in memory unless the head is over 30 s old at that point; a PAT request can therefore wait for
+  two feed refreshes (at most 2 s), one on each side of the lookup.
 - **Shared cache.** Each instance miss costs 1 shared-cache read; each UTS answer (found or not
-  found) costs 1 shared-cache write. Writes therefore equal the UTS lookup rate above.
+  found) costs 1 shared-cache write. Writes therefore equal the UTS lookup rate above. A read, its
+  key provider included, that has not answered within 1 s counts as a miss, so a slow cache adds
+  at most 1 s before the lookup starts. While shared-cache reads time out, every instance miss
+  becomes a UTS lookup plus a cache write, so UTS load is then the worst-case miss rate above,
+  not the normal-traffic table.
 - A PAT without a client address is refused (400) before any cache, feed or lookup call.
 
 ## 7. Feed list size and bandwidth
@@ -155,8 +167,8 @@ signature.
 | Structure | Bound | Size |
 |---|---|---|
 | PAT instance entries | 10,000, oldest first; a "no such PAT" entry can push out a positive one (a flood of random PATs at over 333 per second per instance, from 17 or more addresses, churns it; an evicted positive PAT then costs one shared-cache read, not a UTS lookup) | about 4 MB |
-| PAT failures | pruned of expired entries above 10,000; each lives at most 62 s | about 1 MB |
-| Pending PAT lookups | above 10,000, the ones past their 5 s timeout are failed and dropped; the rest are at most 5 s of lookup starts | 100 B each |
+| PAT failures | 10,000, oldest first (an evicted hash may be looked up again before its retry time, within its address's limit and the pending bound); each lives at most 62 s | about 1 MB |
+| Pending PAT lookups | 1,000 per instance; the ones past their 5 s timeout are failed and dropped before a new one starts | 100 B each |
 | Per-address windows | 10,000, oldest first (an evicted address starts a new window) | about 1 MB |
 | Shared-cache HMAC keys | the 2 versions the bundle lists | negligible |
 | Key sets | one per issuer: about 34 `CryptoKey`s for UTS (16 signers × current and next, plus feed keys), a few for STS | negligible |

@@ -40,8 +40,8 @@ export type DeployTokenCallerDeniedReason = (typeof DEPLOY_TOKEN_CALLER_DENIED_R
 
 /**
  * Non-retryable: the caller gets no deploy token until its identity or policy changes, or, for
- * `not_configured`, until STS's own deploy-token setup is complete (the forbidden permission groups
- * are pinned).
+ * `not_configured`, until STS's own deploy-token setup is complete (the forbidden and allowed
+ * permission groups are pinned).
  */
 export const DEPLOY_TOKEN_DENIED_REASONS = [
   ...DEPLOY_TOKEN_CALLER_DENIED_REASONS,
@@ -53,9 +53,14 @@ export type DeployTokenDeniedReason = (typeof DEPLOY_TOKEN_DENIED_REASONS)[numbe
 /**
  * Retryable after `retryAfterSeconds`: the workload holds its policy's number of unexpired deploy
  * tokens (`too_many_active`), or made its policy's number of mint requests in the last hour
- * (`rate_limited`).
+ * (`rate_limited`), or STS holds its environment's share of the account's tokens
+ * (`account_limit`).
  */
-export const DEPLOY_TOKEN_LIMITED_REASONS = ['too_many_active', 'rate_limited'] as const;
+export const DEPLOY_TOKEN_LIMITED_REASONS = [
+  'too_many_active',
+  'rate_limited',
+  'account_limit',
+] as const;
 export type DeployTokenLimitedReason = (typeof DEPLOY_TOKEN_LIMITED_REASONS)[number];
 
 const RetryAfterSchema = z.number().int().positive().max(3600);

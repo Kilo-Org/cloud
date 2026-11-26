@@ -35,9 +35,12 @@ export const policyState = sqliteTable('policy_state', {
 });
 
 /**
- * One row, id 1: the refresh schedule. `failures` counts consecutive failed manager reads; while
- * it is above zero `next_refresh_at` is a backoff deadline. `webhook_refresh_at` is the end of an
- * open webhook merge window, or null when none is open.
+ * One row, id 1: the refresh schedule. `failures` counts consecutive failed `/workloads` or
+ * `/shared` reads; while it is above zero `next_refresh_at` is a backoff deadline.
+ * `webhook_refresh_at` is the end of an open webhook merge window, or null when none is open.
+ * `ci_failed_at` is when the last `/ci` read failed, or null once one succeeds. While it is set,
+ * the `/ci` copy is served stale, and a fill reads the manager for a CI bundle only after a refresh
+ * interval has passed since it.
  */
 export const refresherState = sqliteTable('refresher_state', {
   id: integer('id').primaryKey(),
@@ -45,4 +48,5 @@ export const refresherState = sqliteTable('refresher_state', {
   failures: integer('failures').notNull(),
   webhookRefreshAt: integer('webhook_refresh_at'),
   lastRefreshAt: integer('last_refresh_at'),
+  ciFailedAt: integer('ci_failed_at'),
 });

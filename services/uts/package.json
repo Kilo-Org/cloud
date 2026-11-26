@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --env local",
+    "dev": "wrangler dev -c wrangler.dev.jsonc",
     "test": "pnpm run test:workers && pnpm run test:repo",
     "test:workers": "vitest run",
     "test:repo": "vitest run --config vitest.node.config.ts --project repo",

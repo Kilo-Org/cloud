@@ -1,6 +1,6 @@
 /**
- * The mint Worker's entry for `wrangler dev --env local` only: the deployed entry plus the
- * development signing route (`src/dev.ts`).
+ * The mint Worker's entry for `wrangler dev -c wrangler.dev.jsonc` only: the deployed entry plus
+ * the development signing route (`src/dev.ts`).
  */
 export { UtsKeySetDO } from './dos/UtsKeySetDO';
 export { UtsSignerDO } from './dos/UtsSignerDO';

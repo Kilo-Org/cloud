@@ -9,10 +9,11 @@ import { jsonResponse } from './responses';
 
 /**
  * Signs a caller-supplied claim set, for the local end-to-end check of the signer and the key set.
- * Only `src/dev-index.ts` routes here, and only the `local` block of `wrangler.jsonc` uses that
- * entry (`test/repo` fails a staging or production block that does), so no deployed bundle holds
- * this route. It also answers 404 unless `UTS_ENVIRONMENT` is `development`, and a token signed
- * here names the development issuer, which no staging or production verifier accepts.
+ * Only `src/dev-index.ts` routes here, and only `wrangler.dev.jsonc` uses that entry: its build
+ * command fails every Wrangler command but `dev`, so no deploy or version upload can bundle it,
+ * and `test/repo` fails any other config that runs it. The route also answers 404 unless
+ * `UTS_ENVIRONMENT` is `development`, and a token signed here names the development issuer, which
+ * no staging or production verifier accepts.
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 

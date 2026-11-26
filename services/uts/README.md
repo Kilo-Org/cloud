@@ -792,8 +792,8 @@ and the security view before and after `/revoke`.
 
 ## Subject operations and identity import
 
-Design 5.2 and 5.6, migration 0014. The web app keeps owning some account authority until its
-cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
+Design 5.2 and 5.6, migrations 0014 and 0015. The web app keeps owning some account authority
+until its cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
 enqueues each write in the same transaction as the app's own write, and its outbox sends it to UTS.
 Each call is one statement with its audit row (actor: the calling workload; the app's own actor
 string in `requestedBy`). It answers 200 only once a vouching feed object took the entries the
@@ -872,11 +872,19 @@ another organization, or on an inactive connection).
 **Authority sync.** `email` moves the primary email forward by version (the audit row names no
 address); `membership` adds, changes or (with `role: null`) removes a membership through
 `uts.remove_org_member`, ordered by the subject's version; `sso-organization` writes the SSO policy,
-the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
-by the organization's own version; a connection active in another organization never moves
-(`409 retry_later connection_conflict`, `Retry-After: 30`, nothing written, also when another
-organization's sync takes it during this one). The authority check behind the legacy bridge and
-`sso_app_organization` is `uts.sso_app_organization` through `src/subjects/authority.ts`: verified
+the WorkOS organization whose `externalId` is the app organization, its connections and its
+verified domains (`verified_domains`: lower case, each once, at most 100), ordered by the
+organization's own version. The domain set replaces the organization's: a domain left out is
+deleted, so `POST /signin/sso/start` answers that SSO is not set up for it; the audit row counts the
+domains and names none (migration 0015). A connection active in another organization never moves
+(`409 retry_later connection_conflict`), nor does a domain verified by another organization
+(`409 retry_later domain_conflict`); both carry `Retry-After: 30`, write nothing, and apply also
+when another organization's sync takes the connection or domain during this one. A sync older than
+the version already applied is `already_applied` without these checks, so a late older sync never
+waits on a connection or domain that moved on. UTS holds no DNS challenge for a synced domain (the
+app verified it through WorkOS), so `dns_challenge_hash` is required only while a domain is
+pending. The authority check behind the legacy bridge and `sso_app_organization` is
+`uts.sso_app_organization` through `src/subjects/authority.ts`: verified
 only when the connection is active, belongs to that WorkOS organization, maps to the app
 organization, and the active account holds an active membership there.
 

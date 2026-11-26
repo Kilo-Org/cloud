@@ -1,9 +1,10 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { AccountImportRequest, SubjectOperation } from '@kilocode/uts-contracts';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IdentityStore } from '../../src/db/client';
 import type { FeedEntry } from '../../src/revocation/entries';
+import { identityStoreProviderSignIn } from '../../src/signin/providers/store';
 import { identityStoreSsoAuthority } from '../../src/subjects/authority';
 import { type SubjectStore, identityStoreSubjects } from '../../src/subjects/store';
 import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
@@ -174,16 +175,24 @@ function importRequest(overrides: Partial<AccountImportRequest> = {}): AccountIm
 const importAccount = (request: AccountImportRequest) =>
   subjects.importAccount({ environment, workload, request, rpId: 'localhost' });
 
-async function syncSso(orgId: string, workosOrg: string, connections: string[], version: number) {
+async function syncSso(
+  orgId: string,
+  workosOrg: string,
+  connections: string[],
+  version: number,
+  domains: string[] = [],
+  operationId: string = randomUUID()
+) {
   return await subjects.syncSsoOrganization({
     environment,
     workload,
-    operationId: randomUUID(),
+    operationId,
     actor: 'system:scim',
     sourceVersion: version,
     orgId,
     workosOrganizationId: workosOrg,
     workosConnectionIds: connections,
+    verifiedDomains: domains,
     enforcement: 'required',
   });
 }
@@ -957,6 +966,202 @@ describe('round-1 review fixes', () => {
         )
       ).toBe('23514');
     }
+  });
+});
+
+describe('SSO domain sync (migration 0015)', () => {
+  const newDomain = () => `${randomBytes(4).toString('hex')}.example.org`;
+
+  /** `POST /signin/sso/start` through the Worker's own start statement, as the app login. */
+  async function ssoStart(domain: string) {
+    const provider = identityStoreProviderSignIn(new IdentityStore(app));
+    return await provider.startFlow({
+      environment,
+      stateHash: createHash('sha256').update(randomUUID()).digest(),
+      binderHash: createHash('sha256').update(randomUUID()).digest(),
+      provider: 'workos',
+      intent: { kind: 'sign_in' },
+      ssoDomain: domain,
+      returnTo: '/authorize?client_id=kilo-cli',
+    });
+  }
+
+  async function domainsOf(orgId: string) {
+    const result = await owner.query<{ domain: string; status: string }>(
+      'SELECT domain, status::text FROM uts.sso_domains WHERE org_id = $1 ORDER BY domain',
+      [orgId]
+    );
+    return result.rows;
+  }
+
+  async function syncAudits(orgId: string) {
+    const result = await owner.query<{ event: unknown; text: string }>(
+      `SELECT event, event::text AS text FROM uts.audit_events
+       WHERE event_type = 'ai.kilo.uts.sso_organization.synced'
+         AND event #>> '{data,attributes,org}' = $1
+       ORDER BY id`,
+      [orgId]
+    );
+    return result.rows;
+  }
+
+  it('lets SSO start find a synced domain and refuses an unsynced one', async () => {
+    const orgId = randomUUID();
+    const connection = `conn_${randomUUID()}`;
+    const [kept, dropped, unsynced] = [newDomain(), newDomain(), newDomain()];
+    const started = { outcome: 'started', workosConnectionId: connection };
+    const refused = { outcome: 'no_sso_connection' };
+    expect(await ssoStart(kept)).toEqual(refused);
+
+    const operationId = randomUUID();
+    expect(
+      (await syncSso(orgId, 'org_d', [connection], 1, [kept, dropped], operationId)).outcome
+    ).toBe('applied');
+    expect(await ssoStart(kept)).toEqual(started);
+    expect(await ssoStart(dropped)).toEqual(started);
+    expect(await ssoStart(unsynced)).toEqual(refused);
+    expect(await domainsOf(orgId)).toEqual(
+      [kept, dropped].sort().map(domain => ({ domain, status: 'verified' }))
+    );
+
+    // The same operation id, and the same set under a new one, change nothing.
+    expect(
+      (await syncSso(orgId, 'org_d', [connection], 1, [kept, dropped], operationId)).outcome
+    ).toBe('already_applied');
+    expect((await syncSso(orgId, 'org_d', [connection], 1, [dropped, kept])).outcome).toBe(
+      'already_applied'
+    );
+
+    // A newer version replaces the set; an older one arriving late changes nothing.
+    expect((await syncSso(orgId, 'org_d', [connection], 3, [kept])).outcome).toBe('applied');
+    expect((await syncSso(orgId, 'org_d', [connection], 2, [kept, dropped])).outcome).toBe(
+      'already_applied'
+    );
+    expect(await ssoStart(kept)).toEqual(started);
+    expect(await ssoStart(dropped)).toEqual(refused);
+    expect(await domainsOf(orgId)).toEqual([{ domain: kept, status: 'verified' }]);
+
+    // An empty set leaves the organization no domain to start from.
+    expect((await syncSso(orgId, 'org_d', [connection], 4, [])).outcome).toBe('applied');
+    expect(await ssoStart(kept)).toEqual(refused);
+    expect(await domainsOf(orgId)).toEqual([]);
+  });
+
+  it('writes one audit row per applied sync that counts the domains and names none', async () => {
+    const orgId = randomUUID();
+    const domains = [newDomain(), newDomain()];
+    await syncSso(orgId, 'org_a', [`conn_${randomUUID()}`], 1, domains);
+    await syncSso(orgId, 'org_a', [], 2, domains);
+    await syncSso(orgId, 'org_a', [], 2, domains);
+    const rows = await syncAudits(orgId);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].event).toMatchObject({
+      data: { attributes: { org: orgId, connections: 1, domains: 2, sourceVersion: 1 } },
+    });
+    for (const row of rows) {
+      for (const domain of domains) expect(row.text).not.toContain(domain);
+    }
+  });
+
+  it('never moves a domain verified by another organization, and writes nothing then', async () => {
+    const domain = newDomain();
+    const [first, second] = [randomUUID(), randomUUID()];
+    expect((await syncSso(first, 'org_x', [], 1, [domain])).outcome).toBe('applied');
+    const conflict = { outcome: 'retry_later', error: 'domain_conflict' };
+    expect(await syncSso(second, 'org_y', [`conn_${randomUUID()}`], 1, [domain])).toEqual(conflict);
+    const left = await owner.query<{ policies: number; connections: number }>(
+      `SELECT (SELECT count(*)::int FROM uts.org_sso_policies WHERE org_id = $1) AS policies,
+              (SELECT count(*)::int FROM uts.sso_connections WHERE org_id = $1) AS connections`,
+      [second]
+    );
+    expect(left.rows).toEqual([{ policies: 0, connections: 0 }]);
+    expect(await syncAudits(second)).toEqual([]);
+
+    expect((await syncSso(first, 'org_x', [], 2, [])).outcome).toBe('applied');
+    expect((await syncSso(second, 'org_y', [], 1, [domain])).outcome).toBe('applied');
+    expect(await domainsOf(second)).toEqual([{ domain, status: 'verified' }]);
+    expect(await domainsOf(first)).toEqual([]);
+  });
+
+  it('answers a late older sync already_applied, even when it names a domain or connection held elsewhere', async () => {
+    const domain = newDomain();
+    const connection = `conn_${randomUUID()}`;
+    const [first, second] = [randomUUID(), randomUUID()];
+    expect((await syncSso(first, 'org_x', [connection], 1, [domain])).outcome).toBe('applied');
+    expect((await syncSso(first, 'org_x', [], 3, [])).outcome).toBe('applied');
+    expect((await syncSso(second, 'org_y', [connection], 1, [domain])).outcome).toBe('applied');
+    // Version 2 of the first organization arrives after version 3; the second holds both now.
+    expect(await syncSso(first, 'org_x', [connection], 2, [domain])).toEqual({
+      outcome: 'already_applied',
+      feedEntries: [],
+    });
+    expect(await domainsOf(second)).toEqual([{ domain, status: 'verified' }]);
+  });
+
+  it('replaces a pending row of a domain sent, keeps another organization pending, and needs a challenge only while pending', async () => {
+    const [own, other] = [randomUUID(), randomUUID()];
+    const [pendingOwn, pendingOther] = [newDomain(), newDomain()];
+    for (const [org, domain] of [
+      [own, pendingOwn],
+      [other, pendingOther],
+    ]) {
+      await owner.query(
+        `INSERT INTO uts.sso_domains (org_id, domain, dns_challenge_hash) VALUES ($1, $2, $3)`,
+        [org, domain, randomBytes(32)]
+      );
+    }
+    expect((await syncSso(own, 'org_p', [], 1, [pendingOwn, pendingOther])).outcome).toBe(
+      'applied'
+    );
+    expect(await domainsOf(own)).toEqual(
+      [pendingOwn, pendingOther].sort().map(domain => ({ domain, status: 'verified' }))
+    );
+    expect(await domainsOf(other)).toEqual([{ domain: pendingOther, status: 'pending' }]);
+    expect(
+      await sqlStateOf(() =>
+        owner.query('INSERT INTO uts.sso_domains (org_id, domain) VALUES ($1, $2)', [
+          other,
+          newDomain(),
+        ])
+      )
+    ).toBe('23514');
+  });
+
+  it('answers retry_later and writes nothing when another organization takes a domain during the sync', async () => {
+    const domain = newDomain();
+    const [taker, syncing] = [randomUUID(), randomUUID()];
+    const appPid = (await app.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    // The other organization's write is not committed yet, so the sync's first check misses it
+    // and its insert waits on the verified domain's unique key.
+    await owner.query('BEGIN');
+    await owner.query(
+      `INSERT INTO uts.sso_domains (org_id, domain, status, verified_at)
+       VALUES ($1, $2, 'verified', now())`,
+      [taker, domain]
+    );
+    const pending = syncSso(syncing, 'org_syncing', [`conn_${randomUUID()}`], 1, [domain]);
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      const waiting = await db.connect().then(async probe => {
+        const result = await probe.query<{ waiting: boolean }>(
+          'SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted) AS waiting',
+          [appPid]
+        );
+        await probe.end();
+        return result.rows[0].waiting;
+      });
+      if (waiting) break;
+      if (Date.now() > deadline) throw new Error('the sync never waited on the domain');
+    }
+    await owner.query('COMMIT');
+    expect(await pending).toEqual({ outcome: 'retry_later', error: 'domain_conflict' });
+    const left = await owner.query<{ policies: number; connections: number; org_id: string }>(
+      `SELECT (SELECT count(*)::int FROM uts.org_sso_policies WHERE org_id = $1) AS policies,
+              (SELECT count(*)::int FROM uts.sso_connections WHERE org_id = $1) AS connections,
+              (SELECT org_id FROM uts.sso_domains WHERE domain = $2) AS org_id`,
+      [syncing, domain]
+    );
+    expect(left.rows).toEqual([{ policies: 0, connections: 0, org_id: taker }]);
   });
 });
 

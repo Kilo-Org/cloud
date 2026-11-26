@@ -14,7 +14,12 @@ import {
   type ServiceTokenVerifier,
   noServiceTokenVerifier,
 } from '../../src/subjects/service-tokens';
-import type { OperationRow, SubjectStore } from '../../src/subjects/store';
+import type {
+  OperationRow,
+  SsoOrganizationSyncInput,
+  SubjectStore,
+  SyncRow,
+} from '../../src/subjects/store';
 
 /**
  * The `/internal/` routes (src/subjects/routes.ts) over a stub store, a stub feed publisher and a
@@ -45,10 +50,15 @@ const entry: FeedEntry = {
 type Stub = {
   operation?: OperationRow | Error;
   publish?: 'published' | 'unpublished';
+  sso?: SyncRow;
 };
 
-function deps(stub: Stub = {}): InternalDeps & { published: FeedEntry[][] } {
+function deps(stub: Stub = {}): InternalDeps & {
+  published: FeedEntry[][];
+  ssoSyncs: SsoOrganizationSyncInput[];
+} {
   const published: FeedEntry[][] = [];
+  const ssoSyncs: SsoOrganizationSyncInput[] = [];
   const store: SubjectStore = {
     async applyOperation() {
       if (stub.operation instanceof Error) throw stub.operation;
@@ -63,8 +73,9 @@ function deps(stub: Stub = {}): InternalDeps & { published: FeedEntry[][] } {
     async syncMembership() {
       return { outcome: 'applied', feedEntries: [entry] };
     },
-    async syncSsoOrganization() {
-      return { outcome: 'already_applied', feedEntries: [] };
+    async syncSsoOrganization(input) {
+      ssoSyncs.push(input);
+      return stub.sso ?? { outcome: 'already_applied', feedEntries: [] };
     },
     async readAppEvents(limit) {
       const event: AppUserCreatedEvent = {
@@ -89,7 +100,7 @@ function deps(stub: Stub = {}): InternalDeps & { published: FeedEntry[][] } {
     subjects: work => work(store),
     publish,
   };
-  return { serviceTokens: tokens, subjects, published };
+  return { serviceTokens: tokens, subjects, published, ssoSyncs };
 }
 
 function post(path: string, body: unknown, bearer: string | null) {
@@ -316,6 +327,43 @@ describe('import, authority sync and app events', () => {
       body: { outcome: 'applied', operation_id: common.operation_id },
     });
     expect(routeDeps.published).toEqual([[entry]]);
+
+    const ssoBody = {
+      ...common,
+      app_organization_id: randomUUID(),
+      workos_organization_id: 'org_1',
+      workos_connection_ids: ['conn_1'],
+      verified_domains: ['example.com', 'eu.example.org'],
+      enforcement: 'required',
+    };
+    const ssoDeps = deps({ sso: { outcome: 'retry_later', error: 'domain_conflict' } });
+    expect(
+      await call(post('/internal/authority/sso-organization', ssoBody, sync), ssoDeps)
+    ).toEqual({
+      status: 409,
+      retryAfter: '30',
+      body: {
+        outcome: 'retry_later',
+        error: 'domain_conflict',
+        operation_id: common.operation_id,
+      },
+    });
+    expect(ssoDeps.ssoSyncs.map(input => input.verifiedDomains)).toEqual([
+      ['example.com', 'eu.example.org'],
+    ]);
+    for (const invalid of [
+      Object.fromEntries(Object.entries(ssoBody).filter(([key]) => key !== 'verified_domains')),
+      { ...ssoBody, verified_domains: ['Example.com'] },
+      { ...ssoBody, verified_domains: ['example.com', 'example.com'] },
+      { ...ssoBody, verified_domains: ['localhost'] },
+    ]) {
+      const refusedDeps = deps();
+      expect(
+        (await call(post('/internal/authority/sso-organization', invalid, sync), refusedDeps))
+          .status
+      ).toBe(400);
+      expect(refusedDeps.ssoSyncs).toEqual([]);
+    }
 
     const events = 'web uts:app-events.read';
     const read = await call(post('/internal/app-events/read', { limit: 5 }, events), deps());

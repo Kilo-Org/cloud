@@ -295,8 +295,18 @@ export const MembershipSyncRequestSchema = z.strictObject({
 });
 
 /**
+ * A domain an organization verified, as WorkOS lists it: lower-case labels of at most 63
+ * characters, at most 253 characters in all. The app lower-cases each domain before it sends it.
+ */
+export const SsoDomainSchema = z
+  .string()
+  .max(253)
+  .regex(/^(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/);
+
+/**
  * An organization's SSO setup: the WorkOS organization whose `externalId` is this app
- * organization, its connections (a connection left out becomes inactive), and the SSO policy.
+ * organization, its connections (a connection left out becomes inactive), its verified domains
+ * (the set replaces the organization's domains; a domain left out is deleted), and the SSO policy.
  * `source_version` is the organization's own authority version.
  */
 export const SsoOrganizationSyncRequestSchema = z.strictObject({
@@ -309,6 +319,10 @@ export const SsoOrganizationSyncRequestSchema = z.strictObject({
     .array(WorkosIdSchema)
     .max(16)
     .refine(ids => new Set(ids).size === ids.length, 'each connection once'),
+  verified_domains: z
+    .array(SsoDomainSchema)
+    .max(100)
+    .refine(domains => new Set(domains).size === domains.length, 'each domain once'),
   enforcement: z.enum(['off', 'optional', 'required']),
 });
 
@@ -318,10 +332,11 @@ export type AuthorityKind = z.infer<typeof AuthorityKindSchema>;
 
 /**
  * `applied`, `already_applied` (the same `operation_id`, an effect that already holds, or a
- * source version older than one UTS applied) and `no_subject` are 200. `retry_later` with
- * `connection_conflict` (409, `Retry-After: 30`): a WorkOS connection is still active in another
- * organization; nothing was written, and the outbox retries until that organization's sync
- * releases it. `refused` with `email_taken` (409) is final for this request.
+ * source version older than one UTS applied) and `no_subject` are 200. `retry_later` (409,
+ * `Retry-After: 30`): with `connection_conflict`, a WorkOS connection is still active in another
+ * organization; with `domain_conflict`, a domain is still verified by another organization.
+ * Nothing was written, and the outbox retries until that organization's sync releases it.
+ * `refused` with `email_taken` (409) is final for this request.
  */
 export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   z.strictObject({
@@ -330,13 +345,13 @@ export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   }),
   z.strictObject({
     outcome: z.literal('retry_later'),
-    error: z.literal('connection_conflict'),
+    error: z.enum(['connection_conflict', 'domain_conflict']),
     operation_id: z.uuid(),
   }),
   z.strictObject({ outcome: z.literal('refused'), error: z.literal('email_taken') }),
 ]);
 
-/** Seconds an SSO sync waits for another organization to release a connection. */
+/** Seconds an SSO sync waits for another organization to release a connection or a domain. */
 export const UTS_CONNECTION_CONFLICT_RETRY_SECONDS = 30;
 export type AuthorityAnswer = z.infer<typeof AuthorityAnswerSchema>;
 

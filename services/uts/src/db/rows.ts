@@ -66,7 +66,7 @@ export const SsoDomainRowSchema = z.strictObject({
   org_id: uuid,
   domain: z.string(),
   status: z.enum(enums.SSO_DOMAIN_STATUSES),
-  dns_challenge_hash: sha256,
+  dns_challenge_hash: sha256.nullable(),
   requested_at: timestamp,
   verified_at: timestamp.nullable(),
 });

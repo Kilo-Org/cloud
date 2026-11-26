@@ -450,6 +450,44 @@ describe('backfillCredentialKmsEnvelopes', () => {
     );
   });
 
+  test('removes an envelope left behind when the previous deployment cleared the credential', async () => {
+    const sealed = sealDualWrittenCredential('sk-revoked', testDataKey);
+    const id = await insertInventoryRow({
+      encrypted_api_key: sealed.legacy,
+      encrypted_api_key_envelope: sealed.envelope,
+    });
+    // A revocation by the previous deployment clears only the static-key column.
+    await db
+      .update(coding_plan_key_inventory)
+      .set({ status: 'revocation_pending', encrypted_api_key: null })
+      .where(eq(coding_plan_key_inventory.id, id));
+    const before = await readInventoryRow(id);
+
+    const { inventory } = await runBackfill();
+
+    expect(inventory.clearedOrphanedEnvelopes).toBe(1);
+    expect(inventory.remaining).toBe(0);
+    const row = await readInventoryRow(id);
+    expect(row.encrypted_api_key).toBeNull();
+    expect(row.encrypted_api_key_envelope).toBeNull();
+    expect(row.updated_at).toBe(before.updated_at);
+    expect(kms.requests).toEqual([]);
+  });
+
+  test('counts and removes orphaned envelopes even when KMS is not configured', async () => {
+    const sealed = sealDualWrittenCredential('sk-revoked', testDataKey);
+    await insertInventoryRow({
+      encrypted_api_key: null,
+      encrypted_api_key_envelope: sealed.envelope,
+    });
+    delete process.env.BYOK_KMS_SERVICE_URL;
+
+    const { inventory } = await runBackfill();
+
+    expect(inventory.clearedOrphanedEnvelopes).toBe(1);
+    expect(inventory.remaining).toBe(0);
+  });
+
   test('does not migrate or count a member connection whose person was deleted', async () => {
     await insertConnectionRow({ kilo_user_id: null, created_by: 'deleted-user' });
 

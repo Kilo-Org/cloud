@@ -51,6 +51,11 @@ export type CredentialKmsBackfillStoreSummary = {
   migrated: number;
   /** Rows another writer changed between the read and the write; the next run retries them. */
   skippedConcurrentWrite: number;
+  /**
+   * Envelopes removed because their static-key credential was cleared: a revocation by the
+   * previous deployment during a rollback clears only the static-key column.
+   */
+  clearedOrphanedEnvelopes: number;
   failed: Record<FailureCategory, number>;
   /**
    * Rows still without a current envelope, counted after the work. Null when the count
@@ -106,7 +111,10 @@ type BackfillRow = { id: string };
 
 type CredentialStore<Row extends BackfillRow> = {
   name: CredentialKmsBackfillStoreName;
+  /** Rows still needing work: an envelope to create, or an orphaned one to remove. */
   countRemaining(): Promise<number>;
+  /** Removes envelopes whose credential was cleared, returning how many. */
+  clearOrphanedEnvelopes?(): Promise<number>;
   selectBatch(afterId: string | null, limit: number): Promise<Row[]>;
   /** Writes the row's envelope unless another writer changed the row since it was read. */
   migrateRow(row: Row): Promise<'migrated' | 'skipped'>;
@@ -121,6 +129,17 @@ const inventoryNeedsEnvelope = needsEnvelope(
   coding_plan_key_inventory.encrypted_api_key_envelope
 );
 
+/**
+ * A cleared credential whose envelope survived. Every writer of this deployment clears both
+ * columns together, so only the previous deployment leaves this state behind; readers
+ * already treat the row as having no credential, and Coding Plans 4.7 requires the
+ * encrypted material itself to go.
+ */
+const inventoryHasOrphanedEnvelope = and(
+  isNull(coding_plan_key_inventory.encrypted_api_key),
+  isNotNull(coding_plan_key_inventory.encrypted_api_key_envelope)
+) as SQL;
+
 type InventoryRow = { id: string; encrypted_api_key: EncryptedData | null };
 
 const codingPlanInventoryStore: CredentialStore<InventoryRow> = {
@@ -129,8 +148,18 @@ const codingPlanInventoryStore: CredentialStore<InventoryRow> = {
     const [row] = await db
       .select({ remaining: count() })
       .from(coding_plan_key_inventory)
-      .where(inventoryNeedsEnvelope);
+      .where(or(inventoryNeedsEnvelope, inventoryHasOrphanedEnvelope));
     return row?.remaining ?? 0;
+  },
+  async clearOrphanedEnvelopes() {
+    // One statement: a row a writer gives a credential again in the meantime no longer
+    // matches, and removing an envelope can never restore a credential.
+    const cleared = await db
+      .update(coding_plan_key_inventory)
+      .set({ encrypted_api_key_envelope: null, updated_at: keepInventoryUpdatedAt })
+      .where(inventoryHasOrphanedEnvelope)
+      .returning({ id: coding_plan_key_inventory.id });
+    return cleared.length;
   },
   async selectBatch(afterId, limit) {
     return await db
@@ -274,6 +303,7 @@ function emptySummary(store: CredentialKmsBackfillStoreName): CredentialKmsBackf
     scanned: 0,
     migrated: 0,
     skippedConcurrentWrite: 0,
+    clearedOrphanedEnvelopes: 0,
     failed: { legacy_unreadable: 0, kms: 0, database: 0 },
     remaining: null,
     reachedEnd: false,
@@ -287,6 +317,11 @@ async function backfillStore<Row extends BackfillRow>(
 ): Promise<CredentialKmsBackfillStoreSummary> {
   const summary = emptySummary(store.name);
   try {
+    // Removing an orphaned envelope needs no data key, so it runs even without KMS.
+    if (store.clearOrphanedEnvelopes) {
+      summary.clearedOrphanedEnvelopes = await store.clearOrphanedEnvelopes();
+    }
+
     // An unconfigured KMS service would fail every row; fail the pass once instead.
     getByokKmsClientConfig();
 

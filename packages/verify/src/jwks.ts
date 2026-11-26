@@ -115,7 +115,9 @@ export function httpJwksSource(
       headers: { accept: 'application/json' },
       redirect: 'manual',
     });
-    if (response.status !== 200 || response.redirected || response.type === 'opaqueredirect') {
+    // Workers types list no 'opaqueredirect' type, but a browser-like fetch answers one.
+    const type: string = response.type;
+    if (response.status !== 200 || response.redirected || type === 'opaqueredirect') {
       await response.body?.cancel();
       throw new Error(`key set answered HTTP ${response.status}`);
     }

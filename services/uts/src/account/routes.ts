@@ -298,10 +298,7 @@ const UNPUBLISHED_RETRY_SECONDS = 2;
  * `/revoke` does (design 5.6): it answers 204 once one feed object confirms, and 503 when neither
  * does; the revocation stands, the backfill adds the entry, and the retry finds it revoked.
  */
-async function revokeResponse(
-  result: RevokeBotKeyResult,
-  deps: AccountDeps
-): Promise<Response> {
+async function revokeResponse(result: RevokeBotKeyResult, deps: AccountDeps): Promise<Response> {
   switch (result.outcome) {
     case 'revoked':
     case 'already_revoked':

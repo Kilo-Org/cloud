@@ -1,11 +1,11 @@
 /**
- * Local end-to-end run of the revocation feed against `wrangler dev --env local` (mint and feed
- * Workers) and the local identity store, plus the verifier Worker of
- * `services/uts-feed/test/fixtures/e2e` for the service-binding path. It checks that a revoke
- * reaches the feed within the bound, that the backfill adds an entry no publish carried, that the
- * feed keeps serving while feed object 0 is stopped, that the head age stays bounded, and that
- * every head verifies under a feed key of the published key set. Synthetic data only; it prints
- * grant ids and kids, never a token.
+ * Local end-to-end run of the revocation feed against `wrangler dev -c wrangler.dev.jsonc` (mint
+ * Worker), `wrangler dev --env local` (feed Worker) and the local identity store, plus the
+ * verifier Worker of `services/uts-feed/test/fixtures/e2e` for the service-binding path. It
+ * checks that a revoke reaches the feed within the bound, that the backfill adds an entry no
+ * publish carried, that the feed keeps serving while feed object 0 is stopped, that the head age
+ * stays bounded, and that every head verifies under a feed key of the published key set.
+ * Synthetic data only; it prints grant ids and kids, never a token.
  *
  *   UTS_E2E_BASE_URL    the mint Worker, such as http://127.0.0.1:8940
  *   UTS_E2E_FEED_URL    the feed Worker, such as http://127.0.0.1:8941

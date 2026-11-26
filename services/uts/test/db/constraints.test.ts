@@ -21,15 +21,12 @@ let db: TestDatabase;
 // directly, so these tests reach every CHECK, foreign key and trigger on them.
 let writer: pg.Client;
 // The app login writes grants, codes, device sessions and revocations only through the OAuth
-// functions (`oauth-grants.test.ts`), and `privileges.test.ts` covers who may write what. The
-// gated rows it may still change itself (a bot key's lifecycle columns) are changed as `app`
-// here, so the column grants are exercised on the real login.
-let app: pg.Client;
+// functions (`oauth-grants.test.ts`), and PATs, bot keys and gate passes only through the account
+// functions (`account.test.ts`); `privileges.test.ts` covers who may write what.
 let accountId: string;
 
 beforeAll(async () => {
   db = await TestDatabase.create();
-  app = await db.connect('uts_app_a');
   writer = await db.connectAsOwner();
   accountId = await insertAccount(writer);
 });

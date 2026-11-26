@@ -23,8 +23,6 @@ export const MAX_AUDIENCES_PER_MINT = 8;
 
 /** Path of the public key set under an issuer URL. */
 export const JWKS_PATH = '/.well-known/jwks.json';
-/** `Cache-Control` of a key-set response (design 5.7). */
-export const JWKS_CACHE_CONTROL = 'public, max-age=300, stale-if-error=86400';
 
 /** The `iss` of STS-issued tokens, per environment; equals `STS_ISSUER` in `services/sts/wrangler.jsonc`. */
 export const STS_ISSUERS: Readonly<Record<StsEnvironment, string>> = {

@@ -225,7 +225,13 @@ export function createStsCanaryHandler(
     const cutoff = now() / 1000 - TOKEN_CLOCK_SKEW_SECONDS;
     const [due] = held.filter(entry => entry.exp < cutoff);
     const presented = due === undefined ? 'skipped' : check(await present(due.token, run), 401);
-    const expired = dropped ? HELD_NOT_GENUINE : presented;
+    // A failed presentation is the more specific failure, so a dropped entry never hides it.
+    const expired =
+      presented !== 'skipped' && presented.result === 'failed'
+        ? presented
+        : dropped
+          ? HELD_NOT_GENUINE
+          : presented;
 
     const kept = held.filter(entry => entry.exp >= cutoff);
     const exp = verified === null ? null : expOf(verified);
@@ -339,7 +345,7 @@ export function createStsCanaryHandler(
     }
 
     // Alongside the route's own mint, so its read and any key-set fetch add no time to the run.
-    const heldLoad = loadHeld();
+    const heldLoad = loadHeld().catch((): HeldLoad => ({ failure: HELD_UNREADABLE }));
     let minted: { token: string } | { failure: StsCanaryCheck };
     try {
       minted = {

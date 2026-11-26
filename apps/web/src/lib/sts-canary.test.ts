@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@j
 import { SignJWT, exportJWK, generateKeyPair, type CryptoKey as JoseKey } from 'jose';
 import type { ServiceTokens } from '@kilocode/service-token-client';
 import { ServiceTokenError, createServiceTokens } from '@kilocode/service-token-client';
-import { createVerifier, failureResponse } from '@kilocode/verify';
+import { createVerifier, failureResponse, type Verifier } from '@kilocode/verify';
 import {
   STS_CANARY_ROUTE_MAX_DURATION_SECONDS,
   type MintRequest,
@@ -122,10 +122,11 @@ function handler(
   now?: () => number,
   newTokens: () => ServiceTokens = deniedTokens,
   store: HeldTokenStore = memoryStore(),
-  key: string | null = 'held:dpl_test'
+  key: string | null = 'held:dpl_test',
+  verifier: Verifier<false> = verifierFor('web')
 ) {
   return createStsCanaryHandler({
-    verifier: verifierFor('web'),
+    verifier,
     tokens,
     newTokens,
     verifyUrl: VERIFY_URL,
@@ -233,7 +234,14 @@ describe('STS canary route handler', () => {
 
     beforeEach(() => {
       jest.useFakeTimers({
-        doNotFake: ['setTimeout', 'clearTimeout', 'setImmediate', 'nextTick', 'queueMicrotask'],
+        doNotFake: [
+          'setTimeout',
+          'clearTimeout',
+          'setImmediate',
+          'nextTick',
+          'queueMicrotask',
+          'performance',
+        ],
       });
     });
 
@@ -241,7 +249,7 @@ describe('STS canary route handler', () => {
     async function runOnNewInstance(
       time: number,
       store: HeldTokenStore,
-      options: { fetchFn?: typeof fetch; key?: string | null } = {}
+      options: { fetchFn?: typeof fetch; key?: string | null; verifier?: Verifier<false> } = {}
     ): Promise<{ report: StsCanaryReport; own: string }> {
       jest.setSystemTime(time);
       const own = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
@@ -252,7 +260,8 @@ describe('STS canary route handler', () => {
           undefined,
           deniedTokens,
           store,
-          options.key === undefined ? 'held:dpl_test' : options.key
+          options.key === undefined ? 'held:dpl_test' : options.key,
+          options.verifier
         ),
         await stsToken('usage-ingest', 'web', 'web:sts.canary')
       );
@@ -386,14 +395,17 @@ describe('STS canary route handler', () => {
         get: async () => await Promise.withResolvers<never>().promise,
         set: async () => {},
       };
-      const started = Date.now();
+      const started = performance.now();
       const slow = await runOnNewInstance(at(10), hung);
       expect(slow.report.negatives.expired).toEqual({
         result: 'failed',
         status: null,
         detail: 'could not read the held tokens',
       });
-      expect(Date.now() - started).toBeLessThan(5_000);
+      // `setTimeout` and `performance` are real here: the run waited the 2 s bound, no more.
+      const elapsed = performance.now() - started;
+      expect(elapsed).toBeGreaterThanOrEqual(1_900);
+      expect(elapsed).toBeLessThan(4_000);
     });
 
     it('reports a failed presentation over a failed write', async () => {
@@ -418,6 +430,60 @@ describe('STS canary route handler', () => {
         status: 200,
         detail: 'expected 401',
       });
+    });
+
+    it('reports a failed presentation over a dropped entry', async () => {
+      jest.setSystemTime(at(0));
+      const held = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
+      const stored = await storeHolding([
+        { token: 'x', exp: 0 },
+        { token: held, exp: Math.floor(at(0) / 1000) + 300 },
+      ]);
+      const { fetchFn } = usageIngest();
+      const accepting: typeof fetch = async (url, init) =>
+        new Headers(init?.headers).get('authorization') === `Bearer ${held}`
+          ? new Response(null, { status: 200 })
+          : await fetchFn(url, init);
+      const run = await runOnNewInstance(at(10), stored, { fetchFn: accepting });
+      expect(run.report.negatives.expired).toEqual({
+        result: 'failed',
+        status: 200,
+        detail: 'expected 401',
+      });
+    });
+
+    it('fails without writing when the key set cannot be reached to verify a held token', async () => {
+      jest.setSystemTime(at(0));
+      const held = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
+      const store = await storeHolding([{ token: held, exp: Math.floor(at(0) / 1000) + 300 }]);
+      const writesBefore = store.writes.length;
+      // The inbound token verifies; the held one meets a key set that cannot be fetched.
+      const reachable = verifierFor('web');
+      const unreachable = createVerifier({
+        audience: 'web',
+        environment: 'production',
+        resourceMetadataUrl: 'https://web.test/.well-known/oauth-protected-resource',
+        sts: {
+          issuer: STS,
+          jwks: async () => {
+            throw new Error('key set unreachable');
+          },
+        },
+      });
+      const verifier: Verifier<false> = {
+        ...reachable,
+        verify: async (input, route, ctx) =>
+          typeof input === 'string'
+            ? await unreachable.verify(input, route, ctx)
+            : await reachable.verify(input, route, ctx),
+      };
+      const run = await runOnNewInstance(at(10), store, { verifier });
+      expect(run.report.negatives.expired).toEqual({
+        result: 'failed',
+        status: null,
+        detail: 'could not verify the held tokens',
+      });
+      expect(store.writes).toHaveLength(writesBefore);
     });
 
     it('fails without a deployment id to keep the held tokens under', async () => {

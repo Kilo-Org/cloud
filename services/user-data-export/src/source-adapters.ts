@@ -151,8 +151,8 @@ LIMIT 1`;
  *     compared numerically (WHERE cannot see output aliases). A page's last row was
  *     therefore not its numeric maximum, and the next page's `>` skipped whatever the
  *     text order had deferred — the same row loss the composite cursors below exist to
- *     prevent. Verified live, on a table since removed from the export, 263 org-scoped
- *     rows sort differently under the two orderings.
+ *     prevent. Verified live: on `system_prompt_prefix`, 263 org-scoped rows sort
+ *     differently under the two orderings.
  *   - No btree can serve a text ordering of a bigint column, so every page bitmap-scanned
  *     and sorted the whole owner's rowset. Measured on a large organization, the startup
  *     cost per page was five orders of magnitude above the qualified form, because
@@ -183,6 +183,8 @@ LIMIT 1`;
  *     platform_integrations                  user XOR org
  *     cloud_agent_code_reviews               user XOR org
  *     cli_sessions                           both columns set
+ *     system_prompt_prefix                   both columns set
+ *     microdollar_usage_metadata             both columns set
  *     code_indexing_search                   both columns set
  *     source_embeddings                      both columns set
  *     external_usage_daily                   org is a dimension, not an owner
@@ -378,16 +380,49 @@ const cliSessionQueries: Record<ExportSubject['type'], string> = {
 };
 
 /**
- * The substitute for a NULL in a text cursor column.
+ * System prompts and user prompts ship as two independent sets.
  *
- * The COALESCE is required, not cosmetic: a NULL inside a tuple comparison yields NULL
- * rather than false, so an uncoalesced cursor would drop exactly the rows the composite
- * cursor exists to keep.
+ * The previous implementation ran one join across microdollar_usage,
+ * microdollar_usage_metadata and system_prompt_prefix, emitting each user prompt
+ * immediately followed by the system prompt in effect for it. Adjacency in the
+ * stream was the only thing expressing that pairing; neither record carried a
+ * shared key.
+ *
+ * The warehouse cannot reproduce it: microdollar_usage_metadata carries no
+ * system_prompt_prefix_id, and system_prompt_prefix is deduplicated to its distinct
+ * (prefix id, user, org) grain rather than one row per usage event. Restoring the
+ * pairing would mean re-exporting a 1.1 billion row table to add the join key.
+ *
+ * Decided deliberately: the export lists every system prompt the user used and
+ * every prompt they wrote, with no correspondence between the two.
+ */
+/**
+ * The grain of this table is the triple `(prefix id, user, org)`, not the prefix, so
+ * `system_prompt_prefix_id` alone repeats and cannot be the cursor.
+ *
+ * Measured 2026-08-12: user `05d920e4` carries prefix id 2 twice, once with an
+ * organization and once without, and one organization carries prefix id 1 nine times.
+ * A single-column cursor pages with `id > $cursor`, so every duplicate that landed on a
+ * page boundary was silently dropped — the same defect found in `cli_sessions.session_id`.
+ *
+ * The remaining dimension of the triple therefore joins the cursor, and which one that
+ * is depends on the scope: a user's export varies by organization, an organization's
+ * export varies by user.
+ *
+ * The COALESCE is required, not cosmetic: a user's personal rows carry a NULL
+ * organization, and a NULL inside a tuple comparison yields NULL rather than false, so
+ * an uncoalesced cursor would drop exactly the rows this exists to keep.
  *
  * `-` rather than `''` as the substitute. Both sort before any id, and the dbt export
  * normalises '' to NULL so neither collides with a real value — but `KeyCursorSchema`
  * requires non-empty strings, and an empty cursor value would be rejected on resume and
  * silently restart the source.
+ *
+ * `system_prompt_prefix_id` is table-qualified in the ORDER BY for the reason recorded on
+ * `SCOPE_COLUMNS`: it is selected through a `::text` cast under its own name, and this is
+ * the table where the two orderings provably disagree on live data. The `COALESCE` needs
+ * no qualifier — an expression is already read as an input reference — and it matches the
+ * expression index the warehouse carries for this ordering.
  */
 const NULL_CURSOR_SENTINEL = '-';
 
@@ -397,6 +432,30 @@ const NULL_CURSOR_SENTINEL = '-';
  * cursor expression that differs from the index expression cannot use the index.
  */
 const NULL_CURSOR_NUMBER = -1;
+function systemPromptPageQuery(scope: keyof typeof SCOPE_COLUMNS): string {
+  // The dimension the scope does not already pin: scoping by user leaves org varying,
+  // and scoping by org leaves user varying.
+  const cursorColumn = scope === 'user' ? SCOPE_COLUMNS.organization : SCOPE_COLUMNS.user;
+  return `SELECT system_prompt_prefix_id::text AS system_prompt_prefix_id,
+  COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}') AS cursor_secondary,
+  system_prompt_prefix
+FROM system_prompt_prefix
+WHERE ${SCOPE_COLUMNS[scope]} = $1
+  AND ($2::bigint IS NULL
+    OR (system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')) > ($2::bigint, $3::text))
+ORDER BY system_prompt_prefix.system_prompt_prefix_id, COALESCE(${cursorColumn}, '${NULL_CURSOR_SENTINEL}')
+LIMIT $4`;
+}
+
+const systemPromptQueries: Record<ExportSubject['type'], string> = {
+  user: systemPromptPageQuery('user'),
+  organization: systemPromptPageQuery('organization'),
+};
+
+const userPromptQueries = subjectPageQueries({
+  table: 'microdollar_usage_metadata',
+  columns: 'id, user_prompt_prefix',
+});
 
 /**
  * The two owner columns are complementary rather than alternative, and neither is a plain
@@ -561,11 +620,11 @@ const USER_AUTH_PROVIDER_COLUMNS = [...USER_AUTH_PROVIDER_KEY, ...USER_AUTH_PROV
  * The cursor is `(provider, provider_account_id)`, prod's primary key and the only unique
  * key this table has. `kilo_user_id` repeats once per linked account, so a cursor on it
  * would skip rows at page boundaries — the defect that shipped twice already, on
- * `cli_sessions.session_id` and again on a source since removed. The warehouse carries
+ * `cli_sessions.session_id` and again on `system_prompt_prefix`. The warehouse carries
  * `user_auth_provider_user_page (kilo_user_id, provider, provider_account_id)`, so this
  * ordering is served from that index with no sort step.
  *
- * No `COALESCE` sentinel on either cursor column, unlike `external_usage_daily`. Both are
+ * No `COALESCE` sentinel on either cursor column, unlike `system_prompt_prefix`. Both are
  * NOT NULL on the warehouse table, so neither can produce the NULL that makes a tuple
  * comparison yield NULL and silently drop the rows it was meant to keep.
  *
@@ -728,7 +787,7 @@ const orbCustomerQuery = singleKeyPageQuery({
  * emits only `IncrementalInsertRows`, so nothing produces a second row for an entity. The
  * moment an update event appears, `payload_id` repeats and a cursor built on it starts
  * skipping rows at page boundaries — which is not a hypothetical, it is the defect that
- * shipped on `cli_sessions.session_id` and again on a source since removed.
+ * shipped on `cli_sessions.session_id` and again on `system_prompt_prefix`.
  *
  * The position pair is unique by construction, so that is the cursor. `payload_id` is
  * exported as a field instead, where its uniqueness does not have to hold.
@@ -1159,6 +1218,12 @@ type CliSessionRow = {
   most_significant_position: string;
   least_significant_position: string;
 };
+type SystemPromptRow = {
+  system_prompt_prefix_id: string;
+  cursor_secondary: string;
+  system_prompt_prefix: string | null;
+};
+type UserPromptRow = { id: string; user_prompt_prefix: string | null };
 type UsageDailyRow = { cursor_owner: string | null; country_code: string | null };
 type MicrodollarUsageHourlyRow = {
   project_id: string | null;
@@ -1554,6 +1619,68 @@ export function createSourceAdapters(queries: SourceAdapterQueries): SourceAdapt
             row.most_significant_position,
             row.least_significant_position,
           ]),
+        };
+      },
+    },
+    {
+      name: 'system_prompt_prefix',
+      warehouseTable: 'system_prompt_prefix',
+      async readPage(input): Promise<SourcePage> {
+        const [afterId, afterSecondary] = keyCursorValues(input.cursor, 2);
+        const rows: SystemPromptRow[] = await warehouseQuery(
+          systemPromptQueries[input.subject.type],
+          [subjectScopeValue(input.subject), afterId, afterSecondary, input.limit]
+        ).then(result =>
+          result.map(row => ({
+            system_prompt_prefix_id: digitString(
+              row.system_prompt_prefix_id,
+              'system_prompt_prefix_id'
+            ),
+            // COALESCE in the query means this is '' rather than null on a personal row,
+            // so the cursor always has a comparable value to carry forward.
+            cursor_secondary: requiredString(row.cursor_secondary, 'cursor_secondary'),
+            system_prompt_prefix: nullableString(row.system_prompt_prefix, 'system_prompt_prefix'),
+          }))
+        );
+        return {
+          records: rows.map(row => ({
+            source: 'system_prompt_prefix',
+            // The prefix id repeats across the triple, so it cannot identify a row on
+            // its own. The pair that orders the page does.
+            id: `${row.system_prompt_prefix_id}.${row.cursor_secondary}`,
+            field: 'system_prompt_prefix',
+            value: row.system_prompt_prefix,
+          })),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [
+            row.system_prompt_prefix_id,
+            row.cursor_secondary,
+          ]),
+        };
+      },
+    },
+    {
+      name: 'microdollar_usage_metadata',
+      warehouseTable: 'microdollar_usage_metadata',
+      async readPage(input): Promise<SourcePage> {
+        const [after] = keyCursorValues(input.cursor, 1);
+        const rows: UserPromptRow[] = await warehouseQuery(userPromptQueries[input.subject.type], [
+          subjectScopeValue(input.subject),
+          after,
+          input.limit,
+        ]).then(result =>
+          result.map(row => ({
+            id: requiredString(row.id, 'id'),
+            user_prompt_prefix: nullableString(row.user_prompt_prefix, 'user_prompt_prefix'),
+          }))
+        );
+        return {
+          records: rows.map(row => ({
+            source: 'microdollar_usage_metadata',
+            id: row.id,
+            field: 'user_prompt_prefix',
+            value: row.user_prompt_prefix,
+          })),
+          nextCursor: nextKeyCursor(rows, input.limit, row => [row.id]),
         };
       },
     },
@@ -2207,6 +2334,10 @@ export const warehouseQueries = {
   cliSessionOrgQuery: cliSessionQueries.organization,
   cloudAgentCodeReviewUserQuery: cloudAgentCodeReviewQueries.user,
   cloudAgentCodeReviewOrgQuery: cloudAgentCodeReviewQueries.organization,
+  systemPromptUserQuery: systemPromptQueries.user,
+  systemPromptOrgQuery: systemPromptQueries.organization,
+  userPromptUserQuery: userPromptQueries.user,
+  userPromptOrgQuery: userPromptQueries.organization,
   codeIndexingUserQuery: codeIndexingQueries.user,
   codeIndexingOrgQuery: codeIndexingQueries.organization,
   codeIndexingSearchUserQuery: codeIndexingSearchQueries.user,
@@ -2303,6 +2434,8 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
     'most_significant_position',
     'least_significant_position',
   ],
+  system_prompt_prefix: ['system_prompt_prefix_id', 'system_prompt_prefix'],
+  microdollar_usage_metadata: ['id', 'user_prompt_prefix'],
   // Every column the query reads, and only those. The two owner columns are covered by
   // `sourceQueryScopes` instead, which is what pairs each subject with its predicate.
   code_indexing_manifest: ['id', 'project_id', 'git_branch', 'file_path'],
@@ -2354,15 +2487,16 @@ export const WAREHOUSE_SOURCE_COLUMNS: Record<string, readonly string[]> = {
  * Tables whose query names BOTH owner columns whichever subject is asking, so the probe
  * has to require both or the read fails on a column it was never asked about.
  *
- * They are here for the same structural reason: their cursor needs a column the scope has
- * not already pinned, and the only one left is the other owner. `external_usage_daily`
- * pages on all three of its columns, one of which the scope fixes and one of which is the
- * other owner.
+ * Both are here for the same structural reason: their cursor needs a column the scope has
+ * not already pinned, and the only one left is the other owner. `system_prompt_prefix`
+ * pages on `(prefix id, the other owner)`; `external_usage_daily` pages on all three of
+ * its columns, one of which the scope fixes and one of which is the other owner.
  *
  * This does couple a personal export to a column only an organization export filters on,
  * which is deliberate — the alternative is a cursor that repeats and drops rows.
  */
 const TABLES_NEEDING_BOTH_SCOPE_COLUMNS = new Set([
+  'system_prompt_prefix',
   'external_usage_daily',
   'microdollar_usage_hourly',
   'usage_daily',
@@ -2379,13 +2513,16 @@ const SUBJECT_SCOPED_TABLES = new Set(
  * Subject-dependent because the two scopes read different owner columns, and a table
  * that can serve one is usable for that one even if it cannot serve the other.
  *
- * `TABLES_NEEDING_BOTH_SCOPE_COLUMNS` are the exception: their cursor reads the opposite
- * scope column as a key, so they need both whichever subject is asking. That does couple
- * the personal export to a column only the organization export filters on — deliberately.
+ * `system_prompt_prefix` is the exception: its cursor reads the opposite scope column
+ * as its second key, so it needs both whichever subject is asking. That does couple the
+ * personal export to a column only the organization export filters on — deliberately.
  * The alternative, falling back to a single-column cursor when `organization_id` is
  * absent, would page on a key that repeats and silently skip rows at page boundaries,
  * which is the defect the composite cursor exists to fix. A source correctly reported
- * as unavailable beats a section that quietly omits rows.
+ * as unavailable beats a section that quietly omits prompts.
+ *
+ * Both columns were confirmed present on the warehouse table on 2026-08-12, so this is
+ * a guard against regression rather than a live constraint.
  */
 export function warehouseRequirements(
   adapters: Pick<SourceAdapter, 'warehouseTable'>[],
@@ -2477,6 +2614,10 @@ export const sourceQueryScopes: Record<keyof typeof sourceQueries, ScopePredicat
   cliSessionOrgQuery: 'organization_id = $1',
   cloudAgentCodeReviewUserQuery: 'kilo_user_id = $1',
   cloudAgentCodeReviewOrgQuery: 'organization_id = $1',
+  systemPromptUserQuery: 'kilo_user_id = $1',
+  systemPromptOrgQuery: 'organization_id = $1',
+  userPromptUserQuery: 'kilo_user_id = $1',
+  userPromptOrgQuery: 'organization_id = $1',
   codeIndexingUserQuery: 'kilo_user_id = $1',
   codeIndexingOrgQuery: 'organization_id = $1',
   codeIndexingSearchUserQuery: 'kilo_user_id = $1',

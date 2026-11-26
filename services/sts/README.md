@@ -530,18 +530,22 @@ How a token finds its policy, in this order:
    `github:<repository id>`: a workflow file that no policy lists, or a listed one on another ref.
 3. **Exact bindings.** On that policy, `sub` must equal the immutable-format subject
    `repo:<owner>@<owner id>/<repo>@<repository id>:environment:<environment>` (a policy without an
-   `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, and `event_name` must be in
-   `events`. A failure is refused `identity_rejected` and audited under the policy's workload.
+   `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, the matched `jobWorkflowRefs`
+   entry must be pinned to that same `ref`, and `event_name` must be in `events`. A failure is
+   refused `identity_rejected` and audited under the policy's workload.
 
 Rules the loader enforces:
 
 - `jobWorkflowRefs` lists every workflow file whose jobs may use the policy, each as
   `<owner>/<repo>/.github/workflows/<file>@<ref>` with a ref from `refs`, all in the policy's own
-  repository, with no wildcard. A called reusable workflow is its own entry: its jobs carry its own
-  `job_workflow_ref`, while `ref` and `event_name` come from the calling run. STS does not check the
-  caller (`workflow_ref`): any workflow on a listed ref that calls a listed reusable workflow, with
-  a listed event and in the policy's environment, gets the bundle, so list a reusable workflow only
-  when every caller on `main` may hold it.
+  repository, with no wildcard. A token's `job_workflow_ref` must equal an entry whose ref equals the
+  token's own `ref`. A called reusable workflow is its own entry: its jobs carry its own
+  `job_workflow_ref`, at the ref it was called with, while `ref` and `event_name` come from the
+  calling run, so a run on one listed ref that calls a workflow pinned to another listed ref is
+  refused. STS does not check the caller (`workflow_ref`) or compare commits (`workflow_sha`,
+  `job_workflow_sha`): any workflow on a listed ref that calls a listed reusable workflow at that
+  ref, with a listed event and in the policy's environment, gets the bundle, so list a reusable
+  workflow only when every caller on that ref may hold it.
 - `events` is an allowlist of `push`, `schedule`, `workflow_dispatch` and `workflow_run`. No event
   that a fork author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
   `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that

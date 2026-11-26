@@ -217,11 +217,15 @@ function isExchangedFromFunctionToken(payload: JWTPayload, issuer: string): bool
 
 /**
  * The bindings of the one policy a GitHub token's environment and workflow file selected: the exact
- * subject, a listed ref, and a listed event (an allowlist, so an event no policy lists is refused).
+ * subject, a listed ref, a listed event (an allowlist, so an event no policy lists is refused), and
+ * a workflow entry pinned to the run's own ref. A called reusable workflow's `job_workflow_ref`
+ * names the ref it was called at, while `ref` is the calling run's: an entry pinned to one listed
+ * ref never admits a run on another.
  */
 function meetsGithubBindings(payload: JWTPayload, identity: GithubIdentity): boolean {
   const ref = claim(payload, 'ref');
   if (ref === null || !identity.refs.includes(ref)) return false;
+  if (!claim(payload, 'job_workflow_ref')?.endsWith(`@${ref}`)) return false;
   const event = claim(payload, 'event_name');
   if (!identity.events.some(listed => listed === event)) return false;
   return claim(payload, 'sub') === githubSubject(identity, ref);

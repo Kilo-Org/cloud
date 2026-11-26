@@ -68,6 +68,7 @@ identity:
   events: [workflow_run]
 secrets: [APP_SECRET]
 `,
+  // Two refs, each with its own workflow file: an entry admits a run on its own ref only.
   'ci-review.yaml': `
 workload: ci-review
 environments: [staging]
@@ -76,7 +77,10 @@ identity:
   repository: acme/other
   repositoryId: '789'
   repositoryOwnerId: '456'
-  jobWorkflowRefs: [acme/other/.github/workflows/review.yml@refs/heads/main]
+  refs: [refs/heads/main, refs/heads/release]
+  jobWorkflowRefs:
+    - acme/other/.github/workflows/review.yml@refs/heads/main
+    - acme/other/.github/workflows/smoke.yml@refs/heads/release
   events: [push]
 secrets: [APP_SECRET]
 `,
@@ -384,6 +388,36 @@ describe('GitHub Actions identity', () => {
       status: 'denied',
       reason: 'identity_rejected',
     });
+  });
+
+  it('admits a workflow entry only on its own ref, even when a reusable workflow is called', async () => {
+    const { verify, provider } = await fixture('staging');
+    const run = (ref: string, jobWorkflowRef: string) =>
+      signToken(provider(GITHUB_ISSUER), {
+        sub: `repo:acme@456/other@789:ref:${ref}`,
+        repository_id: '789',
+        repository_owner_id: '456',
+        ref,
+        event_name: 'push',
+        job_workflow_ref: jobWorkflowRef,
+      });
+    const review = 'acme/other/.github/workflows/review.yml@refs/heads/main';
+    const smoke = 'acme/other/.github/workflows/smoke.yml@refs/heads/release';
+    expect(await verify(await run('refs/heads/release', smoke))).toMatchObject({
+      status: 'verified',
+      workload: 'ci-review',
+    });
+    // A run on one listed ref that calls the workflow pinned to the other listed ref.
+    for (const [ref, workflow] of [
+      ['refs/heads/release', review],
+      ['refs/heads/main', smoke],
+    ]) {
+      expect(await verify(await run(ref, workflow))).toMatchObject({
+        status: 'denied',
+        reason: 'identity_rejected',
+        subject: { actor: 'ci-review', claims: { ref, job_workflow_ref: workflow } },
+      });
+    }
   });
 
   it('refuses a token from another repository', async () => {

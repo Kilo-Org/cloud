@@ -2018,6 +2018,42 @@ test('the session-sync Postgres job installs the closure its steps read', () => 
   );
 });
 
+// The UTS identity-store job runs only `pnpm --filter cloudflare-uts` scripts,
+// and the service's one workspace import, @kilocode/sts-contracts, is declared,
+// so its closure is the whole install. The job bootstraps the service container
+// with the local script and points the suite at a loopback admin URL, which the
+// suite requires before it changes roles or drops databases.
+test('the UTS Postgres job installs the UTS closure and tests against its service', () => {
+  const job = ciJobs['uts-postgres'];
+  const installs = job.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    ["pnpm install --frozen-lockfile --filter 'cloudflare-uts...'"],
+    'one install links the UTS closure'
+  );
+  assert.equal(job.services.postgres.image, 'postgres:17.12', 'the local container release');
+  assert.equal(
+    job.services.postgres.env.POSTGRES_INITDB_ARGS,
+    '-c max_connections=200',
+    'the connection limit services/uts/scripts/local-db.sh starts its container with'
+  );
+  const bootstrap = job.steps.find(step => step.name === 'Create the identity-store admin login');
+  assert.equal(bootstrap.run, 'pnpm --filter cloudflare-uts db:up');
+  assert.equal(bootstrap.env.UTS_PG_CONTAINER, '${{ job.services.postgres.id }}');
+  const adminUrl = new URL(job.env.UTS_TEST_ADMIN_URL);
+  assert.equal(adminUrl.hostname, '127.0.0.1', 'the suite accepts only a loopback host');
+  assert.ok(
+    job.services.postgres.ports.includes(`${adminUrl.port}:5432`),
+    'the admin URL port is the one the service publishes'
+  );
+  const run = job.steps.find(step => step.name === 'Run UTS identity-store tests');
+  assert.equal(run.run, 'pnpm --filter cloudflare-uts test:postgres');
+  assert.ok(
+    ciJobs.test.needs.includes('uts-postgres'),
+    'the required test job fails when the suite fails'
+  );
+});
+
 // The wiring job reads the root project and executes Wrangler's real config
 // parser from the usage-ingest closure, so one frozen install selects both. A
 // second install step would resolve and link the same lockfile again on the

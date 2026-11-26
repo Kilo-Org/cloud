@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "pnpm run test:node",
-    "test:node": "vitest run --config vitest.node.config.ts",
+    "test": "vitest run --config vitest.node.config.ts --project repo",
+    "test:postgres": "vitest run --config vitest.node.config.ts --project db",
     "typecheck": "tsgo --noEmit",
     "db:up": "bash scripts/local-db.sh up",
     "db:down": "bash scripts/local-db.sh down",

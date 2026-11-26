@@ -179,9 +179,10 @@ Supabase's `postgres` login, so the migrations are proven not to need a superuse
 passwords are synthetic, and the tests give the UTS logins a random password on each run.
 
 ```sh
+pnpm test                        # the suites that need no database
 pnpm db:up                       # start the container; prints UTS_MIGRATION_DATABASE_URL
 UTS_MIGRATION_DATABASE_URL=... pnpm db:migrate
-pnpm test:node                   # migrates a template database, then clones it per test file
+pnpm test:postgres               # migrates a template database, then clones it per test file
 pnpm db:down
 ```
 
@@ -189,6 +190,12 @@ pnpm db:down
 `UTS_TEST_ADMIN_URL` changes the admin URL of the tests, for a local server only: the test setup
 changes cluster-wide roles and drops databases, so it refuses any host other than 127.0.0.1,
 localhost and ::1.
+
+In CI, the `test (cloudflare-uts)` job runs `pnpm test`, and the `uts-postgres` job runs
+`pnpm test:postgres` against a `postgres:17.12` service container. That job runs `pnpm db:up`
+with `UTS_PG_CONTAINER` set to the service container, so the container gets the same admin login
+and `uts` database as the local one, and it sets `UTS_TEST_ADMIN_URL` to the container's loopback
+port.
 
 ### Migrations
 

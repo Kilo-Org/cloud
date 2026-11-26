@@ -2,7 +2,7 @@ import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import o11yPolicy from '../../policy/o11y.yaml';
-import { backoffDelayMs, type RefresherDO } from '../../src/dos/RefresherDO';
+import { backoffDelayMs, RefresherDO } from '../../src/dos/RefresherDO';
 import { getBundleStub, getRefresherStub, getSignerStub } from '../../src/dos/stubs';
 import { loadPolicies } from '../../src/policy/load';
 import type { FillResult } from '../../src/types';
@@ -310,12 +310,16 @@ secrets: [CI_RELEASE_KEY]
     secret('/ci/ci-release', 'CI_RELEASE_KEY', 'ci-key'),
   ];
 
-  /** Runs on the refresher with a GitHub policy in force, so its reads include `/ci`. */
+  /** The refresher with a GitHub policy in force, so its reads include `/ci`. */
+  class CiRefresherDO extends RefresherDO {
+    static override readonly policies = ciPolicies;
+  }
+
+  /** Runs on a `CiRefresherDO` over the refresher's own storage. */
   function withCiPolicy<R>(run: (refresher: RefresherDO) => Promise<R>): Promise<R> {
-    return runInDurableObject(getRefresherStub(env, config), async instance => {
-      Object.assign(instance, { policies: ciPolicies });
-      return await run(instance);
-    });
+    return runInDurableObject(getRefresherStub(env, config), async (_instance, state) =>
+      run(new CiRefresherDO(state, env))
+    );
   }
 
   function ciBundleRow(): Promise<{ stale: number; fetched_at: string }> {

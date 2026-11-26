@@ -192,10 +192,10 @@ function poolMax(): number | null {
  * Redacted description of a database error.
  *
  * A drizzle failure stringifies to `Failed query: <SQL>\nparams: <values>`. For
- * the usage write that is ~30KB and the values include `user_prompt_prefix`,
- * `system_prompt_prefix`, the client IP, city and JA4 digest — real end-user
- * prompt text in a log line that fired thousands of times per minute. Never log
- * or capture the raw error from this path; log this instead.
+ * the usage write that is ~30KB and the values include the client IP, city, user
+ * agent and JA4 digest — real end-user data in a log line that fired thousands of
+ * times per minute. Never log or capture the raw error from this path; log this
+ * instead.
  *
  * `detail` is also omitted: PostgreSQL puts the conflicting key values in it.
  */
@@ -250,21 +250,21 @@ export function describeDatabaseError(error: unknown): DatabaseErrorDescription 
  *
  * V8 renders `error.stack` as `${name}: ${message}` followed by the frames, so
  * copying a stack verbatim onto a redacted error re-embeds the message it was
- * redacting — for this path, ~30KB of interpolated statement including prompt
- * prefixes and the client IP. Dropping the header keeps the throw site, which
+ * redacting — for this path, ~30KB of interpolated statement including the
+ * client IP and user agent. Dropping the header keeps the throw site, which
  * `Error.captureStackTrace` on the replacement would lose.
  *
  * The header is removed by exact `${name}: ${message}` prefix, never by searching
  * for the first frame-shaped line. That search is unsafe here because the message
- * embeds `user_prompt_prefix`: a user pasting a stack trace into their prompt —
- * routine for a coding assistant — puts a line matching `/^\s+at\s/` inside the
- * message, and slicing from it carries the rest of the parameters, client IP
- * included, into the result.
+ * embeds client-controlled values such as `http_user_agent`: one containing a
+ * stack trace puts a line matching `/^\s+at\s/` inside the message, and slicing
+ * from it carries the rest of the parameters, client IP included, into the
+ * result.
  *
  * Fails closed. If the stack does not start with the expected header the message
  * boundary is unknown, so no frames are emitted at all; `describeDatabaseError`
  * still supplies the actionable code and constraint. Losing a throw site is
- * cheaper than leaking a prompt.
+ * cheaper than leaking end-user data.
  */
 export function stackFramesUnderHeader(error: unknown, header: string): string {
   if (!(error instanceof Error) || typeof error.stack !== 'string') return header;

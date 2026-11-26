@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { usage } from './usage.test-fixture';
+import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
+import { usage, wireUsage } from './usage.test-fixture';
 import { enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaRecord } from './exa-usage.test-fixture';
 import {
@@ -38,7 +39,7 @@ afterEach(() => {
     config.secret,
     config.protectionBypass,
     serviceToken,
-    usage.metadata.user_prompt_prefix,
+    usage.metadata.http_user_agent,
     enkryptRecord.kiloUserId,
     enkryptRecord.sessionId,
     enkryptRecord.organizationId,
@@ -228,8 +229,15 @@ describe('usage writer client', () => {
         'x-internal-api-key': config.secret,
         'x-vercel-protection-bypass': config.protectionBypass,
       },
-      body: JSON.stringify(event),
+      body: JSON.stringify(toUsageRecordWireBody(event)),
       signal: expect.any(AbortSignal),
+    });
+    const sent = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(sent.metadata).toMatchObject({
+      user_prompt_prefix: null,
+      system_prompt_prefix: null,
+      abuse_delay: null,
+      abuse_downgraded_from: null,
     });
     pending.resolve(Response.json({ status: 'recorded', result }));
     expect(await outcome).toEqual({ kind: 'recorded', result });
@@ -281,7 +289,7 @@ describe('usage writer client', () => {
         'x-usage-write-source': 'queue',
         'x-vercel-protection-bypass': config.protectionBypass,
       },
-      body: JSON.stringify(usage),
+      body: JSON.stringify(wireUsage),
       signal: expect.any(AbortSignal),
     });
   });
@@ -446,7 +454,7 @@ describe('usage writer client', () => {
   it('contains transport failures and logs only the usage ID, safe outcome and error name', async () => {
     fetchMock.mockRejectedValue(
       new Error(
-        `${config.url} ${config.secret} ${config.protectionBypass} ${usage.metadata.user_prompt_prefix}`
+        `${config.url} ${config.secret} ${config.protectionBypass} ${usage.metadata.http_user_agent}`
       )
     );
     expect(await recordLlmUsage(usage, config)).toEqual({

@@ -8,6 +8,7 @@ import {
   readConversationState,
 } from './decision-cache';
 import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
+import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
 import { buildClassifierUsage } from './classifier-usage';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -275,7 +276,7 @@ describe('classifier usage retries', () => {
     for (const [, init] of fetchMock.mock.calls) {
       const body = init?.body;
       if (typeof body !== 'string') throw new Error('Expected serialized usage body');
-      expect(JSON.parse(body)).toEqual(usage);
+      expect(JSON.parse(body)).toEqual(toUsageRecordWireBody(usage));
     }
   });
 

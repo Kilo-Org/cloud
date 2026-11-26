@@ -274,7 +274,7 @@ describe('client eval (real SQLite)', () => {
       model: 'auto-routing/grader',
       cost: 2100,
     });
-    expect(usage.metadata.user_prompt_prefix).toBeNull();
+    expect(usage.metadata).not.toHaveProperty('user_prompt_prefix');
   });
 
   it('grades a judged case once when parallel uploads race for it', async () => {

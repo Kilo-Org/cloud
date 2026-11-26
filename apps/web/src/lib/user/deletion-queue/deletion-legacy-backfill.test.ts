@@ -256,6 +256,9 @@ describe('historical GDPR user-ID backfill', () => {
   it.each(['matched', 'absent'] as const)(
     'runs all six real tasks with %s PostHog identity without notifications and retains an exact, case-sensitive completion receipt',
     async posthogMatch => {
+      const isNotApplicable = (stepKey: Step) =>
+        stepKey === Step.UsagePromptPrefixes ||
+        (stepKey === Step.Posthog && posthogMatch === 'absent');
       await db.insert(user_deletion_requests).values({
         status: RequestStatus.Completed,
         completed_at: new Date().toISOString(),
@@ -288,7 +291,6 @@ describe('historical GDPR user-ID backfill', () => {
       await db.insert(microdollar_usage_metadata).values({
         id: usage.id,
         message_id: 'backfill-message',
-        user_prompt_prefix: 'private user prompt',
       });
       jest.spyOn(KiloClawInternalClient.prototype, 'destroy').mockResolvedValue({ ok: true });
       const posthogBase = 'https://posthog.test/api/environments/backfill-test';
@@ -417,10 +419,7 @@ describe('historical GDPR user-ID backfill', () => {
         expect(outcome).toMatchObject({
           kind: 'applied',
           effectiveOutcome: {
-            kind:
-              stepKey === Step.Posthog && posthogMatch === 'absent'
-                ? 'not_applicable'
-                : 'succeeded',
+            kind: isNotApplicable(stepKey) ? 'not_applicable' : 'succeeded',
           },
         });
       }
@@ -438,9 +437,7 @@ describe('historical GDPR user-ID backfill', () => {
       expect([...statuses.keys()].sort()).toEqual([...userIdSteps].sort());
       for (const stepKey of userIdSteps) {
         expect(statuses.get(stepKey)).toBe(
-          stepKey === Step.Posthog && posthogMatch === 'absent'
-            ? StepStatus.NotApplicable
-            : StepStatus.Succeeded
+          isNotApplicable(stepKey) ? StepStatus.NotApplicable : StepStatus.Succeeded
         );
       }
       expect(await db.select().from(cliSessions)).toEqual([]);
@@ -448,8 +445,13 @@ describe('historical GDPR user-ID backfill', () => {
       expect(await db.select().from(user_auth_provider)).toEqual([]);
       const [instance] = await db.select().from(kiloclaw_instances);
       expect(instance).toMatchObject({ user_id: user.id, destroyed_at: expect.any(String) });
-      const [metadata] = await db.select().from(microdollar_usage_metadata);
-      expect(metadata).toMatchObject({ id: usage.id, user_prompt_prefix: null });
+      const [metadata] = await db
+        .select({
+          id: microdollar_usage_metadata.id,
+          message_id: microdollar_usage_metadata.message_id,
+        })
+        .from(microdollar_usage_metadata);
+      expect(metadata).toEqual({ id: usage.id, message_id: 'backfill-message' });
       expect(await db.select().from(microdollar_usage)).toEqual([usage]);
       expect(await findUserById(user.id)).toMatchObject({
         blocked_reason: user.blocked_reason,

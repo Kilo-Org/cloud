@@ -180,8 +180,6 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     ...usageContext.fraudHeaders,
     provider: usageContext.provider,
     ...usageContext.promptInfo,
-    user_prompt_prefix: null,
-    system_prompt_prefix: null,
     max_tokens: usageContext.max_tokens,
     has_middle_out_transform: usageContext.has_middle_out_transform,
     project_id: usageContext.project_id,
@@ -200,8 +198,6 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     reasoning_setting: usageContext.reasoning_setting,
     inference_region: usageContext.inference_region,
     ttfb_ms: usageContext.ttfb_ms,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
   };
 }
 
@@ -342,8 +338,6 @@ export async function toInsertableDbUsageRecord(
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
     non_inference_cost: usageStats.nonInferenceCost_mUsd ?? null,
-    abuse_delay: metadataFromContext.abuse_delay,
-    abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
 
   if (unrecordable.length > 0) {
@@ -1143,8 +1137,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               market_cost,
               non_inference_cost,
               is_free,
-              abuse_delay,
-              abuse_downgraded_from,
 
               http_user_agent_id,
               http_ip_id,
@@ -1185,8 +1177,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.market_cost},
               ${metadataFields.non_inference_cost},
               ${metadataFields.is_free},
-              ${metadataFields.abuse_delay},
-              ${metadataFields.abuse_downgraded_from},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),

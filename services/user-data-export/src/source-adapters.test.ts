@@ -319,13 +319,13 @@ describe('warehouse availability probe', () => {
     expect(requirementFor('organization', 'app_builder_projects')).not.toContain('kilo_user_id');
   });
 
-  // The exception: this source's cursor reads the opposite scope column as its second
-  // key, so it genuinely needs both whichever subject is asking.
+  // The exception: this source's cursor reads the opposite scope column as a key, so it
+  // genuinely needs both whichever subject is asking.
   it('requires both scope columns for the source whose cursor spans them', () => {
     const { adapters } = harness();
     for (const subject of ['user', 'organization'] as const) {
       const columns =
-        warehouseRequirements(adapters, subject).find(item => item.table === 'system_prompt_prefix')
+        warehouseRequirements(adapters, subject).find(item => item.table === 'external_usage_daily')
           ?.requiredColumns ?? [];
       expect(columns).toContain('kilo_user_id');
       expect(columns).toContain('organization_id');
@@ -345,8 +345,6 @@ describe('warehouse availability probe', () => {
       'app_builder_messages',
       'cli_sessions',
       'cloud_agent_code_reviews',
-      'system_prompt_prefix',
-      'microdollar_usage_metadata',
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
@@ -412,8 +410,6 @@ describe('source adapters', () => {
       'app_builder_messages',
       'cli_sessions',
       'cloud_agent_code_reviews',
-      'system_prompt_prefix',
-      'microdollar_usage_metadata',
       'code_indexing_manifest',
       'code_indexing_search',
       'deployment_events',
@@ -573,25 +569,22 @@ describe('source adapters', () => {
   // Every warehouse source has to switch owner column with the subject. One left on
   // `kilo_user_id` would return the requesting admin's own rows under the
   // organization's name, which is the failure that has no visible symptom.
-  it.each([
-    'app_builder_projects',
-    'app_builder_messages',
-    'cli_sessions',
-    'system_prompt_prefix',
-    'microdollar_usage_metadata',
-  ])('scopes %s to the organization for an organization subject', async name => {
-    const { adapters, warehouseCalls } = harness([]);
+  it.each(['app_builder_projects', 'app_builder_messages', 'cli_sessions'])(
+    'scopes %s to the organization for an organization subject',
+    async name => {
+      const { adapters, warehouseCalls } = harness([]);
 
-    await requireAdapter(adapters, name).readPage?.(ORG_READ_PAGE_INPUT);
+      await requireAdapter(adapters, name).readPage?.(ORG_READ_PAGE_INPUT);
 
-    expect(warehouseCalls).toHaveLength(1);
-    expect(warehouseCalls[0].text).toContain('WHERE organization_id = $1');
-    // Anchored on WHERE rather than the bare column name: `system_prompt_prefix` reads
-    // `kilo_user_id` legitimately, as the second half of its cursor. What must not
-    // appear is the user column as the row filter.
-    expect(warehouseCalls[0].text).not.toContain('WHERE kilo_user_id');
-    expect(warehouseCalls[0].values[0]).toBe('org-1');
-  });
+      expect(warehouseCalls).toHaveLength(1);
+      expect(warehouseCalls[0].text).toContain('WHERE organization_id = $1');
+      // Anchored on WHERE rather than the bare column name, so a legitimate read of the
+      // user column elsewhere in the query cannot fail it. What must not appear is the user
+      // column as the row filter.
+      expect(warehouseCalls[0].text).not.toContain('WHERE kilo_user_id');
+      expect(warehouseCalls[0].values[0]).toBe('org-1');
+    }
+  );
 
   // The identity row belongs to a person. An organization export reading it would put
   // the requesting admin's email and name in a file about the organization.
@@ -632,7 +625,6 @@ describe('source adapters', () => {
   // The sync metadata was dropped from this projection on request. The table does hold
   // deleted rows, so the source can no longer tell them apart and must not imply it can:
   // an absent mark reads as "not deleted, or cannot say", never as a claim of live.
-  // Distinct from `system_prompt_prefix`, which still carries the column and still labels.
   it('never marks a message as deleted, having given up the column', async () => {
     const { adapters, warehouseCalls } = harness([
       { id: 'message-gone', data: { role: 'user' }, _snowflake_deleted: true },
@@ -734,100 +726,6 @@ describe('source adapters', () => {
     expect(warehouseCalls[0]?.values).toEqual(['owner-user', null, null, 100]);
   });
 
-  // The prefix id repeats across the triple, so both the record key and the cursor carry
-  // the second dimension alongside it.
-  it('emits system prompts keyed by the pair that orders them', async () => {
-    const { adapters } = harness([
-      {
-        system_prompt_prefix_id: '42',
-        cursor_secondary: 'org-9',
-        system_prompt_prefix: 'System prompt',
-      },
-    ]);
-
-    const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.({
-      ...READ_PAGE_INPUT,
-      limit: 1,
-    });
-
-    expect(page?.records).toEqual([
-      {
-        source: 'system_prompt_prefix',
-        id: '42.org-9',
-        field: 'system_prompt_prefix',
-        value: 'System prompt',
-      },
-    ]);
-    expect(page?.nextCursor).toEqual({ key: ['42', 'org-9'] });
-  });
-
-  // A personal row has no organization, and the query coalesces it to a sentinel so the
-  // tuple comparison stays non-NULL. Without it the row is dropped at a page boundary,
-  // which is the defect this cursor was widened to fix.
-  it('carries a personal system prompt row through the cursor', async () => {
-    const { adapters, warehouseCalls } = harness([
-      {
-        system_prompt_prefix_id: '7',
-        cursor_secondary: '-',
-        system_prompt_prefix: 'Personal prompt',
-      },
-    ]);
-
-    const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.({
-      ...READ_PAGE_INPUT,
-      limit: 1,
-    });
-
-    expect(warehouseCalls[0].text).toContain("COALESCE(organization_id, '-')");
-    expect(page?.nextCursor).toEqual({ key: ['7', '-'] });
-    // Non-empty, so the cursor survives KeyCursorSchema on resume.
-    expect(page?.nextCursor).toEqual({
-      key: expect.arrayContaining([expect.stringMatching(/.+/)]),
-    });
-  });
-
-  // Deleted rows are RETURNED, they are simply no longer distinguished. The export is a
-  // copy of what the warehouse holds about someone rather than a view of what prod still
-  // serves, so withholding the marker had to not become withholding the row.
-  //
-  // All three source states are fed in — deleted, live, and the unknown a not-yet-reloaded
-  // table produces — because the marker's absence must mean the same thing for each.
-  it('returns a deleted row alongside a live one, marking neither', async () => {
-    const { adapters } = harness([
-      { system_prompt_prefix_id: '1', cursor_secondary: '-', system_prompt_prefix: 'Live' },
-      {
-        system_prompt_prefix_id: '2',
-        cursor_secondary: '-',
-        system_prompt_prefix: 'Deleted',
-        _snowflake_deleted: true,
-      },
-      {
-        system_prompt_prefix_id: '3',
-        cursor_secondary: '-',
-        system_prompt_prefix: 'Unknown',
-        _snowflake_deleted: null,
-      },
-    ]);
-
-    const page = await requireAdapter(adapters, 'system_prompt_prefix').readPage?.(READ_PAGE_INPUT);
-
-    expect(page?.records).toEqual([
-      { source: 'system_prompt_prefix', id: '1.-', field: 'system_prompt_prefix', value: 'Live' },
-      {
-        source: 'system_prompt_prefix',
-        id: '2.-',
-        field: 'system_prompt_prefix',
-        value: 'Deleted',
-      },
-      {
-        source: 'system_prompt_prefix',
-        id: '3.-',
-        field: 'system_prompt_prefix',
-        value: 'Unknown',
-      },
-    ]);
-  });
-
   // Deleted rows are returned, not filtered. The export is a truthful copy of what the
   // warehouse holds, so a deleted row still reaches the person it belonged to. That holds
   // for the sources that no longer carry the flag too: they stopped labelling, not
@@ -854,25 +752,6 @@ describe('source adapters', () => {
 
     expect(warehouseCalls[0].text).not.toContain('_snowflake');
     for (const record of page?.records ?? []) expect(record).not.toHaveProperty('softDeleted');
-  });
-
-  it('emits user prompts as their own set, unpaired from system prompts', async () => {
-    const { adapters } = harness([{ id: 'usage-1', user_prompt_prefix: 'User prompt' }]);
-
-    const page = await requireAdapter(adapters, 'microdollar_usage_metadata').readPage?.({
-      ...READ_PAGE_INPUT,
-      limit: 1,
-    });
-
-    expect(page?.records).toEqual([
-      {
-        source: 'microdollar_usage_metadata',
-        id: 'usage-1',
-        field: 'user_prompt_prefix',
-        value: 'User prompt',
-      },
-    ]);
-    expect(page?.nextCursor).toEqual({ key: ['usage-1'] });
   });
 
   it('stops paging when a page is short', async () => {
@@ -1155,7 +1034,7 @@ describe('source adapters', () => {
 
   // A bare `event_id` in the ORDER BY would bind to the `::text` output column rather than
   // the bigint input, sorting the page as text while the cursor compares numerically. That
-  // is the defect `cli_sessions` and `system_prompt_prefix` were both fixed for, and it is
+  // is the defect `cli_sessions` and other sources were fixed for, and it is
   // silent, so the qualified form is pinned here rather than left to review.
   it('orders deployment events on the qualified bigint column', async () => {
     const { adapters, warehouseCalls } = harness([DEPLOYMENT_EVENT_ROW]);
@@ -1797,7 +1676,7 @@ describe('source adapters', () => {
   });
 
   // A keyset on payload_id would skip the rest of a review at any page boundary inside
-  // one, which is the defect cli_sessions and system_prompt_prefix were both fixed for.
+  // one, which is the defect cli_sessions and other sources were fixed for.
   it('pages code reviews on the position pair and never on payload_id', async () => {
     const { adapters, warehouseCalls } = harness([CODE_REVIEW_ROW]);
 

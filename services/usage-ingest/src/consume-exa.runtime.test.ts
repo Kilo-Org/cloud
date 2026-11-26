@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaMessage, exaRecord } from './exa-usage.test-fixture';
 import { withTaggedConsumerRuntime } from './tagged-consumer.test-fixture';
-import { usage } from './usage.test-fixture';
+import { usage, wireUsage } from './usage.test-fixture';
 
 type ExaReply = 'recorded' | 'duplicate' | 'admission' | 'wrong_echo' | 'missing_echo';
 
@@ -99,7 +99,7 @@ it('routes tagged Exa messages through workerd and keeps LLM and Enkrypt disposi
     ).toEqual([
       { path: '/api/internal/enkrypt-usage/record', body: enkryptRecord, source: 'queue' },
       exaCall,
-      { path: '/api/internal/usage/record', body: usage, source: 'queue' },
+      { path: '/api/internal/usage/record', body: wireUsage, source: 'queue' },
     ]);
 
     const processing = logs

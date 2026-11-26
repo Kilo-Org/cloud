@@ -38,9 +38,6 @@ export async function GET(
       adminOnly: true,
       requestMethod: request.method,
       stepUpExemptCredentials: ['human_bearer'],
-      // Pylon looks users up from its own servers, off the corporate network, with an
-      // admin's personal API key; no other credential skips the network check.
-      adminNetworkExemptCredential: 'personal_api_key',
     });
     if (authFailedResponse) {
       return authFailedResponse;

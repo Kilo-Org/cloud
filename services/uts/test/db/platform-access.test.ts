@@ -59,6 +59,38 @@ describe('the platform access check', () => {
     });
   });
 
+  it('report what a role reachable only through SET ROLE holds', async () => {
+    await inRolledBackTransaction(async () => {
+      // A membership that passes no privilege on until the session runs `SET ROLE`.
+      await admin.query('CREATE ROLE uts_t_platform_switch NOLOGIN');
+      await admin.query('GRANT uts_t_platform_switch TO anon WITH INHERIT FALSE, SET TRUE');
+      await admin.query('SET LOCAL ROLE uts_owner');
+      await admin.query('GRANT SELECT ON uts.refresh_grants TO uts_t_platform_switch');
+      await admin.query('GRANT EXECUTE ON FUNCTION uts.lookup_pat(bytea) TO uts_t_platform_switch');
+      await admin.query('RESET ROLE');
+
+      const { findings } = await checkPlatformAccess(admin);
+      expect(findings).toEqual([
+        {
+          role: 'anon',
+          privilege: 'EXECUTE on uts.lookup_pat(bytea) through SET ROLE uts_t_platform_switch',
+        },
+        {
+          role: 'anon',
+          privilege: 'SELECT on uts.refresh_grants through SET ROLE uts_t_platform_switch',
+        },
+      ]);
+    });
+  });
+
+  it('report nothing for a role that can switch only to roles holding nothing', async () => {
+    await inRolledBackTransaction(async () => {
+      await admin.query('CREATE ROLE uts_t_platform_empty NOLOGIN');
+      await admin.query('GRANT uts_t_platform_empty TO anon WITH INHERIT FALSE, SET TRUE');
+      expect((await checkPlatformAccess(admin)).findings).toEqual([]);
+    });
+  });
+
   it('report EXECUTE on an identity-store function', async () => {
     await inRolledBackTransaction(async () => {
       await admin.query('SET LOCAL ROLE uts_owner');

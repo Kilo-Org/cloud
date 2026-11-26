@@ -50,7 +50,10 @@ database but has no `TEMP`. Members of `pg_read_all_data` and `pg_write_all_data
 every table, so a deploy runs `pnpm db:check-access` (`scripts/check-platform-access.ts`) with the
 migration connection. It lists the members of both roles and fails when `anon`, `authenticated` or
 `service_role` holds any privilege on `uts`, `uts_read` or `uts_migrations`, or on anything in them,
-whether granted directly, through `PUBLIC` or through an inherited role.
+whether granted directly, through `PUBLIC` or through an inherited role. It checks every role a
+platform role can switch to with `SET ROLE` the same way, since a membership with `SET TRUE,
+INHERIT FALSE` passes on no privilege until the session switches, and reports such a privilege as
+`... through SET ROLE <role>`.
 
 ### Rules for statements
 

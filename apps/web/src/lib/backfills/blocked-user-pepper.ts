@@ -31,7 +31,10 @@ export async function countMissingBlockedUserPeppers(): Promise<number> {
   return result?.count ?? 0;
 }
 
-export async function backfillBlockedUserPepperBatch(): Promise<BackfillBatchResult> {
+/** `onUpdated` receives the ids each committed batch changed. */
+export async function backfillBlockedUserPepperBatch(
+  onUpdated?: (userIds: string[]) => Promise<void>
+): Promise<BackfillBatchResult> {
   let totalProcessed = 0;
   // A short select is the only reliable signal the candidate set is exhausted;
   // the update shrinks the set each batch by setting a non-null pepper.
@@ -67,6 +70,7 @@ export async function backfillBlockedUserPepperBatch(): Promise<BackfillBatchRes
       .returning({ id: kilocode_users.id });
 
     totalProcessed += updated.length;
+    await onUpdated?.(updated.map(r => r.id));
 
     if (rows.length < BACKFILL_BATCH_SIZE) {
       reachedEnd = true;

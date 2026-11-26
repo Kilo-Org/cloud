@@ -17,6 +17,12 @@ import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/li
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import * as z from 'zod';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  isAuthAuditLockout,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 const TokensSchema = z.object({
   code: z.string().min(1),
@@ -72,8 +78,18 @@ function requesterFor(request: ApprovedDeviceAuthRequest): DeviceSignInRequester
 }
 
 export const POST = withRestTiming('/api/device-auth/tokens', async (request: Request) => {
+  const attempt: AuthAuditAttempt = { action: 'auth.device_auth.approve' };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/device-auth/tokens'),
+    attempt,
+    () => approve(request, attempt)
+  );
+});
+
+async function approve(request: Request, attempt: AuthAuditAttempt): Promise<Response> {
   const origin = request.headers.get('origin');
   if (origin !== new URL(APP_URL).origin) {
+    attempt.failureReason = 'invalid_origin';
     return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
   }
 
@@ -83,10 +99,12 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
   if (authFailedResponse) {
     return authFailedResponse;
   }
+  attempt.userId = user.id;
 
   const body = await request.json().catch(() => undefined);
   const validation = TokensSchema.safeParse(body);
   if (!validation.success) {
+    attempt.failureReason = 'invalid_request';
     return NextResponse.json(
       { error: 'Invalid request body', details: validation.error.issues },
       { status: 400 }
@@ -117,8 +135,11 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
           }
         : {}),
     });
+    attempt.metadata = { deviceAuthRequestId: approved.id };
   } catch (error) {
     if (error instanceof DeviceAuthRefusalError) {
+      if (error.requestId) attempt.metadata = { deviceAuthRequestId: error.requestId };
+      if (isAuthAuditLockout(error)) attempt.lockout = true;
       const status = APPROVAL_REFUSAL_STATUS[error.code];
       if (status !== undefined) {
         return NextResponse.json(
@@ -142,4 +163,4 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
   );
 
   return NextResponse.json({ success: true });
-});
+}

@@ -1876,11 +1876,13 @@ curl -s -X PUT 'http://localhost:8814/admin/config?router=efficient' \
 
 Decider runs use the worker's default benchmark user (`bot-internal-benchmark`)
 and org unless `benchmarkUserId` / `benchmarkOrgId` overrides are saved in
-config. Each queue message mints a one-hour CLI token from
-`POST /api/internal/bot-token`, which only issues for internal bot users
-(`bot-internal-*`) that belong to the org, so a non-bot override fails the run
-start with a clear error. Create the user locally from the admin
-**Internal Bot Users** page; it also needs credits.
+config. Each queue message mints one-hour tokens from
+`POST /api/internal/bot-token`, at most one per audience: `kilo-gateway` for the
+CLI container and `kilo-api` for a probe's organization catalog read. The
+endpoint only issues for internal bot users (`bot-internal-*`) that belong to
+the org, so a non-bot override fails the run start with a clear error. Create
+the user locally from the admin **Internal Bot Users** page; it also needs
+credits.
 
 > Local KV/D1 writes from a *second* `wrangler` process are not seen by the
 > running dev process (miniflare holds its own view). After writing state out of

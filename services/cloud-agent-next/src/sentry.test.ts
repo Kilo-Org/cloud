@@ -10,6 +10,7 @@ import {
   instrumentCloudAgentWorker,
   shouldCaptureCloudAgentException,
 } from './sentry.js';
+import { SENTRY_ERROR_OPTIONS } from './shared/sentry.js';
 import type { Env } from './types.js';
 
 afterEach(() => {
@@ -334,6 +335,90 @@ describe('Cloud Agent Worker SDK capture', () => {
     expect(events[0]?.exception?.values?.[0]?.stacktrace?.frames?.length).toBeGreaterThan(0);
     expect(JSON.stringify(events)).not.toContain('private-');
     expect(JSON.stringify(events)).not.toContain('203.0.113.14');
+  });
+
+  // An identity whose read throws makes the sanitize step inside beforeSend fail.
+  const throwingIdentity = () => ({
+    get sessionId(): string {
+      throw new Error('unreadable identity');
+    },
+  });
+
+  // A throw from a synchronous beforeSend makes core 10 capture the error as an
+  // internal event that skips beforeSend; a rejected promise does not.
+  it('sends no event when the Worker beforeSend fails', async () => {
+    // The SDK never reads `status`; the hook's capture filter does.
+    const unreadable = new HTTPException(500, { message: 'private-prompt-and-token' });
+    Object.defineProperty(unreadable, 'status', {
+      get(): never {
+        throw new Error('unreadable status');
+      },
+    });
+    const itemTypes: string[] = [];
+    const options: Sentry.CloudflareOptions = {
+      ...cloudAgentSentryOptions(telemetryEnv),
+      transport: () => ({
+        send: async envelope => {
+          for (const [header] of envelope[1]) itemTypes.push(String(header.type));
+          return { statusCode: 200 };
+        },
+        flush: async () => true,
+      }),
+    };
+    let client: ReturnType<typeof Sentry.getClient>;
+    const worker = Sentry.withSentry((_env: Env) => options, {
+      async fetch(_request: Request, _env: Env, _ctx: ExecutionContext) {
+        client = Sentry.getClient();
+        throw unreadable;
+      },
+    });
+    const { ctx, pending } = executionContext();
+    await expect(
+      worker.fetch(new Request('https://worker.example/send'), telemetryEnv as Env, ctx)
+    ).rejects.toBe(unreadable);
+    await Promise.all(pending);
+    await expect(client?.flush(2000)).resolves.toBe(true);
+
+    expect(itemTypes).not.toContain('event');
+  });
+
+  it('keeps the sanitized event when the log line fails', async () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: { values: [{ type: 'Error', value: 'defect' }] },
+    };
+    const hint = { originalException: new Error('defect') };
+    const expected = cloudAgentSentryOptions(telemetryEnv).beforeSend?.(event, hint);
+    expect(expected).not.toBeNull();
+    vi.spyOn(logger, 'withFields').mockImplementation(() => {
+      throw new Error('logger failed');
+    });
+
+    expect(cloudAgentSentryOptions(telemetryEnv).beforeSend?.(event, hint)).toEqual(expected);
+    const withIdentity = cloudAgentSentryOptions(telemetryEnv, 'worker', {}, () => ({}));
+    await expect(Promise.resolve(withIdentity.beforeSend?.(event, hint))).resolves.toEqual(
+      expected
+    );
+  });
+
+  it('resolves beforeSend to null when the sanitize step throws', async () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: { values: [{ type: 'Error', value: 'private-value' }] },
+    };
+    const hint = { originalException: new Error('defect') };
+
+    const withIdentity = cloudAgentSentryOptions(telemetryEnv, 'session', {}, throwingIdentity);
+    await expect(Promise.resolve(withIdentity.beforeSend?.(event, hint))).resolves.toBeNull();
+
+    const unreadable: ErrorEvent = {
+      type: undefined,
+      get exception(): ErrorEvent['exception'] {
+        throw new Error('unreadable exception');
+      },
+    };
+    expect(cloudAgentSentryOptions(telemetryEnv).beforeSend?.(unreadable, hint)).toBeNull();
+    expect(SENTRY_ERROR_OPTIONS.beforeSend(unreadable)).toBeNull();
   });
 
   // Reproducing the sampled trace through `withSentry` under the Node test runner

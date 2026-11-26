@@ -506,12 +506,19 @@ describe('admin action audit', () => {
     expect(updateRow?.metadata).toMatchObject({ changedFields: [], amountUsd: 5 });
   });
 
-  it('records nothing when the write is refused', async () => {
+  it('records a failure row when the write is refused', async () => {
     const caller = await createCallerForUser(plainAdmin.id);
     await expect(caller.admin.creditCampaigns.create(makeValidInput())).rejects.toThrow(
       'Credit management access required'
     );
 
-    expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+    expect(await db.select().from(admin_action_audit_logs)).toEqual([
+      expect.objectContaining({
+        action: 'credit_campaign.create',
+        outcome: 'failure',
+        actor_id: plainAdmin.id,
+        metadata: { errorCode: 'FORBIDDEN' },
+      }),
+    ]);
   });
 });

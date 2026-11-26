@@ -22,7 +22,10 @@ export async function countMissingBlockedAt(): Promise<number> {
   return result?.count ?? 0;
 }
 
-export async function backfillBlockedAtBatch(): Promise<BackfillBatchResult> {
+/** `onUpdated` receives the ids each committed batch changed. */
+export async function backfillBlockedAtBatch(
+  onUpdated?: (userIds: string[]) => Promise<void>
+): Promise<BackfillBatchResult> {
   let totalProcessed = 0;
   let reachedEnd = false;
 
@@ -56,6 +59,7 @@ export async function backfillBlockedAtBatch(): Promise<BackfillBatchResult> {
       .returning({ id: kilocode_users.id });
 
     totalProcessed += updated.length;
+    await onUpdated?.(updated.map(r => r.id));
 
     if (rows.length < BACKFILL_BATCH_SIZE) {
       reachedEnd = true;

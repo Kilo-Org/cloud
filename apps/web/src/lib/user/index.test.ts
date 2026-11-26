@@ -8338,7 +8338,7 @@ describe('User', () => {
     });
 
     it('should terminate managed Coding Plan access and anonymize inventory on soft delete', async () => {
-      const { sealedInventoryColumnsWithStaticKeyCopy } =
+      const { sealedInventoryColumns } =
         await import('@/tests/helpers/coding-plan-inventory.helper');
       const user = await insertTestUser();
       const [inventoryKey] = await db
@@ -8347,8 +8347,7 @@ describe('User', () => {
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
           upstream_plan_id: 'minimax-gdpr-plan',
-          // A static-key copy written before the KMS migration must be removed too.
-          ...sealedInventoryColumnsWithStaticKeyCopy('test-key-for-gdpr', 'static-key-for-gdpr'),
+          ...sealedInventoryColumns('test-key-for-gdpr'),
           credential_fingerprint: `gdpr-${randomUUID()}`,
           status: 'assigned',
           assigned_to_user_id: user.id,
@@ -8397,7 +8396,6 @@ describe('User', () => {
         .where(eq(coding_plan_key_inventory.id, inventoryKey.id));
       expect(retainedInventory.status).toBe('revocation_pending');
       expect(retainedInventory.upstream_plan_id).toBe('minimax-gdpr-plan');
-      expect(retainedInventory.encrypted_api_key).toBeNull();
       expect(retainedInventory.encrypted_api_key_envelope).toBeNull();
       expect(retainedInventory.assigned_to_user_id).toBeNull();
       expect(retainedInventory.revocation_requested_at).not.toBeNull();

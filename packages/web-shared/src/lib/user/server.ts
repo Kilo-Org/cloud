@@ -50,6 +50,7 @@ import {
   type PrivilegedActionClass,
   type PrivilegedCredentialKind,
   type PrivilegedTarget,
+  type PrivilegedTargetKind,
   type StepUpRequirementPayload,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
@@ -62,6 +63,7 @@ import {
   admitStaff,
   type StaffAdmissionResult,
   type StaffAuthorization,
+  type StaffProof,
   type StaffRefusal,
 } from '@kilocode/web-shared/lib/admin/admin-guard';
 import type {
@@ -198,6 +200,17 @@ export type RequiredPermissions = {
   requestHeaders?: Headers;
   /** How this admin read arrived; server components are not REST routes. */
   stepUpSurface?: 'rest' | 'server-component';
+  /**
+   * The exact record an admin request acts on, for its operation proof. It runs
+   * only for an admin browser session that passed the current role, network,
+   * session and pepper checks, receives that current primary row, and runs
+   * before the proof is claimed, so the proof binds the id the handler will act
+   * on. It must name the route's inventory target kind and must not throw for
+   * ordinary input: an input it cannot resolve, or a caller it must not resolve
+   * for, names a null id, and the handler then refuses without acting. A throw
+   * or a different kind fails closed as STEP_UP_UNAVAILABLE.
+   */
+  requestTarget?: (currentUser: User) => Promise<PrivilegedTarget>;
 };
 
 type GetAuthResponse =
@@ -379,7 +392,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
         route,
         method,
         actionClass,
-        proof: { kind: 'request', target: { kind: targetKind, id: null } },
+        proof: requestProof(opts.requestTarget, targetKind),
       });
     } catch (error) {
       // Fail closed. Only the proof check can throw here, after the role and
@@ -433,6 +446,34 @@ async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthRes
   }
 
   return resolveUserFromSession(opts, db);
+}
+
+/**
+ * The proof of an admin REST request: bound to the record `requestTarget`
+ * names for the current primary row, or to the route's target kind alone.
+ */
+function requestProof(
+  requestTarget: RequiredPermissions['requestTarget'],
+  targetKind: PrivilegedTargetKind
+): StaffProof {
+  if (!requestTarget) return { kind: 'request', target: { kind: targetKind, id: null } };
+  let current: User | null = null;
+  return {
+    kind: 'request',
+    // `admitStaff` calls `authorize` with the current primary row right before
+    // it resolves the target.
+    authorize: async currentUser => {
+      current = currentUser;
+    },
+    target: async () => {
+      if (!current) throw new Error('A request target needs the admitted primary row');
+      const target = await requestTarget(current);
+      if (target.kind !== targetKind) {
+        throw new Error('A request target must name the route inventory target kind');
+      }
+      return target;
+    },
+  };
 }
 
 export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {

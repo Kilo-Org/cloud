@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, test, expect, jest } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import {
   admin_action_audit_logs,
   kilo_pass_subscriptions,
   kilocode_users,
   organizations,
+  passkey_credentials,
+  session_step_up_proofs,
   transactional_email_log,
   user_admin_notes,
   user_auth_provider,
 } from '@kilocode/db/schema';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   createDeletionInProgressBlockedReason,
   createSoftDeletedBlockedReason,
@@ -912,5 +917,149 @@ describe('admin.users.addNote', () => {
     expect(serialized).not.toContain('add-note-api-pepper');
     expect(serialized).not.toContain('add-note-web-pepper');
     expect(serialized).not.toContain(appStoreAccountToken);
+  });
+});
+
+describe('admin.users.deleteNote step-up binding', () => {
+  const webSessionId = 'delete-note-web-session';
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+
+  beforeEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+  });
+  afterEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+  });
+
+  async function insertNote(adminId: string, ownerId: string) {
+    const [note] = await db
+      .insert(user_admin_notes)
+      .values({ kilo_user_id: ownerId, note_content: 'note', admin_kilo_user_id: adminId })
+      .returning({ id: user_admin_notes.id });
+    return note!.id;
+  }
+
+  /** A proof minted for deleting one note: the hash the guard computes for that request. */
+  async function insertDeleteNoteProof(adminId: string, noteId: string) {
+    const [credential] = await db
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: adminId,
+        credential_id: `delete-note-${crypto.randomUUID()}`,
+        public_key: 'unused-public-key',
+      })
+      .returning();
+    const verifiedAt = new Date();
+    const [proof] = await db
+      .insert(session_step_up_proofs)
+      .values({
+        kilo_user_id: adminId,
+        session_id_hash: hashWebSessionId(webSessionId),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'operation',
+        action_binding_hash: hashStepUpBinding('sensitive_write', {
+          surface: 'trpc',
+          route: 'admin.users.deleteNote',
+          method: 'mutation',
+          target: { kind: 'none', id: noteId },
+        }),
+        verified_at: verifiedAt.toISOString(),
+        expires_at: new Date(verifiedAt.getTime() + 5 * 60_000).toISOString(),
+      })
+      .returning({ id: session_step_up_proofs.id });
+    return proof!.id;
+  }
+
+  async function proofConsumedAt(proofId: string) {
+    const [row] = await db
+      .select({ consumedAt: session_step_up_proofs.consumed_at })
+      .from(session_step_up_proofs)
+      .where(eq(session_step_up_proofs.id, proofId));
+    return row?.consumedAt ?? null;
+  }
+
+  async function noteExists(noteId: string) {
+    const rows = await db
+      .select({ id: user_admin_notes.id })
+      .from(user_admin_notes)
+      .where(eq(user_admin_notes.id, noteId));
+    return rows.length === 1;
+  }
+
+  async function stepUpRefusal(promise: Promise<unknown>) {
+    const error = await promise.then(
+      () => null,
+      (rejection: unknown) => rejection
+    );
+    return error instanceof TRPCError && error.cause instanceof StepUpRequiredError
+      ? error.cause
+      : null;
+  }
+
+  async function deleteNoteAuditRows(actorId: string) {
+    return db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(
+        and(
+          eq(admin_action_audit_logs.action, 'user.note.delete'),
+          eq(admin_action_audit_logs.actor_id, actorId)
+        )
+      );
+  }
+
+  test('admits a proof bound to the note it deletes once, and audits the note owner', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const noteId = await insertNote(admin.id, owner.id);
+    const proofId = await insertDeleteNoteProof(admin.id, noteId);
+    const caller = await createSessionCallerForUser(admin.id, { webSessionId });
+
+    await expect(caller.admin.users.deleteNote({ note_id: noteId })).resolves.toEqual({
+      success: true,
+    });
+    expect(await noteExists(noteId)).toBe(false);
+    expect(await proofConsumedAt(proofId)).not.toBeNull();
+    expect(await deleteNoteAuditRows(admin.id)).toEqual([
+      expect.objectContaining({
+        outcome: 'success',
+        actor_id: admin.id,
+        target_type: 'user',
+        target_id: owner.id,
+        metadata: expect.objectContaining({ noteId }),
+      }),
+    ]);
+
+    const replay = await stepUpRefusal(caller.admin.users.deleteNote({ note_id: noteId }));
+    expect(replay?.code).toBe('MFA_REQUIRED');
+  });
+
+  test('refuses a proof bound to another note without spending it', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const noteA = await insertNote(admin.id, owner.id);
+    const noteB = await insertNote(admin.id, owner.id);
+    const proofA = await insertDeleteNoteProof(admin.id, noteA);
+    const caller = await createSessionCallerForUser(admin.id, { webSessionId });
+
+    const cause = await stepUpRefusal(caller.admin.users.deleteNote({ note_id: noteB }));
+    expect(cause?.code).toBe('MFA_REQUIRED');
+    expect(cause?.binding).toMatchObject({
+      actionClass: 'sensitive_write',
+      route: 'admin.users.deleteNote',
+      targetKind: 'none',
+      targetId: noteB,
+    });
+    expect(await noteExists(noteB)).toBe(true);
+    expect(await proofConsumedAt(proofA)).toBeNull();
+    expect(await deleteNoteAuditRows(admin.id)).toEqual([
+      expect.objectContaining({ outcome: 'failure', target_type: null, target_id: null }),
+    ]);
+
+    await expect(caller.admin.users.deleteNote({ note_id: noteA })).resolves.toEqual({
+      success: true,
+    });
+    expect(await noteExists(noteB)).toBe(true);
   });
 });

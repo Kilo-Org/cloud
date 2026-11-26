@@ -1425,10 +1425,9 @@ const ACCOUNT_AREA_ID_FIELD = 'userId';
 
 /**
  * Per-procedure overrides for any admin-tier procedure, not only `admin.*`:
- * the validated input field the resolver reads, or `null` for a procedure in
- * an account area that acts on another record and so names no target. A
- * procedure absent from this map and outside the account area names no
- * target either.
+ * the validated input field the resolver reads to find the record it acts
+ * on, or `null` for a procedure that names no single record. A procedure
+ * absent from this map and outside the account area names no target either.
  *
  * The organization mutations below reach the shared organization admission
  * with the same `organizationId` after the admin guard. Binding the guard's
@@ -1438,7 +1437,7 @@ const ACCOUNT_AREA_ID_FIELD = 'userId';
  */
 export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string | null> = {
   'admin.users.addNote': 'kilo_user_id',
-  'admin.users.deleteNote': null,
+  'admin.users.deleteNote': 'note_id',
   'admin.internalBotUsers.create': 'organizationId',
   'admin.salesDemo.reset': 'organizationId',
   'admin.ossSponsorship.addExistingOrgToOss': 'organizationId',
@@ -1463,12 +1462,28 @@ export function targetIdFieldForAdminProcedure(path: string): string | null {
 }
 
 /**
- * The target kind an input field names. The binding records the kind of the
- * value it holds, so a field that names an organization is not reported as an
- * account.
+ * The target kind each declared input field names. The binding records the
+ * kind of the value it holds, so a field that names an organization is not
+ * reported as an account. A note id names a record inside an account, not an
+ * account, so it binds under `none`: the proof names that note and no entity.
+ */
+const TARGET_KIND_BY_INPUT_FIELD: Record<string, PrivilegedTargetKind> = {
+  userId: 'user',
+  kilo_user_id: 'user',
+  organizationId: 'organization',
+  note_id: 'none',
+};
+
+/**
+ * The target kind an input field names. Throws for a field with no declared
+ * kind: that is a wiring error, and guessing a kind would mislabel the proof.
  */
 export function targetKindForInputField(field: string): PrivilegedTargetKind {
-  return field === 'organizationId' ? 'organization' : 'user';
+  const kind = Object.hasOwn(TARGET_KIND_BY_INPUT_FIELD, field)
+    ? TARGET_KIND_BY_INPUT_FIELD[field]
+    : undefined;
+  if (kind === undefined) throw new Error(`No target kind is declared for input field ${field}`);
+  return kind;
 }
 
 function readInputField(input: object, field: string): unknown {

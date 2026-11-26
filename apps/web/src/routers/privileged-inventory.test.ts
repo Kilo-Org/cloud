@@ -2126,6 +2126,13 @@ describe('targetIdFromInput', () => {
     expect(targetIdFromInput(field, { kilo_user_id: 'user-2' })).toBe('user-2');
   });
 
+  test('reads note_id for admin.users.deleteNote and names it under no entity kind', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.deleteNote');
+    expect(field).toBe('note_id');
+    expect(targetIdFromInput(field, { note_id: 'note-1' })).toBe('note-1');
+    expect(targetKindForInputField('note_id')).toBe('none');
+  });
+
   test('reads organizationId for admin.salesDemo.reset', () => {
     const field = targetIdFieldForAdminProcedure('admin.salesDemo.reset');
     expect(field).toBe('organizationId');
@@ -2144,9 +2151,15 @@ describe('targetIdFromInput', () => {
     expect(targetKindForInputField('organizationId')).toBe('organization');
   });
 
+  test('refuses to guess a kind for a field it does not declare', () => {
+    expect(() => targetKindForInputField('grantId')).toThrow(
+      'No target kind is declared for input field grantId'
+    );
+    expect(() => targetKindForInputField('constructor')).toThrow();
+  });
+
   test('names no field for procedures without a single target', () => {
     expect(targetIdFieldForAdminProcedure('admin.supportAccess.deny')).toBeNull();
-    expect(targetIdFieldForAdminProcedure('admin.users.deleteNote')).toBeNull();
     expect(targetIdFieldForAdminProcedure('admin.unknown.procedure')).toBeNull();
   });
 
@@ -2204,6 +2217,13 @@ describe('admin target id fields name mounted mutations', () => {
         problems.push(`${route}: ${procedure._def?.type ?? 'query'}, expected mutation`);
       }
       if (field !== null && field.trim().length === 0) problems.push(`${route} (empty field)`);
+      if (field !== null) {
+        try {
+          targetKindForInputField(field);
+        } catch {
+          problems.push(`${route}: ${field} has no target kind`);
+        }
+      }
     }
 
     expect(problems).toEqual([]);

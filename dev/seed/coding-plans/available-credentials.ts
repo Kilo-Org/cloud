@@ -1,9 +1,9 @@
-import { createCipheriv, createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 
 import { coding_plan_key_inventory } from '@kilocode/db/schema';
-import type { EncryptedData } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
 
+import { sealInventoryCredential } from '../lib/coding-plan-inventory-credential';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
@@ -27,7 +27,7 @@ function printUsage(): void {
   console.log(`Usage: pnpm dev:seed coding-plans:available-credentials ${usage}`);
   console.log('');
   console.log(
-    'Creates encrypted placeholder inventory credentials for local subscription UI testing.'
+    'Creates placeholder inventory credentials, encrypted through the local byok-kms service, for local subscription UI testing.'
   );
   console.log(
     'These credentials bypass provider validation and must not be used for provider traffic.'
@@ -79,18 +79,6 @@ function requireEncryptionKey(): Buffer {
   return key;
 }
 
-function encryptCredential(plaintext: string, key: Buffer): EncryptedData {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-
-  return {
-    iv: iv.toString('base64'),
-    data: encrypted.toString('base64'),
-    authTag: cipher.getAuthTag().toString('base64'),
-  };
-}
-
 function credentialFingerprint(plaintext: string, key: Buffer): string {
   return createHmac('sha256', key).update(plaintext).digest('hex');
 }
@@ -114,14 +102,18 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
   const provider = PROVIDERS[rawProvider];
   const key = requireEncryptionKey();
-  const credentials = Array.from({ length: count }, (_, index) => {
-    const plaintext = `${KEY_PREFIX}:${scenario}:${index + 1}`;
-    return {
-      upstreamPlanId: `${KEY_PREFIX}:${rawProvider}-plan:${scenario}:${index + 1}`,
-      fingerprint: credentialFingerprint(plaintext, key),
-      encrypted: encryptCredential(plaintext, key),
-    };
-  });
+  const credentials = await Promise.all(
+    Array.from({ length: count }, async (_, index) => {
+      const plaintext = `${KEY_PREFIX}:${scenario}:${index + 1}`;
+      const id = randomUUID();
+      return {
+        id,
+        upstreamPlanId: `${KEY_PREFIX}:${rawProvider}-plan:${scenario}:${index + 1}`,
+        fingerprint: credentialFingerprint(plaintext, key),
+        sealed: await sealInventoryCredential(id, plaintext),
+      };
+    })
+  );
   const fingerprints = credentials.map(credential => credential.fingerprint);
   assertLocalSeedDatabase('coding-plans:available-credentials');
   const db = getSeedDb();
@@ -149,10 +141,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         credentials.map(
           credential =>
             ({
+              id: credential.id,
               plan_id: provider.planId,
               provider_id: provider.providerId,
               upstream_plan_id: credential.upstreamPlanId,
-              encrypted_api_key: credential.encrypted,
+              ...credential.sealed,
               credential_fingerprint: credential.fingerprint,
               status: 'available',
             }) satisfies typeof coding_plan_key_inventory.$inferInsert

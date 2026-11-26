@@ -27,9 +27,7 @@ import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 
 /** SHA-256 of a static-key ciphertext; `legacyCiphertextDigestSql` computes the same value. */
 export function legacyCiphertextDigest(legacy: EncryptedData): string {
-  return createHash('sha256')
-    .update(`${legacy.iv}.${legacy.data}.${legacy.authTag}`)
-    .digest('hex');
+  return createHash('sha256').update(`${legacy.iv}.${legacy.data}.${legacy.authTag}`).digest('hex');
 }
 
 /** `legacyCiphertextDigest` of a static-key ciphertext column, computed by PostgreSQL. */
@@ -57,6 +55,21 @@ export function sealDualWrittenCredential(
       ...encryptByokWithDataKey(plaintext, dataKey),
       legacy_digest: legacyCiphertextDigest(legacy),
     },
+  };
+}
+
+/**
+ * The envelope of a credential whose static-key ciphertext is already stored, for the
+ * backfill: the ciphertext is left as it is and the envelope records its digest.
+ */
+export function envelopeForStoredLegacyCiphertext(
+  plaintext: string,
+  legacy: EncryptedData,
+  dataKey: ByokDataKey
+): DualWrittenCredentialEnvelope {
+  return {
+    ...encryptByokWithDataKey(plaintext, dataKey),
+    legacy_digest: legacyCiphertextDigest(legacy),
   };
 }
 

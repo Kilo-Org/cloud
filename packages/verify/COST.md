@@ -36,8 +36,8 @@ While an isolate serves traffic, under the request's `waitUntil`; an idle isolat
 |---|---|---|---|
 | Feed head (UTS-token or PAT traffic) | at most 1 per 10 s = 6/min | 13,200/min = 220/s | 30,000/min = 500/s |
 | Feed list | only when the head names a new hash; at most 6/min | at most 220/s | at most 500/s |
-| UTS key set | at most 1 per 4 min = 0.25/min | 550/min = 9.2/s | 1,250/min = 21/s |
-| STS key set (STS-token traffic) | at most 1 per 4 min = 0.25/min | 550/min = 9.2/s | 1,250/min = 21/s |
+| UTS key set | 1 per 4 min ±20 % minus the response's `Age` (at most 17 s while every signer read succeeds) ≈ 0.25/min; at most 1 per 2.9 min | 550/min = 9.2/s | 1,250/min = 21/s |
+| STS key set (STS-token traffic) | 1 per 4 min ±20 % ≈ 0.25/min; at most 1 per 3.2 min | 550/min = 9.2/s | 1,250/min = 21/s |
 
 - The feed Worker keeps the head in each data center's cache for 5 s, so the feed objects see at
   most one head read per data center per 5 s, whatever the isolate count; design 5.7 sets the proof
@@ -45,6 +45,9 @@ While an isolate serves traffic, under the request's `waitUntil`; an idle isolat
 - These totals depend on the number of warm instances, not on the client count: 10,000, 50,000 or
   200,000 clients only change how many instances are warm. The table is the upper bound for all
   three, at the peak instance counts above.
+- The ±20 % jitter keeps the mean interval at 4 minutes (minus `Age`), so the totals stand; it only
+  spreads the fetches. When every UTS signer read fails, `Age` grows past the refresh point and
+  each fetch counts as failed: the isolate moves to the retry waits of section 4.
 
 **Releases.** A release cold-starts the instances of the released service. With `warm` and the
 bootstrap port, a cold instance makes 2 fetches in parallel (UTS bootstrap, STS key set), down from
@@ -65,9 +68,9 @@ so cancelling requests cannot raise any rate below.
 
 | Dependency down | Retry waits per isolate | Steady rate per isolate | 5,000 isolates | 2,200 instances |
 |---|---|---|---|---|
-| UTS key set, last good set serving (up to 24 h) | 5, 10, 20, 40, 60, 60 … s | 1/min, after about 2 min | 83/s | 37/s |
-| STS key set, set expired (it never serves past 5 min, so STS routes get 503) | 5 s fixed | 12/min | 1,000/s | 440/s |
-| Either key set, cold isolate (no set) | 5 s fixed | 12/min | only cold isolates | only cold instances |
+| UTS key set, last good set serving (up to 24 h), or every answer past the refresh point | 5, 10, 20, 40, 60, 60 … s, each ±20 % | 1/min, after about 2 min | 83/s | 37/s |
+| STS key set, set expired (it never serves past 5 min, so STS routes get 503) | 5 s ±20 % | 12/min | 1,000/s | 440/s |
+| Either key set, cold isolate (no set) | 5 s ±20 % | 12/min | only cold isolates | only cold instances |
 | Revocation feed, copy serving short tokens (head up to 10 min) | 5, 10, 20, 30, 30 … s | 2/min, after about 1 min | 167/s | 73/s |
 | Bootstrap, cold isolate | 5 s fixed | 12/min | only cold isolates | only cold instances |
 

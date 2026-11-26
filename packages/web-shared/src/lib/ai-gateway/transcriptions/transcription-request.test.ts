@@ -33,6 +33,9 @@ describe('TranscriptionRequestSchema', () => {
 
 describe('extractTranscriptionPromptInfo', () => {
   it('returns a zero system_prompt_length', () => {
-    expect(extractTranscriptionPromptInfo()).toEqual({ system_prompt_length: 0 });
+    expect(extractTranscriptionPromptInfo()).toEqual({
+      system_prompt_length: 0,
+      system_prompt_kind: null,
+    });
   });
 });

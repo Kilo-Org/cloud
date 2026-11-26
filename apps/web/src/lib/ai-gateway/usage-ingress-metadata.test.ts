@@ -52,7 +52,7 @@ const context: MicrodollarUsageContext = {
     http_x_vercel_ja4_digest: null,
     http_user_agent: null,
   },
-  promptInfo: { system_prompt_length: 0 },
+  promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
   is_free: false,
   custom_llm_pricing: null,
   max_tokens: null,

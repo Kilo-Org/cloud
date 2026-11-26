@@ -24,6 +24,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import { classifySystemPrompt } from '@kilocode/web-shared/lib/ai-gateway/system-prompt-kind';
 
 const messagesUsageSchema = usageCostSchema.extend({
   input_tokens: z.number().nullish(),
@@ -306,5 +307,9 @@ export function extractMessagesSystemPromptText(body: GatewayMessagesRequest): s
 }
 
 export function extractMessagesPromptInfo(body: GatewayMessagesRequest): PromptInfo {
-  return { system_prompt_length: extractMessagesSystemPromptText(body).length };
+  const systemPrompt = extractMessagesSystemPromptText(body);
+  return {
+    system_prompt_length: systemPrompt.length,
+    system_prompt_kind: classifySystemPrompt(systemPrompt),
+  };
 }

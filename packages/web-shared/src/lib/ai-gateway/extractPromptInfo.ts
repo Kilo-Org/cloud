@@ -1,6 +1,10 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
+  classifySystemPrompt,
+  type SystemPromptKind,
+} from '@kilocode/web-shared/lib/ai-gateway/system-prompt-kind';
+import {
   extractPromptInfo as extractChatCompletionsPromptInfo,
   extractSystemPromptText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
@@ -23,17 +27,19 @@ export function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo
   return extractChatCompletionsPromptInfo(requestBodyParsed.body);
 }
 
-/** The first 100 characters of the system prompt, for classifying a request. Never recorded. */
-export function extractSystemPromptPrefix(requestBodyParsed: GatewayRequest): string {
+/** The client guessed from the full system prompt, without reporting an unreadable body. */
+export function extractSystemPromptKind(
+  requestBodyParsed: GatewayRequest
+): SystemPromptKind | null {
   if (requestBodyParsed.kind === 'messages') {
-    return extractMessagesSystemPromptText(requestBodyParsed.body).slice(0, 100);
+    return classifySystemPrompt(extractMessagesSystemPromptText(requestBodyParsed.body));
   }
   if (requestBodyParsed.kind === 'responses') {
-    return extractResponsesSystemPromptText(requestBodyParsed.body).slice(0, 100);
+    return classifySystemPrompt(extractResponsesSystemPromptText(requestBodyParsed.body));
   }
   try {
-    return extractSystemPromptText(requestBodyParsed.body).slice(0, 100);
+    return classifySystemPrompt(extractSystemPromptText(requestBodyParsed.body));
   } catch {
-    return '';
+    return null;
   }
 }

@@ -25,7 +25,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/usage-endpoint-pipeline';
 
 function extractMultipartPromptInfo(): PromptInfo {
-  return { system_prompt_length: 0 };
+  return { system_prompt_length: 0, system_prompt_kind: null };
 }
 
 function extractMultipartLanguage(formData: FormData): string | null {

@@ -327,7 +327,10 @@ describe('getOrganizationProviderPrivacy', () => {
 
 describe('extractEmbeddingPromptInfo', () => {
   it('should always return a zero system_prompt_length', () => {
-    expect(extractEmbeddingPromptInfo()).toEqual({ system_prompt_length: 0 });
+    expect(extractEmbeddingPromptInfo()).toEqual({
+      system_prompt_length: 0,
+      system_prompt_kind: null,
+    });
   });
 });
 
@@ -722,7 +725,7 @@ describe('countAndStoreFimUsage', () => {
       kiloUserId: 'user-fim-test',
       provider: 'mistral',
       requested_model: 'mistralai/codestral-2508',
-      promptInfo: { system_prompt_length: 0 },
+      promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
       max_tokens: 100,
       has_middle_out_transform: null,
       fraudHeaders: {},
@@ -1240,7 +1243,7 @@ describe.each<{
     status_code: 200,
     usageId: 'usage-recovery-id',
     organizationId: 'usage-organization',
-    promptInfo: { system_prompt_length: 14 },
+    promptInfo: { system_prompt_length: 14, system_prompt_kind: null },
   });
 
   const validPayload = {

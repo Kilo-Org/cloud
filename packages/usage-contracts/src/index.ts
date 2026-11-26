@@ -115,6 +115,9 @@ const UsageMetadataSchema = z.object({
   is_free: z.boolean().nullable(),
   abuse_delay: z.number().nullable(),
   abuse_downgraded_from: z.string().nullable(),
+  // Additive like reasoning_setting: older senders omit it. Plain text rather than an enum, so a
+  // kind added on a newer sender never rejects the record on an older receiver.
+  system_prompt_kind: z.string().nullable().default(null),
 });
 
 /**

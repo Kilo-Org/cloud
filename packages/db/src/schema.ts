@@ -2952,6 +2952,7 @@ export const microdollar_usage_metadata = pgTable(
     is_free: boolean(),
     abuse_delay: integer(),
     abuse_downgraded_from: text(),
+    system_prompt_kind_id: integer(),
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
@@ -3065,6 +3066,16 @@ export const finish_reason = pgTable(
     finish_reason: text().notNull(),
   },
   table => [uniqueIndex('UQ_finish_reason').on(table.finish_reason)]
+);
+
+/** The client guessed from the system prompt, such as `kilo` or `codex`; see `classifySystemPrompt`. */
+export const system_prompt_kind = pgTable(
+  'system_prompt_kind',
+  {
+    system_prompt_kind_id: serial().notNull().primaryKey(),
+    system_prompt_kind: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_system_prompt_kind').on(table.system_prompt_kind)]
 );
 
 export const editor_name = pgTable(
@@ -3185,6 +3196,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   is_free: boolean(),
   abuse_delay: integer(),
   abuse_downgraded_from: text(),
+  system_prompt_kind: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -3240,7 +3252,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.non_inference_cost,
     meta.is_free,
     meta.abuse_delay,
-    meta.abuse_downgraded_from
+    meta.abuse_downgraded_from,
+    spk.system_prompt_kind
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -3256,6 +3269,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
   LEFT JOIN ${reasoning_setting} rs ON meta.reasoning_setting_id = rs.reasoning_setting_id
+  LEFT JOIN ${system_prompt_kind} spk ON meta.system_prompt_kind_id = spk.system_prompt_kind_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;

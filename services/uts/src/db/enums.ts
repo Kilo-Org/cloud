@@ -40,6 +40,15 @@ export const REVOKE_REASONS = [
   'reuse_detected',
   'session_ended',
   'client_blocked',
+  // Added by 0014_identity_import_subject_operations.sql, in this order.
+  'account_recovery',
+  'account_reset',
+  'account_deleted',
+  'staff_signout',
+  'workos_relink',
+  'scim_mailbox_move',
+  'apple_consent_revoked',
+  'staff_api_reset',
 ] as const;
 export const SESSION_STATUSES = ['active', 'revoked'] as const;
 export const GRANT_STATUSES = ['active', 'revoked'] as const;
@@ -78,6 +87,8 @@ export const REVOCATION_KINDS = [
   'kid',
   // Added by 0006_revocation_feed.sql; `ALTER TYPE ... ADD VALUE` appends it.
   'blocked_account',
+  // Added by 0014_identity_import_subject_operations.sql.
+  'unblocked_account',
 ] as const;
 export const GATE_TIERS = ['a', 'b'] as const;
 export const GATED_ACTIONS = [
@@ -121,6 +132,16 @@ export const NOTICE_ATTEMPT_OUTCOMES = [
 export const SIGN_IN_SESSION_KINDS = ['browser', 'device'] as const;
 export const SIGN_IN_INTENTS = ['sign_in', 'link'] as const;
 export const WEBAUTHN_CEREMONIES = ['registration', 'sign_in', 'step_up'] as const;
+export const SUBJECT_OPERATIONS = [
+  'revoke',
+  'unblock',
+  'end_browser_sessions',
+  'end_device_sessions',
+  'revoke_api_credentials',
+  'email_sync',
+  'membership_sync',
+  'sso_organization_sync',
+] as const;
 
 /** Each enum by its type name in the `uts` schema. */
 export const IDENTITY_STORE_ENUMS = {
@@ -161,4 +182,5 @@ export const IDENTITY_STORE_ENUMS = {
   sign_in_intent: SIGN_IN_INTENTS,
   notice_attempt_outcome: NOTICE_ATTEMPT_OUTCOMES,
   sign_in_session_kind: SIGN_IN_SESSION_KINDS,
+  subject_operation: SUBJECT_OPERATIONS,
 } as const;

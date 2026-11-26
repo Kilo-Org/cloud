@@ -169,6 +169,12 @@ describe('provider sign-in', () => {
     expect(methods.rows).toEqual([
       { provider: 'google', provider_subject: subject, verified_email: email, gate_pass_id: null },
     ]);
+    // The sign-up statement writes the app's user-created event (migration 0014).
+    const events = await owner.query(
+      'SELECT event_type, primary_email FROM uts.app_account_events WHERE account_id = $1',
+      [accountId]
+    );
+    expect(events.rows).toEqual([{ event_type: 'user.created', primary_email: email }]);
     const rows = await auditRows(accountId);
     expect(rows.map(row => row.type)).toEqual([
       'ai.kilo.uts.account.created',

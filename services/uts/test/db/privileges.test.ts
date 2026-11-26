@@ -50,8 +50,16 @@ const FUNCTION_WRITTEN_TABLES = [
   'sign_ins',
 ];
 
-/** Tables the app login cannot even read: only the sign-in functions reach them. */
-const FUNCTION_ONLY_TABLES = ['sign_in_flows'];
+/**
+ * Tables the app login cannot even read: only the sign-in functions reach the flows, and only the
+ * subject operation, import and app-event functions (migration 0014) reach the rest.
+ */
+const FUNCTION_ONLY_TABLES = [
+  'sign_in_flows',
+  'subject_operations',
+  'subject_tombstones',
+  'app_account_events',
+];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
 const UPDATE_COLUMN: Partial<Record<string, string>> = {
@@ -666,7 +674,9 @@ describe('functions', () => {
        ORDER BY 1, 2`
     );
     expect(result.rows).toEqual([
+      { routine: 'ack_app_account_events', grantee: 'uts_app' },
       { routine: 'advance_audit_watermark', grantee: 'uts_app' },
+      { routine: 'apply_subject_operation', grantee: 'uts_app' },
       { routine: 'claim_credential_notice', grantee: 'uts_app' },
       { routine: 'claim_due_notices', grantee: 'uts_app' },
       { routine: 'claim_notice', grantee: 'uts_app' },
@@ -684,6 +694,7 @@ describe('functions', () => {
       { routine: 'exchange_device_code', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'finish_notice', grantee: 'uts_app' },
+      { routine: 'import_account', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
@@ -700,7 +711,9 @@ describe('functions', () => {
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
       { routine: 'maintain_provider_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
+      { routine: 'maintain_subject_operation_rows', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
+      { routine: 'read_app_account_events', grantee: 'uts_app' },
       { routine: 'read_browser_session', grantee: 'uts_app' },
       { routine: 'read_device_code', grantee: 'uts_app' },
       { routine: 'read_passkey_assertion', grantee: 'uts_app' },
@@ -713,8 +726,12 @@ describe('functions', () => {
       { routine: 'revoke_bot_key', grantee: 'uts_app' },
       { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
+      { routine: 'sso_app_organization', grantee: 'uts_app' },
       { routine: 'start_email_sign_in', grantee: 'uts_app' },
       { routine: 'start_sign_in_flow', grantee: 'uts_app' },
+      { routine: 'sync_org_membership', grantee: 'uts_app' },
+      { routine: 'sync_primary_email', grantee: 'uts_app' },
+      { routine: 'sync_sso_organization', grantee: 'uts_app' },
       { routine: 'verify_email_code', grantee: 'uts_app' },
     ]);
   });

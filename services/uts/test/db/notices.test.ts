@@ -787,7 +787,7 @@ describe('migration 0010 baseline', () => {
       const migrations = await loadMigrations();
       await applyMigrations(
         admin,
-        migrations.filter(migration => migration.name !== '0010_notices.sql')
+        migrations.filter(migration => migration.name < '0010_notices.sql')
       );
       await admin.query('SET ROLE uts_owner');
       const accountId = await insertAccount(admin);

@@ -1,4 +1,8 @@
-import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  adminProcedure,
+  baseProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -416,15 +420,11 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       };
     }),
 
-  triggerBitbucketCodeReview: baseProcedure
+  // Kilo admins only: the admin guard checks the role, the network and step-up;
+  // the organization check below still applies.
+  triggerBitbucketCodeReview: adminProcedure
     .input(TriggerBitbucketCodeReviewInputSchema)
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user.is_admin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Admin access required',
-        });
-      }
       await ensureOrganizationAccess(ctx, input.organizationId);
 
       try {

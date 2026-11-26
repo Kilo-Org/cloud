@@ -680,7 +680,7 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
     expect(await issuedRows()).toEqual([]);
   });
 
-  it('refuses it in staging and production, where no ai-gateway policy exists', async () => {
+  it('denies an ai-gateway caller at the staging and production mint as unknown_workload', async () => {
     const gateway: MintCaller = {
       channel: 'http',
       workload: 'ai-gateway',

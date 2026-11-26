@@ -441,9 +441,16 @@ goes in an `env.local` block named `kilo-mcp-local`, with `observability.traces.
 every block.
 
 The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
-exists for the gateway's authenticated UTS HTTPS feed transport. It lists development only, so
-staging and production STS refuse the gateway as an unknown workload; its activation adds staging
-and production to both its `environments` lists and is reviewed like any policy change.
+exists for the gateway's authenticated UTS HTTPS feed transport. It lists development only. Staging
+and production STS refuse a real gateway token whole (401 `identity_rejected`) and audit it with
+actor `ai-gateway`: a preview token as `environment_mismatch`, a staging or production token as
+`identity_rejected`, since the policy lists neither identity. A caller that reached the mint there
+would get `unknown_workload`, as no policy names it. Its activation adds staging and production to
+both its `environments` lists and is reviewed like any policy change.
+
+Any preview build of `kilocode-ai-gateway`, from any branch, can obtain this development read
+scope, the same as `web`'s development grants. If fork or outside pull-request previews are ever
+enabled on that project, this grant needs a review first.
 
 Workloads with a policy, all over `worker-binding`:
 

@@ -130,11 +130,7 @@ export async function handleStsCanaryVerify(
     env.STS_URL,
     environment.data,
     new URL(request.url).origin
-  ).verify(
-    request,
-    { issuer: 'sts', scope: USAGE_INGEST_CANARY_TOKEN.scope },
-    { waitUntil }
-  );
+  ).verify(request, { issuer: 'sts', scope: USAGE_INGEST_CANARY_TOKEN.scope }, { waitUntil });
   const run = runIdOf(request);
   if (!result.ok) {
     logSafely('warn', () => ({

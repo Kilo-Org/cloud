@@ -38,6 +38,7 @@ import { ChevronLeft, ChevronRight, Info, X, Bomb } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { BulkChangeVersionDialog } from './BulkChangeVersionDialog';
+import { StopAllRenewalsButton } from './StopAllRenewalsButton';
 import {
   ComposedChart,
   Bar,
@@ -683,6 +684,7 @@ export function KiloclawInstancesPage() {
           Has size override
         </Button>
 
+        <StopAllRenewalsButton />
         <DevNukeAllButton />
       </div>
 

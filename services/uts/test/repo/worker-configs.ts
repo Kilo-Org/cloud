@@ -181,6 +181,8 @@ const BindingsShape = {
     .optional(),
   observability: z
     .looseObject({
+      head_sampling_rate: z.number().optional(),
+      logs: z.looseObject({ head_sampling_rate: z.number().optional() }).optional(),
       traces: z.looseObject({ enabled: z.boolean().optional() }).optional(),
       redact_query_string: z.boolean().optional(),
     })
@@ -659,6 +661,12 @@ function joseCompatibilityProblems({ path, config }: WorkerConfig): string[] {
 }
 
 /**
+ * The largest head sample of the feed Worker's logs: each HTTPS feed read is one invocation, so the
+ * approved log budget allows 1 to 5 percent of them.
+ */
+export const FEED_MAX_LOG_SAMPLING_RATE = 0.05;
+
+/**
  * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
  * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
  * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
@@ -666,9 +674,9 @@ function joseCompatibilityProblems({ path, config }: WorkerConfig): string[] {
  * keeps query strings (a provider callback's authorization code) out of its logs;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
- * without placement, binds no Durable Object, binds each mint entrypoint once, and turns its HTTPS
- * feed on only with `FEED_HTTPS_ENABLED` exactly `true` and the STS issuer of its own environment;
- * and every
+ * without placement, binds no Durable Object, binds each mint entrypoint once, keeps at most a
+ * `FEED_MAX_LOG_SAMPLING_RATE` head sample of its logs, and turns its HTTPS feed on only with
+ * `FEED_HTTPS_ENABLED` exactly `true` and the STS issuer of its own environment; and every
  * jose-verifying config lists `unhandled_rejection_after_microtask_checkpoint` exactly when its
  * compatibility date is before 2026-03-03, the date the flag became workerd's default (jose#892).
  */
@@ -758,6 +766,16 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       if (mintEntrypoints.join(',') !== [...MINT_ENTRYPOINTS].sort().join(',')) {
         problems.push(
           `${block.where}: binds the mint Worker at ${mintEntrypoints.join(', ') || 'no entrypoint'}; expected ${MINT_ENTRYPOINTS.join(' and ')} once each`
+        );
+      }
+      // Cloudflare samples logs at `logs.head_sampling_rate`, else the observability-wide rate,
+      // else keeps every invocation.
+      const observability = block.block?.observability ?? feed.config.observability;
+      const logRate =
+        observability?.logs?.head_sampling_rate ?? observability?.head_sampling_rate ?? 1;
+      if (logRate > FEED_MAX_LOG_SAMPLING_RATE) {
+        problems.push(
+          `${block.where}: observability.logs.head_sampling_rate resolves to ${logRate}; the feed Worker keeps at most ${FEED_MAX_LOG_SAMPLING_RATE} of its invocation logs`
         );
       }
       problems.push(...feedHttpsProblems(block));

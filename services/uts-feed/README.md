@@ -133,7 +133,10 @@ public.
   `Authorization` and the answer is `private`, so no Cloudflare cache answers it in front of the
   Worker. Per verifier instance a head read at most every 10 seconds, a list read only when the
   head names a new list, and one bootstrap per cold start; the monthly arithmetic is in design 3
-  ("Revocation feed").
+  ("Revocation feed"). Invocation logs keep a 5 percent head sample
+  (`observability.logs.head_sampling_rate` 0.05, inherited by every block), so logs do not grow
+  the bill with every read; `services/uts/test/repo` refuses a rate above 0.05. The refusal log
+  lines above are sampled the same way.
 
 ## Local development
 

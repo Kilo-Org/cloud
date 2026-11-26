@@ -14,10 +14,12 @@
     "port": 8801,
     "local_protocol": "http",
   },
-  // Traces stay off, as in every UTS Worker. Every env block inherits this.
+  // Traces stay off, as in every UTS Worker. Invocation logs keep a 5 percent head sample, the log
+  // budget approved for the HTTPS feed, where every read is one invocation (services/uts/test/repo
+  // checks at most 0.05). Every env block inherits this.
   "observability": {
     "enabled": true,
-    "logs": { "enabled": true, "invocation_logs": true },
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 0.05 },
     "traces": { "enabled": false },
   },
   "logpush": true,

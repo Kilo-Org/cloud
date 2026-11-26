@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { experimental_readRawConfig } from 'wrangler';
 import {
   FEED_CONFIG,
+  FEED_MAX_LOG_SAMPLING_RATE,
   FEED_TEST_CONFIG,
   JOSE_UNHANDLED_REJECTION_DATE,
   JOSE_UNHANDLED_REJECTION_FLAG,
@@ -618,5 +619,45 @@ describe('the UTS configs themselves', () => {
         )
       )
     ).toEqual([expect.stringContaining(`${FEED_CONFIG} (env.staging): STS_URL`)]);
+  });
+
+  it('keep the feed logs at a 5 percent head sample in every block, and fail a larger or missing one', () => {
+    expect(configAt(FEED_CONFIG).config.observability?.logs?.head_sampling_rate).toBe(
+      FEED_MAX_LOG_SAMPLING_RATE
+    );
+    const withObservability = (observability: Record<string, unknown>) =>
+      configWith(FEED_CONFIG, raw => ({ ...raw, observability }));
+    const blocks = ['(top level)', '(env.staging)', '(env.local)'];
+    expect(
+      utsConfigProblems(
+        withObservability({ enabled: true, logs: { enabled: true }, traces: { enabled: false } })
+      )
+    ).toEqual(
+      blocks.map(
+        where =>
+          `${FEED_CONFIG} ${where}: observability.logs.head_sampling_rate resolves to 1; the feed Worker keeps at most 0.05 of its invocation logs`
+      )
+    );
+    expect(
+      utsConfigProblems(
+        withObservability({
+          enabled: true,
+          head_sampling_rate: 0.01,
+          logs: { enabled: true, head_sampling_rate: 0.1 },
+          traces: { enabled: false },
+        })
+      )
+    ).toEqual(
+      blocks.map(where =>
+        expect.stringContaining(
+          `${FEED_CONFIG} ${where}: observability.logs.head_sampling_rate resolves to 0.1`
+        )
+      )
+    );
+    expect(
+      utsConfigProblems(
+        withObservability({ enabled: true, head_sampling_rate: 0.01, traces: { enabled: false } })
+      )
+    ).toEqual([]);
   });
 });

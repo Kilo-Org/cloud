@@ -8,7 +8,8 @@ import {
   type WorkloadName,
 } from '@kilocode/sts-contracts';
 import type { PolicySnapshotEntry } from '../policy/load';
-import type { Denial } from './denials';
+import type { KeyRevocation, KeyRingChange } from '../tokens/key-ring';
+import type { BundleDenial, TokenDenial } from './denials';
 
 /** Attributes hold at most 256 values; longer lists are cut and flagged. */
 function attributeList(values: string[]): { values: string[]; truncated: boolean } {
@@ -59,7 +60,7 @@ export function bundleDeliveredEvent(input: {
  */
 export function bundleDeniedEvent(input: {
   environment: StsEnvironment;
-  denial: Denial;
+  denial: BundleDenial;
   count: number;
   windowStart: string;
   overflow: boolean;
@@ -131,8 +132,28 @@ export function managerReferenceRefusedEvent(input: {
   });
 }
 
-function secretKeys(snapshot: PolicySnapshotEntry[]): string[] {
-  return snapshot.flatMap(entry => entry.secrets.map(name => `${entry.workload}:${name}`));
+/** `workload:<value>` for every value of one grant list, such as `o11y:O11Y_CF_AE_API_TOKEN`. */
+function grantKeys(
+  snapshot: PolicySnapshotEntry[],
+  grant: 'secrets' | 'audiences' | 'scopes'
+): Set<string> {
+  return new Set(
+    snapshot.flatMap(entry => (entry[grant] ?? []).map(value => `${entry.workload}:${value}`))
+  );
+}
+
+/** What `current` adds to and removes from `previous`, cut to attribute size and flagged. */
+function diff(
+  previous: Set<string>,
+  current: Set<string>
+): { added: string[]; removed: string[]; truncated: boolean } {
+  const added = attributeList([...current].filter(key => !previous.has(key)));
+  const removed = attributeList([...previous].filter(key => !current.has(key)));
+  return {
+    added: added.values,
+    removed: removed.values,
+    truncated: added.truncated || removed.truncated,
+  };
 }
 
 export function policyChangedEvent(input: {
@@ -142,19 +163,16 @@ export function policyChangedEvent(input: {
   previous: PolicySnapshotEntry[];
   current: PolicySnapshotEntry[];
 }): AuditEvent {
-  const previousWorkloads = new Set(input.previous.map(entry => entry.workload));
-  const currentWorkloads = new Set(input.current.map(entry => entry.workload));
-  const previousSecrets = new Set(secretKeys(input.previous));
-  const currentSecrets = new Set(secretKeys(input.current));
-
-  const addedWorkloads = [...currentWorkloads].filter(name => !previousWorkloads.has(name));
-  const removedWorkloads = [...previousWorkloads].filter(name => !currentWorkloads.has(name));
-  const addedSecrets = [...currentSecrets].filter(key => !previousSecrets.has(key));
-  const removedSecrets = [...previousSecrets].filter(key => !currentSecrets.has(key));
-  const added = attributeList(addedWorkloads);
-  const removed = attributeList(removedWorkloads);
-  const addedSecretList = attributeList(addedSecrets);
-  const removedSecretList = attributeList(removedSecrets);
+  const workloads = diff(
+    new Set(input.previous.map(entry => entry.workload)),
+    new Set(input.current.map(entry => entry.workload))
+  );
+  const secrets = diff(grantKeys(input.previous, 'secrets'), grantKeys(input.current, 'secrets'));
+  const audiences = diff(
+    grantKeys(input.previous, 'audiences'),
+    grantKeys(input.current, 'audiences')
+  );
+  const scopes = diff(grantKeys(input.previous, 'scopes'), grantKeys(input.current, 'scopes'));
 
   return AuditEventSchema.parse({
     specversion: '1.0',
@@ -173,12 +191,186 @@ export function policyChangedEvent(input: {
         environment: input.environment,
         policyHash: input.policyHash,
         previousPolicyHash: input.previousPolicyHash ?? 'none',
-        addedWorkloads: added.values,
-        removedWorkloads: removed.values,
-        addedSecrets: addedSecretList.values,
-        removedSecrets: removedSecretList.values,
-        workloadsTruncated: added.truncated || removed.truncated,
-        secretsTruncated: addedSecretList.truncated || removedSecretList.truncated,
+        addedWorkloads: workloads.added,
+        removedWorkloads: workloads.removed,
+        addedSecrets: secrets.added,
+        removedSecrets: secrets.removed,
+        addedAudiences: audiences.added,
+        removedAudiences: audiences.removed,
+        addedScopes: scopes.added,
+        removedScopes: scopes.removed,
+        workloadsTruncated: workloads.truncated,
+        secretsTruncated: secrets.truncated,
+        audiencesTruncated: audiences.truncated,
+        scopesTruncated: scopes.truncated,
+      },
+    },
+  });
+}
+
+/**
+ * One mint call: every token it signed, as parallel `jtis`, `audiences` and `scopes` lists (design
+ * 5.3: one audit row per call listing each token's `jti`, scope and audience). Never the token.
+ */
+export function tokenIssuedEvent(input: {
+  environment: StsEnvironment;
+  workload: WorkloadName;
+  /** How the caller proved its identity: `worker-binding` or the OIDC provider. */
+  identity: string;
+  kid: string;
+  issuedAt: number;
+  expiresAt: number;
+  attestationCapped: boolean;
+  tokens: { jti: string; audience: string; scope: string }[];
+}): AuditEvent {
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.token.issued',
+    time: new Date(input.issuedAt * 1000).toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.create,
+      outcome: 'success',
+      actor: { kind: 'workload', id: input.workload },
+      attributes: {
+        workload: input.workload,
+        environment: input.environment,
+        identity: input.identity,
+        kid: input.kid,
+        issuedAt: input.issuedAt,
+        expiresAt: input.expiresAt,
+        lifetimeSeconds: input.expiresAt - input.issuedAt,
+        attestationCapped: input.attestationCapped,
+        tokenCount: input.tokens.length,
+        jtis: input.tokens.map(token => token.jti),
+        audiences: input.tokens.map(token => token.audience),
+        scopes: input.tokens.map(token => token.scope),
+      },
+    },
+  });
+}
+
+/**
+ * `count` identical refused token requests in the minute starting at `windowStart`. A refusal of the
+ * whole call (an identity that verified but maps to no usable policy) names no audience or scope.
+ */
+export function tokenDeniedEvent(input: {
+  environment: StsEnvironment;
+  denial: TokenDenial;
+  count: number;
+  windowStart: string;
+  overflow: boolean;
+}): AuditEvent {
+  const { denial } = input;
+  const claims = Object.keys(denial.claims)
+    .sort()
+    .map(name => `${name}=${denial.claims[name]}`.slice(0, 256));
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.token.denied',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.create,
+      outcome: 'denied',
+      outcomeDetail: denial.reason,
+      actor: {
+        kind: denial.channel === 'worker-binding' ? 'workload' : 'service',
+        id: denial.actor,
+      },
+      attributes: {
+        environment: input.environment,
+        channel: denial.channel,
+        reason: denial.reason,
+        workload: denial.actor,
+        ...(denial.audience === undefined ? {} : { audience: denial.audience }),
+        ...(denial.scope === undefined ? {} : { scope: denial.scope }),
+        count: input.count,
+        windowStart: input.windowStart,
+        overflow: input.overflow,
+        claims,
+      },
+    },
+  });
+}
+
+/**
+ * A scheduled change to the token-signing key ring (design 5.7): the first key, the next key
+ * published, the next key activated (the previous one retired), or a retired key unpublished.
+ * API Activity, as for every token and secret operation (design 8.2); Account Change is for
+ * policy and identity changes.
+ */
+export function tokenKeyRotatedEvent(input: {
+  environment: StsEnvironment;
+  change: KeyRingChange;
+}): AuditEvent {
+  const { change } = input;
+  const detail: Record<string, string | number> = {};
+  if (change.change === 'published')
+    detail.activatesAt = new Date(change.activatesAt).toISOString();
+  if (change.change === 'activated' && change.retiredKid !== null) {
+    detail.retiredKid = change.retiredKid;
+  }
+  if (change.change === 'removed') detail.lastTokenExpiresAt = change.lastTokenExp;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.token_key.rotated',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: change.change === 'removed' ? OCSF_API_ACTIVITY.delete : OCSF_API_ACTIVITY.update,
+      outcome: 'success',
+      outcomeDetail: change.change,
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        change: change.change,
+        kid: change.kid,
+        ...detail,
+      },
+    },
+  });
+}
+
+/**
+ * A key left the ring in an emergency: it never signs again and leaves the key set. `cause` is
+ * `listed` for a kid in `TOKEN_SIGNING_KIDS_REVOKED`, or `same_ring` for the `next` key of a shard
+ * whose current key was listed (one storage leak exposes both). A dropped current or next key is
+ * replaced by a freshly generated one at once.
+ */
+export function tokenKeyRevokedEvent(input: {
+  environment: StsEnvironment;
+  revocation: KeyRevocation;
+}): AuditEvent {
+  const { revocation } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.token_key.revoked',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.delete,
+      outcome: 'success',
+      outcomeDetail: 'emergency removal',
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        kid: revocation.kid,
+        state: revocation.state,
+        cause: revocation.cause,
+        replacementKid: revocation.replacementKid ?? 'none',
       },
     },
   });

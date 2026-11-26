@@ -52,6 +52,8 @@
     "MANAGER_IDENTITY_ID": "c531ad9b-eec9-4f93-b173-e14d3d94f6ef",
     // Durable Objects hold secret material, so production and staging pin them to the EU.
     "DO_JURISDICTION": "eu",
+    // Emergency removal of a service-token signing key: comma list of kids (README runbook).
+    "TOKEN_SIGNING_KIDS_REVOKED": "",
   },
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }],
@@ -62,11 +64,13 @@
       { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
       { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
       { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+      { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
   ],
   "env": {
     "staging": {
@@ -88,6 +92,7 @@
         "MANAGER_ENVIRONMENT_SLUG": "staging",
         "MANAGER_IDENTITY_ID": "5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4",
         "DO_JURISDICTION": "eu",
+        "TOKEN_SIGNING_KIDS_REVOKED": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }],
@@ -98,6 +103,7 @@
           { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
           { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+          { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
         ],
       },
     },
@@ -116,6 +122,7 @@
         "MANAGER_IDENTITY_ID": "8c46d33c-6f3b-465b-b99a-ebfb734e2c8c",
         // workerd enforces no data residency, so local development keeps objects unscoped.
         "DO_JURISDICTION": "none",
+        "TOKEN_SIGNING_KIDS_REVOKED": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }],
@@ -126,6 +133,7 @@
           { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
           { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+          { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
         ],
       },
     },

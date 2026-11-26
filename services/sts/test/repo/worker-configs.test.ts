@@ -13,6 +13,7 @@ import {
   type WorkerConfig,
   deployConfigEntries,
   internalWorkerProblems,
+  stsVarProblems,
   parseWorkerConfig,
   trackedPaths,
   workerBindingPolicyProblems,
@@ -128,6 +129,10 @@ describe('repository Worker configs', () => {
 
   it('agree with the deployment lists the check relies on', () => {
     expect(internalWorkerProblems(repoConfigs())).toEqual([]);
+  });
+
+  it('set every var STS reads in each STS deployment, with the issuer verifiers expect', () => {
+    expect(stsVarProblems(repoConfigs())).toEqual([]);
   });
 
   it('bind STS as every worker-binding policy, unless its Worker is listed as external', () => {
@@ -253,6 +258,55 @@ describe('worker config rules', () => {
           `${PATH} (top level): SIGNER binds Durable Object class SignerDO of ${script}; its Durable Objects are internal`
       )
     );
+  });
+
+  it("refuses a config outside services/sts that binds one of STS's own classes", () => {
+    const config = consumer({
+      durable_objects: {
+        bindings: [
+          { name: 'TOKENS', class_name: 'TokenSignerDO' },
+          { name: 'SIGNER', class_name: 'SignerDO' },
+        ],
+      },
+    });
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level): TOKENS binds Durable Object class TokenSignerDO, which only STS defines and binds`,
+    ]);
+    const own = parseWorkerConfig('services/sts/test/fixtures/x/wrangler.jsonc', {
+      name: 'secrets-broker-x-test',
+      ...NO_TRACES,
+      durable_objects: { bindings: [{ name: 'TOKENS', class_name: 'TokenSignerDO' }] },
+    });
+    expect(problemsOf(own)).toEqual([]);
+  });
+
+  it('refuses an STS block whose vars readConfig would refuse or whose issuer differs', () => {
+    const vars = {
+      STS_ENVIRONMENT: 'staging',
+      STS_ISSUER: 'https://sts-staging.kiloapps.io',
+      MANAGER_BASE_URL: 'https://eu.infisical.com',
+      MANAGER_PROJECT_ID: 'project',
+      MANAGER_ENVIRONMENT_SLUG: 'staging',
+      MANAGER_IDENTITY_ID: 'identity',
+      DO_JURISDICTION: 'eu',
+      TOKEN_SIGNING_KIDS_REVOKED: '',
+    };
+    const sts = (blockVars: Record<string, string>) =>
+      parseWorkerConfig('services/sts/wrangler.jsonc', { name: 'sts', vars: blockVars });
+    expect(stsVarProblems([sts(vars)])).toEqual([]);
+    expect(stsVarProblems([sts({ ...vars, TOKEN_SIGNING_KIDS_REVOKED: 'a'.repeat(43) })])).toEqual(
+      []
+    );
+    const { TOKEN_SIGNING_KIDS_REVOKED: _omitted, ...withoutKids } = vars;
+    expect(stsVarProblems([sts(withoutKids)])).toEqual([
+      expect.stringContaining('TOKEN_SIGNING_KIDS_REVOKED'),
+    ]);
+    expect(stsVarProblems([sts({ ...vars, TOKEN_SIGNING_KIDS_REVOKED: 'not-a-kid' })])).toEqual([
+      expect.stringContaining('vars do not pass EnvVarsSchema'),
+    ]);
+    expect(stsVarProblems([sts({ ...vars, STS_ISSUER: 'https://sts.kiloapps.io' })])).toEqual([
+      'services/sts/wrangler.jsonc (top level): STS_ISSUER is https://sts.kiloapps.io, expected https://sts-staging.kiloapps.io',
+    ]);
   });
 
   it('refuses an STS binding at any entrypoint other than SecretsBroker', () => {

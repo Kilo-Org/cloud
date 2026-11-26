@@ -25,8 +25,11 @@ The wire schema comes from `@kilocode/usage-contracts` through its package expor
 That package depends only on Zod at runtime; the Worker does not depend on
 web-shared or database modules in its bundle.
 
-Send `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`. Authentication runs
-before body reads; a missing/empty configured secret returns 503, and missing/wrong
+Send `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`, or, once
+`USAGE_INGEST_PUBLISH_AUTH` allows it, an STS service token
+([STS service tokens for publish and write](#sts-service-tokens-for-publish-and-write)).
+Authentication runs before body reads; under the default a missing/empty configured
+secret returns 503, and missing/wrong
 auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
@@ -167,6 +170,7 @@ settings, comparable aggregates and read-only database snapshots.
 | `USAGE_INGEST_PARALLELISM` | `2` for two processing slots; all other or absent values use one |
 | `USAGE_WRITER_URL` | Full Frankfurt writer URL ending in `/api/internal/usage/record` |
 | `USAGE_WRITER_SECRET` | Writer's existing `INTERNAL_API_SECRET`, sent as `x-internal-api-key` |
+| `USAGE_WRITER_AUTH` | Absent or `legacy` sends the secret; `sts` sends only an STS token ([STS service tokens](#sts-service-tokens-for-publish-and-write)) |
 | `USAGE_WRITER_PROTECTION_BYPASS` | Optional Vercel automation bypass secret |
 
 At activation, commit `USAGE_WRITER_URL` in the target environment’s `vars` or store
@@ -927,6 +931,82 @@ production (proof run 3: the budget is per project or team, not per deployment).
 custom environment exchanges once per instance, custom-environment use must stay well below 100
 exchanging instances per minute; before any staging hot path adopts the client, either that
 holds or encrypted shared entries (design 4.4) come first.
+
+## STS service tokens for publish and write
+
+Design section 6.5 replaces `USAGE_INGEST_PUBLISH_SECRET` and `USAGE_WRITER_SECRET` with STS
+service tokens. Each leg has its own switch, so each rolls back on its own. Both switches are
+absent from `wrangler.jsonc`, which selects `legacy`: the Worker then behaves exactly as before
+them. The scopes come from `@kilocode/sts-contracts`; the canary scopes are not reused.
+
+| Leg | Caller (STS workload) | Receiver | Scope (audience) |
+|---|---|---|---|
+| Publish `/usage`, `/enkrypt-usage` | AI gateway (`ai-gateway`), Vercel OIDC | this Worker | `STS_USAGE_PUBLISH`: `usage-ingest:usage.publish` (`usage-ingest`) |
+| Publish `/exa-usage` | web app (`web`), Vercel OIDC | this Worker | the same |
+| Write `/api/internal/{usage,enkrypt-usage,exa-usage}/record` | this Worker's queue consumer (`usage-ingest`), `STS` binding | web app | `STS_USAGE_RECORD`: `web:usage.record` (`web`) |
+
+STS mints either token only where an STS policy grants it to that workload; until then the
+caller gets a denial and the receiver refuses every token for the scope. The publish routes
+also pin the workload per path (`PUBLISH_WORKLOADS` in `src/publish-auth.ts`): a valid token of
+any other workload gets 403 `{"error":"insufficient_scope"}` before the body is read.
+
+### `USAGE_INGEST_PUBLISH_AUTH` (receiver)
+
+- Absent or `legacy`: only the publish secret. STS is never called, and the
+  `usage_ingest_enqueue_start` line keeps its shape.
+- `dual`: an exact match of the publish secret is accepted first. Otherwise a compact JWS
+  bearer goes to the STS verifier for `usage-ingest:usage.publish`, and its refusal is final
+  (design section 7 status and `WWW-Authenticate`; no fallback to the secret). Any other
+  credential gets the secret's answers: 503 without a configured secret, else 401.
+- `sts`: only an STS token. The secret gets the verifier's 401.
+- Any other value: 503 for every publish, logged as `usage_ingest_publish_auth_misconfigured`.
+
+Under `dual` and `sts` the `usage_ingest_enqueue_start` line adds `auth` (`legacy` or `sts`) and,
+for STS, `auth_caller` (the workload). That counts the publishes the secret still
+authenticates, per caller, path and minute (design section 9.4, item 9). A refusal logs
+`usage_ingest_publish_auth_refused` with status, error and reason, never the token. STS
+verification needs `STS_URL` and `STS_ENVIRONMENT` as for the canary; without them an STS
+token gets 503 (`usage_ingest_publish_auth_sts_unconfigured`).
+
+The publish routes have their own verifier per isolate, keyed only by the verified issuer and
+environment. Its challenges name a fixed origin per environment
+(`USAGE_INGEST_RESOURCE_ORIGINS` in `src/sts.ts`: each script's `workers.dev` address, and
+`http://localhost:8787` for development), never the request's host. The STS canary keeps its
+own verifier and token client. A legacy publish does no STS work. A warm STS publish verifies
+from the held key set, with no network call; the verifier fetches the key set once per 5
+minutes per isolate.
+
+`GET /.well-known/oauth-protected-resource`, the URL those challenges name, answers the RFC 9728
+metadata only while the switch is `dual` or `sts` and the issuer and environment are valid:
+`resource` is that fixed origin, `authorization_servers` the STS issuer, `scopes_supported` only
+`usage-ingest:usage.publish`, `bearer_methods_supported` `["header"]`. Otherwise it is the
+ordinary 404, with no I/O; other methods on it get 405 while it is served.
+
+### `USAGE_WRITER_AUTH` (sender)
+
+Each write carries exactly one credential.
+
+- Absent or `legacy`: only `x-internal-api-key: <USAGE_WRITER_SECRET>`, as before.
+- `sts`: only a `web:usage.record` token (the writer client's `serviceToken`), minted over the
+  `STS` binding by this sender's own per-isolate token client; never the secret. The token comes
+  first; when the mint used up the invocation's launch budget, no write starts
+  (`invocation_budget`). Without a token (denied, STS unavailable, no binding) nothing is sent
+  and the delivery retries under the normal policy with reason `writer_token_unavailable`;
+  `usage_ingest_writer_credential_unavailable` logs why, once per batch. A read with no token
+  held waits for one binding attempt; renewals run under `waitUntil`, and a warm read makes no
+  call.
+- Any other value: nothing is sent and the delivery retries (`writer_auth_misconfigured`).
+
+`x-usage-write-source: queue`, the message kinds and the bypass header do not change, so the
+writer's admission and route provenance stay the same.
+
+### Rollout and rollback
+
+Order per environment, staging first, then production: STS contract and grants; publish
+callers mint and the Worker runs `dual`; the receiver moves to `sts` once its counts show no
+secret-authenticated publish. The writer moves to `sts` only after the web record routes accept
+`web:usage.record`. Roll back one leg by setting its switch to `legacy` and deploying; the
+secrets stay in place until the kill date.
 
 ## Deploy
 

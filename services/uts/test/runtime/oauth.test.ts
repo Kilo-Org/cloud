@@ -1169,7 +1169,11 @@ describe('mint Worker wiring', () => {
       token_endpoint: `${config.endpoints.issuer}/token`,
       revocation_endpoint: `${config.endpoints.issuer}/revoke`,
       introspection_endpoint: `${config.endpoints.issuer}/introspect`,
-      grant_types_supported: ['authorization_code', 'refresh_token'],
+      grant_types_supported: [
+        'authorization_code',
+        'refresh_token',
+        'urn:ietf:params:oauth:grant-type:token-exchange',
+      ],
       response_types_supported: ['code'],
       code_challenge_methods_supported: ['S256'],
       dpop_signing_alg_values_supported: ['EdDSA', 'ES256'],
@@ -1189,6 +1193,7 @@ describe('mint Worker wiring', () => {
         'authorization_code',
         'refresh_token',
         'urn:ietf:params:oauth:grant-type:device_code',
+        'urn:ietf:params:oauth:grant-type:token-exchange',
       ],
     });
   });

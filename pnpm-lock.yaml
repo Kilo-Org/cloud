@@ -3865,6 +3865,9 @@ importers:
       '@kilocode/uts-contracts':
         specifier: workspace:*
         version: link:../../packages/uts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3887,9 +3890,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 4.20260605.1
-      '@kilocode/verify':
-        specifier: workspace:*
-        version: link:../../packages/verify
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4

@@ -145,7 +145,7 @@ const DEV_STS_TOKEN = /^Bearer uts-dev-sts:([a-z0-9-]{1,64}):([a-z][a-z0-9-]*:[a
 /**
  * The development stand-in for the STS token check of the `/internal/` routes: the bearer names
  * its workload and its one scope in clear, and proves nothing. Only this module, which no deploy
- * bundles, passes it; the deployed check refuses every call until `@kilocode/verify` lands.
+ * bundles, passes it; the deployed check is `@kilocode/verify` (src/sts-callers.ts).
  */
 export const developmentServiceTokens: ServiceTokenVerifier = async (authorization, scope) => {
   if (authorization === null) return { status: 'missing' };

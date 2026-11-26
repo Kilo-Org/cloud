@@ -37,8 +37,8 @@ import { NO_VERIFIER_RETRY_SECONDS, type ServiceTokenVerifier } from './service-
 /**
  * The `/internal/` routes of the mint Worker, for the web app's outbox (README, "Subject
  * operations and identity import"). Every route takes `POST` with a JSON body and an STS token
- * for audience `uts` with the route's scope from a listed workload. While no verifier is deployed
- * (`noServiceTokenVerifier`), or the identity store is not bound, every route answers
+ * for audience `uts` with the route's scope from a listed workload. While the STS check cannot
+ * run (the STS key set does not answer), or the identity store is not bound, every route answers
  * `503 temporarily_unavailable` with `Retry-After`, never 500 and never a write.
  */
 export type InternalDeps = {

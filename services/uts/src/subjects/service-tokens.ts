@@ -17,14 +17,5 @@ export type ServiceTokenVerifier = (
   scope: string
 ) => Promise<ServiceTokenCheck>;
 
-/** How long a caller waits while no verifier is deployed. */
+/** How long a caller waits while a route cannot serve it (no identity store, a refused caller). */
 export const NO_VERIFIER_RETRY_SECONDS = 60;
-
-/**
- * The deployed check until the mint Worker carries `@kilocode/verify` (phase 2): it verifies
- * nothing and admits nothing, so every `/internal/` route answers 503 and no write happens.
- */
-export const noServiceTokenVerifier: ServiceTokenVerifier = async () => ({
-  status: 'unavailable',
-  retryAfterSeconds: NO_VERIFIER_RETRY_SECONDS,
-});

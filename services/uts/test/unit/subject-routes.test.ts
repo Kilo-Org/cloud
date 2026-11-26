@@ -10,10 +10,7 @@ import type { FeedEntry } from '../../src/revocation/entries';
 import type { FeedPublish } from '../../src/revocation/publish';
 import type { SubjectDeps } from '../../src/subjects/operations';
 import { type InternalDeps, handleInternalRequest } from '../../src/subjects/routes';
-import {
-  type ServiceTokenVerifier,
-  noServiceTokenVerifier,
-} from '../../src/subjects/service-tokens';
+import type { ServiceTokenVerifier } from '../../src/subjects/service-tokens';
 import type { OperationRow, SubjectStore } from '../../src/subjects/store';
 
 /**
@@ -131,8 +128,12 @@ describe('admission', () => {
     expect((await call(get, deps())).status).toBe(405);
   });
 
-  it('answers 503 with Retry-After on every route while no verifier exists, and writes nothing', async () => {
-    const routeDeps = { ...deps(), serviceTokens: noServiceTokenVerifier };
+  it('answers 503 with Retry-After on every route while the STS check cannot run, and writes nothing', async () => {
+    const unavailable: ServiceTokenVerifier = async () => ({
+      status: 'unavailable',
+      retryAfterSeconds: 60,
+    });
+    const routeDeps = { ...deps(), serviceTokens: unavailable };
     for (const path of [
       ...Object.keys(UTS_SUBJECT_OPERATIONS).map(name => `/internal/subjects/${name}`),
       '/internal/accounts/import',

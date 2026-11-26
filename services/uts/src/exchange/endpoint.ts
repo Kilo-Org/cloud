@@ -68,9 +68,9 @@ export type StsCallerCheck =
 
 /**
  * Verifies an STS token for the audience `uts` (design 6, 7): signature under the STS key set,
- * issuer, environment, time, the service-token profile. `@kilocode/verify` provides it once that
- * package is on this branch; until then the deployed entry wires none, so the exchange is not
- * offered there (`unsupported_grant_type`).
+ * issuer, environment, time, the service-token profile. The deployed entry uses
+ * `@kilocode/verify` (src/sts-callers.ts); a development run without a stand-in STS wires none, so
+ * the exchange is not offered there (`unsupported_grant_type`).
  */
 export type StsCallerVerifier = (token: string) => Promise<StsCallerCheck>;
 

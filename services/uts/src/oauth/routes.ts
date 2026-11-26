@@ -121,8 +121,8 @@ const exchangeWindows = newExchangeWindows();
  * scope registry (`utsScopeEntry`) in every deployed entry; the development entry adds its fixture
  * scopes. `options.mailer` is the email sign-in's mail port; no deployed sender is wired yet, so
  * the deployed entry passes null and email sign-in is not offered there. `options.stsCallers`
- * verifies the broker exchange's STS tokens; the deployed entry passes null until
- * `@kilocode/verify` is on this branch, so the exchange is not offered there.
+ * verifies the broker exchange's STS tokens: `@kilocode/verify` in the deployed entry; null only
+ * in a development run without a stand-in STS, where the exchange is not offered.
  */
 export function oauthService(
   env: Env,

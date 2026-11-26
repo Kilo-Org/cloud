@@ -1008,6 +1008,11 @@ migrations 0000 to 0014. `test/repo` fails a deployed block whose Hyperdrive bin
 `IDENTITY_STORE_HYPERDRIVE` in `test/repo/worker-configs.ts`, or that names a local connection
 string. Apply a new migration to both stores before the deploy that needs it.
 
+The deployed entry checks STS tokens with `@kilocode/verify` against the environment's STS issuer
+(`STS_ISSUERS`), audience `uts` (`src/sts-callers.ts`). `STS_CALLER_WORKLOADS` lists the workloads
+each environment admits on the broker exchange and the `/internal/` routes; production lists none.
+An unreadable STS key set answers 503, never an admission.
+
 ### Provisioning per environment
 
 | Setting | Kind | Value |

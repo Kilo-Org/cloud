@@ -7,12 +7,17 @@
 --   skipped.
 -- * `shard` is `id` modulo 8; one relay instance owns each shard and keeps one watermark row.
 --   Each shard publishes as its own audit stream, so `last_seq` numbers that stream's batches.
--- * Daily partitions hold 7 days. A partition is dropped only when every row in it is older than
---   7 days and every shard's watermark is past every row in it. Maintenance runs one CREATE,
+--   The watermark moves only through `uts.advance_audit_watermark`, which refuses a move that
+--   does not number every row it passes, so a move without a send becomes a sequence gap at the
+--   audit relay service rather than a silent loss.
+-- * Daily partitions hold 7 days. A partition is dropped only when its upper bound is 168 hours
+--   old and every shard's watermark is past every row in it. Maintenance runs one CREATE,
 --   TRUNCATE or DROP per call, after every check; an old partition is truncated before it is
 --   dropped, so the parent's ACCESS EXCLUSIVE lock covers only removing empty files.
 -- * Only the owner can update or delete audit rows; the app role can insert and read them, and
 --   cannot set `id`, `txid` or `created_at` itself.
+-- * A UTS login can change its own statement and transaction limits, so `uts.end_long_transactions`
+--   ends any UTS session whose transaction has run for 30 seconds; the relay's horizon then moves.
 
 SET LOCAL ROLE uts_owner;
 
@@ -150,9 +155,10 @@ CREATE TABLE uts.audit_events (
 -- condition, so neither reads a relayed row (README, "Audit outbox").
 CREATE INDEX audit_events_relay_idx ON uts.audit_events (shard, txid, id);
 
--- One row per shard. `last_txid` and `last_id` mark the newest row the relay has delivered and
--- the archive has confirmed. `last_seq` is the stream sequence number of that row, so batches
--- carry contiguous `fromSeq`/`toSeq` values per shard.
+-- One row per shard. `last_txid` and `last_id` mark the newest row whose batch the audit queue
+-- accepted; nothing confirms that the archive stored it, because UTS cannot bind the archive
+-- (design section 8.1). `last_seq` is the stream sequence number of that row, so batches carry
+-- contiguous `fromSeq`/`toSeq` values per shard. Only `uts.advance_audit_watermark` moves it.
 CREATE TABLE uts.audit_relay_watermarks (
   shard smallint PRIMARY KEY CHECK (shard BETWEEN 0 AND 7),
   last_txid xid8 NOT NULL DEFAULT '0',
@@ -161,6 +167,87 @@ CREATE TABLE uts.audit_relay_watermarks (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO uts.audit_relay_watermarks (shard) SELECT generate_series(0, 7);
+
+-- Moves shard `p_shard`'s watermark from sequence number `p_from_seq` to the row (`p_to_txid`,
+-- `p_to_id`) at sequence number `p_to_seq`. Returns false, changing nothing, when the watermark no
+-- longer stands at `p_from_seq` (another runner moved it). Raises 22023 for any other refused
+-- move, which changes nothing:
+--
+-- * the new position is not after the old one, or `p_to_seq - p_from_seq` is not 1 to 500;
+-- * the target row does not exist in the shard, or its transaction is not below the oldest open
+--   transaction (so a later commit could still sort before it);
+-- * the shard holds a different number of rows between the old position (excluded) and the new
+--   one (included) than `p_to_seq - p_from_seq`.
+--
+-- A login that moves a watermark without sending the rows therefore leaves a sequence gap, which
+-- the audit relay service holds and pages on. The count reads at most 501 entries of the
+-- (shard, txid, id) index with the row comparisons as the index condition, so a call costs one
+-- index range read of the batch it confirms.
+CREATE FUNCTION uts.advance_audit_watermark(
+  p_shard smallint,
+  p_from_seq bigint,
+  p_to_txid xid8,
+  p_to_id bigint,
+  p_to_seq bigint
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  -- Taken before this call locks the row, which gives its own transaction an id.
+  horizon CONSTANT xid8 := pg_snapshot_xmin(pg_current_snapshot());
+  current uts.audit_relay_watermarks%ROWTYPE;
+  covered bigint;
+BEGIN
+  IF p_shard IS NULL OR p_from_seq IS NULL OR p_to_txid IS NULL OR p_to_id IS NULL
+    OR p_to_seq IS NULL
+  THEN
+    RAISE EXCEPTION 'every argument is required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO current FROM uts.audit_relay_watermarks WHERE shard = p_shard FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'no audit shard %', p_shard USING ERRCODE = '22023';
+  END IF;
+  IF current.last_seq <> p_from_seq THEN
+    RETURN false;
+  END IF;
+
+  IF p_to_seq - p_from_seq NOT BETWEEN 1 AND 500 THEN
+    RAISE EXCEPTION 'a watermark moves by 1 to 500 rows' USING ERRCODE = '22023';
+  END IF;
+  IF (p_to_txid, p_to_id) <= (current.last_txid, current.last_id) THEN
+    RAISE EXCEPTION 'a watermark moves only forward' USING ERRCODE = '22023';
+  END IF;
+  IF p_to_txid >= horizon OR NOT EXISTS (
+    SELECT 1 FROM uts.audit_events AS target
+    WHERE target.shard = p_shard AND target.txid = p_to_txid AND target.id = p_to_id
+  ) THEN
+    RAISE EXCEPTION 'the target row is not a final row of the shard' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT count(*) INTO covered
+  FROM (
+    SELECT 1
+    FROM uts.audit_events AS passed
+    WHERE passed.shard = p_shard
+      AND (passed.txid, passed.id) > (current.last_txid, current.last_id)
+      AND (passed.txid, passed.id) <= (p_to_txid, p_to_id)
+    LIMIT 501
+  ) AS window_rows;
+  IF covered <> p_to_seq - p_from_seq THEN
+    RAISE EXCEPTION 'the move passes % rows but numbers %', covered, p_to_seq - p_from_seq
+      USING ERRCODE = '22023';
+  END IF;
+
+  UPDATE uts.audit_relay_watermarks
+  SET last_txid = p_to_txid, last_id = p_to_id, last_seq = p_to_seq, updated_at = now()
+  WHERE shard = p_shard;
+  RETURN true;
+END
+$$;
 
 -- The partition check, as SQL text: `true` when a row of partition `p_partition` is past its
 -- shard's watermark. Each shard is one probe of the partition's (shard, txid, id) index that
@@ -187,9 +274,13 @@ RETURN format(
 
 -- One maintenance step for the UTC day of `p_now`. It creates the first missing partition among
 -- that day and the next `p_days_ahead` days. When none is missing, it takes the first partition
--- whose rows are all older than 7 days and all relayed: it truncates that partition while it still
--- has data, and drops it once it is empty. Partition names carry their UTC day,
--- `audit_events_YYYYMMDD`; a partition with any other name (one added by hand) is left alone.
+-- whose upper bound is at least 168 hours before `p_now` and whose rows are all relayed: it
+-- truncates that partition while it still has data, and drops it once it is empty. Maintenance
+-- names its partitions by their UTC day, `audit_events_YYYYMMDD`; a partition with any other name
+-- (one added by hand) is left alone. The age comes from the bound the partition is attached with,
+-- never from its name, so a partition attached by hand under an older day's name keeps its rows.
+-- The cutoff is a fixed 168 hours rather than 7 calendar days, whose length depends on the time
+-- zone across a daylight-saving change; the function also runs in UTC for the same reason.
 --
 -- * At most one CREATE, TRUNCATE or DROP runs per call, as its last statement, after every check.
 -- * The TRUNCATE locks only the old partition, which no insert reaches, so it can take as long as
@@ -202,6 +293,7 @@ CREATE FUNCTION uts.audit_partition_maintenance_at(p_now timestamptz, p_days_ahe
 RETURNS TABLE (action text, partition_name text)
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
+SET TimeZone = 'UTC'
 -- While a DDL waits for its lock, later inserts queue behind it, so the wait is short. A call that
 -- times out changes nothing and the next call retries.
 SET lock_timeout = '200ms'
@@ -210,6 +302,7 @@ DECLARE
   first_day date := (p_now AT TIME ZONE 'UTC')::date;
   partition_day date;
   partition_table text;
+  candidate record;
   has_unrelayed boolean;
   drop_table text;
 BEGIN
@@ -236,25 +329,33 @@ BEGIN
     RETURN;
   END IF;
 
-  FOR partition_table IN
-    SELECT child.relname
+  FOR candidate IN
+    SELECT child.relname::text AS relname, bound.upper_bound
     FROM pg_inherits
     JOIN pg_class AS child ON child.oid = pg_inherits.inhrelid
+    -- `FOR VALUES FROM ('...') TO ('...')`; NULL for a DEFAULT or MAXVALUE bound, which never
+    -- ages out.
+    CROSS JOIN LATERAL (
+      SELECT (regexp_match(
+        pg_get_expr(child.relpartbound, child.oid),
+        'TO \(''([^'']+)''\)$'
+      ))[1]::timestamptz AS upper_bound
+    ) AS bound
     WHERE pg_inherits.inhparent = 'uts.audit_events'::regclass
       AND child.relname ~ '^audit_events_[0-9]{8}$'
-    ORDER BY child.relname
+    ORDER BY bound.upper_bound, child.relname
   LOOP
-    partition_day := to_date(right(partition_table, 8), 'YYYYMMDD');
-    -- Keep a partition until its newest possible row is 7 days old.
-    CONTINUE WHEN (partition_day + 1)::timestamp AT TIME ZONE 'UTC' > p_now - interval '7 days';
+    -- Keep a partition until its newest possible row is 168 hours old.
+    CONTINUE WHEN candidate.upper_bound IS NULL
+      OR candidate.upper_bound > p_now - interval '168 hours';
 
-    EXECUTE uts.audit_partition_unrelayed_query(partition_table) INTO has_unrelayed;
+    EXECUTE uts.audit_partition_unrelayed_query(candidate.relname) INTO has_unrelayed;
     IF has_unrelayed THEN
       action := 'kept_unrelayed';
-      partition_name := partition_table;
+      partition_name := candidate.relname;
       RETURN NEXT;
     ELSIF drop_table IS NULL THEN
-      drop_table := partition_table;
+      drop_table := candidate.relname;
     END IF;
   END LOOP;
 
@@ -283,6 +384,56 @@ SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
   SELECT * FROM uts.audit_partition_maintenance_at(now(), 7)
+$$;
+
+-- Ends every session of a UTS login, other than the caller's own, whose transaction started more
+-- than `p_limit` ago, and returns each one it ended. The login role defaults (statement 5 s, idle
+-- in transaction 10 s, transaction 10 s; 0000_roles.sql) are settings that a session can change
+-- for itself, so they cannot bound a session that does. This function can: its limit is not the
+-- session's to change, and ending the session rolls back its transaction, so the relay's horizon
+-- (the oldest open transaction) moves past it. UTS logins send one statement per call, so no
+-- correct UTS transaction lasts this long. `pg_stat_activity` covers every database of the
+-- server, which is the horizon's scope too.
+CREATE FUNCTION uts.end_long_transactions_after(p_limit interval)
+RETURNS TABLE (pid integer, login text, transaction_started_at timestamptz)
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  stuck record;
+BEGIN
+  IF p_limit IS NULL OR p_limit < interval '1 second' THEN
+    RAISE EXCEPTION 'p_limit must be at least 1 second' USING ERRCODE = '22023';
+  END IF;
+  FOR stuck IN
+    SELECT activity.pid, activity.usename::text AS usename, activity.xact_start
+    FROM pg_stat_activity AS activity
+    WHERE activity.usename IN (
+        'uts_app_a', 'uts_app_b', 'uts_pat_a', 'uts_pat_b', 'uts_reader_a', 'uts_reader_b'
+      )
+      AND activity.pid <> pg_backend_pid()
+      AND activity.xact_start < clock_timestamp() - p_limit
+  LOOP
+    IF pg_terminate_backend(stuck.pid) THEN
+      pid := stuck.pid;
+      login := stuck.usename;
+      transaction_started_at := stuck.xact_start;
+      RETURN NEXT;
+    END IF;
+  END LOOP;
+END
+$$;
+
+-- The entry point that UTS calls through the app role: the minute cron, and each audit relay run
+-- before it reads. The limit is fixed at 30 seconds, so a caller cannot widen it, and a UTS
+-- session holds the relay back for at most that limit plus the time to the next call.
+CREATE FUNCTION uts.end_long_transactions()
+RETURNS TABLE (pid integer, login text, transaction_started_at timestamptz)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT * FROM uts.end_long_transactions_after(interval '30 seconds')
 $$;
 
 -- Today's partition and the next 7 days' exist before the first insert.

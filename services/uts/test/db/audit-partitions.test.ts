@@ -147,4 +147,52 @@ describe('audit partition maintenance', () => {
       await owner.query('DROP TABLE uts.audit_events_archive');
     }
   });
+
+  it('judges age by the bound a partition is attached with, not by its name', async () => {
+    // An older day's name on a partition that holds rows from 3 days ago. DDL takes no bind
+    // parameters; both bounds are ISO strings this test builds.
+    const from = new Date(daysAgo(3).setUTCHours(0, 0, 0, 0));
+    const to = new Date(from.getTime() + DAY_MS);
+    await owner.query(
+      `CREATE TABLE uts.audit_events_20000101 PARTITION OF uts.audit_events
+       FOR VALUES FROM ('${from.toISOString()}') TO ('${to.toISOString()}')`
+    );
+    try {
+      const rows = await insertRowsAt(new Date(from.getTime() + DAY_MS / 2));
+      for (const row of rows) await advanceWatermark(row);
+      expect(await maintain(now)).toEqual([]);
+      expect(await owner.query('SELECT 1 FROM uts.audit_events_20000101')).toMatchObject({
+        rowCount: 8,
+      });
+    } finally {
+      await owner.query('DROP TABLE uts.audit_events_20000101');
+    }
+  });
+
+  it('drops a partition 168 hours after its upper bound, whatever the session time zone', async () => {
+    await owner.query(
+      `CREATE TABLE uts.audit_events_20260303 PARTITION OF uts.audit_events
+       FOR VALUES FROM ('2026-03-03 00:00:00+00') TO ('2026-03-04 00:00:00+00')`
+    );
+    // New York moves its clocks forward on 2026-03-08, so 7 calendar days there end 1 hour
+    // short of 168 hours: 7 days before this time is 30 minutes after the partition's bound.
+    await owner.query(`SET TimeZone = 'America/New_York'`);
+    try {
+      // A lead of 8 days also creates every partition the later call needs, so that call's only
+      // step is the drop. The last creation call already ran the drop check at this time.
+      const beforeCutoff = new Date('2026-03-10T23:30:00Z');
+      await createPartitions(beforeCutoff, 8);
+      expect(await maintain(beforeCutoff)).toEqual([]);
+
+      const afterCutoff = new Date('2026-03-11T00:30:00Z');
+      expect(await maintain(afterCutoff)).toEqual([
+        { action: 'dropped', partition_name: 'audit_events_20260303' },
+      ]);
+    } finally {
+      await owner.query('RESET TimeZone');
+      // The March partitions this test created are old and empty; today's maintenance drops them.
+      let dropped = true;
+      while (dropped) dropped = (await maintain(now)).some(row => row.action === 'dropped');
+    }
+  });
 });

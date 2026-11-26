@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { inspect } from 'node:util';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -183,7 +184,7 @@ describe('identity-store client', () => {
   });
 
   it('decodes enum arrays, domain arrays, bytea, xid8 and int8 into the row schemas', async () => {
-    const owner = await db.connect('uts_app_a');
+    const owner = await db.connectAsOwner();
     const accountId = await insertAccount(owner);
     const sessionId = await insertBrowserSession(owner, accountId);
     await insertGatePass(owner, accountId, 'pat_create');
@@ -232,20 +233,22 @@ describe('identity-store client', () => {
 
 describe('PAT and bot key lookups', () => {
   it('find active credentials and skip revoked, expired, blocked or cut-off ones', async () => {
-    const app = await db.connect('uts_app_a');
-    const accountId = await insertAccount(app);
-    const blockedAccountId = await insertAccount(app);
-    await app.query(
+    // PATs and bot keys in chosen states (revoked, expired, flagged days ago) need direct inserts,
+    // which only the owner may make.
+    const fixtures = await db.connectAsOwner();
+    const accountId = await insertAccount(fixtures);
+    const blockedAccountId = await insertAccount(fixtures);
+    await fixtures.query(
       `UPDATE uts.accounts SET status = 'blocked', blocked_at = now() WHERE id = $1`,
       [blockedAccountId]
     );
     const insertPat = async (
       status: 'active' | 'revoked',
-      owner = accountId,
+      holder = accountId,
       createdDaysAgo = 0
     ) => {
       const tokenHash = randomHash();
-      await app.query(
+      await fixtures.query(
         `INSERT INTO uts.personal_access_tokens
            (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, created_at,
             expires_at, status, revoked_at, revoke_reason)
@@ -254,13 +257,19 @@ describe('PAT and bot key lookups', () => {
                  now() - make_interval(days => $5) + interval '90 days',
                  $4::uts.credential_status, CASE WHEN $4::uts.credential_status = 'revoked' THEN now() END,
                  CASE WHEN $4::uts.credential_status = 'revoked' THEN 'user_revoke'::uts.revoke_reason END)`,
-        [owner, tokenHash, await insertGatePass(app, owner, 'pat_create'), status, createdDaysAgo]
+        [
+          holder,
+          tokenHash,
+          await insertGatePass(fixtures, holder, 'pat_create'),
+          status,
+          createdDaysAgo,
+        ]
       );
       return tokenHash;
     };
     const insertBotKey = async (status: string, flaggedDaysAgo: number | null, kept: boolean) => {
       const tokenHash = randomHash();
-      await app.query(
+      await fixtures.query(
         `INSERT INTO uts.org_bot_keys
            (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id,
             created_at, expires_at, status, flagged_at, kept_by, kept_at)
@@ -270,7 +279,7 @@ describe('PAT and bot key lookups', () => {
         [
           accountId,
           tokenHash,
-          await insertGatePass(app, accountId, 'bot_key_create'),
+          await insertGatePass(fixtures, accountId, 'bot_key_create'),
           status,
           flaggedDaysAgo,
           kept,
@@ -307,6 +316,45 @@ describe('PAT and bot key lookups', () => {
       expect(await lookupBotKey(store, cutOff)).toBeNull();
       expect(await lookupBotKey(store, kept)).toMatchObject({ status: 'kept' });
     });
+  });
+
+  it('refuse a credential that expires during a transaction that began before', async () => {
+    const fixtures = await db.connectAsOwner();
+    const accountId = await insertAccount(fixtures);
+    const patHash = randomHash();
+    await fixtures.query(
+      `INSERT INTO uts.personal_access_tokens
+         (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
+       VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3,
+               now() + interval '2 seconds')`,
+      [accountId, patHash, await insertGatePass(fixtures, accountId, 'pat_create')]
+    );
+    const botHash = randomHash();
+    // Flagged so that its 168-hour cutoff falls 2 seconds from now.
+    await fixtures.query(
+      `INSERT INTO uts.org_bot_keys
+         (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id,
+          created_at, expires_at, status, flagged_at)
+       VALUES (gen_random_uuid(), $1, 'bot', $2, 'wxyz', 'gateway', 'gateway:models.read', $3,
+               now() - interval '10 days', now() + interval '60 days', 'flagged',
+               now() - interval '168 hours' + interval '2 seconds')`,
+      [accountId, botHash, await insertGatePass(fixtures, accountId, 'bot_key_create')]
+    );
+
+    const pat = await db.connect('uts_pat_a');
+    const found = async () => [
+      (await pat.query('SELECT 1 FROM uts.lookup_pat($1)', [patHash])).rowCount,
+      (await pat.query('SELECT 1 FROM uts.lookup_bot_key($1)', [botHash])).rowCount,
+    ];
+    await pat.query('BEGIN');
+    try {
+      expect(await found()).toEqual([1, 1]);
+      // Expiry is compared with the server's clock, so the wait is real time.
+      await sleep(2_500);
+      expect(await found()).toEqual([0, 0]);
+    } finally {
+      await pat.query('ROLLBACK');
+    }
   });
 
   it('rejects a hash that is not 32 bytes before querying', async () => {

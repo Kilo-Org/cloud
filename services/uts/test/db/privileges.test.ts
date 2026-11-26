@@ -1,11 +1,14 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_STORE_TABLES } from '../../src/db/rows';
 import { LOGIN_ROLES } from './connection';
 import {
+  RELAY_READ,
   TestDatabase,
   insertAccount,
   insertAudit,
+  insertBrowserSession,
   insertGatePass,
   loginPassword,
   randomHash,
@@ -58,6 +61,12 @@ describe('role attributes', () => {
     expect(result.rows[0].statement_timeout).toBe('5s');
   });
 
+  it.each(LOGIN_ROLES)('set a 10-second transaction limit for %s', async login => {
+    const client = await db.connect(login);
+    const result = await client.query<{ transaction_timeout: string }>('SHOW transaction_timeout');
+    expect(result.rows[0].transaction_timeout).toBe('10s');
+  });
+
   it('cancel a statement that runs for 5 seconds', async () => {
     const client = await db.connect('uts_pat_a');
     const started = Date.now();
@@ -71,6 +80,8 @@ describe('role attributes', () => {
     const { promise: terminated, resolve } = Promise.withResolvers<unknown>();
     // The server's error arrives first; the closed socket then reports a second one.
     client.on('error', resolve);
+    // The transaction limit would end the session at the same time; this test shows the idle one.
+    await client.query('SET transaction_timeout = 0');
     await client.query('BEGIN');
     await client.query('SELECT 1 FROM uts.accounts LIMIT 1');
     const started = Date.now();
@@ -79,6 +90,75 @@ describe('role attributes', () => {
     expect(error).toBeInstanceOf(pg.DatabaseError);
     expect(error instanceof pg.DatabaseError ? error.code : undefined).toBe('25P03');
   }, 20_000);
+
+  it('terminate a session whose transaction lasts 10 seconds, even when it is never idle long', async () => {
+    const client = await db.connect('uts_app_a');
+    const { promise: terminated, resolve } = Promise.withResolvers<unknown>();
+    client.on('error', resolve);
+    await client.query('BEGIN');
+    const started = Date.now();
+    let ended: unknown;
+    void terminated.then(error => {
+      ended = error;
+    });
+    // The server's own clock drives the transaction limit, so the pauses are real time. Short
+    // statements with short pauses keep the statement and idle limits from firing.
+    while (ended === undefined && Date.now() - started < 15_000) {
+      await client.query('SELECT 1').catch((error: unknown) => {
+        ended = error;
+      });
+      await sleep(1_000);
+    }
+    expect(Date.now() - started).toBeGreaterThanOrEqual(9_500);
+    expect(Date.now() - started).toBeLessThan(13_000);
+    const error = await terminated;
+    expect(error instanceof pg.DatabaseError ? error.code : undefined).toBe('25P04');
+  }, 20_000);
+
+  it('end a UTS session that lifted its own limits once its transaction passes the limit', async () => {
+    const stuck = await db.connect('uts_app_b');
+    const { promise: terminated, resolve } = Promise.withResolvers<unknown>();
+    stuck.on('error', resolve);
+    await stuck.query(
+      `SET statement_timeout = 0; SET idle_in_transaction_session_timeout = 0;
+       SET transaction_timeout = 0`
+    );
+    await stuck.query('BEGIN');
+    const row = await insertAudit(stuck);
+    const pid = await stuck.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+
+    // The open transaction holds every shard's read back.
+    const relay = await db.connect('uts_app_a');
+    const horizon = async () => {
+      const result = await relay.query<{ xmin: bigint }>(
+        'SELECT pg_snapshot_xmin(pg_current_snapshot()) AS xmin'
+      );
+      return result.rows[0].xmin;
+    };
+    expect(await horizon()).toBeLessThanOrEqual(row.txid);
+    // The app role's entry point keeps its fixed 30-second limit, so this young session stays.
+    expect((await relay.query('SELECT * FROM uts.end_long_transactions()')).rows).toEqual([]);
+
+    // Every other UTS session ends its transaction within 10 seconds, so a limit just above that
+    // can end only a session that lifted its own limits. The limit is measured on the server's
+    // clock, so the wait is real time.
+    await sleep(11_500);
+    const owner = await db.connectAsOwner();
+    const ended = await owner.query<{ pid: number; login: string }>(
+      `SELECT pid, login FROM uts.end_long_transactions_after(interval '11 seconds')`
+    );
+    expect(ended.rows).toEqual([{ pid: pid.rows[0].pid, login: 'uts_app_b' }]);
+    const error = await terminated;
+    expect(error instanceof pg.DatabaseError ? error.code : undefined).toBe('57P01');
+
+    await vi.waitFor(async () => expect(await horizon()).toBeGreaterThan(row.txid), {
+      timeout: 5_000,
+      interval: 100,
+    });
+    // The rolled-back row never reaches the relay.
+    const read = await relay.query<{ id: bigint }>(RELAY_READ, [row.shard, 500]);
+    expect(read.rows.map(item => item.id)).not.toContain(row.id);
+  }, 25_000);
 
   it.each(['uts_reader_a', 'uts_reader_b'] as const)(
     'start %s in read-only transactions',
@@ -93,18 +173,46 @@ describe('role attributes', () => {
 });
 
 describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
-  it('reads and writes the credential tables', async () => {
+  it('reads and writes the ungated credential tables', async () => {
     const app = await db.connect(login);
     const accountId = await insertAccount(app);
-    const gatePassId = await insertGatePass(app, accountId, 'pat_create');
+    const sessionId = await insertBrowserSession(app, accountId);
     const result = await app.query(
+      `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now(),
+         revoke_reason = 'sign_out'
+       WHERE id = $1`,
+      [sessionId]
+    );
+    expect(result.rowCount).toBe(1);
+  });
+
+  it('revokes a PAT, but cannot bring it back', async () => {
+    const owner = await db.connectAsOwner();
+    const accountId = await insertAccount(owner);
+    const pat = await owner.query<{ id: string }>(
       `INSERT INTO uts.personal_access_tokens
          (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
        VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')
        RETURNING id`,
-      [accountId, randomHash(), gatePassId]
+      [accountId, randomHash(), await insertGatePass(owner, accountId, 'pat_create')]
     );
-    expect(result.rowCount).toBe(1);
+    const app = await db.connect(login);
+    await app.query(
+      `UPDATE uts.personal_access_tokens
+       SET status = 'revoked', revoked_at = now(), revoke_reason = 'user_revoke'
+       WHERE id = $1`,
+      [pat.rows[0].id]
+    );
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `UPDATE uts.personal_access_tokens
+           SET status = 'active', revoked_at = NULL, revoke_reason = NULL
+           WHERE id = $1`,
+          [pat.rows[0].id]
+        )
+      )
+    ).toBe('23514');
   });
 
   it('inserts audit rows and runs partition maintenance', async () => {
@@ -142,12 +250,43 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     ],
     ['insert a watermark row', 'INSERT INTO uts.audit_relay_watermarks (shard) VALUES (0)'],
     ['delete a watermark row', 'DELETE FROM uts.audit_relay_watermarks'],
+    ['move a watermark directly', 'UPDATE uts.audit_relay_watermarks SET last_id = last_id + 1'],
     [
       'call partition maintenance with a chosen time',
       `SELECT uts.audit_partition_maintenance_at(now() + interval '30 days', 7)`,
     ],
+    [
+      'end transactions with a chosen limit',
+      `SELECT * FROM uts.end_long_transactions_after(interval '1 second')`,
+    ],
     ['call the PAT lookup', `SELECT * FROM uts.lookup_pat('\\x00')`],
     ['read the migration record', 'SELECT * FROM uts_migrations.applied'],
+    ['write a gate pass', `INSERT INTO uts.gate_passes (tier) VALUES ('b')`],
+    ['reopen a gate pass', `UPDATE uts.gate_passes SET status = 'open', consumed_at = NULL`],
+    ['delete a gate pass', 'DELETE FROM uts.gate_passes'],
+    ['insert a PAT', `INSERT INTO uts.personal_access_tokens (name) VALUES ('ci')`],
+    ['insert an org bot key', `INSERT INTO uts.org_bot_keys (name) VALUES ('bot')`],
+    ['insert a CI trust policy', `INSERT INTO uts.ci_trust_policies (repository_id) VALUES (1)`],
+    ['insert a third-party consent', 'INSERT INTO uts.third_party_consents (org_id) VALUES (NULL)'],
+    [
+      'insert an approved device code',
+      `INSERT INTO uts.device_codes (status, approved_at) VALUES ('approved', now())`,
+    ],
+    ['approve a device code', `UPDATE uts.device_codes SET approved_at = now()`],
+    ['detach a bot key from its pass', 'UPDATE uts.org_bot_keys SET gate_pass_id = NULL'],
+    ['give a PAT another hash', `UPDATE uts.personal_access_tokens SET token_hash = token_hash`],
+    ['extend a PAT', `UPDATE uts.personal_access_tokens SET expires_at = expires_at`],
+    ['widen a CI trust policy', `UPDATE uts.ci_trust_policies SET ref_pattern = NULL`],
+    ['widen a consent', `UPDATE uts.third_party_consents SET scopes = scopes`],
+    [
+      'call the gated PAT write step',
+      `SELECT * FROM uts.write_gated_pat('a', NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', NULL, 1)`,
+    ],
+    [
+      'call the gated bot key write step',
+      `SELECT * FROM uts.write_gated_bot_key('a', NULL, NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', 1)`,
+    ],
+    ['compute tier B checks', `SELECT uts.tier_b_checks('a', NULL, NULL)`],
   ])('cannot %s', async (_name, statement) => {
     const app = await db.connect(login);
     expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
@@ -168,22 +307,22 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
 
 describe.each(['uts_pat_a', 'uts_pat_b'] as const)('PAT login %s', login => {
   it('finds an active PAT and an active bot key by hash', async () => {
-    const app = await db.connect('uts_app_a');
-    const accountId = await insertAccount(app);
+    const owner = await db.connectAsOwner();
+    const accountId = await insertAccount(owner);
     const patHash = randomHash();
-    await app.query(
+    await owner.query(
       `INSERT INTO uts.personal_access_tokens
          (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
        VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')`,
-      [accountId, patHash, await insertGatePass(app, accountId, 'pat_create')]
+      [accountId, patHash, await insertGatePass(owner, accountId, 'pat_create')]
     );
     const botHash = randomHash();
-    await app.query(
+    await owner.query(
       `INSERT INTO uts.org_bot_keys
          (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
        VALUES (gen_random_uuid(), $1, 'bot', $2, 'wxyz', 'gateway', 'gateway:models.read', $3,
                now() + interval '90 days')`,
-      [accountId, botHash, await insertGatePass(app, accountId, 'bot_key_create')]
+      [accountId, botHash, await insertGatePass(owner, accountId, 'bot_key_create')]
     );
 
     const pat = await db.connect(login);
@@ -323,32 +462,81 @@ describe('table privileges', () => {
        ) AS grants`
     );
 
+    // Gated tables (0003_access.sql): no INSERT, and UPDATE only on lifecycle columns.
+    const gatedUpdates: Record<string, string[]> = {
+      personal_access_tokens: [
+        'last_used_asn',
+        'last_used_at',
+        'last_used_country',
+        'last_used_ip',
+        'revoke_reason',
+        'revoked_at',
+        'status',
+      ],
+      org_bot_keys: [
+        'flagged_at',
+        'kept_at',
+        'kept_by',
+        'last_used_at',
+        'revoked_at',
+        'revoked_by',
+        'status',
+      ],
+      ci_trust_policies: ['revoked_at', 'status', 'updated_at'],
+      third_party_consents: ['revoked_at', 'status'],
+      device_codes: [
+        'account_id',
+        'consumed_at',
+        'denied_at',
+        'last_polled_at',
+        'poll_interval_seconds',
+        'status',
+      ],
+    };
+    const deviceCodeInserts = [
+      'asn',
+      'city',
+      'client_id',
+      'client_ip',
+      'country',
+      'device_code_hash',
+      'expires_at',
+      'poll_interval_seconds',
+      'scopes',
+      'user_agent',
+      'user_code_hash',
+    ];
     const credentialTables = Object.keys(IDENTITY_STORE_TABLES).filter(
-      table => table !== 'audit_events' && table !== 'audit_relay_watermarks'
+      table =>
+        table !== 'audit_events' &&
+        table !== 'audit_relay_watermarks' &&
+        table !== 'gate_passes' &&
+        !(table in gatedUpdates)
     );
     const views = await admin.query<{ relname: string }>(
       `SELECT relname FROM pg_class WHERE relnamespace = 'uts_read'::regnamespace AND relkind = 'v'`
     );
+    const app = (relation: string, privilege: string) => ({
+      grantee: 'uts_app',
+      relation,
+      privilege,
+    });
     const expected = [
       ...credentialTables.flatMap(table =>
-        ['DELETE', 'INSERT', 'SELECT', 'UPDATE'].map(privilege => ({
-          grantee: 'uts_app',
-          relation: `uts.${table}`,
-          privilege,
-        }))
+        ['DELETE', 'INSERT', 'SELECT', 'UPDATE'].map(privilege => app(`uts.${table}`, privilege))
       ),
-      { grantee: 'uts_app', relation: 'uts.audit_events', privilege: 'SELECT' },
-      ...['account_id', 'event', 'event_id', 'event_type'].map(column => ({
-        grantee: 'uts_app',
-        relation: `uts.audit_events(${column})`,
-        privilege: 'INSERT',
-      })),
-      { grantee: 'uts_app', relation: 'uts.audit_relay_watermarks', privilege: 'SELECT' },
-      ...['last_id', 'last_seq', 'last_txid', 'updated_at'].map(column => ({
-        grantee: 'uts_app',
-        relation: `uts.audit_relay_watermarks(${column})`,
-        privilege: 'UPDATE',
-      })),
+      app('uts.gate_passes', 'SELECT'),
+      ...Object.entries(gatedUpdates).flatMap(([table, columns]) => [
+        app(`uts.${table}`, 'DELETE'),
+        app(`uts.${table}`, 'SELECT'),
+        ...columns.map(column => app(`uts.${table}(${column})`, 'UPDATE')),
+      ]),
+      ...deviceCodeInserts.map(column => app(`uts.device_codes(${column})`, 'INSERT')),
+      app('uts.audit_events', 'SELECT'),
+      ...['account_id', 'event', 'event_id', 'event_type'].map(column =>
+        app(`uts.audit_events(${column})`, 'INSERT')
+      ),
+      app('uts.audit_relay_watermarks', 'SELECT'),
       ...views.rows.map(view => ({
         grantee: 'uts_reader',
         relation: `uts_read.${view.relname}`,
@@ -375,6 +563,8 @@ describe('functions', () => {
        ORDER BY 1, 2`
     );
     expect(result.rows).toEqual([
+      { routine: 'advance_audit_watermark', grantee: 'uts_app' },
+      { routine: 'end_long_transactions', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
       { routine: 'is_scope_set', grantee: 'uts_app' },

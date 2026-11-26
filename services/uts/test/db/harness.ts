@@ -162,6 +162,11 @@ export async function insertDeviceSession(
   return result.rows[0].id;
 }
 
+/**
+ * Inserts an open tier B pass with `client`, which must act as `uts_owner`: no login role can
+ * write a pass. Tests use it to build rows in a chosen state; UTS itself writes a pass only
+ * consumed, in the statement of the gated row (`uts.write_gated_pat`, `uts.write_gated_bot_key`).
+ */
 export async function insertGatePass(
   client: pg.Client,
   accountId: string,

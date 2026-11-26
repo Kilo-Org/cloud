@@ -74,7 +74,7 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
       body,
       model: body.model.trim(),
       requestProvider: requestPrivacy.data,
-      promptInfo: extractEmbeddingPromptInfo(body),
+      promptInfo: extractEmbeddingPromptInfo(),
     };
   },
 

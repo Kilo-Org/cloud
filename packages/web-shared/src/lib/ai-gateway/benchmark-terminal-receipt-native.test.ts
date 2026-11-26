@@ -83,7 +83,7 @@ describe('terminal no-charge receipt through the real native writer', () => {
         requested_model: 'openai/gpt-4o',
         is_free: false,
         custom_llm_pricing: null,
-        promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+        promptInfo: { system_prompt_length: 0 },
         max_tokens: 5,
         has_middle_out_transform: false,
         isStreaming: false,

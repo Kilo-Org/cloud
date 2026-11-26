@@ -135,34 +135,23 @@ function promptExtractionReportFields(body: unknown) {
   return typeof model === 'string' ? { model: model.slice(0, REPORTED_MODEL_MAX_LENGTH) } : {};
 }
 
+export function extractSystemPromptText(body: OpenRouterChatCompletionRequest): string {
+  return (body.messages ?? [])
+    .filter(m => m.role === 'system' || m.role === 'developer')
+    .map(extractMessageTextContent)
+    .join('\n');
+}
+
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {
   try {
-    const messages = body.messages ?? [];
-
-    const systemPrompt = messages
-      .filter(m => m.role === 'system' || m.role === 'developer')
-      .map(extractMessageTextContent)
-      .join('\n');
-
-    const system_prompt_prefix = systemPrompt.slice(0, 100);
-    const system_prompt_length = systemPrompt.length;
-
-    const lastUserMessage =
-      messages
-        .filter(m => m.role === 'user')
-        .slice(-1)
-        .map(extractMessageTextContent)[0] ?? '';
-
-    const user_prompt_prefix = lastUserMessage.slice(0, 100);
-
-    return { system_prompt_prefix, system_prompt_length, user_prompt_prefix };
+    return { system_prompt_length: extractSystemPromptText(body).length };
   } catch (e) {
     captureException(e, {
       level: 'warning',
       tags: { source: 'prompt_extraction' },
       extra: promptExtractionReportFields(body),
     });
-    return { system_prompt_prefix: '', system_prompt_length: -1, user_prompt_prefix: '' };
+    return { system_prompt_length: -1 };
   }
 }
 
@@ -186,6 +175,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     ...usageContext.fraudHeaders,
     provider: usageContext.provider,
     ...usageContext.promptInfo,
+    user_prompt_prefix: null,
+    system_prompt_prefix: null,
     max_tokens: usageContext.max_tokens,
     has_middle_out_transform: usageContext.has_middle_out_transform,
     project_id: usageContext.project_id,
@@ -218,8 +209,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
  *
  * NULs have been observed in client-populated fields on the LLM gateway hot
  * path: HTTP headers from the VS Code extension (machine_id, session_id,
- * http_user_agent) and prompt-derived fields (system_prompt_prefix,
- * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
+ * http_user_agent) and prompt-derived fields, which are no longer recorded. Sanitizing at the DB boundary is a safety net; once
  * the upstream source is identified via the `console.warn` in
  * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
  * and remove this.
@@ -360,12 +350,6 @@ export async function toInsertableDbUsageRecord(
       requested_model: usageContextInfo.requested_model,
       provider,
     });
-  }
-
-  if (organization_id) {
-    //never log any sensitive data for orgs
-    metadata.user_prompt_prefix = null;
-    metadata.system_prompt_prefix = null;
   }
 
   // Strip NUL bytes before returning. Postgres `text` columns reject them
@@ -1120,7 +1104,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`vercel_ip_country`, metadataFields.http_x_vercel_ip_country)}
           , ${createUpsertCTE(sql`vercel_ip_city`, metadataFields.http_x_vercel_ip_city)}
           , ${createUpsertCTE(sql`ja4_digest`, metadataFields.http_x_vercel_ja4_digest)}
-          , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
           , ${createUpsertCTE(sql`api_kind`, metadataFields.api_kind)}
@@ -1134,7 +1117,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               id,
               message_id,
               created_at,
-              user_prompt_prefix,
               vercel_ip_latitude,
               vercel_ip_longitude,
               system_prompt_length,
@@ -1163,7 +1145,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               vercel_ip_country_id,
               vercel_ip_city_id,
               ja4_digest_id,
-              system_prompt_prefix_id,
               finish_reason_id,
               editor_name_id,
               api_kind_id,
@@ -1177,7 +1158,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.id},
               ${metadataFields.message_id ?? '<missing>'},
               ${metadataFields.created_at},
-              ${metadataFields.user_prompt_prefix},
               ${metadataFields.http_x_vercel_ip_latitude},
               ${metadataFields.http_x_vercel_ip_longitude},
               ${metadataFields.system_prompt_length},
@@ -1206,7 +1186,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT vercel_ip_country_id FROM vercel_ip_country_cte),
               (SELECT vercel_ip_city_id FROM vercel_ip_city_cte),
               (SELECT ja4_digest_id FROM ja4_digest_cte),
-              (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
               (SELECT editor_name_id FROM editor_name_cte),
               (SELECT api_kind_id FROM api_kind_cte),

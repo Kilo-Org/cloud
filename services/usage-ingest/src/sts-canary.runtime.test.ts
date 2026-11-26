@@ -46,6 +46,7 @@ async function webRoute(request: IncomingMessage, response: ServerResponse): Pro
       workload: 'web',
       audience: 'usage-ingest',
       scope: 'usage-ingest:sts.canary',
+      environment: 'development',
     })
   );
   const outbound = await verifyAtWorker(own);
@@ -98,7 +99,8 @@ beforeAll(async () => {
       vars: {
         STS_CANARY_ENABLED: 'true',
         STS_URL: base,
-        STS_ENVIRONMENT: 'production',
+        // A loopback stand-in issuer is accepted only for development.
+        STS_ENVIRONMENT: 'development',
         WEB_STS_CANARY_URL: `${base}/api/internal/sts-canary`,
         // Node exports `alg: "Ed25519"`, which workerd's importKey refuses for an Ed25519 key.
         TEST_SIGNING_JWK: JSON.stringify({

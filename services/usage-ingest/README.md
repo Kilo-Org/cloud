@@ -805,7 +805,10 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
 the bearer token with `@kilocode/verify` (issuer `STS_URL`, environment `STS_ENVIRONMENT`,
 audience `usage-ingest`, scope `usage-ingest:sts.canary`, key set from `STS_URL` over HTTPS) and
 answers 204 or the section 7 refusal (401 `invalid_token`, 403 `insufficient_scope`, 503
-`temporarily_unavailable`; 503 also while `STS_URL` or `STS_ENVIRONMENT` is not configured). Each
+`temporarily_unavailable`). It answers 503 while `STS_URL` or `STS_ENVIRONMENT` is not configured
+or the two disagree: `STS_ENVIRONMENT` must be the environment `STS_ISSUERS` names `STS_URL` under,
+and an issuer outside `STS_ISSUERS` is accepted only on loopback for `development` (the runtime
+test's stand-in). Each
 outcome logs `sts_canary_verify_accepted` or `sts_canary_verify_refused` (status, error, reason,
 the run id), never the token. The route works whether or not the flag is on.
 
@@ -882,6 +885,12 @@ A Vercel caller adds one exchange per deployment, audience and base-token renewa
 the Runtime Cache, and one cache read per new instance; in a custom environment, one exchange per
 instance, audience and base-token renewal, with no cache read. A deployment STS refuses adds at
 most one exchange per minute per audience and region, through the refusal marker.
+
+Staging shares the project's Vercel exchange budget, about 100 exchanges per minute, with
+production (proof run 3: the budget is per project or team, not per deployment). Because a
+custom environment exchanges once per instance, custom-environment use must stay well below 100
+exchanging instances per minute; before any staging hot path adopts the client, either that
+holds or encrypted shared entries (design 4.4) come first.
 
 ## Deploy
 

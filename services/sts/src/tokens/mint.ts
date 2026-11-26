@@ -8,7 +8,7 @@ import {
   type MintResult,
   type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
-import { recordDenial, type TokenDenial } from '../audit/denials';
+import { DENIAL_FIELD_MAX_LENGTH, recordDenial, type TokenDenial } from '../audit/denials';
 import {
   MIN_TOKEN_LIFETIME_SECONDS,
   TOKEN_SIGNER_DEADLINE_MS,
@@ -83,6 +83,13 @@ export async function serveMint(
   const { caller, waitUntil, authority } = input;
   const parsed = MintRequestSchema.safeParse(input.request);
   if (!parsed.success) return { status: 'invalid_request' };
+  // Longer than a denial row holds; no policy grants one that long. Refused whole, before any
+  // denial is recorded.
+  const oversized = parsed.data.tokens.some(
+    ({ audience, scope }) =>
+      audience.length > DENIAL_FIELD_MAX_LENGTH || scope.length > DENIAL_FIELD_MAX_LENGTH
+  );
+  if (oversized) return { status: 'invalid_request' };
 
   const expiring =
     caller.attestationExp !== null &&

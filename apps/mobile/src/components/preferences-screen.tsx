@@ -28,6 +28,7 @@ import {
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { PREFERENCES_HUB_SETTINGS } from '@/lib/settings-search/preference-sources';
+import { ChatSyncSettingRow } from '@/components/chat/chat-sync-setting-row';
 
 /**
  * Preferences hub: each group s1 split into a subpage is one navigation row
@@ -113,6 +114,10 @@ export function PreferencesScreen({ settingsTarget }: Readonly<{ settingsTarget?
             />
           </SettingsTarget>
         </Section>
+
+        <SettingsTarget item={PREFERENCES_HUB_SETTINGS.chatSync}>
+          <ChatSyncSettingRow />
+        </SettingsTarget>
 
         <Section label={t('preferences.accountNotifications')}>
           <RowGroup leadingTile>

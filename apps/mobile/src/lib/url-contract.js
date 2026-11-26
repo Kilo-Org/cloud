@@ -22,6 +22,9 @@ export const URL_SCHEMES = {
   // session's own token (lib/chat/kilo-mcp.ts). An explicit value overrides
   // the committed production default in lib/config.ts.
   kiloMcpUrl: ['https:'],
+  // The session-sync service quick chats sync to. Production value is
+  // committed in apps/mobile/.env; a dev override comes from .env.local.
+  sessionSyncUrl: ['https:'],
 };
 
 /** Production host allowlist, seeded from the committed mobile production
@@ -47,6 +50,7 @@ export const PRODUCTION_HOSTS = [
   'latency.kiloapps.io',
   'mcp.kiloapps.io',
   'notifications.kiloapps.io',
+  'session-sync.kiloapps.io',
 ];
 
 /** Committed production default for the optional latency ingest endpoint. It

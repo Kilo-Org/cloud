@@ -4067,6 +4067,28 @@
       "accessibility": "Palitan ang pangalan ng chat: {{title}}",
       "openHint": "Binubuksan ang chat. Pindutin nang matagal para palitan ang pangalan o burahin."
     },
+    "sync": {
+      "busyTitle": "Abala sa ibang device",
+      "busyBody": "May sinasagot ang chat na ito sa ibang device. Hintaying matapos ito bago ka magpadala ng kahit ano.",
+      "liveTitle": "Tumatakbo sa iyong computer",
+      "liveBody": "Mapupunta sa session na tumatakbo sa iyong computer ang mga mensaheng ipapadala mo.",
+      "divergedTitle": "Nagbago ang chat na ito sa dalawang device",
+      "divergedBody": "Hindi mapagsasama ang mga mensahe rito at sa ibang device. I-load ang pinakabago para manatiling naka-sync ang device na ito.",
+      "divergedAction": "Itapon ang mga hindi na-sync na mensahe at i-load ang pinakabago",
+      "settingTitle": "I-sync ang mga chat sa lahat ng device",
+      "settingDescription": "Panatilihing naka-sync ang mga chat sa iyong mga device, kasama ang Kilo CLI.",
+      "settingUnreadable": "Hindi mabasa ang setting na ito. I-tap para subukan muli.",
+      "searchPlaceholder": "Maghanap ng chat",
+      "originFilter": "Pinagmulan ng chat",
+      "originMobile": "Mobile",
+      "includeArchived": "Isama ang naka-archive",
+      "deleteEverywhereTitle": "Burahin ang chat na ito sa lahat ng device?",
+      "deleteEverywhereBody": "Mabubura ito sa bawat device at hindi na maibabalik.",
+      "deletedElsewhere": "Binura ang chat na ito sa ibang device.",
+      "listLoadFailed": "Hindi ma-load ang mga naka-sync na chat.",
+      "noticeBody": "Naka-sync na ang iyong mga chat sa lahat ng iyong device.",
+      "noticeAction": "Puwede mo itong i-off sa Settings."
+    },
     "beta": "Beta",
     "details": {
       "title": "Mga detalye ng chat",

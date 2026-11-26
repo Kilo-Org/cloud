@@ -3995,6 +3995,28 @@
       "accessibility": "重命名聊天：{{title}}",
       "openHint": "打开聊天。长按可重命名或删除。"
     },
+    "sync": {
+      "busyTitle": "另一台设备正忙",
+      "busyBody": "此聊天正在另一台设备上回复。请等待其完成后再发送内容。",
+      "liveTitle": "正在你的电脑上运行",
+      "liveBody": "你发送的消息将发送到你电脑上正在运行的会话。",
+      "divergedTitle": "此聊天在两台设备上均有更改",
+      "divergedBody": "此处与另一台设备上的消息无法合并。请加载最新内容，使此设备保持同步。",
+      "divergedAction": "舍弃未同步的消息并加载最新内容",
+      "settingTitle": "跨设备同步聊天",
+      "settingDescription": "在你的各台设备（包括 Kilo CLI）之间保持聊天同步。",
+      "settingUnreadable": "无法读取此设置。点按以重试。",
+      "searchPlaceholder": "搜索聊天",
+      "originFilter": "聊天来源",
+      "originMobile": "移动设备",
+      "includeArchived": "包括已归档",
+      "deleteEverywhereTitle": "要在所有设备上删除此聊天吗？",
+      "deleteEverywhereBody": "此聊天将在所有设备上删除，且无法恢复。",
+      "deletedElsewhere": "此聊天已在另一台设备上删除。",
+      "listLoadFailed": "无法加载已同步的聊天。",
+      "noticeBody": "你的聊天现在会在各设备之间同步。",
+      "noticeAction": "你可以在“设置”中关闭此功能。"
+    },
     "beta": "测试版",
     "details": {
       "title": "聊天详情",

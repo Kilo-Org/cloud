@@ -57,12 +57,50 @@ vi.mock('@/lib/chat/use-chat', () => ({
     isError: state.listFailed,
     isSuccess: state.listAnswered,
     refetch: () => undefined,
-    remove: async () => {
-      await Promise.resolve();
-    },
+    remove: () => Promise.resolve(undefined),
   }),
 }));
 vi.mock('@/lib/chat/layers', () => ({ rememberModelFacts: () => undefined }));
+vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
+  useChatSyncGate: () => ({
+    state: { kind: 'off' },
+    enabled: false,
+    decide: () => Promise.resolve(undefined),
+  }),
+  useChatSyncUploader: () => undefined,
+  useSyncBanner: () => ({ kind: 'none' }),
+  useDeletedElsewhere: () => undefined,
+  useChatSyncNotice: () => ({ visible: false, dismiss: () => undefined }),
+  useMergedChatList: () => ({
+    surface: { kind: 'off' },
+    rows: [],
+    hasNextPage: false,
+    fetchNextPage: () => undefined,
+    refetch: () => undefined,
+    nextPageFailed: false,
+  }),
+}));
+vi.mock('@/lib/chat/sync/sync-send', () => ({
+  prepareSend: () => Promise.resolve({ kind: 'local' }),
+}));
+vi.mock('@/lib/chat/sync/sync-backfill-run', () => ({
+  startBackfill: () => Promise.resolve(undefined),
+}));
+vi.mock('@/lib/chat/sync/sync-service', () => ({
+  prepareSend: () => Promise.resolve({ kind: 'local' }),
+  pullOpenedChat: () => Promise.resolve(undefined),
+  discardAndReload: () => Promise.resolve(''),
+  registerSyncUploader: () => () => undefined,
+  bannerOf: () => ({ kind: 'none' }),
+  watchBanners: () => () => undefined,
+  onDeletedElsewhere: () => () => undefined,
+  uploadSettledChat: () => Promise.resolve(undefined),
+  uploadRenamedChat: () => Promise.resolve(undefined),
+  deleteEverywhere: () => Promise.resolve({ kind: 'local-only' }),
+  deleteServerSession: () => Promise.resolve(true),
+  importServerSession: () => Promise.resolve(null),
+  startBackfill: () => Promise.resolve(undefined),
+}));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ authEpoch: 0 }) }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),

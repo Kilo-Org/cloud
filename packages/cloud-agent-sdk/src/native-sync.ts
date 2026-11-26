@@ -63,19 +63,52 @@ const instanceSchema = z.object({
     })
     .passthrough(),
 });
+export const nativeClientKindSchema = z.enum(['cli', 'mobile', 'cloud-agent']);
+export type NativeClientKind = z.infer<typeof nativeClientKindSchema>;
+const listedSessionSchema = z
+  .object({
+    sessionID: z.string(),
+    tenant: tenantSchema,
+    createdAt: z.number(),
+    updatedAt: z.number().optional(),
+    title: z.string().nullable().optional(),
+    client: nativeClientKindSchema.optional(),
+    directory: z.string().nullable().optional(),
+    archived: z.boolean().optional(),
+    live: z.boolean(),
+  })
+  .transform(item => ({
+    sessionID: item.sessionID,
+    tenant: item.tenant,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt ?? item.createdAt,
+    title: item.title ?? null,
+    client: item.client ?? ('cli' as const),
+    directory: item.directory ?? null,
+    archived: item.archived ?? false,
+    live: item.live,
+  }));
 const listSchema = z.object({
-  items: z.array(
-    z.object({
-      sessionID: z.string(),
-      tenant: tenantSchema,
-      createdAt: z.number(),
-      live: z.boolean(),
-    })
-  ),
+  items: z.array(listedSessionSchema),
   cursor: z.string().nullable(),
 });
 export type NativeEvent = z.infer<typeof envelopeSchema>;
-export type NativeSessionSummary = z.infer<typeof listSchema>['items'][number];
+export type ListedSession = z.infer<typeof listedSessionSchema>;
+export type NativeSessionSummary = ListedSession;
+export type ListSessionsParams = {
+  cursor?: string;
+  limit?: number;
+  q?: string;
+  client?: NativeClientKind;
+  directory?: string;
+  archived?: boolean;
+  organizationID?: string;
+};
+export type NativeDeleteResult =
+  | { type: 'deleted' }
+  | { type: 'not_found' }
+  | { type: 'retryable'; retryAfterMs?: number }
+  | { type: 'failed'; code: string };
 export type NativeConnection = 'connecting' | 'connected' | 'disconnected';
 export type NativePresenceState = {
   connection: NativeConnection;
@@ -165,11 +198,39 @@ export class NativeSyncError extends Error {
   constructor(
     public readonly code: string,
     public readonly status = 0,
-    public readonly retryAfterMs = 0
+    public readonly retryAfterMs = 0,
+    public readonly position?: number
   ) {
     super(code);
     this.name = 'NativeSyncError';
   }
+}
+
+/** The retryable/failed split shared by every one-shot session-sync call. */
+export function classifyNativeSyncError(
+  error: unknown
+): { type: 'retryable'; retryAfterMs?: number } | { type: 'failed'; code: string } {
+  if (error instanceof NativeSyncError) {
+    const retryable =
+      error.status === 0 ||
+      error.status === 408 ||
+      error.status === 429 ||
+      error.status >= 500 ||
+      error.code === 'upload_in_progress' ||
+      error.code === 'request_timeout';
+    if (retryable) {
+      return error.retryAfterMs > 0
+        ? { type: 'retryable', retryAfterMs: error.retryAfterMs }
+        : { type: 'retryable' };
+    }
+    return { type: 'failed', code: error.code };
+  }
+  if (error instanceof z.ZodError) return { type: 'failed', code: 'invalid_response' };
+  const code =
+    error instanceof Error && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : 'unknown_error';
+  return { type: 'failed', code };
 }
 const recordSchema = z.record(z.string(), z.unknown());
 function record(value: unknown) {
@@ -612,6 +673,13 @@ export class NativeSyncClient {
           )
         );
         const error = record(body['error']);
+        const details = record(error['details']);
+        const position =
+          typeof error['position'] === 'number'
+            ? error['position']
+            : typeof details['position'] === 'number'
+              ? details['position']
+              : undefined;
         const retry = response.headers.get('Retry-After');
         const retryAfterMs = retry
           ? /^\d+$/.test(retry)
@@ -621,7 +689,8 @@ export class NativeSyncClient {
         throw new NativeSyncError(
           typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
           response.status,
-          retryAfterMs
+          retryAfterMs,
+          position
         );
       }
       return await raceAbort(
@@ -703,12 +772,44 @@ export class NativeSyncClient {
       throw error;
     }
   }
-  async listSessions(cursor?: string) {
+  async listSessions(
+    params?: ListSessionsParams | string
+  ): Promise<{ items: ListedSession[]; cursor: string | null }> {
+    const input: ListSessionsParams =
+      typeof params === 'string' ? { cursor: params } : (params ?? {});
+    const query = new URLSearchParams();
+    query.set('limit', String(input.limit ?? 50));
+    if (input.cursor) query.set('cursor', input.cursor);
+    if (input.q) query.set('q', input.q);
+    if (input.client) query.set('client', input.client);
+    if (input.directory !== undefined) query.set('directory', input.directory);
+    if (input.archived !== undefined) query.set('archived', String(input.archived));
     return listSchema.parse(
-      await this.request(
-        `/v1/sessions?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
-      )
+      await this.request(`/v1/sessions?${query.toString()}`, undefined, input.organizationID)
     );
+  }
+  /** Delete everywhere: tombstones the server session for every device of the creator. */
+  async deleteSession(sessionID: string, organizationID?: string): Promise<NativeDeleteResult> {
+    try {
+      await this.request(
+        `/v1/sessions/${encodeURIComponent(sessionID)}`,
+        { method: 'DELETE' },
+        organizationID
+      );
+      return { type: 'deleted' };
+    } catch (error) {
+      if (error instanceof NativeSyncError) {
+        if (error.code === 'session_deleted') return { type: 'deleted' };
+        if (
+          error.code === 'session_not_found' ||
+          error.code === 'not_found' ||
+          error.status === 404
+        ) {
+          return { type: 'not_found' };
+        }
+      }
+      return classifyNativeSyncError(error);
+    }
   }
   private socket(
     path: string,

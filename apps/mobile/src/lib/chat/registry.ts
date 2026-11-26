@@ -96,6 +96,7 @@ import {
   toolsOfSession,
   touchChat,
 } from './store';
+import { notifyChatSettled } from './sync/sync-hooks';
 
 /**
  * The chats that are running, for as long as they run.
@@ -290,7 +291,7 @@ async function inOwnScope<E>(
  * never built out of anything that varies — which is why it speaks of web
  * search as a tool that may or may not be offered.
  */
-const SYSTEM =
+export const SYSTEM =
   'You are Kilo, a helpful assistant inside a mobile app. ' +
   'Answer briefly and in plain language, in the language the person writes in. ' +
   'One tool tells you the date and time; the date you were trained on has ' +
@@ -1422,6 +1423,9 @@ async function settle(
      tool-set change made while the answer was arriving is different: it is
      applied either way, because the answer is no longer arriving. */
   await drain(sessionId, chat, failed !== null);
+  if (failure === null) {
+    notifyChatSettled(sessionId, turns);
+  }
 }
 
 /**

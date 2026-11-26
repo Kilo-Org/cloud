@@ -4145,6 +4145,28 @@
       "accessibility": "Preimenuj razgovor: {{title}}",
       "openHint": "Otvara razgovor. Dugo pritisnite za preimenovanje ili brisanje."
     },
+    "sync": {
+      "busyTitle": "Zauzeto na drugom uređaju",
+      "busyBody": "Ovaj chat upravo odgovara na drugom uređaju. Pričekaj da završi prije nego što išta pošalješ.",
+      "liveTitle": "Pokrenuto na tvom računalu",
+      "liveBody": "Poruke koje pošalješ idu u sesiju pokrenutu na tvom računalu.",
+      "divergedTitle": "Ovaj chat promijenjen je na dva uređaja",
+      "divergedBody": "Poruke ovdje i na drugom uređaju ne mogu se spojiti. Učitaj najnoviju verziju kako bi ovaj uređaj ostao usklađen.",
+      "divergedAction": "Odbaci nesinkronizirane poruke i učitaj najnovije",
+      "settingTitle": "Sinkroniziraj chatove na svim uređajima",
+      "settingDescription": "Drži chatove usklađenima na svim svojim uređajima, uključujući Kilo CLI.",
+      "settingUnreadable": "Nije moguće pročitati ovu postavku. Dodirnite za ponovni pokušaj.",
+      "searchPlaceholder": "Pretraži chatove",
+      "originFilter": "Izvor chata",
+      "originMobile": "Mobitel",
+      "includeArchived": "Uključi arhivirane",
+      "deleteEverywhereTitle": "Izbrisati ovaj chat posvuda?",
+      "deleteEverywhereBody": "Bit će izbrisan na svim uređajima i neće se moći vratiti.",
+      "deletedElsewhere": "Ovaj chat izbrisan je na drugom uređaju.",
+      "listLoadFailed": "Nije moguće učitati sinkronizirane chatove.",
+      "noticeBody": "Tvoji se chatovi sada sinkroniziraju na svim tvojim uređajima.",
+      "noticeAction": "To možeš isključiti u Postavkama."
+    },
     "beta": "Beta",
     "details": {
       "title": "Pojedinosti razgovora",

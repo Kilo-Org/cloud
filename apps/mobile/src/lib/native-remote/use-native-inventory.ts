@@ -149,11 +149,17 @@ export function useNativeInventory(client: NativeRemoteClient, organizationID?: 
       }
       const sessionID = createdSession(reply.body);
       void load();
+      const created = Date.now();
       return {
         sessionID,
         tenant: instance.tenant,
         live: true,
-        createdAt: Date.now(),
+        createdAt: created,
+        updatedAt: created,
+        title: null,
+        client: 'cli',
+        directory: directory === '' ? null : directory,
+        archived: false,
       } satisfies NativeSessionSummary;
     } catch (error) {
       if (owner.current === client && lifetime.current === generation) {

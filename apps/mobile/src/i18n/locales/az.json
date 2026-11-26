@@ -4067,6 +4067,28 @@
       "accessibility": "Söhbətin adını dəyiş: {{title}}",
       "openHint": "Söhbəti açır. Adını dəyişmək və ya silmək üçün basıb saxlayın."
     },
+    "sync": {
+      "busyTitle": "Başqa cihazda məşğuldur",
+      "busyBody": "Bu söhbət başqa cihazda cavab verir. Nəsə göndərməzdən əvvəl onun bitməsini gözləyin.",
+      "liveTitle": "Kompüterinizdə işləyir",
+      "liveBody": "Göndərdiyiniz mesajlar kompüterinizdə işləyən sessiyaya gedir.",
+      "divergedTitle": "Bu söhbət iki cihazda dəyişdirilib",
+      "divergedBody": "Buradakı və başqa cihazdakı mesajları birləşdirmək mümkün deyil. Bu cihazı uyğun saxlamaq üçün ən son versiyanı yükləyin.",
+      "divergedAction": "Sinxronlaşdırılmamış mesajları silin və ən son versiyanı yükləyin",
+      "settingTitle": "Söhbətləri cihazlar arasında sinxronlaşdırın",
+      "settingDescription": "Söhbətləri Kilo CLI daxil olmaqla bütün cihazlarınızda uyğun saxlayın.",
+      "settingUnreadable": "Bu parametri oxumaq mümkün olmadı. Yenidən cəhd etmək üçün toxunun.",
+      "searchPlaceholder": "Söhbətlərdə axtarın",
+      "originFilter": "Söhbətin mənbəyi",
+      "originMobile": "Mobil",
+      "includeArchived": "Arxivdəkilər daxil olmaqla",
+      "deleteEverywhereTitle": "Bu söhbət hər yerdə silinsin?",
+      "deleteEverywhereBody": "Söhbət bütün cihazlarda silinəcək və bərpa edilə bilməyəcək.",
+      "deletedElsewhere": "Bu söhbət başqa cihazda silinib.",
+      "listLoadFailed": "Sinxronlaşdırılmış söhbətləri yükləmək mümkün olmadı.",
+      "noticeBody": "Söhbətləriniz artıq bütün cihazlarınız arasında sinxronlaşdırılır.",
+      "noticeAction": "Bunu Ayarlarda söndürə bilərsiniz."
+    },
     "beta": "Beta",
     "details": {
       "title": "Söhbətin təfərrüatları",

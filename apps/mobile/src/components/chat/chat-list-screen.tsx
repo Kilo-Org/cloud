@@ -1,24 +1,18 @@
-import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
-import { EmptyState, StateAction } from '@/components/empty-state';
-import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Fab, FAB_GUTTER, FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
-import { MessageCircle, MessageCirclePlus } from '@/components/ui/icons';
-import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { useAuth } from '@/lib/auth/auth-context';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { defaultChatModel } from '@/lib/chat/backend-model-options';
 import { rememberModelFacts } from '@/lib/chat/layers';
-import { type ChatSummary } from '@/lib/chat/store';
-import { newChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
+import { useChatList, useChatPlace } from '@/lib/chat/use-chat';
 import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
@@ -27,12 +21,29 @@ import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-s
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { useOrganization } from '@/lib/organization-context';
 import { useLocalResetNotice } from '@/lib/persist/use-local-reset-notice';
+import {
+  type ChatListFilters,
+  DEFAULT_CHAT_FILTERS,
+  type MergedChatRow,
+} from '@/lib/chat/sync/sync-list';
+import { startBackfill } from '@/lib/chat/sync/sync-backfill-run';
+import {
+  useChatSyncGate,
+  useChatSyncNotice,
+  useChatSyncUploader,
+  useDeletedElsewhere,
+  useMergedChatList,
+} from '@/lib/chat/sync/use-chat-sync';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
+import { ChatListBody } from './chat-list-body';
+import { useChatListActions } from './chat-list-actions';
 import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { LocalResetNoticeCard } from './local-reset-notice';
+import { ChatSyncListControls } from './chat-sync-list-controls';
+import { ChatSyncNoticeCard } from './chat-sync-notice-card';
 
 /**
  * The chats a person has, newest first.
@@ -45,8 +56,6 @@ import { LocalResetNoticeCard } from './local-reset-notice';
  * a plainer kind: the same header, the same edge-to-edge rows, and the same
  * button in the same corner for starting one.
  */
-
-const SKELETON_ROW_COUNT = 8;
 
 export function ChatListScreen() {
   const { organizationId } = useOrganization();
@@ -61,7 +70,7 @@ function ScopedChatListScreen() {
   const place = useChatPlace();
   const tabBarHeight = useEffectiveTabBarHeight();
   const connectivity = useCommittedConnectivityStatus();
-  const { notice: localResetNotice, dismiss: dismissLocalResetNotice } = useLocalResetNotice();
+  const { notice: localResetNotice, dismiss: handleLocalResetDismiss } = useLocalResetNotice();
 
   const {
     models,
@@ -94,6 +103,45 @@ function ScopedChatListScreen() {
     rename,
   } = useChatList(place);
 
+  // Sync: the flag and the per-account setting together. Off, the list is
+  // exactly the device's chats, as before; on, server sessions merge in.
+  const gate = useChatSyncGate(place);
+  useChatSyncUploader(place, gate.enabled);
+  const notice = useChatSyncNotice(place);
+  const handleSyncNoticeDismiss = notice.dismiss;
+  // Existing chats upload in the background once sync is on; the run stops
+  // itself if the setting is turned off.
+  useEffect(() => {
+    if (place !== null && gate.enabled) {
+      void startBackfill(place);
+    }
+  }, [place, gate.enabled]);
+  const [filters, setFilters] = useState<ChatListFilters>(DEFAULT_CHAT_FILTERS);
+  const merged = useMergedChatList({ place, enabled: gate.enabled, chats, filters });
+  const rows: readonly MergedChatRow[] = gate.enabled
+    ? merged.rows
+    : chats.map(chat => ({
+        key: chat.sessionId,
+        title: chat.title,
+        preview: chat.preview,
+        model: chat.model,
+        updatedAt: chat.updatedAt,
+        live: false,
+        archived: false,
+        origin: null,
+        localSessionId: chat.sessionId,
+        serverSessionId: null,
+        chat,
+      }));
+  const rowsByKey = useMemo(() => new Map(rows.map(row => [row.key, row])), [rows]);
+  useDeletedElsewhere(
+    useCallback(() => {
+      toast.error(t('modelChat.sync.deletedElsewhere'), { position: 'top-center' });
+      refetch();
+      merged.refetch();
+    }, [merged, refetch, t])
+  );
+
   // There is no picker here: a chat starts on the model the latest one is on,
   // and the conversation's own picker switches it from its next message.
   const selectedModel = defaultChatModel({
@@ -111,78 +159,49 @@ function ScopedChatListScreen() {
     [options]
   );
 
-  /* Starting a chat discovers the Kilo MCP server before the session opens, and
-     a slow or offline one takes up to four seconds to give up. The button says
-     it is working for that whole time, so a tap never reads as one that was
-     ignored — and the second tap a silent wait invites cannot open a second
-     chat. The ref is the guard, not the state: two presses in one frame both
-     read the state as it was before the first one re-rendered. */
-  const [starting, setStarting] = useState(false);
-  const startingRef = useRef(false);
-
-  const start = useCallback(() => {
-    if (startingRef.current) {
-      return;
-    }
-    const model = selectedModel;
-    if (place === null || model === undefined) {
-      return;
-    }
-    startingRef.current = true;
-    setStarting(true);
-    void (async () => {
-      try {
-        const sessionId = await newChat(place, {
-          model,
-          effort: null,
-        });
-        // Whatever the last attempt failed with is moot once a chat starts.
-        toast.dismiss('chat-start-failed');
-        router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
-      } catch (error) {
-        /* Starting the chat or opening its session failed. Saying nothing would
-           read as a button that does not work, and a toast that dismissed itself
-           four seconds later was missed by whoever looked away. The reason stays
-           until it is dismissed, at the top so it never covers the tab bar. */
-        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'), {
-          id: 'chat-start-failed',
-          position: 'top-center',
-          duration: Infinity,
-          closeButton: true,
-        });
-      } finally {
-        startingRef.current = false;
-        setStarting(false);
-      }
-    })();
-  }, [selectedModel, place, router, t]);
-
-  const open = useCallback(
+  const openChat = useCallback(
     (sessionId: string) => {
       router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
     },
     [router]
   );
 
-  const drop = useCallback(
-    (sessionId: string) => {
-      void remove(sessionId);
-    },
-    [remove]
-  );
+  const { starting, start, open, drop, renameRow } = useChatListActions({
+    place,
+    enabled: gate.enabled,
+    rowsByKey,
+    selectedModel,
+    t,
+    openChat,
+    refetchList: refetch,
+    refetchMerged: merged.refetch,
+    remove,
+    rename,
+  });
 
   const renderItem = useCallback(
-    ({ item, index }: { item: ChatSummary; index: number }) => (
+    ({ item, index }: { item: MergedChatRow; index: number }) => (
       <ChatRow
-        chat={item}
+        chat={
+          item.chat ?? {
+            sessionId: item.key,
+            model: item.model,
+            title: item.title,
+            preview: item.preview,
+            updatedAt: item.updatedAt,
+          }
+        }
         modelName={nameOf(item.model)}
-        last={index === chats.length - 1}
+        last={index === rows.length - 1}
         onPress={open}
         onDelete={drop}
-        onRename={rename}
+        onRename={renameRow}
+        origin={item.origin}
+        liveRemote={item.live}
+        deleteEverywhere={gate.enabled && item.serverSessionId !== null}
       />
     ),
-    [chats.length, drop, nameOf, open, rename]
+    [drop, gate.enabled, nameOf, open, renameRow, rows.length]
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty
@@ -190,11 +209,15 @@ function ScopedChatListScreen() {
   // body is decided by the two reads' own provenance (see
   // `selectChatListSurface`), so an unanswered read can never read as "no
   // chats": the corner button follows the same body.
+  const serverFailed =
+    gate.enabled && (merged.surface.kind === 'failed' || merged.surface.kind === 'retryable-error');
   const surface = selectChatListSurface({
-    chatCount: chats.length,
-    listAnswered,
-    listFailed: isError,
-    listLoading: isLoading,
+    chatCount: rows.length,
+    listAnswered:
+      listAnswered &&
+      (!gate.enabled || merged.surface.kind === 'ready' || merged.surface.kind === 'off'),
+    listFailed: isError || serverFailed,
+    listLoading: isLoading || (gate.enabled && merged.surface.kind === 'loading'),
     hasPlace: place !== null,
     catalogAnswered: modelsFetched && !modelsFailed,
     catalogLoading: modelsLoading,
@@ -224,80 +247,6 @@ function ScopedChatListScreen() {
     [showFab, tabBarHeight]
   );
 
-  function renderBody() {
-    if (surface.kind === 'list-error') {
-      return (
-        <QueryError
-          variant="server"
-          // i18n-dup-ok: 'modelChat.list.loadFailed' was renamed from the base catalog's
-          // quickChat.historyRetry in the harness-chat rebuild; no other live key carries it.
-          title={t('modelChat.list.loadFailed')}
-          onRetry={refetch}
-        />
-      );
-    }
-    if (surface.kind === 'catalog-error') {
-      return (
-        <QueryError
-          // Offline names the connection; anything else is the catalog's own
-          // failure. Retry asks either read again.
-          variant={surface.offline ? 'offline' : 'server'}
-          title={surface.offline ? undefined : t('common.couldNotLoadModels')}
-          onRetry={() => {
-            void refetchModels();
-          }}
-        />
-      );
-    }
-    if (surface.kind === 'loading') {
-      return (
-        <View className="pt-1">
-          {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-            <RowSkeleton
-              key={index}
-              variant="session"
-              subtitle
-              last={index === SKELETON_ROW_COUNT - 1}
-            />
-          ))}
-        </View>
-      );
-    }
-    if (surface.kind === 'empty') {
-      return (
-        <EmptyState
-          icon={MessageCircle}
-          // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
-          // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
-          title={t('modelChat.empty.title')}
-          // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
-          // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
-          description={t('modelChat.empty.description')}
-          action={
-            <StateAction
-              label={t('modelChat.list.new')}
-              icon={MessageCirclePlus}
-              onPress={start}
-              loading={starting}
-              disabled={selectedModel === undefined}
-            />
-          }
-        />
-      );
-    }
-    return (
-      <FlashList
-        data={[...chats]}
-        keyExtractor={chat => chat.sessionId}
-        renderItem={renderItem}
-        // Newest first: a chat that just arrived belongs on screen, and holding
-        // the old scroll position would put it above the top of the list.
-        maintainVisibleContentPosition={{ disabled: true }}
-        contentContainerStyle={listStyle}
-      />
-    );
-  }
-
   return (
     <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
       <View className="flex-1 bg-background">
@@ -314,9 +263,35 @@ function ScopedChatListScreen() {
         {/* Above every body kind: an emptied list must never read as an
             ordinary empty state, so the explanation outranks what remains. */}
         {localResetNotice.kind === 'present' ? (
-          <LocalResetNoticeCard onDismiss={dismissLocalResetNotice} />
+          <LocalResetNoticeCard onDismiss={handleLocalResetDismiss} />
         ) : null}
-        <View className="flex-1">{renderBody()}</View>
+        {gate.enabled && notice.visible ? (
+          <ChatSyncNoticeCard
+            onDismiss={handleSyncNoticeDismiss}
+            onOpenSettings={() => {
+              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+        ) : null}
+        {gate.enabled ? <ChatSyncListControls filters={filters} onChange={setFilters} /> : null}
+        <View className="flex-1">
+          <ChatListBody
+            surface={surface}
+            serverFailed={serverFailed}
+            rows={rows}
+            renderItem={renderItem}
+            listStyle={listStyle}
+            hasNextPage={merged.hasNextPage}
+            fetchNextPage={merged.fetchNextPage}
+            refetchList={refetch}
+            refetchMerged={merged.refetch}
+            refetchModels={() => void refetchModels()}
+            t={t}
+            start={start}
+            starting={starting}
+            selectedModel={selectedModel}
+          />
+        </View>
         {showFab && (
           <Fab
             label={t('modelChat.list.new')}

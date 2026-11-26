@@ -26,6 +26,8 @@ import {
 } from './state';
 import { forgetQuestions, titledByAsked } from './pending';
 import { type ChatSummary, deleteChat, listChats, renameChat } from './store';
+import { deleteEverywhere, uploadRenamedChat } from './sync/sync-service';
+import { useChatSyncGate } from './sync/use-chat-sync';
 
 /**
  * The chat surface, as React sees it.
@@ -70,6 +72,7 @@ export type ChatList = {
 export function useChatList(place: ChatPlace | null): ChatList {
   const scope = place?.chatScope ?? null;
   const client = useQueryClient();
+  const gate = useChatSyncGate(place);
   const query = useQuery({
     queryKey: listKey(scope ?? ''),
     enabled: place !== null,
@@ -97,19 +100,34 @@ export function useChatList(place: ChatPlace | null): ChatList {
   const remove = useCallback(
     async (sessionId: string) => {
       const current = snapshotOf(sessionId).sessionId;
+      if (gate.enabled && place !== null) {
+        const outcome = await deleteEverywhere(place, current);
+        if (outcome.kind === 'deleted') {
+          await forgetQuestions(current);
+          await client.invalidateQueries({ queryKey: listKey(scope ?? '') });
+          return;
+        }
+        if (outcome.kind === 'failed') {
+          return;
+        }
+      }
       await releaseChat(current);
       await forgetQuestions(current);
       deleteChat(await encryptedDatabase(), current);
       await client.invalidateQueries({ queryKey: listKey(scope ?? '') });
     },
-    [client, scope]
+    [client, gate.enabled, place, scope]
   );
   const rename = useCallback(
     async (sessionId: string, title: string) => {
-      renameChat(await encryptedDatabase(), snapshotOf(sessionId).sessionId, title);
+      const current = snapshotOf(sessionId).sessionId;
+      renameChat(await encryptedDatabase(), current, title);
       await client.invalidateQueries({ queryKey: listKey(scope ?? '') });
+      if (gate.enabled && place !== null) {
+        void uploadRenamedChat(place, current);
+      }
     },
-    [client, scope]
+    [client, gate.enabled, place, scope]
   );
   return {
     chats: query.data ?? [],

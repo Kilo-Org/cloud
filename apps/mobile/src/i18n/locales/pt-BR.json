@@ -4223,6 +4223,28 @@
       "accessibility": "Renomear chat: {{title}}",
       "openHint": "Abre a conversa. Toque e segure para renomear ou excluir."
     },
+    "sync": {
+      "busyTitle": "Ocupado em outro dispositivo",
+      "busyBody": "Este chat está respondendo em outro dispositivo. Aguarde a conclusão antes de enviar algo.",
+      "liveTitle": "Executando no seu computador",
+      "liveBody": "As mensagens que você enviar vão para a sessão em execução no seu computador.",
+      "divergedTitle": "Este chat foi alterado em dois dispositivos",
+      "divergedBody": "As mensagens daqui e de outro dispositivo não podem ser combinadas. Carregue a versão mais recente para manter este dispositivo sincronizado.",
+      "divergedAction": "Descartar mensagens não sincronizadas e carregar a versão mais recente",
+      "settingTitle": "Sincronizar chats entre dispositivos",
+      "settingDescription": "Mantenha os chats sincronizados entre seus dispositivos, incluindo o Kilo CLI.",
+      "settingUnreadable": "Não foi possível ler esta configuração. Toque para tentar novamente.",
+      "searchPlaceholder": "Pesquisar chats",
+      "originFilter": "Origem do chat",
+      "originMobile": "Celular",
+      "includeArchived": "Incluir arquivados",
+      "deleteEverywhereTitle": "Excluir este chat em todos os dispositivos?",
+      "deleteEverywhereBody": "Ele será excluído em todos os dispositivos e não poderá ser recuperado.",
+      "deletedElsewhere": "Este chat foi excluído em outro dispositivo.",
+      "listLoadFailed": "Não foi possível carregar os chats sincronizados.",
+      "noticeBody": "Seus chats agora são sincronizados entre seus dispositivos.",
+      "noticeAction": "Você pode desativar isso nas Configurações."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detalhes do chat",

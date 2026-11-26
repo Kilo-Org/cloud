@@ -4067,6 +4067,28 @@
       "accessibility": "Riemërto bisedën: {{title}}",
       "openHint": "Hap bisedën. Shtypni gjatë për ta riemërtuar ose fshirë."
     },
+    "sync": {
+      "busyTitle": "I zënë në një pajisje tjetër",
+      "busyBody": "Kjo bisedë po përgjigjet në një pajisje tjetër. Prit që të përfundojë para se të dërgosh diçka.",
+      "liveTitle": "Po ekzekutohet në kompjuterin tënd",
+      "liveBody": "Mesazhet që dërgon shkojnë te sesioni që po ekzekutohet në kompjuterin tënd.",
+      "divergedTitle": "Kjo bisedë ndryshoi në dy pajisje",
+      "divergedBody": "Mesazhet këtu dhe në pajisjen tjetër nuk mund të bashkohen. Ngarko versionin më të fundit që kjo pajisje të jetë e sinkronizuar.",
+      "divergedAction": "Hidh mesazhet e pasinkronizuara dhe ngarko versionin më të fundit",
+      "settingTitle": "Sinkronizo bisedat në të gjitha pajisjet",
+      "settingDescription": "Mbaji bisedat të sinkronizuara në të gjitha pajisjet e tua, përfshirë Kilo CLI.",
+      "settingUnreadable": "Ky cilësim nuk u lexua dot. Trokit për të provuar përsëri.",
+      "searchPlaceholder": "Kërko biseda",
+      "originFilter": "Origjina e bisedës",
+      "originMobile": "Celulari",
+      "includeArchived": "Përfshi të arkivuarat",
+      "deleteEverywhereTitle": "Ta fshish këtë bisedë kudo?",
+      "deleteEverywhereBody": "Fshihet në çdo pajisje dhe nuk mund të rikthehet.",
+      "deletedElsewhere": "Kjo bisedë u fshi në një pajisje tjetër.",
+      "listLoadFailed": "Bisedat e sinkronizuara nuk u ngarkuan dot.",
+      "noticeBody": "Bisedat e tua tani sinkronizohen në të gjitha pajisjet.",
+      "noticeAction": "Mund ta çaktivizosh këtë te Cilësimet."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detajet e bisedës",

@@ -20,8 +20,18 @@ export const createdSessions = sqliteTable(
     tenant_id: text('tenant_id').notNull(),
     session_id: text('session_id').notNull(),
     created_at: integer('created_at').notNull().default(0),
+    title: text('title'),
+    /** NFKD-folded, lower-cased title the search compares against. */
+    title_folded: text('title_folded'),
+    client: text('client', { enum: ['cli', 'mobile', 'cloud-agent'] })
+      .notNull()
+      .default('cli'),
+    directory: text('directory'),
+    /** Backfilled from `created_at` for rows created before list metadata. */
+    updated_at: integer('updated_at').notNull().default(0),
+    archived: integer('archived').notNull().default(0),
   },
-  table => [index('created_sessions_newest').on(table.created_at, table.target)]
+  table => [index('created_sessions_updated').on(table.updated_at, table.target)]
 );
 
 /** Permanent admission fence; content cleanup is alarm-driven. */

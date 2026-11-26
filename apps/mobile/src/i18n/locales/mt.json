@@ -4301,6 +4301,28 @@
       "accessibility": "Ibdel l-isem taċ-chat: {{title}}",
       "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tibdel l-isem jew tħassar."
     },
+    "sync": {
+      "busyTitle": "Okkupat fuq apparat ieħor",
+      "busyBody": "Din iċ-chat qed twieġeb fuq apparat ieħor. Stenna sakemm tispiċċa qabel ma tibgħat xi ħaġa.",
+      "liveTitle": "Qed taħdem fuq il-kompjuter tiegħek",
+      "liveBody": "Il-messaġġi li tibgħat imorru għas-sessjoni li qed taħdem fuq il-kompjuter tiegħek.",
+      "divergedTitle": "Din iċ-chat inbidlet fuq żewġ apparati",
+      "divergedBody": "Il-messaġġi hawn u fuq apparat ieħor ma jistgħux jingħaqdu. Tella' l-aħħar verżjoni biex dan l-apparat jibqa' sinkronizzat.",
+      "divergedAction": "Armi l-messaġġi mhux sinkronizzati u tella' l-aħħar verżjoni",
+      "settingTitle": "Issinkronizza ċ-chats bejn l-apparati",
+      "settingDescription": "Żomm iċ-chats sinkronizzati bejn l-apparati tiegħek, inkluż Kilo CLI.",
+      "settingUnreadable": "Ma setax jinqara dan l-issettjar. Tektek biex terġa' tipprova.",
+      "searchPlaceholder": "Fittex fiċ-chats",
+      "originFilter": "Oriġini taċ-chat",
+      "originMobile": "Mowbajl",
+      "includeArchived": "Inkludi l-arkivjati",
+      "deleteEverywhereTitle": "Tħassar din iċ-chat kullimkien?",
+      "deleteEverywhereBody": "Titħassar fuq kull apparat u ma tistax tiġi rkuprata.",
+      "deletedElsewhere": "Din iċ-chat tħassret fuq apparat ieħor.",
+      "listLoadFailed": "Ma setgħux jittellgħu ċ-chats sinkronizzati.",
+      "noticeBody": "Iċ-chats tiegħek issa huma sinkronizzati bejn l-apparati tiegħek.",
+      "noticeAction": "Tista' titfi dan mill-Issettjar."
+    },
     "beta": "Beta",
     "details": {
       "title": "Dettalji taċ-chat",

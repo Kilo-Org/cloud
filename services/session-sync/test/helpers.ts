@@ -56,9 +56,14 @@ export function batch(
 
 export type Client = {
   send(method: string, path: string, init?: RequestInit): Promise<Response>;
-  register(id: string, sourceID: string): Promise<Response>;
+  register(
+    id: string,
+    sourceID: string,
+    client?: 'cli' | 'mobile' | 'cloud-agent'
+  ): Promise<Response>;
   state(id: string): Promise<Response>;
   apply(id: string, body: unknown): Promise<Response>;
+  status(id: string, sourceID: string, after: number, value: string): Promise<Response>;
   entities(id: string, query?: Record<string, string>): Promise<Response>;
   putBlob(id: string, hash: string, bytes: Uint8Array): Promise<Response>;
   getBlob(id: string, hash: string): Promise<Response>;
@@ -81,9 +86,12 @@ export function client(principal: Principal): Client {
 
   return {
     send,
-    register: (id: string, sourceID: string) => json('PUT', session(id), { version: 1, sourceID }),
+    register: (id: string, sourceID: string, client?: 'cli' | 'mobile' | 'cloud-agent') =>
+      json('PUT', session(id), { version: 1, sourceID, ...(client ? { client } : {}) }),
     state: (id: string) => send('GET', session(id)),
     apply: (id: string, body: unknown) => json('POST', `${session(id)}/batches`, body),
+    status: (id: string, sourceID: string, after: number, value: string) =>
+      json('PUT', `${session(id)}/status`, { version: 1, sourceID, after, status: value }),
     entities: (id: string, query: Record<string, string> = {}) =>
       send('GET', `${session(id)}/entities?${new URLSearchParams(query).toString()}`),
     putBlob: (id: string, hash: string, bytes: Uint8Array) =>

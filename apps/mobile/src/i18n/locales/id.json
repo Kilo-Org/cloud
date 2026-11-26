@@ -3999,6 +3999,28 @@
       "accessibility": "Ganti nama obrolan: {{title}}",
       "openHint": "Membuka obrolan. Tekan lama untuk mengganti nama atau menghapus."
     },
+    "sync": {
+      "busyTitle": "Sibuk di perangkat lain",
+      "busyBody": "Chat ini sedang menjawab di perangkat lain. Tunggu sampai selesai sebelum mengirim apa pun.",
+      "liveTitle": "Berjalan di komputer Anda",
+      "liveBody": "Pesan yang Anda kirim akan masuk ke sesi yang berjalan di komputer Anda.",
+      "divergedTitle": "Chat ini berubah di dua perangkat",
+      "divergedBody": "Pesan di sini dan di perangkat lain tidak dapat digabungkan. Muat versi terbaru agar perangkat ini tetap selaras.",
+      "divergedAction": "Buang pesan yang belum disinkronkan dan muat versi terbaru",
+      "settingTitle": "Sinkronkan chat di semua perangkat",
+      "settingDescription": "Jaga chat tetap selaras di semua perangkat Anda, termasuk Kilo CLI.",
+      "settingUnreadable": "Tidak dapat membaca pengaturan ini. Ketuk untuk mencoba lagi.",
+      "searchPlaceholder": "Cari chat",
+      "originFilter": "Asal chat",
+      "originMobile": "Seluler",
+      "includeArchived": "Sertakan yang diarsipkan",
+      "deleteEverywhereTitle": "Hapus chat ini di semua perangkat?",
+      "deleteEverywhereBody": "Chat akan dihapus di semua perangkat dan tidak dapat dipulihkan.",
+      "deletedElsewhere": "Chat ini telah dihapus di perangkat lain.",
+      "listLoadFailed": "Tidak dapat memuat chat yang disinkronkan.",
+      "noticeBody": "Chat Anda kini tersinkron di semua perangkat Anda.",
+      "noticeAction": "Anda dapat menonaktifkannya di Pengaturan."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detail obrolan",

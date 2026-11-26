@@ -4067,6 +4067,28 @@
       "accessibility": "Nimeta vestlus ümber: {{title}}",
       "openHint": "Avab vestluse. Ümbernimetamiseks või kustutamiseks hoia all."
     },
+    "sync": {
+      "busyTitle": "Teises seadmes hõivatud",
+      "busyBody": "See vestlus vastab praegu teises seadmes. Enne millegi saatmist oota, kuni see lõpetab.",
+      "liveTitle": "Töötab sinu arvutis",
+      "liveBody": "Sinu saadetud sõnumid lähevad sinu arvutis töötavasse seanssi.",
+      "divergedTitle": "Seda vestlust muudeti kahes seadmes",
+      "divergedBody": "Siinseid ja teise seadme sõnumeid ei saa kokku liita. Laadi uusim versioon, et see seade püsiks sünkroonis.",
+      "divergedAction": "Loobu sünkroonimata sõnumitest ja laadi uusim",
+      "settingTitle": "Sünkrooni vestlused seadmete vahel",
+      "settingDescription": "Hoia vestlused kõigis oma seadmetes, sh Kilo CLI-s, sünkroonis.",
+      "settingUnreadable": "Seda seadet ei õnnestunud lugeda. Puuduta uuesti proovimiseks.",
+      "searchPlaceholder": "Otsi vestlusi",
+      "originFilter": "Vestluse päritolu",
+      "originMobile": "Mobiil",
+      "includeArchived": "Kaasa arhiveeritud",
+      "deleteEverywhereTitle": "Kas kustutada see vestlus kõikjalt?",
+      "deleteEverywhereBody": "See kustutatakse kõigist seadmetest ja seda ei saa taastada.",
+      "deletedElsewhere": "See vestlus kustutati teises seadmes.",
+      "listLoadFailed": "Sünkroonitud vestlusi ei õnnestunud laadida.",
+      "noticeBody": "Sinu vestlused sünkroonitakse nüüd kõigis sinu seadmetes.",
+      "noticeAction": "Selle saad välja lülitada seadetes."
+    },
     "beta": "Beeta",
     "details": {
       "title": "Vestluse üksikasjad",

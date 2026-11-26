@@ -81,6 +81,9 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
   'lib/url-authority.ts': 'URL scheme and hostname normalization',
   'lib/code-reviewer-council.ts': 'council label dedupe comparison',
+  // Parses identifiers and matches search text: never display copy.
+  'lib/chat/sync/sync-ids.ts': 'Crockford/hex identifier parsing',
+  'lib/chat/sync/sync-list.ts': 'case-insensitive search matching, not display',
 };
 
 /** The `.toUpperCase(` / `.toLowerCase(` call the class is about. */

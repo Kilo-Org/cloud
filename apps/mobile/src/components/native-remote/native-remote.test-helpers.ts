@@ -37,6 +37,11 @@ export const summary = {
   tenant: onlineHost.tenant,
   live: true,
   createdAt: 1,
+  updatedAt: 1,
+  title: null,
+  client: 'cli' as const,
+  directory: null,
+  archived: false,
 };
 
 type SessionConnectionMock = {

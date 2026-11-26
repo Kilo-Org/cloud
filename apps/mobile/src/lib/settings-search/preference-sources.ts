@@ -35,6 +35,7 @@ const APPEARANCE_OPTION_SETTINGS = {
 
 /** Every row below the Appearance section. */
 const PREFERENCES_HUB_REST_SETTINGS = {
+  chatSync: defineSetting('chat-sync', 'modelChat.sync.settingTitle'),
   account: defineSetting('account', 'preferences.account', 'language'),
   notifications: defineSetting('notifications', 'common.notifications', 'notifications'),
   notificationHistory: defineSetting(

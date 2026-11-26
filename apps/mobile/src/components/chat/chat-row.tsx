@@ -2,17 +2,36 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 import { RenameModal } from '@/components/rename-modal';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { Cloud, Smartphone, Terminal } from '@/components/ui/icons';
 import { SessionRow } from '@/components/ui/session-row';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { CHAT_TITLE_MAX_LENGTH, type ChatSummary } from '@/lib/chat/store';
 import { useChatStatus } from '@/lib/chat/use-chat';
 import { timeAgo } from '@/lib/utils';
+
+type ChatOrigin = 'mobile' | 'cli' | 'cloud-agent';
+
+/** The badge a row wears for where its session started, and the name it reads. */
+const ORIGIN_LABELS = {
+  mobile: 'modelChat.sync.originMobile',
+  cli: 'agentChat.sessionFilter.platformCli',
+  'cloud-agent': 'agentChat.sessionFilter.platformCloud',
+} as const;
+
+const ORIGIN_ICONS = {
+  mobile: Smartphone,
+  cli: Terminal,
+  'cloud-agent': Cloud,
+} as const;
 
 /**
  * One chat in the list.
@@ -32,6 +51,12 @@ type ChatRowProps = {
   onPress: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => Promise<void>;
+  /** Where the session started, when sync knows it: the badge beside the row. */
+  origin?: ChatOrigin | null;
+  /** A runner is live on this session on another device. */
+  liveRemote?: boolean;
+  /** Deleting this chat deletes it everywhere, and the confirm says so. */
+  deleteEverywhere?: boolean;
 };
 
 export function ChatRow({
@@ -41,8 +66,12 @@ export function ChatRow({
   onPress,
   onDelete,
   onRename,
+  origin = null,
+  liveRemote = false,
+  deleteEverywhere = false,
 }: Readonly<ChatRowProps>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   // The answer may be arriving on another screen: the chat says so, not the row.
   const working = useChatStatus(chat.sessionId) === 'working';
   const { showActionSheetWithOptions } = useActionSheet();
@@ -56,12 +85,17 @@ export function ChatRow({
   // message in each tells them apart, and repeating one that is already the
   // title would say nothing.
   const preview = chat.preview.trim() === chat.title.trim() ? '' : chat.preview;
+  // The badge beside the title: which platform the session started on.
+  const OriginIcon = origin === null ? null : ORIGIN_ICONS[origin];
+  const originLabel = origin === null ? '' : t(ORIGIN_LABELS[origin]);
 
   function confirmDelete() {
     notificationHaptic(Haptics.NotificationFeedbackType.Warning);
     confirm({
-      title: t('modelChat.list.deleteTitle'),
-      message: title,
+      title: t(
+        deleteEverywhere ? 'modelChat.sync.deleteEverywhereTitle' : 'modelChat.list.deleteTitle'
+      ),
+      message: deleteEverywhere ? `${title}\n${t('modelChat.sync.deleteEverywhereBody')}` : title,
       confirmLabel: t('common.delete'),
       onConfirm: () => {
         onDelete(chat.sessionId);
@@ -93,7 +127,12 @@ export function ChatRow({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={title}
+        // The row is one accessible element, so its label carries the title and
+        // the origin the badge draws; a label on the badge alone is swallowed
+        // by this pressable and a screen reader could never learn the origin.
+        accessibilityLabel={
+          originLabel === '' ? title : formatList([title, originLabel], i18n.language)
+        }
         accessibilityHint={t('modelChat.rename.openHint')}
         className="active:opacity-70"
         onPress={() => {
@@ -107,8 +146,16 @@ export function ChatRow({
           subtitle={preview}
           subtitleVariant="default"
           meta={timeAgo(new Date(chat.updatedAt), undefined, now)}
-          live={working}
+          live={working || liveRemote}
           metaWhileLive
+          platformIcon={
+            OriginIcon === null ? undefined : (
+              // Drawn only: the row's own label above announces the origin.
+              <View accessible={false} importantForAccessibility="no">
+                <OriginIcon size={14} color={colors.mutedForeground} />
+              </View>
+            )
+          }
           last={last}
         />
       </Pressable>

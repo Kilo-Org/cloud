@@ -4067,6 +4067,28 @@
       "accessibility": "የውይይቱን ስም ቀይር፦ {{title}}",
       "openHint": "ውይይቱን ይከፍታል። ስም ለመቀየር ወይም ለመሰረዝ ተጭነው ይያዙ።"
     },
+    "sync": {
+      "busyTitle": "በሌላ መሣሪያ ላይ ሥራ ላይ ነው",
+      "busyBody": "ይህ ውይይት በሌላ መሣሪያ ላይ እየመለሰ ነው። ማንኛውንም ነገር ከመላክዎ በፊት እስኪጨርስ ይጠብቁ።",
+      "liveTitle": "በኮምፒውተርዎ ላይ እየሠራ ነው",
+      "liveBody": "የሚልኳቸው መልዕክቶች በኮምፒውተርዎ ላይ ወደሚሠራው ክፍለ-ጊዜ ይሄዳሉ።",
+      "divergedTitle": "ይህ ውይይት በሁለት መሣሪያዎች ላይ ተቀይሯል",
+      "divergedBody": "እዚህ እና በሌላ መሣሪያ ላይ ያሉ መልዕክቶች ሊቀላቀሉ አይችሉም። ይህ መሣሪያ እንዲጣጣም የቅርብ ጊዜውን ይጫኑ።",
+      "divergedAction": "ያልተመሳሰሉ መልዕክቶችን አስወግድና የቅርብ ጊዜውን ጫን",
+      "settingTitle": "ውይይቶችን በመሣሪያዎች መካከል አመሳስል",
+      "settingDescription": "Kilo CLIን ጨምሮ በመሣሪያዎችዎ ሁሉ ውይይቶችን ተመሳስለው ያቆዩ።",
+      "settingUnreadable": "ይህን ቅንብር ማንበብ አልተቻለም። እንደገና ለመሞከር ይንኩ።",
+      "searchPlaceholder": "ውይይቶችን ፈልግ",
+      "originFilter": "የውይይት ምንጭ",
+      "originMobile": "ሞባይል",
+      "includeArchived": "በማህደር የተቀመጡትን አካትት",
+      "deleteEverywhereTitle": "ይህ ውይይት ከሁሉም ቦታ ይሰረዝ?",
+      "deleteEverywhereBody": "በሁሉም መሣሪያ ላይ ይሰረዛል፣ መልሶም ማግኘት አይቻልም።",
+      "deletedElsewhere": "ይህ ውይይት በሌላ መሣሪያ ላይ ተሰርዟል።",
+      "listLoadFailed": "የተመሳሰሉ ውይይቶችን መጫን አልተቻለም።",
+      "noticeBody": "ውይይቶችዎ አሁን በመሣሪያዎችዎ መካከል ይመሳሰላሉ።",
+      "noticeAction": "ይህን በቅንብሮች ውስጥ ማጥፋት ይችላሉ።"
+    },
     "beta": "ቤታ",
     "details": {
       "title": "የውይይት ዝርዝሮች",

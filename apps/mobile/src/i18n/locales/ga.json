@@ -4301,6 +4301,28 @@
       "accessibility": "Athainmnigh an comhrá: {{title}}",
       "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun athainmniú nó scriosadh."
     },
+    "sync": {
+      "busyTitle": "Gnóthach ar ghléas eile",
+      "busyBody": "Tá an comhrá seo ag freagairt ar ghléas eile. Fan go gcríochnóidh sé sula seolfaidh tú aon rud.",
+      "liveTitle": "Ag rith ar do ríomhaire",
+      "liveBody": "Téann na teachtaireachtaí a sheolann tú chuig an seisiún atá ag rith ar do ríomhaire.",
+      "divergedTitle": "Athraíodh an comhrá seo ar dhá ghléas",
+      "divergedBody": "Ní féidir na teachtaireachtaí anseo agus ar ghléas eile a chumasc. Luchtaigh an leagan is déanaí chun an gléas seo a choinneáil i gcomhréir.",
+      "divergedAction": "Scrios na teachtaireachtaí nach bhfuil sioncronaithe agus luchtaigh an leagan is déanaí",
+      "settingTitle": "Sioncronaigh comhráite idir gléasanna",
+      "settingDescription": "Coinnigh comhráite i gcomhréir ar do ghléasanna go léir, Kilo CLI san áireamh.",
+      "settingUnreadable": "Níorbh fhéidir an socrú seo a léamh. Tapáil chun iarracht eile a dhéanamh.",
+      "searchPlaceholder": "Cuardaigh comhráite",
+      "originFilter": "Bunús an chomhrá",
+      "originMobile": "Soghluaiste",
+      "includeArchived": "Cuir cartlannaithe san áireamh",
+      "deleteEverywhereTitle": "Scrios an comhrá seo i ngach áit?",
+      "deleteEverywhereBody": "Scriosfar é ar gach gléas agus ní féidir é a aisghabháil.",
+      "deletedElsewhere": "Scriosadh an comhrá seo ar ghléas eile.",
+      "listLoadFailed": "Níorbh fhéidir comhráite sioncronaithe a luchtú.",
+      "noticeBody": "Sioncronaítear do chomhráite ar do ghléasanna go léir anois.",
+      "noticeAction": "Is féidir leat é seo a mhúchadh sna Socruithe."
+    },
     "beta": "Béite",
     "details": {
       "title": "Sonraí an chomhrá",

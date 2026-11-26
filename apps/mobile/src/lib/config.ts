@@ -47,13 +47,12 @@ const KILO_MCP_URL_PRODUCTION = 'https://mcp.kiloapps.io';
 export const KILO_MCP_URL: string | undefined =
   optional('kiloMcpUrl') ??
   (extra?.isProductionBuild === true ? KILO_MCP_URL_PRODUCTION : undefined);
-// The native remote preview requires a development bundle and an explicit relay.
-export const SESSION_SYNC_URL: string | undefined = __DEV__
-  ? process.env.EXPO_PUBLIC_SESSION_SYNC_URL
-  : undefined;
-if (SESSION_SYNC_URL) {
-  assertUrlScheme('sessionSyncUrl', SESSION_SYNC_URL, ['https:'], { allowInsecure: true });
-}
+// The session-sync service: production builds reach the committed
+// SESSION_SYNC_URL; a development bundle may point at a local relay through
+// EXPO_PUBLIC_SESSION_SYNC_URL (the native-remote preview uses that too).
+export const SESSION_SYNC_URL: string =
+  (__DEV__ ? process.env.EXPO_PUBLIC_SESSION_SYNC_URL : undefined) ?? required('sessionSyncUrl');
+assertUrlScheme('sessionSyncUrl', SESSION_SYNC_URL, ['https:'], { allowInsecure: __DEV__ });
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
 export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(

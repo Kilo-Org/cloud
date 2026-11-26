@@ -1,0 +1,1 @@
+ALTER TABLE `created_sessions` ADD `title_folded` text;

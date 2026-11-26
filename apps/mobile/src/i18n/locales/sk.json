@@ -4223,6 +4223,28 @@
       "accessibility": "Premenovať chat: {{title}}",
       "openHint": "Otvorí chat. Dlhým stlačením ho premenujete alebo odstránite."
     },
+    "sync": {
+      "busyTitle": "Zaneprázdnené na inom zariadení",
+      "busyBody": "Tento chat práve odpovedá na inom zariadení. Pred odoslaním počkajte, kým sa dokončí.",
+      "liveTitle": "Beží na vašom počítači",
+      "liveBody": "Správy, ktoré odošlete, sa pošlú do relácie spustenej na vašom počítači.",
+      "divergedTitle": "Tento chat sa zmenil na dvoch zariadeniach",
+      "divergedBody": "Správy na tomto a inom zariadení nie je možné zlúčiť. Načítajte najnovšiu verziu, aby toto zariadenie zostalo synchronizované.",
+      "divergedAction": "Zahodiť nesynchronizované správy a načítať najnovšie",
+      "settingTitle": "Synchronizovať chaty medzi zariadeniami",
+      "settingDescription": "Udržujte chaty zosúladené na všetkých zariadeniach vrátane Kilo CLI.",
+      "settingUnreadable": "Toto nastavenie sa nepodarilo načítať. Ťuknutím to skúste znova.",
+      "searchPlaceholder": "Hľadať chaty",
+      "originFilter": "Pôvod chatu",
+      "originMobile": "Mobil",
+      "includeArchived": "Vrátane archivovaných",
+      "deleteEverywhereTitle": "Odstrániť tento chat všade?",
+      "deleteEverywhereBody": "Odstráni sa na všetkých zariadeniach a nebude ho možné obnoviť.",
+      "deletedElsewhere": "Tento chat bol odstránený na inom zariadení.",
+      "listLoadFailed": "Synchronizované chaty sa nepodarilo načítať.",
+      "noticeBody": "Vaše chaty sa teraz synchronizujú medzi vašimi zariadeniami.",
+      "noticeAction": "Môžete to vypnúť v Nastaveniach."
+    },
     "beta": "Beta",
     "details": {
       "title": "Podrobnosti chatu",

@@ -74,7 +74,13 @@ const kindSchema = z.enum([
   'instruction-blob',
   'asset',
 ]);
-const entityHeader = { kind: kindSchema, id: idSchema, revision: positionSchema };
+const entityHeader = {
+  kind: kindSchema,
+  id: idSchema,
+  revision: positionSchema,
+  // Side tag of the row's last writer; absent from pages served before it existed.
+  sourceID: z.string().min(1).max(256).nullable().optional(),
+};
 const entitySchema = z.union([
   z.strictObject({ ...entityHeader, value: z.json() }),
   z.strictObject({
@@ -499,7 +505,7 @@ async function readSnapshot(
   const cursors = new Set<string>();
   let cursor: string | null = null;
   do {
-    const query = `revision=${state.revision}&limit=100${cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
+    const query = `revision=${state.revision}&limit=100&include=source${cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
     const page = pageSchema.parse(await request<unknown>(`${path}/entities?${query}`));
     if (page.sessionID !== sessionID)
       throw new Error('Native entity page session identity mismatch');

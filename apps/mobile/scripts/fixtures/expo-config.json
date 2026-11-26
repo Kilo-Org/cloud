@@ -38,7 +38,11 @@
   "plugins": [
     [
       "@sentry/react-native/expo",
-      { "experimental_android": { "enableAndroidGradlePlugin": true } }
+      {
+        "experimental_android": {
+          "enableAndroidGradlePlugin": true
+        }
+      }
     ],
     "./plugins/withAndroidRotationSurface",
     "./plugins/withAndroidManifestFix",
@@ -56,7 +60,11 @@
     ],
     [
       "expo-dev-client",
-      { "toolsButton": false, "showMenuAtLaunch": false, "skipOnboarding": true }
+      {
+        "toolsButton": false,
+        "showMenuAtLaunch": false,
+        "skipOnboarding": true
+      }
     ],
     [
       "expo-build-properties",
@@ -66,13 +74,19 @@
         }
       }
     ],
-    ["expo-notifications", { "defaultChannel": "needs-input" }]
+    [
+      "expo-notifications",
+      {
+        "defaultChannel": "needs-input"
+      }
+    ]
   ],
   "extra": {
     "apiBaseUrl": "https://fixture.invalid/api",
     "webBaseUrl": "https://fixture.invalid",
     "cloudAgentWsUrl": "wss://fixture.invalid/cloud-agent",
     "sessionIngestWsUrl": "wss://fixture.invalid/session-ingest",
+    "sessionSyncUrl": "https://session-sync.kiloapps.io",
     "appsFlyerDevKey": "fixture-dev-key",
     "appsFlyerAppId": "fixture-app-id",
     "eventServiceUrl": "https://fixture.invalid/events",

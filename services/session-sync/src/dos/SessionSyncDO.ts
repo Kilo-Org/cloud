@@ -33,6 +33,7 @@ import {
   type SessionState,
   type SyncError,
   type Tenant,
+  type SessionListMetadata,
   type SessionStatus,
 } from '../protocol';
 import * as batches from './session-sync/batch';
@@ -40,6 +41,7 @@ import { getTenantStub } from './SessionSyncTenantDO';
 import { getRelayStub } from './SessionRelayDO';
 import * as blob from './session-sync/blob';
 import * as erase from './session-sync/erase';
+import * as listMetadata from './session-sync/list-metadata';
 import * as page from './session-sync/page';
 import * as session from './session-sync/session';
 import { leaseBytes } from './session-sync/lease';
@@ -66,6 +68,7 @@ const pageInput = z.strictObject({
   cursor: cursorSchema.optional(),
   limit: z.number().int().min(1).max(LIMITS.pageItems),
   revision: z.number().int().min(0).optional(),
+  includeSource: z.boolean().optional(),
 });
 const blobInput = z.strictObject({ ...target, blob: blobRefSchema });
 const attemptInput = z.strictObject({ ...target, blob: blobRefSchema, attempt: z.uuid() });
@@ -437,7 +440,14 @@ export class SessionSyncDO extends DurableObject<Env> {
       const existing = session.load(this.db);
       const prior = existing
         ? this.tx(() =>
-            session.register(this.db, principal, sessionID, request.sourceID, Date.now())
+            session.register(
+              this.db,
+              principal,
+              sessionID,
+              request.sourceID,
+              Date.now(),
+              request.client ?? 'cli'
+            )
           )
         : null;
       if (prior && !prior.ok) return prior;
@@ -451,6 +461,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         getTenantStub(this.env, { type: 'user', id: principal.userID }).trackCreatedSession({
           principal,
           sessionID,
+          client: request.client ?? 'cli',
         })
       );
       if (!indexed.ok) return indexed;
@@ -489,7 +500,14 @@ export class SessionSyncDO extends DurableObject<Env> {
         return admitted;
       }
       const registered = this.tx(() =>
-        session.register(this.db, principal, sessionID, request.sourceID, Date.now())
+        session.register(
+          this.db,
+          principal,
+          sessionID,
+          request.sourceID,
+          Date.now(),
+          request.client ?? 'cli'
+        )
       );
       if (registered.ok) {
         if (registered.value.created)
@@ -644,8 +662,22 @@ export class SessionSyncDO extends DurableObject<Env> {
           Date.now(),
           work
         );
+        // The last session put in the batch holds the record the index shows.
+        let metadata: SessionListMetadata | undefined;
+        if (meta) {
+          for (const change of batch.value.changes) {
+            if (change.op !== 'put' || change.kind !== 'session') continue;
+            metadata = notifications.listMetadata(
+              'value' in change ? change.value : undefined,
+              receipt.committedAt
+            );
+          }
+          // The batch and its index debt commit together; the push follows.
+          if (metadata) listMetadata.stage(this.db, metadata, receipt.committedAt);
+        }
         return {
           receipt,
+          metadata,
           notification: meta
             ? notifications.snapshot(this.db, 'session.updated', receipt.committedAt, meta)
             : undefined,
@@ -653,6 +685,8 @@ export class SessionSyncDO extends DurableObject<Env> {
       });
       if (!applied.ok) return applied;
       this.notify(principal.userID, applied.value.notification);
+      // The debt is already durable in the batch's transaction; the sweep below
+      // schedules its push, so no tenant call delays this response.
       await phase(
         this.env,
         'applyBatch',
@@ -898,6 +932,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       });
       const purged = await this.purgeRelay();
       await this.cleanup();
+      await this.flushListMetadata();
       if (!purged.ok) return;
       const reconciled = await this.reconcileLease();
       if (!reconciled.ok) await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_MS);
@@ -976,6 +1011,50 @@ export class SessionSyncDO extends DurableObject<Env> {
     return (meta.last_write_at || meta.updated_at) + RETENTION_MS;
   }
 
+  /**
+   * Pushes the metadata an accepted batch owes the creator index. A refused
+   * call keeps the durable debt and its retry deadline; the alarm repeats it,
+   * so a transient tenant failure cannot leave the list stale forever.
+   */
+  private async flushListMetadata(): Promise<Result<null>> {
+    const owed = listMetadata.owed(this.db, Date.now());
+    if (!owed) return ok(null);
+    if (Date.now() < owed.retryAt) {
+      await this.scheduleSweep();
+      return ok(null);
+    }
+    const meta = session.load(this.db);
+    if (!meta || meta.deleted_at !== null) {
+      this.tx(() => {
+        listMetadata.clear(this.db);
+        return null;
+      });
+      return ok(null);
+    }
+    const listed = await this.tenantCall(() =>
+      getTenantStub(this.env, { type: 'user', id: meta.creator_id }).updateCreatedSession({
+        tenant: { type: meta.tenant_type, id: meta.tenant_id },
+        sessionID: meta.session_id,
+        metadata: owed.metadata,
+      })
+    );
+    if (!listed.ok) {
+      this.tx(() => {
+        const hint = listed.error.details?.retryAt;
+        listMetadata.refused(this.db, Date.now(), typeof hint === 'number' ? hint : undefined);
+        return null;
+      });
+      await this.scheduleSweep();
+      return listed;
+    }
+    this.tx(() => {
+      listMetadata.succeeded(this.db, owed.value);
+      return null;
+    });
+    await this.scheduleSweep();
+    return ok(null);
+  }
+
   private async scheduleSweep(): Promise<void> {
     const meta = session.load(this.db);
     const leaseDue =
@@ -993,7 +1072,11 @@ export class SessionSyncDO extends DurableObject<Env> {
         ? Math.max(Date.now() + 1, this.relayPurgeRetryAt)
         : null;
     const retentionDue = meta && meta.deleted_at === null ? this.retentionDeadline(meta) : null;
-    const deadlines = [blobDue, leaseDue, retentionDue, relayDue].filter(value => value !== null);
+    const owed = listMetadata.owed(this.db, Date.now());
+    const metadataDue = owed ? Math.max(owed.retryAt, Date.now() + 1) : null;
+    const deadlines = [blobDue, leaseDue, retentionDue, relayDue, metadataDue].filter(
+      value => value !== null
+    );
     if (deadlines.length === 0) return;
     const due = Math.min(...deadlines);
     const current = await this.ctx.storage.getAlarm();

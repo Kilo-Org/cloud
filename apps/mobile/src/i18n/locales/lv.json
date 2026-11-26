@@ -4145,6 +4145,28 @@
       "accessibility": "Pārdēvēt tērzēšanu: {{title}}",
       "openHint": "Atver tērzēšanu. Turiet nospiestu, lai pārdēvētu vai dzēstu."
     },
+    "sync": {
+      "busyTitle": "Aizņemts citā ierīcē",
+      "busyBody": "Šajā tērzēšanā pašlaik tiek atbildēts citā ierīcē. Pirms kaut ko sūtāt, pagaidiet, līdz tas beidzas.",
+      "liveTitle": "Darbojas jūsu datorā",
+      "liveBody": "Jūsu sūtītās ziņas nonāk sesijā, kas darbojas jūsu datorā.",
+      "divergedTitle": "Šī tērzēšana tika mainīta divās ierīcēs",
+      "divergedBody": "Šeit un citā ierīcē esošās ziņas nevar apvienot. Ielādējiet jaunāko versiju, lai šajā ierīcē viss būtu sinhronizēts.",
+      "divergedAction": "Atmest nesinhronizētās ziņas un ielādēt jaunāko",
+      "settingTitle": "Sinhronizēt tērzēšanas starp ierīcēm",
+      "settingDescription": "Uzturiet tērzēšanas sinhronizētas visās savās ierīcēs, arī Kilo CLI.",
+      "settingUnreadable": "Neizdevās nolasīt šo iestatījumu. Pieskarieties, lai mēģinātu vēlreiz.",
+      "searchPlaceholder": "Meklēt tērzēšanas",
+      "originFilter": "Tērzēšanas izcelsme",
+      "originMobile": "Mobilā ierīce",
+      "includeArchived": "Iekļaut arhivētās",
+      "deleteEverywhereTitle": "Vai dzēst šo tērzēšanu visur?",
+      "deleteEverywhereBody": "Tā tiks dzēsta visās ierīcēs, un to nevarēs atjaunot.",
+      "deletedElsewhere": "Šī tērzēšana tika dzēsta citā ierīcē.",
+      "listLoadFailed": "Neizdevās ielādēt sinhronizētās tērzēšanas.",
+      "noticeBody": "Jūsu tērzēšanas tagad tiek sinhronizētas visās jūsu ierīcēs.",
+      "noticeAction": "To var izslēgt iestatījumos."
+    },
     "beta": "Beta",
     "details": {
       "title": "Tērzēšanas informācija",

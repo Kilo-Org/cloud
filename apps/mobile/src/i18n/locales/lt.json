@@ -4223,6 +4223,28 @@
       "accessibility": "Pervadinti pokalbį: {{title}}",
       "openHint": "Atidaro pokalbį. Palaikykite, kad pervadintumėte arba ištrintumėte."
     },
+    "sync": {
+      "busyTitle": "Užimta kitame įrenginyje",
+      "busyBody": "Šiame pokalbyje atsakymas generuojamas kitame įrenginyje. Prieš ką nors siųsdami, palaukite, kol jis baigs.",
+      "liveTitle": "Vykdoma jūsų kompiuteryje",
+      "liveBody": "Jūsų siunčiamos žinutės patenka į jūsų kompiuteryje vykdomą seansą.",
+      "divergedTitle": "Šis pokalbis pakeistas dviejuose įrenginiuose",
+      "divergedBody": "Šiame ir kitame įrenginyje esančių žinučių sujungti nepavyksta. Įkelkite naujausią versiją, kad šis įrenginys būtų sinchronizuotas.",
+      "divergedAction": "Atmesti nesinchronizuotas žinutes ir įkelti naujausią versiją",
+      "settingTitle": "Sinchronizuoti pokalbius tarp įrenginių",
+      "settingDescription": "Pokalbiai bus sinchronizuojami visuose jūsų įrenginiuose, įskaitant Kilo CLI.",
+      "settingUnreadable": "Nepavyko perskaityti šio nustatymo. Palieskite, kad bandytumėte dar kartą.",
+      "searchPlaceholder": "Ieškoti pokalbių",
+      "originFilter": "Pokalbio šaltinis",
+      "originMobile": "Mobilusis",
+      "includeArchived": "Įtraukti archyvuotus",
+      "deleteEverywhereTitle": "Ištrinti šį pokalbį visur?",
+      "deleteEverywhereBody": "Jis bus ištrintas visuose įrenginiuose ir jo nebus galima atkurti.",
+      "deletedElsewhere": "Šis pokalbis buvo ištrintas kitame įrenginyje.",
+      "listLoadFailed": "Nepavyko įkelti sinchronizuotų pokalbių.",
+      "noticeBody": "Dabar jūsų pokalbiai sinchronizuojami visuose jūsų įrenginiuose.",
+      "noticeAction": "Tai galite išjungti nustatymuose."
+    },
     "beta": "Beta",
     "details": {
       "title": "Pokalbio informacija",

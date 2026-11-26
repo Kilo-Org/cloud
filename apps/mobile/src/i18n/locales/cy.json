@@ -4379,6 +4379,28 @@
       "accessibility": "Ailenwi sgwrs: {{title}}",
       "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ailenwi neu ddileu."
     },
+    "sync": {
+      "busyTitle": "Yn brysur ar ddyfais arall",
+      "busyBody": "Mae'r sgwrs hon yn ateb ar ddyfais arall. Arhoswch iddi orffen cyn anfon unrhyw beth.",
+      "liveTitle": "Yn rhedeg ar eich cyfrifiadur",
+      "liveBody": "Mae'r negeseuon rydych chi'n eu hanfon yn mynd i'r sesiwn sy'n rhedeg ar eich cyfrifiadur.",
+      "divergedTitle": "Newidiodd y sgwrs hon ar ddwy ddyfais",
+      "divergedBody": "Does dim modd cyfuno'r negeseuon yma a'r rhai ar ddyfais arall. Llwythwch y fersiwn ddiweddaraf i gadw'r ddyfais hon yn gyson.",
+      "divergedAction": "Gwaredu negeseuon heb eu cysoni a llwytho'r diweddaraf",
+      "settingTitle": "Cysoni sgyrsiau ar draws dyfeisiau",
+      "settingDescription": "Cadwch sgyrsiau'n gyson ar draws eich dyfeisiau, gan gynnwys Kilo CLI.",
+      "settingUnreadable": "Methu darllen y gosodiad hwn. Tapiwch i roi cynnig arall.",
+      "searchPlaceholder": "Chwilio sgyrsiau",
+      "originFilter": "Tarddiad y sgwrs",
+      "originMobile": "Symudol",
+      "includeArchived": "Cynnwys rhai wedi'u harchifo",
+      "deleteEverywhereTitle": "Dileu'r sgwrs hon ym mhobman?",
+      "deleteEverywhereBody": "Caiff ei dileu ar bob dyfais a does dim modd ei hadfer.",
+      "deletedElsewhere": "Cafodd y sgwrs hon ei dileu ar ddyfais arall.",
+      "listLoadFailed": "Methu llwytho sgyrsiau wedi'u cysoni.",
+      "noticeBody": "Mae eich sgyrsiau bellach yn cysoni ar draws eich dyfeisiau.",
+      "noticeAction": "Gallwch ddiffodd hyn yn y Gosodiadau."
+    },
     "beta": "Beta",
     "details": {
       "title": "Manylion sgwrs",

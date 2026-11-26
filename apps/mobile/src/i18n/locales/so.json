@@ -4067,6 +4067,28 @@
       "accessibility": "Beddel magaca sheekaysiga: {{title}}",
       "openHint": "Wada sheekaysiga ayuu furayaa. Si aad magaca u beddesho ama u tirtirto si dheer u taabo."
     },
+    "sync": {
+      "busyTitle": "Wuu ku mashquulsan yahay qalab kale",
+      "busyBody": "Wada-sheekeysigan waxaa looga jawaabayaa qalab kale. Sug inta uu dhammaynayo ka hor intaadan waxba dirin.",
+      "liveTitle": "Wuxuu ku socdaa kombiyuutarkaaga",
+      "liveBody": "Fariimaha aad dirto waxay aadayaan fadhiga ka socda kombiyuutarkaaga.",
+      "divergedTitle": "Wada-sheekeysigan waxaa lagu beddelay laba qalab",
+      "divergedBody": "Fariimaha halkan ku jira iyo kuwa qalabka kale lama isku dari karo. Soo rar kii ugu dambeeyay si qalabkani ula jaan qaado.",
+      "divergedAction": "Tirtir fariimaha aan la waafajin oo soo rar kii ugu dambeeyay",
+      "settingTitle": "Ku waafaji wada-sheekeysiyada qalabyada oo dhan",
+      "settingDescription": "Ka dhig wada-sheekeysiyadu kuwo isku jaan qaada qalabyadaada oo dhan, oo ay ku jirto Kilo CLI.",
+      "settingUnreadable": "Lama akhrin karin dejintan. Taabo si aad mar kale isku daydo.",
+      "searchPlaceholder": "Raadi wada-sheekeysiyada",
+      "originFilter": "Halka uu wada-sheekeysigu ka yimid",
+      "originMobile": "Moobayl",
+      "includeArchived": "Ku dar kuwa kaydsan",
+      "deleteEverywhereTitle": "Ma tirtiraysaa wada-sheekeysigan meel kasta?",
+      "deleteEverywhereBody": "Waxaa laga tirtirayaa qalab kasta, lamana soo celin karo.",
+      "deletedElsewhere": "Wada-sheekeysigan waxaa laga tirtiray qalab kale.",
+      "listLoadFailed": "Lama soo rari karin wada-sheekeysiyada la waafajiyay.",
+      "noticeBody": "Wada-sheekeysiyadaadu hadda waxay isku waafaqaan qalabyadaada oo dhan.",
+      "noticeAction": "Waxaad tan ka dami kartaa Dejinta."
+    },
     "beta": "Beta",
     "details": {
       "title": "Faahfaahinta wada sheekaysiga",

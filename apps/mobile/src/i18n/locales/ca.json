@@ -4145,6 +4145,28 @@
       "accessibility": "Reanomena el xat: {{title}}",
       "openHint": "Obre el xat. Mantén premut per reanomenar-lo o suprimir-lo."
     },
+    "sync": {
+      "busyTitle": "Ocupat en un altre dispositiu",
+      "busyBody": "Aquest xat està responent en un altre dispositiu. Espera que acabi abans d'enviar res.",
+      "liveTitle": "S'està executant a l'ordinador",
+      "liveBody": "Els missatges que enviïs van a la sessió que s'executa a l'ordinador.",
+      "divergedTitle": "Aquest xat ha canviat en dos dispositius",
+      "divergedBody": "Els missatges d'aquí i els d'un altre dispositiu no es poden combinar. Carrega la versió més recent per mantenir aquest dispositiu sincronitzat.",
+      "divergedAction": "Descarta els missatges no sincronitzats i carrega la versió més recent",
+      "settingTitle": "Sincronitza els xats entre dispositius",
+      "settingDescription": "Mantén els xats sincronitzats entre els teus dispositius, inclòs el Kilo CLI.",
+      "settingUnreadable": "No s'ha pogut llegir aquest paràmetre. Toca per tornar-ho a provar.",
+      "searchPlaceholder": "Cerca xats",
+      "originFilter": "Origen del xat",
+      "originMobile": "Mòbil",
+      "includeArchived": "Inclou els arxivats",
+      "deleteEverywhereTitle": "Vols suprimir aquest xat a tot arreu?",
+      "deleteEverywhereBody": "Se suprimirà de tots els dispositius i no es podrà recuperar.",
+      "deletedElsewhere": "Aquest xat s'ha suprimit en un altre dispositiu.",
+      "listLoadFailed": "No s'han pogut carregar els xats sincronitzats.",
+      "noticeBody": "Ara els teus xats se sincronitzen entre els teus dispositius.",
+      "noticeAction": "Pots desactivar-ho a Configuració."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detalls del xat",

@@ -4145,6 +4145,28 @@
       "accessibility": "Preimenuj razgovor: {{title}}",
       "openHint": "Otvara razgovor. Dugo pritisnite za preimenovanje ili brisanje."
     },
+    "sync": {
+      "busyTitle": "Zauzeto na drugom uređaju",
+      "busyBody": "U ovom razgovoru odgovor se upravo generiše na drugom uređaju. Sačekajte da završi prije nego što bilo šta pošaljete.",
+      "liveTitle": "Pokrenuto na vašem računaru",
+      "liveBody": "Poruke koje pošaljete idu u sesiju pokrenutu na vašem računaru.",
+      "divergedTitle": "Ovaj razgovor je izmijenjen na dva uređaja",
+      "divergedBody": "Poruke ovdje i na drugom uređaju ne mogu se spojiti. Učitajte najnoviju verziju da ovaj uređaj ostane usklađen.",
+      "divergedAction": "Odbaci nesinhronizovane poruke i učitaj najnovije",
+      "settingTitle": "Sinhronizuj razgovore na svim uređajima",
+      "settingDescription": "Neka razgovori budu usklađeni na svim vašim uređajima, uključujući Kilo CLI.",
+      "settingUnreadable": "Nije moguće pročitati ovu postavku. Dodirnite da pokušate ponovo.",
+      "searchPlaceholder": "Pretraži razgovore",
+      "originFilter": "Porijeklo razgovora",
+      "originMobile": "Mobilni",
+      "includeArchived": "Uključi arhivirane",
+      "deleteEverywhereTitle": "Izbrisati ovaj razgovor svuda?",
+      "deleteEverywhereBody": "Bit će izbrisan na svim uređajima i ne može se vratiti.",
+      "deletedElsewhere": "Ovaj razgovor je izbrisan na drugom uređaju.",
+      "listLoadFailed": "Nije moguće učitati sinhronizovane razgovore.",
+      "noticeBody": "Vaši razgovori se sada sinhronizuju na svim vašim uređajima.",
+      "noticeAction": "Ovo možete isključiti u Postavkama."
+    },
     "beta": "Beta",
     "details": {
       "title": "Detalji razgovora",

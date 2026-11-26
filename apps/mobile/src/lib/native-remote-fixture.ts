@@ -27,6 +27,11 @@ export const nativeRemoteFixtureSummary: NativeSessionSummary = {
   tenant: { type: 'user', id: 'fixture-owner' },
   live: true,
   createdAt: 1,
+  updatedAt: 1,
+  title: null,
+  client: 'cli',
+  directory: null,
+  archived: false,
 };
 
 const emptyPending = {

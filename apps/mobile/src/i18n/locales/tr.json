@@ -4067,6 +4067,28 @@
       "accessibility": "Sohbeti yeniden adlandır: {{title}}",
       "openHint": "Sohbeti açar. Yeniden adlandırmak veya silmek için uzun basın."
     },
+    "sync": {
+      "busyTitle": "Başka bir cihazda meşgul",
+      "busyBody": "Bu sohbet başka bir cihazda yanıt veriyor. Bir şey göndermeden önce bitmesini bekleyin.",
+      "liveTitle": "Bilgisayarınızda çalışıyor",
+      "liveBody": "Gönderdiğiniz mesajlar bilgisayarınızda çalışan oturuma gider.",
+      "divergedTitle": "Bu sohbet iki cihazda değişti",
+      "divergedBody": "Buradaki mesajlar başka bir cihazdakilerle birleştirilemiyor. Bu cihazı güncel tutmak için en son sürümü yükleyin.",
+      "divergedAction": "Eşitlenmemiş mesajları sil ve en son sürümü yükle",
+      "settingTitle": "Sohbetleri cihazlar arasında eşitle",
+      "settingDescription": "Kilo CLI dahil tüm cihazlarınızda sohbetleri eşit tutun.",
+      "settingUnreadable": "Bu ayar okunamadı. Tekrar denemek için dokunun.",
+      "searchPlaceholder": "Sohbetlerde ara",
+      "originFilter": "Sohbet kaynağı",
+      "originMobile": "Mobil",
+      "includeArchived": "Arşivlenenleri dahil et",
+      "deleteEverywhereTitle": "Bu sohbet her yerden silinsin mi?",
+      "deleteEverywhereBody": "Tüm cihazlardan silinir ve geri alınamaz.",
+      "deletedElsewhere": "Bu sohbet başka bir cihazda silindi.",
+      "listLoadFailed": "Eşitlenen sohbetler yüklenemedi.",
+      "noticeBody": "Sohbetleriniz artık cihazlarınız arasında eşitleniyor.",
+      "noticeAction": "Bunu Ayarlar'dan kapatabilirsiniz."
+    },
     "beta": "Beta",
     "details": {
       "title": "Sohbet ayrıntıları",

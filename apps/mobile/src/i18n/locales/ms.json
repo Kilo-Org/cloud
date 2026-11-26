@@ -3997,6 +3997,28 @@
       "accessibility": "Namakan semula sembang: {{title}}",
       "openHint": "Membuka sembang. Tekan lama untuk menamakan semula atau memadam."
     },
+    "sync": {
+      "busyTitle": "Sibuk pada peranti lain",
+      "busyBody": "Sembang ini sedang menjawab pada peranti lain. Tunggu sehingga ia selesai sebelum anda menghantar apa-apa.",
+      "liveTitle": "Berjalan pada komputer anda",
+      "liveBody": "Mesej yang anda hantar akan pergi ke sesi yang berjalan pada komputer anda.",
+      "divergedTitle": "Sembang ini berubah pada dua peranti",
+      "divergedBody": "Mesej di sini dan pada peranti lain tidak dapat digabungkan. Muatkan versi terkini supaya peranti ini kekal selari.",
+      "divergedAction": "Buang mesej yang belum disegerakkan dan muatkan versi terkini",
+      "settingTitle": "Segerakkan sembang merentas peranti",
+      "settingDescription": "Pastikan sembang kekal selari merentas peranti anda, termasuk Kilo CLI.",
+      "settingUnreadable": "Tidak dapat membaca tetapan ini. Ketik untuk cuba lagi.",
+      "searchPlaceholder": "Cari sembang",
+      "originFilter": "Asal sembang",
+      "originMobile": "Mudah alih",
+      "includeArchived": "Sertakan yang diarkibkan",
+      "deleteEverywhereTitle": "Padam sembang ini di semua tempat?",
+      "deleteEverywhereBody": "Sembang ini akan dipadam pada setiap peranti dan tidak boleh dipulihkan.",
+      "deletedElsewhere": "Sembang ini telah dipadam pada peranti lain.",
+      "listLoadFailed": "Tidak dapat memuatkan sembang yang disegerakkan.",
+      "noticeBody": "Sembang anda kini disegerakkan merentas peranti anda.",
+      "noticeAction": "Anda boleh mematikan ciri ini dalam Tetapan."
+    },
     "beta": "Beta",
     "details": {
       "title": "Butiran sembang",

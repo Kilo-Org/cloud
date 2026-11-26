@@ -23,6 +23,7 @@ describe('assertUrlScheme', () => {
     { key: 'notificationsUrl', value: 'https://notifications.kilo.ai' },
     { key: 'cloudAgentWsUrl', value: 'wss://cloud-agent.kilo.ai' },
     { key: 'sessionIngestWsUrl', value: 'wss://session-ingest.kilo.ai' },
+    { key: 'sessionSyncUrl', value: 'https://session-sync.kiloapps.io' },
     { key: 'eventServiceUrl', value: 'https://events.kilo.ai' },
     { key: 'latencyIngestUrl', value: 'https://latency.kiloapps.io' },
     { key: 'kiloMcpUrl', value: 'https://mcp.kiloapps.io' },

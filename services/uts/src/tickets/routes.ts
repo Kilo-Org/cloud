@@ -120,7 +120,7 @@ export const TICKET_REDEEMERS: Readonly<
 > = {
   production: {},
   staging: {},
-  development: { 'uts-ticket-test': ['gateway', 'kilo-chat'] },
+  development: { 'uts-ticket-test': ['gateway', 'kilo-chat', 'event-service'] },
 };
 
 /**

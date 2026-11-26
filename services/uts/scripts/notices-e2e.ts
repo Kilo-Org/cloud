@@ -21,6 +21,7 @@
  *   UTS_E2E_ADMIN_URL  admin login to the identity-store database (loopback only)
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { UTS_ENDPOINTS, UTS_SECURITY_PATH, SecurityViewSchema } from '@kilocode/uts-contracts';
 import { SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import pg from 'pg';
@@ -76,7 +77,11 @@ async function post(
     headers,
   });
   const text = await response.text();
-  return { status: response.status, body: text === '' ? null : (JSON.parse(text) as unknown) };
+  return {
+    status: response.status,
+    retryAfter: response.headers.get('Retry-After'),
+    body: text === '' ? null : (JSON.parse(text) as unknown),
+  };
 }
 
 async function devPost(path: string, body: unknown, headers: Record<string, string> = {}) {
@@ -101,7 +106,7 @@ async function signIn(
     redirect_uri: CALLBACK,
     code_challenge: sha256(verifier).toString('base64url'),
     code_challenge_method: 'S256',
-    scope: 'gateway:models.read',
+    scope: 'event-service:events.subscribe',
     state: 'notices-e2e',
     dpop_jkt: device.jkt,
   })) {
@@ -400,8 +405,17 @@ async function main() {
     )
   );
 
-  const revoked = await post('/revoke', { token: travelGrant.refreshToken, client_id: 'kilo-cli' });
-  check('revoke answered', revoked.status === 200);
+  // `/revoke` answers 503 with Retry-After until a feed object vouches for the entry: a feed that
+  // has just bootstrapped signs its first head shortly after. A client repeats the same request.
+  const revoke = () => post('/revoke', { token: travelGrant.refreshToken, client_id: 'kilo-cli' });
+  let revoked = await revoke();
+  let revokeAttempts = 1;
+  while (revoked.status === 503 && revokeAttempts < 10) {
+    await sleep(Number(revoked.retryAfter ?? '2') * 1000);
+    revoked = await revoke();
+    revokeAttempts += 1;
+  }
+  check('revoke answered', revoked.status === 200, { attempts: revokeAttempts });
   const afterRevoke = await fetch(new URL(UTS_SECURITY_PATH.slice(1), base), {
     headers: viewHeaders,
   });

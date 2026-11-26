@@ -64,7 +64,8 @@ const OIDC = `http://127.0.0.1:${PORT + 3}`;
 const GITHUB = `http://127.0.0.1:${PORT + 4}`;
 const WORKOS = `http://127.0.0.1:${PORT + 5}`;
 const CLI_REDIRECT = 'http://127.0.0.1:4100/callback';
-const SCOPES = 'gateway:models.read kilo-chat:messages.read';
+/** Scopes the registry gives the CLI. */
+const SCOPES = 'session-sync:grants.exchange event-service:events.subscribe';
 const SSO_DOMAIN = `e2e-${randomBytes(3).toString('hex')}.example.org`;
 const SSO_CONNECTION = `conn_${randomBytes(6).toString('hex')}`;
 const REQUIRED_DOMAIN = `required-${randomBytes(3).toString('hex')}.example.org`;

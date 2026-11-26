@@ -7720,6 +7720,7 @@
             },
             "cloneFromKiloSessionId": {},
             "cloneUpToMessageId": {},
+            "workspaceContinuation": {},
             "callbackTarget": {
               "anyOf": [
                 {
@@ -7770,6 +7771,11 @@
               "description": "GitLab project path (e.g., group/project or group/subgroup/project)",
               "type": "string",
               "pattern": "^[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)+$"
+            },
+            "expectedGitLabInstanceUrl": {
+              "type": "string",
+              "maxLength": 2048,
+              "format": "uri"
             },
             "bitbucketRepo": {
               "type": "object",
@@ -8424,6 +8430,10 @@
               "type": "string",
               "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
             },
+            "workspaceContinuation": {
+              "type": "boolean",
+              "const": true
+            },
             "autoInitiate": {
               "type": "boolean",
               "const": true
@@ -8483,6 +8493,11 @@
               "description": "GitLab project path (e.g., group/project or group/subgroup/project)",
               "type": "string",
               "pattern": "^[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)+$"
+            },
+            "expectedGitLabInstanceUrl": {
+              "type": "string",
+              "maxLength": 2048,
+              "format": "uri"
             },
             "bitbucketRepo": {
               "type": "object",
@@ -8997,10 +9012,12 @@
       "kilosessionid",
       "clonefromkilosessionid",
       "cloneuptomessageid",
+      "workspacecontinuation",
       "callbacktarget",
       "githubrepo",
       "githubintegrationid",
       "gitlabproject",
+      "expectedgitlabinstanceurl",
       "bitbucketrepo",
       "publicrepourl",
       "mode",
@@ -9021,7 +9038,7 @@
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch basebranch stackonworktreeid autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch baseBranch stackOnWorktreeId autoCommit attachments devcontainer"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid workspacecontinuation callbacktarget githubrepo githubintegrationid gitlabproject expectedgitlabinstanceurl bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch basebranch stackonworktreeid autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId workspaceContinuation callbackTarget githubRepo githubIntegrationId gitlabProject expectedGitLabInstanceUrl bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch baseBranch stackOnWorktreeId autoCommit attachments devcontainer"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -21341,6 +21358,7 @@
                 },
                 "cloneFromKiloSessionId": {},
                 "cloneUpToMessageId": {},
+                "workspaceContinuation": {},
                 "callbackTarget": {
                   "anyOf": [
                     {
@@ -21391,6 +21409,11 @@
                   "description": "GitLab project path (e.g., group/project or group/subgroup/project)",
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)+$"
+                },
+                "expectedGitLabInstanceUrl": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "format": "uri"
                 },
                 "bitbucketRepo": {
                   "type": "object",
@@ -22051,6 +22074,10 @@
                   "type": "string",
                   "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
                 },
+                "workspaceContinuation": {
+                  "type": "boolean",
+                  "const": true
+                },
                 "autoInitiate": {
                   "type": "boolean",
                   "const": true
@@ -22110,6 +22137,11 @@
                   "description": "GitLab project path (e.g., group/project or group/subgroup/project)",
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)+$"
+                },
+                "expectedGitLabInstanceUrl": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "format": "uri"
                 },
                 "bitbucketRepo": {
                   "type": "object",
@@ -22629,10 +22661,12 @@
       "kilosessionid",
       "clonefromkilosessionid",
       "cloneuptomessageid",
+      "workspacecontinuation",
       "callbacktarget",
       "githubrepo",
       "githubintegrationid",
       "gitlabproject",
+      "expectedgitlabinstanceurl",
       "bitbucketrepo",
       "publicrepourl",
       "mode",
@@ -22653,7 +22687,7 @@
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch basebranch stackonworktreeid autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch baseBranch stackOnWorktreeId autoCommit attachments devcontainer"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid workspacecontinuation callbacktarget githubrepo githubintegrationid gitlabproject expectedgitlabinstanceurl bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch basebranch stackonworktreeid autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId workspaceContinuation callbackTarget githubRepo githubIntegrationId gitlabProject expectedGitLabInstanceUrl bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch baseBranch stackOnWorktreeId autoCommit attachments devcontainer"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",

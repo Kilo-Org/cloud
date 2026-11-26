@@ -15,8 +15,17 @@ export default defineConfig({
         // production default-off value here; the sink tests opt in explicitly
         // through `setPushSinkModeForTesting`.
         bindings: { PUSH_SINK_MODE: '' },
+        // Worker unit tests resolve the STS binding to a local stub, never the
+        // deployed broker. The binding mirrors wrangler.jsonc: the named
+        // `SecretsBroker` entrypoint with `props.caller`. The stub refuses every
+        // bundle; a test of the `sts` source injects its own synthetic binding.
         serviceBindings: {
           EVENT_SERVICE: 'event-service-stub',
+          STS: {
+            name: 'sts-stub',
+            entrypoint: 'SecretsBroker',
+            props: { caller: 'notifications' },
+          },
           SELF: kCurrentWorker,
         },
         workers: [
@@ -28,6 +37,18 @@ export default defineConfig({
               export default class EventServiceStub extends WorkerEntrypoint {
                 async fetch() { return new Response('ok'); }
                 async isUserInContext() { return false; }
+              }
+            `,
+          },
+          {
+            name: 'sts-stub',
+            modules: true,
+            script: `
+              import { WorkerEntrypoint } from 'cloudflare:workers';
+              export class SecretsBroker extends WorkerEntrypoint {
+                async getBundle() {
+                  return { status: 'denied', reason: 'unknown_workload' };
+                }
               }
             `,
           },

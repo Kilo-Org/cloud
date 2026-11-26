@@ -1,5 +1,6 @@
 import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
+import notificationsPolicy from '../../policy/notifications.yaml';
 import o11yPolicy from '../../policy/o11y.yaml';
 import usageIngestPolicy from '../../policy/usage-ingest.yaml';
 import webPolicy from '../../policy/web.yaml';
@@ -11,6 +12,7 @@ import type { Policy } from './schema';
 const sources: Record<PolicyFile, string> = {
   'audit-relay.yaml': auditRelayPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
+  'notifications.yaml': notificationsPolicy,
   'o11y.yaml': o11yPolicy,
   'usage-ingest.yaml': usageIngestPolicy,
   'web.yaml': webPolicy,

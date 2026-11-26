@@ -59,14 +59,16 @@ describe('findAttributionIdentityRefusal', () => {
     );
   });
 
-  it('admits a token that carries no pepper claim, as an internal service token does', async () => {
-    const db = database({
-      account: activeMember('pepper-current'),
-      membership: [{ role: 'member' }],
-    });
+  it.each(['pepper-current', null])(
+    'refuses a token that carries no pepper claim when the stored pepper is %s',
+    async pepper => {
+      const db = database({ account: activeMember(pepper), membership: [{ role: 'member' }] });
 
-    await expect(findAttributionIdentityRefusal(db, claims(undefined))).resolves.toBeNull();
-  });
+      await expect(findAttributionIdentityRefusal(db, claims(undefined))).resolves.toBe(
+        'credential_stale'
+      );
+    }
+  );
 
   it('refuses a null claim against an account that holds a pepper', async () => {
     const db = database({

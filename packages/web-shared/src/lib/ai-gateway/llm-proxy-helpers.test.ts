@@ -2307,9 +2307,72 @@ describe('captureProxyError', () => {
       )
     );
 
-    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data.upstreamErrorParam).toBe('a'.repeat(512));
     expect(data.upstreamErrorCode).toBe('b'.repeat(512));
+  });
+
+  it('redacts secret-shaped values in the logged response', async () => {
+    const fakeKey = 'sk-or-v1-fake0000000000000000000000';
+    const fakeJwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
+    const data = await captureResponsesError(
+      {},
+      Response.json(
+        { error: { message: `invalid key ${fakeKey}`, echo: `Bearer ${fakeJwt}` } },
+        { status: 401 }
+      )
+    );
+
+    expect(data.first4kOfResponse).toBe(
+      '{"error":{"message":"invalid key [Filtered]","echo":"Bearer [Filtered]"}}'
+    );
+  });
+
+  it.each([
+    ['a JWT', 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU'],
+    ['a provider key', 'sk-or-v1-fake0000000000000000000000'],
+  ])('drops the part of %s that the 4k limit cuts', async (_name, secret) => {
+    const data = await captureResponsesError(
+      {},
+      new Response(`${'x '.repeat(2045)} ${secret}`, { status: 400 })
+    );
+
+    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2045)} [Truncated]`);
+  });
+
+  it('redacts only the first 4k of a long response', async () => {
+    const started = performance.now();
+    const data = await captureResponsesError(
+      {},
+      new Response('eyJ-'.repeat(50_000), { status: 400 })
+    );
+
+    expect(performance.now() - started).toBeLessThan(50);
+    expect(data.first4kOfResponse).toBe('[Truncated]');
+  });
+
+  it('reads only a bounded prefix of a large error body', async () => {
+    const chunk = new TextEncoder().encode(`${'x '.repeat(32 * 1024)}`);
+    let pulledChunks = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulledChunks += 1;
+        if (pulledChunks > 1024) controller.close();
+        else controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const response = new Response(body, { status: 502 });
+
+    const data = await captureResponsesError({}, response);
+    await response.body?.cancel();
+
+    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2048)}[Truncated]`);
+    expect(pulledChunks).toBeLessThan(8);
+    expect(cancelled).toBe(true);
   });
 
   it('does not parse error JSON beyond the 16 KiB diagnostic limit', async () => {
@@ -2319,7 +2382,7 @@ describe('captureProxyError', () => {
     );
     const data = await captureResponsesError({}, response);
 
-    expect(data.first4kOfResponse).toHaveLength(4096);
+    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data).not.toHaveProperty('upstreamErrorParam');
     expect(data).not.toHaveProperty('upstreamErrorCode');
     expect(await response.json()).toMatchObject({ error: { param: 'input' } });

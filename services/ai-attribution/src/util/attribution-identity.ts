@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
 import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
+import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-token-pepper';
 import { eq } from 'drizzle-orm';
 
 // Account rules for a signed organization claim: the claim names an identity and an
@@ -17,10 +18,7 @@ export type AttributionIdentityRefusal =
 export type AttributionIdentityClaims = {
   kiloUserId: string;
   organizationId: string;
-  /**
-   * The token's `apiTokenPepper` claim. `undefined` means the token carries no claim, as an
-   * internal service token does; `null` is a claim that must match a null stored pepper.
-   */
+  /** The token's `apiTokenPepper` claim; `undefined` when the token carries none. */
   apiTokenPepper: string | null | undefined;
 };
 
@@ -47,9 +45,7 @@ export async function findAttributionIdentityRefusal(
 
   if (!account) return 'identity_missing';
   if (account.blockedAt !== null || account.blockedReason !== null) return 'identity_blocked';
-  // The stored pepper is the account's credential generation. A present claim must equal it;
-  // the comparison is skipped only for a token that carries no claim at all.
-  if (claims.apiTokenPepper !== undefined && account.apiTokenPepper !== claims.apiTokenPepper) {
+  if (!isKiloUserCredentialPepperCurrent(claims, account.apiTokenPepper)) {
     return 'credential_stale';
   }
 

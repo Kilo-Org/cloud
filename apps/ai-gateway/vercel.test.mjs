@@ -41,3 +41,8 @@ test('the build script runs only the Next build', () => {
   const manifest = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
   assert.equal(manifest.scripts.build, 'next build');
 });
+
+test('the build inlines the bearer-only authentication setting', async () => {
+  const { default: nextConfig } = await import('./next.config.mjs');
+  assert.equal(nextConfig.env?.KILO_BROWSER_SESSIONS, 'disabled');
+});

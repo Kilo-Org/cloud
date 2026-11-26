@@ -16,10 +16,9 @@ function decodeJwt(token: string): Record<string, unknown> {
 
 describe('security analysis token issuance', () => {
   it('preserves legacy tokens while shared resource tokens are disabled', async () => {
-    const [control, triage, session] = await Promise.all([
+    const [control, triage] = await Promise.all([
       generateControlToken(user, secret, 'production', false),
       generateTriageToken(user, secret, 'production', undefined, 'organization-1'),
-      generateInternalServiceToken(user.id, secret, 'false'),
     ]);
 
     expect(decodeJwt(control)).toMatchObject({
@@ -33,15 +32,26 @@ describe('security analysis token issuance', () => {
     expect(decodeJwt(control)).not.toHaveProperty('organizationId');
     expect(decodeJwt(triage)).not.toHaveProperty('aud');
     expect(decodeJwt(triage)).not.toHaveProperty('organizationId');
-    expect(decodeJwt(session)).not.toHaveProperty('aud');
-    expect(decodeJwt(session)).not.toHaveProperty('apiTokenPepper');
+  });
+
+  it('mints a modern audience-bound session assertion without a pepper claim', async () => {
+    const session = decodeJwt(await generateInternalServiceToken(user.id, secret));
+
+    expect(session).toMatchObject({
+      aud: 'session-ingest',
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+    });
+    expect(session).not.toHaveProperty('apiTokenPepper');
+    expect(session).not.toHaveProperty('env');
+    expect(Number(session.exp) - Number(session.iat)).toBe(3600);
   });
 
   it('mints isolated modern control, triage, and session assertions', async () => {
     const [control, triage, session] = await Promise.all([
       generateControlToken(user, secret, 'production', true),
       generateTriageToken(user, secret, 'production', true),
-      generateInternalServiceToken(user.id, secret, true),
+      generateInternalServiceToken(user.id, secret),
     ]);
 
     expect(decodeJwt(control)).toMatchObject({

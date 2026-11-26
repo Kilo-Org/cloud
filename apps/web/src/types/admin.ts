@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import type {
+  User,
   UserAdminNote,
   Organization,
   OrganizationMembership,
@@ -10,7 +11,7 @@ import { OrganizationSchema } from '@kilocode/web-shared/lib/organizations/organ
 import { type BalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import type { PaginationMetadata } from '@kilocode/web-shared/types/pagination';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import type { ClientUser } from '@/lib/admin/client-user';
+import type { ClientUser } from '@/lib/user/client-user';
 
 export type PaymentMethodStatus = Awaited<ReturnType<typeof describePaymentMethods>>;
 
@@ -82,7 +83,9 @@ export const OrganizationsApiGetResponseSchema = z.object({
   }),
 });
 
-export type NoteWithAdminUser = UserAdminNote & { admin_kilo_user: ClientUser | null };
+export type NoteWithAdminUser = UserAdminNote & {
+  admin_kilo_user: Pick<User, 'id' | 'google_user_name' | 'google_user_email'> | null;
+};
 
 export const AdminCreditTransactionSchema = z.object({
   id: z.string(),

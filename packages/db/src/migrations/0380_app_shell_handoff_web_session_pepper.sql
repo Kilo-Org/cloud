@@ -1,0 +1,1 @@
+ALTER TABLE "app_shell_handoff_tokens" ADD COLUMN "web_session_pepper" text;

@@ -61,7 +61,11 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateInternalServiceToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -1140,6 +1144,47 @@ describe('getUserFromAuth', () => {
     expect(result.deviceSessionId).toBeUndefined();
   });
 
+  test('rejects a short-lived internal assertion without a pepper claim for an account with a pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'claimless-peppered-pepper' });
+    const token = generateInternalServiceToken(user.id, { expiresIn: 300 });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('rejects an audience-less internal assertion without a pepper claim for an account without a pepper', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = generateInternalServiceToken(user.id);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('revokes a user token when the pepper rotates from null to a value', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: 'rotated-from-null-pepper' })
+      .where(eq(kilocode_users.id, user.id));
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
   test('failure paths leave deviceSessionId undefined even when the token carried the claim', async () => {
     const user = await insertTestUser({
       google_user_email: `api-token-failure-${crypto.randomUUID()}@example.com`,
@@ -1189,6 +1234,74 @@ describe('getUserFromSession', () => {
     mockGetServerSession.mockRejectedValue(error);
 
     await expect(getUserFromSession()).rejects.toBe(error);
+  });
+});
+
+describe('browser sessions by deployment', () => {
+  const originalSetting = process.env.KILO_BROWSER_SESSIONS;
+
+  afterEach(() => {
+    if (originalSetting === undefined) delete process.env.KILO_BROWSER_SESSIONS;
+    else process.env.KILO_BROWSER_SESSIONS = originalSetting;
+  });
+
+  async function signedInCookieRequest() {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers({ Cookie: 'next-auth.session-token=session' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      isNewUser: false,
+    });
+    return user;
+  }
+
+  test('apps/web accepts a session cookie', async () => {
+    delete process.env.KILO_BROWSER_SESSIONS;
+    const user = await signedInCookieRequest();
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.credential).toBe('session');
+  });
+
+  describe('apps/ai-gateway', () => {
+    beforeEach(() => {
+      process.env.KILO_BROWSER_SESSIONS = 'disabled';
+    });
+
+    test('treats a session cookie without a bearer as anonymous', async () => {
+      await signedInCookieRequest();
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(401);
+      expect(result.credentialsRejected).toBe(false);
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    });
+
+    test('never reads the session through the session-only entry points', async () => {
+      await signedInCookieRequest();
+
+      await expect(getUserFromSession()).resolves.toBeNull();
+      expect((await getUserFromSessionForCredentialIssuance()).user).toBeNull();
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    });
+
+    test('still authenticates a bearer token', async () => {
+      const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        })
+      );
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user?.id).toBe(user.id);
+    });
   });
 });
 

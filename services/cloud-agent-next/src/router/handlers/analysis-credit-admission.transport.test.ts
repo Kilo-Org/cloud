@@ -35,7 +35,7 @@ const SECRET = 'transport-test-secret';
 const ORGANIZATION_ID = '11111111-1111-4111-8111-111111111111';
 const ENDPOINT = 'https://worker.test/trpc/getAnalysisCreditAdmission';
 
-const TOKEN = jwt.sign({ version: 3, kiloUserId: 'usr_transport' }, SECRET, {
+const TOKEN = jwt.sign({ version: 3, kiloUserId: 'usr_transport', apiTokenPepper: null }, SECRET, {
   algorithm: 'HS256',
 });
 

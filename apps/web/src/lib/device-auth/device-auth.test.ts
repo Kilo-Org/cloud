@@ -4,6 +4,7 @@ import {
   device_auth_requests,
   device_sessions,
   kilocode_users,
+  magic_link_tokens,
   pending_auth_links,
 } from '@kilocode/db/schema';
 import { and, eq, gt, sql } from 'drizzle-orm';
@@ -37,6 +38,7 @@ import {
   getDeviceAuthPendingLink,
 } from './device-auth';
 import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
+import { createSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
 // Capture real implementations for pass-through default behaviour.
@@ -1002,6 +1004,7 @@ describe('Device Auth', () => {
         provider: 'github',
         email: testUserEmail,
         displayName: 'octocat',
+        needsEmailedCode: true,
       });
       await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toMatchObject({
         code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired,
@@ -1013,8 +1016,9 @@ describe('Device Auth', () => {
       expect(request?.pending_link_secret_hash).toBeNull();
     });
 
-    test('completes the pending link only after credential issuance succeeds', async () => {
-      const { secret, pendingLink } = await createPendingLink({
+    /** A request carrying a live pending link of the test user's existing account. */
+    async function requestWithPendingLink(providerAccountId: string) {
+      const created = await createPendingLink({
         kiloUserId: testUserId,
         kind: 'existing_account',
         identity: {
@@ -1023,15 +1027,115 @@ describe('Device Auth', () => {
           google_user_image_url: '',
           hosted_domain: '@@github@@',
           provider: 'github',
-          provider_account_id: 'github-device-after-issuance',
+          provider_account_id: providerAccountId,
           display_name: null,
         },
         emailCodeAllowed: true,
       });
-      const { userCode, deviceCode } = await createDeviceAuthRequest({
-        pendingLinkToken: secret,
+      const request = await createDeviceAuthRequest({ pendingLinkToken: created.secret });
+      return { ...request, pendingLink: created.pendingLink };
+    }
+
+    const APPROVER_WEB_SESSION_ID = 'web-session-device-approver';
+
+    /** The code emailed for adding the pending link, bound to the approving session. */
+    async function emailedLinkCode() {
+      // A code sent a moment ago blocks the next one with the resend cooldown.
+      await db.delete(magic_link_tokens).where(eq(magic_link_tokens.email, testUserEmail));
+      const created = await createSignInMethodChangeCode({
+        userId: testUserId,
+        email: testUserEmail,
+        change: 'link',
+        provider: 'github',
+        webSessionId: APPROVER_WEB_SESSION_ID,
       });
-      await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: true });
+      if (created.status !== 'created') throw new Error(`expected a code, got ${created.status}`);
+      return { code: created.code, challengeId: created.challengeId };
+    }
+
+    test.each([
+      ['no proof', false, {}, DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired],
+      ['no emailed code', true, {}, DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid],
+      [
+        'a wrong emailed code',
+        true,
+        { code: '000000', challengeId: '00000000-0000-4000-8000-000000000000' },
+        DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid,
+      ],
+    ])(
+      'refuses to add the pending link with %s and leaves the request pending',
+      async (_label, withProof, emailed, refusal) => {
+        const { userCode } = await requestWithPendingLink(
+          `github-device-refused-${crypto.randomUUID()}`
+        );
+
+        await expect(
+          approveDeviceAuthRequest(userCode, testUserId, {
+            addPendingLink: true,
+            ...(withProof
+              ? {
+                  pendingLinkProof: {
+                    email: testUserEmail,
+                    webSessionId: APPROVER_WEB_SESSION_ID,
+                    ...emailed,
+                  },
+                }
+              : {}),
+          })
+        ).rejects.toMatchObject({ code: refusal });
+        expect((await getDeviceAuthRequest(userCode))?.status).toBe('pending');
+      }
+    );
+
+    test('refuses to add the pending link from a session without a session id', async () => {
+      const { userCode } = await requestWithPendingLink('github-device-no-session-id');
+      const emailed = await emailedLinkCode();
+
+      await expect(
+        approveDeviceAuthRequest(userCode, testUserId, {
+          addPendingLink: true,
+          pendingLinkProof: { email: testUserEmail, webSessionId: undefined, ...emailed },
+        })
+      ).rejects.toMatchObject({ code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired });
+      expect((await getDeviceAuthRequest(userCode))?.status).toBe('pending');
+    });
+
+    test('refuses a code emailed for another browser session', async () => {
+      const { userCode } = await requestWithPendingLink('github-device-other-session');
+      const emailed = await emailedLinkCode();
+
+      await expect(
+        approveDeviceAuthRequest(userCode, testUserId, {
+          addPendingLink: true,
+          pendingLinkProof: {
+            email: testUserEmail,
+            webSessionId: 'web-session-someone-else',
+            ...emailed,
+          },
+        })
+      ).rejects.toMatchObject({ code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid });
+    });
+
+    test('approves without a code when the approver declines the pending link', async () => {
+      const { userCode } = await requestWithPendingLink('github-device-declined');
+
+      await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: false });
+
+      expect((await getDeviceAuthRequest(userCode))?.status).toBe('approved');
+    });
+
+    test('completes the pending link only after credential issuance succeeds', async () => {
+      const { userCode, deviceCode, pendingLink } = await requestWithPendingLink(
+        'github-device-after-issuance'
+      );
+      await approveDeviceAuthRequest(userCode, testUserId, {
+        addPendingLink: true,
+        pendingLinkProof: {
+          email: testUserEmail,
+          webSessionId: APPROVER_WEB_SESSION_ID,
+          ...(await emailedLinkCode()),
+        },
+      });
 
       mockedGenerateApiToken.mockImplementationOnce(() => {
         throw new Error('issuance failed');
@@ -1407,6 +1511,7 @@ describe('Device Auth', () => {
         provider: 'github',
         email: testUserEmail,
         displayName: 'octocat',
+        needsEmailedCode: true,
       });
 
       await setDeadline(code, deadline);

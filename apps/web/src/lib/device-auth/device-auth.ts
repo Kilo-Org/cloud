@@ -18,6 +18,7 @@ import {
   resolveStoredPendingLinkForUser,
   type PendingLinkResult,
 } from '@/lib/auth/pending-link';
+import { consumeSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
@@ -41,6 +42,11 @@ export type DeviceAuthPendingLink = {
   provider: AuthProviderId;
   email: string;
   displayName: string | null;
+  /**
+   * Whether adding it needs the code emailed to the account. An explicit link
+   * spent its code when it started; a link to an existing account did not.
+   */
+  needsEmailedCode: boolean;
 };
 
 /** The live pending link a device request carries, for the approval page. */
@@ -62,7 +68,49 @@ export async function getDeviceAuthPendingLink(
     provider: pending.provider,
     email: pending.email,
     displayName: pending.display_name,
+    needsEmailedCode: pending.kind === 'existing_account',
   };
+}
+
+/**
+ * What the approver presents to add a pending link: the emailed code for that
+ * link, bound to the approving browser session.
+ */
+export type DeviceAuthPendingLinkProof = {
+  email: string;
+  webSessionId: string | undefined;
+  code?: string;
+  challengeId?: string;
+};
+
+/**
+ * Spends the emailed code that authorizes adding a pending link to an existing
+ * account. A device approval comes from a browser session, and a session
+ * cookie alone does not prove the mailbox, so it is held to the same code as a
+ * link started from Connected accounts.
+ */
+async function spendPendingLinkCode(
+  userId: string,
+  provider: AuthProviderId,
+  proof: DeviceAuthPendingLinkProof | undefined
+): Promise<void> {
+  if (!proof?.webSessionId) {
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired);
+  }
+  if (!proof.code || !proof.challengeId) {
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid);
+  }
+  const result = await consumeSignInMethodChangeCode(
+    { userId, email: proof.email, change: 'link', provider, webSessionId: proof.webSessionId },
+    proof.code,
+    proof.challengeId
+  );
+  if (result === 'invalid') {
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid);
+  }
+  if (result === 'locked') {
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked);
+  }
 }
 
 const CODE_LENGTH = 8;
@@ -346,7 +394,12 @@ export function isDeviceAuthRequestExpired(
 export async function approveDeviceAuthRequest(
   userCode: string,
   userId: string,
-  options: { confirmedClientId?: string; addPendingLink?: boolean } = {}
+  options: {
+    confirmedClientId?: string;
+    addPendingLink?: boolean;
+    /** Required to add a pending link to an existing account. */
+    pendingLinkProof?: DeviceAuthPendingLinkProof;
+  } = {}
 ): Promise<void> {
   const now = new Date().toISOString();
   const code = normalizeDeviceAuthUserCode(userCode);
@@ -362,7 +415,8 @@ export async function approveDeviceAuthRequest(
 
   // A live pending link must never attach silently: an actionable row that
   // carries one requires the approver's explicit choice. Declining clears
-  // the stored hash so consumption cannot attach it later.
+  // the stored hash so consumption cannot attach it later. Adding a link to
+  // an existing account spends the emailed code here, before the approval.
   let clearPendingLink = false;
   if (actionable && existing && existing.pending_link_secret_hash) {
     const livePending = await getLivePendingLinkByHash(existing.pending_link_secret_hash);
@@ -371,6 +425,9 @@ export async function approveDeviceAuthRequest(
         throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired);
       }
       clearPendingLink = options.addPendingLink === false;
+      if (options.addPendingLink && livePending.kind === 'existing_account') {
+        await spendPendingLinkCode(userId, livePending.provider, options.pendingLinkProof);
+      }
     }
   }
 

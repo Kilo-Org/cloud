@@ -22,12 +22,12 @@ import {
 import {
   accountBalanceMicrodollars,
   findOrganizationMemberBalanceRow,
-  isApiTokenPepperCurrent,
   createEmailDomainBlacklistCache,
   organizationMemberBalance,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-token-pepper';
 import { findEffectiveOrganizationMemberRole } from '@kilocode/worker-utils/organization-membership';
 import * as z from 'zod';
 
@@ -121,7 +121,7 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
     .from(kilocode_users)
     .where(eq(kilocode_users.id, payload.kiloUserId))
     .limit(1);
-  if (!user || !isApiTokenPepperCurrent(user.api_token_pepper, payload.apiTokenPepper)) {
+  if (!user || !isKiloUserCredentialPepperCurrent(payload, user.api_token_pepper)) {
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }
   // This Worker does not depend on @kilocode/web-shared, so the account availability rule is

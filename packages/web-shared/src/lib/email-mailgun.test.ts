@@ -54,6 +54,8 @@ const originalAutomatedTest = process.env.IS_IN_AUTOMATED_TEST;
 const originalNodeEnvironment = process.env.NODE_ENV;
 const originalTargetEnvironment = process.env.VERCEL_TARGET_ENV;
 const originalStagingSink = process.env.STAGING_EMAIL_REDIRECT_TO;
+const originalVercelEnvironment = process.env.VERCEL_ENV;
+const originalAutomatedTestOutbox = process.env.LOCAL_EMAIL_OUTBOX_IN_AUTOMATED_TEST;
 
 function restoreEnvironmentVariable(name: string, value: string | undefined): void {
   if (value === undefined) {
@@ -72,6 +74,8 @@ afterEach(() => {
   restoreEnvironmentVariable('NODE_ENV', originalNodeEnvironment);
   restoreEnvironmentVariable('VERCEL_TARGET_ENV', originalTargetEnvironment);
   restoreEnvironmentVariable('STAGING_EMAIL_REDIRECT_TO', originalStagingSink);
+  restoreEnvironmentVariable('VERCEL_ENV', originalVercelEnvironment);
+  restoreEnvironmentVariable('LOCAL_EMAIL_OUTBOX_IN_AUTOMATED_TEST', originalAutomatedTestOutbox);
   mailgunClientMock.mockClear();
   writeEmailToLocalOutboxMock.mockClear();
   captureMessageMock.mockClear();
@@ -273,6 +277,27 @@ describe('Mailgun email boundary', () => {
 
     await expect(sendViaMailgun(message)).resolves.toBe(true);
 
+    expect(writeEmailToLocalOutboxMock).not.toHaveBeenCalled();
+    expect(mailgunClientMock).not.toHaveBeenCalled();
+  });
+
+  it('captures automated-test email locally only when the outbox is opted in off Vercel', async () => {
+    restoreEnvironmentVariable('IS_IN_AUTOMATED_TEST', '1');
+    restoreEnvironmentVariable('NODE_ENV', 'development');
+    process.env.LOCAL_EMAIL_OUTBOX_IN_AUTOMATED_TEST = '1';
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.VERCEL_ENV;
+
+    await expect(sendViaMailgun(message)).resolves.toBe(true);
+    expect(writeEmailToLocalOutboxMock).toHaveBeenCalledWith(message);
+    expect(mailgunClientMock).not.toHaveBeenCalled();
+
+    writeEmailToLocalOutboxMock.mockClear();
+    process.env.VERCEL_ENV = 'preview';
+    await expect(sendViaMailgun(message)).resolves.toBe(true);
+    delete process.env.VERCEL_ENV;
+    process.env.VERCEL_TARGET_ENV = 'production';
+    await expect(sendViaMailgun(message)).resolves.toBe(true);
     expect(writeEmailToLocalOutboxMock).not.toHaveBeenCalled();
     expect(mailgunClientMock).not.toHaveBeenCalled();
   });

@@ -85,6 +85,23 @@ describe('bundle delivery', () => {
     expect(attributes).toMatchObject(run);
   });
 
+  it('refuses a malformed run at the RPC boundary and appends no row', async () => {
+    const stub = getBundleStub(env, config, 'o11y');
+    await stub.putBundle(await workloadBundle({ O11Y_CF_AE_API_TOKEN: { version: 1 } }));
+    const workflow = 'acme/repo/.github/workflows/release.yml@refs/heads/main';
+    for (const run of [
+      { jobWorkflowRef: workflow, runId: 'not-a-number' },
+      { jobWorkflowRef: 'x'.repeat(600), runId: '9001' },
+      { jobWorkflowRef: workflow, runId: '9001', token: 'eyJ.secret' },
+    ]) {
+      expect(await stub.getBundle('o11y', 'development', {}, run)).toMatchObject({
+        status: 'unavailable',
+        reason: 'internal',
+      });
+    }
+    expect((await auditRows(stub)).count).toBe(0);
+  });
+
   it('serves the sealed bundle and appends one delivery row in the same call', async () => {
     const stub = getBundleStub(env, config, 'o11y');
     await stub.putBundle(

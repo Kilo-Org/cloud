@@ -27,7 +27,7 @@ import { createEncryptionKey, openJson, sealJson } from '../crypto/aes';
 import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/bundle-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
-import type { GithubRun } from '../identity/verify';
+import { GithubRunSchema, type GithubRun } from '../identity/verify';
 import { policyIndex } from '../policy';
 import type { PolicyIndex } from '../policy/load';
 import type { Policy } from '../policy/schema';
@@ -106,6 +106,19 @@ export class BundleDO extends DurableObject<Env> {
   ): Promise<BundleResult> {
     const target = BundleTargetSchema.parse({ workload, environment });
     const ifNoneMatch = BundleRequestSchema.parse(request).ifNoneMatch;
+    // RPC hands over whatever the caller sent; the broker sends a verified token's run, so
+    // anything else is a bug, refused before it can reach the delivery row.
+    const parsedRun = GithubRunSchema.nullable().safeParse(run);
+    if (!parsedRun.success) {
+      console.error('sts: malformed GitHub run at the bundle boundary; the read is refused', {
+        workload: target.workload,
+      });
+      return {
+        status: 'unavailable',
+        reason: 'internal',
+        retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
+      };
+    }
 
     if (target.environment !== this.config.environment) {
       return { status: 'denied', reason: 'environment_mismatch' };
@@ -174,7 +187,7 @@ export class BundleDO extends DurableObject<Env> {
             version: secret.version,
           })),
           missing,
-          run,
+          run: parsedRun.data,
         })
       );
     } catch (error) {

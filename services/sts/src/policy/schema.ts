@@ -24,7 +24,7 @@ const GithubEnvironmentSchema = z.string().regex(/^[A-Za-z0-9._-]{1,255}$/);
  * At most 512 characters: the delivery row records a verified token's `job_workflow_ref`, which
  * equals one of these, as one audit attribute, and an attribute string holds at most 512.
  */
-const JobWorkflowRefSchema = z
+export const JobWorkflowRefSchema = z
   .string()
   .max(512)
   .regex(

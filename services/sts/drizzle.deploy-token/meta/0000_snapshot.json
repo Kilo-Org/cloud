@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "75039175-8bc2-4eae-987a-4ec3406abe4e",
+  "id": "70cc9cc6-3535-44b5-a27d-0779d81663d3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_event": {
@@ -155,6 +155,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "outcome_unknown": {
+          "name": "outcome_unknown",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "delete_cause": {
           "name": "delete_cause",
@@ -376,6 +384,60 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "deploy_token_sweep_retry": {
+      "name": "deploy_token_sweep_retry",
+      "columns": {
+        "token_id": {
+          "name": "token_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_name": {
+          "name": "token_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "retry_at": {
+          "name": "retry_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "failure_audited": {
+          "name": "failure_audited",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {},

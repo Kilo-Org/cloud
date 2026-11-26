@@ -468,6 +468,11 @@ export class DeployTokenDO extends DurableObject<Env> {
         detail: created.detail,
       });
       this.requestSweep(requestedExpiry + DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS);
+      this.db
+        .update(schema.deployToken)
+        .set({ outcomeUnknown: true })
+        .where(eq(schema.deployToken.slot, slot))
+        .run();
       await this.auditMintFailed(caller, grant.permissionSet, slot, 'unknown', null);
       return await this.failCreation(slot);
     }
@@ -609,18 +614,26 @@ export class DeployTokenDO extends DurableObject<Env> {
    * Deletes one of the caller's own tokens. A token id STS never handed to this workload is
    * `not_found`, whoever holds it, and so is a token asked for by another run of the same workload.
    * A token of the caller's that is already deleted answers `revoked` without a Cloudflare call. A
-   * deletion that failed is tried again no sooner than its row's retry time, by the caller as by
-   * the alarm: until then the caller hears `unavailable` with the time left, and no call is made.
+   * revoke during a deletion of the token already in flight (the alarm's) joins it and answers
+   * from its outcome. A deletion that failed is tried again no sooner than its row's retry time,
+   * by the caller as by the alarm: until then the caller hears `unavailable` with the time left,
+   * and no call is made.
    */
   async revoke(raw: DeployTokenRevokeRequest): Promise<DeployTokenRevokeOutcome> {
     const input = DeployTokenRevokeRequestSchema.parse(raw);
     if (input.environment !== this.config.environment) return UNAVAILABLE;
-    const row = this.rowFor(input.tokenId);
+    let row = this.rowFor(input.tokenId);
     if (row === undefined || row.state === 'failed' || row.state === 'pending') {
       return { status: 'not_found', reason: 'unknown_token' };
     }
     if (row.workload !== input.caller.workload) return { status: 'not_found', reason: 'not_owner' };
     if (row.runId !== input.caller.run.runId) return { status: 'not_found', reason: 'other_run' };
+    const inFlight = this.deleting.get(input.tokenId);
+    if (inFlight !== undefined) {
+      // That attempt set the retry time before its call; its outcome is this revoke's.
+      await inFlight;
+      row = this.rowFor(input.tokenId) ?? row;
+    }
     if (row.state === 'deleted') return { status: 'revoked' };
     const now = Date.now();
     if (row.deleteRetryAt !== null && row.deleteRetryAt > now) {
@@ -646,11 +659,12 @@ export class DeployTokenDO extends DurableObject<Env> {
   /**
    * Relays audit rows, marks expired tokens owed, ends creations an earlier instance of this object
    * left `pending`, runs the window check of tokens whose live window closed, retries owed
-   * deletions (at most `DEPLOY_TOKEN_DELETES_PER_ALARM`, least recently tried first), runs the
-   * sweep when due with what is left of that budget, and prunes ended rows. The window check runs
-   * before the deletions, so a hold the deletions keep renewing cannot starve it. While the
-   * credential hold runs (Cloudflare answered 401 or 403 to the minting credential), the alarm
-   * makes no Cloudflare call and reads no credential.
+   * deletions (at most `DEPLOY_TOKEN_DELETES_PER_ALARM`, least recently tried first), then the
+   * sweep's failed deletions that are due, runs the sweep when due with what is left of that
+   * budget, and prunes ended rows. The window check runs before the deletions, so a hold the
+   * deletions keep renewing cannot starve it. While the credential hold runs (Cloudflare answered
+   * 401 to the minting credential, or 401 or 403 to a list), the alarm makes no Cloudflare call
+   * and reads no credential.
    */
   async alarm(): Promise<void> {
     let failed = false;
@@ -681,7 +695,8 @@ export class DeployTokenDO extends DurableObject<Env> {
       if (this.credentialHeld(Date.now())) break;
       if (row.tokenId !== null) await this.deleteOnce(row.tokenId);
     }
-    await this.sweepIfDue(Date.now(), DEPLOY_TOKEN_DELETES_PER_ALARM - owed.length);
+    const retried = await this.retrySweepDeletions(DEPLOY_TOKEN_DELETES_PER_ALARM - owed.length);
+    await this.sweepIfDue(Date.now(), DEPLOY_TOKEN_DELETES_PER_ALARM - owed.length - retried);
     now = Date.now();
     this.audit.pruneIfDue(now);
     this.db
@@ -722,7 +737,7 @@ export class DeployTokenDO extends DurableObject<Env> {
       );
       this.db
         .update(schema.deployToken)
-        .set({ state: 'failed', endedAt: now })
+        .set({ state: 'failed', endedAt: now, outcomeUnknown: true })
         .where(eq(schema.deployToken.slot, row.slot))
         .run();
       await this.auditMintFailed(
@@ -738,9 +753,9 @@ export class DeployTokenDO extends DurableObject<Env> {
   /**
    * The refusal while this environment holds `DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING` tokens that
    * may exist at Cloudflare and count against the account's 500-token cap: creations in progress,
-   * handed-over tokens until deleted, tokens whose deletion is owed, and creations that ended
-   * without a token id recently enough that a lost token may still exist (its expiry plus the
-   * sweep's delay).
+   * handed-over tokens until deleted, tokens whose deletion is owed, creations whose outcome is
+   * unknown recently enough that a lost token may still exist (its expiry plus the sweep's delay),
+   * and tokens the sweep found but could not delete yet.
    */
   private accountLimit(now: number): DeployTokenMintResult | null {
     const lostSince =
@@ -758,14 +773,20 @@ export class DeployTokenDO extends DurableObject<Env> {
           and(
             eq(schema.deployToken.state, 'failed'),
             isNull(schema.deployToken.tokenId),
+            eq(schema.deployToken.outcomeUnknown, true),
             gt(schema.deployToken.createdAt, lostSince)
           )
         )
       )
       .get();
-    if ((row?.outstanding ?? 0) < DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING) return null;
+    const stuck = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.deployTokenSweepRetry)
+      .get();
+    const outstanding = (row?.outstanding ?? 0) + (stuck?.count ?? 0);
+    if (outstanding < DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING) return null;
     console.error('sts: deploy token refused: this environment holds its share of account tokens', {
-      outstanding: row?.outstanding,
+      outstanding,
     });
     return {
       status: 'limited',
@@ -1114,8 +1135,10 @@ export class DeployTokenDO extends DurableObject<Env> {
    * Reads up to `DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM` pages of the account's token list and deletes,
    * within `budget`, every expired token named for this environment that STS holds no row for. A
    * page where it deleted something is read again (the list shifted); a page shorter than the page
-   * size ends the sweep, and the next one runs a day later. While a 429's wait or the credential
-   * hold runs, the sweep waits until both ended.
+   * size ends the sweep, and the next one runs a day later. A token whose deletion failed is
+   * passed over, so it holds up neither its page nor the later ones: `retrySweepDeletions` tries
+   * it again by id. While a 429's wait or the credential hold runs, the sweep waits until both
+   * ended.
    */
   private async sweepIfDue(now: number, budget: number): Promise<void> {
     const state = this.db
@@ -1143,6 +1166,10 @@ export class DeployTokenDO extends DurableObject<Env> {
     let page = state.page ?? 1;
     let left = budget;
     for (let read = 0; read < DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM; read += 1) {
+      if (Date.now() < this.cloudflareResumeAt()) {
+        this.setSweep(Math.max(soon, this.cloudflareResumeAt()), page);
+        return;
+      }
       const listed = await tokens.list(credential.value, page, DEPLOY_TOKEN_SWEEP_PAGE_SIZE);
       if (listed.status !== 'ok') {
         console.error('sts: deploy token sweep could not list tokens', { detail: listed.detail });
@@ -1156,20 +1183,18 @@ export class DeployTokenDO extends DurableObject<Env> {
         token =>
           token.name.startsWith(prefix) &&
           (token.expiresAt === null || token.expiresAt <= now) &&
-          this.rowFor(token.id) === undefined
+          this.rowFor(token.id) === undefined &&
+          !this.sweepRetryPending(token.id)
       );
       let deleted = 0;
       for (const orphan of orphans) {
-        if (left <= 0 || this.credentialHeld(Date.now())) break;
-        left -= 1;
-        if ((await this.sweepDelete(tokens, credential.value, orphan)) !== 'delete_failed') {
-          deleted += 1;
+        if (left <= 0 || Date.now() < this.cloudflareResumeAt()) {
+          // Out of budget, or the credential hold or a 429's wait began: this page again later.
+          this.setSweep(Math.max(soon, this.cloudflareResumeAt()), page);
+          return;
         }
-      }
-      if (deleted < orphans.length) {
-        // Out of budget, or a deletion failed: this page again on the next alarm.
-        this.setSweep(Math.max(soon, this.cloudflareHoldUntil), page);
-        return;
+        left -= 1;
+        if ((await this.sweepDelete(orphan)) !== 'delete_failed') deleted += 1;
       }
       if (deleted === 0) {
         if (listed.tokens.length < DEPLOY_TOKEN_SWEEP_PAGE_SIZE) {
@@ -1334,10 +1359,10 @@ export class DeployTokenDO extends DurableObject<Env> {
    * The `deploy_token.unexpected_route` rows of one check; throws `WindowCheckFailure`. A route
    * list has no time, so a route counts when it differs from the zone's previous list (every route
    * of a zone never listed before), and the tokens it names are every token with that zone live
-   * since that list. Such a route is expected only when a live token intends both its Worker
+   * since that list. Such a route is expected only when one live token intends both its Worker
    * (`intendedScripts`) and its pattern (`intendedRoutes`), so a new or changed pattern that sends
-   * traffic to an intended Worker counts too. A removed route, or one that runs no Worker, is not
-   * reported.
+   * traffic to an intended Worker counts too, and so does one token's pattern pointed at another
+   * token's Worker. A removed route, or one that runs no Worker, is not reported.
    */
   private async auditUnexpectedRoutes(
     routes: Map<string, ListedRoute[]>,
@@ -1376,8 +1401,9 @@ export class DeployTokenDO extends DurableObject<Env> {
         const { script } = route;
         if (!changed || script === null) continue;
         if (
-          live.some(window => window.intended.includes(script)) &&
-          live.some(window => window.routes.includes(route.pattern))
+          live.some(
+            window => window.intended.includes(script) && window.routes.includes(route.pattern)
+          )
         ) {
           continue;
         }
@@ -1463,20 +1489,58 @@ export class DeployTokenDO extends DurableObject<Env> {
     }
   }
 
-  /** Deletes one expired token the sweep found and audits the attempt. */
-  private async sweepDelete(
-    tokens: CloudflareTokens,
-    credential: string,
-    orphan: ListedToken
-  ): Promise<DeployTokenDeletionResult> {
-    const deletion = await tokens.delete(credential, orphan.id);
+  /**
+   * Deletes one expired token the sweep found, or one whose deletion failed before, and audits the
+   * attempt. A failure keeps the token in `deploy_token_sweep_retry`, which the sweep passes over
+   * from then on. A failure of the token's own (a 403, a 5xx, no answer, no credential) doubles its
+   * wait up to the sweep's interval; a 401 or a 429 adds none, as the credential hold or
+   * Cloudflare's wait already delays every call. Its `delete_failed` row is written once, until
+   * Cloudflare deleted the token or no longer has it.
+   */
+  private async sweepDelete(orphan: ListedToken): Promise<DeployTokenDeletionResult> {
+    const failure = await this.deleteAtCloudflare(orphan.id);
+    const retry = this.db
+      .select()
+      .from(schema.deployTokenSweepRetry)
+      .where(eq(schema.deployTokenSweepRetry.tokenId, orphan.id))
+      .get();
     const result: DeployTokenDeletionResult =
-      deletion.status === 'unreachable' ? 'delete_failed' : deletion.status;
-    if (deletion.status === 'unreachable') {
-      console.error('sts: deploy token sweep deletion failed; the next sweep retries it', {
-        detail: deletion.detail,
+      failure === null ? 'deleted' : failure === 'gone' ? 'gone' : 'delete_failed';
+    if (failure === null || failure === 'gone') {
+      this.db
+        .delete(schema.deployTokenSweepRetry)
+        .where(eq(schema.deployTokenSweepRetry.tokenId, orphan.id))
+        .run();
+    } else {
+      console.error('sts: deploy token sweep deletion failed; it is tried again later', {
+        detail: failure.detail,
       });
-      this.noteFailure(deletion);
+      this.noteFailure(failure);
+      const own = !failure.credentialRefused && failure.retryAfterMs === null;
+      const attempts = (retry?.attempts ?? 0) + (own ? 1 : 0);
+      const now = Date.now();
+      const retryAt = own
+        ? now +
+          Math.min(
+            DEPLOY_TOKEN_SWEEP_INTERVAL_MS,
+            DEPLOY_TOKEN_DELETE_RETRY_MS * 2 ** (attempts - 1)
+          )
+        : now;
+      this.db
+        .insert(schema.deployTokenSweepRetry)
+        .values({
+          tokenId: orphan.id,
+          tokenName: orphan.name,
+          expiresAt: orphan.expiresAt,
+          retryAt,
+          attempts,
+        })
+        .onConflictDoUpdate({
+          target: schema.deployTokenSweepRetry.tokenId,
+          set: { retryAt, attempts },
+        })
+        .run();
+      if (retry?.failureAudited === true) return result;
     }
     try {
       await this.audit.append(
@@ -1494,8 +1558,53 @@ export class DeployTokenDO extends DurableObject<Env> {
       );
     } catch (error) {
       console.error('sts: deploy token sweep audit append failed', { reason: errorName(error) });
+      return result;
+    }
+    if (result === 'delete_failed') {
+      this.db
+        .update(schema.deployTokenSweepRetry)
+        .set({ failureAudited: true })
+        .where(eq(schema.deployTokenSweepRetry.tokenId, orphan.id))
+        .run();
     }
     return result;
+  }
+
+  /** The sweep passes over a token whose failed deletion `retrySweepDeletions` owns. */
+  private sweepRetryPending(tokenId: string): boolean {
+    return (
+      this.db
+        .select({ tokenId: schema.deployTokenSweepRetry.tokenId })
+        .from(schema.deployTokenSweepRetry)
+        .where(eq(schema.deployTokenSweepRetry.tokenId, tokenId))
+        .get() !== undefined
+    );
+  }
+
+  /**
+   * Tries again, by id, the sweep's failed deletions that are due, at most `budget`, the longest
+   * due first, and returns how many it tried. Stops while the credential hold or a 429's wait runs.
+   */
+  private async retrySweepDeletions(budget: number): Promise<number> {
+    if (budget <= 0 || this.config.cloudflareDeployAccountId === null) return 0;
+    const due = this.db
+      .select()
+      .from(schema.deployTokenSweepRetry)
+      .where(lte(schema.deployTokenSweepRetry.retryAt, Date.now()))
+      .orderBy(asc(schema.deployTokenSweepRetry.retryAt))
+      .limit(budget)
+      .all();
+    let tried = 0;
+    for (const retry of due) {
+      if (Date.now() < this.cloudflareResumeAt()) break;
+      tried += 1;
+      await this.sweepDelete({
+        id: retry.tokenId,
+        name: retry.tokenName,
+        expiresAt: retry.expiresAt,
+      });
+    }
+    return tried;
   }
 
   /** The earliest time a row is due for deletion, or null for none. */
@@ -1559,9 +1668,10 @@ export class DeployTokenDO extends DurableObject<Env> {
 
   /**
    * Sets the alarm to the earliest of the audit work, the next owed deletion, the next expiry, the
-   * next window check, an interrupted creation, the sweep and the row prune. After an alarm
-   * (`afterAlarm`), owed deletions wait at least `DEPLOY_TOKEN_DELETE_RETRY_MS`, so retries make at
-   * most `DEPLOY_TOKEN_DELETES_PER_ALARM` Cloudflare deletes per 30 seconds whatever the number of
+   * next window check, an interrupted creation, the next retry of a failed sweep deletion, the
+   * sweep and the row prune. After an alarm (`afterAlarm`), owed deletions and sweep retries wait
+   * at least `DEPLOY_TOKEN_DELETE_RETRY_MS`, so retries make at most
+   * `DEPLOY_TOKEN_DELETES_PER_ALARM` Cloudflare deletes per 30 seconds whatever the number of
    * owed tokens. Deletions and the window check wait out the credential hold.
    */
   private async scheduleAlarm(now: number, failed: boolean, afterAlarm = false): Promise<void> {
@@ -1587,6 +1697,18 @@ export class DeployTokenDO extends DurableObject<Env> {
     if (expiry !== null) target = Math.min(target, expiry);
     const interrupted = this.nextInterruptedCreation();
     if (interrupted !== null) target = Math.min(target, interrupted);
+    const sweepRetry =
+      this.db
+        .select({ at: sql<number | null>`min(${schema.deployTokenSweepRetry.retryAt})` })
+        .from(schema.deployTokenSweepRetry)
+        .get()?.at ?? null;
+    if (sweepRetry !== null && this.config.cloudflareDeployAccountId !== null) {
+      const due = Math.max(sweepRetry, this.cloudflareResumeAt());
+      target = Math.min(
+        target,
+        afterAlarm ? Math.max(due, now + DEPLOY_TOKEN_DELETE_RETRY_MS) : due
+      );
+    }
     const sweep = this.db
       .select({ at: schema.deployTokenSweep.nextSweepAt })
       .from(schema.deployTokenSweep)

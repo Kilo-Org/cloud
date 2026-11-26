@@ -25,6 +25,7 @@ CREATE TABLE `deploy_token` (
 	`created_at` integer NOT NULL,
 	`expires_at` integer NOT NULL,
 	`ended_at` integer,
+	`outcome_unknown` integer DEFAULT false NOT NULL,
 	`delete_cause` text,
 	`delete_retry_at` integer,
 	`delete_attempts` integer DEFAULT 0 NOT NULL,
@@ -62,4 +63,13 @@ CREATE TABLE `deploy_token_sweep` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`next_sweep_at` integer NOT NULL,
 	`page` integer
+);
+--> statement-breakpoint
+CREATE TABLE `deploy_token_sweep_retry` (
+	`token_id` text PRIMARY KEY NOT NULL,
+	`token_name` text NOT NULL,
+	`expires_at` integer,
+	`retry_at` integer NOT NULL,
+	`attempts` integer DEFAULT 0 NOT NULL,
+	`failure_audited` integer DEFAULT false NOT NULL
 );

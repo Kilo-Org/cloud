@@ -136,10 +136,13 @@ export type ListedRoute = { id: string; pattern: string; script: string | null }
 
 export type RouteList = { status: 'ok'; routes: ListedRoute[] } | CloudflareUnreachable;
 
+/** A 429 without a readable `Retry-After` still asks STS to wait this long. */
+const RATE_LIMITED_DEFAULT_WAIT_MS = 60_000;
+
 function retryAfterMs(response: Response): number | null {
   if (response.status !== 429) return null;
   const seconds = Number(response.headers.get('retry-after'));
-  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : RATE_LIMITED_DEFAULT_WAIT_MS;
 }
 
 function isCredentialRefused(status: number): boolean {

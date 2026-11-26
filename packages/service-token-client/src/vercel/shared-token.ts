@@ -15,12 +15,14 @@
  *    until its own `exp` minus 60 s even when a newer base token has arrived. A base token
  *    missing one of those claims fails the request.
  * 2. A cached token is used only when it decodes to the same five claims, `aud` equal to the
- *    audience, and `exp` equal to the entry's: code that can write the cache but holds another
- *    deployment's token cannot make this deployment present it. A forged or stale entry can
- *    still fail the caller's STS call (STS checks the signature); the caller then calls
- *    `invalidate`, which drops it from memory and the cache so the next request exchanges again
- *    (once per STS refusal). Code that writes this project's cache runs with the project's own
- *    trust.
+ *    audience, `exp` equal to the entry's, and the issuer and `act` STS requires of an exchanged
+ *    token (the team slug issuer of its `owner`, `act.aud` that team's default audience, nothing
+ *    nested): code that can write the cache but holds another deployment's token cannot make this
+ *    deployment present it. An exchanged token that fails the same check is never stored nor
+ *    served. A forged or stale entry can still fail the caller's STS call (STS checks the
+ *    signature); the caller then calls `invalidate`, which drops it from memory and the cache so
+ *    the next request exchanges again (once per STS refusal). Code that writes this project's
+ *    cache runs with the project's own trust.
  * 2a. When STS refuses a token this instance exchanged itself, `invalidate` writes a refusal
  *    marker for the deployment and audience that lives `refusedTtlSeconds` (the client's
  *    `DENIED_RECHECK_MS`, 60 s). While it lives no instance of the deployment drops a cached token
@@ -170,13 +172,32 @@ function deploymentOf(claims: Record<string, unknown> | null): string | null {
   return parts.join('\n');
 }
 
+/** The exchange's issuer: the team slug form `https://oidc.vercel.com/<team slug>`. */
+const VERCEL_ISSUER_PREFIX = 'https://oidc.vercel.com/';
+
+/**
+ * STS's checks of an exchanged token besides its signature and deployment (`services/sts` README,
+ * "Vercel"): the issuer is the team slug form of its own `owner`, and `act` names that team's
+ * default audience, the base token's, with no nested `act`. A token that fails them is never
+ * stored nor served: STS would refuse it, and for a token this instance exchanged `invalidate`
+ * would keep it and write the refusal marker.
+ */
+function isExchangedFunctionToken(claims: Record<string, unknown>): boolean {
+  const owner = claims.owner;
+  if (typeof owner !== 'string' || owner === '' || owner.includes('/')) return false;
+  if (claims.iss !== `${VERCEL_ISSUER_PREFIX}${owner}`) return false;
+  const act = claims.act;
+  if (typeof act !== 'object' || act === null || Array.isArray(act) || 'act' in act) return false;
+  return 'aud' in act && act.aud === `https://vercel.com/${owner}`;
+}
+
 function asEntry(value: unknown, deployment: string, audience: string): Entry | null {
   if (typeof value !== 'object' || value === null) return null;
   if (!('token' in value) || typeof value.token !== 'string') return null;
   if (!('exp' in value) || typeof value.exp !== 'number') return null;
   const claims = claimsOf(value.token);
   if (claims === null || claims.aud !== audience || claims.exp !== value.exp) return null;
-  if (deploymentOf(claims) !== deployment) return null;
+  if (deploymentOf(claims) !== deployment || !isExchangedFunctionToken(claims)) return null;
   return { token: value.token, exp: value.exp };
 }
 
@@ -407,7 +428,9 @@ export class SharedExchangedToken {
             audience
           );
           if (exchanged === null) {
-            return fail('the exchanged token does not carry this deployment and audience');
+            return fail(
+              'the exchanged token is not one STS accepts for this deployment and audience'
+            );
           }
           const ttl = cacheTtlSeconds(exchanged.exp, nowSeconds());
           if (ttl === null) return fail('the exchanged token expires within 60 seconds');

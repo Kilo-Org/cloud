@@ -24,11 +24,16 @@ function nowSeconds(): number {
 }
 
 const DEPLOYMENT = {
+  owner: 'kilocode',
+  iss: 'https://oidc.vercel.com/kilocode',
   owner_id: 'team_T1',
   project_id: 'prj_P1',
   environment: 'production',
   deployment_id: 'dpl_D1',
 };
+
+/** The `act` Vercel adds on an exchange: the base token's audience, the team default. */
+const ACT = { iat: nowSeconds(), aud: 'https://vercel.com/kilocode' };
 
 function memoryCache(): SharedCache {
   const entries = new Map<string, { value: unknown; expiresAt: number }>();
@@ -54,7 +59,7 @@ function exchangeLikeVercel(): { exchange: Exchange; calls: string[] } {
   const exchange: Exchange = async (baseToken, audience) => {
     calls.push(audience);
     const claims = JSON.parse(Buffer.from(baseToken.split('.')[1] ?? '', 'base64url').toString());
-    return { kind: 'token', token: unsignedJwt({ ...claims, aud: audience }) };
+    return { kind: 'token', token: unsignedJwt({ ...claims, aud: audience, act: ACT }) };
   };
   return { exchange, calls };
 }
@@ -171,7 +176,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
 
   function setup(refuses: (identity: string) => boolean) {
     const base = unsignedJwt({ ...DEPLOYMENT, iat: nowSeconds(), exp: nowSeconds() + 7200 });
-    const poisoned = `${unsignedJwt({ ...DEPLOYMENT, aud: STS, iat: nowSeconds(), exp: nowSeconds() + 3600 }).slice(0, -'signature'.length)}forged`;
+    const poisoned = `${unsignedJwt({ ...DEPLOYMENT, aud: STS, act: ACT, iat: nowSeconds(), exp: nowSeconds() + 3600 }).slice(0, -'signature'.length)}forged`;
     const { exchange, calls } = exchangeLikeVercel();
     const { fetchFn, presented } = sts(identity => identity === poisoned || refuses(identity));
     const tokens = createHttpServiceTokens({
@@ -248,7 +253,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
         );
         return {
           kind: 'token',
-          token: unsignedJwt({ ...claims, aud: audience, n: exchangedAt.length }),
+          token: unsignedJwt({ ...claims, aud: audience, act: ACT, n: exchangedAt.length }),
         };
       };
       const { fetchFn, presented } = sts(() => true);

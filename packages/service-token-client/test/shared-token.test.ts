@@ -24,11 +24,16 @@ function unsignedJwt(claims: Record<string, unknown>): string {
 }
 
 const DEPLOYMENT = {
+  owner: 'kilocode',
+  iss: 'https://oidc.vercel.com/kilocode',
   owner_id: 'team_T1',
   project_id: 'prj_P1',
   environment: 'production',
   deployment_id: 'dpl_D1',
 };
+
+/** The `act` Vercel adds on an exchange: the base token's audience, the team default. */
+const ACT = { iat: nowSeconds(), aud: 'https://vercel.com/kilocode' };
 
 function baseToken(claims: Record<string, unknown> = {}): string {
   return unsignedJwt({ ...DEPLOYMENT, iat: nowSeconds(), exp: nowSeconds() + 7200, ...claims });
@@ -80,7 +85,7 @@ function fakeExchange(options: {
     const claims = claimsOf(base);
     return {
       kind: 'token',
-      token: unsignedJwt({ ...claims, exp: options.exp ?? claims.exp, aud: AUDIENCE }),
+      token: unsignedJwt({ ...claims, exp: options.exp ?? claims.exp, aud: AUDIENCE, act: ACT }),
     };
   };
   return { calls, exchange };
@@ -222,6 +227,7 @@ describe('shared exchanged token (D10)', () => {
       deployment_id: 'dpl_D9',
       exp: nowSeconds() + 7200,
       aud: AUDIENCE,
+      act: ACT,
     });
     shared.set(key, { token: foreign, exp: nowSeconds() + 7200 });
     const third = await new SharedExchangedToken(cache, { settings: { jitterMs: 1 } }).get(
@@ -241,6 +247,48 @@ describe('shared exchanged token (D10)', () => {
       detail: 'the base token lacks a deployment claim',
     });
     expect(calls.attempts).toBe(0);
+  });
+
+  it('never stores nor serves a token without the team issuer or act STS requires', async () => {
+    const shared = new Map<string, unknown>();
+    const cache: SharedCache = {
+      get: async key => shared.get(key) ?? null,
+      set: async (key, value) => void shared.set(key, value),
+      delete: async key => void shared.delete(key),
+    };
+    const exp = nowSeconds() + 7200;
+    const malformed = [
+      { act: undefined },
+      { act: ACT.aud },
+      { act: { aud: 'https://vercel.com/other' } },
+      { act: { ...ACT, act: { aud: 'https://vercel.com/kilocode' } } },
+      { iss: 'https://oidc.vercel.com/other' },
+      { iss: 'https://oidc.vercel.com' },
+    ];
+    const settings = { jitterMs: 1, claim: false };
+    for (const claims of malformed) {
+      shared.clear();
+      const token = unsignedJwt({ ...DEPLOYMENT, exp, aud: AUDIENCE, act: ACT, ...claims });
+      const exchange: Exchange = async () => ({ kind: 'token', token });
+      const instance = new SharedExchangedToken(cache, { settings });
+      expect(await instance.get(BASE_TOKEN, AUDIENCE, exchange)).toMatchObject({
+        status: 'failed',
+        detail: 'the exchanged token is not one STS accepts for this deployment and audience',
+      });
+      expect([...shared.values()]).toEqual([]);
+
+      // The same token written to the cache under this deployment's key is a miss.
+      const { exchange: valid } = fakeExchange({ budget: 100 });
+      await new SharedExchangedToken(cache, { settings }).get(BASE_TOKEN, AUDIENCE, valid);
+      const [key = ''] = shared.keys();
+      shared.set(key, { token, exp });
+      const later = await new SharedExchangedToken(cache, { settings }).get(
+        BASE_TOKEN,
+        AUDIENCE,
+        valid
+      );
+      expect(later).toMatchObject({ status: 'ok', report: { source: 'exchanged' } });
+    }
   });
 
   it('does not share entries between key prefixes, in the cache or in memory', async () => {

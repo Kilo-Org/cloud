@@ -76,8 +76,10 @@ Vercel workload, and it passed.**
    instances of a deployment share one key per region and audience. A base token missing one of
    them fails the request.
 2. A cached entry is used only if its token decodes to the same five claims, `aud` equal to the
-   audience and `exp` equal to the entry's, until `exp` minus 60 s, whichever base token the reader
-   holds. A forged entry with matching claims can only make the caller's STS call fail (STS checks
+   audience, `exp` equal to the entry's, the team slug issuer of its `owner` and an `act` naming that
+   team's default audience with nothing nested (as STS requires), until `exp` minus 60 s, whichever
+   base token the reader holds. An exchanged token that fails the same check is never stored nor
+   served. A forged entry with matching claims can only make the caller's STS call fail (STS checks
    the signature). The key is not secret: code that can write the same Runtime Cache partition
    (other deployments of the project in the same scope; a custom environment may share the preview
    partition) can stall a deployment's exchanges, never change which token it presents; production

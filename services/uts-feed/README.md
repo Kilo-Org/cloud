@@ -19,11 +19,12 @@ after the 16 signers rotate together).
   - `Kilo-Key-Set-Oldest-Age`: the seconds since the oldest keys in the set were read. A verifier
     counts its 24-hour last-good limit from it, so it keeps no key longer than 24 hours after that
     signer's last good read (design 7, decision Q55).
-- The keys come from the mint Worker's internal signer-keys route (`GET /internal/signer-keys`),
-  fetched over the `UTS_MINT` service binding to the mint Worker's default entrypoint, so the read
-  runs in the mint Worker's placed fetch handler. The binding carries this Worker's deployed name as
-  `props.caller`; the mint Worker answers any other caller as an unknown path. The answer lists each
-  signer with its keys and the time they were read from the signer object, or with its failure.
+- The keys come from `signerKeys()` on the mint Worker's `SignerKeys` entrypoint, called over the
+  `UTS_MINT` service binding. The binding carries this Worker's deployed name as `props.caller`;
+  the mint Worker refuses any other caller. Placement does not apply to a named entrypoint, so the
+  read and its 16 signer calls run where this Worker runs. The answer lists each signer with its
+  keys and the time they were read from the signer object, or with its failure. This Worker
+  validates the result and then disposes it, so the call does not stay open.
 - Each isolate holds every signer's keys separately, as plain data with their read time, and never
   shares a pending read between requests (`src/jwks.ts`):
   - while its newest keys are under 10 seconds old it serves the held set with no new read;
@@ -32,16 +33,17 @@ after the 16 signers rotate together).
     copy); after that a request waits for the read. While every signer read succeeds, a signer key
     change therefore reaches this response within 17 seconds, and a verifier within 5 minutes and
     17 seconds (its `max-age` plus these 17 seconds);
-  - an isolate starts at most one read per 10 seconds, whatever the outcome, and aborts a read
-    after 10 seconds; a request that needs a read another request started polls for up to 10
-    seconds, and keeps polling when a new read replaces a hung one;
+  - an isolate starts at most one read per 10 seconds, whatever the outcome, and gives up a read
+    after 10 seconds (a result that lands later is only disposed); a request that needs a read
+    another request started polls for up to 10 seconds, and keeps polling when a new read replaces
+    a hung one;
   - isolates share no copy: the Cache API is one cache per zone, shared by every Worker on the
     zone, so a copy there could be written by another Worker, and design 7 allows a shared entry
     only under an HMAC from the workload's own secret bundle, which this Worker does not hold yet.
     A new isolate, after a deploy of this Worker too, makes its own first read.
 - Failures:
-  - any failed read (a failed or timed-out call, a refused caller, an answer that is not a valid
-    signer-keys answer) keeps the held set serving;
+  - any failed read (a failed or timed-out call, a refused caller, a result that is not a valid
+    signer-keys read) keeps the held set serving;
   - a signer the mint Worker answers without keys keeps the keys this isolate holds for it, so the
     other signers stay current. Each signer's keys serve for up to 24 hours after its last good
     read; then that signer drops out of the set, its tokens fail verification, and the isolate logs

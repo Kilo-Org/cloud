@@ -1,18 +1,19 @@
 import {
-  signerKeysHttpStatus,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
   type SignerKeysAnswer,
+  type SignerKeysBinding,
   type SignerKeysEntry,
+  type SignerKeysRead,
   type UtsEnvironment,
   type UtsPublicJwk,
 } from '@kilocode/uts-contracts';
+import { WorkerEntrypoint } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import type { PublicKeysResult } from './dos/UtsSignerDO';
 import { getSignerStub } from './dos/stubs';
-import { FEED_DEPLOYMENTS, type Env, type UtsConfig } from './env';
-import { jsonResponse } from './responses';
+import { FEED_DEPLOYMENTS, readConfig, type Env, type UtsConfig } from './env';
 
 /**
  * An isolate answers from its copy of the last combined answer for this long after that read
@@ -207,34 +208,40 @@ async function readSignerObjects(
 }
 
 /**
- * The internal signer-keys route (`UTS_SIGNER_KEYS_PATH`). It runs in the mint Worker's fetch
- * handler, which placement runs next to the identity store's primary, so the 16 signer calls
- * start next to the signer objects in western Europe. It answers only the feed Worker of its own
- * environment: a service binding carries `props.caller`, and only a deploy in the account can set
- * props, so the check is deploy-level trust, as for the STS broker (design 6.4). A request
- * without that caller, from the internet or from another binding, gets the same 404 as an unknown
- * path. `test/repo` keeps every other config from binding the mint Worker.
+ * One signer-keys read for the binding whose props are `props`. It answers only the feed Worker of
+ * the mint Worker's own environment: a service binding carries `props.caller`, and only a deploy
+ * in the account can set props, so the check is deploy-level trust, as for the STS broker
+ * (design 6.4). Any other caller, or a binding without props, gets `refused`. The answer is plain
+ * data, so it stays readable after the caller disposes the RPC result.
  */
-export async function signerKeysResponse(
-  request: Request,
+export async function signerKeysRead(
   env: Env,
   config: UtsConfig,
   props: unknown
-): Promise<Response> {
+): Promise<SignerKeysRead> {
   const caller = callerOf(props);
   if (caller !== FEED_DEPLOYMENTS[config.environment]) {
-    if (caller !== null) {
-      console.warn(JSON.stringify({ event: 'uts.signer_keys.refused', caller }));
-    }
-    return jsonResponse({ error: 'not_found' }, 404);
-  }
-  if (request.method !== 'GET') {
-    return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
+    console.warn(JSON.stringify({ event: 'uts.signer_keys.refused', caller }));
+    return { status: 'refused' };
   }
   const answer = await signerKeysAnswer(config.environment, startedAt =>
     readSignerObjects(env, config, startedAt)
   );
-  return jsonResponse(answer, signerKeysHttpStatus(answer));
+  return { status: 'answered', answer };
+}
+
+/**
+ * The named entrypoint the feed Worker binds with its deployed name as `props.caller`
+ * (`UTS_SIGNER_KEYS_ENTRYPOINT`). A service binding delivers `props` to a named entrypoint, as
+ * for the STS broker. Placement does not apply to a named entrypoint, so the read and its 16
+ * signer calls run where the feed Worker runs; the default entrypoint's fetch handler, which
+ * placement covers, serves no signer keys. `test/repo` keeps every other config from binding the
+ * mint Worker.
+ */
+export class SignerKeys extends WorkerEntrypoint<Env> implements SignerKeysBinding {
+  async signerKeys(): Promise<SignerKeysRead> {
+    return await signerKeysRead(this.env, readConfig(this.env), this.ctx.props);
+  }
 }
 
 /** Test seam: drops this isolate's copy, held keys and read state, as a new isolate starts. */

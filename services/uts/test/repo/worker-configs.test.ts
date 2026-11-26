@@ -41,6 +41,7 @@ function withFeed(edit: (raw: Record<string, unknown>) => Record<string, unknown
 const mintBinding = (service: string, caller: string) => ({
   binding: 'UTS_MINT',
   service,
+  entrypoint: 'SignerKeys',
   props: { caller },
 });
 
@@ -108,11 +109,11 @@ describe('UTS Durable Object classes', () => {
   });
 });
 
-describe('the internal signer-keys route', () => {
+describe('the SignerKeys entrypoint', () => {
   it('fails any other config that binds the mint Worker, at any entrypoint', () => {
     for (const binding of [
       mintBinding('uts', 'consumer'),
-      { binding: 'UTS', service: 'uts-staging', entrypoint: 'SignerKeys' },
+      { binding: 'UTS', service: 'uts-staging' },
       mintBinding('uts-local', 'uts-feed-local'),
     ]) {
       expect(workerConfigProblems([consumer({ services: [binding] })])).toEqual([
@@ -127,11 +128,14 @@ describe('the internal signer-keys route', () => {
     ).toEqual([]);
   });
 
-  it('fails a feed block whose caller is not its own deployed name', () => {
+  it('fails a feed block whose caller is not its own deployed name, or that carries no props', () => {
     const problems = workerConfigProblems(
       withFeed(raw => ({ ...raw, services: [mintBinding('uts', 'uts-feed-staging')] }))
     );
     expect(problems).toEqual([expect.stringContaining('sets props.caller "uts-feed-staging"')]);
+    const { props: _props, ...withoutProps } = mintBinding('uts', 'uts-feed');
+    const propless = workerConfigProblems(withFeed(raw => ({ ...raw, services: [withoutProps] })));
+    expect(propless).toEqual([expect.stringContaining('sets props.caller undefined')]);
   });
 
   it('fails a feed block that binds another environment of the mint Worker', () => {
@@ -141,14 +145,15 @@ describe('the internal signer-keys route', () => {
     expect(problems).toEqual([expect.stringContaining('this block must bind uts')]);
   });
 
-  it('fails a feed binding at a named entrypoint or through a preview', () => {
-    const named = workerConfigProblems(
-      withFeed(raw => ({
-        ...raw,
-        services: [{ ...mintBinding('uts', 'uts-feed'), entrypoint: 'SignerKeys' }],
-      }))
-    );
-    expect(named).toEqual([expect.stringContaining('binds entrypoint SignerKeys')]);
+  it('fails a feed binding at the default or another entrypoint, or through a preview', () => {
+    const { entrypoint: _entrypoint, ...atDefault } = mintBinding('uts', 'uts-feed');
+    for (const [binding, entrypoint] of [
+      [atDefault, '(default)'],
+      [{ ...atDefault, entrypoint: 'Admin' }, 'Admin'],
+    ] as const) {
+      const problems = workerConfigProblems(withFeed(raw => ({ ...raw, services: [binding] })));
+      expect(problems).toEqual([expect.stringContaining(`binds entrypoint ${entrypoint}`)]);
+    }
     const preview = workerConfigProblems(
       withFeed(raw => ({ ...raw, previews: { services: [mintBinding('uts', 'uts-feed')] } }))
     );

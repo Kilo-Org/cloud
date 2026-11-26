@@ -4,6 +4,7 @@ import {
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
   UtsJwksSchema,
+  type SignerKeysBinding,
   type SignerKeysEntry,
 } from '@kilocode/uts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,37 +42,31 @@ function signerEntry(signer: number, generation = 0, readAt = Date.now()): OkEnt
 const allSigners = (generation = 0, readAt = Date.now()): SignerKeysEntry[] =>
   Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => signerEntry(signer, generation, readAt));
 
-const okAnswer = (generation = 0, readAt = Date.now()) =>
-  Response.json({ signers: allSigners(generation, readAt) });
+type MintResult = Record<string, unknown> & Partial<Disposable>;
+
+/** A `signerKeys()` result that carries `signers` as the mint Worker's answer. */
+const answered = (signers: unknown[]): MintResult => ({ status: 'answered', answer: { signers } });
+
+const okAnswer = (generation = 0, readAt = Date.now()) => answered(allSigners(generation, readAt));
 
 /** Every signer failed with `status`, as the mint Worker answers when it holds no keys. */
 const failedAnswer = (status: 'misconfigured' | 'unavailable') =>
-  Response.json(
-    { signers: Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })) },
-    { status: status === 'misconfigured' ? 500 : 503 }
-  );
+  answered(Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })));
 
-/** A mint Worker binding that answers `answer` and records each read's request options. */
-function mintBinding(
-  answer: () => Promise<Response>
-): Fetcher & { calls: number; inits: Array<RequestInit | undefined> } {
+/** A mint Worker binding whose `signerKeys()` answers `answer`, counting its calls. */
+function mintBinding(answer: () => Promise<MintResult>): SignerKeysBinding & { calls: number } {
   const fake = {
     calls: 0,
-    inits: new Array<RequestInit | undefined>(),
-    fetch: async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    signerKeys: async (): Promise<MintResult> => {
       fake.calls += 1;
-      fake.inits.push(init);
       return await answer();
-    },
-    connect: (): Socket => {
-      throw new Error('the feed Worker opens no socket to the mint Worker');
     },
   };
   return fake;
 }
 
 /** The development feed Worker, with the mint binding the test supplies. */
-function envWith(mint: Fetcher, environment = 'development'): Env {
+function envWith(mint: SignerKeysBinding, environment = 'development'): Env {
   return { UTS_ENVIRONMENT: environment, UTS_MINT: mint };
 }
 
@@ -79,7 +74,7 @@ const jwksRequest = (init?: RequestInit) =>
   new Request('http://localhost:8801/.well-known/jwks.json', init);
 
 /** One key-set request, with its background work finished, as if the clock read `at`. */
-async function get(mint: Fetcher, at?: number, environment?: string): Promise<Response> {
+async function get(mint: SignerKeysBinding, at?: number, environment?: string): Promise<Response> {
   const clock = at === undefined ? null : vi.spyOn(Date, 'now').mockReturnValue(at);
   try {
     const ctx = createExecutionContext();
@@ -156,12 +151,28 @@ describe('reads', () => {
     expect(mint.calls).toBe(1);
   });
 
-  it('aborts each mint read after the read guard', async () => {
-    const mint = mintBinding(async () => okAnswer());
-    await get(mint, T0);
-    const signal = mint.inits[0]?.signal;
-    expect(signal).toBeInstanceOf(AbortSignal);
-    expect(signal?.aborted).toBe(false);
+  it('gives up a mint read after the read guard, and disposes a result that lands later', async () => {
+    vi.useFakeTimers({ now: T0 });
+    try {
+      const late = Promise.withResolvers<MintResult>();
+      const mint = mintBinding(async () => await late.promise);
+      const pending = get(mint);
+      await vi.advanceTimersByTimeAsync(KEY_SET_READ_GUARD_MS);
+      expect((await pending).status).toBe(503);
+      const dispose = vi.fn();
+      late.resolve({ ...okAnswer(), [Symbol.dispose]: dispose });
+      await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('disposes each mint result once it holds the validated copy', async () => {
+    const dispose = vi.fn();
+    const mint = mintBinding(async () => ({ ...okAnswer(), [Symbol.dispose]: dispose }));
+    const response = await get(mint, T0);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(await keysOf(response)).toHaveLength(32);
   });
 
   it('shares no copy between isolates: a new isolate makes its own read', async () => {
@@ -257,7 +268,7 @@ describe('reads', () => {
     let call = 0;
     const mint = mintBinding(async () => {
       call += 1;
-      if (call === 1) return await new Promise<Response>(() => undefined);
+      if (call === 1) return await new Promise<MintResult>(() => undefined);
       return okAnswer();
     });
     const clock = vi.spyOn(Date, 'now').mockReturnValue(T0);
@@ -281,7 +292,7 @@ describe('signers', () => {
       const signers = allSigners(0);
       signers[3] = signerEntry(3, 1);
       signers[7] = { signer: 7, status: 'unavailable' };
-      return Response.json({ signers }, { status: 503 });
+      return answered(signers);
     });
     await get(mint, T0);
     failing = true;
@@ -299,7 +310,7 @@ describe('signers', () => {
       if (!failing) return okAnswer(0);
       const signers = allSigners(0);
       signers[7] = { signer: 7, status: 'unavailable' };
-      return Response.json({ signers }, { status: 503 });
+      return answered(signers);
     });
     await get(mint, T0);
     failing = true;
@@ -317,7 +328,7 @@ describe('signers', () => {
     const mint = mintBinding(async () => {
       const signers = allSigners(0);
       signers[7] = signerEntry(7, 0, Date.now() - 3600 * 1000);
-      return Response.json({ signers });
+      return answered(signers);
     });
     const response = await get(mint, T0);
     expect(await xsOf(response.clone(), 7)).toEqual(xs(7, 0));
@@ -329,7 +340,7 @@ describe('signers', () => {
     const mint = mintBinding(async () => {
       const signers = allSigners(0);
       if (olderHeld) signers[7] = signerEntry(7, 2, T0 - 1000);
-      return Response.json({ signers });
+      return answered(signers);
     });
     await get(mint, T0);
     olderHeld = true;
@@ -343,7 +354,7 @@ describe('signers', () => {
       if (!failing) return okAnswer(0);
       const signers = allSigners(0);
       signers[7] = { signer: 7, status: 'unavailable' };
-      return Response.json({ signers }, { status: 503 });
+      return answered(signers);
     });
     await get(mint, T0);
     failing = true;
@@ -374,10 +385,7 @@ describe('failures', () => {
   });
 
   it('keeps serving the held set after any failed read: a refused caller or an invalid answer', async () => {
-    for (const failure of [
-      () => Response.json({ error: 'not_found' }, { status: 404 }),
-      () => Response.json({ signers: [] }),
-    ]) {
+    for (const failure of [() => ({ status: 'refused' }), () => answered([])]) {
       resetIsolate();
       let fail = false;
       const mint = mintBinding(async () => (fail ? failure() : okAnswer()));
@@ -406,11 +414,11 @@ describe('failures', () => {
     expect(mint.calls).toBe(2);
   });
 
-  it('answers 503 for a mint answer that is a platform error page', async () => {
-    const mint = mintBinding(
-      async () => new Response('worker exceeded resource limits', { status: 503 })
-    );
-    expect((await get(mint)).status).toBe(503);
+  it('keeps no keys from a result that is not a signer-keys read', async () => {
+    for (const result of [{ status: 'answered' }, { signers: allSigners() }, { status: 'other' }]) {
+      resetIsolate();
+      expect((await get(mintBinding(async () => result))).status).toBe(500);
+    }
   });
 
   it('answers 503 when the mint Worker has keys for no signer', async () => {
@@ -418,10 +426,7 @@ describe('failures', () => {
   });
 
   it('answers 500 when the mint Worker refuses this caller or a signer object is misconfigured', async () => {
-    for (const answer of [
-      () => Response.json({ error: 'not_found' }, { status: 404 }),
-      () => failedAnswer('misconfigured'),
-    ]) {
+    for (const answer of [() => ({ status: 'refused' }), () => failedAnswer('misconfigured')]) {
       resetIsolate();
       const response = await get(mintBinding(async () => answer()));
       expect(response.status).toBe(500);
@@ -439,7 +444,7 @@ describe('failures', () => {
     duplicated[3] = { ...third, keys: [...third.keys, ...third.keys] };
     for (const body of [missing, { signers: withPrivate }, { signers: duplicated }]) {
       resetIsolate();
-      expect((await get(mintBinding(async () => Response.json(body)))).status).toBe(500);
+      expect((await get(mintBinding(async () => answered(body.signers)))).status).toBe(500);
     }
   });
 });

@@ -74,14 +74,14 @@ Each object:
 - logs each rotation and removal as `uts.signer.key_event` (`SignerKeyEvent`, public `kid`s only),
   the event the UTS audit pipeline will carry (design 8.3).
 
-### The internal signer-keys route
+### The SignerKeys entrypoint
 
-`GET /internal/signer-keys` (`UTS_SIGNER_KEYS_PATH`) answers `{ signers }`, every signer exactly
-once (`SignerKeysAnswerSchema`): its keys with `readAt`, the time they were read from the signer
+`signerKeys()` on the named entrypoint `SignerKeys` (`UTS_SIGNER_KEYS_ENTRYPOINT`, in
+`src/signer-keys.ts`) returns plain data (`SignerKeysReadSchema`): `{ status: 'refused' }`, or
+`{ status: 'answered', answer }` where `answer` is `{ signers }`, every signer exactly once
+(`SignerKeysAnswerSchema`): its keys with `readAt`, the time they were read from the signer
 object, or its failure, `misconfigured` (the object refused to load) or `unavailable` (the call
-failed after its retries). The status is `200` when every signer has keys, else `500` when a signer
-is misconfigured, else `503`; the body is the whole answer either way, so the feed Worker still
-takes every signer that has keys.
+failed after its retries). The feed Worker takes every signer that has keys.
 
 - Each isolate answers from a plain-data copy of its last answer for 2 seconds, with one read in
   flight; a request that needs that read polls for it. The signer objects therefore see at most one
@@ -92,19 +92,20 @@ takes every signer that has keys.
   refuses to load, answers those keys with their own `readAt` while they are under 24 hours old,
   and its failure after that; each failure is logged with the read time of the keys that stood in.
 
-It is a route of the mint Worker's fetch handler, so placement runs it next to the identity store's
-primary and its 16 signer calls start next to the signer objects; an RPC method or a named
-entrypoint would run in the caller's data center. It answers only a service binding to the default
-entrypoint whose `props.caller` is the feed Worker's deployed name for its own environment; every
-other request, from the internet or another binding, gets the same `404 not_found` as an unknown
-path. The default export is a `WorkerEntrypoint` class whose `fetch` serves every route: a deployed
-Worker delivers a binding's `props` to an entrypoint class only, not to a plain handler object
-(`wrangler dev` and the test runtime deliver them to both, so `test/runtime/entrypoint.test.ts`
-checks the class).
+It answers only a service binding to this entrypoint whose `props.caller` is the feed Worker's
+deployed name for its own environment, and refuses every other binding, with another caller or
+without props. A service binding delivers `props` to a named entrypoint, as for the STS broker;
+a deployed mint Worker did not see them on its default entrypoint, either as a plain handler object
+or as a `WorkerEntrypoint` class. The default entrypoint's fetch handler serves no signer keys: a
+request to the old `/internal/signer-keys` path gets `404 not_found` like any unknown path.
+Placement does not apply to a named entrypoint, so a read and its 16 signer calls run where the
+feed Worker runs, not next to the signer objects. That adds latency to each read, with the same
+call counts; a key-set request waits for a read only when its isolate holds no keys under 17
+seconds old.
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
-UTS Durable Object class or binds the mint Worker, any feed binding at a named entrypoint or whose
-caller is not the feed block's own name, and any drift in the UTS configs (names, `eu`
-jurisdiction, placement, traces).
+UTS Durable Object class or binds the mint Worker, any feed binding at an entrypoint other than
+`SignerKeys` or whose caller is not the feed block's own name, and any drift in the UTS configs
+(names, `eu` jurisdiction, placement, traces).
 
 ## Local development
 
@@ -124,8 +125,9 @@ must name the development issuer.
 - `pnpm test:workers`: unit and runtime tests in the Workers pool (`vitest.config.ts`,
   `wrangler.test.jsonc`): key lifecycle with time travel, signing and verification with `jose`, key
   persistence across restarts, rotation by alarm, an overdue rotation and a lost alarm, emergency
-  removal by direct call, the RPC surface, the signer-keys route (its caller check, its 2-second
-  copy, one read in flight, and the held keys of a failed signer), metadata.
+  removal by direct call, the RPC surface, the SignerKeys entrypoint over real service bindings
+  (its caller check, its 2-second copy, one read in flight, and the held keys of a failed signer),
+  metadata.
 - `pnpm test:repo`: the repository config check (`test/repo`), with no database.
 - `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
   tests (`test/db`, see "Local database and tests").
@@ -173,29 +175,18 @@ Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and meta
    curl -sS https://uts-feed-staging.kiloapps.io/.well-known/jwks.json | jq -r '.keys[].kid' | sort | diff /tmp/kids-before - && echo same
    ```
 
-3. **The mint path and the signer-keys route run in the placed region (design 5.2).** Cloudflare
-   adds a `cf-placement` header (`remote-<colo>` or `local-<colo>`) to the responses of a placed
-   Worker. Read it from the public metadata response, and from the feed Worker's
-   `uts_feed.signer_keys.read` line, which logs the header of the internal signer-keys response as
-   the feed Worker received it. Start the feed tail, then make the feed Worker read (a new
-   deploy starts new isolates, which read at their first request):
+3. **The mint path runs in the placed region (design 5.2).** Cloudflare adds a `cf-placement`
+   header (`remote-<colo>` or `local-<colo>`) to the responses of a placed Worker's fetch handler.
+   Read it from the public metadata response:
 
    ```sh
    curl -sS -o /dev/null -D - https://uts-staging.kiloapps.io/.well-known/oauth-authorization-server | grep -i '^cf-placement'
-   (cd ../uts-feed && pnpm exec wrangler tail uts-feed-staging --format json > /tmp/uts-feed-staging-tail.json &)
-   sleep 5
-   (cd ../uts-feed && pnpm exec wrangler deploy --env staging)
-   curl -sS -o /dev/null https://uts-feed-staging.kiloapps.io/.well-known/jwks.json
-   sleep 5
-   jq -r '.logs[]?.message[]? | select(type == "string" and contains("uts_feed.signer_keys.read"))' /tmp/uts-feed-staging-tail.json | jq -c '{status, placement}'
    ```
 
-   Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt) on the metadata
-   response and `"status":200` with the same placement on each read line. A `null` placement on a
-   read line leaves placement of the signer-keys route unproven, not disproven: Cloudflare is not
-   documented to add that header to a service-binding response. Record it as unproven in the pull
-   request; if placement did not apply, each key-set read would make its 16 signer calls from the
-   feed Worker's data center (latency only, the same call counts).
+   Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt). The signer-keys
+   read is outside this check: it runs on the `SignerKeys` named entrypoint, which placement does
+   not cover, so it runs where the feed Worker runs. The key-set request above proves it answers
+   the feed Worker (`32` keys).
 
 ## Deploys
 

@@ -8,12 +8,13 @@ import {
 } from './jwks';
 
 /**
- * The mint Worker's internal signer-keys route. Only the feed Worker reaches it, over a service
- * binding to the mint Worker's default entrypoint with `props: { caller: '<feed deployment name>' }`,
- * so the read runs in the mint Worker's placed fetch handler. The mint Worker answers every other
- * request on this path as an unknown path (404).
+ * The mint Worker's named entrypoint that answers the feed Worker's signer-keys read. Only the
+ * feed Worker binds it, with `props: { caller: '<feed deployment name>' }`; a service binding
+ * delivers `props` to a named entrypoint, as for the STS broker. Placement does not apply to a
+ * named entrypoint, so the read and its 16 signer calls run where the feed Worker runs
+ * (design 5.2, 5.7).
  */
-export const UTS_SIGNER_KEYS_PATH = '/internal/signer-keys';
+export const UTS_SIGNER_KEYS_ENTRYPOINT = 'SignerKeys';
 
 /**
  * How long a signer's last good keys stand in for its failed reads, at the mint Worker and at the
@@ -27,7 +28,7 @@ export const UTS_SIGNER_KEYS_HOLD_MS = 24 * 60 * 60 * 1000;
 export type SignerPublicKeys = { signer: number; keys: UtsPublicJwk[] };
 
 /**
- * One signer in the route's answer:
+ * One signer in the signer-keys answer:
  * - `ok`: its keys as its signer object answered at `readAt` (epoch milliseconds), by the read
  *   that answers or, after this read's call failed, by an earlier one under 24 hours old;
  * - `misconfigured`: the object refused to load under its name or jurisdiction, a deploy error
@@ -56,7 +57,7 @@ function uniqueKids(entries: readonly SignerKeysEntry[]): boolean {
   return new Set(kids).size === kids.length;
 }
 
-/** The body of the signer-keys route: every signer exactly once, and no `kid` twice. */
+/** The signer-keys answer: every signer exactly once, and no `kid` twice. */
 export const SignerKeysAnswerSchema = z.strictObject({
   signers: z
     .array(SignerKeysEntrySchema)
@@ -70,12 +71,21 @@ export const SignerKeysAnswerSchema = z.strictObject({
 export type SignerKeysAnswer = z.infer<typeof SignerKeysAnswerSchema>;
 
 /**
- * The HTTP status the mint Worker sends with an answer: 200 when every signer has keys; otherwise
- * 500 when a signer object is misconfigured, else 503. The body is the whole answer either way, so
- * the feed Worker still takes the keys of every signer that has them.
+ * The result of one `signerKeys()` call: the whole answer, which carries each signer's keys or
+ * failure, or `refused` when the binding's `props.caller` is not the feed Worker of the mint
+ * Worker's own environment.
  */
-export function signerKeysHttpStatus(answer: SignerKeysAnswer): 200 | 500 | 503 {
-  if (answer.signers.some(entry => entry.status === 'misconfigured')) return 500;
-  if (answer.signers.some(entry => entry.status === 'unavailable')) return 503;
-  return 200;
-}
+export const SignerKeysReadSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('answered'), answer: SignerKeysAnswerSchema }),
+  z.strictObject({ status: z.literal('refused') }),
+]);
+export type SignerKeysRead = z.infer<typeof SignerKeysReadSchema>;
+
+/**
+ * The `SignerKeys` entrypoint as the feed Worker's binding exposes it. The result crosses a
+ * deploy boundary, so the caller validates it with `SignerKeysReadSchema`. workerd gives the
+ * object an RPC call returns a disposer, and the call stays open until it runs, so the caller
+ * disposes the result once it holds the validated copy (Partial: a test double has none).
+ * https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
+ */
+export type SignerKeysBinding = { signerKeys(): Promise<object & Partial<Disposable>> };

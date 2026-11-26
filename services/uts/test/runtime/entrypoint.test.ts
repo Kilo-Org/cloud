@@ -1,25 +1,41 @@
+import { UTS_SIGNER_KEYS_ENTRYPOINT } from '@kilocode/uts-contracts';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
-import UtsMintDev from '../../src/dev-index';
-import UtsMint from '../../src/index';
+import * as devEntry from '../../src/dev-index';
+import * as deployedEntry from '../../src/index';
 import { resetSignerKeysIsolate } from '../../src/signer-keys';
-import { fetchSignerKeys } from './support';
-import { env } from './test-env';
+import { readSignerKeys } from './support';
+import { config, env } from './test-env';
 
 /**
- * A deployed Worker delivers a service binding's `props` only to an entrypoint class; workerd
- * delivers them to a plain handler object too, so the binding calls below pass with either shape
- * and the class check is what holds the deployed behaviour.
+ * The feed Worker reads signer keys through a binding to the mint Worker's named entrypoint, with
+ * its deployed name as `props`; these calls go through real service bindings in workerd.
  */
-describe('mint Worker default entrypoint', () => {
-  it('is a WorkerEntrypoint class in the deployed and the development entry', () => {
-    expect(UtsMint.prototype).toBeInstanceOf(WorkerEntrypoint);
-    expect(UtsMintDev.prototype).toBeInstanceOf(WorkerEntrypoint);
+describe('SignerKeys entrypoint', () => {
+  it('is a named WorkerEntrypoint export of the deployed and the development entry', () => {
+    for (const entry of [deployedEntry, devEntry]) {
+      expect(Object.keys(entry)).toContain(UTS_SIGNER_KEYS_ENTRYPOINT);
+      expect(entry.SignerKeys.prototype).toBeInstanceOf(WorkerEntrypoint);
+    }
   });
 
-  it("receives the feed binding's props through the default entrypoint and refuses a binding without them", async () => {
+  it("receives the feed binding's props and answers every signer", async () => {
     resetSignerKeysIsolate();
-    expect((await fetchSignerKeys(env.FEED_MINT)).status).toBe(200);
-    expect((await fetchSignerKeys(env.PROPLESS_MINT)).status).toBe(404);
+    const read = await readSignerKeys(env.FEED_MINT);
+    if (read.status !== 'answered') throw new Error(`feed caller got ${read.status}`);
+    expect(read.answer.signers.every(entry => entry.status === 'ok')).toBe(true);
+  });
+
+  it('refuses a binding that names another caller or carries no props', async () => {
+    expect(await readSignerKeys(env.OTHER_MINT)).toEqual({ status: 'refused' });
+    expect(await readSignerKeys(env.PROPLESS_MINT)).toEqual({ status: 'refused' });
+  });
+
+  it("serves no signer keys from the default entrypoint, even with the feed Worker's props", async () => {
+    const response = await env.DEFAULT_MINT.fetch(
+      `${config.endpoints.issuer}/internal/signer-keys`
+    );
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'not_found' });
   });
 });

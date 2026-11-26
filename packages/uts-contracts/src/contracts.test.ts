@@ -17,10 +17,10 @@ import {
 } from './jwks';
 import { AuthorizationServerMetadataSchema } from './metadata';
 import {
-  signerKeysHttpStatus,
   SignerKeysAnswerSchema,
+  SignerKeysReadSchema,
+  UTS_SIGNER_KEYS_ENTRYPOINT,
   UTS_SIGNER_KEYS_HOLD_MS,
-  UTS_SIGNER_KEYS_PATH,
   type SignerKeysEntry,
 } from './signer-keys';
 
@@ -137,16 +137,19 @@ describe('SignerKeysAnswerSchema', () => {
     expect(SignerKeysAnswerSchema.safeParse({ signers: withoutReadTime }).success).toBe(false);
   });
 
-  it('maps an answer to its HTTP status on the internal path, and holds keys 24 hours', () => {
-    expect(UTS_SIGNER_KEYS_PATH).toBe('/internal/signer-keys');
+  it('names the signer-keys entrypoint, holds keys 24 hours, and reads an answer or a refusal', () => {
+    expect(UTS_SIGNER_KEYS_ENTRYPOINT).toBe('SignerKeys');
     expect(UTS_SIGNER_KEYS_HOLD_MS).toBe(24 * 60 * 60 * 1000);
-    expect(signerKeysHttpStatus({ signers: signers() })).toBe(200);
-    const unavailable = signers();
-    unavailable[4] = { signer: 4, status: 'unavailable' };
-    expect(signerKeysHttpStatus({ signers: unavailable })).toBe(503);
-    const misconfigured = [...unavailable];
-    misconfigured[9] = { signer: 9, status: 'misconfigured' };
-    expect(signerKeysHttpStatus({ signers: misconfigured })).toBe(500);
+    const answer = { signers: signers() };
+    expect(SignerKeysReadSchema.parse({ status: 'answered', answer })).toEqual({
+      status: 'answered',
+      answer,
+    });
+    expect(SignerKeysReadSchema.parse({ status: 'refused' })).toEqual({ status: 'refused' });
+    expect(SignerKeysReadSchema.safeParse({ status: 'answered' }).success).toBe(false);
+    expect(
+      SignerKeysReadSchema.safeParse({ status: 'answered', answer: { signers: [] } }).success
+    ).toBe(false);
   });
 
   it('rejects a missing or repeated signer, a kid of another signer, and a kid twice', () => {

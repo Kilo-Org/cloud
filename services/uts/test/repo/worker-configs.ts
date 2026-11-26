@@ -2,7 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { UTS_ENDPOINTS, type UtsEnvironment } from '@kilocode/uts-contracts';
+import {
+  UTS_ENDPOINTS,
+  UTS_SIGNER_KEYS_ENTRYPOINT,
+  type UtsEnvironment,
+} from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import { FEED_DEPLOYMENTS, MINT_DEPLOYMENTS } from '../../src/env';
 
@@ -259,10 +263,10 @@ function durableObjectProblems(path: string, block: Block): string[] {
 }
 
 /**
- * The internal signer-keys route answers one caller per environment: the feed Worker, whose
- * binding names the mint deployment of its own environment, at its default entrypoint (placement
- * covers only the default entrypoint's fetch handler), and carries its own deployed name as
- * `props.caller`. The mint Worker's test config binds itself. Nothing else binds the mint Worker.
+ * The `SignerKeys` entrypoint answers one caller per environment: the feed Worker, whose binding
+ * names the mint deployment of its own environment at that named entrypoint and carries its own
+ * deployed name as `props.caller`. The mint Worker's test config binds itself. Nothing else binds
+ * the mint Worker, at any entrypoint.
  */
 function serviceBindingProblems(path: string, block: Block): string[] {
   const problems: string[] = [];
@@ -290,9 +294,9 @@ function serviceBindingProblems(path: string, block: Block): string[] {
         `${where} binds ${binding.service}; this block must bind ${MINT_DEPLOYMENTS[environment]}`
       );
     }
-    if (binding.entrypoint !== undefined) {
+    if (binding.entrypoint !== UTS_SIGNER_KEYS_ENTRYPOINT) {
       problems.push(
-        `${where} binds entrypoint ${binding.entrypoint}; bind the default entrypoint, whose fetch handler placement covers`
+        `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; bind ${UTS_SIGNER_KEYS_ENTRYPOINT}`
       );
     }
     if (binding.environment !== undefined) {

@@ -1,9 +1,11 @@
 import { runInDurableObject } from 'cloudflare:test';
 import {
-  SignerKeysAnswerSchema,
+  SignerKeysReadSchema,
   UTS_SIGNER_COUNT,
-  UTS_SIGNER_KEYS_PATH,
   UtsJwksSchema,
+  type SignerKeysAnswer,
+  type SignerKeysBinding,
+  type SignerKeysRead,
   type UtsJwks,
 } from '@kilocode/uts-contracts';
 import { getSignerStub } from '../../src/dos/stubs';
@@ -52,18 +54,30 @@ export async function resetAllSigners(): Promise<void> {
   for (let signer = 0; signer < UTS_SIGNER_COUNT; signer += 1) await resetSigner(signer);
 }
 
-/** The internal signer-keys route, called through `binding` as a service-binding fetch. */
-export async function fetchSignerKeys(binding: Fetcher = env.FEED_MINT): Promise<Response> {
-  return await binding.fetch(`${config.endpoints.issuer}${UTS_SIGNER_KEYS_PATH}`);
+/** One `signerKeys()` call through `binding`, validated and then disposed as the feed Worker does. */
+export async function readSignerKeys(
+  binding: SignerKeysBinding = env.FEED_MINT
+): Promise<SignerKeysRead> {
+  const result = await binding.signerKeys();
+  const read = SignerKeysReadSchema.parse(result);
+  result[Symbol.dispose]?.();
+  return read;
+}
+
+/** The answer the feed caller gets; any refusal fails the test. */
+export async function feedAnswer(): Promise<SignerKeysAnswer> {
+  const read = await readSignerKeys();
+  if (read.status !== 'answered') throw new Error(`feed caller got ${read.status}`);
+  return read.answer;
 }
 
 /**
- * The key set as the feed Worker builds it: every signer's keys over the internal route. It drops
- * the route's isolate copy first, so the answer reflects the signer objects now.
+ * The key set as the feed Worker builds it: every signer's keys over the SignerKeys entrypoint.
+ * It drops the isolate copy first, so the answer reflects the signer objects now.
  */
 export async function keySet(): Promise<UtsJwks> {
   resetSignerKeysIsolate();
-  const answer = SignerKeysAnswerSchema.parse(await (await fetchSignerKeys()).json());
+  const answer = await feedAnswer();
   return UtsJwksSchema.parse({
     keys: answer.signers.flatMap(entry => {
       if (entry.status !== 'ok') throw new Error(`signer ${entry.signer} answered ${entry.status}`);

@@ -1,4 +1,3 @@
-import { createExecutionContext } from 'cloudflare:test';
 import { AuthorizationServerMetadataSchema, UTS_ENDPOINTS } from '@kilocode/uts-contracts';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import { describe, expect, it } from 'vitest';
@@ -15,9 +14,8 @@ function request(path: string, init?: RequestInit): Request {
   return new Request(`${config.endpoints.issuer}${path}`, init);
 }
 
-/** An internet request: its execution context carries no binding props. */
-const fetchMint = (input: Request, target: Env = env) =>
-  handleRequest(input, target, createExecutionContext());
+/** An internet request to the default entrypoint's fetch handler. */
+const fetchMint = (input: Request, target: Env = env) => handleRequest(input, target);
 
 /** The same Worker as configured for production; only plain vars differ. */
 const productionEnv = { ...env, UTS_ENVIRONMENT: 'production', DO_JURISDICTION: 'eu' };
@@ -65,8 +63,7 @@ describe('development signing route', () => {
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
     });
-  const sign = (body: unknown, target: Env = env) =>
-    handleDevRequest(signRequest(body), target, createExecutionContext());
+  const sign = (body: unknown, target: Env = env) => handleDevRequest(signRequest(body), target);
 
   it('signs with the signer the grant hash picks; the token verifies against the key set', async () => {
     const response = await sign({ grantId: 'grant-e2e', claims: claims({ sid: 'grant-e2e' }) });
@@ -100,7 +97,7 @@ describe('development signing route', () => {
   });
 
   it('serves the deployed routes through the development entry', async () => {
-    const response = await handleDevRequest(request(METADATA_PATH), env, createExecutionContext());
+    const response = await handleDevRequest(request(METADATA_PATH), env);
     expect(response.status).toBe(200);
   });
 });

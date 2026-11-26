@@ -1,19 +1,8 @@
-import { createExecutionContext } from 'cloudflare:test';
-import {
-  SignerKeysAnswerSchema,
-  signerOfTokenKid,
-  UTS_ENDPOINTS,
-  UTS_SIGNER_COUNT,
-  UTS_SIGNER_KEYS_PATH,
-} from '@kilocode/uts-contracts';
+import { signerOfTokenKid, UTS_ENDPOINTS, UTS_SIGNER_COUNT } from '@kilocode/uts-contracts';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleRequest } from '../../src/http';
-import {
-  resetSignerKeysIsolate,
-  SIGNER_KEYS_COPY_MS,
-  signerKeysResponse,
-} from '../../src/signer-keys';
-import { fetchSignerKeys, keySet, resetAllSigners, resetSigner } from './support';
+import { resetSignerKeysIsolate, SIGNER_KEYS_COPY_MS, signerKeysRead } from '../../src/signer-keys';
+import { feedAnswer, keySet, readSignerKeys, resetAllSigners, resetSigner } from './support';
 import { config, env } from './test-env';
 
 beforeAll(async () => {
@@ -28,24 +17,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const signerKeysUrl = `${config.endpoints.issuer}${UTS_SIGNER_KEYS_PATH}`;
-
 async function answerAt(at: number) {
   const clock = vi.spyOn(Date, 'now').mockReturnValue(at);
   try {
-    return SignerKeysAnswerSchema.parse(await (await fetchSignerKeys()).json());
+    return await feedAnswer();
   } finally {
     clock.mockRestore();
   }
 }
 
-describe('internal signer-keys route', () => {
+describe('SignerKeys entrypoint reads', () => {
   it('answers the feed caller with every signer exactly once, each read now', async () => {
     const before = Date.now();
-    const response = await fetchSignerKeys();
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    const answer = SignerKeysAnswerSchema.parse(await response.json());
+    const answer = await feedAnswer();
     expect(answer.signers.map(entry => entry.signer)).toEqual(
       Array.from({ length: UTS_SIGNER_COUNT }, (_, index) => index)
     );
@@ -77,39 +61,32 @@ describe('internal signer-keys route', () => {
     expect([...perSigner.values()]).toEqual(Array.from({ length: UTS_SIGNER_COUNT }, () => 2));
   });
 
-  it('answers another caller, a binding without props and an internet request as an unknown path', async () => {
-    for (const response of [
-      await fetchSignerKeys(env.OTHER_MINT),
-      await fetchSignerKeys(env.PROPLESS_MINT),
-      await handleRequest(new Request(signerKeysUrl), env, createExecutionContext()),
-    ]) {
-      expect(response.status).toBe(404);
-      expect(await response.json()).toEqual({ error: 'not_found' });
-    }
+  it('refuses another caller and a binding without props, and the internet gets 404 for the old route path', async () => {
+    expect(await readSignerKeys(env.OTHER_MINT)).toEqual({ status: 'refused' });
+    expect(await readSignerKeys(env.PROPLESS_MINT)).toEqual({ status: 'refused' });
+    const internet = await handleRequest(
+      new Request(`${config.endpoints.issuer}/internal/signer-keys`),
+      env
+    );
+    expect(internet.status).toBe(404);
+    expect(await internet.json()).toEqual({ error: 'not_found' });
   });
 
-  it('answers 405 to the feed caller for another method', async () => {
-    const response = await env.FEED_MINT.fetch(signerKeysUrl, { method: 'POST' });
-    expect(response.status).toBe(405);
-    expect(response.headers.get('Allow')).toBe('GET');
-  });
-
-  it('answers 500 with each signer misconfigured when the objects refuse to load under the names it reads', async () => {
+  it('answers each signer misconfigured when the objects refuse to load under the names it reads', async () => {
     // Staging names in a development Worker: every object refuses, as after a wrong deploy.
     const staging = {
       ...config,
       environment: 'staging' as const,
       endpoints: UTS_ENDPOINTS.staging,
     };
-    const response = await signerKeysResponse(new Request(signerKeysUrl), env, staging, {
-      caller: 'uts-feed-staging',
-    });
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({
-      signers: Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({
-        signer,
-        status: 'misconfigured',
-      })),
+    expect(await signerKeysRead(env, staging, { caller: 'uts-feed-staging' })).toEqual({
+      status: 'answered',
+      answer: {
+        signers: Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({
+          signer,
+          status: 'misconfigured',
+        })),
+      },
     });
   });
 });

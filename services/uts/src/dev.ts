@@ -21,14 +21,10 @@ const DevSignRequestSchema = z.strictObject({
   claims: z.unknown(),
 });
 
-export async function handleDevRequest(
-  request: Request,
-  env: Env,
-  ctx: ExecutionContext
-): Promise<Response> {
+export async function handleDevRequest(request: Request, env: Env): Promise<Response> {
   const config = readConfig(env);
   if (new URL(request.url).pathname !== DEV_SIGN_PATH || config.environment !== 'development') {
-    return await handleRequest(request, env, ctx);
+    return await handleRequest(request, env);
   }
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });

@@ -1,10 +1,9 @@
 import {
-  SignerKeysAnswerSchema,
-  UTS_ENDPOINTS,
+  SignerKeysReadSchema,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
-  UTS_SIGNER_KEYS_PATH,
   type SignerKeysAnswer,
+  type SignerKeysBinding,
   type UtsEnvironment,
   type UtsJwks,
   type UtsPublicJwk,
@@ -26,8 +25,8 @@ export const KEY_SET_MAX_SERVED_AGE_MS = 17 * 1000;
 
 /**
  * An isolate starts a read at most once per this long, whatever the outcome, so it costs the mint
- * Worker at most one read per 10 seconds. A read gives up after this long (its fetch is aborted),
- * and a request waits at most this long for reads other requests started.
+ * Worker at most one read per 10 seconds. A read gives up after this long (a later result is only
+ * disposed), and a request waits at most this long for reads other requests started.
  */
 export const KEY_SET_READ_GUARD_MS = 10 * 1000;
 
@@ -88,61 +87,55 @@ type MintRead =
   | { status: 'answered'; answer: SignerKeysAnswer; receivedAt: number }
   | KeySetFailure;
 
-/** The JSON value of `text`, or undefined when it is not JSON. */
-function parseJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-}
+const GUARD_EXPIRED = Symbol('guard expired');
 
 /**
- * Reads every signer's keys from the mint Worker's internal route, through the service binding to
- * its default entrypoint. The fetch, body included, is aborted after the read guard, so a hung read
- * is a failed read. The revocation-feed slice adds its two feed keys to the same `keys` array under
- * their own prefix.
+ * Reads every signer's keys from the mint Worker's `SignerKeys` entrypoint over the service
+ * binding. A call that has not answered after the read guard is a failed read; its result, if it
+ * still lands while this context lives, is disposed. The revocation-feed slice adds its two feed
+ * keys to the same `keys` array under their own prefix.
  */
-async function readFromMint(mint: Fetcher, environment: UtsEnvironment): Promise<MintRead> {
-  let response: Response;
-  let text: string;
+async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
+  // Created in an async callback, so a binding that throws as it is called becomes a rejection
+  // that the catch below answers.
+  const call = Promise.try(async () => await mint.signerKeys());
+  const guard = Promise.withResolvers<typeof GUARD_EXPIRED>();
+  const timer = setTimeout(() => guard.resolve(GUARD_EXPIRED), KEY_SET_READ_GUARD_MS);
+  let result: Awaited<typeof call> | typeof GUARD_EXPIRED;
   try {
-    response = await mint.fetch(`${UTS_ENDPOINTS[environment].issuer}${UTS_SIGNER_KEYS_PATH}`, {
-      signal: AbortSignal.timeout(KEY_SET_READ_GUARD_MS),
-    });
-    text = await response.text();
+    result = await Promise.race([call, guard.promise]);
   } catch (error) {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.failed', error: String(error) }));
     return { status: 'unavailable' };
+  } finally {
+    clearTimeout(timer);
   }
-  // One line per read, no key material: where the mint Worker ran the route (the `cf-placement`
-  // response header, `remote-<colo>` or `local-<colo>`, absent without placement).
-  console.log(
-    JSON.stringify({
-      event: 'uts_feed.signer_keys.read',
-      status: response.status,
-      placement: response.headers.get('cf-placement'),
-    })
-  );
-  if (response.status === 404) {
+  if (result === GUARD_EXPIRED) {
+    console.error(JSON.stringify({ event: 'uts_feed.signer_keys.timed_out' }));
+    void call.then(
+      late => late[Symbol.dispose]?.(),
+      () => undefined
+    );
+    return { status: 'unavailable' };
+  }
+  // The parse copies the plain data out and never throws; the disposer is a symbol key, which it
+  // leaves behind.
+  const parsed = SignerKeysReadSchema.safeParse(result);
+  result[Symbol.dispose]?.();
+  if (!parsed.success) {
+    console.error(JSON.stringify({ event: 'uts_feed.signer_keys.invalid_answer' }));
+    return { status: 'misconfigured', reason: 'invalid_answer' };
+  }
+  if (parsed.data.status === 'refused') {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.refused' }));
     return { status: 'misconfigured', reason: 'refused' };
   }
-  const parsed = SignerKeysAnswerSchema.safeParse(parseJson(text));
-  if (!parsed.success) {
-    console.error(
-      JSON.stringify({ event: 'uts_feed.signer_keys.invalid_answer', status: response.status })
-    );
-    // A platform error page in place of the route's JSON is a failed call, not a wrong answer.
-    return response.status >= 500
-      ? { status: 'unavailable' }
-      : { status: 'misconfigured', reason: 'invalid_answer' };
-  }
-  const failed = parsed.data.signers.filter(entry => entry.status !== 'ok');
+  const { answer } = parsed.data;
+  const failed = answer.signers.filter(entry => entry.status !== 'ok');
   if (failed.length > 0) {
     console.error(JSON.stringify({ event: 'uts_feed.signer_keys.signers_failed', failed }));
   }
-  return { status: 'answered', answer: parsed.data, receivedAt: Date.now() };
+  return { status: 'answered', answer, receivedAt: Date.now() };
 }
 
 /**
@@ -195,8 +188,12 @@ function merge(
  * Runs one read and records its outcome. Keys newer than those held replace them signer by
  * signer, so a read that finishes late changes nothing a newer read brought.
  */
-async function runRead(state: FeedIsolate, mint: Fetcher, startedAt: number): Promise<void> {
-  const result = await readFromMint(mint, state.environment);
+async function runRead(
+  state: FeedIsolate,
+  mint: SignerKeysBinding,
+  startedAt: number
+): Promise<void> {
+  const result = await readFromMint(mint);
   let outcome: ReadState;
   if (result.status === 'answered') {
     state.signers = merge(state.signers, result.answer, result.receivedAt);
@@ -268,7 +265,7 @@ function okRead(set: ServedSet, now: number): KeySetRead {
  * the held keys serving, each signer's for up to 24 hours after its last good read.
  */
 export async function serveKeySet(
-  mint: Fetcher,
+  mint: SignerKeysBinding,
   environment: UtsEnvironment,
   ctx: ExecutionContext
 ): Promise<KeySetRead> {

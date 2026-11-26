@@ -659,7 +659,8 @@ GitHub token lives minutes, the lease up to an hour.
 | `unavailable` | 503, `Retry-After` | Infisical refused or failed, the lease object failed or did not answer in 25 seconds, or the environment has no `MANAGER_PROJECT_SLUG` |
 
 Revoke answers `revoked` (200) for the caller's own lease once STS has revoked it (no Infisical
-call then), and `not_found` (404) for any lease id STS did not hand to this workload, another
+call then), `unavailable` without an Infisical call once STS stopped its revocation as
+`unconfirmed`, and `not_found` (404) for any lease id STS did not hand to this workload, another
 workload's included. An expired lease still goes to Infisical, which answers 404 once its own expiry
 revocation succeeded: expiry stops new logins, not open sessions. A GitHub caller's lease belongs to
 its run: a job of another run of the same workflow gets `not_found` too, and a re-run attempt of the
@@ -694,8 +695,12 @@ no answer body is logged or kept. The first failure writes `lease.revoked` with 
 until Infisical confirms it (a second `lease.revoked` row), also after the lease expired, since
 `VALID UNTIL` refuses new logins but ends no open session. A failure after the expiry logs an
 error that says the sessions may still be open. A day after the expiry the object stops: it writes
-`lease.revoked` with result `unconfirmed` and logs an error naming the lease id, for a person to end
-the role's sessions by hand (Risks below). The alarm takes at most 5 leases, least recently tried
+`lease.revoked` with result `unconfirmed`, logs an error naming the lease id, for a person to end
+the role's sessions by hand (Risks below), and ends a delivered lease's row in state `unconfirmed`,
+so a later revoke does not make it owed again; if that row cannot be written, it tries again 30
+seconds later. It stops the same way on a 404 after a recorded `revoke_failed`: until trial check 3
+shows that Infisical keeps a lease whose revocation failed until a revocation succeeds, a missing
+lease may be one deleted without its role being revoked. The alarm takes at most 5 leases, least recently tried
 first, so leases that keep failing cannot hold back a newer one; it retries a lease no sooner than
 30 seconds after its last attempt, the caller's included, or after Infisical's `Retry-After` on a
 429 when that is longer. A caller's revoke then answers `unavailable`, and the caller may retry
@@ -708,7 +713,8 @@ identity, channel, grant, lease id, `ttlSeconds`, `requestedTtlSeconds` when giv
 `expiresAt`, and a GitHub caller's `jobWorkflowRef`, `runId`, `runAttempt`) and
 `ai.kilo.sts.lease.revoked` (`cause`: `caller`, `late`, `expiry_mismatch` or `audit_failed`;
 `result`: `revoked`, `gone` when Infisical no longer had it, `revoke_failed` when Infisical did not
-confirm it, or `unconfirmed` when the object stopped a day after the expiry; the last two with
+confirm it, or `unconfirmed` when the object stopped a day after the expiry or on a 404 after a
+recorded failure; the last two with
 outcome `failure`). Refusals of an identified caller become
 `ai.kilo.sts.lease.denied` through the denial object, merged per minute: the answer's reason, or
 for a revoke the caller heard as `not_found`, `not_owner` (another workload's lease), `other_run`
@@ -729,13 +735,16 @@ leases); `VALID UNTIL` and the dropped role refuse a new login on both nodes. Th
 `idle_session_timeout` (15 min) protect an honest consumer only: a session can change any of them
 with `SET`, and a database-level setting is a default too. Only a pooler or a kill job outside the
 session enforces a time limit, and on the replica STS has neither. `check.sh` shows on one node
-that `VALID UNTIL` refuses new logins and leaves an open session alone until a revocation.
+that `VALID UNTIL` refuses new logins and leaves an open session alone until a revocation. So
+`replica-read` is staging-only until a replica-side session sweeper ships (a phase 2 follow-up PR
+that runs the session-ending function on each replica): no production policy grants it before.
 
 **Risks.**
 
 - A `ci-migration` lease is equivalent to holding the `postgres` owner credential for up to an
-  hour, not a bounded capability (design decision Q64, which needs Igor's security acceptance
-  before any production use). Within that hour it can create permanent `LOGIN` roles, grant them
+  hour, not a bounded capability (design decision Q64, which Igor accepted on 2026-11-26 on these
+  terms: it acts as `postgres` for up to an hour, and its effects outlive the revocation). Within
+  that hour it can create permanent `LOGIN` roles, grant them
   any right `postgres` holds, plant `SECURITY DEFINER` functions, triggers or event triggers,
   change any object `postgres` owns and read every row. Everything it leaves behind outlives the
   revocation and the expiry, which end only its own logins and sessions. What stands between a
@@ -759,8 +768,9 @@ that `VALID UNTIL` refuses new logins and leaves an open session alone until a r
   strong as `postgres`. Each login lives only in its dynamic secret's configuration; the
   break-glass owner enters it once, and Terraform ignores the field (design 4.2).
 - Neither login can end another role's session: they hold no `pg_signal_backend`. The revocation
-  calls `kilo_lease.end_sessions`, a `SECURITY DEFINER` function owned by `postgres` (which
-  Supabase makes a member of `pg_signal_backend`) with a fixed `search_path`. It ends only the
+  calls `kilo_lease.end_sessions`, a `SECURITY DEFINER` function with a fixed `search_path`, owned
+  by `postgres` (which Supabase makes a member of `pg_signal_backend`) or, after the `ci-migration`
+  setup, by `kilo_lease_owner` (a member of it). It ends only the
   sessions of the caller's own template's lease roles, as `kilo_lease.lease_role` records them by
   OID at creation: the one being revoked, blocked or expired ones, and dropped ones. A session of a
   dropped role that was never a lease is left alone (PostgreSQL keeps an ordinary role's sessions
@@ -851,9 +861,19 @@ psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
 Generate the password into the break-glass owner's session only (or into a variable) and enter it
 into the dynamic secret below. `setup.sql` ends with `report.sql`, one row per finding and a
 `summary` row; every count in the summary must be 0 (Risks lists the rows that remain by design).
-Run `report.sql` again after a migration adds a function or an extension. Only after Igor has
-accepted design decision Q64, and only as a superuser, run `setup-ci-migration.sql` with
-`-v migration_admin_password=...`; on Supabase that needs Supabase's own staff.
+Run `report.sql` again after a migration adds a function or an extension. Igor accepted design
+decision Q64 on 2026-11-26; `ci-migration` still needs `setup-ci-migration.sql`, run only as a
+superuser with `-v migration_admin_password=...`, which on Supabase needs Supabase's own staff.
+
+What each setup guarantees. After `setup.sql` alone (`replica-read` only), `postgres` owns the
+`kilo_lease` schema, its table and its functions and administers the replica login, so whoever
+holds `postgres` could change them; no lease acts as `postgres` then, and `postgres` already holds
+every right a `replica-read` lease has. `setup-ci-migration.sql` then, before any lease can act as
+`postgres`, removes `postgres`'s ADMIN on the replica login, moves the schema, its table and its
+functions to `kilo_lease_owner` (no login, created by the superuser, a member of
+`pg_signal_backend`), and turns off activity tracking for both admin logins, so a `ci-migration`
+lease can neither reset an admin password, replace `kilo_lease.create_lease` to record later
+passwords, nor read a creation statement in `pg_stat_activity` (`check.sh`).
 
 **Infisical setup, per environment (staging first).**
 
@@ -885,11 +905,16 @@ accepted design decision Q64, and only as a superuser, run `setup-ci-migration.s
    two parts ran as two transactions (the role has no login after the first commit). Check that
    neither admin login's statements reach the Postgres log (`select rolname, rolconfig from
    pg_roles where rolname like 'kilo_lease_%admin'` shows the settings) and that no pgaudit
-   object audit covers schema `kilo_lease`.
+   object audit covers schema `kilo_lease`. Force a revocation failure (for example, revoke
+   `EXECUTE` on `kilo_lease.revoke_lease` from the admin login for the test) and check that every
+   later revoke answers 200 with the kept row (`status` `Failed to delete`) and never a 404 until a
+   revocation succeeds; until this is confirmed, STS treats a 404 after a recorded failure as
+   `unconfirmed`.
 7. STS: set `MANAGER_PROJECT_SLUG` (Infisical → project settings) and `LEASE_CI_MIGRATION_TARGET`
    in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants. In
-   production, leave `LEASE_CI_MIGRATION_TARGET` empty and grant no `ci-migration` until Igor has
-   accepted design decision Q64.
+   production, grant no `replica-read` until the replica-side session sweeper ships, and leave
+   `LEASE_CI_MIGRATION_TARGET` empty and grant no `ci-migration` until `setup-ci-migration.sql` ran
+   there.
 
 **Cost.** One lease is one `LeaseDO` call and one Infisical create, plus a login and one `SignerDO`
 call when the object's 10-minute token has lapsed (leases are sparse, so assume it has), and one
@@ -1174,6 +1199,7 @@ leaves none of a dropped role (`replica-read` and `ci-migration`), and that a on
 revocation statement is refused; that a role revocation cannot drop (an object in `template1`, a
 right `postgres` granted) stays without login and is listed; that a `ci-migration` session runs
 as `postgres`, holds none of its rights after `SET ROLE NONE`, and its DDL (`CREATE EXTENSION`
-included) leaves nothing owned by the lease role; that `DROP ROLE` alone would leave a session
-open and unnamed, which the next revocation ends for a lease role; and that no revocation ends the
-session of a dropped role that was never a lease.
+included) leaves nothing owned by the lease role, and that neither it nor `postgres` can replace,
+add or take over a `kilo_lease` function after `setup-ci-migration.sql`; that `DROP ROLE` alone
+would leave a session open and unnamed, which the next revocation ends for a lease role; and that
+no revocation ends the session of a dropped role that was never a lease.

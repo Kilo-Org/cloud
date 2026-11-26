@@ -5,10 +5,9 @@ import { TestDatabase } from './harness';
 /**
  * The hot-path reads (design section 3: mint, refresh, PAT lookup, web session check) each reach
  * a credential through one unique-index probe on its hash, plus primary-key probes for the rows
- * that hang off it. The PAT and bot key cases plan the stored functions' own bodies; the grant
- * cases plan the reads that the one-statement mint and refresh functions are built from. The
- * tables hold a few thousand analyzed rows, so the planner sees real selectivity rather than
- * empty tables.
+ * that hang off it. Each case plans a stored function's own body: the PAT and bot key lookups, and
+ * the grant reads that the one-statement mint and refresh functions call. The tables hold a few
+ * thousand analyzed rows, so the planner sees real selectivity rather than empty tables.
  */
 
 let db: TestDatabase;
@@ -59,9 +58,12 @@ const SEED = `
   SELECT account_id, 'https://client.example.com/metadata', '{mcp:tools.read}', id
   FROM uts.gate_passes WHERE action = 'third_party_approve';
 
+  -- Families bound to one of the account's organizations, as the refresh grants are.
   INSERT INTO uts.third_party_grant_families
-    (account_id, client_id, consent_id, scopes, auth_time, amr, expires_at)
-  SELECT account_id, client_id, id, scopes, now(), '{oauth}', now() + interval '90 days'
+    (account_id, client_id, consent_id, scopes, org_id, auth_time, amr, expires_at)
+  SELECT account_id, client_id, id, scopes,
+         md5('org' || (substr(account_id, 12)::integer % 200))::uuid, now(), '{oauth}',
+         now() + interval '90 days'
   FROM uts.third_party_consents;
 
   INSERT INTO uts.third_party_refresh_tokens (family_id, token_hash, idle_expires_at)
@@ -82,7 +84,8 @@ const SEED = `
 
   ANALYZE uts.accounts, uts.org_sso_policies, uts.org_memberships, uts.device_sessions,
     uts.refresh_grants, uts.browser_sessions, uts.third_party_grant_families,
-    uts.third_party_refresh_tokens, uts.personal_access_tokens, uts.org_bot_keys;
+    uts.third_party_refresh_tokens, uts.third_party_consents, uts.personal_access_tokens,
+    uts.org_bot_keys;
 `;
 
 beforeAll(async () => {
@@ -115,21 +118,6 @@ async function functionBody(signature: string): Promise<string> {
   return result.rows[0].prosrc;
 }
 
-const REFRESH_GRANT_READ = `
-  SELECT grant_row.id, grant_row.allowed_scopes, membership.role, policy.enforcement
-  FROM uts.refresh_grants AS grant_row
-  JOIN uts.accounts AS account ON account.id = grant_row.account_id
-  LEFT JOIN uts.org_memberships AS membership
-    ON membership.org_id = grant_row.org_id AND membership.account_id = grant_row.account_id
-  LEFT JOIN uts.org_sso_policies AS policy ON policy.org_id = grant_row.org_id
-  WHERE grant_row.token_hash = $1 AND grant_row.status = 'active' AND account.status = 'active'`;
-
-const THIRD_PARTY_REFRESH_READ = `
-  SELECT token.id, family.scopes
-  FROM uts.third_party_refresh_tokens AS token
-  JOIN uts.third_party_grant_families AS family ON family.id = token.family_id
-  WHERE token.token_hash = $1 AND family.status = 'active'`;
-
 const BROWSER_SESSION_READ = `
   SELECT id, account_id, status, idle_expires_at, expires_at
   FROM uts.browser_sessions
@@ -148,9 +136,10 @@ const CASES: [string, () => Promise<string>, Record<string, string>][] = [
   ],
   [
     'a mint or first-party refresh',
-    async () => REFRESH_GRANT_READ,
+    () => functionBody('uts.read_refresh_grant(bytea)'),
     {
       refresh_grants: 'refresh_grants_token_hash_key',
+      device_sessions: 'device_sessions_pkey',
       accounts: 'accounts_pkey',
       org_memberships: 'org_memberships_pkey',
       org_sso_policies: 'org_sso_policies_pkey',
@@ -158,10 +147,14 @@ const CASES: [string, () => Promise<string>, Record<string, string>][] = [
   ],
   [
     'a third-party refresh',
-    async () => THIRD_PARTY_REFRESH_READ,
+    () => functionBody('uts.read_third_party_refresh_token(bytea)'),
     {
       third_party_refresh_tokens: 'third_party_refresh_tokens_token_hash_key',
       third_party_grant_families: 'third_party_grant_families_pkey',
+      third_party_consents: 'third_party_consents_pkey',
+      accounts: 'accounts_pkey',
+      org_memberships: 'org_memberships_pkey',
+      org_sso_policies: 'org_sso_policies_pkey',
     },
   ],
   [

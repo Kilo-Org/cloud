@@ -14,6 +14,16 @@ import {
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 
+/** Tables the app login writes only through the OAuth grant functions (migration 0004). */
+const FUNCTION_WRITTEN_TABLES = [
+  'authorization_codes',
+  'refresh_grants',
+  'device_sessions',
+  'third_party_grant_families',
+  'third_party_refresh_tokens',
+  'revocations',
+];
+
 let db: TestDatabase;
 let todayPartition: string;
 
@@ -158,6 +168,37 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     expect(await sqlStateOf(() => app.query(`SELECT * FROM uts.${todayPartition}`))).toBe(
       INSUFFICIENT_PRIVILEGE
     );
+  });
+
+  it.each(FUNCTION_WRITTEN_TABLES)(
+    'cannot insert, update or delete uts.%s directly, only read it',
+    async table => {
+      const app = await db.connect(login);
+      await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
+      const column = table === 'revocations' ? 'kind' : 'status';
+      for (const statement of [
+        `INSERT INTO uts.${table} DEFAULT VALUES`,
+        `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
+        `DELETE FROM uts.${table} WHERE false`,
+      ]) {
+        expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+      }
+    }
+  );
+
+  it.each([
+    [
+      'revoke a grant without its audit row',
+      `SELECT uts.end_grant('first_party', gen_random_uuid(), 'sign_out')`,
+    ],
+    [
+      'write an audit row through the OAuth writer',
+      `SELECT uts.write_audit_event('development', 'ai.kilo.uts.test', 6003, 1, 'success', NULL, 'a', '{}')`,
+    ],
+    ['read a grant through the hot-path read', `SELECT * FROM uts.read_refresh_grant('\\x00')`],
+  ])('cannot %s', async (_name, statement) => {
+    const app = await db.connect(login);
+    expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
   });
 
   it('changes its own password, which the rotation job needs', async () => {
@@ -331,11 +372,10 @@ describe('table privileges', () => {
     );
     const expected = [
       ...credentialTables.flatMap(table =>
-        ['DELETE', 'INSERT', 'SELECT', 'UPDATE'].map(privilege => ({
-          grantee: 'uts_app',
-          relation: `uts.${table}`,
-          privilege,
-        }))
+        (FUNCTION_WRITTEN_TABLES.includes(table)
+          ? ['SELECT']
+          : ['DELETE', 'INSERT', 'SELECT', 'UPDATE']
+        ).map(privilege => ({ grantee: 'uts_app', relation: `uts.${table}`, privilege }))
       ),
       { grantee: 'uts_app', relation: 'uts.audit_events', privilege: 'SELECT' },
       ...['account_id', 'event', 'event_id', 'event_type'].map(column => ({
@@ -375,12 +415,18 @@ describe('functions', () => {
        ORDER BY 1, 2`
     );
     expect(result.rows).toEqual([
+      { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
       { routine: 'is_scope_set', grantee: 'uts_app' },
+      { routine: 'issue_authorization_code', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
+      { routine: 'refresh_first_party', grantee: 'uts_app' },
+      { routine: 'refresh_third_party', grantee: 'uts_app' },
+      { routine: 'revoke_refresh_token', grantee: 'uts_app' },
     ]);
   });
 });

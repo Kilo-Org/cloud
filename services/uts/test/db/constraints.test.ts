@@ -17,18 +17,21 @@ const GENERATED_ALWAYS = '428C9';
 const NOT_NULL_VIOLATION = '23502';
 
 let db: TestDatabase;
-let app: pg.Client;
+let writer: pg.Client;
 let accountId: string;
 
+// The constraints hold for every writer, so this file writes as the owner: the app login writes
+// grants, codes, device sessions and revocations only through the OAuth functions
+// (`oauth-grants.test.ts`), and `privileges.test.ts` covers who may write what.
 beforeAll(async () => {
   db = await TestDatabase.create();
-  app = await db.connect('uts_app_a');
-  accountId = await insertAccount(app);
+  writer = await db.connectAsOwner();
+  accountId = await insertAccount(writer);
 });
 afterAll(() => db.drop());
 
 function rejects(statement: string, values: unknown[] = []) {
-  return sqlStateOf(() => app.query(statement, values));
+  return sqlStateOf(() => writer.query(statement, values));
 }
 
 describe('domains', () => {
@@ -48,7 +51,7 @@ describe('domains', () => {
     ['malformed', '{Gateway:chat}'],
     ['empty', '{}'],
   ])('reject a scope set that is %s', async (_name, scopes) => {
-    const deviceSessionId = await insertDeviceSession(app, accountId);
+    const deviceSessionId = await insertDeviceSession(writer, accountId);
     expect(
       await rejects(
         `INSERT INTO uts.refresh_grants
@@ -72,8 +75,8 @@ describe('domains', () => {
 
 describe('first-party refresh grants', () => {
   async function insertGrant(clientClass: 'desktop' | 'mobile', idleDays: number, maxDays: number) {
-    const deviceSessionId = await insertDeviceSession(app, accountId, clientClass);
-    return app.query(
+    const deviceSessionId = await insertDeviceSession(writer, accountId, clientClass);
+    return writer.query(
       `INSERT INTO uts.refresh_grants
          (account_id, device_session_id, client_id, client_class, token_hash, dpop_jkt,
           allowed_scopes, idle_expires_at, expires_at)
@@ -101,7 +104,7 @@ describe('first-party refresh grants', () => {
   );
 
   it('reject a revoked grant without a revocation time', async () => {
-    const deviceSessionId = await insertDeviceSession(app, accountId);
+    const deviceSessionId = await insertDeviceSession(writer, accountId);
     expect(
       await rejects(
         `INSERT INTO uts.refresh_grants
@@ -115,7 +118,7 @@ describe('first-party refresh grants', () => {
   });
 
   it('reject an active grant that carries a revocation time', async () => {
-    const deviceSessionId = await insertDeviceSession(app, accountId);
+    const deviceSessionId = await insertDeviceSession(writer, accountId);
     expect(
       await rejects(
         `INSERT INTO uts.refresh_grants
@@ -131,13 +134,13 @@ describe('first-party refresh grants', () => {
   it('reject a second grant with the same token hash', async () => {
     const tokenHash = randomHash();
     const insert = async () =>
-      app.query(
+      writer.query(
         `INSERT INTO uts.refresh_grants
            (account_id, device_session_id, client_id, client_class, token_hash, dpop_jkt,
             allowed_scopes, idle_expires_at, expires_at)
          VALUES ($1, $2, 'kilo-cli', 'desktop', $3, $4, '{gateway:models.read}',
                  now() + interval '1 day', now() + interval '1 day')`,
-        [accountId, await insertDeviceSession(app, accountId), tokenHash, randomHash()]
+        [accountId, await insertDeviceSession(writer, accountId), tokenHash, randomHash()]
       );
     await insert();
     expect(await sqlStateOf(insert)).toBe(UNIQUE_VIOLATION);
@@ -172,18 +175,18 @@ describe('browser sessions', () => {
 describe('third-party refresh tokens', () => {
   async function insertFamily(): Promise<string> {
     const clientId = `https://client.example.com/${crypto.randomUUID()}`;
-    await app.query(
+    await writer.query(
       `INSERT INTO uts.third_party_clients
          (client_id, client_name, redirect_uris, document, fetched_at, cache_expires_at)
        VALUES ($1, 'Example', '{https://client.example.com/callback}', '{}', now(), now() + interval '1 hour')`,
       [clientId]
     );
-    const consent = await app.query<{ id: string }>(
+    const consent = await writer.query<{ id: string }>(
       `INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
        VALUES ($1, $2, '{mcp:tools.read}', $3) RETURNING id`,
-      [accountId, clientId, await insertGatePass(app, accountId, 'third_party_approve')]
+      [accountId, clientId, await insertGatePass(writer, accountId, 'third_party_approve')]
     );
-    const family = await app.query<{ id: string }>(
+    const family = await writer.query<{ id: string }>(
       `INSERT INTO uts.third_party_grant_families
          (account_id, client_id, consent_id, scopes, auth_time, amr, expires_at)
        VALUES ($1, $2, $3, '{mcp:tools.read}', now(), '{oauth}', now() + interval '90 days')
@@ -194,7 +197,7 @@ describe('third-party refresh tokens', () => {
   }
 
   function insertToken(familyId: string, fields = '', values = '') {
-    return app.query(
+    return writer.query(
       `INSERT INTO uts.third_party_refresh_tokens (family_id, token_hash, idle_expires_at${fields})
        VALUES ($1, $2, now() + interval '30 days'${values})`,
       [familyId, randomHash()]
@@ -257,7 +260,7 @@ describe('authorization codes', () => {
     clientKind = 'first_party',
     jkt: Buffer | null = randomHash()
   ) {
-    return app.query(
+    return writer.query(
       `INSERT INTO uts.authorization_codes
          (code_hash, client_id, client_kind, account_id, redirect_uri, scopes, code_challenge,
           dpop_jkt, auth_time, amr, expires_at)
@@ -283,14 +286,57 @@ describe('authorization codes', () => {
     expect(await sqlStateOf(() => insertCode(challenge, '60 seconds', 'first_party', null))).toBe(
       CHECK_VIOLATION
     );
-    await insertCode(challenge, '60 seconds', 'third_party', null);
+  });
+
+  it('tie a consent to every third-party code and only to those', async () => {
+    const clientId = `https://client.example.com/${crypto.randomUUID()}`;
+    await writer.query(
+      `INSERT INTO uts.third_party_clients
+         (client_id, client_name, redirect_uris, document, fetched_at, cache_expires_at)
+       VALUES ($1, 'Example', '{https://client.example.com/callback}', '{}', now(), now() + interval '1 hour')`,
+      [clientId]
+    );
+    const consent = await writer.query<{ id: string }>(
+      `INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
+       VALUES ($1, $2, '{gateway:models.read}', $3) RETURNING id`,
+      [accountId, clientId, await insertGatePass(writer, accountId, 'third_party_approve')]
+    );
+    const insertWithConsent = (clientKind: string, consentId: string | null) =>
+      writer.query(
+        `INSERT INTO uts.authorization_codes
+           (code_hash, client_id, client_kind, account_id, redirect_uri, scopes, code_challenge,
+            auth_time, amr, expires_at, consent_id)
+         VALUES ($1, $2, $3, $4, 'https://client.example.com/callback', '{gateway:models.read}',
+                 $5, now(), '{oauth}', now() + interval '60 seconds', $6)`,
+        [randomHash(), clientId, clientKind, accountId, challenge, consentId]
+      );
+    await insertWithConsent('third_party', consent.rows[0].id);
+    expect(await sqlStateOf(() => insertWithConsent('third_party', null))).toBe(CHECK_VIOLATION);
+    expect(await sqlStateOf(() => insertCode(challenge, '60 seconds', 'third_party', null))).toBe(
+      CHECK_VIOLATION
+    );
+  });
+
+  it('name the grant of a consumed code and only of a consumed code', async () => {
+    const consume = (grantId: string | null) =>
+      writer.query(
+        `INSERT INTO uts.authorization_codes
+           (code_hash, client_id, client_kind, account_id, redirect_uri, scopes, code_challenge,
+            dpop_jkt, auth_time, amr, expires_at, status, consumed_at, grant_id)
+         VALUES ($1, 'kilo-cli', 'first_party', $2, 'http://127.0.0.1:4100/callback',
+                 '{gateway:models.read}', $3, $4, now(), '{passkey}', now() + interval '60 seconds',
+                 'consumed', now(), $5)`,
+        [randomHash(), accountId, challenge, randomHash(), grantId]
+      );
+    await consume(crypto.randomUUID());
+    expect(await sqlStateOf(() => consume(null))).toBe(CHECK_VIOLATION);
   });
 });
 
 describe('device codes', () => {
   function insertDeviceCode(status: string, extra: Record<string, string | null>) {
     const columns = Object.keys(extra);
-    return app.query(
+    return writer.query(
       `INSERT INTO uts.device_codes
          (device_code_hash, user_code_hash, client_id, scopes, expires_at, status${columns.map(c => `, ${c}`).join('')})
        VALUES ($1, $2, 'kilo-cli', '{gateway:models.read}', now() + interval '10 minutes', $3${columns
@@ -305,13 +351,13 @@ describe('device codes', () => {
     await insertDeviceCode('pending', {});
     await insertDeviceCode('approved', {
       account_id: accountId,
-      gate_pass_id: await insertGatePass(app, accountId, 'device_approve'),
+      gate_pass_id: await insertGatePass(writer, accountId, 'device_approve'),
       approved_at: now,
     });
     await insertDeviceCode('denied', { account_id: accountId, denied_at: now });
     await insertDeviceCode('consumed', {
       account_id: accountId,
-      gate_pass_id: await insertGatePass(app, accountId, 'device_approve'),
+      gate_pass_id: await insertGatePass(writer, accountId, 'device_approve'),
       approved_at: now,
       consumed_at: now,
     });
@@ -353,7 +399,7 @@ describe('email codes and limits', () => {
     purpose = 'sign_in',
     account: string | null = null
   ) {
-    return app.query(
+    return writer.query(
       `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at)
        VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END)`,
       [purpose, randomHash(), account, randomHash(), attempts, status, consumed]
@@ -386,7 +432,7 @@ describe('email codes and limits', () => {
 
   it('cap a limit row at 5 codes per hour and stop only sign-in codes', async () => {
     const insertLimit = (purpose: string, sent: number, status: string, stopped: boolean) =>
-      app.query(
+      writer.query(
         `INSERT INTO uts.email_code_limits
            (purpose, email_hash, hour_started_at, sent_in_hour, day_started_at, failures_in_day, status, stopped_until)
          VALUES ($1, $2, now(), $3, now(), 20, $4, CASE WHEN $5 THEN now() + interval '1 hour' END)`,
@@ -420,18 +466,18 @@ describe('PATs and org bot keys', () => {
         `INSERT INTO uts.personal_access_tokens
            (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
          VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '366 days')`,
-        [accountId, randomHash(), await insertGatePass(app, accountId, 'pat_create')]
+        [accountId, randomHash(), await insertGatePass(writer, accountId, 'pat_create')]
       )
     ).toBe(CHECK_VIOLATION);
   });
 
   async function insertBotKey(status: string, fields: string, values: string) {
-    return app.query(
+    return writer.query(
       `INSERT INTO uts.org_bot_keys
          (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at, status${fields})
        VALUES (gen_random_uuid(), $1, 'bot', $2, 'wxyz', 'gateway', 'gateway:models.read', $3,
                now() + interval '90 days', $4${values})`,
-      [accountId, randomHash(), await insertGatePass(app, accountId, 'bot_key_create'), status]
+      [accountId, randomHash(), await insertGatePass(writer, accountId, 'bot_key_create'), status]
     );
   }
 
@@ -454,7 +500,7 @@ describe('PATs and org bot keys', () => {
 
 describe('gate passes and step-ups', () => {
   it('reject a tier A pass without the emailed code', async () => {
-    const sessionId = await insertBrowserSession(app, accountId);
+    const sessionId = await insertBrowserSession(writer, accountId);
     expect(
       await rejects(
         `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
@@ -465,7 +511,7 @@ describe('gate passes and step-ups', () => {
   });
 
   it('reject an email change without the code sent to the new address', async () => {
-    const sessionId = await insertBrowserSession(app, accountId);
+    const sessionId = await insertBrowserSession(writer, accountId);
     expect(
       await rejects(
         `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
@@ -476,7 +522,7 @@ describe('gate passes and step-ups', () => {
   });
 
   it('reject a tier B pass for a tier A action, and a pass over 10 minutes', async () => {
-    const sessionId = await insertBrowserSession(app, accountId);
+    const sessionId = await insertBrowserSession(writer, accountId);
     expect(
       await rejects(
         `INSERT INTO uts.gate_passes (account_id, browser_session_id, tier, action, satisfied_by, expires_at)
@@ -494,15 +540,15 @@ describe('gate passes and step-ups', () => {
   });
 
   it('require an admin step-up to carry a recent company sign-in and the client address', async () => {
-    const sessionId = await insertBrowserSession(app, accountId);
-    const passkey = await app.query<{ id: string }>(
+    const sessionId = await insertBrowserSession(writer, accountId);
+    const passkey = await writer.query<{ id: string }>(
       `INSERT INTO uts.passkey_credentials
          (account_id, credential_id, public_key, backup_eligible, backed_up, rp_id, name)
        VALUES ($1, $2, '\\x01', true, true, 'app.example.com', 'laptop') RETURNING id`,
       [accountId, randomHash()]
     );
     const insertStepUp = (ssoAge: string, ip: string | null) =>
-      app.query(
+      writer.query(
         `INSERT INTO uts.step_ups
            (account_id, browser_session_id, purpose, passkey_credential_id, expires_at, sso_auth_time, client_ip)
          VALUES ($1, $2, 'admin', $3, now() + interval '10 minutes', now() - $4::interval, $5)`,
@@ -517,7 +563,7 @@ describe('gate passes and step-ups', () => {
 describe('revocations', () => {
   it('keep a PAT entry exactly 15 minutes and every other entry at least 10 minutes', async () => {
     const insert = (kind: string, feedExpiry: string, revokedBefore: string | null = null) =>
-      app.query(
+      writer.query(
         `INSERT INTO uts.revocations (kind, subject_id, revoked_before, feed_expires_at)
          VALUES ($1, $2, $3::timestamptz, now() + $4::interval)`,
         [kind, crypto.randomUUID(), revokedBefore, feedExpiry]
@@ -544,7 +590,7 @@ describe('org membership replica', () => {
         [orgId, accountId]
       )
     ).toBe(CHECK_VIOLATION);
-    await app.query(
+    await writer.query(
       `INSERT INTO uts.org_memberships (org_id, account_id, role, status, removed_at, event_version)
        VALUES ($1, $2, 'member', 'removed', now(), 3)`,
       [orgId, accountId]
@@ -554,7 +600,7 @@ describe('org membership replica', () => {
 
 describe('gate pass binding', () => {
   function insertPat(owner: string, gatePassId: string) {
-    return app.query(
+    return writer.query(
       `INSERT INTO uts.personal_access_tokens
          (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
        VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')`,
@@ -563,36 +609,36 @@ describe('gate pass binding', () => {
   }
 
   it('let a pass create one credential of its own account and action', async () => {
-    const gatePassId = await insertGatePass(app, accountId, 'pat_create');
+    const gatePassId = await insertGatePass(writer, accountId, 'pat_create');
     await insertPat(accountId, gatePassId);
     expect(await sqlStateOf(() => insertPat(accountId, gatePassId))).toBe(UNIQUE_VIOLATION);
   });
 
   it('refuse a pass of another account or another action', async () => {
-    const otherAccountId = await insertAccount(app);
+    const otherAccountId = await insertAccount(writer);
     expect(
       await sqlStateOf(async () =>
-        insertPat(accountId, await insertGatePass(app, otherAccountId, 'pat_create'))
+        insertPat(accountId, await insertGatePass(writer, otherAccountId, 'pat_create'))
       )
     ).toBe(FOREIGN_KEY_VIOLATION);
     expect(
       await sqlStateOf(async () =>
-        insertPat(accountId, await insertGatePass(app, accountId, 'bot_key_create'))
+        insertPat(accountId, await insertGatePass(writer, accountId, 'bot_key_create'))
       )
     ).toBe(FOREIGN_KEY_VIOLATION);
   });
 
   it('bind a bot key pass to the member who creates the key', async () => {
-    const otherAccountId = await insertAccount(app);
+    const otherAccountId = await insertAccount(writer);
     const insertBotKey = (creator: string, gatePassId: string) =>
-      app.query(
+      writer.query(
         `INSERT INTO uts.org_bot_keys
            (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
          VALUES (gen_random_uuid(), $1, 'bot', $2, 'wxyz', 'gateway', 'gateway:models.read', $3,
                  now() + interval '90 days')`,
         [creator, randomHash(), gatePassId]
       );
-    const gatePassId = await insertGatePass(app, accountId, 'bot_key_create');
+    const gatePassId = await insertGatePass(writer, accountId, 'bot_key_create');
     expect(await sqlStateOf(() => insertBotKey(otherAccountId, gatePassId))).toBe(
       FOREIGN_KEY_VIOLATION
     );
@@ -600,7 +646,7 @@ describe('gate pass binding', () => {
   });
 
   const insertBotKeyFor = (creator: string, orgId: string, gatePassId: string) =>
-    app.query<{ id: string }>(
+    writer.query<{ id: string }>(
       `INSERT INTO uts.org_bot_keys
          (org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
        VALUES ($1, $2, 'bot', $3, 'wxyz', 'gateway', 'gateway:models.read', $4,
@@ -610,31 +656,31 @@ describe('gate pass binding', () => {
     );
 
   it('flag the bot keys of a deleted creator account and keep the creator as history', async () => {
-    const creatorId = await insertAccount(app);
+    const creatorId = await insertAccount(writer);
     const orgId = crypto.randomUUID();
-    const gatePassId = await insertGatePass(app, creatorId, 'bot_key_create');
+    const gatePassId = await insertGatePass(writer, creatorId, 'bot_key_create');
     const active = await insertBotKeyFor(creatorId, orgId, gatePassId);
     const revoked = await insertBotKeyFor(
       creatorId,
       orgId,
-      await insertGatePass(app, creatorId, 'bot_key_create')
+      await insertGatePass(writer, creatorId, 'bot_key_create')
     );
-    await app.query(
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = created_by
        WHERE id = $1`,
       [revoked.rows[0].id]
     );
     // The creator also holds a PAT, which goes with the account.
-    await app.query(
+    await writer.query(
       `INSERT INTO uts.personal_access_tokens
          (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
        VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, now() + interval '90 days')`,
-      [creatorId, randomHash(), await insertGatePass(app, creatorId, 'pat_create')]
+      [creatorId, randomHash(), await insertGatePass(writer, creatorId, 'pat_create')]
     );
 
-    await app.query('DELETE FROM uts.accounts WHERE id = $1', [creatorId]);
+    await writer.query('DELETE FROM uts.accounts WHERE id = $1', [creatorId]);
 
-    const keys = await app.query(
+    const keys = await writer.query(
       `SELECT id, org_id, created_by, gate_pass_id, status, flagged_at IS NOT NULL AS flagged
        FROM uts.org_bot_keys WHERE id = ANY ($1::uuid[])`,
       [[active.rows[0].id, revoked.rows[0].id]]
@@ -647,13 +693,14 @@ describe('gate pass binding', () => {
       ])
     );
     expect(keys.rows).toHaveLength(2);
-    const passes = await app.query('SELECT 1 FROM uts.gate_passes WHERE account_id = $1', [
+    const passes = await writer.query('SELECT 1 FROM uts.gate_passes WHERE account_id = $1', [
       creatorId,
     ]);
     expect(passes.rowCount).toBe(0);
-    const pats = await app.query('SELECT 1 FROM uts.personal_access_tokens WHERE account_id = $1', [
-      creatorId,
-    ]);
+    const pats = await writer.query(
+      'SELECT 1 FROM uts.personal_access_tokens WHERE account_id = $1',
+      [creatorId]
+    );
     expect(pats.rowCount).toBe(0);
 
     // The deleted pass cannot create another key.
@@ -664,7 +711,7 @@ describe('gate pass binding', () => {
 
   it('refuse a new bot key without a gate pass, even one inserted as flagged', async () => {
     const insert = (status: string) =>
-      app.query(
+      writer.query(
         `INSERT INTO uts.org_bot_keys
            (org_id, created_by, name, token_hash, last_four, audience, scope, expires_at, status,
             flagged_at)
@@ -680,30 +727,31 @@ describe('gate pass binding', () => {
   it('refuse a bot key gate pass action of another kind', async () => {
     expect(
       await sqlStateOf(async () =>
-        app.query(
+        writer.query(
           `INSERT INTO uts.org_bot_keys
              (org_id, created_by, gate_pass_id, gate_pass_action, name, token_hash, last_four,
               audience, scope, expires_at)
            VALUES (gen_random_uuid(), $1, $2, 'pat_create', 'bot', $3, 'wxyz', 'gateway',
                    'gateway:models.read', now() + interval '90 days')`,
-          [accountId, await insertGatePass(app, accountId, 'bot_key_create'), randomHash()]
+          [accountId, await insertGatePass(writer, accountId, 'bot_key_create'), randomHash()]
         )
       )
     ).toBe(CHECK_VIOLATION);
   });
 
   it('refuse a pass delete that would leave an active bot key without its pass', async () => {
-    const gatePassId = await insertGatePass(app, accountId, 'bot_key_create');
+    const gatePassId = await insertGatePass(writer, accountId, 'bot_key_create');
     const key = await insertBotKeyFor(accountId, crypto.randomUUID(), gatePassId);
-    const deletePass = () => app.query('DELETE FROM uts.gate_passes WHERE id = $1', [gatePassId]);
+    const deletePass = () =>
+      writer.query('DELETE FROM uts.gate_passes WHERE id = $1', [gatePassId]);
     expect(await sqlStateOf(deletePass)).toBe(CHECK_VIOLATION);
 
-    await app.query(
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() WHERE id = $1`,
       [key.rows[0].id]
     );
     await deletePass();
-    const after = await app.query('SELECT gate_pass_id FROM uts.org_bot_keys WHERE id = $1', [
+    const after = await writer.query('SELECT gate_pass_id FROM uts.org_bot_keys WHERE id = $1', [
       key.rows[0].id,
     ]);
     expect(after.rows).toEqual([{ gate_pass_id: null }]);
@@ -711,7 +759,7 @@ describe('gate pass binding', () => {
 
   it('bind a device approval to the approving account and one code', async () => {
     const approve = (approver: string, gatePassId: string) =>
-      app.query(
+      writer.query(
         `INSERT INTO uts.device_codes
            (device_code_hash, user_code_hash, client_id, scopes, expires_at, status, account_id,
             gate_pass_id, approved_at)
@@ -719,8 +767,8 @@ describe('gate pass binding', () => {
                  'approved', $3, $4, now())`,
         [randomHash(), randomHash(), approver, gatePassId]
       );
-    const otherAccountId = await insertAccount(app);
-    const gatePassId = await insertGatePass(app, accountId, 'device_approve');
+    const otherAccountId = await insertAccount(writer);
+    const gatePassId = await insertGatePass(writer, accountId, 'device_approve');
     expect(await sqlStateOf(() => approve(otherAccountId, gatePassId))).toBe(FOREIGN_KEY_VIOLATION);
     await approve(accountId, gatePassId);
     expect(await sqlStateOf(() => approve(accountId, gatePassId))).toBe(UNIQUE_VIOLATION);
@@ -728,7 +776,7 @@ describe('gate pass binding', () => {
 
   it('refuse a consent made with a pass for a PAT', async () => {
     const clientId = `https://client.example.com/${crypto.randomUUID()}`;
-    await app.query(
+    await writer.query(
       `INSERT INTO uts.third_party_clients
          (client_id, client_name, redirect_uris, document, fetched_at, cache_expires_at)
        VALUES ($1, 'Example', '{https://client.example.com/callback}', '{}', now(), now() + interval '1 hour')`,
@@ -736,10 +784,10 @@ describe('gate pass binding', () => {
     );
     expect(
       await sqlStateOf(async () =>
-        app.query(
+        writer.query(
           `INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
            VALUES ($1, $2, '{mcp:tools.read}', $3)`,
-          [accountId, clientId, await insertGatePass(app, accountId, 'pat_create')]
+          [accountId, clientId, await insertGatePass(writer, accountId, 'pat_create')]
         )
       )
     ).toBe(FOREIGN_KEY_VIOLATION);
@@ -748,13 +796,13 @@ describe('gate pass binding', () => {
   it('refuse a gate pass action that the caller sets', async () => {
     expect(
       await sqlStateOf(async () =>
-        app.query(
+        writer.query(
           `INSERT INTO uts.personal_access_tokens
              (account_id, name, token_hash, last_four, audience, scope, gate_pass_id,
               gate_pass_action, expires_at)
            VALUES ($1, 'ci', $2, 'abcd', 'gateway', 'gateway:models.read', $3, 'bot_key_create',
                    now() + interval '90 days')`,
-          [accountId, randomHash(), await insertGatePass(app, accountId, 'bot_key_create')]
+          [accountId, randomHash(), await insertGatePass(writer, accountId, 'bot_key_create')]
         )
       )
     ).toBe(GENERATED_ALWAYS);
@@ -763,7 +811,7 @@ describe('gate pass binding', () => {
 
 describe('refresh grants', () => {
   it('leave 10 percent of each page free for last-use updates', async () => {
-    const result = await app.query<{ reloptions: string[] }>(
+    const result = await writer.query<{ reloptions: string[] }>(
       `SELECT reloptions FROM pg_class WHERE oid = 'uts.refresh_grants'::regclass`
     );
     expect(result.rows[0].reloptions).toEqual(['fillfactor=90']);

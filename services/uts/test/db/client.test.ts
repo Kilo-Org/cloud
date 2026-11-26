@@ -183,7 +183,7 @@ describe('identity-store client', () => {
   });
 
   it('decodes enum arrays, domain arrays, bytea, xid8 and int8 into the row schemas', async () => {
-    const owner = await db.connect('uts_app_a');
+    const owner = await db.connectAsOwner();
     const accountId = await insertAccount(owner);
     const sessionId = await insertBrowserSession(owner, accountId);
     await insertGatePass(owner, accountId, 'pat_create');

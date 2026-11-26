@@ -259,6 +259,8 @@ export const AuthorizationCodeRowSchema = z.strictObject({
   expires_at: timestamp,
   status: z.enum(enums.CODE_STATUSES),
   consumed_at: timestamp.nullable(),
+  consent_id: uuid.nullable(),
+  grant_id: uuid.nullable(),
 });
 
 export const DeviceCodeRowSchema = z.strictObject({

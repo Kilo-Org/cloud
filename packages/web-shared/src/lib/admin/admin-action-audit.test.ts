@@ -138,7 +138,7 @@ describe('recordAdminAction', () => {
     });
   });
 
-  test('records one row and one event per entry across insert chunks', async () => {
+  test('records one row per entry and one log line per insert chunk', async () => {
     const userIds = Array.from({ length: 1_001 }, (_, index) => `bulk-user-${index}`);
 
     await recordAdminActions(
@@ -147,15 +147,64 @@ describe('recordAdminAction', () => {
         action: 'user.unblock' as const,
         target: userActionTarget(userId),
         message: 'Unblocked user via bulk unblock',
+        metadata: { bulk: true, userId },
       }))
     );
 
     const rows = await db
-      .select({ target_id: admin_action_audit_logs.target_id })
+      .select({ id: admin_action_audit_logs.id, target_id: admin_action_audit_logs.target_id })
       .from(admin_action_audit_logs);
     expect(rows.map(row => row.target_id).sort()).toEqual([...userIds].sort());
-    expect(events).toHaveLength(userIds.length);
-    expect(events.every(event => event.persisted && event.auditLogId !== null)).toBe(true);
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      event: 'admin_action',
+      action: 'user.unblock',
+      outcome: 'success',
+      entryCount: 1_000,
+      persisted: true,
+      route: 'admin.users.resetAPIKey',
+      targetType: 'user',
+      targetIds: userIds.slice(0, 1_000),
+      message: 'Unblocked user via bulk unblock',
+      // Each entry carries its own metadata, so the line names none.
+      metadata: null,
+    });
+    expect(events[1]).toMatchObject({ entryCount: 1, targetIds: [userIds[1_000]] });
+    const loggedIds = events.flatMap(event => ('auditLogIds' in event ? event.auditLogIds : []));
+    expect([...loggedIds].sort()).toEqual(rows.map(row => row.id).sort());
+    expect(Math.max(...events.map(event => JSON.stringify(event).length))).toBeLessThan(128_000);
+  });
+
+  test('splits a bulk log line by action and outcome', async () => {
+    await recordAdminActions(ctxFor(), [
+      { action: 'user.unblock', target: userActionTarget('user-1'), message: 'Unblocked' },
+      {
+        action: 'user.unblock',
+        outcome: 'failure',
+        errorCode: 'Error',
+        target: userActionTarget('user-2'),
+        message: 'Unblock failed',
+      },
+      { action: 'user.unblock', target: organizationActionTarget('org-3'), message: 'Unblocked' },
+    ]);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        outcome: 'success',
+        entryCount: 2,
+        targetType: null,
+        targetIds: ['user-1', 'org-3'],
+        message: 'Unblocked',
+      }),
+      expect.objectContaining({
+        outcome: 'failure',
+        entryCount: 1,
+        targetType: 'user',
+        targetIds: ['user-2'],
+        metadata: { errorCode: 'Error' },
+      }),
+    ]);
   });
 
   test('does nothing for an empty batch', async () => {

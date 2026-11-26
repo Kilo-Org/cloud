@@ -1,5 +1,5 @@
 {
-  "id": "ee108912-11b6-4695-89e6-a22fdd7bce19",
+  "id": "c30af322-5bfd-4918-9ad0-431b9ad84057",
   "prevId": "baf44efc-df30-45d8-8a3f-ba7e4371a2eb",
   "version": "7",
   "dialect": "postgresql",
@@ -62,13 +62,6 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
-        },
-        "outcome": {
-          "name": "outcome",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'success'"
         },
         "created_at": {
           "name": "created_at",
@@ -2959,155 +2952,6 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.auth_audit_logs": {
-      "name": "auth_audit_logs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "action": {
-          "name": "action",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "outcome": {
-          "name": "outcome",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "method": {
-          "name": "method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "failure_reason": {
-          "name": "failure_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "subject_email_hash": {
-          "name": "subject_email_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_auth_audit_logs_created_at": {
-          "name": "IDX_auth_audit_logs_created_at",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_auth_audit_logs_user_id_created_at": {
-          "name": "IDX_auth_audit_logs_user_id_created_at",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_auth_audit_logs_action_created_at": {
-          "name": "IDX_auth_audit_logs_action_created_at",
-          "columns": [
-            {
-              "expression": "action",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_auth_audit_logs_subject_email_hash_created_at": {
-          "name": "IDX_auth_audit_logs_subject_email_hash_created_at",
-          "columns": [
-            {
-              "expression": "subject_email_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"auth_audit_logs\".\"subject_email_hash\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -25205,7 +25049,7 @@
         },
         "check_magic_link_tokens_purpose": {
           "name": "check_magic_link_tokens_purpose",
-          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change')"
+          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change', 'passkey_enrollment')"
         }
       },
       "isRLSEnabled": false

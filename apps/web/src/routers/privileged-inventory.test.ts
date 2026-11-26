@@ -17,7 +17,10 @@ import {
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
-import { isAuditedAdminRoute } from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import {
+  adminMutationsMissingAuditSpec,
+  isAuditedAdminRoute,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   SUPPORT_NEVER_KEYS,
   SUPPORT_READ_ALLOWLIST,
@@ -797,5 +800,11 @@ describe('admin target id fields name mounted mutations', () => {
     }
 
     expect(problems).toEqual([]);
+  });
+});
+
+describe('admin mutations declare how they are audited', () => {
+  test('every admin-guarded mutation carries valid adminAudit meta', () => {
+    expect(adminMutationsMissingAuditSpec(procedures)).toEqual([]);
   });
 });

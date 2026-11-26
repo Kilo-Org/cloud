@@ -37,6 +37,7 @@ import {
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
+  isAdminAuditInputRejection,
   reportAdminAuditGap,
   runAdminAuditScope,
   type AdminAuditSpec,
@@ -571,8 +572,10 @@ const adminStepUpEnforcementMiddleware = t.middleware(
 
 // Audits every admin mutation, including those of the specialized procedures
 // chained on `adminProcedure`, from its `adminAudit` meta. It runs after the
-// admin and step-up guards, so a refused non-admin records nothing; a refusal
-// by a specialized guard chained later is recorded as a failure.
+// admin guard, so a refused non-admin records nothing, and before the step-up
+// guard and any specialized guard chained later, so their refusals are
+// recorded as failures. Input that never parsed records its failure with no
+// target.
 const adminAuditMiddleware = t.middleware(({ ctx, meta, path, type, getRawInput, next }) => {
   if (type !== 'mutation') return next();
   const spec = meta?.adminAudit;
@@ -587,11 +590,17 @@ const adminAuditMiddleware = t.middleware(({ ctx, meta, path, type, getRawInput,
     input: getRawInput,
     run: () => next(),
     outcomeOf: result =>
-      result.ok ? { outcome: 'success' } : { outcome: 'failure', errorCode: result.error.code },
+      result.ok
+        ? { outcome: 'success' }
+        : {
+            outcome: 'failure',
+            errorCode: result.error.code,
+            inputRejected: isAdminAuditInputRejection(result.error),
+          },
   });
 });
 
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)
-  .use(adminStepUpEnforcementMiddleware)
-  .use(adminAuditMiddleware);
+  .use(adminAuditMiddleware)
+  .use(adminStepUpEnforcementMiddleware);

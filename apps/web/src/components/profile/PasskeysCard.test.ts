@@ -239,6 +239,60 @@ async function flush() {
   });
 }
 
+/** Lets every pending fetch and state update of the add flow settle. */
+async function settle() {
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  });
+}
+
+function dialog(): HTMLElement | null {
+  return mounted!.container.querySelector('[role="dialog"]');
+}
+
+/**
+ * The React props of a rendered element. React's change and submit events do
+ * not fire through linkedom, so the tests call the handlers React attached.
+ */
+function reactProps(element: Element): Record<string, any> {
+  const key = Object.keys(element).find(name => name.startsWith('__reactProps$'));
+  if (!key) throw new Error('not a React element');
+  return (element as any)[key];
+}
+
+function typeCode(code: string) {
+  const input = dialog()!.querySelector('input')!;
+  act(() => {
+    reactProps(input).onChange({ target: { value: code } });
+  });
+}
+
+function submitCode() {
+  const form = dialog()!.querySelector('form')!;
+  act(() => {
+    reactProps(form).onSubmit({ preventDefault: () => {} });
+  });
+}
+
+function requestBody(call: number): unknown {
+  const init = mockFetch.mock.calls[call]?.[1] as { body: string };
+  return JSON.parse(init.body);
+}
+
+const SENT = {
+  ok: true,
+  json: async () => ({
+    emailCodeId: 'email-code-1',
+    expiresInSeconds: 600,
+    email: 'person@example.com',
+  }),
+};
+const OPTIONS = { ok: true, json: async () => ({ challengeId: 'c', options: {} }) };
+
+function refused(status: number, body: Record<string, unknown>) {
+  return { ok: false, status, json: async () => body };
+}
+
 const ROW = {
   id: '11111111-1111-4111-8111-111111111111',
   name: 'Work laptop',
@@ -379,50 +433,302 @@ describe('PasskeysCard', () => {
     expect(mockRefetch).toHaveBeenCalled();
   });
 
-  it('reports a retryable failure when the add request fails', async () => {
+  it('adds a passkey with the code emailed to the account', async () => {
     mockQueryResult.data = { passkeys: [ROW] };
-    mockFetch.mockResolvedValue({ ok: false, json: async () => ({ error: 'BOOM' }) });
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(OPTIONS)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ credentialId: 'credential' }) });
     mounted = mountCard();
 
     act(() => button(mounted!.container, 'Add a passkey').click());
-    await flush();
+    await settle();
 
-    expect(mounted.container.textContent).toContain('Could not add a passkey. Try again.');
-    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
-    expect(hasButton(mounted.container, 'Add a passkey')).toBe(true);
+    expect(requestBody(0)).toEqual({ action: 'send_code' });
+    expect(dialog()?.textContent).toContain(
+      'We sent a 6-digit code to person@example.com. It expires in 10 minutes.'
+    );
+    const input = dialog()!.querySelector('input')!;
+    expect(reactProps(input)).toMatchObject({
+      inputMode: 'numeric',
+      autoComplete: 'one-time-code',
+    });
+
+    typeCode('123456');
+    submitCode();
+    await settle();
+
+    expect(requestBody(1)).toEqual({
+      action: 'options',
+      emailCode: { emailCodeId: 'email-code-1', code: '123456' },
+    });
+    expect(requestBody(2)).toMatchObject({
+      action: 'verify',
+      challengeId: 'c',
+      emailCode: { emailCodeId: 'email-code-1', code: '123456' },
+    });
+    expect(mockRefetch).toHaveBeenCalled();
+    expect(dialog()).toBeNull();
   });
 
-  it('adds no row when the creation sheet is cancelled', async () => {
+  it('keeps the dialog and the typed code after a wrong code', async () => {
     mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(refused(401, { error: 'EMAIL_CODE_INVALID', attemptsLeft: 3 }));
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    typeCode('123456');
+    submitCode();
+    await settle();
+
+    expect(alerts(mounted.container)).toContain('That code is not correct. 3 tries left.');
+    expect((dialog()!.querySelector('input') as HTMLInputElement).value).toBe('123456');
+    expect(mockStartRegistration).not.toHaveBeenCalled();
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  it('sends a new code after the code expired', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(refused(401, { error: 'EMAIL_CODE_EXPIRED' }))
+      .mockResolvedValueOnce(SENT);
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    typeCode('123456');
+    submitCode();
+    await settle();
+
+    expect(alerts(mounted.container)).toContain(
+      'That code expired or was already used. Send a new code.'
+    );
+
+    act(() => button(dialog()!, 'Send a new code').click());
+    await settle();
+
+    expect(requestBody(2)).toEqual({ action: 'send_code' });
+    expect(alerts(mounted.container)).toEqual([]);
+    expect((dialog()!.querySelector('input') as HTMLInputElement).value).toBe('');
+  });
+
+  it('shows the wait and holds the code step while the account is locked', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(refused(429, { error: 'EMAIL_CODE_LOCKED', retryAfterSeconds: 900 }));
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    typeCode('123456');
+    submitCode();
+    await settle();
+
+    expect(alerts(mounted.container)).toContain(
+      'Too many incorrect codes. You can send a new code in 15 minutes.'
+    );
+    expect(button(dialog()!, 'Send a new code').disabled).toBe(true);
+    expect(button(dialog()!, 'Add passkey').disabled).toBe(true);
+  });
+
+  it('stops offering the old code when sending a new one fails', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(refused(502, { error: 'EMAIL_DELIVERY_FAILED' }));
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    act(() => button(dialog()!, 'Send a new code').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain('We could not send the code email. Try again.');
+    expect(dialog()!.querySelector('input')).toBeNull();
+    expect(hasButton(dialog()!, 'Try again')).toBe(true);
+
+    act(() => button(dialog()!, 'Cancel').click());
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+
+    expect(requestBody(2)).toEqual({ action: 'send_code' });
+  });
+
+  it('keeps the code entry with the previous code when the resend request fails on the network', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch.mockResolvedValueOnce(SENT).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    act(() => button(dialog()!, 'Send a new code').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain('Could not add a passkey. Try again.');
+    expect(dialog()?.textContent).toContain('We sent a 6-digit code to person@example.com.');
+    expect(dialog()!.querySelector('input')).not.toBeNull();
+
+    mockFetch.mockResolvedValueOnce(OPTIONS);
+    typeCode('123456');
+    submitCode();
+    await settle();
+
+    expect(requestBody(2)).toEqual({
+      action: 'options',
+      emailCode: { emailCodeId: 'email-code-1', code: '123456' },
+    });
+  });
+
+  it('explains the hourly code limit on its own', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch.mockResolvedValueOnce(
+      refused(429, { error: 'EMAIL_CODE_HOURLY_LIMIT', retryAfterSeconds: 1500 })
+    );
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain(
+      'Too many codes were sent for this account in the last hour. Try again in 25 minutes.'
+    );
+    expect(dialog()!.querySelector('input')).toBeNull();
+  });
+
+  it('keeps the code entry with the previous code when a resend hits the hourly limit', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(SENT)
+      .mockResolvedValueOnce(
+        refused(429, { error: 'EMAIL_CODE_HOURLY_LIMIT', retryAfterSeconds: 1500 })
+      );
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+    act(() => button(dialog()!, 'Send a new code').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain(
+      'Too many codes were sent for this account in the last hour. Try again in 25 minutes.'
+    );
+    expect(dialog()?.textContent).toContain('We sent a 6-digit code to person@example.com.');
+    expect(dialog()!.querySelector('input')).not.toBeNull();
+
+    mockFetch.mockResolvedValueOnce(OPTIONS);
+    typeCode('123456');
+    submitCode();
+    await settle();
+
+    expect(requestBody(2)).toEqual({
+      action: 'options',
+      emailCode: { emailCodeId: 'email-code-1', code: '123456' },
+    });
+  });
+
+  it('shows the code entry for a code sent while the dialog was closed', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    const delivery = Promise.withResolvers<typeof SENT>();
+    mockFetch.mockReturnValueOnce(delivery.promise);
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    act(() => button(dialog()!, 'Cancel').click());
+    expect(dialog()).toBeNull();
+
+    delivery.resolve(SENT);
+    await settle();
+    expect(dialog()).toBeNull();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+
+    expect(dialog()?.textContent).toContain('We sent a 6-digit code to person@example.com.');
+    expect(dialog()!.querySelector('input')).not.toBeNull();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers a retry when the code email could not be sent', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch
+      .mockResolvedValueOnce(refused(502, { error: 'EMAIL_DELIVERY_FAILED' }))
+      .mockResolvedValueOnce(SENT);
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain('We could not send the code email. Try again.');
+
+    act(() => button(dialog()!, 'Try again').click());
+    await settle();
+
+    expect(dialog()?.textContent).toContain('person@example.com');
+  });
+
+  it('explains an account address that cannot receive email, without a retry', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch.mockResolvedValueOnce(refused(422, { error: 'EMAIL_UNDELIVERABLE' }));
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain(
+      'We cannot deliver email to your account address, so we cannot send a code.'
+    );
+    expect(hasButton(dialog()!, 'Try again')).toBe(false);
+    expect(hasButton(dialog()!, 'Send a new code')).toBe(false);
+  });
+
+  it('reports a retryable failure when the add request fails', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch.mockResolvedValue(refused(503, { error: 'RATE_LIMIT_UNAVAILABLE' }));
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Add a passkey').click());
+    await settle();
+
+    expect(alerts(mounted.container)).toContain('Could not add a passkey. Try again.');
+    expect(hasButton(dialog()!, 'Try again')).toBe(true);
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+  });
+
+  it('closes without an error and adds no row when the creation sheet is cancelled', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockFetch.mockResolvedValueOnce(SENT).mockResolvedValueOnce(OPTIONS);
     mockStartRegistration.mockRejectedValue(
       Object.assign(new Error('cancelled'), { name: 'NotAllowedError' })
     );
     mounted = mountCard();
 
     act(() => button(mounted!.container, 'Add a passkey').click());
-    await flush();
+    await settle();
+    typeCode('123456');
+    submitCode();
+    await settle();
 
-    expect(mounted.container.textContent).toContain(
-      'Passkey creation was cancelled. No passkey was added.'
-    );
+    expect(dialog()).toBeNull();
+    expect(alerts(mounted.container)).toEqual([]);
     expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
     expect(mockRefetch).not.toHaveBeenCalled();
   });
 
   it('asks to sign in again when enrollment needs reauthentication', async () => {
     mockQueryResult.data = { passkeys: [ROW] };
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({ error: 'REAUTH_REQUIRED' }),
-    });
+    mockFetch.mockResolvedValue(refused(401, { error: 'REAUTH_REQUIRED' }));
     mounted = mountCard();
 
     act(() => button(mounted!.container, 'Add a passkey').click());
-    await flush();
+    await settle();
 
     expect(mounted.container.textContent).toContain('Sign in again before adding a passkey');
     expect(hasButton(mounted.container, 'Sign out and sign in again')).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockRefetch).not.toHaveBeenCalled();
   });
 

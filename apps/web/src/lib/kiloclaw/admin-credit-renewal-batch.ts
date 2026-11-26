@@ -49,12 +49,22 @@ export async function getCreditRenewalPreview() {
   };
 }
 
-export async function stopCreditRenewals(actor: CreditRenewalAdminActor) {
+export type StoppedCreditRenewal = { subscriptionId: string; userId: string };
+
+/**
+ * Stops credit renewal for every eligible subscription, in chunks. `onStopped`
+ * receives each committed chunk's stopped subscriptions.
+ */
+export async function stopCreditRenewals(
+  actor: CreditRenewalAdminActor,
+  onStopped?: (stopped: StoppedCreditRenewal[]) => Promise<void>
+) {
   const deadlineAtMs = Date.now() + WORK_BUDGET_MS;
   let updated = 0;
 
   while (Date.now() < deadlineAtMs) {
-    const fetched = await db.transaction(async tx => {
+    const { fetched, stopped } = await db.transaction(async tx => {
+      const stoppedInChunk: StoppedCreditRenewal[] = [];
       const rows = await tx
         .select()
         .from(kiloclaw_subscriptions)
@@ -85,11 +95,13 @@ export async function stopCreditRenewals(actor: CreditRenewalAdminActor) {
           before,
           after,
         });
+        stoppedInChunk.push({ subscriptionId: after.id, userId: after.user_id });
         updated += 1;
       }
-      return rows.length;
+      return { fetched: rows.length, stopped: stoppedInChunk };
     });
 
+    if (stopped.length > 0) await onStopped?.(stopped);
     if (fetched < CHUNK_SIZE) break;
   }
 

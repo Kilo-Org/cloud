@@ -14,7 +14,9 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 // About six months.
 const RETENTION_DAYS = 183;
 const BATCH_SIZE = 2_500;
-const MAX_BATCHES_PER_RUN = 2;
+// The cron routes allow 300 s. No batch starts after this budget, so the last
+// one finishes well before the platform stops the function.
+const TIME_BUDGET_MS = 120_000;
 
 /** An audit table pruned by age: its primary key and its indexed creation time. */
 export type AuditLogRetentionTable = {
@@ -46,8 +48,9 @@ async function deleteExpiredBatch(
 }
 
 /**
- * Cron handler that deletes audit rows older than the retention window, in at
- * most {@link MAX_BATCHES_PER_RUN} batches per run so one run stays bounded.
+ * Cron handler that deletes audit rows older than the retention window, batch
+ * after batch until none are left or {@link TIME_BUDGET_MS} has passed.
+ * `has_more` is reported only when the budget ran out with expired rows left.
  * `deletedCountField` names the table-specific count in the scheduled-job
  * success event.
  */
@@ -67,19 +70,22 @@ export function auditLogRetentionCron(params: {
     });
 
     try {
-      const cutoffDate = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1_000).toISOString();
+      const startedAt = Date.now();
+      const cutoffDate = new Date(startedAt - RETENTION_DAYS * 24 * 60 * 60 * 1_000).toISOString();
+      const deadline = startedAt + TIME_BUDGET_MS;
 
       let deletedCount = 0;
       let hasMore = false;
       let batchesRun = 0;
 
-      for (let batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
+      for (;;) {
         const result = await deleteExpiredBatch(params.source, cutoffDate);
         deletedCount += result.deletedCount;
-        hasMore = result.hasMore;
         batchesRun++;
 
-        if (!hasMore || result.deletedCount === 0) {
+        if (!result.hasMore || result.deletedCount === 0) break;
+        if (Date.now() >= deadline) {
+          hasMore = true;
           break;
         }
       }

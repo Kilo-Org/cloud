@@ -818,14 +818,19 @@ export const codingPlansRouter = createTRPCRouter({
         entries: z.array(z.string().min(1)).min(1).max(1000),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       addAdminAuditMetadata({
         providerId: input.providerId,
         planId: input.planId,
         keyCount: input.entries.length,
       });
       try {
-        return await uploadKeysToInventory(input.providerId, input.planId, input.entries);
+        return await uploadKeysToInventory(
+          input.providerId,
+          input.planId,
+          input.entries,
+          ctx.user.id
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (
@@ -1044,9 +1049,9 @@ export const codingPlansRouter = createTRPCRouter({
     .input(
       z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1).max(500) })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
-        await replaceManualCredentialRevocation(input.inventoryKeyId, input.apiKey);
+        await replaceManualCredentialRevocation(input.inventoryKeyId, input.apiKey, ctx.user.id);
       } catch (error) {
         const message =
           error instanceof ManualCredentialReplacementError

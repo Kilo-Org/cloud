@@ -8,6 +8,7 @@ import { and, eq } from 'drizzle-orm';
 import { kilocode_users, openai_chatgpt_connections, type User } from '@kilocode/db/schema';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { useFakeByokKmsForSuite } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { openAiChatGptConnectorGone } from './connector';
@@ -72,6 +73,7 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
   let owner: User;
   let member: User;
   let organization: { id: string };
+  useFakeByokKmsForSuite();
 
   beforeAll(async () => {
     process.env.OPENAI_CHATGPT_API_KEY = 'partner-project-key';

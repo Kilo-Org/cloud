@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll, beforeEach, afterAll, afterEach } from '@jest/globals';
+import { sealedInventoryColumns } from '@/tests/helpers/coding-plan-inventory.helper';
 import { randomBytes } from 'crypto';
 // Catalog-mode code reads the catalog snapshot through a process-wide cache. Stubbing those reads
 // keeps the cache unfilled for the listSupportedModels test, which stores its own metadata.
@@ -64,8 +65,7 @@ import {
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
-import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { byokOwner, getByokKeyStates } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
   isFakeByokKmsRequest,
@@ -2376,14 +2376,13 @@ describe('BYOK Router', () => {
     });
 
     async function createInstalledMiniMaxKey() {
-      const encrypted = encryptApiKey('installed-minimax-key', BYOK_ENCRYPTION_KEY);
       const [inventory] = await db
         .insert(coding_plan_key_inventory)
         .values({
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
           upstream_plan_id: 'minimax-installed-plan',
-          encrypted_api_key: encrypted,
+          ...sealedInventoryColumns('installed-minimax-key'),
           credential_fingerprint: crypto.randomUUID(),
           status: 'assigned',
           assigned_to_user_id: ownerUser.id,
@@ -2420,14 +2419,13 @@ describe('BYOK Router', () => {
     }
 
     async function createInstalledBytePlusKey() {
-      const encrypted = encryptApiKey('installed-byteplus-key', BYOK_ENCRYPTION_KEY);
       const [inventory] = await db
         .insert(coding_plan_key_inventory)
         .values({
           plan_id: 'byteplus-coding-plan-team-lite',
           provider_id: 'byteplus-coding',
           upstream_plan_id: 'byteplus-installed-plan',
-          encrypted_api_key: encrypted,
+          ...sealedInventoryColumns('installed-byteplus-key'),
           credential_fingerprint: crypto.randomUUID(),
           status: 'assigned',
           assigned_to_user_id: ownerUser.id,

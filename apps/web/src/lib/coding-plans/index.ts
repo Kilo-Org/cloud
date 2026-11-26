@@ -328,9 +328,6 @@ export async function subscribeToCodingPlan(
   if (!plan) {
     throw new Error(`Plan "${planId}" is not available as a coding plan.`);
   }
-  if (!BYOK_ENCRYPTION_KEY) {
-    throw new Error('BYOK encryption is not configured');
-  }
 
   const requestKey = idempotencyFingerprint(idempotencyKey);
   // The data key request carries no plaintext, so it is issued before the transaction to
@@ -635,10 +632,6 @@ export async function reassignSubscriptionCredential(
   subscriptionId: string,
   adminUserId: string
 ): Promise<{ inventoryKeyId: string }> {
-  if (!BYOK_ENCRYPTION_KEY) {
-    throw credentialReassignmentError('BYOK encryption is not configured');
-  }
-
   // The data key request carries no plaintext, so it is issued before the transaction to
   // keep the network call from holding the subscription and inventory row locks. The
   // identifiers it binds to are re-checked under the lock.

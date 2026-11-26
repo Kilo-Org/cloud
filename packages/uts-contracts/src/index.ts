@@ -10,4 +10,5 @@ export * from './signin';
 export * from './signin-methods';
 export * from './security';
 export * from './signer-keys';
+export * from './subjects';
 export * from './token';

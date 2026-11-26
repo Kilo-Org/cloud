@@ -26,6 +26,14 @@ import {
 } from './jwks';
 import { AuthorizationServerMetadataSchema } from './metadata';
 import {
+  AccountImportRequestSchema,
+  AppUserCreatedEventSchema,
+  reasonAllowed,
+  SubjectOperationRequestSchema,
+  UTS_CREATED_ACCOUNT_ID,
+  UTS_SUBJECT_OPERATIONS,
+} from './subjects';
+import {
   decodeBase64Url,
   encodeBase64Url,
   FEED_HEAD_TYPE,
@@ -456,6 +464,111 @@ describe('AuthorizationServerMetadataSchema', () => {
     expect(
       AuthorizationServerMetadataSchema.safeParse({ ...document, grant_types_supported: undefined })
         .success
+    ).toBe(false);
+  });
+});
+
+describe('subject operation contracts', () => {
+  const request = {
+    operation_id: '00000000-0000-4000-8000-000000000001',
+    subject: 'oauth/google:1',
+    reason: 'access_block',
+    actor: 'admin:staff-1',
+    source_version: 0,
+  };
+
+  it('accept the three actor forms and refuse every other', () => {
+    for (const actor of ['user:abc', 'admin:oauth/google:1', 'system:scim-sync.v2']) {
+      expect(SubjectOperationRequestSchema.safeParse({ ...request, actor }).success).toBe(true);
+    }
+    for (const actor of [
+      'user:',
+      'user:a b',
+      'system:Upper',
+      `system:${'a'.repeat(65)}`,
+      'staff:x',
+    ]) {
+      expect(SubjectOperationRequestSchema.safeParse({ ...request, actor }).success).toBe(false);
+    }
+  });
+
+  it('take a source version from 0 to 2^53 - 1', () => {
+    for (const [version, ok] of [
+      [0, true],
+      [Number.MAX_SAFE_INTEGER, true],
+      [-1, false],
+      [2 ** 53, false],
+      [1.5, false],
+    ] as const) {
+      expect(
+        SubjectOperationRequestSchema.safeParse({ ...request, source_version: version }).success
+      ).toBe(ok);
+    }
+  });
+
+  it('let each operation take only its own reasons', () => {
+    expect(reasonAllowed('revoke', 'account_deleted')).toBe(true);
+    expect(reasonAllowed('unblock', 'access_unblock')).toBe(true);
+    expect(reasonAllowed('unblock', 'access_block')).toBe(false);
+    expect(reasonAllowed('end-browser-sessions', 'apple_consent_revoked')).toBe(true);
+    expect(reasonAllowed('end-device-sessions', 'staff_signout')).toBe(false);
+    expect(reasonAllowed('revoke-api-credentials', 'staff_api_reset')).toBe(true);
+    expect(UTS_SUBJECT_OPERATIONS.unblock.scope).toBe(UTS_SUBJECT_OPERATIONS.revoke.scope);
+  });
+
+  it('refuse an import of a uts_ id, a repeated identity or a repeated passkey', () => {
+    const identity = {
+      provider: 'google',
+      provider_subject: '1',
+      verified_email: null,
+      workos_connection_id: null,
+      linked_at: '2025-01-01T00:00:00Z',
+    };
+    const base = {
+      app_user_id: 'oauth/google:1',
+      primary_email: 'user@example.com',
+      status: 'active',
+      verified_identities: [identity],
+      sso_authority: null,
+      passkeys: [],
+      source_version: 1,
+    };
+    expect(AccountImportRequestSchema.safeParse(base).success).toBe(true);
+    expect(
+      AccountImportRequestSchema.safeParse({ ...base, app_user_id: `uts_${'a'.repeat(26)}` })
+        .success
+    ).toBe(false);
+    expect(
+      AccountImportRequestSchema.safeParse({ ...base, verified_identities: [identity, identity] })
+        .success
+    ).toBe(false);
+    expect(
+      AccountImportRequestSchema.safeParse({
+        ...base,
+        verified_identities: [{ ...identity, provider: 'workos' }],
+      }).success
+    ).toBe(false);
+    expect(
+      AccountImportRequestSchema.safeParse({ ...base, primary_email: 'User@example.com' }).success
+    ).toBe(false);
+  });
+
+  it('describe the user-created event the app consumes', () => {
+    expect(
+      AppUserCreatedEventSchema.parse({
+        event_id: '00000000-0000-4000-8000-000000000002',
+        type: 'user.created',
+        occurred_at: '2026-11-26T12:00:00.000Z',
+        account: { id: `uts_${'a'.repeat(26)}`, primary_email: 'new@example.com' },
+      }).account.id
+    ).toMatch(UTS_CREATED_ACCOUNT_ID);
+    expect(
+      AppUserCreatedEventSchema.safeParse({
+        event_id: '00000000-0000-4000-8000-000000000002',
+        type: 'user.created',
+        occurred_at: '2026-11-26T12:00:00.000Z',
+        account: { id: 'oauth/google:1', primary_email: 'new@example.com' },
+      }).success
     ).toBe(false);
   });
 });

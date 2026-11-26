@@ -637,25 +637,33 @@ describe('code exchange', () => {
     expect(stored.rows).toEqual([{ status: 'revoked' }]);
   });
 
-  it('rotates a third-party family to the retried token', async () => {
+  it('revokes a third-party family when the same exchange comes again', async () => {
     const accountId = await insertAccount(owner);
     const family = await thirdPartyFamily(accountId);
-    const retryToken = token();
-    const retried = await grants.exchangeCode({
-      ...family.exchange,
-      refreshTokenHash: sha256(retryToken),
-    });
-    expect(retried).toMatchObject({ outcome: 'issued', subjectId: accountId });
-    const tokens = await owner.query(
-      `SELECT token_hash, status, grace_until - rotated_at AS grace
-       FROM uts.third_party_refresh_tokens WHERE family_id = $1 ORDER BY issued_at, parent_id NULLS FIRST`,
+    // Same client, redirect URI and verifier inside the code lifetime: a third-party client has no
+    // DPoP key, so the verifier alone does not show the same client instance.
+    expect(
+      await grants.exchangeCode({ ...family.exchange, refreshTokenHash: sha256(token()) })
+    ).toEqual({ outcome: 'invalid_grant' });
+    const stored = await owner.query(
+      'SELECT status, revoke_reason FROM uts.third_party_grant_families WHERE id = $1',
       [family.familyId]
     );
-    expect(tokens.rows).toEqual([
-      { token_hash: sha256(family.refreshToken), status: 'rotated', grace: { minutes: 1 } },
-      { token_hash: sha256(retryToken), status: 'active', grace: null },
-    ]);
-    expect((await refreshThirdParty(family.clientId, retryToken).result).outcome).toBe('issued');
+    expect(stored.rows).toEqual([{ status: 'revoked', revoke_reason: 'reuse_detected' }]);
+    const tokens = await owner.query(
+      'SELECT token_hash, status FROM uts.third_party_refresh_tokens WHERE family_id = $1',
+      [family.familyId]
+    );
+    expect(tokens.rows).toEqual([{ token_hash: sha256(family.refreshToken), status: 'active' }]);
+    const rows = await auditRows(accountId);
+    expect(rows.at(-1)).toMatchObject({
+      type: 'ai.kilo.uts.authorization_code.reused',
+      event: { data: { outcome: 'denied', attributes: { grantId: family.familyId } } },
+    });
+    expect(rows.map(row => row.event.data.attributes.rotation)).not.toContain('code_retry');
+    expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
+      outcome: 'invalid_grant',
+    });
   });
 
   it('creates a third-party family whose id is the grant id, with its first token', async () => {

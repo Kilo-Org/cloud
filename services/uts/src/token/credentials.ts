@@ -56,9 +56,9 @@ function uuidOfBase64url(value: string): string | null {
 /**
  * The grant id a code exchange creates: a version 8 uuid (RFC 9562) from the first 16 bytes of
  * SHA-256 over a fixed label and the code. Every attempt with one code names the same grant, so a
- * retried exchange gets the grant the first attempt created, and the proof `jti`s of all attempts
- * are recorded under one grant. The id is public (the `sid` of every token); a hash under another
- * label than the stored code hash, it reveals nothing of the code.
+ * retried first-party exchange gets the grant the first attempt created, and the proof `jti`s of
+ * all attempts are recorded under one grant. The id is public (the `sid` of every token); a hash
+ * under another label than the stored code hash, it reveals nothing of the code.
  */
 export async function grantIdOfCode(code: string): Promise<string> {
   const bytes = (await sha256(`${GRANT_ID_LABEL}${code}`)).slice(0, 16);

@@ -430,17 +430,18 @@ $$;
 -- the new grant id from the code, so every attempt with one code names one grant; the grant id is
 -- the `sid` of every token.
 --
--- A retry (design 5.4): when signing, or anything else after this statement committed, failed,
--- the client sends the same request again. The same client, redirect URI, PKCE challenge and DPoP
--- key presenting the consumed code while the code's 60-second lifetime lasts get the same grant
--- and new tokens, and the code is not counted as reused. Only hashes are stored, so the retry
--- stores a new refresh token and the newest one wins: a first-party grant's token hash is
--- replaced, so the earlier token is unknown from then on; a third-party family rotates to the new
--- token, and the earlier one becomes a rotated token, whose use after its 60-second grace revokes
--- the family. The retry writes a `token.issued` row (`rotation` `code_retry`) instead of a second
--- `grant.created`. Any other use of a consumed code (another client, redirect URI, verifier or
--- key, or after the code's lifetime) revokes the grant it created and fails (RFC 6749 section
--- 4.1.2).
+-- A retry (design 5.4), first party only: when signing, or anything else after this statement
+-- committed, failed, the client sends the same request again. The same first-party client,
+-- redirect URI, PKCE challenge and DPoP key presenting the consumed code while the code's
+-- 60-second lifetime lasts get the same grant and new tokens, and the code is not counted as
+-- reused; the DPoP key and a fresh proof `jti` show it is the same client instance. Only hashes
+-- are stored, so the retry replaces the grant's token hash and the earlier refresh token is
+-- unknown from then on. The retry writes a `token.issued` row (`rotation` `code_retry`) instead of
+-- a second `grant.created`. Any other use of a consumed code (another client, redirect URI,
+-- verifier or key, after the code's lifetime, or any second use by a third-party client, whose
+-- only proof is the PKCE verifier) revokes the grant it created and fails (OAuth 2.1 section
+-- 4.1.2, RFC 6749 section 4.1.2). A third-party client that lost its response authorizes again;
+-- its consent stands, so it sees no consent screen.
 --
 -- The audit row lists the `jti` each token will carry: the Worker signs the tokens after the
 -- statement commits, so a failed signing leaves ids no token carries, and the retry lists new ids.
@@ -490,9 +491,7 @@ DECLARE
   new_session_id uuid;
   idle_window interval;
   grant_state uts.grant_status;
-  family_end timestamptz;
   previous_hash bytea;
-  previous_token_id uuid;
 BEGIN
   SELECT * INTO code FROM uts.authorization_codes AS stored WHERE stored.code_hash = p_code_hash
   FOR UPDATE;
@@ -510,7 +509,9 @@ BEGIN
     AND (code.client_kind = 'first_party') = (p_client_class IS NOT NULL);
   retry := code.status = 'consumed';
 
-  IF retry AND NOT (same_request AND code.grant_id = p_grant_id) THEN
+  IF retry AND NOT (
+    same_request AND code.grant_id = p_grant_id AND code.client_kind = 'first_party'
+  ) THEN
     revoked_account := uts.end_grant(code.client_kind, code.grant_id, 'reuse_detected');
     IF revoked_account IS NOT NULL THEN
       PERFORM uts.write_audit_event(
@@ -604,7 +605,7 @@ BEGIN
     INSERT INTO uts.third_party_refresh_tokens (family_id, token_hash, idle_expires_at)
     VALUES (p_grant_id, p_refresh_token_hash, now() + interval '30 days');
     refresh_expires_at := now() + interval '30 days';
-  ELSIF code.client_kind = 'first_party' THEN
+  ELSE
     SELECT grant_row.status, grant_row.token_hash,
       least(grant_row.idle_expires_at, grant_row.expires_at)
     INTO grant_state, previous_hash, refresh_expires_at
@@ -617,27 +618,6 @@ BEGIN
     END IF;
     UPDATE uts.refresh_grants AS grant_row SET token_hash = p_refresh_token_hash
     WHERE grant_row.id = p_grant_id;
-  ELSE
-    SELECT family.status, family.expires_at INTO grant_state, family_end
-    FROM uts.third_party_grant_families AS family WHERE family.id = p_grant_id
-    FOR UPDATE;
-    IF grant_state IS DISTINCT FROM 'active' THEN
-      outcome := 'invalid_grant';
-      RETURN NEXT;
-      RETURN;
-    END IF;
-    UPDATE uts.third_party_refresh_tokens AS token
-    SET status = 'rotated', rotated_at = now(), grace_until = now() + interval '60 seconds'
-    WHERE token.family_id = p_grant_id AND token.status = 'active'
-    RETURNING token.id, token.token_hash INTO previous_token_id, previous_hash;
-    IF NOT FOUND THEN
-      outcome := 'invalid_grant';
-      RETURN NEXT;
-      RETURN;
-    END IF;
-    refresh_expires_at := least(now() + interval '30 days', family_end);
-    INSERT INTO uts.third_party_refresh_tokens (family_id, parent_id, token_hash, idle_expires_at)
-    VALUES (p_grant_id, previous_token_id, p_refresh_token_hash, refresh_expires_at);
   END IF;
 
   token_ids := ARRAY(SELECT gen_random_uuid() FROM generate_series(1, cardinality(chosen.scopes)));

@@ -148,16 +148,18 @@ grant id picks signs all of them, and `issued_tokens` lists them. The claims are
 failure no retry fixes gives 500.
 
 The tokens are signed after the statement commits. When signing fails (or the response is lost),
-the client sends the same code exchange again with a new DPoP proof. While the code's 60-second
-lifetime lasts, the same client, redirect URI, PKCE verifier and DPoP key get the grant the first
-attempt created, new access tokens and a new refresh token, and the code does not count as
-reused. Only hashes are stored, so the newest refresh token wins: a first-party grant's token hash
-is replaced, and the earlier token is unknown from then on; a third-party family rotates to the
-new token, and the earlier one becomes a rotated token whose use after its grace revokes the
-family. A consumed code with another client, redirect URI, verifier or key, or after its
-lifetime, still revokes the grant. The audit row of a mint lists the `jti` of each token the call
-is about to sign: after a failed signing no token carries those ids, and the retry's row
-(`token.issued`, `rotation` `code_retry`) lists the ids of the tokens it signs.
+a first-party client sends the same code exchange again with a new DPoP proof. While the code's
+60-second lifetime lasts, the same client, redirect URI, PKCE verifier and DPoP key get the grant
+the first attempt created, new access tokens and a new refresh token, and the code does not count
+as reused: the device key and a fresh proof show the same client instance. Only hashes are
+stored, so the newest refresh token wins: the grant's token hash is replaced, and the earlier
+token is unknown from then on. A third-party client has only its PKCE verifier, so any second use
+of its code revokes the family (OAuth 2.1 section 4.1.2); a third-party client that lost its
+response authorizes again, and its consent stands, so it sees no consent screen. A consumed code
+with another client, redirect URI, verifier or key, or after its lifetime, still revokes the
+grant. The audit row of a mint lists the `jti` of each token the call is about to sign: after a
+failed signing no token carries those ids, and the retry's row (`token.issued`, `rotation`
+`code_retry`) lists the ids of the tokens it signs.
 
 ## Tests
 

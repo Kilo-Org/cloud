@@ -3,6 +3,7 @@ import { parse } from 'yaml';
 import { sha256Base64Url } from '../crypto/hash';
 import {
   PolicySchema,
+  isLeaseDynamicGrant,
   policyFileProblems,
   vercelEnvironmentKey,
   type DynamicGrant,
@@ -16,12 +17,25 @@ export type PolicySnapshotEntry = {
   secrets: string[];
   audiences: string[];
   scopes: string[];
-  /** One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant. */
+  /**
+   * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant, and one
+   * `cloudflare-deploy:<permissionSet>:<ttlSeconds>:<maxActive>:<maxPerHour>:<groups>:<zones>` with
+   * the first 8 characters of each sorted id, so a changed group or zone shows.
+   */
   dynamic: string[];
 };
 
 function dynamicKey(entry: DynamicGrant): string {
-  return `${entry.grant}:${entry.maxTtlSeconds}:${entry.defaultTtlSeconds}:${entry.maxActive}`;
+  if (isLeaseDynamicGrant(entry)) {
+    return `${entry.grant}:${entry.maxTtlSeconds}:${entry.defaultTtlSeconds}:${entry.maxActive}`;
+  }
+  const short = (ids: string[]) =>
+    [...ids]
+      .sort()
+      .map(id => id.slice(0, 8))
+      .join('+');
+  const groups = short(entry.permissionGroups.map(group => group.id));
+  return `${entry.grant}:${entry.permissionSet}:${entry.ttlSeconds}:${entry.maxActive}:${entry.maxPerHour}:${groups}:${short(entry.zones)}`;
 }
 
 export type PolicyIndex = {

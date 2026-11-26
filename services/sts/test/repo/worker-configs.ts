@@ -111,6 +111,7 @@ export const STS_CLASS_NAMES: readonly string[] = [
   'DenialDO',
   'TokenSignerDO',
   'LeaseDO',
+  'DeployTokenDO',
 ];
 
 // Prefix matches, wider than the deployment lists on purpose: a binding to a name that only looks

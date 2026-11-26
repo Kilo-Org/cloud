@@ -11,7 +11,7 @@ import {
 import type { PolicySnapshotEntry } from '../policy/load';
 import type { KeyRevocation, KeyRingChange } from '../tokens/key-ring';
 import type { GithubRun } from '../identity/verify';
-import type { BundleDenial, LeaseDenial, TokenDenial } from './denials';
+import type { BundleDenial, DeployTokenDenial, LeaseDenial, TokenDenial } from './denials';
 
 /** Attributes hold at most 256 values; longer lists are cut and flagged. */
 function attributeList(values: string[]): { values: string[]; truncated: boolean } {
@@ -546,6 +546,214 @@ export function leaseDeniedEvent(input: {
         workload: denial.actor,
         ...(denial.grant === undefined ? {} : { grant: denial.grant }),
         ...(denial.leaseId === undefined ? {} : { leaseId: denial.leaseId }),
+        count: input.count,
+        windowStart: input.windowStart,
+        overflow: input.overflow,
+        claims,
+      },
+    },
+  });
+}
+
+/** Who asked for a Cloudflare deploy token: a verified GitHub job of a policy workload. */
+export type DeployTokenAuditCaller = LeaseAuditCaller & { run: GithubRun };
+
+/**
+ * One Cloudflare deploy token STS handed to its caller (design 4.4: every mint audited): the
+ * permission set and its groups, the token's id, name and expiry, and the job's run. Never the
+ * token value or the minting credential. `intendedScripts` repeats the policy's list for review;
+ * Cloudflare does not limit the token to them.
+ */
+export function deployTokenMintedEvent(input: {
+  environment: StsEnvironment;
+  caller: DeployTokenAuditCaller;
+  permissionSet: string;
+  tokenId: string;
+  tokenName: string;
+  ttlSeconds: number;
+  expiresAt: number;
+  permissionGroups: string[];
+  zones: string[];
+  intendedScripts: string[];
+}): AuditEvent {
+  const { caller } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.minted',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.create,
+      outcome: 'success',
+      actor: { kind: 'workload', id: caller.workload },
+      attributes: {
+        workload: caller.workload,
+        environment: input.environment,
+        identity: caller.identity,
+        channel: caller.channel,
+        provider: 'cloudflare',
+        permissionSet: input.permissionSet,
+        tokenId: input.tokenId,
+        tokenName: input.tokenName,
+        ttlSeconds: input.ttlSeconds,
+        expiresAt: new Date(input.expiresAt).toISOString(),
+        permissionGroups: [...input.permissionGroups],
+        zones: [...input.zones],
+        intendedScripts: [...input.intendedScripts],
+        ...runAttributes(caller.run),
+      },
+    },
+  });
+}
+
+/**
+ * Why STS deletes a deploy token: its caller asked (`caller`); it expired (`expired`, the reaper);
+ * or STS could not hand it over (`late`: the creation outlasted its budget; `expiry_mismatch`:
+ * Cloudflare's expiry is not the one asked for; `grant_mismatch`: its permission groups are not
+ * the ones asked for, or one administers tokens or members; `audit_failed`: the mint row could not
+ * be written).
+ */
+export type DeployTokenDeleteCause =
+  | 'caller'
+  | 'expired'
+  | 'late'
+  | 'expiry_mismatch'
+  | 'grant_mismatch'
+  | 'audit_failed';
+
+/**
+ * What the deletion at Cloudflare gave: `deleted`; `gone` (Cloudflare no longer had it); or
+ * `delete_failed` (Cloudflare could not be reached or refused, and the object retries until it
+ * succeeds; a later row records the success).
+ */
+export type DeployTokenDeletionResult = 'deleted' | 'gone' | 'delete_failed';
+
+/** A deletion of a token STS handed over or tried to: the caller's revoke, or a failed hand-over. */
+export function deployTokenRevokedEvent(input: {
+  environment: StsEnvironment;
+  caller: DeployTokenAuditCaller;
+  permissionSet: string;
+  tokenId: string;
+  cause: Exclude<DeployTokenDeleteCause, 'expired'>;
+  result: DeployTokenDeletionResult;
+}): AuditEvent {
+  const { caller } = input;
+  const failed = input.result === 'delete_failed';
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.revoked',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.delete,
+      outcome: failed ? 'failure' : 'success',
+      outcomeDetail: failed ? 'delete_failed' : input.cause,
+      actor:
+        input.cause === 'caller'
+          ? { kind: 'workload', id: caller.workload }
+          : { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        workload: caller.workload,
+        environment: input.environment,
+        identity: caller.identity,
+        channel: caller.channel,
+        provider: 'cloudflare',
+        permissionSet: input.permissionSet,
+        tokenId: input.tokenId,
+        cause: input.cause,
+        result: input.result,
+        ...runAttributes(caller.run),
+      },
+    },
+  });
+}
+
+/**
+ * The reaper deleted an expired token, so the account's 500-token cap never fills: one STS holds a
+ * row for (`source: ledger`, with its workload and run), or one named for this environment that
+ * STS holds no row for, found by the sweep of the account's token list (`source: sweep`: a creation
+ * whose answer was lost).
+ */
+export function deployTokenReapedEvent(input: {
+  environment: StsEnvironment;
+  source: 'ledger' | 'sweep';
+  caller: DeployTokenAuditCaller | null;
+  permissionSet: string | null;
+  tokenId: string;
+  tokenName: string | null;
+  expiresAt: number | null;
+  result: DeployTokenDeletionResult;
+}): AuditEvent {
+  const { caller } = input;
+  const failed = input.result === 'delete_failed';
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.reaped',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.delete,
+      outcome: failed ? 'failure' : 'success',
+      outcomeDetail: failed ? 'delete_failed' : 'expired',
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        provider: 'cloudflare',
+        source: input.source,
+        tokenId: input.tokenId,
+        result: input.result,
+        ...(caller === null ? {} : { workload: caller.workload }),
+        ...(input.permissionSet === null ? {} : { permissionSet: input.permissionSet }),
+        ...(input.tokenName === null ? {} : { tokenName: input.tokenName.slice(0, 512) }),
+        ...(input.expiresAt === null ? {} : { expiresAt: new Date(input.expiresAt).toISOString() }),
+        ...(caller === null ? {} : runAttributes(caller.run)),
+      },
+    },
+  });
+}
+
+/** `count` identical refused deploy-token or revoke requests in the minute starting at `windowStart`. */
+export function deployTokenDeniedEvent(input: {
+  environment: StsEnvironment;
+  denial: DeployTokenDenial;
+  count: number;
+  windowStart: string;
+  overflow: boolean;
+}): AuditEvent {
+  const { denial } = input;
+  const claims = Object.keys(denial.claims)
+    .sort()
+    .map(name => `${name}=${denial.claims[name]}`.slice(0, 256));
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.deploy_token.denied',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId:
+        denial.tokenId === undefined ? OCSF_API_ACTIVITY.create : OCSF_API_ACTIVITY.delete,
+      outcome: 'denied',
+      outcomeDetail: denial.reason,
+      actor: { kind: 'service', id: denial.actor },
+      attributes: {
+        environment: input.environment,
+        channel: denial.channel,
+        reason: denial.reason,
+        workload: denial.actor,
+        provider: 'cloudflare',
+        ...(denial.tokenId === undefined ? {} : { tokenId: denial.tokenId }),
         count: input.count,
         windowStart: input.windowStart,
         overflow: input.overflow,

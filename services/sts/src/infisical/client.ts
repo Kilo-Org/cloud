@@ -1,6 +1,12 @@
 import { z } from 'zod';
-import { MANAGER_FETCH_TIMEOUT_MS } from '../constants';
+import { MANAGER_FETCH_TIMEOUT_MS, MINTING_FOLDER } from '../constants';
 import type { ManagerConfig } from '../env';
+
+/** One minting credential; its value stays in the deploy-token object's memory. */
+export type MintingSecretRead =
+  | { status: 'ok'; value: string }
+  | { status: 'missing' }
+  | { status: 'unreachable'; detail: string; retryAfterMs: number | null };
 
 /** The folders the refresher reads in each environment (design 4.2); `/ci` only for GitHub policies. */
 export type ManagerFolder = '/workloads' | '/shared' | '/ci';
@@ -157,10 +163,12 @@ export class InfisicalClient {
    * Reads one folder and everything below it. A folder the manager does not have is an empty
    * folder; a transport failure, a timeout, 429, 5xx, a refused login, another 4xx or a malformed
    * body is unreachable. https://infisical.com/docs/api-reference/endpoints/secrets/list
+   * The minting credentials under `MINTING_FOLDER` never leave this method: the `/ci` read drops
+   * them before anything else sees them (README "Cloudflare deploy tokens").
    */
   async readFolder(folder: ManagerFolder, ifNoneMatch: string | null): Promise<FolderRead> {
     try {
-      return await this.performRead(folder, ifNoneMatch);
+      return await this.performRead(folder, true, ifNoneMatch);
     } catch (error) {
       if (error instanceof ManagerUnreachableError) {
         return { status: 'unreachable', detail: error.detail, retryAfterMs: error.retryAfterMs };
@@ -169,8 +177,35 @@ export class InfisicalClient {
     }
   }
 
+  /**
+   * Reads one minting credential from `MINTING_FOLDER` itself, nothing below it. `missing` when the
+   * folder or the name is absent, hidden from this identity, or a value in reference syntax.
+   */
+  async readMintingSecret(name: string): Promise<MintingSecretRead> {
+    let read: FolderRead;
+    try {
+      read = await this.performRead(MINTING_FOLDER, false, null);
+    } catch (error) {
+      if (error instanceof ManagerUnreachableError) {
+        return { status: 'unreachable', detail: error.detail, retryAfterMs: error.retryAfterMs };
+      }
+      throw error;
+    }
+    if (read.status !== 'fresh') {
+      return { status: 'unreachable', detail: 'manager answered 304', retryAfterMs: null };
+    }
+    const entry = read.entries.find(
+      candidate => candidate.path === MINTING_FOLDER && candidate.name === name
+    );
+    if (entry === undefined || entry.value === '' || entry.value.startsWith('${')) {
+      return { status: 'missing' };
+    }
+    return { status: 'ok', value: entry.value };
+  }
+
   private async performRead(
-    folder: ManagerFolder,
+    folder: string,
+    recursive: boolean,
     ifNoneMatch: string | null
   ): Promise<FolderRead> {
     const token = await this.login();
@@ -178,7 +213,7 @@ export class InfisicalClient {
     url.searchParams.set('projectId', this.config.projectId);
     url.searchParams.set('environment', this.config.environmentSlug);
     url.searchParams.set('secretPath', folder);
-    url.searchParams.set('recursive', 'true');
+    url.searchParams.set('recursive', String(recursive));
     url.searchParams.set('expandSecretReferences', 'false');
     url.searchParams.set('includeImports', 'false');
     url.searchParams.set('viewSecretValue', 'true');
@@ -210,13 +245,16 @@ export class InfisicalClient {
     const entries: ManagerEntry[] = [];
     let hidden = 0;
     for (const secret of parsed.data.secrets) {
+      const path = (secret.secretPath ?? folder).replace(/(.)\/+$/, '$1');
+      const minting = path === MINTING_FOLDER || path.startsWith(`${MINTING_FOLDER}/`);
+      if (folder !== MINTING_FOLDER && minting) continue;
       if (secret.type !== 'shared') continue;
       if (secret.secretValueHidden) {
         hidden += 1;
         continue;
       }
       entries.push({
-        path: (secret.secretPath ?? folder).replace(/(.)\/+$/, '$1'),
+        path,
         name: secret.secretKey,
         id: secret.id,
         version: secret.version,

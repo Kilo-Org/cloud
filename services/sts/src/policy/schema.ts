@@ -1,5 +1,7 @@
 import {
   AudienceSchema,
+  CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS,
+  CLOUDFLARE_DEPLOY_MIN_TTL_SECONDS,
   LEASE_GRANT_MAX_TTL_SECONDS,
   LEASE_MIN_TTL_SECONDS,
   LeaseGrantSchema,
@@ -15,6 +17,7 @@ import {
   type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
+import { MINTING_FOLDER, MINTING_SECRET_NAMES } from '../constants';
 
 const SlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
 const StableIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -182,14 +185,96 @@ export const LEASE_MAX_ACTIVE_CEILING: Readonly<Record<LeaseGrant, number>> = {
  * One database lease grant (design 6.3 `dynamic`): the Infisical dynamic secret, the longest and
  * the default lifetime a request gets, and how many leases of it the workload may hold at once.
  */
-const DynamicGrantSchema = z.strictObject({
+const LeaseDynamicGrantSchema = z.strictObject({
   grant: LeaseGrantSchema,
   maxTtlSeconds: z.number().int().min(LEASE_MIN_TTL_SECONDS),
   defaultTtlSeconds: z.number().int().min(LEASE_MIN_TTL_SECONDS),
   maxActive: z.number().int().min(1),
 });
 
+export type LeaseDynamicGrant = z.infer<typeof LeaseDynamicGrantSchema>;
+
+export const CLOUDFLARE_DEPLOY_GRANT = 'cloudflare-deploy';
+
+/** The most unexpired Cloudflare deploy tokens, and mints per hour, a policy may allow. */
+export const CLOUDFLARE_DEPLOY_MAX_ACTIVE_CEILING = 3;
+export const CLOUDFLARE_DEPLOY_MAX_PER_HOUR_CEILING = 12;
+
+/** A Cloudflare account, zone or permission-group id: 32 lowercase hexadecimal characters. */
+export const CloudflareIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
+
+/**
+ * A permission group no deploy token may hold, matched on the name the policy declares and on the
+ * name Cloudflare returns for the minted token: a token that can create API tokens or manage
+ * members can make a credential that outlives the 1-hour bound.
+ */
+export const FORBIDDEN_PERMISSION_GROUP_NAME = /api[ _-]?tokens?|member/i;
+
+/**
+ * One Cloudflare permission group, by the id Cloudflare lists at
+ * `GET /accounts/<account>/tokens/permission_groups`, resolved when the policy is written (README
+ * "Cloudflare deploy tokens"). STS sends only the id. `name` is for people reading the policy and
+ * for the load-time check of `FORBIDDEN_PERMISSION_GROUP_NAME`; `scope` says which resource the
+ * group applies to: the account of `CF_DEPLOY_ACCOUNT_ID`, or each listed zone.
+ */
+const CloudflarePermissionGroupSchema = z.strictObject({
+  id: CloudflareIdSchema,
+  name: z.string().min(1).max(100),
+  scope: z.enum(['account', 'zone']),
+});
+
+/**
+ * One Cloudflare deploy-token grant (design 4.5, 6.3 `dynamic`): the permission set a GitHub
+ * deploy job's token carries, its lifetime, and the workload's limits. `intendedScripts` names the
+ * Workers the job deploys, for audit and review only: Cloudflare's API cannot limit an API token to
+ * named Workers, so the token can change every Worker its permission groups reach in the account.
+ */
+export const CloudflareDeployGrantSchema = z.strictObject({
+  grant: z.literal(CLOUDFLARE_DEPLOY_GRANT),
+  permissionSet: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
+  permissionGroups: z.array(CloudflarePermissionGroupSchema).min(1).max(8),
+  zones: z.array(CloudflareIdSchema).max(4).default([]),
+  intendedScripts: z
+    .array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/))
+    .min(1)
+    .max(16),
+  ttlSeconds: z
+    .number()
+    .int()
+    .min(CLOUDFLARE_DEPLOY_MIN_TTL_SECONDS)
+    .max(CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS)
+    .default(CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS),
+  maxActive: z.number().int().min(1),
+  maxPerHour: z.number().int().min(1),
+});
+
+export type CloudflareDeployGrant = z.infer<typeof CloudflareDeployGrantSchema>;
+
+const DynamicGrantSchema = z.discriminatedUnion('grant', [
+  LeaseDynamicGrantSchema,
+  CloudflareDeployGrantSchema,
+]);
+
 export type DynamicGrant = z.infer<typeof DynamicGrantSchema>;
+
+export function isLeaseDynamicGrant(entry: DynamicGrant): entry is LeaseDynamicGrant {
+  return entry.grant !== CLOUDFLARE_DEPLOY_GRANT;
+}
+
+/** The policy's lease entry for `grant`, or undefined when it lists none. */
+export function leaseDynamicGrant(
+  policy: Policy,
+  grant: LeaseGrant
+): LeaseDynamicGrant | undefined {
+  return policy.dynamic.filter(isLeaseDynamicGrant).find(entry => entry.grant === grant);
+}
+
+/** The policy's Cloudflare deploy-token entry, or undefined when it lists none. */
+export function cloudflareDeployGrant(policy: Policy): CloudflareDeployGrant | undefined {
+  return policy.dynamic.find(
+    (entry): entry is CloudflareDeployGrant => entry.grant === CLOUDFLARE_DEPLOY_GRANT
+  );
+}
 
 export const PolicySchema = z.strictObject({
   workload: WorkloadNameSchema,
@@ -200,8 +285,14 @@ export const PolicySchema = z.strictObject({
   audiences: z.array(AudienceSchema.max(63)).max(64).default([]),
   /** Scopes it may hold, each from `STS_SCOPE_REGISTRY` and under one of `audiences`. */
   scopes: z.array(ScopeSchema.max(127)).max(256).default([]),
-  /** Database leases it may request, one entry per grant; empty requests none (default deny). */
-  dynamic: z.array(DynamicGrantSchema).max(LeaseGrantSchema.options.length).default([]),
+  /**
+   * Database leases and CI deploy tokens it may request, one entry per grant; empty requests none
+   * (default deny).
+   */
+  dynamic: z
+    .array(DynamicGrantSchema)
+    .max(LeaseGrantSchema.options.length + 1)
+    .default([]),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;
@@ -233,6 +324,10 @@ function dynamicProblems(policy: Policy): string[] {
     problems.push('dynamic lists a grant twice');
   }
   for (const entry of policy.dynamic) {
+    if (!isLeaseDynamicGrant(entry)) {
+      problems.push(...cloudflareDeployProblems(policy, entry));
+      continue;
+    }
     const ceiling = LEASE_GRANT_MAX_TTL_SECONDS[entry.grant];
     if (entry.maxTtlSeconds > ceiling) {
       problems.push(`dynamic ${entry.grant}: maxTtlSeconds is above ${ceiling}`);
@@ -258,6 +353,62 @@ function dynamicProblems(policy: Policy): string[] {
         );
       }
     }
+  }
+  return problems;
+}
+
+/**
+ * A Cloudflare deploy-token grant serves only a GitHub job bound to a protected GitHub environment
+ * (production also needs `refs/heads/main`, checked with the other GitHub rules). Every zone-scoped
+ * group needs a zone, every zone a zone-scoped group, and no group may administer tokens or members.
+ */
+function cloudflareDeployProblems(policy: Policy, entry: CloudflareDeployGrant): string[] {
+  const problems: string[] = [];
+  const { identity } = policy;
+  if (identity.kind !== 'github-oidc') {
+    problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT} is only for a github-oidc policy`);
+  } else if (identity.environment === undefined) {
+    problems.push(
+      `a github-oidc policy with dynamic ${CLOUDFLARE_DEPLOY_GRANT} must bind identity.environment`
+    );
+  }
+  if (entry.maxActive > CLOUDFLARE_DEPLOY_MAX_ACTIVE_CEILING) {
+    problems.push(
+      `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: maxActive is above ${CLOUDFLARE_DEPLOY_MAX_ACTIVE_CEILING}`
+    );
+  }
+  if (entry.maxPerHour > CLOUDFLARE_DEPLOY_MAX_PER_HOUR_CEILING) {
+    problems.push(
+      `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: maxPerHour is above ${CLOUDFLARE_DEPLOY_MAX_PER_HOUR_CEILING}`
+    );
+  }
+  if (entry.maxPerHour < entry.maxActive) {
+    problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: maxPerHour is below maxActive`);
+  }
+  if (hasDuplicates(entry.permissionGroups.map(group => group.id))) {
+    problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permissionGroups lists a group twice`);
+  }
+  if (hasDuplicates(entry.zones)) {
+    problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: zones contains a duplicate`);
+  }
+  if (hasDuplicates(entry.intendedScripts)) {
+    problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: intendedScripts contains a duplicate`);
+  }
+  for (const group of entry.permissionGroups) {
+    if (FORBIDDEN_PERMISSION_GROUP_NAME.test(group.name)) {
+      problems.push(
+        `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permission group ${group.name} administers tokens or members`
+      );
+    }
+  }
+  const zoneScoped = entry.permissionGroups.some(group => group.scope === 'zone');
+  if (zoneScoped && entry.zones.length === 0) {
+    problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: a zone-scoped permission group needs zones`);
+  }
+  if (!zoneScoped && entry.zones.length > 0) {
+    problems.push(
+      `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: zones without a zone-scoped permission group`
+    );
   }
   return problems;
 }
@@ -352,6 +503,11 @@ export function policyFileProblems(
     if (ENVIRONMENT_SUFFIX.test(name)) {
       problems.push(
         `secret ${name} carries an environment suffix; the manager environment picks it`
+      );
+    }
+    if (MINTING_SECRET_NAMES.includes(name)) {
+      problems.push(
+        `secret ${name} is a minting credential (${MINTING_FOLDER}); no policy may be granted it`
       );
     }
   }

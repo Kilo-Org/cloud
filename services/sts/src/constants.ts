@@ -181,3 +181,73 @@ export const LEASE_EXPIRY_TOLERANCE_MS = 2 * 60 * 1000;
 
 /** A lease row stays this long after the lease ended, for revoke answers and the rate count. */
 export const LEASE_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The manager folder that holds the token-minting credentials (design 4.4). Only the deploy-token
+ * object reads it, with a read of its own; the refresher drops it from its `/ci` copy, and no
+ * policy may name a secret in `MINTING_SECRET_NAMES`, so no bundle can carry one.
+ */
+export const MINTING_FOLDER = '/ci/minting';
+
+/**
+ * The Cloudflare account API token that creates deploy tokens: `Account API Tokens Write` plus the
+ * deploy permission groups, owned by the dedicated account member (README "Cloudflare deploy
+ * tokens").
+ */
+export const CLOUDFLARE_MINTING_TOKEN_SECRET = 'CLOUDFLARE_MINTING_TOKEN';
+
+export const MINTING_SECRET_NAMES: readonly string[] = [CLOUDFLARE_MINTING_TOKEN_SECRET];
+
+/**
+ * The deploy-token object reuses a minting credential it read this long ago, and reads it again
+ * after that (a rotation reaches it within 4 minutes) or at once after Cloudflare refused it.
+ */
+export const MINTING_CREDENTIAL_CACHE_MS = REFRESH_INTERVAL_MS;
+
+/** Bound on one Cloudflare API request. */
+export const CLOUDFLARE_FETCH_TIMEOUT_MS = 8_000;
+
+/** A deploy-token request body is `{}` or a token id; anything above this is refused unread. */
+export const DEPLOY_TOKEN_REQUEST_MAX_BODY_BYTES = 1024;
+
+/**
+ * The deploy-token object gives up on a token whose creation took longer than this, measured from
+ * when STS called the object, and checked again after the `deploy_token.minted` row is written: it
+ * deletes the token and answers `unavailable`, so no token outlives a caller that stopped waiting.
+ * A creation is at most a manager login, one manager read and one Cloudflare create, 8 seconds
+ * each.
+ */
+export const DEPLOY_TOKEN_MINT_BUDGET_MS = 30_000;
+
+/** STS stops waiting for the deploy-token object after this long, past the object's own budget. */
+export const DEPLOY_TOKEN_OBJECT_DEADLINE_MS = 35_000;
+
+/** A failed mint or revoke call: the caller retries after this many seconds. */
+export const DEPLOY_TOKEN_RETRY_AFTER_SECONDS = 30;
+
+/** Cloudflare's `expires_on` may differ from the requested one by this much; else it is deleted. */
+export const DEPLOY_TOKEN_EXPIRY_TOLERANCE_MS = 2 * 60 * 1000;
+
+/**
+ * An owed deletion Cloudflare could not take is retried no sooner than this after its last
+ * attempt, doubling per failure up to `DEPLOY_TOKEN_DELETE_RETRY_CAP_MS`, or after Cloudflare's
+ * `Retry-After` when longer. Unlike an Infisical lease, an expired Cloudflare token stays in the
+ * account and counts against its 500-token cap, so a deletion stays owed until it succeeds.
+ */
+export const DEPLOY_TOKEN_DELETE_RETRY_MS = 30_000;
+export const DEPLOY_TOKEN_DELETE_RETRY_CAP_MS = 60 * 60 * 1000;
+
+/** Owed deletions one alarm makes, least recently tried first; the next alarm takes the rest. */
+export const DEPLOY_TOKEN_DELETES_PER_ALARM = 5;
+
+/**
+ * The sweep lists the account's tokens and deletes expired ones that STS named for this
+ * environment but holds no row for (a creation whose answer was lost). It runs daily and once more
+ * after each creation whose outcome STS does not know, at most this many list pages per alarm.
+ */
+export const DEPLOY_TOKEN_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const DEPLOY_TOKEN_SWEEP_PAGES_PER_ALARM = 2;
+export const DEPLOY_TOKEN_SWEEP_PAGE_SIZE = 50;
+
+/** A deploy-token row stays this long after its token was deleted, for revoke answers and limits. */
+export const DEPLOY_TOKEN_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;

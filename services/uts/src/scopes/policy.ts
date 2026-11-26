@@ -16,12 +16,13 @@ export type ScopeRegistry = (scope: string) => UtsScopeEntry | null;
 export type MintClient = { kind: 'first_party' | 'third_party'; clientId: string };
 
 /**
- * The first of `scopes` that `client` may not hold, or null when it may hold every one (design
- * 5.3, 5.9): a scope the registry does not list; for a first-party client, a scope whose
- * `allowedClients` does not name it; for a third-party client, a scope that is not third-party-safe
- * or does not allow `third_party`. The authorization endpoint answers `invalid_scope` before the
- * hand-off, so a code or grant only ever holds scopes its client may hold; the token endpoint
- * checks the requested scopes before its statement and the minted scopes before signing.
+ * The first of `scopes` that `client` may not hold through a grant, or null when it may hold every
+ * one (design 5.3, 5.9): a scope the registry does not list; a scope only the broker exchange
+ * mints (`issuance: 'token_exchange'`); for a first-party client, a scope whose `allowedClients`
+ * does not name it; for a third-party client, a scope that is not third-party-safe or does not
+ * allow `third_party`. The authorization endpoint answers `invalid_scope` before the hand-off, so
+ * a code or grant only ever holds scopes its client may hold; the token endpoint checks the
+ * requested scopes before its statement and the minted scopes before signing.
  */
 export function clientScopeRefusal(
   scopes: readonly string[],
@@ -30,7 +31,7 @@ export function clientScopeRefusal(
 ): string | null {
   for (const scope of scopes) {
     const entry = registry(scope);
-    if (entry === null) return scope;
+    if (entry === null || entry.issuance !== 'grant') return scope;
     const allowed =
       client.kind === 'third_party'
         ? entry.thirdPartySafe && entry.allowedClients.includes(THIRD_PARTY_CLIENTS)

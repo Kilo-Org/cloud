@@ -1,6 +1,7 @@
 export * from './account';
 export * from './clients';
 export * from './environment';
+export * from './exchange';
 export * from './jwks';
 export * from './metadata';
 export * from './oauth';

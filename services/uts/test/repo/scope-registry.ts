@@ -30,7 +30,13 @@ const PRIVILEGED_MAX_LIFETIME_SECONDS = 300;
  *   and the roles those subjects need are `any` or a non-empty list of distinct membership roles;
  *   a scope limited to listed roles is neither third-party-safe nor PAT-eligible, because only
  *   the first-party mint statements read the member's role;
- * - a privileged, step-up, staff-only or credential-changing scope is never delegable.
+ * - a privileged, step-up, staff-only or credential-changing scope is never delegable;
+ * - a scope that only the broker exchange mints (`issuance: 'token_exchange'`) is delegable, not
+ *   PAT-eligible, delegates to nothing, and is the `delegatesTo` target of exactly one scope;
+ * - a `delegatesTo` source is a grant scope that is not delegable itself, and each target is a
+ *   registered exchange scope;
+ * - a scope has a consent line exactly when a third-party client can ask for it at `/authorize`
+ *   (third-party-safe and minted from a grant): one line of plain text, at most 200 characters.
  */
 export function scopeRegistryProblems(registry: Readonly<Record<string, UtsScopeEntry>>): string[] {
   const problems: string[] = [];
@@ -92,6 +98,34 @@ export function scopeRegistryProblems(registry: Readonly<Record<string, UtsScope
       if (entry.thirdPartySafe || entry.patEligible) {
         problem('is limited to listed roles but third-party-safe or PAT-eligible');
       }
+    }
+    if (entry.issuance === 'token_exchange') {
+      if (!entry.delegable || entry.patEligible || entry.delegatesTo.length > 0) {
+        problem('is minted by the exchange but not delegable, PAT-eligible or delegating');
+      }
+      const sources = Object.values(registry).filter(other => other.delegatesTo.includes(scope));
+      if (sources.length !== 1) problem('is the exchange target of other than exactly one scope');
+    }
+    if (entry.delegatesTo.length > 0 && (entry.issuance !== 'grant' || entry.delegable)) {
+      problem('delegates but is itself delegable or minted by the exchange');
+    }
+    for (const target of entry.delegatesTo) {
+      const targetEntry = Object.hasOwn(registry, target) ? registry[target] : undefined;
+      if (targetEntry?.issuance !== 'token_exchange') {
+        problem(`delegates to ${target}, which is not a registered exchange scope`);
+      }
+    }
+    const consentable = entry.thirdPartySafe && entry.issuance === 'grant';
+    if (consentable !== (entry.consentText !== null)) {
+      problem('has a consent line exactly when a third-party client can ask for it');
+    }
+    if (
+      entry.consentText !== null &&
+      (entry.consentText.length === 0 ||
+        entry.consentText.length > 200 ||
+        /[\p{Cc}<>]/u.test(entry.consentText))
+    ) {
+      problem('consent line must be one line of plain text, 1 to 200 characters');
     }
   }
   return problems;

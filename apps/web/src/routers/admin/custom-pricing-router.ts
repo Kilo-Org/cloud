@@ -22,14 +22,17 @@ export const adminCustomPricingRouter = createTRPCRouter({
     return { config: parsed.success ? parsed.data : row.config };
   }),
 
-  set: adminProcedure.input(SetCustomPricingConfigSchema).mutation(async ({ input }) => {
-    await db
-      .insert(ai_gateway_config)
-      .values({ custom_pricing: input.config })
-      .onConflictDoUpdate({
-        target: ai_gateway_config.id,
-        set: { custom_pricing: input.config },
-      });
-    return { config: input.config };
-  }),
+  set: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'custom_pricing.set' } })
+    .input(SetCustomPricingConfigSchema)
+    .mutation(async ({ input }) => {
+      await db
+        .insert(ai_gateway_config)
+        .values({ custom_pricing: input.config })
+        .onConflictDoUpdate({
+          target: ai_gateway_config.id,
+          set: { custom_pricing: input.config },
+        });
+      return { config: input.config };
+    }),
 });

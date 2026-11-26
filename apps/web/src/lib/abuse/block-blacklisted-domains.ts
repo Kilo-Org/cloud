@@ -85,6 +85,8 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
   /** Null records a scheduled system block. */
   actorId: string | null;
   domains: string[];
+  /** Receives the ids each committed batch blocked. */
+  onBlocked?: (userIds: string[]) => Promise<void>;
 }): Promise<BlockBlacklistedDomainsBackfillResponse> {
   if (params.domains.length === 0) {
     return { processed: 0, remaining: false };
@@ -144,6 +146,7 @@ export async function backfillBlockBlacklistedDomainsBatch(params: {
       .returning({ id: kilocode_users.id });
 
     totalProcessed += updated.length;
+    await params.onBlocked?.(updated.map(r => r.id));
 
     if (rows.length < BATCH_SIZE) {
       reachedEnd = true;

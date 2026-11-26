@@ -1911,6 +1911,40 @@ describe('POST /admin/debug-cli', () => {
     });
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it('mints the unsplit token, naming no audience, for the CLI that runs without the case proxy', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    const runnerFetch = vi.fn(async (_request: Request) =>
+      Response.json({ exitCode: 0, durationMs: 1, stdoutLines: [], stderrTail: '' })
+    );
+    const runnerEnv = env as unknown as Record<string, unknown>;
+    runnerEnv.BENCH_RUNNER = {
+      idFromName: (name: string) => name,
+      get: () => ({ fetch: runnerFetch }),
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async () =>
+        Response.json({ token: 'unsplit-token', expiresAt: '2030-01-01T00:00:00Z' })
+      )
+    );
+    try {
+      const res = await authedPost('/admin/debug-cli', { model: 'a/b', prompt: 'hello' });
+
+      expect(res.status).toBe(200);
+      const mintInit = vi.mocked(fetch).mock.calls[0]![1];
+      expect(JSON.parse(mintInit?.body as string)).toEqual({
+        userId: DEFAULT_BENCHMARK_USER_ID,
+        organizationId: DEFAULT_BENCHMARK_ORG_ID,
+      });
+      const runBody = JSON.parse(await runnerFetch.mock.calls[0]![0].text()) as {
+        kiloToken: string;
+      };
+      expect(runBody.kiloToken).toBe('unsplit-token');
+    } finally {
+      delete runnerEnv.BENCH_RUNNER;
+    }
+  });
 });
 
 describe('GET /admin/registry', () => {

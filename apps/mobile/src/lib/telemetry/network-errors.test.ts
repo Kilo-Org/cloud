@@ -19,7 +19,8 @@ import {
   resetNetworkErrorReports,
   trpcProcedureFromUrl,
 } from '@/lib/telemetry/network-errors';
-import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
+import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
+import { scrubEvent } from '@/lib/telemetry/sentry-scrub.test-helpers';
 
 let events: TelemetryEvent[] = [];
 let breadcrumbs: TelemetryBreadcrumb[] = [];

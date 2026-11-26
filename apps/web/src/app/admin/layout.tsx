@@ -13,6 +13,8 @@ import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { stepUpErrorCodeForState } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import type { StepUpRequirement } from '@/components/admin/step-up/step-up-error';
+import { AdminAccessDenied } from '@/app/admin/components/AdminAccessDenied';
+import { adminNetworkRefusalFor } from '@kilocode/web-shared/lib/admin/admin-network';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const auth = await getUserFromAuth({
@@ -23,6 +25,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const currentUser = auth.user;
 
   if (!currentUser) {
+    if (auth.adminNetworkDenial) {
+      return (
+        <AdminAccessDenied message={adminNetworkRefusalFor(auth.adminNetworkDenial).message} />
+      );
+    }
     return <UnauthorizedPage />;
   }
 

@@ -53,17 +53,20 @@ export const adminGatewayConfigRouter = createTRPCRouter({
     return readConfig();
   }),
 
-  set: adminProcedure.input(GatewayConfigInputSchema).mutation(async ({ input, ctx }) => {
-    const config: GatewayConfig = {
-      vercel_routing_opt_out_models: input.vercel_routing_opt_out_models,
-      updated_at: new Date().toISOString(),
-      updated_by: ctx.user.id,
-      updated_by_email: ctx.user.google_user_email,
-      note: input.note,
-    };
-    await mergeIntoConfig(config);
-    return config;
-  }),
+  set: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'gateway_config.set' } })
+    .input(GatewayConfigInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const config: GatewayConfig = {
+        vercel_routing_opt_out_models: input.vercel_routing_opt_out_models,
+        updated_at: new Date().toISOString(),
+        updated_by: ctx.user.id,
+        updated_by_email: ctx.user.google_user_email,
+        note: input.note,
+      };
+      await mergeIntoConfig(config);
+      return config;
+    }),
 
   getOrganizationFeatures: adminProcedure.query(async () => {
     return readOrganizationFeatures(db);
@@ -92,6 +95,9 @@ export const adminGatewayConfigRouter = createTRPCRouter({
     }),
 
   setOrganizationFeatures: adminProcedure
+    .meta({
+      adminAudit: { kind: 'declarative', action: 'gateway_config.organization_features.set' },
+    })
     .input(OrganizationFeaturesCompatibleInputSchema)
     .mutation(async ({ input }) => {
       const orgPermissionPolicy =
@@ -111,6 +117,9 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   }),
 
   setAnthropicUserProfiles: adminProcedure
+    .meta({
+      adminAudit: { kind: 'declarative', action: 'gateway_config.anthropic_user_profiles.set' },
+    })
     .input(AnthropicUserProfilesSettingsInputSchema)
     .mutation(async ({ input }) => {
       const anthropic_user_profiles: AnthropicUserProfilesSettings = {

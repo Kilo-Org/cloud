@@ -36,7 +36,7 @@ function params(overrides: Partial<Parameters<typeof checkDirectProviderAccess>[
     user,
     organizationId: 'org-1',
     model: 'vendor/model',
-    provider: 'inception',
+    provider: 'mistral',
     isFreeUsage: false,
     hasByok: false,
     ...overrides,
@@ -111,9 +111,9 @@ describe('checkDirectProviderAccess', () => {
   });
 
   it.each([
-    ['restricted routes without the provider', new Set(['mistral']), false],
+    ['restricted routes without the provider', new Set(['openrouter']), false],
     ['empty routes', new Set<string>(), false],
-    ['routes including the provider', new Set(['inception']), true],
+    ['routes including the provider', new Set(['mistral']), true],
     ['unrestricted routes', undefined, true],
   ])('handles %s', async (_label, eligibleProviderRoutes, allowed) => {
     decide({ allowed: true, eligibleProviderRoutes });

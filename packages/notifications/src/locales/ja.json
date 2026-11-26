@@ -8,7 +8,8 @@
       "securityFinding": "セキュリティの検出結果の確認が必要です",
       "securityUpdate": "セキュリティチェックに更新があります",
       "agentBriefing": "エージェントブリーフィングの準備ができました",
-      "activeAgentsGlanceable": "アクティブなエージェントに更新があります"
+      "activeAgentsGlanceable": "アクティブなエージェントに更新があります",
+      "accountSecurity": "アカウントでセキュリティ関連のアクティビティがありました"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 違反"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "アカウントにパスキーが追加されました"
+      },
+      "passkeyRemoved": {
+        "title": "アカウントからパスキーが削除されました"
+      },
+      "signInMethodLinked": {
+        "title": "アカウントにサインイン方法が追加されました"
+      },
+      "signInMethodUnlinked": {
+        "title": "アカウントからサインイン方法が削除されました"
+      },
+      "deviceSignInApproved": {
+        "title": "デバイスのサインインが承認されました"
+      },
+      "apiKeyReset": {
+        "title": "APIトークンがリセットされました"
+      },
+      "browserSessionsRevoked": {
+        "title": "すべてのブラウザからサインアウトしました"
+      },
+      "deviceSessionRevoked": {
+        "title": "デバイスがアカウントからサインアウトされました"
+      },
+      "signInResetBySupport": {
+        "title": "Kiloサポートがサインインをリセットしました"
+      },
+      "newSignIn": {
+        "title": "アカウントへの新しいサインイン"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}}付近の{{device}}から。心当たりがない場合は、今すぐアカウントのセキュリティを確認してください。",
+        "device": "{{device}}から。心当たりがない場合は、今すぐアカウントのセキュリティを確認してください。",
+        "location": "{{location}}付近から。心当たりがない場合は、今すぐアカウントのセキュリティを確認してください。",
+        "unknown": "心当たりがない場合は、今すぐアカウントのセキュリティを確認してください。",
+        "selfNamedDevice": "自らを「{{name}}」と名乗るデバイスから。心当たりがない場合は、今すぐアカウントのセキュリティを確認してください。",
+        "support": "Kiloサポートが実行しました。心当たりがない場合は、サポートにお問い合わせください。"
+      }
     }
   },
   "sessionReady": {

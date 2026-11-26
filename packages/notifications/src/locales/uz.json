@@ -8,7 +8,8 @@
       "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi",
       "securityUpdate": "Xavfsizlik tekshiruvida yangilanish bor",
       "agentBriefing": "Agent brifingingiz tayyor",
-      "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
+      "activeAgentsGlanceable": "Faol agentlarda yangilanish bor",
+      "accountSecurity": "Hisobingizda xavfsizlik faoliyati bo‘ldi"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA buzilishi"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Hisobingizga kirish kaliti qo‘shildi"
+      },
+      "passkeyRemoved": {
+        "title": "Hisobingizdan kirish kaliti olib tashlandi"
+      },
+      "signInMethodLinked": {
+        "title": "Hisobingizga kirish usuli qo‘shildi"
+      },
+      "signInMethodUnlinked": {
+        "title": "Hisobingizdan kirish usuli olib tashlandi"
+      },
+      "deviceSignInApproved": {
+        "title": "Qurilmadan kirish tasdiqlandi"
+      },
+      "apiKeyReset": {
+        "title": "API tokeni qayta o‘rnatildi"
+      },
+      "browserSessionsRevoked": {
+        "title": "Barcha brauzerlardan chiqildi"
+      },
+      "deviceSessionRevoked": {
+        "title": "Qurilma hisobingizdan chiqarildi"
+      },
+      "signInResetBySupport": {
+        "title": "Kirish Kilo yordam xizmati tomonidan qayta o‘rnatildi"
+      },
+      "newSignIn": {
+        "title": "Hisobingizga yangi kirish"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} yaqinidagi {{device}} qurilmasidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "device": "{{device}} qurilmasidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "location": "{{location}} yaqinidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "unknown": "Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "selfNamedDevice": "O‘zini \"{{name}}\" deb atagan qurilmadan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "support": "Kilo yordam xizmati tomonidan bajarildi. Agar buni so‘ramagan bo‘lsangiz, yordam xizmatiga murojaat qiling."
+      }
     }
   },
   "sessionReady": {

@@ -745,7 +745,7 @@ dead-letters without it.
 
 The alert has severity `ticket` (`DEAD_LETTER_QUEUE_SEVERITY`), so o11y posts it
 to the `O11Y_SLACK_WEBHOOK_TICKET` webhook, which `services/o11y/wrangler.jsonc`
-requires to deliver to #o11y-alerts. It does not page. Changing the severity to
+requires to deliver to #kilo-o11y-alerts. It does not page. Changing the severity to
 `page` would route it to `O11Y_SLACK_WEBHOOK_PAGE`, with o11y's other page alerts,
 and shorten the cooldown to 15 minutes.
 
@@ -758,7 +758,7 @@ that continue after that mean the DLQ is missing.
 
 ### Who receives it
 
-Whoever triages #o11y-alerts, who hands it to the DLQ replay owner:
+Whoever triages #kilo-o11y-alerts, who hands it to the DLQ replay owner:
 **`<replay owner, to be named>`**. On an alert, find the usage IDs from
 `usage_ingest_final_attempt_failed` in Workers Logs for `usage-ingest`, reconcile
 by stable usage ID, and replay only as described under [Queue policy](#queue-policy),

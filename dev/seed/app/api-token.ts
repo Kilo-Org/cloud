@@ -11,7 +11,7 @@ import type { SeedResult } from '../index';
 export const usage = '<email> [options]';
 
 // Thirty days, the lifetime generateApiToken() mints for a user-held credential
-// (TOKEN_EXPIRY.thirtyDays in packages/web-shared/src/lib/tokens.ts) and the
+// (TOKEN_EXPIRY.thirtyDays in apps/web/src/lib/auth/kilo-token-signing.ts) and the
 // longest one signKiloToken() signs.
 // The resource-delegation policy (createControlTokenForRequest →
 // isKiloCredentialExchangeEligible, LEGACY_API_TOKEN_LIFETIMES_SECONDS in

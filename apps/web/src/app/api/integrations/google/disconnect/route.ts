@@ -15,6 +15,7 @@ import {
   addAdminAuditMetadata,
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        setAdminAuditOutcome({ outcome: 'failure', errorCode: 'missing_instance' });
         return NextResponse.redirect(
           new URL(buildDisconnectPath(organizationId, 'error=missing_instance'), APP_URL),
           303
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest) {
       const kiloclawClient = new KiloClawInternalClient();
       await kiloclawClient.clearGoogleOAuthConnection(user.id, instance.id);
 
+      setAdminAuditOutcome({ outcome: 'success' });
       return NextResponse.redirect(
         new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL),
         303

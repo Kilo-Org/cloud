@@ -23,13 +23,19 @@ import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/m
 import {
   addAdminAuditMetadata,
   adminActionContextFromHeaders,
-  responseAuditOutcome,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
+/**
+ * Redirects back to the GitHub integration page, and names the outcome an
+ * elevated organization write records: a failure with the `error` code when
+ * one is given, else a success.
+ */
 function redirect(path: string, error?: string) {
   const url = new URL(path, APP_URL);
   if (error) url.searchParams.set('github_connection_error', error);
+  setAdminAuditOutcome(error ? { outcome: 'failure', errorCode: error } : { outcome: 'success' });
   return NextResponse.redirect(url);
 }
 
@@ -96,6 +102,7 @@ export async function GET(request: NextRequest) {
         });
         const url = new URL(path, APP_URL);
         url.searchParams.set('github_connection_attempt', attempt.id);
+        setAdminAuditOutcome({ outcome: 'success' });
         return NextResponse.redirect(url);
       }
       if (
@@ -147,7 +154,6 @@ export async function GET(request: NextRequest) {
       action: 'organization.github.connect',
       message: 'GitHub: connection callback',
       metadata: { attemptId: attempt.id, stage: state.stage },
-      outcomeOf: response => responseAuditOutcome(response, 'github_connection_error'),
     },
     connect
   );

@@ -12,6 +12,7 @@ import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import {
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -134,6 +135,9 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
         ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=installed')
         : buildIntegrationOAuthRedirectPath(PLATFORM.DOLTHUB, owner, 'success=installed');
 
+      // A `returnTo` with its own query or fragment keeps the redirect target
+      // from saying how the write went, so the outcome is named here.
+      setAdminAuditOutcome({ outcome: 'success' });
       return NextResponse.redirect(new URL(successPath, APP_URL));
     };
 

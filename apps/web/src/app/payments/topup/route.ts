@@ -20,6 +20,7 @@ import {
 import {
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 /**
@@ -138,6 +139,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
       return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
     }
 
+    // A redirect does not say how the write went; the checkout session exists.
+    setAdminAuditOutcome({ outcome: 'success' });
     return NextResponse.redirect(url, { status: 303 });
   };
 

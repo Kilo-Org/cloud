@@ -12,6 +12,7 @@ import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import {
+  addAdminAuditMetadata,
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
@@ -111,7 +112,6 @@ export async function POST(request: Request) {
         requiredRoles: ORGANIZATION_ROLES,
         action: 'organization.cloud_agent_session.stream_ticket',
         message: 'Signed a cloud agent stream ticket',
-        metadata: { cloudAgentSessionId },
       },
       async () => {
         const sessionOwnership = await verifyOrgOwnsSessionByCloudAgentId(
@@ -126,6 +126,9 @@ export async function POST(request: Request) {
             { status: 403 }
           );
         }
+        // Only a session the organization owns is named: the requested id is
+        // caller-supplied text until this check matched it to a stored session.
+        addAdminAuditMetadata({ kiloSessionId: sessionOwnership.kiloSessionId });
         return NextResponse.json(
           signStreamTicket({
             userId: user.id,

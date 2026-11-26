@@ -7,13 +7,15 @@ import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
+  admin_action_audit_logs,
   cliSessions,
+  kilocode_users,
   organization_memberships,
   organizations,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { POST } from './route';
 
@@ -212,6 +214,44 @@ describe('POST /api/cloud-agent/sessions/stream-ticket', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Session not found or access denied',
     });
+  });
+
+  it('keeps a requested session id the organization does not own out of a Kilo admin bypass row', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const previousSupportAccess = process.env.SUPPORT_ACCESS_ENABLED;
+    process.env.SUPPORT_ACCESS_ENABLED = 'false';
+    signInAs(admin);
+
+    try {
+      const unknownSessionId = `unverified-${'x'.repeat(512)}`;
+      const refused = await postTicket({
+        cloudAgentSessionId: unknownSessionId,
+        organizationId: organization.id,
+      });
+      expect(refused.status).toBe(403);
+
+      const rows = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'organization.cloud_agent_session.stream_ticket',
+          outcome: 'failure',
+          target_type: 'organization',
+          target_id: organization.id,
+          metadata: { heldRoles: [], errorCode: '403' },
+        }),
+      ]);
+      expect(JSON.stringify(rows)).not.toContain('unverified-');
+    } finally {
+      if (previousSupportAccess === undefined) delete process.env.SUPPORT_ACCESS_ENABLED;
+      else process.env.SUPPORT_ACCESS_ENABLED = previousSupportAccess;
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    }
   });
 
   it('returns the authentication failure response unchanged', async () => {

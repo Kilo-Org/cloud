@@ -29,6 +29,7 @@ import {
   addAdminAuditMetadata,
   adminActionContextFromHeaders,
   runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
@@ -127,6 +128,14 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     }
 
     const connect = async () => {
+      // Names the outcome an elevated organization write records: a `returnTo`
+      // with its own query or fragment keeps the redirect target from saying it
+      // reliably.
+      const failWith = (errorCode: string, path: string) => {
+        setAdminAuditOutcome({ outcome: 'failure', errorCode });
+        return NextResponse.redirect(new URL(path, APP_URL));
+      };
+
       if (error) {
         captureMessage('GitLab OAuth error', {
           level: 'warning',
@@ -134,11 +143,10 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
           extra: gitLabOAuthSentryContext(searchParams),
         });
 
-        const redirectPath = buildGitLabRedirectPath(
-          verifiedState,
-          `error=${encodeURIComponent(error)}`
+        return failWith(
+          'oauth_provider_error',
+          buildGitLabRedirectPath(verifiedState, `error=${encodeURIComponent(error)}`)
         );
-        return NextResponse.redirect(new URL(redirectPath, APP_URL));
       }
 
       if (!code) {
@@ -148,8 +156,10 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
           extra: gitLabOAuthSentryContext(searchParams),
         });
 
-        const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=missing_code');
-        return NextResponse.redirect(new URL(redirectPath, APP_URL));
+        return failWith(
+          'missing_code',
+          buildGitLabRedirectPath(verifiedState, 'error=missing_code')
+        );
       }
 
       const customCredentials = customCredentialsRef
@@ -163,8 +173,10 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
           extra: gitLabOAuthSentryContext(searchParams),
         });
 
-        const redirectPath = buildGitLabRedirectPath(verifiedState, 'error=connection_failed');
-        return NextResponse.redirect(new URL(redirectPath, APP_URL));
+        return failWith(
+          'connection_failed',
+          buildGitLabRedirectPath(verifiedState, 'error=connection_failed')
+        );
       }
 
       const tokens = await exchangeGitLabOAuthCode(code, normalizedInstanceUrl, customCredentials);
@@ -206,6 +218,7 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
           ? `/organizations/${owner.id}/integrations/gitlab?success=connected`
           : `/integrations/gitlab?success=connected`;
 
+      setAdminAuditOutcome({ outcome: 'success' });
       return NextResponse.redirect(new URL(successPath, APP_URL));
     };
 

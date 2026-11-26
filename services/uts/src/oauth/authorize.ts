@@ -12,6 +12,7 @@ import {
   type FirstPartyClient,
   type RedirectRule,
   identifyClient,
+  clientServedIn,
   isRegisteredRedirect,
 } from './clients';
 import { jktOfParameter } from './dpop';
@@ -124,6 +125,12 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   if (identity.kind === 'first_party') {
     if (!isRegisteredRedirect(identity.client, redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
+    }
+    if (!clientServedIn(identity.client, deps.config.environment)) {
+      return directError(
+        'unauthorized_client',
+        'this client needs device attestation, which this environment does not verify yet'
+      );
     }
     client = {
       kind: 'first_party',

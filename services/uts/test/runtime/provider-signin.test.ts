@@ -60,8 +60,9 @@ function methodsWith(implementation: Partial<ProviderSignInStore>, mail: SignInE
   return { methods, calls };
 }
 
+/** The cookies a response sets; each is a `__Host-` cookie without `Expires`, so this split holds. */
 function setCookies(response: Response): string[] {
-  return response.headers.getSetCookie();
+  return (response.headers.get('Set-Cookie') ?? '').split(/,\s*(?=__Host-)/);
 }
 
 afterEach(() => vi.restoreAllMocks());

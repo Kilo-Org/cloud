@@ -60,5 +60,19 @@
       "service": "uts-test",
       "props": { "caller": "uts-feed-local" },
     },
+    // The TicketRedeemer entrypoint as the development redeemer binds it, and as a caller it
+    // refuses.
+    {
+      "binding": "TICKET_REDEEMER",
+      "service": "uts-test",
+      "entrypoint": "TicketRedeemer",
+      "props": { "caller": "uts-ticket-test" },
+    },
+    {
+      "binding": "OTHER_REDEEMER",
+      "service": "uts-test",
+      "entrypoint": "TicketRedeemer",
+      "props": { "caller": "o11y" },
+    },
   ],
 }

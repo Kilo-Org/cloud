@@ -3,6 +3,7 @@ import type { SignerKeysBinding } from '@kilocode/uts-contracts';
 import { readConfig, type Env, type UtsConfig } from '../../src/env';
 import type { SignInMethods } from '../../src/signin/flows';
 import { readSignInConfig } from '../../src/signin/providers/config';
+import type { TicketRedeemer } from '../../src/tickets/redeemer';
 
 /**
  * The bindings `wrangler.test.jsonc` adds for the tests: the mint Worker's SignerKeys entrypoint
@@ -13,6 +14,8 @@ export type TestEnv = Env & {
   OTHER_MINT: SignerKeysBinding;
   PROPLESS_MINT: SignerKeysBinding;
   DEFAULT_MINT: Fetcher;
+  TICKET_REDEEMER: Service<TicketRedeemer>;
+  OTHER_REDEEMER: Service<TicketRedeemer>;
 };
 
 // The runtime env is untyped here; this binds it to the bindings `wrangler.test.jsonc` declares

@@ -471,11 +471,13 @@ describe('email codes and limits', () => {
       );
     // A sign-in email without a code: sent while codes are stopped.
     await insertShape('sign_in', 'someone@example.com', null);
-    expect(await sqlStateOf(() => insertShape('sign_in', null, randomHash()))).toBe(CHECK_VIOLATION);
+    expect(await sqlStateOf(() => insertShape('sign_in', null, randomHash()))).toBe(
+      CHECK_VIOLATION
+    );
     expect(await sqlStateOf(() => insertShape('tier_a', null, null))).toBe(CHECK_VIOLATION);
-    expect(
-      await sqlStateOf(() => insertShape('tier_a', 'someone@example.com', randomHash()))
-    ).toBe(CHECK_VIOLATION);
+    expect(await sqlStateOf(() => insertShape('tier_a', 'someone@example.com', randomHash()))).toBe(
+      CHECK_VIOLATION
+    );
   });
 
   it.each([

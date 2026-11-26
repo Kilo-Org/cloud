@@ -229,7 +229,8 @@ const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   no_session: { status: 401, message: 'Sign in first, then add the sign-in method again.' },
   gate_required: {
     status: 403,
-    message: 'Adding a sign-in method needs a fresh confirmation. Confirm the change and try again.',
+    message:
+      'Adding a sign-in method needs a fresh confirmation. Confirm the change and try again.',
   },
   method_in_use: { status: 409, message: 'This sign-in method belongs to another account.' },
   no_sso_connection: {
@@ -307,7 +308,12 @@ export async function beginFlow(
   request: Request,
   methods: SignInMethods,
   provider: FlowProvider,
-  params: { returnTo: string; intent: string | null; gatePass: string | null; ssoDomain: string | null },
+  params: {
+    returnTo: string;
+    intent: string | null;
+    gatePass: string | null;
+    ssoDomain: string | null;
+  },
   /** Null when the stored flow cannot reach the provider, a failure no retry fixes. */
   providerUrl: (values: FlowValues, workosConnectionId: string | null) => URL | null
 ): Promise<Response> {
@@ -317,7 +323,11 @@ export async function beginFlow(
     const gatePass = z.uuid().safeParse(params.gatePass);
     if (sessionValue === null) return refusalPage('no_session', params.returnTo);
     if (!gatePass.success) return refusalPage('gate_required', params.returnTo);
-    intent = { kind: 'link', sessionTokenHash: await sha256(sessionValue), gatePassId: gatePass.data };
+    intent = {
+      kind: 'link',
+      sessionTokenHash: await sha256(sessionValue),
+      gatePassId: gatePass.data,
+    };
   } else if (params.intent !== null && params.intent !== 'sign_in') {
     return messagePage('Sign in to Kilo', 'Unknown sign-in request.', 400, params.returnTo);
   }

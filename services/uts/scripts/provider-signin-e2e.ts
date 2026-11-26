@@ -45,9 +45,14 @@ import { isLoopbackHost } from './connection';
 const adminUrl = z.url().parse(process.env.UTS_E2E_ADMIN_URL);
 const appUrl = z.url().parse(process.env.UTS_E2E_APP_URL);
 for (const url of [adminUrl, appUrl]) {
-  if (!isLoopbackHost(new URL(url))) throw new Error('the end-to-end run uses a local database only');
+  if (!isLoopbackHost(new URL(url)))
+    throw new Error('the end-to-end run uses a local database only');
 }
-const PORT = z.coerce.number().int().positive().parse(process.env.UTS_E2E_PORT ?? '9000');
+const PORT = z.coerce
+  .number()
+  .int()
+  .positive()
+  .parse(process.env.UTS_E2E_PORT ?? '9000');
 const base = `http://127.0.0.1:${PORT}`;
 const issuer = UTS_ENDPOINTS.development.issuer;
 const OIDC = `http://127.0.0.1:${PORT + 3}`;
@@ -191,7 +196,8 @@ function redeem(form: URLSearchParams, clientId: string): Grant | null {
   const grant = grants.get(form.get('code') ?? '');
   grants.delete(form.get('code') ?? '');
   if (grant === undefined || grant.clientId !== clientId) return null;
-  if (form.get('redirect_uri') !== null && form.get('redirect_uri') !== grant.redirectUri) return null;
+  if (form.get('redirect_uri') !== null && form.get('redirect_uri') !== grant.redirectUri)
+    return null;
   if (grant.challenge !== null) {
     const verifier = form.get('code_verifier') ?? '';
     if (b64(sha256(verifier)) !== grant.challenge) return null;
@@ -238,7 +244,8 @@ async function main() {
     const idToken = await new SignJWT({
       nonce: grant.nonce,
       email: grant.identity.email,
-      email_verified: clientId === 'e2e-apple' ? String(grant.identity.verified) : grant.identity.verified,
+      email_verified:
+        clientId === 'e2e-apple' ? String(grant.identity.verified) : grant.identity.verified,
     })
       .setProtectedHeader({ alg: 'RS256', kid: 'e2e-idp' })
       .setIssuer(OIDC)
@@ -447,7 +454,10 @@ async function cliAuthorization(): Promise<CliAuthorization> {
 async function codeOf(authorizeUrl: string): Promise<string> {
   const response = await browse(authorizeUrl);
   const location = new URL(response.headers.get('Location') ?? '');
-  check(response.status === 302 && location.origin + location.pathname === CLI_REDIRECT, 'code redirect');
+  check(
+    response.status === 302 && location.origin + location.pathname === CLI_REDIRECT,
+    'code redirect'
+  );
   check(location.searchParams.get('iss') === issuer, 'iss in the authorization response');
   return keep(location.searchParams.get('code') ?? '');
 }
@@ -538,7 +548,10 @@ async function run(admin: pg.Client) {
     const callback = await providerSignIn(await providerLink(cli.url, 'google'));
     check(callback.status === 303, `google callback ${callback.status}`);
     check(jar.has('__Host-uts_session'), 'session cookie');
-    check(![...jar.keys()].some(name => name.startsWith('__Host-uts_flow_')), 'flow cookie cleared');
+    check(
+      ![...jar.keys()].some(name => name.startsWith('__Host-uts_flow_')),
+      'flow cookie cleared'
+    );
     const tokens = await tokensOf(await codeOf(cli.url), cli);
     const session = await sessionOf(googleEmail);
     check(tokens.claims.sub === session.account_id, 'token subject is the signed-in account');
@@ -557,13 +570,21 @@ async function run(admin: pg.Client) {
   {
     jar.clear();
     const cli = await cliAuthorization();
-    queued.push({ subject: String(randomBytes(3).readUIntBE(0, 3)), email: githubEmail, verified: true });
+    queued.push({
+      subject: String(randomBytes(3).readUIntBE(0, 3)),
+      email: githubEmail,
+      verified: true,
+    });
     const callback = await providerSignIn(await providerLink(cli.url, 'github'));
     check(callback.status === 303, `github callback ${callback.status}`);
     const tokens = await tokensOf(await codeOf(cli.url), cli);
     const session = await sessionOf(githubEmail);
     check(tokens.claims.sub === session.account_id, 'github token subject');
-    log('1b github sign-in -> code -> token', { callback: callback.status, amr: session.amr, tokens: tokens.count });
+    log('1b github sign-in -> code -> token', {
+      callback: callback.status,
+      amr: session.amr,
+      tokens: tokens.count,
+    });
   }
 
   // 1c. WorkOS SSO: the address picks the connection; sign-in -> code -> token.
@@ -572,17 +593,31 @@ async function run(admin: pg.Client) {
     jar.clear();
     const cli = await cliAuthorization();
     const page = await (await browse(cli.url)).text();
-    const returnTo = /name="return_to" value="([^"]+)"/.exec(page)?.[1]?.replaceAll('&amp;', '&') ?? '';
+    const returnTo =
+      /name="return_to" value="([^"]+)"/.exec(page)?.[1]?.replaceAll('&amp;', '&') ?? '';
     check(page.includes('Sign in with SSO'), 'sign-in page offers SSO');
-    queued.push({ subject: `prof_${randomBytes(6).toString('hex')}`, email: ssoEmail, verified: false });
-    const start = await browse('/signin/sso/start', formPost({ email: ssoEmail, return_to: returnTo }));
+    queued.push({
+      subject: `prof_${randomBytes(6).toString('hex')}`,
+      email: ssoEmail,
+      verified: false,
+    });
+    const start = await browse(
+      '/signin/sso/start',
+      formPost({ email: ssoEmail, return_to: returnTo })
+    );
     const toWorkos = new URL(start.headers.get('Location') ?? '');
-    check(toWorkos.searchParams.get('connection') === SSO_CONNECTION, 'SSO start names the connection');
+    check(
+      toWorkos.searchParams.get('connection') === SSO_CONNECTION,
+      'SSO start names the connection'
+    );
     const callback = await providerSignIn(toWorkos.toString());
     check(callback.status === 303, `sso callback ${callback.status}`);
     const tokens = await tokensOf(await codeOf(cli.url), cli);
     const session = await sessionOf(ssoEmail);
-    check(session.amr[0] === 'sso' && tokens.claims.sub === session.account_id, 'sso session and token');
+    check(
+      session.amr[0] === 'sso' && tokens.claims.sub === session.account_id,
+      'sso session and token'
+    );
     log('1c workos sso sign-in -> code -> token', {
       connection: 'flow connection',
       amr: session.amr,
@@ -603,10 +638,20 @@ async function run(admin: pg.Client) {
     const page = z
       .object({ action: z.string(), code: z.string(), state: z.string() })
       .parse(await (await fetch(authorizeAt)).json());
-    const callback = await browse(page.action, formPost({ code: page.code, state: page.state }, 'https://appleid.apple.com'));
-    check(callback.status === 303 && callback.headers.get('Location') === '/signin/done', 'apple signed in');
+    const callback = await browse(
+      page.action,
+      formPost({ code: page.code, state: page.state }, 'https://appleid.apple.com')
+    );
+    check(
+      callback.status === 303 && callback.headers.get('Location') === '/signin/done',
+      'apple signed in'
+    );
     const session = await sessionOf(appleEmail);
-    log('2 apple form_post sign-in', { callback: callback.status, amr: session.amr, clientSecret: 'ES256 verified by stand-in' });
+    log('2 apple form_post sign-in', {
+      callback: callback.status,
+      amr: session.amr,
+      clientSecret: 'ES256 verified by stand-in',
+    });
   }
 
   // 3. Email: five wrong codes lock the code but not its link; then a code and a link sign in.
@@ -622,7 +667,10 @@ async function run(admin: pg.Client) {
       if (message.code !== null) keep(message.code);
       return message;
     };
-    const sent = await browse('/signin/email/start', formPost({ email, return_to: '/signin/done' }));
+    const sent = await browse(
+      '/signin/email/start',
+      formPost({ email, return_to: '/signin/done' })
+    );
     check(sent.status === 200, `email start ${sent.status}`);
     const first = await mail();
     const wrong = first.code === '000000' ? '111111' : '000000';
@@ -654,9 +702,15 @@ async function run(admin: pg.Client) {
     jar.clear();
 
     const cli = await cliAuthorization();
-    await browse('/signin/email/start', formPost({ email, return_to: new URL(cli.url).pathname + new URL(cli.url).search }));
+    await browse(
+      '/signin/email/start',
+      formPost({ email, return_to: new URL(cli.url).pathname + new URL(cli.url).search })
+    );
     const second = await mail();
-    const signedIn = await browse('/signin/email/code', formPost({ email, code: second.code ?? '' }));
+    const signedIn = await browse(
+      '/signin/email/code',
+      formPost({ email, code: second.code ?? '' })
+    );
     check(signedIn.status === 303 && jar.has('__Host-uts_session'), 'email code signs in');
     const tokens = await tokensOf(await codeOf(cli.url), cli);
     const session = await sessionOf(email);
@@ -669,8 +723,14 @@ async function run(admin: pg.Client) {
     const linkToken = new URL(third.link).searchParams.get('token') ?? '';
     const viaLink = await browse('/signin/email/link', formPost({ token: linkToken }));
     const reuse = await browse('/signin/email/link', formPost({ token: linkToken }));
-    check(confirm.status === 200 && viaLink.status === 303 && reuse.status === 400, 'email link once');
-    const foreign = await browse('/signin/email/code', formPost({ email, code: '123456' }, 'https://evil.example'));
+    check(
+      confirm.status === 200 && viaLink.status === 303 && reuse.status === 400,
+      'email link once'
+    );
+    const foreign = await browse(
+      '/signin/email/code',
+      formPost({ email, code: '123456' }, 'https://evil.example')
+    );
     check(foreign.status === 403, 'code posted from another site refused');
     log('3b email code and link sign in', {
       code: signedIn.status,
@@ -685,11 +745,22 @@ async function run(admin: pg.Client) {
   // 4. Linking refusals, and a link with a tier A pass of the session.
   {
     jar.clear();
-    queued.push({ subject: String(randomBytes(3).readUIntBE(0, 3)), email: existingEmail, verified: false });
+    queued.push({
+      subject: String(randomBytes(3).readUIntBE(0, 3)),
+      email: existingEmail,
+      verified: false,
+    });
     const unverified = await providerSignIn('/signin/oauth/github/start');
-    queued.push({ subject: String(randomBytes(3).readUIntBE(0, 3)), email: existingEmail, verified: true });
+    queued.push({
+      subject: String(randomBytes(3).readUIntBE(0, 3)),
+      email: existingEmail,
+      verified: true,
+    });
     const verified = await providerSignIn('/signin/oauth/github/start');
-    check(unverified.status === 409 && verified.status === 303, 'unverified refused, verified links');
+    check(
+      unverified.status === 409 && verified.status === 303,
+      'unverified refused, verified links'
+    );
 
     jar.clear();
     const ssoExisting = keep(`existing@${SSO_DOMAIN}`);
@@ -697,17 +768,29 @@ async function run(admin: pg.Client) {
       `e2e:${randomUUID()}`,
       ssoExisting,
     ]);
-    queued.push({ subject: `prof_${randomBytes(6).toString('hex')}`, email: ssoExisting, verified: false });
+    queued.push({
+      subject: `prof_${randomBytes(6).toString('hex')}`,
+      email: ssoExisting,
+      verified: false,
+    });
     const ssoStart = await browse('/signin/sso/start', formPost({ email: ssoExisting }));
     const ssoRefused = await providerSignIn(ssoStart.headers.get('Location') ?? '');
 
     jar.clear();
-    queued.push({ subject: `g-${randomUUID()}`, email: keep(`x@${REQUIRED_DOMAIN}`), verified: true });
+    queued.push({
+      subject: `g-${randomUUID()}`,
+      email: keep(`x@${REQUIRED_DOMAIN}`),
+      verified: true,
+    });
     const requiresSso = await providerSignIn('/signin/oauth/google/start');
 
     // Signed in by Google (step 1a), the session links GitHub only with a tier A pass.
     jar.clear();
-    queued.push({ subject: `g-${randomUUID()}`, email: keep(`linker-${randomBytes(3).toString('hex')}@gmail.com`), verified: true });
+    queued.push({
+      subject: `g-${randomUUID()}`,
+      email: keep(`linker-${randomBytes(3).toString('hex')}@gmail.com`),
+      verified: true,
+    });
     await providerSignIn('/signin/oauth/google/start');
     const linker = await adminClient.query<{ account_id: string; id: string }>(
       `SELECT account_id, id FROM uts.browser_sessions ORDER BY created_at DESC LIMIT 1`
@@ -719,8 +802,14 @@ async function run(admin: pg.Client) {
        RETURNING id`,
       [linker.rows[0].account_id, linker.rows[0].id]
     );
-    queued.push({ subject: String(randomBytes(3).readUIntBE(0, 3)), email: keep(`other-${randomBytes(3).toString('hex')}@example.com`), verified: false });
-    const linked = await providerSignIn(`/signin/oauth/github/start?intent=link&gate_pass=${pass.rows[0].id}`);
+    queued.push({
+      subject: String(randomBytes(3).readUIntBE(0, 3)),
+      email: keep(`other-${randomBytes(3).toString('hex')}@example.com`),
+      verified: false,
+    });
+    const linked = await providerSignIn(
+      `/signin/oauth/github/start?intent=link&gate_pass=${pass.rows[0].id}`
+    );
     const methods = await admin.query<{ provider: string; gate_pass_id: string | null }>(
       'SELECT provider, gate_pass_id FROM uts.sign_in_methods WHERE account_id = $1 ORDER BY added_at',
       [linker.rows[0].account_id]
@@ -752,7 +841,9 @@ async function run(admin: pg.Client) {
     const key = `${row.event_type} ${row.outcome}`;
     counts[key] = (counts[key] ?? 0) + 1;
   }
-  const leaked = secrets.filter(value => value.length >= 6 && rows.rows.some(row => row.text.includes(value)));
+  const leaked = secrets.filter(
+    value => value.length >= 6 && rows.rows.some(row => row.text.includes(value))
+  );
   check(leaked.length === 0, `${leaked.length} secret or address values in audit rows`);
   log('5 audit rows (type outcome: count)', counts);
   log('5 values checked against audit rows', { values: secrets.length, found: leaked.length });
@@ -762,9 +853,15 @@ async function run(admin: pg.Client) {
   const durations: number[] = [];
   for (let index = 0; index < 20; index += 1) {
     jar.clear();
-    queued.push({ subject: String(1_000_000 + index), email: keep(`t${index}-${randomBytes(2).toString('hex')}@example.com`), verified: true });
+    queued.push({
+      subject: String(1_000_000 + index),
+      email: keep(`t${index}-${randomBytes(2).toString('hex')}@example.com`),
+      verified: true,
+    });
     const start = await browse('/signin/oauth/github/start');
-    const { location } = await follow(start.headers.get('Location') ?? '', next => next.pathname.endsWith('/callback'));
+    const { location } = await follow(start.headers.get('Location') ?? '', next =>
+      next.pathname.endsWith('/callback')
+    );
     const began = performance.now();
     const callback = await browse(location?.toString() ?? '');
     durations.push(performance.now() - began);

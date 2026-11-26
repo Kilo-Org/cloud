@@ -89,7 +89,12 @@ function codeEntryPage(email: string, withCode: boolean, message: string | null,
 </form>`
     : '';
   const note = message === null ? '' : `<p>${escapeHtml(message)}</p>\n`;
-  return page('Check your email', 'email-code', `${note}<p>${escapeHtml(intro)}</p>\n${form}`, status);
+  return page(
+    'Check your email',
+    'email-code',
+    `${note}<p>${escapeHtml(intro)}</p>\n${form}`,
+    status
+  );
 }
 
 function linkConfirmPage(token: string): Response {
@@ -151,7 +156,13 @@ export async function handleEmailRequest(
     let stored;
     try {
       stored = await methods.store(async store =>
-        store.startEmail({ email, emailHash, linkHash: await sha256(linkToken), codeHash, returnTo })
+        store.startEmail({
+          email,
+          emailHash,
+          linkHash: await sha256(linkToken),
+          codeHash,
+          returnTo,
+        })
       );
     } catch (error) {
       return unavailablePage(classifyFailure(error, 'email_start') === 'retryable');

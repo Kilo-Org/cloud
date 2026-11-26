@@ -1,6 +1,7 @@
 import {
   type TicketRedemption,
   type TicketResponse,
+  type UtsEnvironment,
   UTS_TICKET_LIFETIME_SECONDS,
   UTS_TICKETS_PATH,
   UtsAudienceSchema,
@@ -10,7 +11,7 @@ import {
 } from '@kilocode/uts-contracts';
 import type { UtsConfig } from '../env';
 import { requestFirstPartyClient } from '../oauth/clients';
-import { failureResponse, oauthError } from '../oauth/errors';
+import { classifyFailure, failureResponse, oauthError } from '../oauth/errors';
 import { readForm } from '../oauth/params';
 import { firstPartyProof, replayedDpopProof } from '../oauth/proof';
 import { grantError, required } from '../oauth/token-endpoint';
@@ -32,9 +33,11 @@ import type { TicketAccess } from './store';
  *   this URL, as a refresh does (design 5.4): one statement checks the grant and the key, records
  *   the proof's `jti`, stores the ticket's hash and writes the audit row. `resource` names the
  *   audience (RFC 8707 form), which must be one the grant's scopes name.
- * * `POST /tickets/redeem` is the audience's call: one statement consumes the ticket and writes
- *   the audit row, and answers the account, grant and client it was minted for. Every ticket it
- *   cannot redeem answers the same `invalid_ticket`, so a caller learns nothing more.
+ * * Redemption is the audience's call through the `TicketRedeemer` entrypoint
+ *   (src/tickets/redeemer.ts), never over the internet: only a listed caller may redeem, and only
+ *   for its own audiences. One statement consumes the ticket and writes the audit row, and answers
+ *   the account, grant and client it was minted for. Every ticket it cannot redeem answers the
+ *   same `invalid_ticket`, so a caller learns nothing more.
  */
 
 export type TicketDeps = { config: UtsConfig; tickets: TicketAccess };
@@ -105,41 +108,67 @@ export async function handleTicketIssue(request: Request, deps: TicketDeps): Pro
   }
 }
 
-function invalidTicket(): Response {
-  return jsonResponse({ error: 'invalid_ticket' }, 400);
-}
+/**
+ * The services that may redeem tickets, by the deployed name their service binding carries as
+ * `props.caller`, with the audiences each may redeem for. A ticket opens one service, so a caller
+ * redeems only tickets minted for its own audiences. Production and staging list no caller yet:
+ * every redemption there is refused until a surface that takes tickets moves to UTS (phase 4) and
+ * adds itself here; `test/repo` keeps every other config from binding the redeemer.
+ */
+export const TICKET_REDEEMERS: Readonly<
+  Record<UtsEnvironment, Readonly<Record<string, readonly string[]>>>
+> = {
+  production: {},
+  staging: {},
+  development: { 'uts-ticket-test': ['gateway', 'kilo-chat'] },
+};
 
-export async function handleTicketRedeem(request: Request, deps: TicketDeps): Promise<Response> {
-  if (request.method !== 'POST') {
-    return oauthError('invalid_request', 405, 'use POST', { Allow: 'POST' });
+/**
+ * `refused`: the caller is not a listed redeemer, or the audience is not one of its own; no
+ * statement runs. `invalid_ticket`: unknown, used, expired, minted for another audience, or its
+ * grant ended; every such ticket answers alike. `unavailable` and `failed`: a store failure that
+ * a retry can, or cannot, fix.
+ */
+export type TicketRedeemResult =
+  | { status: 'redeemed'; redemption: TicketRedemption }
+  | { status: 'refused' | 'invalid_ticket' | 'unavailable' | 'failed' };
+
+/** Redeems `ticket` for `audience` on behalf of the binding caller `caller` (null: no props). */
+export async function redeemTicket(
+  deps: TicketDeps,
+  caller: string | null,
+  ticket: unknown,
+  audience: unknown
+): Promise<TicketRedeemResult> {
+  const allowed = caller === null ? undefined : TICKET_REDEEMERS[deps.config.environment][caller];
+  const parsedAudience = UtsAudienceSchema.safeParse(audience);
+  if (allowed === undefined || !parsedAudience.success || !allowed.includes(parsedAudience.data)) {
+    console.error(JSON.stringify({ event: 'uts.tickets.redeem_refused', caller }));
+    return { status: 'refused' };
   }
-  const form = await readForm(request);
-  if (form.status === 'invalid') return oauthError('invalid_request', 400, form.description);
-  const ticket = form.params.one('ticket');
-  const audienceParam = form.params.one('audience');
-  const audience =
-    audienceParam.status === 'present' ? UtsAudienceSchema.safeParse(audienceParam.value) : null;
-  if (audience === null || !audience.success) {
-    return oauthError('invalid_request', 400, 'audience is required once');
-  }
-  if (ticket.status !== 'present' || !isRandomCredential(ticket.value)) return invalidTicket();
+  if (typeof ticket !== 'string' || !isRandomCredential(ticket))
+    return { status: 'invalid_ticket' };
   try {
-    const ticketHash = await sha256(ticket.value);
+    const ticketHash = await sha256(ticket);
     const result = await deps.tickets(store =>
-      store.redeem(deps.config.environment, ticketHash, audience.data)
+      store.redeem(deps.config.environment, ticketHash, parsedAudience.data)
     );
-    if (result.outcome !== 'redeemed') return invalidTicket();
-    const body: TicketRedemption = {
-      sub: result.accountId,
-      sid: result.grantId,
-      client_id: result.clientId,
-      purpose: result.purpose,
-      audience: audience.data,
-      ...(result.resource === null ? {} : { resource: result.resource }),
-      ...(result.orgId === null ? {} : { org: result.orgId }),
+    if (result.outcome !== 'redeemed') return { status: 'invalid_ticket' };
+    return {
+      status: 'redeemed',
+      redemption: {
+        sub: result.accountId,
+        sid: result.grantId,
+        client_id: result.clientId,
+        purpose: result.purpose,
+        audience: parsedAudience.data,
+        ...(result.resource === null ? {} : { resource: result.resource }),
+        ...(result.orgId === null ? {} : { org: result.orgId }),
+      },
     };
-    return jsonResponse(body, 200);
   } catch (error) {
-    return failureResponse(error, 'tickets_redeem');
+    return {
+      status: classifyFailure(error, 'tickets_redeem') === 'retryable' ? 'unavailable' : 'failed',
+    };
   }
 }

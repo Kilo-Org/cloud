@@ -239,7 +239,8 @@ async function verifyIdToken(
     return payload;
   } catch (error) {
     if (error instanceof errors.JWKSTimeout) throw new ProviderError('retryable', 'jwks_timeout');
-    if (error instanceof errors.JOSEError) throw new ProviderError('refused', `id_token_${error.code}`);
+    if (error instanceof errors.JOSEError)
+      throw new ProviderError('refused', `id_token_${error.code}`);
     // createRemoteJWKSet rethrows a failed key-set fetch as it came.
     throw new ProviderError('retryable', 'jwks_unreachable');
   }
@@ -325,9 +326,7 @@ async function githubIdentity(
     call(`${spec.endpoints.api}/user`, { headers }, 'user'),
     call(`${spec.endpoints.api}/user/emails`, { headers }, 'emails'),
   ]);
-  const primary = parse(GitHubEmailsSchema, emails, 'emails_response').find(
-    entry => entry.primary
-  );
+  const primary = parse(GitHubEmailsSchema, emails, 'emails_response').find(entry => entry.primary);
   const email = normalizeEmail(primary?.email);
   return {
     subject: String(parse(GitHubUserSchema, user, 'user_response').id),

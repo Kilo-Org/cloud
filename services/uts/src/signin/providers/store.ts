@@ -314,7 +314,12 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
     async completeEmailLink(input) {
       const row = await one(
         'SELECT * FROM uts.complete_email_link($1, $2, $3, $4, $5, $6, $7, $8)',
-        [input.environment, input.linkHash, input.sessionTokenHash, ...networkValues(input.network)],
+        [
+          input.environment,
+          input.linkHash,
+          input.sessionTokenHash,
+          ...networkValues(input.network),
+        ],
         EmailLinkRowSchema
       );
       if (row.outcome === 'signed_in') {

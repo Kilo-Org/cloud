@@ -21,9 +21,12 @@ export const UTS_PASSKEYS_PAGE_PATH = '/signin/passkeys';
 /** The one script of the sign-in pages. */
 export const UTS_SIGNIN_SCRIPT_PATH = '/signin/assets/signin.js';
 
-/** One-time tickets: minted from a first-party grant, redeemed once by their audience. */
+/**
+ * One-time tickets: minted from a first-party grant at this path, redeemed once by their audience
+ * through the mint Worker's `TicketRedeemer` entrypoint.
+ */
 export const UTS_TICKETS_PATH = '/tickets';
-export const UTS_TICKET_REDEEM_PATH = '/tickets/redeem';
+export const UTS_TICKET_REDEEMER_ENTRYPOINT = 'TicketRedeemer';
 
 /** Design 5.3: a device code lives 10 minutes; RFC 8628 section 3.2 polls every 5 seconds. */
 export const UTS_DEVICE_CODE_LIFETIME_SECONDS = 600;
@@ -78,6 +81,3 @@ export const TicketRedemptionSchema = z.strictObject({
   org: z.uuid().optional(),
 });
 export type TicketRedemption = z.infer<typeof TicketRedemptionSchema>;
-
-/** Every ticket that cannot be redeemed (unknown, used, expired, another audience) answers this. */
-export const TicketRefusalSchema = z.strictObject({ error: z.literal('invalid_ticket') });

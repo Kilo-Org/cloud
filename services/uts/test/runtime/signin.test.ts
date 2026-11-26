@@ -15,7 +15,7 @@ import { handleDeviceDecision, handleDevicePage } from '../../src/signin/device/
 import { signInHandoff } from '../../src/signin/handoff';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../../src/signin/passkey/ceremonies';
 import type { BrowserSession, DeviceExchangeResult } from '../../src/signin/store';
-import { handleTicketIssue, handleTicketRedeem } from '../../src/tickets/routes';
+import { TICKET_REDEEMERS, handleTicketIssue, redeemTicket } from '../../src/tickets/routes';
 import { createFirstPartyRefreshToken, randomCredential } from '../../src/token/credentials';
 import { signerAccess } from '../../src/token/mint';
 import {
@@ -614,8 +614,8 @@ describe('one-time tickets', () => {
     }
   });
 
-  it('redeem for the audience, and answer one refusal for every ticket it cannot redeem', async () => {
-    const redeemed = fakeTickets({
+  const redeemedStore = () =>
+    fakeTickets({
       redeem: async () => ({
         outcome: 'redeemed',
         accountId: 'oauth/runtime-user',
@@ -626,12 +626,17 @@ describe('one-time tickets', () => {
         clientId: 'kilo-cli',
       }),
     });
-    const ticket = randomCredential();
-    const response = await handleTicketRedeem(
-      formRequest('/tickets/redeem', { ticket, audience: 'kilo-chat' }),
-      redeemed.deps
+
+  it('redeem for a listed caller and one of its audiences', async () => {
+    const store = redeemedStore();
+    const result = await redeemTicket(
+      store.deps,
+      'uts-ticket-test',
+      randomCredential(),
+      'kilo-chat'
     );
-    expect(TicketRedemptionSchema.parse(await response.json())).toEqual({
+    if (result.status !== 'redeemed') throw new Error('expected a redemption');
+    expect(TicketRedemptionSchema.parse(result.redemption)).toEqual({
       sub: 'oauth/runtime-user',
       sid: grantId,
       client_id: 'kilo-cli',
@@ -639,27 +644,78 @@ describe('one-time tickets', () => {
       audience: 'kilo-chat',
       resource: 'session-1',
     });
+  });
 
+  it('refuse an unlisted caller, a binding without props and an audience not the caller’s, before any statement', async () => {
+    const store = redeemedStore();
+    const ticket = randomCredential();
+    expect(await redeemTicket(store.deps, 'o11y', ticket, 'kilo-chat')).toEqual({
+      status: 'refused',
+    });
+    expect(await redeemTicket(store.deps, null, ticket, 'kilo-chat')).toEqual({
+      status: 'refused',
+    });
+    expect(await redeemTicket(store.deps, 'uts-ticket-test', ticket, 'session-ingest')).toEqual({
+      status: 'refused',
+    });
+    expect(await redeemTicket(store.deps, 'uts-ticket-test', ticket, 42)).toEqual({
+      status: 'refused',
+    });
+    expect(store.calls).toEqual([]);
+  });
+
+  it('refuse every caller in production and staging, whose redeemer lists are empty', async () => {
+    for (const environment of ['production', 'staging'] as const) {
+      expect(TICKET_REDEEMERS[environment]).toEqual({});
+      const store = fakeTickets();
+      const deps = { ...store.deps, config: { ...config, environment } };
+      expect(await redeemTicket(deps, 'uts-ticket-test', randomCredential(), 'kilo-chat')).toEqual({
+        status: 'refused',
+      });
+      expect(store.calls).toEqual([]);
+    }
+  });
+
+  it('answer invalid_ticket alike for a malformed or unknown ticket, and 503-style failures by class', async () => {
     const unknown = fakeTickets({ redeem: async () => ({ outcome: 'unknown' }) });
-    const refused = await handleTicketRedeem(
-      formRequest('/tickets/redeem', { ticket, audience: 'kilo-chat' }),
-      unknown.deps
-    );
-    expect(refused.status).toBe(400);
-    expect(await refused.json()).toEqual({ error: 'invalid_ticket' });
+    expect(await redeemTicket(unknown.deps, 'uts-ticket-test', 'short', 'kilo-chat')).toEqual({
+      status: 'invalid_ticket',
+    });
     expect(
-      await (
-        await handleTicketRedeem(
-          formRequest('/tickets/redeem', { ticket: 'short', audience: 'kilo-chat' }),
-          unknown.deps
-        )
-      ).json()
-    ).toEqual({ error: 'invalid_ticket' });
+      await redeemTicket(unknown.deps, 'uts-ticket-test', randomCredential(), 'kilo-chat')
+    ).toEqual({
+      status: 'invalid_ticket',
+    });
+    const failing = fakeTickets({
+      redeem: async () => {
+        throw storeFailure('retryable');
+      },
+    });
     expect(
-      await errorOf(
-        await handleTicketRedeem(formRequest('/tickets/redeem', { ticket }), unknown.deps)
+      await redeemTicket(failing.deps, 'uts-ticket-test', randomCredential(), 'kilo-chat')
+    ).toEqual({
+      status: 'unavailable',
+    });
+  });
+
+  it('read the caller from the binding props of the TicketRedeemer entrypoint', async () => {
+    // An unlisted caller is refused before the identity store is touched; the listed one passes
+    // the caller check and reaches the store, which the test pool cannot connect to.
+    expect(await env.OTHER_REDEEMER.redeem(randomCredential(), 'kilo-chat')).toEqual({
+      status: 'refused',
+    });
+    const listed = await env.TICKET_REDEEMER.redeem(randomCredential(), 'kilo-chat');
+    expect(['unavailable', 'failed']).toContain(listed.status);
+  });
+
+  it('are not redeemable over the internet', async () => {
+    expect(
+      await handleOAuthRequest(
+        formRequest('/tickets/redeem', { ticket: randomCredential(), audience: 'kilo-chat' }),
+        '/tickets/redeem',
+        oauthDeps(fakeGrants().access)
       )
-    ).toBe('invalid_request');
+    ).toBeNull();
   });
 });
 

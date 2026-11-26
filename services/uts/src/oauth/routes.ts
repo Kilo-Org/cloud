@@ -11,7 +11,6 @@ import {
   UTS_SIGNED_IN_PATH,
   UTS_SIGNIN_SCRIPT_PATH,
   UTS_TOKEN_PATH,
-  UTS_TICKET_REDEEM_PATH,
   UTS_TICKETS_PATH,
 } from '@kilocode/uts-contracts';
 import type { Env, UtsConfig } from '../env';
@@ -34,7 +33,7 @@ import { providerSignInAccess } from '../signin/providers/store';
 import { signInScript } from '../signin/script';
 import { handleSsoRequest } from '../signin/sso/routes';
 import { signInAccess } from '../signin/store';
-import { type TicketDeps, handleTicketIssue, handleTicketRedeem } from '../tickets/routes';
+import { type TicketDeps, handleTicketIssue } from '../tickets/routes';
 import { ticketAccess } from '../tickets/store';
 import { type SignerAccess, signerAccess } from '../token/mint';
 import { classifyFailure } from './errors';
@@ -173,8 +172,6 @@ export async function handleOAuthRequest(
       return signInScript();
     case UTS_TICKETS_PATH:
       return await handleTicketIssue(request, deps.tickets);
-    case UTS_TICKET_REDEEM_PATH:
-      return await handleTicketRedeem(request, deps.tickets);
     case UTS_DEVICE_AUTHORIZATION_PATH:
       return deps.device === null
         ? null

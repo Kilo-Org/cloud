@@ -2,12 +2,15 @@ import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import { getSignerStub } from './dos/stubs';
 import type { SignResult } from './dos/UtsSignerDO';
-import { readConfig, type Env } from './env';
+import { readConfig, type Env, type UtsConfig } from './env';
+import { identityStoreBinding } from './grants/binding';
 import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
 import type { AuthorizationHandoff } from './oauth/authorize';
 import { jsonResponse } from './responses';
 import type { SignInEmail, SignInMailer } from './signin/email/mailer';
+import { redeemTicket } from './tickets/routes';
+import { ticketAccess } from './tickets/store';
 import type { SignerAccess } from './token/mint';
 
 /**
@@ -30,6 +33,34 @@ import type { SignerAccess } from './token/mint';
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 export const DEV_MAIL_PATH = '/__dev/mail';
+
+/**
+ * `POST /__dev/tickets/redeem` with `{ ticket, audience }` redeems as the development redeemer
+ * `uts-ticket-test`, as its `TicketRedeemer` binding would, for the local end-to-end run, which
+ * cannot hold a service binding.
+ */
+export const DEV_TICKET_REDEEM_PATH = '/__dev/tickets/redeem';
+const DevRedeemSchema = z.strictObject({ ticket: z.unknown(), audience: z.unknown() });
+
+async function handleDevTicketRedeem(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  config: UtsConfig
+): Promise<Response> {
+  const binding = identityStoreBinding(env);
+  const body = DevRedeemSchema.safeParse(await request.json().catch(() => undefined));
+  if (request.method !== 'POST' || binding.kind === 'unprovisioned' || !body.success) {
+    return jsonResponse({ error: 'invalid_request' }, 400);
+  }
+  const result = await redeemTicket(
+    { config, tickets: ticketAccess(binding.connectionString, ctx) },
+    'uts-ticket-test',
+    body.data.ticket,
+    body.data.audience
+  );
+  return jsonResponse(result, result.status === 'redeemed' ? 200 : 400);
+}
 
 /** The synthetic account the development hand-off signs in. */
 export const DEV_ACCOUNT_ID = 'dev:uts-local';
@@ -80,6 +111,9 @@ export async function handleDevRequest(
     return message === undefined
       ? jsonResponse({ error: 'not_found' }, 404)
       : jsonResponse(message, 200);
+  }
+  if (pathname === DEV_TICKET_REDEEM_PATH) {
+    return await handleDevTicketRedeem(request, env, ctx, config);
   }
   if (pathname !== DEV_SIGN_PATH) {
     // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant

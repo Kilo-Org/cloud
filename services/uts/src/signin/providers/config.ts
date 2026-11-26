@@ -130,7 +130,10 @@ function configured<Names extends string, Value>(
   return { status: 'on', ...build(values as Record<Names, string>) };
 }
 
-function credentialsOf(provider: UtsOAuthProvider, env: SignInEnv): Configured<{
+function credentialsOf(
+  provider: UtsOAuthProvider,
+  env: SignInEnv
+): Configured<{
   credentials: ClientCredentials;
 }> {
   if (provider === 'apple') {

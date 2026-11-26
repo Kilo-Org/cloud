@@ -1,7 +1,4 @@
-import {
-  UtsOAuthProviderSchema,
-  utsProviderCallbackPath,
-} from '@kilocode/uts-contracts';
+import { UtsOAuthProviderSchema, utsProviderCallbackPath } from '@kilocode/uts-contracts';
 import { jsonResponse } from '../../responses';
 import {
   type SignInMethods,

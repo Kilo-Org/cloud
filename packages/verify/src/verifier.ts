@@ -425,7 +425,6 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     if (entry === null) return failures.insufficientScope('scope_unknown', route.scope);
     if (claims.scope !== route.scope)
       return failures.insufficientScope('scope_mismatch', route.scope);
-    if (!orgMatches(route, claims.org)) return failures.orgMismatch();
 
     // Row 11: a session-bound route or scope needs a session id.
     if ((route.requiresSession === true || entry.requiresSession) && claims.sid === undefined) {
@@ -447,6 +446,8 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     }
     if (list.revokedKids.has(signed.kid)) return failures.invalidToken('revoked_kid');
     if (list.blockedAccounts.has(claims.sub)) return failures.invalidToken('blocked_account');
+    // Row 9 after the feed, as on the PAT path: a revoked token gets 401 whatever its org.
+    if (!orgMatches(route, claims.org)) return failures.orgMismatch();
 
     return {
       ok: true,

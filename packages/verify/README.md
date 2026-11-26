@@ -159,7 +159,7 @@ Code is in `src/verifier.ts` unless named; tests are table-driven, one `describe
 | 6 Time | `exp` after `iat` and after any `nbf`; then `exp`, `iat`, `nbf` with 60 s skew | `timeFailure` | row 6 |
 | 7 Identity | `sub`, `jti`, `client_id`; STS profile | claim schemas, `claimsReason` | row 7 |
 | 8 Scope | Registered scope of this audience, equal to the route scope; PATs only for PAT-eligible scopes | `verifyStsToken`, `verifyUtsToken`, `verifyPat` | row 8; PAT record checks |
-| 9 Organization | On an org-scoped route, the credential's org equals the route org; none is refused. STS routes cannot be org-scoped | `orgMatches`, `assertRoute` | row 9; PAT record checks |
+| 9 Organization | On an org-scoped route, the credential's org equals the route org; none is refused. Checked after the feed, so a revoked credential gets 401 whatever its org. STS routes cannot be org-scoped | `orgMatches`, `assertRoute` | row 9; PAT record checks |
 | 10 Revocation | UTS: `revoked_before`, revoked `sid` and `kid`; STS: none (decision Q4) | `verifyUtsToken`, `revocation.ts` | row 10; `revocation.test.ts` |
 | 11 Session | A session-bound route or scope needs a live `sid`; a PAT never qualifies | `verifyUtsToken`, `verifyPat` | row 11; PAT record checks |
 | 12 PAT | Offline check, client address, two cache layers, feed override, fail-closed lookups | `pat-format.ts`, `pat.ts`, `verifyPat` | row 12; `pat.test.ts` |

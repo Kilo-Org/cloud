@@ -563,6 +563,15 @@ describe('row 9: on an org-scoped route the token names exactly the request org'
       route: uts,
       expected: OK,
     },
+    {
+      name: 'a revoked token of another org is refused as revoked (401), as on the PAT path',
+      setup: h => {
+        h.feed.list.revokedSids = new Set(['grant-1']);
+      },
+      token: h => sign(h.uts, utsClaims({ org: 'org-2' })),
+      route: { ...uts, org: 'org-1' },
+      expected: invalid('revoked_session'),
+    },
   ]);
 });
 

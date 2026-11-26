@@ -745,8 +745,10 @@ describe('passkey', () => {
       await insertCredential(mine, { kiloUserId: userId });
       await insertCredential(theirs, { kiloUserId: otherUserId });
 
-      expect(await deletePasskey(userId, theirs.credentialId)).toBe(false);
-      expect(await deletePasskey(userId, mine.credentialId)).toBe(true);
+      expect(await deletePasskey(userId, theirs.credentialId)).toBeNull();
+      expect(await deletePasskey(userId, mine.credentialId)).toMatchObject({
+        id: expect.any(String),
+      });
 
       const remaining = await db
         .select()

@@ -1,9 +1,9 @@
 import { db, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
 import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import { newPepperRotation } from '@kilocode/web-shared/lib/auth/pepper-rotation';
 
 export function isWebSessionCurrent(
   sessionPepper: string | null | undefined,
@@ -26,14 +26,25 @@ export async function readWebSessionPepper(kiloUserId: User['id']): Promise<stri
   return row?.web_session_pepper ?? null;
 }
 
+/** The account a revocation signed out, read from the revoking update itself. */
+export type WebSessionRevocation = {
+  user: Pick<User, 'id' | 'google_user_email'>;
+  /** Identifies this revocation without revealing the pepper it installed. */
+  rotationId: string;
+};
+
+/** Rotates the web-session pepper; resolves null when no such user exists. */
 export async function revokeWebSessions(
   kiloUserId: User['id'],
   fromDb: DrizzleConnection = db
-): Promise<void> {
-  await fromDb
+): Promise<WebSessionRevocation | null> {
+  const rotation = newPepperRotation();
+  const [user] = await fromDb
     .update(kilocode_users)
-    .set({ web_session_pepper: randomUUID() })
-    .where(eq(kilocode_users.id, kiloUserId));
+    .set({ web_session_pepper: rotation.pepper })
+    .where(eq(kilocode_users.id, kiloUserId))
+    .returning({ id: kilocode_users.id, google_user_email: kilocode_users.google_user_email });
+  const revocation = user ? { user, rotationId: rotation.rotationId } : null;
 
   // Every proof is bound to a session that is now invalid. The pepper update is
   // the authoritative revocation; the proof rows are cleared afterwards, not
@@ -46,7 +57,8 @@ export async function revokeWebSessions(
     } catch (error) {
       reportStepUpFailure('revoke_web_sessions_step_up', error);
     }
-    return;
+    return revocation;
   }
   await revokeStepUpProofs(kiloUserId, 'session_revoked', fromDb);
+  return revocation;
 }

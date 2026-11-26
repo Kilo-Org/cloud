@@ -7,6 +7,8 @@ import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
+import { scheduleNewSignInCheck } from '@/lib/auth/new-sign-in-check';
+import { claimWebSignInDevice } from '@/lib/auth/web-sign-in-device';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
 import NextAuth from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
@@ -1890,6 +1892,24 @@ export const authOptions: NextAuthOptions = {
           userId: existingUser.id,
           email: existingUser.google_user_email,
         });
+
+        // A completed browser sign-in (not a session update), checked for a
+        // new device on a new network after the response. Fake login is the
+        // local test sign-in and is not a posture change.
+        if (
+          (trigger === 'signIn' || trigger === 'signUp') &&
+          accountInfo.provider !== 'fake-login'
+        ) {
+          const webSignIn = claimWebSignInDevice();
+          if (webSignIn) {
+            await scheduleNewSignInCheck({
+              user: existingUser,
+              method: accountInfo.provider,
+              device: webSignIn.device,
+              headers: webSignIn.headers,
+            });
+          }
+        }
       } catch (error) {
         captureException(error, {
           tags: {

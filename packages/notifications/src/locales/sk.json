@@ -8,7 +8,8 @@
       "securityFinding": "Nájdený bezpečnostný problém si vyžaduje pozornosť",
       "securityUpdate": "Bezpečnostná kontrola má aktualizáciu",
       "agentBriefing": "Váš prehľad agenta je pripravený",
-      "activeAgentsGlanceable": "Aktívni agenti majú aktualizáciu"
+      "activeAgentsGlanceable": "Aktívni agenti majú aktualizáciu",
+      "accountSecurity": "Vo vašom účte prebehla bezpečnostná aktivita"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Porušenie SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Do vášho účtu bol pridaný prístupový kľúč"
+      },
+      "passkeyRemoved": {
+        "title": "Z vášho účtu bol odstránený prístupový kľúč"
+      },
+      "signInMethodLinked": {
+        "title": "Do vášho účtu bola pridaná metóda prihlásenia"
+      },
+      "signInMethodUnlinked": {
+        "title": "Z vášho účtu bola odstránená metóda prihlásenia"
+      },
+      "deviceSignInApproved": {
+        "title": "Prihlásenie zariadenia bolo schválené"
+      },
+      "apiKeyReset": {
+        "title": "Token API bol obnovený"
+      },
+      "browserSessionsRevoked": {
+        "title": "Boli ste odhlásení zo všetkých prehliadačov"
+      },
+      "deviceSessionRevoked": {
+        "title": "Zariadenie bolo odhlásené z vášho účtu"
+      },
+      "signInResetBySupport": {
+        "title": "Prihlásenie obnovila podpora Kilo"
+      },
+      "newSignIn": {
+        "title": "Nové prihlásenie do vášho účtu"
+      },
+      "body": {
+        "deviceAndLocation": "Zo zariadenia {{device}} neďaleko {{location}}. Neboli ste to vy? Hneď skontrolujte zabezpečenie svojho účtu.",
+        "device": "Zo zariadenia {{device}}. Neboli ste to vy? Hneď skontrolujte zabezpečenie svojho účtu.",
+        "location": "Neďaleko {{location}}. Neboli ste to vy? Hneď skontrolujte zabezpečenie svojho účtu.",
+        "unknown": "Neboli ste to vy? Hneď skontrolujte zabezpečenie svojho účtu.",
+        "selfNamedDevice": "Zo zariadenia, ktoré sa samo nazvalo „{{name}}“. Neboli ste to vy? Hneď skontrolujte zabezpečenie svojho účtu.",
+        "support": "Vykonala podpora Kilo. Ak ste o to nežiadali, kontaktujte podporu."
+      }
     }
   },
   "sessionReady": {

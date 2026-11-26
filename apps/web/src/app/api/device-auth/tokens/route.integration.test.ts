@@ -48,7 +48,12 @@ describe('POST /api/device-auth/tokens integration', () => {
       kiloUserId: user.id,
       webSessionPepper: user.web_session_pepper,
     });
-    mockApproveDeviceAuthRequest.mockResolvedValue({ requestId: 'device-auth-request-1' });
+    mockApproveDeviceAuthRequest.mockResolvedValue({
+      id: crypto.randomUUID(),
+      requestingClientName: null,
+      userAgent: null,
+      ipAddress: null,
+    });
 
     const response = await POST(createRequest({ Cookie: 'next-auth.session-token=valid-cookie' }));
 

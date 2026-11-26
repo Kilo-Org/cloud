@@ -35,7 +35,6 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  INCEPTION_API_KEY: 'system-inception-key',
   MISTRAL_API_KEY: 'system-mistral-key',
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
@@ -110,7 +109,7 @@ const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
 function makeRequest(
-  model = 'inception/mercury-edit-2',
+  model = 'mistralai/codestral-2508',
   stream = false,
   extraHeaders: Record<string, string> = {}
 ) {
@@ -160,7 +159,7 @@ function makeUpstreamResponse() {
   return new Response(
     JSON.stringify({
       id: 'fim-test',
-      model: 'mercury-edit-2',
+      model: 'codestral-2508',
       usage: {
         prompt_tokens: 1_000,
         completion_tokens: 100,
@@ -206,7 +205,7 @@ describe('POST /api/fim/completions', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('bills the Inception model when using the system key', async () => {
+  it('bills the Codestral model when using the system key', async () => {
     setOrganizationAuth();
     const upstreamResponse = makeUpstreamResponse();
     const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
@@ -214,7 +213,9 @@ describe('POST /api/fim/completions', () => {
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(
-      makeRequest('inception/mercury-edit-2', false, { 'x-kilocode-mode': 'code' }) as never
+      makeRequest('mistralai/codestral-2508', false, {
+        'x-kilocode-mode': 'code',
+      }) as never
     );
 
     expect(response.status).toBe(200);
@@ -222,9 +223,9 @@ describe('POST /api/fim/completions', () => {
     const [url, init] = mockedFetch.mock.calls[0];
     expect(init).toBeDefined();
     const headers = new Headers(init?.headers);
-    expect(url).toBe('https://api.inceptionlabs.ai/v1/fim/completions');
-    expect(JSON.parse(init?.body as string).model).toBe('mercury-edit-2');
-    expect(headers.get('authorization')).toBe('Bearer system-inception-key');
+    expect(url).toBe('https://api.mistral.ai/v1/fim/completions');
+    expect(JSON.parse(init?.body as string).model).toBe('codestral-2508');
+    expect(headers.get('authorization')).toBe('Bearer system-mistral-key');
     expect(headers.get('content-type')).toBe('application/json');
     for (const [name, value] of Object.entries(ATTRIBUTION_HEADERS)) {
       expect(headers.get(name)).toBe(value);
@@ -232,8 +233,8 @@ describe('POST /api/fim/completions', () => {
 
     await flushAfter();
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(325);
-    expect(stats.market_cost).toBe(325);
+    expect(stats.cost_mUsd).toBe(390);
+    expect(stats.market_cost).toBe(390);
 
     expect(jest.mocked(emitApiMetricsForResponse)).toHaveBeenCalledWith(
       {
@@ -242,9 +243,9 @@ describe('POST /api/fim/completions', () => {
         isAnonymous: false,
         isStreaming: false,
         userByok: false,
-        provider: 'inception',
-        requestedModel: 'inception/mercury-edit-2',
-        resolvedModel: 'inception/mercury-edit-2',
+        provider: 'mistral',
+        requestedModel: 'mistralai/codestral-2508',
+        resolvedModel: 'mistralai/codestral-2508',
         toolsAvailable: [],
         toolsUsed: [],
         ttfbMs: expect.any(Number),
@@ -265,7 +266,9 @@ describe('POST /api/fim/completions', () => {
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
     const response = await handleFimCompletionsRequest(
-      makeRequest('inception/mercury-edit-2', false, { 'x-kilocode-mode': 'code' }) as never
+      makeRequest('mistralai/codestral-2508', false, {
+        'x-kilocode-mode': 'code',
+      }) as never
     );
 
     expect(response.status).toBe(500);
@@ -380,7 +383,7 @@ describe('POST /api/fim/completions', () => {
     });
   });
 
-  it('rejects an exhausted balance for the Inception model', async () => {
+  it('rejects an exhausted balance for the Codestral model', async () => {
     setOrganizationAuth({ balance: 0 });
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
@@ -410,7 +413,7 @@ describe('POST /api/fim/completions', () => {
     }
   );
 
-  it.each([null, [], [{ providerId: 'mistral', decryptedAPIKey: 'unused-key' }]])(
+  it.each([null, [], [{ providerId: 'openai', decryptedAPIKey: 'unused-key' }]])(
     'masks a platform-funded 402 with BYOK entries %j and preserves upstream accounting',
     async byokEntries => {
       setOrganizationAuth();
@@ -426,8 +429,10 @@ describe('POST /api/fim/completions', () => {
       });
       await flushAfter();
       expect(captureMessage).toHaveBeenCalledWith(
-        'inception returned 402 Payment Required',
-        expect.objectContaining({ extra: expect.objectContaining({ status: 402 }) })
+        'mistral returned 402 Payment Required',
+        expect.objectContaining({
+          extra: expect.objectContaining({ status: 402 }),
+        })
       );
       expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
         expect.objectContaining({ status_code: 402, hasError: true, cost_mUsd: 0 }),
@@ -442,7 +447,6 @@ describe('POST /api/fim/completions', () => {
   );
 
   it.each([
-    ['inception/mercury-edit-2', 'inception'],
     ['mistralai/codestral-2508', 'codestral'],
     ['mistralai/codestral-2508', 'mistral'],
   ])('passes a BYOK 402 through for %s using %s without Sentry', async (model, providerId) => {
@@ -461,9 +465,7 @@ describe('POST /api/fim/completions', () => {
     expect(url).toBe(
       providerId === 'codestral'
         ? 'https://codestral.mistral.ai/v1/fim/completions'
-        : providerId === 'mistral'
-          ? 'https://api.mistral.ai/v1/fim/completions'
-          : 'https://api.inceptionlabs.ai/v1/fim/completions'
+        : 'https://api.mistral.ai/v1/fim/completions'
     );
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer user-supplied-key');
     await flushAfter();
@@ -500,23 +502,11 @@ describe('POST /api/fim/completions', () => {
     }
   );
 
-  it('rejects an exhausted balance for other FIM models', async () => {
-    setOrganizationAuth({ balance: 0 });
-
-    const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(
-      makeRequest('mistralai/codestral-2508') as never
-    );
-
-    expect(response.status).toBe(402);
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
-
   it.each([
     'codestral-2508',
     'mistralai/codestral-2508:free',
     'mistralai/codestral-latest',
-    'inception/mercury-edit-latest',
+    'inception/mercury-edit-2',
   ])('rejects unknown FIM model or alias %s', async model => {
     setOrganizationAuth();
 
@@ -530,10 +520,10 @@ describe('POST /api/fim/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('allows Inception BYOK with an exhausted balance', async () => {
+  it('allows Mistral BYOK with an exhausted balance', async () => {
     setOrganizationAuth({ balance: 0 });
     mockedGetBYOKforOrganization.mockResolvedValue([
-      { providerId: 'inception', decryptedAPIKey: 'user-inception-key' },
+      { providerId: 'mistral', decryptedAPIKey: 'user-mistral-key' },
     ] as never);
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
@@ -544,35 +534,30 @@ describe('POST /api/fim/completions', () => {
     const [, init] = mockedFetch.mock.calls[0];
     expect(init).toBeDefined();
     const headers = new Headers(init?.headers);
-    expect(headers.get('authorization')).toBe('Bearer user-inception-key');
+    expect(headers.get('authorization')).toBe('Bearer user-mistral-key');
     await flushAfter();
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(0);
-    expect(stats.market_cost).toBe(325);
+    expect(stats.market_cost).toBe(390);
   });
 
-  it.each(['inception/mercury-edit-2', 'mistralai/codestral-2508'])(
-    'forwards %s to its provider',
-    async model => {
-      setOrganizationAuth({ settings: { data_collection: 'deny' } satisfies OrganizationSettings });
-      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+  it('forwards the Codestral model to Mistral', async () => {
+    setOrganizationAuth({
+      settings: { data_collection: 'deny' } satisfies OrganizationSettings,
+    });
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
-      const { handleFimCompletionsRequest } = await import('./fim-completions');
-      const response = await handleFimCompletionsRequest(makeRequest(model) as never);
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
 
-      expect(response.status).toBe(200);
-      expect(mockedFetch).toHaveBeenCalledTimes(1);
-      const [url, init] = mockedFetch.mock.calls[0];
-      expect(url).toBe(
-        model.startsWith('inception/')
-          ? 'https://api.inceptionlabs.ai/v1/fim/completions'
-          : 'https://api.mistral.ai/v1/fim/completions'
-      );
-      const upstreamBody = JSON.parse(init?.body as string);
-      expect(upstreamBody.prompt).toBe('const value =');
-      expect(upstreamBody.suffix).toBe(';');
-    }
-  );
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockedFetch.mock.calls[0];
+    expect(url).toBe('https://api.mistral.ai/v1/fim/completions');
+    const upstreamBody = JSON.parse(init?.body as string);
+    expect(upstreamBody.prompt).toBe('const value =');
+    expect(upstreamBody.suffix).toBe(';');
+  });
 
   it('forwards a BYOK request to its provider', async () => {
     setOrganizationAuth({
@@ -580,7 +565,7 @@ describe('POST /api/fim/completions', () => {
       settings: { data_collection: 'deny' } satisfies OrganizationSettings,
     });
     mockedGetBYOKforOrganization.mockResolvedValue([
-      { providerId: 'inception', decryptedAPIKey: 'org-inception-key' },
+      { providerId: 'mistral', decryptedAPIKey: 'org-mistral-key' },
     ] as never);
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
@@ -590,13 +575,13 @@ describe('POST /api/fim/completions', () => {
     expect(response.status).toBe(200);
     const [, init] = mockedFetch.mock.calls[0];
     const headers = new Headers(init?.headers);
-    expect(headers.get('authorization')).toBe('Bearer org-inception-key');
+    expect(headers.get('authorization')).toBe('Bearer org-mistral-key');
   });
 
-  it('asks Inception to report usage in a stream and bills it', async () => {
+  it('asks Mistral to report usage in a stream and bills it', async () => {
     setOrganizationAuth();
     const chunk = (fields: object) =>
-      `data: ${JSON.stringify({ id: 'cmpl-1', model: 'mercury-edit-2', created: 1, ...fields })}\n\n`;
+      `data: ${JSON.stringify({ id: 'cmpl-1', model: 'codestral-2508', created: 1, ...fields })}\n\n`;
     mockedFetch.mockResolvedValue(
       new Response(
         chunk({ choices: [{ index: 0, text: ' compl', finish_reason: null }] }) +
@@ -622,21 +607,19 @@ describe('POST /api/fim/completions', () => {
       responseContent: ' completion',
       inputTokens: 1_000,
       outputTokens: 100,
-      cost_mUsd: 325,
+      cost_mUsd: 390,
     });
   });
 
   it.each([
-    ['inception/mercury-edit-2', true, { include_usage: true }],
-    ['mistralai/codestral-2508', true, { include_usage: true }],
-    ['inception/mercury-edit-2', false, undefined],
-    ['mistralai/codestral-2508', false, undefined],
-  ])('sets stream_options for %s with stream %s', async (model, stream, expected) => {
+    [true, { include_usage: true }],
+    [false, undefined],
+  ])('sets stream_options for stream %s', async (stream, expected) => {
     setOrganizationAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
     const { handleFimCompletionsRequest } = await import('./fim-completions');
-    await handleFimCompletionsRequest(makeRequest(model, stream) as never);
+    await handleFimCompletionsRequest(makeRequest(undefined, stream) as never);
 
     const [, init] = mockedFetch.mock.calls[0];
     expect(JSON.parse(init?.body as string).stream_options).toEqual(expected);

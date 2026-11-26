@@ -18,11 +18,9 @@ import {
   sendAccountDeletionSupportNotification,
   sendSignInCodeEmail,
   sendSignInMethodChangeCodeEmail,
-  sendSignInMethodRemovedEmail,
 } from '@kilocode/web-shared/lib/email';
 import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import type { User } from '@kilocode/db/schema';
 import {
   consumeSignInMethodChangeCode,
   createSignInMethodChangeCode,
@@ -30,7 +28,11 @@ import {
   SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
   type SignInMethodChangeCodeBinding,
 } from '@/lib/auth/sign-in-method-change-email-code';
-import { currentSignInMethodChangeRequestDetails } from '@/lib/auth/sign-in-method-change-request';
+import {
+  currentSecurityNoticeRequest,
+  recognisedClientLabel,
+  scheduleSecurityNotice,
+} from '@/lib/security-notices';
 import {
   consumeSignInCode,
   createSignInCode,
@@ -122,6 +124,7 @@ import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { newPepperRotation } from '@kilocode/web-shared/lib/auth/pepper-rotation';
 import { revokeUserSessions } from '@/lib/user/session-revocation';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
@@ -179,15 +182,16 @@ async function assertSelfServiceAccountDeletionAllowed(userId: string): Promise<
  * One conditional UPDATE does the whole job: the ownership filter means a
  * caller can never revoke another user's session, and the `revoked_at` filter
  * keeps the first revocation's timestamp and reason. A missing, foreign, or
- * already-revoked session is a silent no-op — no caller reads the difference,
- * and staying silent stops a caller probing for other users' session ids.
+ * already-revoked session is a silent no-op to the client, which stops a
+ * caller probing for other users' session ids. Returns the revoked session's
+ * recorded user agent when this call revoked a live session, else null.
  */
 async function revokeOwnedDeviceSession(
   sessionId: string,
   userId: string,
   reason: 'user_revoked' | 'logout'
-): Promise<boolean> {
-  const revoked = await db
+): Promise<{ userAgent: string | null } | null> {
+  const [revoked] = await db
     .update(device_sessions)
     .set({ revoked_at: sql`now()`, revoked_reason: reason })
     .where(
@@ -197,31 +201,32 @@ async function revokeOwnedDeviceSession(
         isNull(device_sessions.revoked_at)
       )
     )
-    .returning({ id: device_sessions.id });
+    .returning({ userAgent: device_sessions.user_agent });
   invalidateDeviceSession(sessionId);
-  return revoked.length > 0;
+  return revoked ?? null;
 }
 
 /**
  * Revokes a device session as one audited attempt. The caller is answered
  * the same whether or not a session changed, but the audit row records a
- * session that was missing, foreign, or already revoked as a failure.
+ * session that was missing, foreign, or already revoked as a failure. Returns
+ * what {@link revokeOwnedDeviceSession} returns.
  */
 async function auditedRevokeOwnedDeviceSession(
   ctx: TRPCContext & { user: { id: string } },
   sessionId: string,
   reason: 'user_revoked' | 'logout'
-): Promise<void> {
+): Promise<{ userAgent: string | null } | null> {
   const attempt: AuthAuditAttempt = {
     action: 'auth.device_session.revoke',
     userId: ctx.user.id,
     method: reason,
     metadata: { deviceSessionId: sessionId },
   };
-  await auditAuthProcedure(ctx, attempt, async () => {
-    if (!(await revokeOwnedDeviceSession(sessionId, ctx.user.id, reason))) {
-      attempt.failureReason = 'session_not_active';
-    }
+  return auditAuthProcedure(ctx, attempt, async () => {
+    const revoked = await revokeOwnedDeviceSession(sessionId, ctx.user.id, reason);
+    if (!revoked) attempt.failureReason = 'session_not_active';
+    return revoked;
   });
 }
 
@@ -853,32 +858,6 @@ async function spendSignInMethodChangeCode(
   if (result === 'locked') throw signInMethodChangeRefused('codeLocked');
 }
 
-/**
- * Tells the account owner about an unlink after it happened. A failed email
- * does not undo the unlink; it is reported.
- */
-async function sendSignInMethodRemovedNotice(
-  user: Pick<User, 'google_user_email'>,
-  provider: AuthProviderId
-): Promise<void> {
-  const details = await currentSignInMethodChangeRequestDetails();
-  try {
-    const notice = await sendSignInMethodRemovedEmail(
-      user.google_user_email,
-      AUTH_PROVIDER_DISPLAY_NAMES[provider],
-      details
-    );
-    if (!notice.sent) {
-      captureException(new Error('Sign-in method removed notice was not sent'), {
-        tags: { operation: 'sign_in_method_change_notice', provider },
-        extra: { reason: notice.reason },
-      });
-    }
-  } catch (error) {
-    captureException(error, { tags: { operation: 'sign_in_method_change_notice', provider } });
-  }
-}
-
 // Passkey enrollment and management change which authenticators can sign in
 // as this account, so they are never authorized by a bare bearer token. A
 // browser session keeps its existing rules; a native app session must present
@@ -1063,8 +1042,10 @@ export const userRouter = createTRPCRouter({
         managementAuthorization: z.string().trim().min(1).max(512).optional(),
       })
     )
-    .mutation(async ({ ctx, input }) =>
-      auditAuthProcedure(
+    .mutation(async ({ ctx, input }) => {
+      // Set inside the management transaction; read once it has committed.
+      const removed: { passkey: { id: string; name: string | null } | null } = { passkey: null };
+      await auditAuthProcedure(
         ctx,
         {
           action: 'auth.passkey.remove',
@@ -1082,16 +1063,29 @@ export const userRouter = createTRPCRouter({
             ctx,
             { operation: 'remove', authorization: input.managementAuthorization },
             async fromDb => {
-              const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
-              if (!deleted) {
+              removed.passkey = await deleteOwnedPasskey(ctx.user.id, credentialId, fromDb);
+              if (!removed.passkey) {
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
               }
             }
           );
-          return successResult();
         }
-      )
-    ),
+      );
+      // Scheduled after the audited attempt, so the notice and the audit row
+      // never decide each other.
+      if (removed.passkey) {
+        await scheduleSecurityNotice(
+          ctx.user,
+          {
+            type: 'passkey_removed',
+            passkeyId: removed.passkey.id,
+            passkeyName: removed.passkey.name,
+          },
+          await currentSecurityNoticeRequest()
+        );
+      }
+      return successResult();
+    }),
 
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
@@ -1175,9 +1169,9 @@ export const userRouter = createTRPCRouter({
 
   unlinkAuthProvider: baseProcedure
     .input(UnlinkAuthProviderInputSchema)
-    .mutation(async ({ ctx, input }) =>
+    .mutation(async ({ ctx, input }) => {
       // recordSignInMethodChange records the unlink; a refusal is recorded here.
-      auditAuthProcedure(
+      const { removedLinkCreatedAt } = await auditAuthProcedure(
         ctx,
         {
           action: 'auth.sign_in_method.unlink',
@@ -1191,7 +1185,7 @@ export const userRouter = createTRPCRouter({
           // A refused unlink must not spend the code.
           assertNoTrpcError(await checkAuthProviderUnlink(ctx.user.id, input.provider));
           await spendSignInMethodChangeCode(binding, input.code, input.challengeId);
-          const result = assertNoTrpcError(
+          const unlinked = assertNoTrpcError(
             await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
           );
           await recordSignInMethodChange({
@@ -1200,11 +1194,25 @@ export const userRouter = createTRPCRouter({
             provider: input.provider,
             request: { ip: ctx.ip, route: ctx.trpcPath },
           });
-          await sendSignInMethodRemovedNotice(ctx.user, input.provider);
-          return result;
+          return unlinked;
         }
-      )
-    ),
+      );
+      // Only the call that removed the link rows reports them, after the
+      // audited attempt so the notice and the audit row never decide each other.
+      const [firstRemoved, ...otherRemoved] = removedLinkCreatedAt;
+      if (firstRemoved !== undefined) {
+        await scheduleSecurityNotice(
+          ctx.user,
+          {
+            type: 'sign_in_method_unlinked',
+            provider: input.provider,
+            removedLinkCreatedAt: [firstRemoved, ...otherRemoved],
+          },
+          await currentSecurityNoticeRequest()
+        );
+      }
+      return successResult();
+    }),
 
   // Emails a one-time code that authorizes one link or unlink from this
   // browser session. The code goes to the account's primary email address.
@@ -1260,7 +1268,8 @@ export const userRouter = createTRPCRouter({
       userId: ctx.user.id,
       method: ctx.credential,
     };
-    return auditAuthProcedure(ctx, attempt, async () => {
+    const apiTokenRotation = newPepperRotation();
+    await auditAuthProcedure(ctx, attempt, async () => {
       // A reset has to evict whoever may already hold a credential for the
       // account, so it rotates both peppers and closes the device sessions in
       // one transaction: a stolen token or browser session cannot survive it,
@@ -1269,7 +1278,10 @@ export const userRouter = createTRPCRouter({
       const revokedSessionIds = await db.transaction(async tx => {
         await tx
           .update(kilocode_users)
-          .set({ api_token_pepper: crypto.randomUUID(), web_session_pepper: crypto.randomUUID() })
+          .set({
+            api_token_pepper: apiTokenRotation.pepper,
+            web_session_pepper: crypto.randomUUID(),
+          })
           .where(eq(kilocode_users.id, ctx.user.id));
 
         return revokeUserSessions(tx, ctx.user.id, {
@@ -1282,22 +1294,34 @@ export const userRouter = createTRPCRouter({
         invalidateDeviceSession(sessionId);
       }
       attempt.metadata = { revokedDeviceSessionCount: revokedSessionIds.length };
-
-      return successResult();
     });
+
+    // Scheduled after the audited attempt, so the notice and the audit row
+    // never decide each other.
+    await scheduleSecurityNotice(
+      ctx.user,
+      { type: 'api_key_reset', rotationId: apiTokenRotation.rotationId },
+      await currentSecurityNoticeRequest()
+    );
+
+    return successResult();
   }),
 
-  signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) =>
-    auditAuthProcedure(
+  signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
+    const revocation = await auditAuthProcedure(
       ctx,
       { action: 'auth.sessions.revoke_all', userId: ctx.user.id, method: ctx.credential },
-      async () => {
-        await revokeWebSessions(ctx.user.id);
-
-        return successResult();
-      }
-    )
-  ),
+      () => revokeWebSessions(ctx.user.id)
+    );
+    if (revocation) {
+      await scheduleSecurityNotice(
+        revocation.user,
+        { type: 'browser_sessions_revoked', rotationId: revocation.rotationId },
+        await currentSecurityNoticeRequest()
+      );
+    }
+    return successResult();
+  }),
 
   // ─── Device Sessions ────────────────────────────────────────────────
 
@@ -1327,7 +1351,19 @@ export const userRouter = createTRPCRouter({
   revokeDeviceSessionById: baseProcedure
     .input(z.object({ sessionId: DeviceSessionIdSchema }))
     .mutation(async ({ ctx, input }) => {
-      await auditedRevokeOwnedDeviceSession(ctx, input.sessionId, 'user_revoked');
+      const revoked = await auditedRevokeOwnedDeviceSession(ctx, input.sessionId, 'user_revoked');
+      // Only the call that revoked a live session reports it.
+      if (revoked) {
+        await scheduleSecurityNotice(
+          ctx.user,
+          {
+            type: 'device_session_revoked',
+            deviceSessionId: input.sessionId,
+            revokedDevice: recognisedClientLabel(revoked.userAgent),
+          },
+          await currentSecurityNoticeRequest()
+        );
+      }
       return successResult();
     }),
 

@@ -758,14 +758,15 @@ export async function listPasskeysForUser(kiloUserId: string): Promise<PasskeyCr
 
 /**
  * Delete one of the user's passkeys. Scoped to the user so a caller can never
- * touch another user's credential, even with a known credential id.
+ * touch another user's credential, even with a known credential id. Returns
+ * the deleted passkey, or null when no such credential belonged to the user.
  */
 export async function deletePasskey(
   kiloUserId: string,
   credentialId: string,
   fromDb: DrizzleConnection = db
-): Promise<boolean> {
-  const deleted = await fromDb
+): Promise<{ id: string; name: string | null } | null> {
+  const [deleted] = await fromDb
     .delete(passkey_credentials)
     .where(
       and(
@@ -773,9 +774,9 @@ export async function deletePasskey(
         eq(passkey_credentials.credential_id, credentialId)
       )
     )
-    .returning({ id: passkey_credentials.id });
+    .returning({ id: passkey_credentials.id, name: passkey_credentials.name });
 
-  return deleted.length > 0;
+  return deleted ?? null;
 }
 
 /**

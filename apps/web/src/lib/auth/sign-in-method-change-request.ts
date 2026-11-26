@@ -4,7 +4,6 @@ import {
   clientIpFromHeaders,
   routeFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import type { SignInMethodChangeRequestDetails } from '@kilocode/web-shared/lib/email';
 
 const BROWSERS: ReadonlyArray<[RegExp, string]> = [
   [/\bEdg(?:e|A|iOS)?\//, 'Edge'],
@@ -53,30 +52,6 @@ export function approximateLocation(headersList: Headers): string | null {
   const country = headerValue(headersList, 'x-vercel-ip-country');
   const parts = [city, country].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? parts.join(', ') : null;
-}
-
-export function signInMethodChangeRequestDetails(
-  headersList: Headers,
-  changedAt: Date = new Date()
-): SignInMethodChangeRequestDetails {
-  return {
-    changedAt,
-    ip: clientIpFromHeaders(headersList),
-    location: approximateLocation(headersList),
-    device: describeUserAgent(headersList.get('user-agent')),
-  };
-}
-
-/**
- * The details of the current request. Outside a request scope there are no
- * headers, so the details hold only the time.
- */
-export async function currentSignInMethodChangeRequestDetails(): Promise<SignInMethodChangeRequestDetails> {
-  try {
-    return signInMethodChangeRequestDetails(new Headers(await headers()));
-  } catch {
-    return { changedAt: new Date(), ip: null, location: null, device: null };
-  }
 }
 
 /**

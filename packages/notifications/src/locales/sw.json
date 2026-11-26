@@ -8,7 +8,8 @@
       "securityFinding": "Tokeo la usalama linahitaji umakini",
       "securityUpdate": "Ukaguzi wa usalama umepokea sasisho",
       "agentBriefing": "Ripoti yako ya wakala wa programu iko tayari",
-      "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
+      "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho",
+      "accountSecurity": "Kulikuwa na shughuli za usalama kwenye akaunti yako"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ukiukaji wa SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Ufunguo wa siri umeongezwa kwenye akaunti yako"
+      },
+      "passkeyRemoved": {
+        "title": "Ufunguo wa siri umeondolewa kwenye akaunti yako"
+      },
+      "signInMethodLinked": {
+        "title": "Njia ya kuingia imeongezwa kwenye akaunti yako"
+      },
+      "signInMethodUnlinked": {
+        "title": "Njia ya kuingia imeondolewa kwenye akaunti yako"
+      },
+      "deviceSignInApproved": {
+        "title": "Kuingia kwa kifaa kumeidhinishwa"
+      },
+      "apiKeyReset": {
+        "title": "Tokeni ya API imewekwa upya"
+      },
+      "browserSessionsRevoked": {
+        "title": "Umetoka kwenye vivinjari vyote"
+      },
+      "deviceSessionRevoked": {
+        "title": "Kifaa kimetolewa kwenye akaunti yako"
+      },
+      "signInResetBySupport": {
+        "title": "Usaidizi wa Kilo umeweka upya kuingia"
+      },
+      "newSignIn": {
+        "title": "Kuingia kupya kwenye akaunti yako"
+      },
+      "body": {
+        "deviceAndLocation": "Kutoka {{device}} karibu na {{location}}. Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "device": "Kutoka {{device}}. Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "location": "Karibu na {{location}}. Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "unknown": "Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "selfNamedDevice": "Kutoka kwa kifaa kilichojiita \"{{name}}\". Si wewe? Kagua usalama wa akaunti yako sasa.",
+        "support": "Imefanywa na usaidizi wa Kilo. Ikiwa hukuomba hili, wasiliana na usaidizi."
+      }
     }
   },
   "sessionReady": {

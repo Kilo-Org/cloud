@@ -42,6 +42,7 @@ import {
   authAuditRequestFromHeaders,
   type AuthAuditAttempt,
 } from '@/lib/auth/auth-audit';
+import { scheduleSecurityNotice, securityNoticeRequestFromHeaders } from '@/lib/security-notices';
 
 /**
  * Vercel Firewall rate-limit rule applied to `{ action: 'send_code' }` and
@@ -315,6 +316,11 @@ async function handleNativeRegistration(
       authViaToken: true,
       headersList: request.headers,
     });
+    await scheduleSecurityNotice(
+      user,
+      { type: 'passkey_added', passkeyId: credential.id, passkeyName: credential.name },
+      securityNoticeRequestFromHeaders(request.headers)
+    );
 
     attempt.metadata = { step: 'verify', passkeyId: credential.id };
     return NextResponse.json({ credentialId: credential.credential_id });
@@ -434,6 +440,11 @@ async function registerPasskey(request: NextRequest, attempt: AuthAuditAttempt):
       authViaToken: false,
       headersList: request.headers,
     });
+    await scheduleSecurityNotice(
+      user,
+      { type: 'passkey_added', passkeyId: credential.id, passkeyName: credential.name },
+      securityNoticeRequestFromHeaders(request.headers)
+    );
 
     attempt.metadata = { step: 'verify', passkeyId: credential.id };
     return NextResponse.json({ credentialId: credential.credential_id });

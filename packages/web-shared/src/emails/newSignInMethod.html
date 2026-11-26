@@ -54,8 +54,8 @@
                   "
                   class="kc-text"
                 >
-                  {{ provider_name }} was added as a sign-in method for your Kilo Code account. If
-                  this was you, no action is needed.
+                  {{ provider_name }} was added as a sign-in method for your Kilo Code account.{{
+                  replaced_note }}{{ sign_out_note }} If this was you, no action is needed.
                 </p>
                 <p
                   style="
@@ -100,8 +100,7 @@
                     class="kc-muted"
                   >
                     <strong class="kc-strong" style="color: #1a1a1a">If this was not you:</strong>
-                    remove this sign-in method at {{ connected_accounts_link }}, sign out of all
-                    browser sessions, and contact {{ support_email }}.
+                    {{ not_you_steps }}
                   </p>
                 </div>
               </td>

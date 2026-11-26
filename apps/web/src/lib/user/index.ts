@@ -55,6 +55,7 @@ import {
   device_auth_requests,
   device_sessions,
   native_attested_keys,
+  user_sign_in_contexts,
   auto_top_up_configs,
   auto_routing_custom_routers,
   platform_integrations,
@@ -147,16 +148,13 @@ import {
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import {
-  AUTH_PROVIDER_DISPLAY_NAMES,
   hosted_domain_specials,
   knownSignupStepUpMethods,
   type AuthErrorType,
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
-import { sendNewSignInMethodEmail } from '@kilocode/web-shared/lib/email';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
-import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
 import {
@@ -164,10 +162,8 @@ import {
   authAuditRequestFromCurrentRequest,
   recordAuthEvent,
 } from '@/lib/auth/auth-audit';
-import {
-  currentSignInMethodChangeAuditRequest,
-  currentSignInMethodChangeRequestDetails,
-} from '@/lib/auth/sign-in-method-change-request';
+import { currentSignInMethodChangeAuditRequest } from '@/lib/auth/sign-in-method-change-request';
+import { currentSecurityNoticeRequest, scheduleSecurityNotice } from '@/lib/security-notices';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -650,19 +646,28 @@ export async function createOrUpdateUser(
     if (shouldLink) {
       let linkedUser = userByEmail;
       if (args.provider === 'workos') {
-        linkedUser = await db.transaction(async tx => {
-          await tx
+        // A sign-in that settles onto the WorkOS row it already has is a
+        // no-op re-link, which stays silent (.specs/account-linking.md).
+        const isNewWorkosLink = !existingProviders.some(
+          p => p.provider === 'workos' && p.provider_account_id === args.provider_account_id
+        );
+        const settled = await db.transaction(async tx => {
+          const removed = await tx
             .delete(user_auth_provider)
-            .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
-          await tx.insert(user_auth_provider).values({
-            kilo_user_id: userByEmail.id,
-            provider: args.provider,
-            provider_account_id: args.provider_account_id,
-            email: args.google_user_email,
-            avatar_url: args.google_user_image_url,
-            display_name: args.display_name ?? null,
-            hosted_domain: args.hosted_domain,
-          });
+            .where(eq(user_auth_provider.kilo_user_id, userByEmail.id))
+            .returning({ provider: user_auth_provider.provider });
+          const [linked] = await tx
+            .insert(user_auth_provider)
+            .values({
+              kilo_user_id: userByEmail.id,
+              provider: args.provider,
+              provider_account_id: args.provider_account_id,
+              email: args.google_user_email,
+              avatar_url: args.google_user_image_url,
+              display_name: args.display_name ?? null,
+              hosted_domain: args.hosted_domain,
+            })
+            .returning({ created_at: user_auth_provider.created_at });
           const [updatedUser] = await tx
             .update(kilocode_users)
             .set({
@@ -670,9 +675,38 @@ export async function createOrUpdateUser(
             })
             .where(eq(kilocode_users.id, userByEmail.id))
             .returning();
-          if (!updatedUser) throw new Error('Failed to rotate web sessions for WorkOS user');
-          return updatedUser;
+          if (!updatedUser || !linked) {
+            throw new Error('Failed to rotate web sessions for WorkOS user');
+          }
+          return {
+            user: updatedUser,
+            linkedAt: linked.created_at,
+            // The other sign-in methods the link removed, each named once in a
+            // stable order. A stale WorkOS row it replaces is the same method.
+            replacedProviders: [
+              ...new Set(
+                removed.map(row => row.provider).filter(provider => provider !== 'workos')
+              ),
+            ].sort(),
+          };
         });
+        linkedUser = settled.user;
+        if (isNewWorkosLink) {
+          await scheduleSecurityNotice(
+            settled.user,
+            {
+              type: 'sign_in_method_linked',
+              provider: 'workos',
+              linkedIdentity: {
+                email: args.google_user_email,
+                displayName: args.display_name ?? null,
+              },
+              linkedAt: new Date(settled.linkedAt),
+              change: { kind: 'sso_settled', replacedProviders: settled.replacedProviders },
+            },
+            await currentSecurityNoticeRequest()
+          );
+        }
       } else {
         const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
         if (!linkResult.success) {
@@ -1046,8 +1080,8 @@ export async function linkAccountToExistingUser(
   );
 
   if (!isNoOpRelink) {
-    // Read while the request is still in scope; the email goes after the response.
-    const details = await currentSignInMethodChangeRequestDetails();
+    // Read while the request is still in scope; the notice goes after the response.
+    const noticeRequest = await currentSecurityNoticeRequest();
     await recordSignInMethodChange({
       user: existingUser,
       change: 'link',
@@ -1055,37 +1089,22 @@ export async function linkAccountToExistingUser(
       request: await currentSignInMethodChangeAuditRequest(),
     });
 
-    if (authProviderData.provider !== 'fake-login') {
-      // Sent after the response: the notice must never delay or fail the sign-in.
-      await runAfterResponse(async () => {
-        try {
-          const notice = await sendNewSignInMethodEmail(
-            existingUser.google_user_email,
-            AUTH_PROVIDER_DISPLAY_NAMES[authProviderData.provider],
-            {
-              email: authProviderData.google_user_email,
-              displayName: authProviderData.display_name ?? null,
-            },
-            details
-          );
-          if (!notice.sent) {
-            captureException(new Error('New sign-in method notice was not sent'), {
-              tags: {
-                operation: 'sign_in_method_change_notice',
-                provider: authProviderData.provider,
-              },
-              extra: { reason: notice.reason },
-            });
-          }
-        } catch (error) {
-          captureException(error, {
-            tags: {
-              operation: 'sign_in_method_change_notice',
-              provider: authProviderData.provider,
-            },
-          });
-        }
-      });
+    // Only the call that wrote the link row reports it, and never the test login.
+    if (authProviderData.provider !== 'fake-login' && linkResult.linkedAt !== null) {
+      await scheduleSecurityNotice(
+        existingUser,
+        {
+          type: 'sign_in_method_linked',
+          provider: authProviderData.provider,
+          linkedIdentity: {
+            email: authProviderData.google_user_email,
+            displayName: authProviderData.display_name ?? null,
+          },
+          linkedAt: new Date(linkResult.linkedAt),
+          change: { kind: 'added' },
+        },
+        noticeRequest
+      );
     }
   } else {
     // A relink of the identity already attached changes nothing, so it sends
@@ -1841,6 +1860,7 @@ export async function anonymizeCloudUserData(
   // device_sessions cascade deletes device_refresh_tokens via FK
   await tx.delete(device_sessions).where(eq(device_sessions.kilo_user_id, userId));
   await tx.delete(native_attested_keys).where(eq(native_attested_keys.kilo_user_id, userId));
+  await tx.delete(user_sign_in_contexts).where(eq(user_sign_in_contexts.user_id, userId));
   // native_admission_challenges are ephemeral (cleaned by cron) and have no user FK
   await tx.delete(github_install_states).where(eq(github_install_states.kilo_user_id, userId));
   await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
@@ -2662,7 +2682,8 @@ export async function getWorkOSOrganization(domain: string) {
 }
 
 type LinkAuthErrors = 'ACCOUNT-ALREADY-LINKED' | 'PROVIDER-ALREADY-LINKED' | 'LINKING-FAILED';
-export type LinkAuthProviderResult = OptionalError<LinkAuthErrors>;
+/** `linkedAt` is when the link row was written, or null when the identical account was already linked. */
+export type LinkAuthProviderResult = Result<{ linkedAt: string | null }, LinkAuthErrors>;
 
 export type AuthProviderLinking = Omit<UserAuthProvider, 'created_at'>;
 
@@ -2692,7 +2713,7 @@ export async function linkAuthProviderToUser(
     // not fail on an already-present row. A different account id for the same
     // provider stays PROVIDER-ALREADY-LINKED.
     if (existingProvider.provider_account_id === authProviderData.provider_account_id) {
-      return successResult();
+      return successResult({ linkedAt: null });
     }
     return failureResult('PROVIDER-ALREADY-LINKED');
   }
@@ -2706,7 +2727,7 @@ export async function linkAuthProviderToUser(
     return failureResult('LINKING-FAILED');
   }
 
-  return successResult();
+  return successResult({ linkedAt: newAuthProvider.created_at });
 }
 
 async function tryVerifyDiscordGuildMembership(
@@ -2758,21 +2779,26 @@ export async function checkAuthProviderUnlink(
   return successResult();
 }
 
+/**
+ * Removes the provider's link rows. `removedLinkCreatedAt` holds when each
+ * removed row was written, empty when a concurrent unlink removed them first.
+ */
 export async function unlinkAuthProviderFromUser(
   kiloUserId: string,
   provider: AuthProviderId
-): Promise<OptionalError<TRPCError>> {
+): Promise<Result<{ removedLinkCreatedAt: string[] }, TRPCError>> {
   const unlinkable = await checkAuthProviderUnlink(kiloUserId, provider);
   if (!unlinkable.success) return unlinkable;
 
-  await db
+  const removed = await db
     .delete(user_auth_provider)
     .where(
       and(
         eq(user_auth_provider.kilo_user_id, kiloUserId),
         eq(user_auth_provider.provider, provider)
       )
-    );
+    )
+    .returning({ created_at: user_auth_provider.created_at });
 
   // Clear Discord guild membership verification when unlinking Discord
   if (provider === 'discord') {
@@ -2790,5 +2816,5 @@ export async function unlinkAuthProviderFromUser(
     await clearOpenAiChatGptConnection({ kiloUserId, organizationId: null });
   }
 
-  return successResult();
+  return successResult({ removedLinkCreatedAt: removed.map(row => row.created_at) });
 }

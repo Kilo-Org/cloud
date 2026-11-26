@@ -16,8 +16,13 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store'),
   evaluateStepUp: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/notifications-worker-client'),
+  dispatchAccountSecurityPush: jest.fn(async () => true),
+}));
 jest.mock('@kilocode/web-shared/lib/email', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/email'),
+  sendPasskeyAddedEmail: jest.fn(async () => ({ sent: true })),
   sendPasskeyEnrollmentCodeEmail: jest.fn(),
 }));
 
@@ -46,7 +51,11 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
+import { dispatchAccountSecurityPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { sendPasskeyEnrollmentCodeEmail } from '@kilocode/web-shared/lib/email';
 import { createPasskeyEnrollmentCode } from '@/lib/auth/passkey-enrollment-email-code';
 import {
@@ -70,6 +79,12 @@ const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
 const mockCaptureException = jest.mocked(captureException);
 const mockSendCodeEmail = jest.mocked(sendPasskeyEnrollmentCodeEmail);
+const mockDispatchPush = jest.mocked(dispatchAccountSecurityPush);
+
+/** The (recipient, event) of every security-notice push sent since the last clear. */
+function noticePushes() {
+  return mockDispatchPush.mock.calls.map(([push]) => [push.recipientUserId, push.event]);
+}
 
 const fakeUser = {
   id: 'user-1',
@@ -129,6 +144,18 @@ function createNativeRequest(body: unknown): NextRequest {
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json', authorization: 'Bearer native-token' },
   });
+}
+
+// An enrollment notice leaves an outbox row that references its user; a later
+// suite in the same worker that deletes every user would hit it. Each suite
+// that inserts users deletes those rows in its own afterAll, which runs before
+// the worker setup's root afterAll closes the database connections.
+const createdUserIds: string[] = [];
+
+async function insertUser(fields: Partial<User> = {}): Promise<User> {
+  const created = await insertTestUser(fields);
+  createdUserIds.push(created.id);
+  return created;
 }
 
 describe('POST /api/auth/passkey/register', () => {
@@ -248,6 +275,7 @@ describe('POST /api/auth/passkey/register', () => {
         ...unusedEmailCode,
       }
     );
+    expect(noticePushes()).toEqual([['user-1', 'passkey_added']]);
   });
 
   it('returns 400 for an invalid request', async () => {
@@ -305,6 +333,7 @@ describe('POST /api/auth/passkey/register', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'CHALLENGE_ALREADY_USED' });
+    expect(noticePushes()).toEqual([]);
   });
 
   it('refuses a stale admin enrollment without a fresh sign-in or step-up proof', async () => {
@@ -525,11 +554,13 @@ describe('POST /api/auth/passkey/register (native app)', () => {
   let user: User;
   let deviceSessionId: string;
 
+  afterAll(() => deleteTransactionalEmailLogForUsers(createdUserIds));
+
   beforeEach(async () => {
     jest.clearAllMocks();
     rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
-    user = await insertTestUser();
+    user = await insertUser();
     const [session] = await db
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
@@ -583,10 +614,11 @@ describe('POST /api/auth/passkey/register (native app)', () => {
 
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
     expect(mockVerifyNativeRegistration).not.toHaveBeenCalled();
+    expect(noticePushes()).toEqual([]);
   });
 
   it('requires the grant before an admin enrollment too', async () => {
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await insertUser({ is_admin: true });
     const [session] = await db
       .insert(device_sessions)
       .values({ kilo_user_id: admin.id })
@@ -722,10 +754,12 @@ describe('POST /api/auth/passkey/register (native app)', () => {
       error: 'PASSKEY_MANAGEMENT_AUTHORIZATION_INVALID',
     });
     expect(mockVerifyNativeRegistration).toHaveBeenCalledTimes(1);
+    // One notice for the enrollment, none for the refused replay.
+    expect(noticePushes()).toEqual([[user.id, 'passkey_added']]);
   });
 
   it('audits an admin enrollment from the native path as a bearer enrollment', async () => {
-    const admin = await insertTestUser({ is_admin: true });
+    const admin = await insertUser({ is_admin: true });
     const [session] = await db
       .insert(device_sessions)
       .values({ kilo_user_id: admin.id })
@@ -784,6 +818,8 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
   const sessionPepper = 'browser-session-pepper';
   let user: User;
 
+  afterAll(() => deleteTransactionalEmailLogForUsers(createdUserIds));
+
   function signIn(webSessionId: string, authenticatedAt = Math.floor(Date.now() / 1000)) {
     mockGetUserFromAuth.mockResolvedValue({
       user,
@@ -801,7 +837,7 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     mockCreateRegistrationOptions.mockImplementation(actualPasskey.createRegistrationOptions);
     mockVerifyRegistration.mockImplementation(actualPasskey.verifyRegistration);
     mockSendCodeEmail.mockResolvedValue({ sent: true });
-    user = await insertTestUser({ web_session_pepper: sessionPepper });
+    user = await insertUser({ web_session_pepper: sessionPepper });
     signIn('browser-session-a');
   });
 
@@ -891,6 +927,7 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
 
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
     expect(mockVerifyRegistration).not.toHaveBeenCalled();
+    expect(noticePushes()).toEqual([]);
   });
 
   it('counts wrong codes, locks at the fifth, and sends no code while locked', async () => {
@@ -1046,6 +1083,22 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
       options: { challenge: string };
     };
 
+    // A wrong code is refused before the ceremony: no passkey and no notice.
+    const wrongVerify = await POST(
+      createRequest({
+        action: 'verify',
+        challengeId: second.challengeId,
+        response: buildRegistrationResponse(createTestAuthenticator(), {
+          challenge: second.options.challenge,
+        }),
+        emailCode: { ...emailCode, code: wrongCode(emailCode.code) },
+      })
+    );
+    expect(wrongVerify.status).toBe(401);
+    expect(await wrongVerify.json()).toEqual({ error: 'EMAIL_CODE_INVALID', attemptsLeft: 4 });
+    expect(await passkeyCount()).toBe(0);
+    expect(noticePushes()).toEqual([]);
+
     const verify = await POST(
       createRequest({
         action: 'verify',
@@ -1061,6 +1114,7 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     expect(await codeRows()).toEqual([
       { challenge_id: emailCode.emailCodeId, consumed_at: expect.any(String) },
     ]);
+    expect(noticePushes()).toEqual([[user.id, 'passkey_added']]);
 
     const optionsAgain = await POST(createRequest({ action: 'options', emailCode }));
     expect(optionsAgain.status).toBe(401);
@@ -1079,6 +1133,8 @@ describe('POST /api/auth/passkey/register (browser email code)', () => {
     expect(secondPasskey.status).toBe(401);
     expect(await secondPasskey.json()).toEqual({ error: 'EMAIL_CODE_EXPIRED' });
     expect(await passkeyCount()).toBe(1);
+    // One notice for the one enrollment; the refused second passkey sends none.
+    expect(noticePushes()).toEqual([[user.id, 'passkey_added']]);
   });
 
   it('records each code send, failed send and wrong code, and the lockout once, as auth rows', async () => {

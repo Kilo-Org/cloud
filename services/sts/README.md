@@ -296,11 +296,9 @@ Identity kinds:
   bind `environments`. Tokens from `pull_request_target`, `workflow_run` and `issue_comment` are
   refused unless `allowedEvents` names the event.
 
-Not yet supported: `vercel-oidc`. The design accepts a Vercel token only with STS's own audience,
-which needs the per-audience token exchange and its proof run (design 4.4); it comes with the first
-Vercel workload. Until then a Vercel token is refused like any unlisted issuer. A default-audience
-Vercel token (`https://vercel.com/<team>`) is shared by every relying party of the team, which is
-why the exchange is a prerequisite.
+- `vercel-oidc`: `teamSlug`, `teamId`, `projectId`, `projectName`, and `environments`
+  (`production`, `preview`, or `{ customEnvironmentId: env_... }`). See
+  [Vercel callers](#vercel-callers).
 
 Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
@@ -388,6 +386,127 @@ CI runs it whenever any Worker config changes (`scripts/affected-workspaces.mjs`
 The first refresher check after a deploy compares the policy hash with the stored one and writes one
 `ai.kilo.sts.policy.changed` event naming the workloads and secret names that were added or removed.
 Secret values never appear in an audit event, a log line or a Durable Object response.
+
+### Vercel callers
+
+A Vercel function's own OIDC token (header `x-vercel-oidc-token`) carries the team-wide audience
+`https://vercel.com/<team slug>`, which every project and every preview deployment of the team
+shares; STS refuses it. The caller first exchanges it for a token whose only audience is the STS
+issuer of the environment it calls (`https://sts.kiloapps.io`, staging
+`https://sts-staging.kiloapps.io`). The exchange (`POST https://oidc.vercel.com/~token` with
+`{ token, aud }`, what `getVercelOidcToken({ audience })` in `@vercel/oidc` 3.8 or later calls)
+keeps the base token's `exp`, sets `aud`, adds `act` `{ iat, aud: "https://vercel.com/<team slug>" }`,
+and issues from the team slug issuer (https://vercel.com/docs/oidc/reference,
+https://vercel.com/changelog/custom-oidc-token-audiences,
+https://github.com/vercel/vercel/blob/main/packages/oidc/src/exchange-vercel-oidc-token.ts; proof run
+1 recorded these claims). The base token is therefore a bearer credential for STS through the
+exchange: the client reads it inside the request handler, never at module scope, and sends it only
+to the exchange.
+
+The exchange allows about 100 exchanges per burst, refilling within about 65 seconds (proof runs 1
+and 2). The budget is per project or per team, not per deployment: two fresh deployments fired
+together got 42 + 58 = 100 tokens, then 429 (proof run 3, run e; project versus team was not
+measured). So overlapping deployments, and if it is team-wide every project of team `kilocode`,
+share it. It refuses to exchange an exchanged token (401, proof runs 2 and 3). A
+client therefore never exchanges once per instance: it shares the exchanged token through the
+Vercel Runtime Cache (decision D10, design 4.4 and Q49), with the algorithm in
+`proof/vercel-exchange/lib/shared-token.ts`: key SHA-256 of the base token's `owner_id`,
+`project_id`, `environment`, `custom_environment_id` and `deployment_id` and the audience (Vercel
+renews the base token during a deployment's life, even mid-wave, so the token itself is not in the
+key); memory, then the cache, a cached token used until its own `exp` minus 60 seconds whatever
+base token the reader holds; on a miss a random wait and a re-read, then a claim marker so one
+request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
+exchanging again. The cache key is not secret and the entry holds the whole exchanged token: code
+that can use the same Runtime Cache partition (other deployments of the project in the same
+environment) can read and present that token and can stall a deployment's exchanges, but cannot
+make a deployment present another deployment's token (the reader checks the claims, STS checks the
+signature). Within one environment a read gains nothing, since STS takes no deployment claim.
+Vercel documents separate partitions only for preview and production, so a custom environment may
+share the preview partition; the phase 2 slice-4 client therefore encrypts every custom-environment
+entry (AES-GCM under a key only that environment holds, the cache key as associated data) and
+fetches `oidc.vercel.com` with `redirect: 'error'`. There is no
+early refresh: the exchanged token keeps the base token's `exp`, so
+exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
+the request at once. When the cache is down (the claim marker does not read back), each request
+exchanges once and fails at once on a 429: about 100 requests per 65 seconds get a token and the
+rest of a cold wave fail fast until the cache is back.
+
+STS verifies the exchanged token against the team slug issuer `https://oidc.vercel.com/<teamSlug>`
+(discovery, then the key set it names, each with a 5-second timeout); the team id issuer form
+(`https://oidc.vercel.com/team_...`) is refused. Then: RS256 only, a 60-second clock skew, `aud`
+exactly the STS issuer as a single string, `iat` and `exp` present and `iat` no later than now plus
+the skew, and `act` an object whose `aud` is `https://vercel.com/<teamSlug>` with no nested `act`
+(a token exchanged from an already exchanged token, or one without `act`, is refused). A token with
+a `user_id` claim is refused in every environment: Vercel puts it on the tokens of a person's
+`vercel env pull` and `vercel dev` (those live 12 hours; function tokens live 2 hours), and STS
+serves deployments, not people. The refusal is audited with the `user_id`. For the same reason a
+policy cannot list the Vercel `development` environment.
+
+Authorization keys on the stable ids only: `owner_id` must be `teamId`, `project_id` must be
+`projectId`, and `environment` must be listed, or, for a custom environment, `custom_environment_id`
+must equal a listed `customEnvironmentId` (a custom environment's slug never matches). The names
+(`owner`, `project`) only have to agree with `sub`
+(`owner:<team slug>:project:<project name>:environment:<environment>`) and `owner` with `teamSlug`;
+`projectName` is never compared. One project id maps to one workload.
+
+Environment mapping (design 6.2), checked when the policy loads and again on every token:
+
+| Vercel environment | STS environment it may read |
+|---|---|
+| `production` | `production` only |
+| `preview` | `development` only (a preview runs code from any branch) |
+| custom environment, by id | `staging` only |
+
+The web app's staging is the custom environment `staging` (id `env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b`,
+deployed with `--target=staging`), so its policy lists
+`{ customEnvironmentId: env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b }` and STS staging serves exactly that
+environment. Anyone with deploy rights on the project can deploy to that custom environment, so
+staging values must not be production-grade. Team `kilocode` is `team_ItxRShuUkJaEd9GmXMEEgunb`.
+
+A policy fails to load when a listed Vercel environment can read none of the policy's STS
+environments, or when one of its STS environments has no listed Vercel environment that may read it.
+A token from a listed Vercel environment that this STS deployment may not serve is refused with
+`environment_mismatch`. A refusal of a verified Vercel token is audited with `owner_id`,
+`project_id`, `environment`, `custom_environment_id` and `user_id` only (actor
+`vercel:<owner_id>/<project_id>` or the policy's workload), never a name or the token. The verified
+outcome carries the token's `exp` and `iat` (`attestationExp`, `attestationIat`, seconds). The mint
+in the next PR of this stack (`/v1/token`) caps what it issues at `attestationExp`; for a Vercel
+token `attestationIat` is the exchange time, not the base token's issue time, so it says nothing
+about how old the deployment's token is.
+
+Person tokens: proof runs 2 and 3 pulled `preview`, `production` and `staging` tokens with
+`vercel env pull`; each claimed `environment: development` and carried `user_id`, and proof run 3
+showed `user_id` survives the exchange, so STS refuses them before and after it. Build tokens:
+`scope` equals `sub` (`owner:kilocode:project:<name>:environment:<env>`) for function,
+custom-environment and person tokens alike (proof run 3), so STS cannot tell a Vercel build token
+from a function token of the same environment: build code is trusted like the deployment's own
+code (design 6.2). A staging custom-environment function token carries `environment: staging` and
+`custom_environment_id`, so a policy pinned to `production` refuses it on the claim alone.
+
+**Merge gate: passed.** Proof run 3 (2026-11-25, `proof/vercel-exchange/README.md`) passed every
+check of the gate run: a 2,500-invocation cold wave on 498 cold instances in `iad1` got every token
+with 2 exchanges, 0 × 429, time to token p99 1,954 ms and max 2,623 ms. For every environment pulled
+from the throwaway proof project, both the pulled and the exchanged token carry `user_id` (gate:
+holds). A Vercel workload may now move to STS.
+
+Cost, with about 2,200 Vercel instance starts per release and 43 releases a day, for R function
+regions (the web app's project setting) and one audience (STS):
+
+| | Exchanges per release | Exchanges per day | Bundle calls per day |
+|---|---|---|---|
+| One exchange per instance (no shared cache) | 2,200, above the limit of about 100 | 94,600 | 94,600 |
+| D10 shared cache | about R (a handful of the shared budget; overlapping releases add theirs) | about 43 R, plus about 12 R if Vercel renews the base token every 2 hours | 94,600 |
+
+Runtime Cache reads: a memory hit reads nothing, a cache hit is 1 read, a miss that reaches the claim
+is 4 reads and 1 to 2 writes, then 2 reads per poll step. Proof run 2's single-key wave measured
+about 1 read per instance, so about 2,200 to 3,000 reads per wave and region (worst case about
+120,000 if every instance polls to the deadline) and about 100,000 to 130,000 per day. The client
+count (10,000, 50,000 or 200,000) does
+not change any row: the instance count drives it. On the STS side each isolate fetches the Vercel
+issuer's discovery once and its key set at most once per 10 minutes (jose's default `cacheMaxAge`),
+plus at most once per 30 seconds after an unknown `kid` (its cooldown). Requests share only the
+finished key set, so a cold isolate makes one fetch pair per request that arrives before the first
+pair lands; each fetch gives up after 5 seconds, so that window lasts at most 10 seconds.
 
 ## Infisical setup, per environment
 

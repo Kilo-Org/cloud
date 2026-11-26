@@ -5,6 +5,7 @@ import {
   SecretNameSchema,
   StsEnvironmentSchema,
   WorkloadNameSchema,
+  type StsEnvironment,
   isRegisteredStsScope,
   scopeAudience,
   type StsScopeRegistry,
@@ -62,10 +63,59 @@ export const GithubIdentitySchema = z
     message: 'github-oidc binds environments, refs, or both',
   });
 
+/**
+ * The Vercel environments a policy may list. `development` is not one: its tokens come from a
+ * person's `vercel env pull` or `vercel dev`, not from a deployment. Any other `environment` claim
+ * is a custom environment's slug, listed by its id.
+ */
+const VERCEL_STANDARD_ENVIRONMENTS = ['production', 'preview'] as const;
+
+const VercelEnvironmentSchema = z.union([
+  z.enum(VERCEL_STANDARD_ENVIRONMENTS),
+  z.strictObject({ customEnvironmentId: StableIdSchema }),
+]);
+
+export type VercelEnvironment = z.infer<typeof VercelEnvironmentSchema>;
+
+export const VERCEL_ISSUER_PREFIX = 'https://oidc.vercel.com/';
+
+/**
+ * Vercel function tokens after the custom-audience exchange (https://vercel.com/docs/oidc/reference).
+ * The issuer is the team slug form `https://oidc.vercel.com/<teamSlug>`, the form the proof run
+ * recorded on exchanged function tokens; the team id form is refused. The stable `owner_id`,
+ * `project_id` and `environment` (or `custom_environment_id`) claims bind the identity;
+ * `projectName` is for people reading the policy and never authorizes.
+ */
+export const VercelIdentitySchema = z.strictObject({
+  kind: z.literal('vercel-oidc'),
+  teamSlug: SlugSchema,
+  teamId: z.string().regex(/^team_[A-Za-z0-9]{1,64}$/),
+  projectId: z.string().regex(/^prj_[A-Za-z0-9]{1,64}$/),
+  projectName: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,99}$/),
+  environments: z.array(VercelEnvironmentSchema).min(1).max(32),
+});
+
+/**
+ * The STS environments a Vercel environment may read (design 6.2): only `production` reaches
+ * production values; a preview runs code from any branch, so it reads development values; a custom
+ * environment reads staging values only.
+ */
+export function vercelStsEnvironments(environment: VercelEnvironment): readonly StsEnvironment[] {
+  if (typeof environment !== 'string') return ['staging'];
+  return environment === 'production' ? ['production'] : ['development'];
+}
+
+export function vercelEnvironmentKey(environment: VercelEnvironment): string {
+  return typeof environment === 'string'
+    ? environment
+    : `custom:${environment.customEnvironmentId}`;
+}
+
 export const PolicyIdentitySchema = z.discriminatedUnion('kind', [
   WorkerBindingIdentitySchema,
   FlyIdentitySchema,
   GithubIdentitySchema,
+  VercelIdentitySchema,
 ]);
 
 function hasDuplicates(values: readonly string[]): boolean {
@@ -163,6 +213,25 @@ export function policyFileProblems(
     }
     if (policy.environments.includes('production') && environments === undefined) {
       problems.push('a github-oidc policy that grants production must bind identity.environments');
+    }
+  }
+  if (policy.identity.kind === 'vercel-oidc') {
+    const sources = policy.identity.environments;
+    if (hasDuplicates(sources.map(vercelEnvironmentKey))) {
+      problems.push('identity.environments contains a duplicate');
+    }
+    for (const source of sources) {
+      const readable = vercelStsEnvironments(source);
+      if (!readable.some(target => policy.environments.includes(target))) {
+        problems.push(
+          `Vercel environment ${vercelEnvironmentKey(source)} may only read ${readable.join(' or ')}, which the policy does not grant`
+        );
+      }
+    }
+    for (const target of policy.environments) {
+      if (!sources.some(source => vercelStsEnvironments(source).includes(target))) {
+        problems.push(`no listed Vercel environment may read ${target}`);
+      }
     }
   }
   return problems;

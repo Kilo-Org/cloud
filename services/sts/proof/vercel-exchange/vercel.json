@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": false,
+  "functions": {
+    "api/exchange.ts": { "maxDuration": 300 },
+    "api/cold.ts": { "maxDuration": 30 },
+    "api/shared.ts": { "maxDuration": 60 },
+    "api/chain.ts": { "maxDuration": 30 }
+  }
+}

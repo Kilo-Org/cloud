@@ -62,8 +62,8 @@ afterEach(async () => {
   await worker.dispose();
 });
 
-async function race(route: string): Promise<Race> {
-  const reply = await worker.fetch(`http://probe.test/race?route=${route}`);
+async function race(route: string, query = ''): Promise<Race> {
+  const reply = await worker.fetch(`http://probe.test/race?route=${route}${query}`);
   return (await reply.json()) as Race;
 }
 
@@ -137,7 +137,8 @@ it('checks a webhook that arrives while a cancelled request was loading the secr
 }, 30_000);
 
 it('verifies a workload token that arrives while a cancelled request was discovering its provider', async () => {
-  const result = await race('identity');
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const result = await race('identity', `&issuedAt=${issuedAt}`);
   // The first racer's discovery never answers; the second racer's discovery and key set fetch do.
   expect(result).toMatchObject({
     first: 'cancelled',
@@ -150,6 +151,8 @@ it('verifies a workload token that arrives while a cancelled request was discove
     status: 'verified',
     workload: 'fly-app',
     provider: 'fly',
+    attestationExp: issuedAt + 600,
+    attestationIat: issuedAt,
   });
   expect(workerdLogs.filter(message => CROSS_REQUEST_WARNING.test(message))).toEqual([]);
 }, 30_000);

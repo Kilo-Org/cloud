@@ -230,22 +230,186 @@ secrets: [APP_ONE_SECRET]
     );
   });
 
-  it('rejects the Vercel identity kind, which needs the audience exchange first', () => {
-    expectThrow(
-      {
-        'web.yaml': `
-workload: web
-environments: [production]
+  describe('vercel-oidc', () => {
+    const vercel = (options: {
+      workload?: string;
+      environments: string;
+      vercelEnvironments: string;
+      extra?: string;
+    }) => `
+workload: ${options.workload ?? 'web'}
+environments: ${options.environments}
 identity:
   kind: vercel-oidc
   teamSlug: acme
-  projectId: prj_web
-  vercelEnvironments: [production]
+  teamId: team_Acme1
+  projectId: prj_Web1
+  projectName: acme-web
+  environments: ${options.vercelEnvironments}${options.extra ?? ''}
 secrets: [APP_ONE_SECRET]
-`,
-      },
-      'does not match the policy schema'
-    );
+`;
+
+    it('loads a project that maps production, preview and a custom environment', () => {
+      const index = loadPolicies({
+        'web.yaml': vercel({
+          environments: '[production, staging, development]',
+          vercelEnvironments: '[production, preview, { customEnvironmentId: env_S1 }]',
+        }),
+      });
+      expect(index.get('production', 'web')?.identity).toMatchObject({
+        kind: 'vercel-oidc',
+        teamId: 'team_Acme1',
+        projectId: 'prj_Web1',
+      });
+      expect(index.snapshot()[0]?.identity).toBe(
+        'vercel-oidc|acme|team_Acme1|prj_Web1|acme-web|custom:env_S1,preview,production'
+      );
+    });
+
+    it('derives the issuer from the team slug and refuses the team id form', () => {
+      for (const issuer of ['https://oidc.vercel.com/team_Acme1', 'https://oidc.vercel.com/acme']) {
+        expectThrow(
+          {
+            'web.yaml': vercel({
+              environments: '[production]',
+              vercelEnvironments: '[production]',
+              extra: `\n  issuer: ${issuer}`,
+            }),
+          },
+          'does not match the policy schema'
+        );
+      }
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[production]',
+            vercelEnvironments: '[production]',
+          }).replace('teamSlug: acme', 'teamSlug: team_Acme1'),
+        },
+        'does not match the policy schema'
+      );
+    });
+
+    it('rejects the development environment, whose tokens belong to a person', () => {
+      for (const vercelEnvironments of ['[development]', '[preview, development]']) {
+        expectThrow(
+          { 'web.yaml': vercel({ environments: '[development]', vercelEnvironments }) },
+          'does not match the policy schema'
+        );
+      }
+    });
+
+    it('rejects unknown fields, malformed ids and a custom environment named by slug', () => {
+      for (const source of [
+        vercel({
+          environments: '[production]',
+          vercelEnvironments: '[production]',
+          extra: '\n  vercelEnvironments: [production]',
+        }),
+        vercel({ environments: '[production]', vercelEnvironments: '[staging]' }),
+        vercel({
+          environments: '[staging]',
+          vercelEnvironments: '[{ customEnvironmentSlug: staging }]',
+        }),
+        vercel({ environments: '[production]', vercelEnvironments: '[]' }),
+      ]) {
+        expectThrow({ 'web.yaml': source }, 'does not match the policy schema');
+      }
+      expectThrow(
+        {
+          'web.yaml': vercel({ environments: '[production]', vercelEnvironments: '[production]' })
+            .replace('team_Acme1', 'acme')
+            .replace('prj_Web1', 'web'),
+        },
+        'does not match the policy schema'
+      );
+    });
+
+    it('lets only Vercel production read production values', () => {
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[production]',
+            vercelEnvironments: '[production, preview]',
+          }),
+        },
+        'Vercel environment preview may only read development, which the policy does not grant'
+      );
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[production]',
+            vercelEnvironments: '[{ customEnvironmentId: env_S1 }]',
+          }),
+        },
+        'no listed Vercel environment may read production'
+      );
+    });
+
+    it('maps preview only to development, custom environments only to staging', () => {
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[staging]',
+            vercelEnvironments: '[preview]',
+          }),
+        },
+        'no listed Vercel environment may read staging'
+      );
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[development]',
+            vercelEnvironments: '[production, preview]',
+          }),
+        },
+        'Vercel environment production may only read production'
+      );
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[development]',
+            vercelEnvironments: '[{ customEnvironmentId: env_S1 }]',
+          }),
+        },
+        'Vercel environment custom:env_S1 may only read staging, which the policy does not grant'
+      );
+      expect(() =>
+        loadPolicies({
+          'web.yaml': vercel({
+            environments: '[staging, development]',
+            vercelEnvironments: '[preview, { customEnvironmentId: env_S1 }]',
+          }),
+        })
+      ).not.toThrow();
+    });
+
+    it('rejects a duplicate environment entry', () => {
+      expectThrow(
+        {
+          'web.yaml': vercel({
+            environments: '[staging]',
+            vercelEnvironments:
+              '[{ customEnvironmentId: env_S1 }, { customEnvironmentId: env_S1 }]',
+          }),
+        },
+        'identity.environments contains a duplicate'
+      );
+    });
+
+    it('binds one workload per Vercel project id', () => {
+      expectThrow(
+        {
+          'web.yaml': vercel({ environments: '[production]', vercelEnvironments: '[production]' }),
+          'web-preview.yaml': vercel({
+            workload: 'web-preview',
+            environments: '[development]',
+            vercelEnvironments: '[preview]',
+          }),
+        },
+        'declare the same identity'
+      );
+    });
   });
 
   it('rejects two workloads that declare the same identity', () => {

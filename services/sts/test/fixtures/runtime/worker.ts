@@ -215,7 +215,8 @@ function routeRequest(env: ProbeEnv, route: string | null): Request {
   return new Request(`${issuer}${MANAGER_JWKS_PATH}`);
 }
 
-async function buildIdentity(issuer: string): Promise<void> {
+/** The token's `iat` comes from the test so it can check the outcome exactly; it lives 10 minutes. */
+async function buildIdentity(issuer: string, issuedAt: number): Promise<void> {
   const provider = await createProvider(FLY_ISSUER, issuer);
   const local = providerFetch([provider]);
   identity = {
@@ -226,13 +227,17 @@ async function buildIdentity(issuer: string): Promise<void> {
       fetch: async (input: RequestInfo | URL, init?: RequestInit) =>
         await slowCall(calls.identity, () => local.fetch(input, init)),
     }),
-    token: await signToken(provider, {
-      org_id: '1111',
-      org_name: 'acme',
-      app_id: '2222',
-      app_name: 'fly-app',
-      machine_id: 'machine-1',
-    }),
+    token: await signToken(
+      provider,
+      {
+        org_id: '1111',
+        org_name: 'acme',
+        app_id: '2222',
+        app_name: 'fly-app',
+        machine_id: 'machine-1',
+      },
+      { issuedAt, expiresAt: issuedAt + 600 }
+    ),
   };
 }
 
@@ -250,9 +255,12 @@ function isRoute(route: string | null): route is keyof typeof calls {
  * The first request is cancelled while its signer, refresher or provider call is in flight; the
  * second arrives right after and must not depend on the first request's call.
  */
-async function race(env: ProbeEnv, route: string | null): Promise<Response> {
+async function race(env: ProbeEnv, url: URL): Promise<Response> {
+  const route = url.searchParams.get('route');
   if (!isRoute(route)) return new Response('unknown route', { status: 400 });
-  if (route === 'identity') await buildIdentity(readConfig(env).issuer);
+  if (route === 'identity') {
+    await buildIdentity(readConfig(env).issuer, Number(url.searchParams.get('issuedAt')));
+  }
   const first = await env.SELF.fetch(routeRequest(env, route), {
     signal: AbortSignal.timeout(100),
   }).then(
@@ -331,7 +339,7 @@ export default {
       case '/fill':
         return await readFilled(env, url.searchParams.get('deadlineMs'));
       case '/race':
-        return await race(env, url.searchParams.get('route'));
+        return await race(env, url);
       case '/verify':
         return await verifyIdentity();
       case '/strand':

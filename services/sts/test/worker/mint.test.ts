@@ -24,6 +24,18 @@ const FLY_CLAIMS = {
   machine_id: 'machine-1',
 };
 
+const VERCEL_ISSUER = 'https://oidc.vercel.com/acme';
+/** An exchanged preview function token (https://vercel.com/docs/oidc/reference). */
+const VERCEL_CLAIMS = {
+  sub: 'owner:acme:project:acme-web:environment:preview',
+  owner: 'acme',
+  owner_id: 'team_Acme1',
+  project: 'acme-web',
+  project_id: 'prj_Web1',
+  environment: 'preview',
+  act: { iat: Math.floor(Date.now() / 1000) - 60, aud: 'https://vercel.com/acme' },
+};
+
 const audiences = Array.from({ length: 9 }, (_, index) => `aud-${index + 1}`);
 const scopes = Object.fromEntries(
   audiences.map(audience => [audience, { scopes: [`${audience}:read`] }])
@@ -71,6 +83,20 @@ identity:
 secrets: []
 audiences: [aud-1]
 scopes: ['aud-1:read']
+`,
+      'vercel-web.yaml': `
+workload: vercel-web
+environments: [development]
+identity:
+  kind: vercel-oidc
+  teamSlug: acme
+  teamId: team_Acme1
+  projectId: prj_Web1
+  projectName: acme-web
+  environments: [preview]
+secrets: []
+audiences: [aud-2]
+scopes: ['aud-2:read']
 `,
     },
     { scopeRegistry: scopes }
@@ -343,13 +369,15 @@ describe('worker-binding mint', () => {
 describe('HTTP mint', () => {
   // One provider key for the file: STS's isolate keeps the verifier, and its key set, per policy index.
   let provider: TestProvider;
+  let vercel: TestProvider;
 
   beforeAll(async () => {
     provider = await createProvider(FLY_ISSUER, config.issuer);
+    vercel = await createProvider(VERCEL_ISSUER, config.issuer);
   });
 
   beforeEach(() => {
-    vi.stubGlobal('fetch', providerFetch([provider]).fetch);
+    vi.stubGlobal('fetch', providerFetch([provider, vercel]).fetch);
   });
 
   async function post(body: string, token?: string): Promise<Response> {
@@ -386,6 +414,25 @@ describe('HTTP mint', () => {
       identity: 'fly',
       attestationCapped: true,
     });
+  });
+
+  it('issues a Vercel function the audience and scope its policy grants', async () => {
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await signToken(vercel, VERCEL_CLAIMS, { issuedAt, expiresAt: issuedAt + 3600 });
+    const response = await post(
+      JSON.stringify({ tokens: [{ audience: 'aud-2', scope: 'aud-2:read' }] }),
+      token
+    );
+    expect(response.status).toBe(200);
+    const result = await response.json<MintResult>();
+    if (result.status !== 'ok' || result.tokens[0].status !== 'issued') {
+      throw new Error(`expected an issued token, got ${JSON.stringify(result)}`);
+    }
+    expect(decodeJwt(result.tokens[0].token)).toMatchObject({
+      sub: 'service:vercel-web',
+      aud: 'aud-2',
+    });
+    expect((await issuedRows())[0].data.attributes).toMatchObject({ identity: 'vercel' });
   });
 
   it('denies every token as attestation_expiring when the attestation leaves under 60 seconds', async () => {

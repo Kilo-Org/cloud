@@ -146,10 +146,17 @@ describe('Fly machine identity', () => {
 describe('GitHub Actions identity', () => {
   it('accepts a token bound to the repository ids, the environment and the ref', async () => {
     const { verify, provider } = await fixture('production');
-    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toMatchObject({
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS, {
+      issuedAt,
+      expiresAt: issuedAt + 300,
+    });
+    expect(await verify(token)).toEqual({
       status: 'verified',
       workload: 'github-deploy',
       provider: 'github',
+      attestationExp: issuedAt + 300,
+      attestationIat: issuedAt,
     });
   });
 
@@ -184,16 +191,23 @@ describe('GitHub Actions identity', () => {
 
   it('accepts a privileged event the policy names explicitly', async () => {
     const { verify, provider } = await fixture('staging');
-    const token = await signToken(provider(GITHUB_ISSUER), {
-      repository_id: '789',
-      repository_owner_id: '456',
-      ref: 'refs/heads/main',
-      event_name: 'workflow_run',
-    });
-    expect(await verify(token)).toMatchObject({
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await signToken(
+      provider(GITHUB_ISSUER),
+      {
+        repository_id: '789',
+        repository_owner_id: '456',
+        ref: 'refs/heads/main',
+        event_name: 'workflow_run',
+      },
+      { issuedAt, expiresAt: issuedAt + 300 }
+    );
+    expect(await verify(token)).toEqual({
       status: 'verified',
       workload: 'github-review',
       provider: 'github',
+      attestationExp: issuedAt + 300,
+      attestationIat: issuedAt,
     });
   });
 
@@ -287,6 +301,21 @@ describe('token rejection', () => {
   it('refuses a malformed token', async () => {
     const { verify } = await fixture('production');
     expect(await verify('not-a-jwt')).toEqual({ status: 'denied', reason: 'identity_rejected' });
+  });
+
+  it.each([
+    ['Fly', FLY_ISSUER, FLY_CLAIMS],
+    ['GitHub', GITHUB_ISSUER, GITHUB_CLAIMS],
+  ])('refuses a %s token without iat or without exp', async (_name, issuer, claims) => {
+    const { verify, provider } = await fixture('production');
+    for (const times of [
+      { issuedAt: null },
+      { expiresAt: null },
+      { issuedAt: null, expiresAt: null },
+    ]) {
+      const token = await signToken(provider(issuer), claims, times);
+      expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+    }
   });
 });
 

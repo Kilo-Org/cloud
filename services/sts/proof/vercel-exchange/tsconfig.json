@@ -1,0 +1,23 @@
+{
+  // Typecheck only, run by `pnpm typecheck` in services/sts with the STS workspace's compiler and
+  // Node types. This directory is not a pnpm workspace, so `@vercel/functions` resolves to the web
+  // app's install, which pins the same version as package.json here (3.4.6).
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "typeRoots": ["../../node_modules/@types"],
+    "types": ["node"],
+    "paths": {
+      "@vercel/functions": ["../../../../apps/web/node_modules/@vercel/functions/index.d.ts"]
+    }
+  },
+  "include": ["api/**/*.ts", "lib/**/*.ts", "drive.ts", "inspect-env-token.ts"]
+}

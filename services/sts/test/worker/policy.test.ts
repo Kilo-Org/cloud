@@ -146,8 +146,8 @@ scopes: ['o11y:alerts.read']
       environment: 'production',
       policyHash: 'after',
       previousPolicyHash: 'before',
-      previous: before.snapshot(),
-      current: after.snapshot(),
+      previous: before.snapshot('production'),
+      current: after.snapshot('production'),
     });
     expect(event.data.attributes).toMatchObject({
       addedAudiences: ['app-one:o11y'],
@@ -169,7 +169,7 @@ scopes: ['o11y:alerts.read']
       identity: z.string(),
       secrets: z.array(z.string()),
     });
-    const [entry] = loadPolicies({ 'app-one.yaml': valid }).snapshot();
+    const [entry] = loadPolicies({ 'app-one.yaml': valid }).snapshot('production');
     expect(BaseSnapshotEntrySchema.safeParse(entry).success).toBe(true);
   });
 });
@@ -274,7 +274,7 @@ ${options.extra ?? ''}`;
         environment: 'release',
         refs: ['refs/heads/main'],
       });
-      expect(index.snapshot().map(entry => entry.identity)).toEqual([
+      expect(index.snapshot('production').map(entry => entry.identity)).toEqual([
         `github-oidc|acme/repo|123|456|automation|refs/heads/main|acme/repo/.github/workflows/beta.yml@refs/heads/main,${RELEASE}|push,schedule`,
         `github-oidc|acme/repo|123|456|release|refs/heads/main|${RELEASE}|workflow_dispatch`,
       ]);
@@ -510,7 +510,7 @@ secrets: [APP_ONE_SECRET]
         teamId: 'team_Acme1',
         projectId: 'prj_Web1',
       });
-      expect(index.snapshot()[0]?.identity).toBe(
+      expect(index.snapshot('production')[0]?.identity).toBe(
         'vercel-oidc|acme|team_Acme1|prj_Web1|acme-web|custom:env_S1,preview,production'
       );
     });
@@ -706,8 +706,8 @@ secrets: [APP_TWO_SECRET]
       'app-one.yaml': valid.replace('APP_ONE_SECRET', 'APP_TWO_SECRET'),
     });
     const firstAgain = loadPolicies({ 'app-one.yaml': valid });
-    expect(await first.hash()).toBe(await firstAgain.hash());
-    expect(await first.hash()).not.toBe(await second.hash());
+    expect(await first.hash('production')).toBe(await firstAgain.hash('production'));
+    expect(await first.hash('production')).not.toBe(await second.hash('production'));
   });
 
   it('loads the shipped policies for the workloads STS serves', () => {
@@ -758,7 +758,7 @@ ${dynamic}`;
     expect(index.get('production', 'app-one')?.dynamic).toEqual([
       { grant: 'replica-read', maxTtlSeconds: 9000, defaultTtlSeconds: 3600, maxActive: 2 },
     ]);
-    expect(index.snapshot().map(entry => entry.dynamic)).toEqual([
+    expect(index.snapshot('production').map(entry => entry.dynamic)).toEqual([
       ['replica-read:9000:3600:2'],
       ['ci-migration:3600:3600:1'],
     ]);
@@ -817,8 +817,8 @@ ${dynamic}`;
       environment: 'production',
       policyHash: 'after',
       previousPolicyHash: 'before',
-      previous: before.snapshot(),
-      current: after.snapshot(),
+      previous: before.snapshot('production'),
+      current: after.snapshot('production'),
     });
     expect(event.data.attributes).toMatchObject({
       addedDynamic: ['app-one:replica-read:9000:3600:2'],
@@ -829,15 +829,196 @@ ${dynamic}`;
 
   it('writes no dynamic field for a policy without lease grants, so a reader from before leases parses the snapshot', () => {
     const plain = loadPolicies({ 'app-one.yaml': valid });
-    expect(plain.snapshot()[0]).not.toHaveProperty('dynamic');
+    expect(plain.snapshot('production')[0]).not.toHaveProperty('dynamic');
     // The strict snapshot reader of the stacked base: the same schema without `dynamic`.
     const baseReader = PolicySnapshotSchema.element.omit({ dynamic: true }).array();
-    expect(baseReader.safeParse(JSON.parse(JSON.stringify(plain.snapshot()))).success).toBe(true);
+    expect(
+      baseReader.safeParse(JSON.parse(JSON.stringify(plain.snapshot('production')))).success
+    ).toBe(true);
     const leasing = loadPolicies({ 'app-one.yaml': worker(grant('replica-read', 3600, 3600, 1)) });
-    expect(baseReader.safeParse(leasing.snapshot()).success).toBe(false);
+    expect(baseReader.safeParse(leasing.snapshot('production')).success).toBe(false);
     // The reader fills the token-grant lists a policy without token grants leaves out.
-    expect(PolicySnapshotSchema.parse(JSON.parse(JSON.stringify(plain.snapshot())))).toEqual(
-      plain.snapshot().map(entry => ({ audiences: [], scopes: [], ...entry }))
+    expect(
+      PolicySnapshotSchema.parse(JSON.parse(JSON.stringify(plain.snapshot('production'))))
+    ).toEqual(plain.snapshot('production').map(entry => ({ audiences: [], scopes: [], ...entry })));
+  });
+});
+
+describe('policy environment grants', () => {
+  const allEnvironments = `
+workload: app-one
+environments: [development, staging, production]
+identity:
+  kind: worker-binding
+secrets: [APP_ONE_SECRET]
+audiences: [gateway]
+scopes: ['gateway:models.read']
+`;
+  const developmentGrants = `environmentGrants:
+  development:
+    audiences: [o11y]
+    scopes: ['o11y:alerts.read', 'gateway:usage.write']
+    secrets: [APP_ONE_EXTRA]
+`;
+  const load = (source: string) =>
+    loadPolicies({ 'app-one.yaml': source }, { scopeRegistry: REGISTRY });
+  const expectEnvironmentThrow = (source: string, fragment: string) =>
+    expect(() => load(source)).toThrow(fragment);
+
+  it('adds a development grant where STS runs in development and nowhere else', async () => {
+    const index = load(`${allEnvironments}${developmentGrants}`);
+    expect(index.get('development', 'app-one')).toMatchObject({
+      audiences: ['gateway', 'o11y'],
+      scopes: ['gateway:models.read', 'o11y:alerts.read', 'gateway:usage.write'],
+      secrets: ['APP_ONE_SECRET', 'APP_ONE_EXTRA'],
+      environmentGrants: {},
+    });
+    expect(index.forEnvironment('development')[0]?.secrets).toContain('APP_ONE_EXTRA');
+    const base = load(allEnvironments);
+    for (const environment of ['staging', 'production'] as const) {
+      expect(index.get(environment, 'app-one')).toMatchObject({
+        audiences: ['gateway'],
+        scopes: ['gateway:models.read'],
+        secrets: ['APP_ONE_SECRET'],
+        environmentGrants: {},
+      });
+      // The other environments keep the bundle, snapshot and hash of the policy without the grant.
+      expect(await index.workloadHash(environment, 'app-one')).toBe(
+        await base.workloadHash(environment, 'app-one')
+      );
+      expect(index.snapshot(environment)).toEqual(base.snapshot(environment));
+      expect(await index.hash(environment)).toBe(await base.hash(environment));
+    }
+    expect(await index.workloadHash('development', 'app-one')).not.toBe(
+      await base.workloadHash('development', 'app-one')
     );
+    expect(await index.hash('development')).not.toBe(await base.hash('development'));
+  });
+
+  it('refuses a key outside environments, an empty entry and an unknown field', () => {
+    expectEnvironmentThrow(
+      `${valid}environmentGrants:\n  staging:\n    secrets: [APP_ONE_EXTRA]\n`,
+      'environmentGrants.staging names an environment the policy does not list'
+    );
+    expectEnvironmentThrow(
+      `${allEnvironments}environmentGrants:\n  development: {}\n`,
+      'environmentGrants.development grants nothing'
+    );
+    expectEnvironmentThrow(
+      `${allEnvironments}environmentGrants:\n  preview:\n    secrets: [APP_ONE_EXTRA]\n`,
+      'does not match the policy schema'
+    );
+    expectEnvironmentThrow(
+      `${allEnvironments}environmentGrants:\n  development:\n    dynamic: []\n`,
+      'does not match the policy schema'
+    );
+  });
+
+  it('holds an environment grant to every rule of a base grant', () => {
+    const grant = (body: string) => `${allEnvironments}environmentGrants:\n  development:\n${body}`;
+    expectEnvironmentThrow(
+      grant(`    scopes: ['gateway:admin']\n`),
+      'development: scope gateway:admin is not in STS_SCOPE_REGISTRY'
+    );
+    expectEnvironmentThrow(
+      grant(`    scopes: ['o11y:alerts.read']\n`),
+      'development: scope o11y:alerts.read belongs to audience o11y, which audiences does not list'
+    );
+    expectEnvironmentThrow(
+      grant(`    audiences: [o11y]\n`),
+      'development: audience o11y has no scope'
+    );
+    expectEnvironmentThrow(
+      grant(`    audiences: [app-one]\n    scopes: ['app-one:read']\n`),
+      'development: audience app-one is the workload itself'
+    );
+    expectEnvironmentThrow(
+      grant(`    scopes: ['gateway:models.read']\n`),
+      'development: scopes contains a duplicate'
+    );
+    expectEnvironmentThrow(
+      grant(`    secrets: [APP_ONE_SECRET]\n`),
+      'development: secrets contains a duplicate'
+    );
+    expectEnvironmentThrow(
+      grant(`    secrets: [APP_ONE_EXTRA_STAGING]\n`),
+      'development: secret APP_ONE_EXTRA_STAGING carries an environment suffix'
+    );
+    expectEnvironmentThrow(
+      grant(`    secrets: [CLOUDFLARE_MINTING_TOKEN]\n`),
+      'development: secret CLOUDFLARE_MINTING_TOKEN is a minting credential'
+    );
+  });
+
+  it('refuses the reserved denied probe and its audience inside an environment grant, whatever the registry says', () => {
+    // The registry lists the probe, so only its reservation can refuse it.
+    const registry = {
+      ...REGISTRY,
+      canary: { scopes: ['canary:denied-probe', 'canary:other'] },
+    };
+    const grant = (body: string) => () =>
+      loadPolicies(
+        { 'app-one.yaml': `${allEnvironments}environmentGrants:\n  development:\n${body}` },
+        { scopeRegistry: registry }
+      );
+    expect(grant(`    audiences: [canary]\n    scopes: ['canary:denied-probe']\n`)).toThrow(
+      'development: scope canary:denied-probe is reserved and no policy may grant it'
+    );
+    expect(grant(`    audiences: [canary]\n    scopes: ['canary:other']\n`)).toThrow(
+      'development: audience canary is reserved and no policy may grant it'
+    );
+    // The shipped registry lists the probe too, and the shipped web policy grants it nowhere.
+    expect(() =>
+      loadPolicies({
+        'app-one.yaml': `${allEnvironments.replace(
+          "audiences: [gateway]\nscopes: ['gateway:models.read']\n",
+          ''
+        )}environmentGrants:\n  development:\n    audiences: [canary]\n    scopes: ['canary:denied-probe']\n`,
+      })
+    ).toThrow('development: scope canary:denied-probe is reserved and no policy may grant it');
+    for (const environment of ['development', 'staging', 'production'] as const) {
+      expect(policyFor(environment, 'web')?.audiences).not.toContain('canary');
+    }
+  });
+
+  it('stores the grants of its own environment merged into the lists a rollback reads', () => {
+    const index = load(`${allEnvironments}${developmentGrants}`);
+    const [entry] = index.snapshot('development');
+    expect(entry).toEqual({
+      workload: 'app-one',
+      environments: ['development', 'production', 'staging'],
+      identity: 'worker-binding',
+      secrets: ['APP_ONE_EXTRA', 'APP_ONE_SECRET'],
+      audiences: ['gateway', 'o11y'],
+      scopes: ['gateway:models.read', 'gateway:usage.write', 'o11y:alerts.read'],
+    });
+    // The strict snapshot reader of the version before environment grants parses every entry.
+    expect(
+      PolicySnapshotSchema.safeParse(JSON.parse(JSON.stringify(index.snapshot('development'))))
+        .success
+    ).toBe(true);
+  });
+
+  it('grants web its UTS audiences, scopes and client keys in development only', () => {
+    const development = policyFor('development', 'web');
+    expect(development).toMatchObject({
+      audiences: ['usage-ingest', 'uts-feed', 'uts'],
+      scopes: [
+        'usage-ingest:sts.canary',
+        'uts-feed:revocation.read',
+        'uts:subjects.revoke',
+        'uts:browser-sessions.end',
+        'uts:api-credentials.revoke',
+      ],
+      secrets: ['UTS_KILO_WEB_CLIENT_KEY', 'UTS_KILO_WEB_CLIENT_KEY_NEXT'],
+    });
+    for (const environment of ['staging', 'production'] as const) {
+      expect(policyFor(environment, 'web')).toMatchObject({
+        audiences: ['usage-ingest'],
+        scopes: ['usage-ingest:sts.canary'],
+        secrets: [],
+      });
+    }
+    expect(policyIndex.has('kilo-mcp')).toBe(false);
   });
 });

@@ -289,6 +289,16 @@ export function cloudflareDeployGrant(policy: Policy): CloudflareDeployGrant | u
   );
 }
 
+/**
+ * Grants a policy adds where STS runs in one environment only, on top of its base grants, under
+ * the same rules (design 6.3). Activating a grant in another environment is a data change.
+ */
+const EnvironmentGrantsSchema = z.strictObject({
+  audiences: z.array(AudienceSchema.max(63)).max(64).default([]),
+  scopes: z.array(ScopeSchema.max(127)).max(256).default([]),
+  secrets: z.array(SecretNameSchema).max(256).default([]),
+});
+
 export const PolicySchema = z.strictObject({
   workload: WorkloadNameSchema,
   environments: z.array(StsEnvironmentSchema).min(1).max(3),
@@ -306,10 +316,34 @@ export const PolicySchema = z.strictObject({
     .array(DynamicGrantSchema)
     .max(LeaseGrantSchema.options.length + 1)
     .default([]),
+  /** Grants for one STS environment only, each key one of `environments`; absent adds none. */
+  environmentGrants: z
+    .strictObject({
+      development: EnvironmentGrantsSchema.optional(),
+      staging: EnvironmentGrantsSchema.optional(),
+      production: EnvironmentGrantsSchema.optional(),
+    })
+    .default({}),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;
 export type PolicyIdentity = z.infer<typeof PolicyIdentitySchema>;
+
+/**
+ * The policy as STS applies it in `environment`: its base grants plus that environment's own, with
+ * no `environmentGrants` left, so a reader of the result sees only what this environment grants.
+ */
+export function effectivePolicy(policy: Policy, environment: StsEnvironment): Policy {
+  if (Object.keys(policy.environmentGrants).length === 0) return policy;
+  const extra = policy.environmentGrants[environment];
+  return {
+    ...policy,
+    audiences: [...policy.audiences, ...(extra?.audiences ?? [])],
+    scopes: [...policy.scopes, ...(extra?.scopes ?? [])],
+    secrets: [...policy.secrets, ...(extra?.secrets ?? [])],
+    environmentGrants: {},
+  };
+}
 
 export const PolicySnapshotEntrySchema = z.strictObject({
   workload: z.string(),
@@ -568,6 +602,39 @@ export function policyFileProblems(
   policy: Policy,
   registry: StsScopeRegistry = STS_SCOPE_REGISTRY,
   pins: CloudflareDeployPins = CLOUDFLARE_DEPLOY_PINS
+): string[] {
+  const problems = appliedPolicyProblems(policy, registry, pins);
+  for (const [environment, grants] of Object.entries(policy.environmentGrants)) {
+    if (grants === undefined) continue;
+    if (!policy.environments.some(listed => listed === environment)) {
+      problems.push(
+        `environmentGrants.${environment} names an environment the policy does not list`
+      );
+    }
+    if (grants.audiences.length + grants.scopes.length + grants.secrets.length === 0) {
+      problems.push(`environmentGrants.${environment} grants nothing`);
+    }
+  }
+  // Each environment's policy, with its own grants added, passes every rule the base policy does,
+  // so a grant for one environment meets the same registry, reserved-scope and secret-name rules.
+  for (const environment of policy.environments) {
+    if (policy.environmentGrants[environment] === undefined) continue;
+    for (const problem of appliedPolicyProblems(
+      effectivePolicy(policy, environment),
+      registry,
+      pins
+    )) {
+      if (!problems.includes(problem)) problems.push(`${environment}: ${problem}`);
+    }
+  }
+  return problems;
+}
+
+/** The checks of one policy as STS applies it: the base policy, or one environment's. */
+function appliedPolicyProblems(
+  policy: Policy,
+  registry: StsScopeRegistry,
+  pins: CloudflareDeployPins
 ): string[] {
   const problems: string[] = [...grantProblems(policy, registry), ...dynamicProblems(policy, pins)];
   if (hasDuplicates(policy.environments)) problems.push('environments contains a duplicate');

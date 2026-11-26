@@ -4,6 +4,7 @@ import type { CloudflareDeployPins } from '../constants';
 import { sha256Base64Url } from '../crypto/hash';
 import {
   PolicySchema,
+  effectivePolicy,
   isLeaseDynamicGrant,
   policyFileProblems,
   vercelEnvironmentKey,
@@ -12,9 +13,10 @@ import {
 } from './schema';
 
 /**
- * One policy as `RefresherDO` stores it to diff the next policy change against. A policy without
- * token grants leaves out `audiences` and `scopes`, so its entry keeps the format of the version
- * before token grants, whose strict parser a rollback would run on it.
+ * One policy as `RefresherDO` stores it to diff the next policy change against, as STS applies it
+ * in the refresher's environment: an environment's own grants appear merged into the lists, never
+ * as a field, so a rollback's strict parser reads the entry. A policy without token grants leaves
+ * out `audiences` and `scopes`, so its entry keeps the format of the version before token grants.
  */
 export type PolicySnapshotEntry = {
   workload: string;
@@ -46,15 +48,20 @@ function dynamicKey(entry: DynamicGrant): string {
   return `${entry.grant}:${entry.permissionSet}:${entry.ttlSeconds}:${entry.maxActive}:${entry.maxPerHour}:${groups}:${short(entry.zones)}`;
 }
 
+/**
+ * The loaded policies. Every per-environment read (`get`, `forEnvironment`, `snapshot`, `hash`,
+ * `workloadHash`) answers with each policy's base grants plus that environment's own; `all` returns
+ * the files as written, for identity matching only.
+ */
 export type PolicyIndex = {
   all(): Policy[];
   forEnvironment(environment: StsEnvironment): Policy[];
   has(workload: string): boolean;
   get(environment: StsEnvironment, workload: string): Policy | null;
-  snapshot(): PolicySnapshotEntry[];
-  hash(): Promise<string>;
+  snapshot(environment: StsEnvironment): PolicySnapshotEntry[];
+  hash(environment: StsEnvironment): Promise<string>;
   /** Hash of one workload's secret grants; a bundle built under another hash is out of date. */
-  workloadHash(workload: string): Promise<string>;
+  workloadHash(environment: StsEnvironment, workload: string): Promise<string>;
 };
 
 function sortedList(values: readonly string[] | undefined): string {
@@ -154,7 +161,7 @@ export function loadPolicies(
     }
   }
 
-  const entries: PolicySnapshotEntry[] = policies.map(policy => ({
+  const snapshotEntry = (policy: Policy): PolicySnapshotEntry => ({
     workload: policy.workload,
     environments: [...policy.environments].sort(),
     identity: canonicalIdentity(policy),
@@ -162,31 +169,57 @@ export function loadPolicies(
     ...(policy.audiences.length > 0 ? { audiences: [...policy.audiences].sort() } : {}),
     ...(policy.scopes.length > 0 ? { scopes: [...policy.scopes].sort() } : {}),
     ...(policy.dynamic.length > 0 ? { dynamic: policy.dynamic.map(dynamicKey).sort() } : {}),
-  }));
+  });
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
+
+  // Each environment's view is built once, on first use, so no request allocates a merged policy.
+  type EnvironmentView = {
+    served: Policy[];
+    servedByWorkload: Map<string, Policy>;
+    entries: PolicySnapshotEntry[];
+  };
+  const views = new Map<StsEnvironment, EnvironmentView>();
+  const viewOf = (environment: StsEnvironment): EnvironmentView => {
+    const cached = views.get(environment);
+    if (cached !== undefined) return cached;
+    const applied = policies.map(policy => effectivePolicy(policy, environment));
+    const served = applied.filter(policy => policy.environments.includes(environment));
+    const view = {
+      served,
+      servedByWorkload: new Map(served.map(policy => [policy.workload, policy])),
+      // Every policy, as the version before environment grants wrote it, so a deploy that adds
+      // none changes no stored snapshot.
+      entries: applied.map(snapshotEntry),
+    };
+    views.set(environment, view);
+    return view;
+  };
 
   // Hashes are kept as strings, never promises, so no request awaits a digest another request
   // started (workerd ties a promise to the request that created it).
-  let policyHash: string | null = null;
+  const policyHashes = new Map<StsEnvironment, string>();
   const workloadHashes = new Map<string, string>();
   return {
     all: () => policies,
-    forEnvironment: environment =>
-      policies.filter(policy => policy.environments.includes(environment)),
+    forEnvironment: environment => viewOf(environment).served,
     has: workload => byWorkload.has(workload),
-    get: (environment, workload) => {
-      const policy = byWorkload.get(workload);
-      if (!policy || !policy.environments.includes(environment)) return null;
-      return policy;
-    },
-    snapshot: () => entries,
-    hash: async () => (policyHash ??= await sha256Base64Url(JSON.stringify(entries))),
-    workloadHash: async workload => {
-      const cached = workloadHashes.get(workload);
+    get: (environment, workload) => viewOf(environment).servedByWorkload.get(workload) ?? null,
+    snapshot: environment => viewOf(environment).entries,
+    hash: async environment => {
+      const cached = policyHashes.get(environment);
       if (cached !== undefined) return cached;
-      const secrets = [...(byWorkload.get(workload)?.secrets ?? [])].sort();
+      const hash = await sha256Base64Url(JSON.stringify(viewOf(environment).entries));
+      policyHashes.set(environment, hash);
+      return hash;
+    },
+    workloadHash: async (environment, workload) => {
+      const key = `${environment}|${workload}`;
+      const cached = workloadHashes.get(key);
+      if (cached !== undefined) return cached;
+      const policy = byWorkload.get(workload);
+      const secrets = [...(policy ? effectivePolicy(policy, environment).secrets : [])].sort();
       const hash = await sha256Base64Url(JSON.stringify({ workload, secrets }));
-      workloadHashes.set(workload, hash);
+      workloadHashes.set(key, hash);
       return hash;
     },
   };

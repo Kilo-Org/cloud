@@ -23,12 +23,24 @@ export const STS_RESERVED_SCOPES: readonly string[] = [STS_DENIED_PROBE.scope];
 /**
  * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
  * usage-ingest back, each with a token of the other's canary scope. `canary` holds only the
- * reserved denied probe.
+ * reserved denied probe. The UTS scopes are those UTS and its feed accept from a service: the web
+ * app reads the revocation feed and ends or revokes a subject's sessions and credentials;
+ * `uts:token-exchange` authenticates kilo-mcp's RFC 8693 exchange. STS mints each one only where
+ * a policy grants it (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   web: { scopes: ['web:sts.canary'] },
   'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
   [STS_DENIED_PROBE.audience]: { scopes: [STS_DENIED_PROBE.scope] },
+  'uts-feed': { scopes: ['uts-feed:revocation.read'] },
+  uts: {
+    scopes: [
+      'uts:subjects.revoke',
+      'uts:browser-sessions.end',
+      'uts:api-credentials.revoke',
+      'uts:token-exchange',
+    ],
+  },
 };
 
 /** Whether `scope` is registered under `audience`. Inherited object keys never match. */

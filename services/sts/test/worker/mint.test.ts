@@ -16,7 +16,12 @@ import { getDenialStub, getTokenSignerStub } from '../../src/dos/stubs';
 import type { TokenSignerDO } from '../../src/dos/TokenSignerDO';
 import { handleRequest, mintResponse } from '../../src/http';
 import { loadPolicies } from '../../src/policy/load';
-import { defaultMintAuthority, serveMint, type MintAuthority } from '../../src/tokens/mint';
+import {
+  defaultMintAuthority,
+  serveMint,
+  type MintAuthority,
+  type MintCaller,
+} from '../../src/tokens/mint';
 import { stubOfflineNetwork } from './manager';
 import { resetDenialObject, resetTokenSignerObject } from './reset';
 import { createProvider, providerFetch, signToken, type TestProvider } from './support';
@@ -510,6 +515,91 @@ describe('HTTP mint', () => {
     expect(response.status).toBe(401);
     expect(pending).toHaveLength(0);
     expect(JSON.stringify(warnings.mock.calls)).not.toContain(forged);
+  });
+});
+
+describe('UTS grants of the shipped web policy', () => {
+  const UTS_GRANTS = [
+    { audience: 'uts-feed', scope: 'uts-feed:revocation.read' },
+    { audience: 'uts', scope: 'uts:subjects.revoke' },
+    { audience: 'uts', scope: 'uts:browser-sessions.end' },
+    { audience: 'uts', scope: 'uts:api-credentials.revoke' },
+  ];
+  const web: MintCaller = {
+    channel: 'http',
+    workload: 'web',
+    identity: 'vercel',
+    attestationExp: null,
+    claims: { provider: 'vercel' },
+  };
+
+  it.each(UTS_GRANTS)(
+    'issues $scope in development and denies it in staging and production',
+    async entry => {
+      const request = { tokens: [entry] };
+      const issued = await serveMint(env, config, {
+        caller: web,
+        request,
+        waitUntil,
+        authority: defaultMintAuthority,
+      });
+      expect(issued).toMatchObject({
+        status: 'ok',
+        tokens: [{ status: 'issued', audience: entry.audience }],
+      });
+      for (const environment of ['staging', 'production'] as const) {
+        const denied = await serveMint(
+          env,
+          { ...config, environment },
+          { caller: web, request, waitUntil, authority: defaultMintAuthority }
+        );
+        expect(denied).toEqual({
+          status: 'ok',
+          tokens: [{ status: 'denied', ...entry, reason: 'audience_not_allowed' }],
+        });
+      }
+    }
+  );
+
+  it('issues a kilocode-app preview function a UTS feed token over HTTP in development', async () => {
+    const issuer = 'https://oidc.vercel.com/kilocode';
+    const kilocode = await createProvider(issuer, config.issuer);
+    vi.stubGlobal('fetch', providerFetch([kilocode]).fetch);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await signToken(
+      kilocode,
+      {
+        sub: 'owner:kilocode:project:kilocode-app:environment:preview',
+        owner: 'kilocode',
+        owner_id: 'team_ItxRShuUkJaEd9GmXMEEgunb',
+        project: 'kilocode-app',
+        project_id: 'prj_AAnAlIuYPrpU0aDbT1kdm0ymL7hR',
+        environment: 'preview',
+        act: { iat: issuedAt - 60, aud: 'https://vercel.com/kilocode' },
+      },
+      { issuedAt, expiresAt: issuedAt + 3600 }
+    );
+    const ctx = { waitUntil, passThroughOnException: () => undefined, props: {} };
+    const response = await handleRequest(
+      new Request(`${config.issuer}/v1/token`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: JSON.stringify({ tokens: [UTS_GRANTS[0]] }),
+      }),
+      env,
+      ctx as unknown as ExecutionContext,
+      defaultMintAuthority
+    );
+    expect(response.status).toBe(200);
+    const result = await response.json<MintResult>();
+    if (result.status !== 'ok' || result.tokens[0].status !== 'issued') {
+      throw new Error(`expected an issued token, got ${JSON.stringify(result)}`);
+    }
+    expect(decodeJwt(result.tokens[0].token)).toMatchObject({
+      sub: 'service:web',
+      aud: 'uts-feed',
+      scope: 'uts-feed:revocation.read',
+    });
   });
 });
 

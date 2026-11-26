@@ -151,17 +151,27 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes and the reserved probe, so every other scope is denied', () => {
+  it('lists only the pilot scopes, the reserved probe and the UTS scopes, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
       web: { scopes: ['web:sts.canary'] },
       'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
       canary: { scopes: ['canary:denied-probe'] },
+      'uts-feed': { scopes: ['uts-feed:revocation.read'] },
+      uts: {
+        scopes: [
+          'uts:subjects.revoke',
+          'uts:browser-sessions.end',
+          'uts:api-credentials.revoke',
+          'uts:token-exchange',
+        ],
+      },
     });
     expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
     expect(isRegisteredStsScope('canary', 'canary:denied-probe')).toBe(true);
     expect(isRegisteredStsScope('gateway', 'gateway:models.read')).toBe(false);
     expect(isRegisteredStsScope('web', 'usage-ingest:sts.canary')).toBe(false);
+    expect(isRegisteredStsScope('uts', 'uts-feed:revocation.read')).toBe(false);
   });
 
   it('lists each shipped scope under its own audience', () => {

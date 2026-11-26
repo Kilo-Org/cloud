@@ -375,19 +375,41 @@ Identity kinds:
 
 Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
-`STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`; today the canary scopes `web:sts.canary` and `usage-ingest:sts.canary`, and the reserved `canary:denied-probe`) and
-belong to a listed audience, every audience needs at least one scope, and no audience may be the
-workload itself. A reserved scope (`STS_RESERVED_SCOPES`, today `canary:denied-probe`) and its
-audience fail the load whatever the registry says: no policy may grant them (see
-[Alerts on token denials](#alerts-on-token-denials)). `dynamic` lists the database lease grants
-the workload may request ([Database leases](#database-leases)) and its Cloudflare deploy-token
-grant ([Cloudflare deploy tokens](#cloudflare-deploy-tokens)); it defaults to empty, so a policy
-without it leases and mints nothing. No policy may name a minting credential
-(`CLOUDFLARE_MINTING_TOKEN`) in `secrets`, whatever its identity.
+`STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`: the canary scopes `web:sts.canary` and
+`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`, and
+under `uts` the scopes `uts:subjects.revoke`, `uts:browser-sessions.end`,
+`uts:api-credentials.revoke` and `uts:token-exchange`) and belong to a listed audience, every
+audience needs at least one scope, and no audience may be the workload itself. A reserved scope
+(`STS_RESERVED_SCOPES`, today `canary:denied-probe`) and its audience fail the load whatever the
+registry says: no policy may grant them (see [Alerts on token denials](#alerts-on-token-denials)).
+`dynamic` lists the database lease grants the workload may request
+([Database leases](#database-leases)) and its Cloudflare deploy-token grant
+([Cloudflare deploy tokens](#cloudflare-deploy-tokens)); it defaults to empty, so a policy without
+it leases and mints nothing. No policy may name a minting credential (`CLOUDFLARE_MINTING_TOKEN`)
+in `secrets`, whatever its identity.
 
 ```yaml
 audiences: [web]
 scopes: ['web:sts.canary']
+```
+
+`environmentGrants` adds `audiences`, `scopes` and `secrets` where STS runs in one environment
+only, on top of the policy's own lists. Each key must be one of the policy's `environments` and
+must grant something. The policy as that environment applies it (its lists plus the key's)
+passes every rule above, so a grant there cannot repeat a base grant, name an unregistered scope,
+or name a minting credential. Activating a grant in staging or production later is a data
+change: add the key. Every read STS makes in an environment (the mint decision, the bundle, the
+refresher's push and its policy snapshot and hash) sees only that environment's grants; the
+other environments keep the bundle, snapshot and hash they had. The stored snapshot shows the
+grants merged into its lists, never as a field of its own, so a rollback's strict reader parses
+it.
+
+```yaml
+environmentGrants:
+  development:
+    audiences: [uts-feed]
+    scopes: ['uts-feed:revocation.read']
+    secrets: [UTS_KILO_WEB_CLIENT_KEY]
 ```
 
 The `ai.kilo.sts.policy.changed` event lists added and removed `workload:audience` and
@@ -397,12 +419,32 @@ Adding a file also means adding it to `src/policy/registry.ts`; the typed import
 `src/policy/index.ts` makes the two disagree at typecheck, and `test/repo/policy-files.test.ts`
 checks the directory itself.
 
+Token and secret grants (secrets of the Worker-binding workloads are in their files):
+
+| Workload | Audience: scopes | Secrets | STS environments |
+|---|---|---|---|
+| `usage-ingest` | `web`: `web:sts.canary` | none | development, staging, production |
+| `web` | `usage-ingest`: `usage-ingest:sts.canary` | none | development, staging, production |
+| `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
+| `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
+| `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
+| `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | none yet, so STS refuses it |
+
+Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
+is reserved: its policy (`worker-binding`, `props.caller` `kilo-mcp`, development first) lands once
+`services/kilo-mcp/wrangler.jsonc` binds STS, because the config check below refuses a
+`worker-binding` policy that no config here binds. Its local block must bind `sts-local`, the
+development STS: its `dev` block may only bind `sts-dev`, which STS does not deploy, so the binding
+goes in an `env.local` block named `kilo-mcp-local`, with `observability.traces.enabled: false` in
+every block.
+
 Workloads with a policy, all over `worker-binding`:
 
 | Workload | Environments | Worker config |
 |---|---|---|
 | `o11y` | development, staging, production | `services/o11y/wrangler.jsonc` |
 | `audit-relay` | development, staging, production | `services/audit-relay/wrangler.jsonc` |
+| `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 
@@ -1687,7 +1729,7 @@ promise of another request; that a bound caller cannot reach the mint authority 
 the token signer keeps its key across a restart of the runtime with persisted storage. `typecheck`
 and `lint` are the usual package scripts.
 
-**Local end-to-end check of service tokens.** The shipped scope registry lists only the canary scopes, so a
+**Local end-to-end check of service tokens.** The shipped scope registry lists no scope a probe may hold, so a
 test build of STS in `test/fixtures/e2e/` (STS's own routes, broker and objects, checked against a
 test registry and a probe policy) runs next to a probe Worker that binds its broker with
 `props.caller` and consumes its audit queue:

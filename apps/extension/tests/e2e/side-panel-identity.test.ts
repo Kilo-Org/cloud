@@ -9,7 +9,7 @@ const API_ORIGIN = 'https://app.kilo.ai';
 const FIRST_TOKEN = 'token-1';
 const SECOND_TOKEN = 'token-account-b';
 const SECOND_EMAIL = 'second@kilo.ai';
-const DEVICE_CODE = 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc';
+const DEVICE_CODE = 'device-code';
 const USER_CODE = 'ABCD-EFGH';
 const UPDATED_AT = '2026-10-20T00:00:00.000Z';
 
@@ -180,16 +180,23 @@ test('side panel agents views follow the signed-in identity through a device-aut
     await context.route(`${API_ORIGIN}/api/device-auth/codes?app=1`, route =>
       route.fulfill({
         json: {
-          code: DEVICE_CODE,
+          code: 'cancel-code',
+          device_code: DEVICE_CODE,
           user_code: USER_CODE,
           verificationUrl: `${API_ORIGIN}/device-auth`,
         },
         status: 200,
       })
     );
-    await context.route(`${API_ORIGIN}/api/device-auth/codes/${DEVICE_CODE}`, route =>
-      route.fulfill({ json: { token: SECOND_TOKEN, userEmail: SECOND_EMAIL }, status: 200 })
-    );
+    await context.route(`${API_ORIGIN}/api/device-auth/token`, async route => {
+      const request = route.request();
+      expect(request.method()).toBe('POST');
+      expect(request.postDataJSON()).toStrictEqual({ deviceCode: DEVICE_CODE });
+      await route.fulfill({
+        json: { status: 'approved', token: SECOND_TOKEN, userEmail: SECOND_EMAIL },
+        status: 200,
+      });
+    });
     await context.route(`${API_ORIGIN}/device-auth`, route =>
       route.fulfill({
         body: '<!doctype html><html><body>Device authorization</body></html>',

@@ -298,6 +298,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
 });
 
 describe('vercelExchange', () => {
+  const signal = new AbortController().signal;
   function answering(response: Response) {
     const requests: { url: string; body: unknown }[] = [];
     // The exchange posts a string URL and a JSON string body.
@@ -310,7 +311,7 @@ describe('vercelExchange', () => {
 
   it('posts the base token and audience to the exchange and returns its token', async () => {
     const { fetchFn, requests } = answering(Response.json({ token: 'exchanged' }));
-    expect(await vercelExchange(fetchFn)('base', STS)).toEqual({
+    expect(await vercelExchange(fetchFn)('base', STS, signal)).toEqual({
       kind: 'token',
       token: 'exchanged',
     });
@@ -319,16 +320,20 @@ describe('vercelExchange', () => {
 
   it('tells a 429 from other failures and never returns the error body', async () => {
     expect(
-      await vercelExchange(answering(new Response('slow down', { status: 429 })).fetchFn)('b', STS)
+      await vercelExchange(answering(new Response('slow down', { status: 429 })).fetchFn)(
+        'b',
+        STS,
+        signal
+      )
     ).toEqual({
       kind: 'rate_limited',
     });
     expect(
       await vercelExchange(
         answering(new Response('{"error":"base.payload.sig"}', { status: 401 })).fetchFn
-      )('b', STS)
+      )('b', STS, signal)
     ).toEqual({ kind: 'failed', detail: 'the exchange answered 401' });
-    expect(await vercelExchange(answering(Response.json({})).fetchFn)('b', STS)).toEqual({
+    expect(await vercelExchange(answering(Response.json({})).fetchFn)('b', STS, signal)).toEqual({
       kind: 'failed',
       detail: 'the exchange answered no token',
     });
@@ -343,10 +348,25 @@ describe('vercelExchange', () => {
         ? new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/' } })
         : Response.json({ token: 'exchanged' });
     }) as typeof fetch;
-    expect(await vercelExchange(fetchFn)('base', STS)).toEqual({
+    expect(await vercelExchange(fetchFn)('base', STS, signal)).toEqual({
       kind: 'failed',
       detail: 'the exchange answered 307',
     });
     expect(redirects).toEqual(['manual']);
+  });
+
+  it('aborts the exchange when the shared-token deadline aborts its signal', async () => {
+    const deadline = new AbortController();
+    const fetchFn = (async (_url: string, init?: RequestInit) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      return await promise;
+    }) as typeof fetch;
+    const attempt = vercelExchange(fetchFn)('base', STS, deadline.signal);
+    deadline.abort();
+    expect(await attempt).toEqual({
+      kind: 'failed',
+      detail: 'the exchange request failed (AbortError)',
+    });
   });
 });

@@ -49,10 +49,11 @@ export type VercelIdentityOptions = {
  * One exchange: `{ token, aud }` to Vercel, which answers a token with the base token's `exp`, the
  * given `aud` and an `act` claim. Only the status reaches the caller on a failure: an error body
  * could echo the token. The body carries the base token, so a redirect is never followed: a 307 or
- * 308 would resend it to the target, another origin included. A 3xx fails the exchange.
+ * 308 would resend it to the target, another origin included. A 3xx fails the exchange. It gives
+ * up after `EXCHANGE_TIMEOUT_MS`, or earlier when `signal` aborts (the shared-token deadline).
  */
 export function vercelExchange(fetchFn: typeof fetch = fetch): Exchange {
-  return async (baseToken, audience) => {
+  return async (baseToken, audience, signal) => {
     let response: Response;
     try {
       response = await fetchFn(VERCEL_EXCHANGE_URL, {
@@ -60,7 +61,7 @@ export function vercelExchange(fetchFn: typeof fetch = fetch): Exchange {
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ token: baseToken, aud: audience }),
         redirect: 'manual',
-        signal: AbortSignal.timeout(EXCHANGE_TIMEOUT_MS),
+        signal: AbortSignal.any([AbortSignal.timeout(EXCHANGE_TIMEOUT_MS), signal]),
       });
     } catch (error) {
       const name = error instanceof Error ? error.name : 'Error';

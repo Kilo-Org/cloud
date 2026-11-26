@@ -390,6 +390,7 @@ describe('shared exchanged token (D10)', () => {
         if (!key.endsWith(':claim')) await sleep(2_000);
         stored.set(key, value);
       },
+      delete: async key => void stored.delete(key),
     };
     const instance = new SharedExchangedToken(cache, {
       settings: { jitterMs: 1, deadlineMs: 400 },

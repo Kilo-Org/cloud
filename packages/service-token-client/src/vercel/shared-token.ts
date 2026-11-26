@@ -21,8 +21,11 @@
  *    deployment present it. An exchanged token that fails the same check is never stored nor
  *    served. A forged or stale entry can still fail the caller's STS call (STS checks the
  *    signature); the caller then calls `invalidate`, which drops it from memory and the cache so
- *    the next request exchanges again (once per STS refusal). Code that writes this project's
- *    cache runs with the project's own trust.
+ *    the next request exchanges again (once per STS refusal). The entry holds the whole token
+ *    under a key anyone can compute, so code that can use the same Runtime Cache partition can
+ *    read and present it. Vercel separates `preview` and `production`; a custom environment may
+ *    share the preview partition, so every custom-environment entry is to be encrypted
+ *    (`services/sts/proof/vercel-exchange/README.md`, "Carried into the phase 2 slice-4 client").
  * 2a. When STS refuses a token this instance exchanged itself, `invalidate` writes a refusal
  *    marker for the deployment and audience that lives `refusedTtlSeconds` (the client's
  *    `DENIED_RECHECK_MS`, 60 s). While it lives no instance of the deployment drops a cached token
@@ -46,7 +49,10 @@
  *    backoff and jitter instead of exchanging again. The marker expires after `claimTtlSeconds`;
  *    a poller that then finds neither a token nor a marker claims again, so a lost exchanger or a
  *    429 costs one more exchange per marker lifetime, never a burst.
- * 8. No token by `deadlineMs`: the request fails, and the caller's STS call fails with it.
+ * 8. No token by `deadlineMs`: the request fails, and the caller's STS call fails with it. Every
+ *    cache call, wait and exchange ends at the deadline: one still running then is abandoned (the
+ *    exchange is aborted). A token the exchange returned in time is handed out even when its cache
+ *    write is cut short, at the deadline at the latest.
  *
  * Cache cost per request: a memory hit reads nothing; a cache hit is 1 read; a miss that reaches
  * the claim is 4 reads (read, read after jitter, claim check, read-back) and 1 write (the marker;
@@ -63,8 +69,12 @@ export type SharedCache = {
   delete(key: string): Promise<void>;
 };
 
-/** One call to the exchange for the given base token and audience. */
-export type Exchange = (baseToken: string, audience: string) => Promise<ExchangeAttempt>;
+/** One call to the exchange for the given base token and audience; `signal` aborts it. */
+export type Exchange = (
+  baseToken: string,
+  audience: string,
+  signal: AbortSignal
+) => Promise<ExchangeAttempt>;
 
 export type ExchangeAttempt =
   | { kind: 'token'; token: string }
@@ -119,18 +129,34 @@ export type SharedTokenResult =
   | { status: 'ok'; token: string; exp: number; report: SharedTokenReport }
   | { status: 'failed'; detail: string; report: SharedTokenReport };
 
-export type Clock = { now(): number; sleep(ms: number): Promise<void>; random(): number };
+export type Clock = {
+  now(): number;
+  /** Resolves after `ms`, or at once when `signal` aborts. */
+  sleep(ms: number, signal?: AbortSignal): Promise<void>;
+  random(): number;
+};
 
 /** A token with less left is never handed out nor kept: the caller's STS call and the clock skew need it. */
 const MIN_REMAINING_SECONDS = 60;
 
 type Entry = { token: string; exp: number };
 
+/** What an operation bounded by the deadline answers when the deadline comes first. */
+const LATE: unique symbol = Symbol('late');
+
 const SYSTEM_CLOCK: Clock = {
   now: () => Date.now(),
-  sleep: ms => {
+  sleep: (ms, signal) => {
     const { promise, resolve } = Promise.withResolvers<void>();
-    setTimeout(resolve, ms);
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
     return promise;
   },
   random: () => Math.random(),
@@ -310,6 +336,7 @@ export class SharedExchangedToken {
     const settings = { ...this.settings, ...overrides };
     const { cache, clock } = this;
     const started = clock.now();
+    const deadline = started + settings.deadlineMs;
     const nowSeconds = () => Math.floor(clock.now() / 1000);
     const report: SharedTokenReport = {
       source: null,
@@ -331,16 +358,37 @@ export class SharedExchangedToken {
       report.timeToTokenMs = clock.now() - started;
       return { status: 'failed', detail, report };
     };
+    // Runs `operation` until the deadline. When the deadline comes first it answers `LATE` and
+    // aborts the operation's signal; a cache call that ignores the signal is abandoned.
+    const beforeDeadline = async <T>(
+      operation: (signal: AbortSignal) => Promise<T>
+    ): Promise<T | typeof LATE> => {
+      const left = deadline - clock.now();
+      if (left <= 0) return LATE;
+      const settled = new AbortController();
+      try {
+        return await Promise.race([
+          operation(settled.signal),
+          clock.sleep(left, settled.signal).then((): typeof LATE => LATE),
+        ]);
+      } finally {
+        settled.abort();
+      }
+    };
     const wait = async (ms: number): Promise<void> => {
-      await clock.sleep(ms);
-      report.waitedMs += ms;
+      const capped = Math.max(0, Math.min(ms, deadline - clock.now()));
+      await clock.sleep(capped);
+      report.waitedMs += capped;
     };
     // A cache that throws counts as a miss; one that cannot write leaves the token in memory only.
+    // A read the deadline cuts short is a miss too.
     const read = async (key: string): Promise<unknown> => {
+      if (clock.now() >= deadline) return null;
       const readStarted = clock.now();
       report.cacheReads += 1;
       try {
-        return await cache.get(key);
+        const value = await beforeDeadline(async () => await cache.get(key));
+        return value === LATE ? null : value;
       } catch {
         return null;
       } finally {
@@ -348,9 +396,10 @@ export class SharedExchangedToken {
       }
     };
     const write = async (key: string, value: unknown, ttl: number): Promise<void> => {
+      if (clock.now() >= deadline) return;
       report.cacheWrites += 1;
       try {
-        await cache.set(key, value, { ttl });
+        await beforeDeadline(async () => await cache.set(key, value, { ttl }));
       } catch {
         // Polling requests then wait for the next claim; this request still has its token.
       }
@@ -403,17 +452,19 @@ export class SharedExchangedToken {
       return isClaim(marker) && marker.owner === owner;
     };
 
-    const deadline = started + settings.deadlineMs;
     let pollMs = settings.pollStartMs;
     while (clock.now() < deadline) {
-      if (await mayExchange()) {
+      if ((await mayExchange()) && clock.now() < deadline) {
         // Step 2a: no exchange while STS refuses this deployment's freshly exchanged token.
         if (isRefused(await read(`${key}:refused`))) {
           return fail('STS refused a token freshly exchanged for this deployment and audience');
         }
         report.exchangeAttempts += 1;
         nextExchangeAt = clock.now() + settings.exchangeRetryMs;
-        const attempt = await exchange(baseToken, audience);
+        const attempt = await beforeDeadline(
+          async signal => await exchange(baseToken, audience, signal)
+        );
+        if (attempt === LATE) break;
         if (attempt.kind === 'failed') return fail(attempt.detail);
         if (attempt.kind === 'rate_limited') {
           report.rateLimited += 1;
@@ -434,8 +485,9 @@ export class SharedExchangedToken {
           }
           const ttl = cacheTtlSeconds(exchanged.exp, nowSeconds());
           if (ttl === null) return fail('the exchanged token expires within 60 seconds');
-          await write(key, exchanged, ttl);
           this.remember(key, exchanged, ttl, false);
+          // The write ends at the deadline at the latest; the token in hand is valid either way.
+          await write(key, exchanged, ttl);
           return finish('exchanged', exchanged);
         }
       }

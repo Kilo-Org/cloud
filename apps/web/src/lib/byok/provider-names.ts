@@ -25,7 +25,6 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   cohere: 'Cohere',
   deepseek: 'DeepSeek',
   openai: 'OpenAI API key',
-  inception: 'Inception',
   fireworks: 'Fireworks',
   gmicloud: 'GMI Cloud',
   google: 'Google AI Studio',

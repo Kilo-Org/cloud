@@ -5,6 +5,7 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { UtsAuditRelayDO } from './dos/UtsAuditRelayDO';
 import type { UtsKeySetDO } from './dos/UtsKeySetDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 import type { UtsFeedDO } from './feed/UtsFeedDO';
@@ -52,6 +53,10 @@ export type Env = {
   PAT_LOOKUP_CONNECTIONS?: string;
   UTS_SIGNER_DO: DurableObjectNamespace<UtsSignerDO>;
   UTS_KEY_SET_DO: DurableObjectNamespace<UtsKeySetDO>;
+  /** One audit outbox relay object per audit shard (src/audit/relay.ts). */
+  UTS_AUDIT_RELAY_DO: DurableObjectNamespace<UtsAuditRelayDO>;
+  /** The environment's UTS audit queue, which only UTS produces to and the audit relay consumes. */
+  AUDIT_QUEUE: Queue;
   /**
    * The two revocation-feed objects. Only this Worker binds them, so only it writes entries; the
    * feed Worker reads heads and lists through the `FeedReads` entrypoint (src/feed/reads.ts).

@@ -27,32 +27,50 @@ export const AUDIT_RELAY_DEPLOYMENTS: readonly string[] = [
 /** [deployed Worker name, resource]: one right on an audit queue or archive bucket. */
 type Grant = readonly [worker: string, resource: string];
 
-/** Each STS deployment produces only to its own environment's audit queue. */
+/**
+ * Each STS deployment produces only to its own environment's STS audit queue, and each UTS mint
+ * deployment (its audit outbox relay) only to its environment's UTS audit queue. The relay trusts
+ * the queue a batch arrives on to name its producer, so no producer shares a queue with another.
+ */
 export const AUDIT_QUEUE_PRODUCERS: readonly Grant[] = [
   ['sts', 'kilo-audit'],
   ['sts-staging', 'kilo-audit-staging'],
   ['sts-local', 'kilo-audit-local'],
   // services/sts/wrangler.test.jsonc, which only the Workers test pool runs.
   ['sts-test', 'kilo-audit-local'],
+  ['uts', 'kilo-audit-uts'],
+  ['uts-staging', 'kilo-audit-uts-staging'],
+  ['uts-local', 'kilo-audit-uts-local'],
+  // services/uts/wrangler.test.jsonc, which only the Workers test pool runs.
+  ['uts-test', 'kilo-audit-uts-local'],
 ];
 
 /**
- * Each relay deployment consumes its own environment's audit queue and dead-letter queue. Nothing
+ * Each relay deployment consumes its own environment's audit queues and dead-letter queues. Nothing
  * produces to a dead-letter queue: only the relay's own consumer moves messages there.
  */
 export const AUDIT_QUEUE_CONSUMERS: readonly Grant[] = [
   ['audit-relay', 'kilo-audit'],
   ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay', 'kilo-audit-uts'],
+  ['audit-relay', 'kilo-audit-uts-dlq'],
   ['audit-relay-staging', 'kilo-audit-staging'],
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay-local', 'kilo-audit-uts-local'],
+  ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
 ];
 
 export const AUDIT_QUEUE_DEAD_LETTERS: readonly Grant[] = [
   ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay', 'kilo-audit-uts-dlq'],
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
 ];
 
 /**
@@ -95,6 +113,12 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
   ...AUDIT_RELAY_DEPLOYMENTS.map((name): [string, string] => [name, 'audit-relay']),
   ['sts-test', 'sts-test'],
   ['audit-relay-test', 'audit-relay-test'],
+  // The UTS mint Worker holds an audit queue producer grant under these names, so only its own
+  // configs may deploy as them (services/uts/test/repo pins the rest of the UTS names).
+  ['uts', 'uts'],
+  ['uts-staging', 'uts'],
+  ['uts-local', 'uts'],
+  ['uts-test', 'uts-test'],
 ]);
 
 /**
@@ -686,8 +710,11 @@ function grantProblem(
 }
 
 /**
- * An audit batch is trusted as the producing STS deployment's own stream, so a foreign producer
- * could forge one, and a foreign consumer (or dead-letter target) would take batches from the relay.
+ * A queue message carries no producer identity, so the audit relay takes the producer from the
+ * queue a batch arrives on: an STS queue may carry only `sts:<env>:` streams with STS sources, and
+ * a UTS queue only the 8 `uts:<env>:` shard streams with UTS sources. That holds only while each
+ * audit queue has exactly one producer per environment, which these grants enforce. A foreign
+ * consumer (or dead-letter target) would take batches from the relay.
  */
 function auditQueueProblems(block: Block): string[] {
   const worker = block.deployedName;

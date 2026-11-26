@@ -31,6 +31,12 @@ const UTS_CONFIGS = new Set([
   FEED_TEST_CONFIG,
 ]);
 
+/** The one name each test config deploys as, in the Workers test pool only. */
+const TEST_CONFIG_NAMES: ReadonlyMap<string, string> = new Map([
+  [MINT_TEST_CONFIG, 'uts-test'],
+  [FEED_TEST_CONFIG, 'uts-feed-test'],
+]);
+
 /**
  * Every UTS Durable Object class and the configs that alone may bind it. Only the mint Worker
  * binds the feed objects, so only it writes feed entries; the feed Worker reads them through the
@@ -40,6 +46,7 @@ export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>
   ['UtsSignerDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
   ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
   ['UtsFeedDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsAuditRelayDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
 ]);
 
 /** The mint Worker entrypoints the feed Worker binds, each once per block. */
@@ -73,6 +80,13 @@ const WRANGLER_ENVIRONMENTS: ReadonlyMap<string | null, UtsEnvironment> = new Ma
   ['staging', 'staging'],
   ['local', 'development'],
 ]);
+
+/** The UTS audit queue of each environment; only the mint Worker of that environment sends to it. */
+const UTS_AUDIT_QUEUES: Readonly<Record<UtsEnvironment, string>> = {
+  production: 'kilo-audit-uts',
+  staging: 'kilo-audit-uts-staging',
+  development: 'kilo-audit-uts-local',
+};
 
 // Prefix match, wider than the deployment lists on purpose: a name that only looks like UTS
 // fails here instead of slipping past an exact-name list.
@@ -111,6 +125,11 @@ const RouteSchema = z.union([
 const BindingsShape = {
   vars: z.record(z.string(), z.unknown()).optional(),
   services: z.array(ServiceBindingSchema).optional(),
+  queues: z
+    .looseObject({
+      producers: z.array(z.looseObject({ binding: z.string(), queue: z.string() })).optional(),
+    })
+    .optional(),
   durable_objects: z
     .looseObject({
       bindings: z.array(
@@ -456,6 +475,21 @@ function expectedDeployments(
     .join(', ');
 }
 
+/** A mint block produces only to its own environment's UTS audit queue. */
+function auditQueueProblems(
+  where: string,
+  bindings: Bindings,
+  environment: UtsEnvironment
+): string[] {
+  const produced = (bindings.queues?.producers ?? [])
+    .map(producer => `${producer.binding}=${producer.queue}`)
+    .join(', ');
+  const expected = `AUDIT_QUEUE=${UTS_AUDIT_QUEUES[environment]}`;
+  return produced === expected
+    ? []
+    : [`${where}: produces to ${produced || 'nothing'}; expected ${expected}`];
+}
+
 /** Problems with the development config; `utsConfigProblems` lists its rules. */
 function devConfigProblems(dev: WorkerConfig): string[] {
   const { config } = dev;
@@ -477,6 +511,7 @@ function devConfigProblems(dev: WorkerConfig): string[] {
   if (config.route !== undefined || (config.routes ?? []).length > 0) {
     problems.push(`${MINT_DEV_CONFIG}: the development config has no routes`);
   }
+  problems.push(...auditQueueProblems(MINT_DEV_CONFIG, config, 'development'));
   return problems;
 }
 
@@ -513,6 +548,12 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
     if (deployments(mint) !== expected)
       problems.push(`${MINT_CONFIG} deploys ${deployments(mint)}; expected ${expected}`);
     for (const block of blocksOf(mint)) {
+      const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+      // Each block produces only to its own environment's UTS audit queue, the one queue whose
+      // batches the audit relay reads as UTS streams (services/audit-relay/src/relay).
+      if (environment !== undefined && !block.preview) {
+        problems.push(...auditQueueProblems(block.where, block.bindings, environment));
+      }
       const main = block.block?.main ?? mint.config.main;
       if (main !== MINT_DEPLOYED_ENTRY) {
         problems.push(
@@ -547,6 +588,9 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       if ((block.bindings.durable_objects?.bindings ?? []).length > 0) {
         problems.push(`${block.where}: the feed Worker binds no Durable Object`);
       }
+      if ((block.bindings.queues?.producers ?? []).length > 0) {
+        problems.push(`${block.where}: the feed Worker produces to no queue`);
+      }
       const mintEntrypoints = (block.bindings.services ?? [])
         .filter(binding => isMintName(binding.service))
         .map(binding => binding.entrypoint ?? '(default)')
@@ -557,6 +601,17 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
         );
       }
     }
+  }
+  // The test configs run only in the Workers test pool; each deploys only its own name, so neither
+  // can take a deployed UTS name and the rights (an audit queue producer) granted to that name.
+  for (const [path, name] of TEST_CONFIG_NAMES) {
+    const worker = byPath.get(path);
+    if (worker === undefined) continue;
+    const names = blocksOf(worker)
+      .map(block => String(block.deployedName))
+      .sort()
+      .join(', ');
+    if (names !== name) problems.push(`${path} deploys ${names}; expected only ${name}`);
   }
   return problems;
 }

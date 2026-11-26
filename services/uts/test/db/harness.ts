@@ -62,24 +62,10 @@ export function loginPassword(): string {
 }
 
 /**
- * The relay's read for one shard: rows past the shard's watermark and below the oldest open
- * transaction, oldest first. The watermark drives a lateral probe, so the row comparison is an
- * index condition on every partition and relayed rows are never read (README, "Audit outbox").
- * Parameters: `$1` the shard, `$2` the batch size.
+ * The relay's own read for one shard (`src/audit/outbox.ts`), so the plan and volume tests check
+ * the statement the relay sends. Parameters: `$1` the shard, `$2` the batch size.
  */
-export const RELAY_READ = `SELECT event.*
-  FROM uts.audit_relay_watermarks AS watermark
-  CROSS JOIN LATERAL (
-    SELECT candidate.*
-    FROM uts.audit_events AS candidate
-    WHERE candidate.shard = watermark.shard
-      AND (candidate.txid, candidate.id) > (watermark.last_txid, watermark.last_id)
-      AND candidate.txid < pg_snapshot_xmin(pg_current_snapshot())
-    ORDER BY candidate.txid, candidate.id
-    LIMIT $2
-  ) AS event
-  WHERE watermark.shard = $1
-  ORDER BY event.txid, event.id`;
+export { RELAY_READ } from '../../src/audit/outbox';
 
 /** Runs `work` and returns the SQLSTATE it fails with. */
 export async function sqlStateOf(work: () => Promise<unknown>): Promise<string> {

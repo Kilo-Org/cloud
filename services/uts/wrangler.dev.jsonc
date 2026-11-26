@@ -34,13 +34,19 @@
       { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
       { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
       { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
+      { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
     { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
   ],
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-local" }] },
+  // No schedule locally; run the cron by hand with `wrangler dev --test-scheduled` and
+  // `curl "http://127.0.0.1:8800/__scheduled?cron=*+*+*+*+*"`.
+  "triggers": { "crons": [] },
   // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo: set
   // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE and
   // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_PAT to URLs with the passwords

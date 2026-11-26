@@ -558,11 +558,10 @@ one stuck session or one long statement cannot hold back the audit relay. The da
 the same idle limit for every other session (admin, migration, dashboard). These are defaults that
 a session can change for itself, so they bound mistakes only. `uts.end_long_transactions()` bounds a
 session that changes them: it ends every session of a UTS login whose transaction started more than
-30 seconds ago, a limit the caller cannot change. The audit relay slice's minute cron and each of
-its relay runs will call it before they read; nothing calls it in this package yet, so that bound
-holds only once the relay lands (then about 35 seconds). The relay's horizon is the oldest open
-transaction of the whole server, so the alert on an unrelayed row older than 60 seconds covers
-sessions of other logins and in other databases.
+30 seconds ago, a limit the caller cannot change. The minute cron calls it first, so such a
+transaction ends within about 90 seconds (30 seconds plus the cron period). The relay's horizon is
+the oldest open transaction of the whole server, so the alert on an unrelayed row older than 60
+seconds covers sessions of other logins and in other databases.
 
 ### Platform roles
 
@@ -647,25 +646,51 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
 ### Audit outbox
 
 `uts.audit_events` is partitioned by UTC day. Each row records its transaction id (`xid8`) and its
-shard (`id % 8`). Each shard publishes as its own audit stream, and `last_seq` numbers that stream's
-batches. The watermark marks the newest row whose batch the audit queue accepted; nothing confirms
-that the archive stored it, because UTS cannot bind the archive or the audit relay service (design
-section 8.1). A partition is therefore dropped only once every row in it is relayed and it is past
-the 7-day tier, which leaves the audit relay service days to retry on top of the queue's own
-retries.
+shard (`id % 8`). Each shard publishes as its own audit stream, `uts:<environment>:<shard>`, and
+`last_seq` numbers that stream's batches.
 
-The watermark moves only through `uts.advance_audit_watermark()` (SECURITY DEFINER); the app login
-has no UPDATE on the watermarks. The function locks the shard's row and accepts a move only from
-the current `last_seq`, forward, to a row of the shard below the oldest open transaction, and only
-when the sequence advances by exactly the count of the shard's rows it passes (1 to 500, one index
-range read). A login that moves a watermark without sending therefore leaves a sequence gap, which
-the audit relay service holds and pages on, rather than a silently skipped row.
+The relay (`src/audit/relay.ts`) is one Durable Object per shard (`UtsAuditRelayDO`, named
+`<environment>:audit-relay:<shard>`). Its alarm runs every 5 seconds: it reads up to 500 rows past
+the watermark, sends them as one gzipped `AuditBatch` to `AUDIT_QUEUE`, the environment's UTS
+audit queue `kilo-audit-uts[-staging|-local]` (halving any batch the encoder refuses, so each
+message stays under 60 KB), and moves the watermark after each message the queue accepted, only
+from the `last_seq` it read. Only UTS sends to that queue, so the audit relay service accepts only
+the 8 `uts:<environment>:<shard>` streams from it (design decision Q66). A run reads at most 10
+times; one that reached that budget runs again at once. A failed run leaves the watermark in place.
+What comes next depends on the failure (`src/audit/relay-schedule.ts`):
 
-The relay read for one shard has this shape, and the relay keeps it (`RELAY_READ` in
-`test/db/harness.ts`; `test/db/audit-maintenance.test.ts` checks the plan):
+- **Retryable** (a connection, lock or statement timeout, or a queue send that threw): the next run
+  waits 5 seconds, doubling per failed run in a row up to 60.
+- **Permanent** (the database refused a statement, or a single row does not fit a message): the
+  next run waits 60 seconds at once. The run logs `uts.audit_relay.failed` with
+  `failure: "permanent"`, which pages; retrying sooner cannot help.
+- **Superseded** (another runner moved the watermark first, as during an overlapping deploy):
+  nothing failed, so the next run comes after the usual 5 seconds, the failure count stays as it
+  was, and the run logs only a `uts.audit_relay.superseded` warning.
+
+The object keeps its count of failed runs in a row in its storage, so the backoff holds when the
+runtime evicts it between alarms; a good run deletes the count. A batch the queue took before a
+failure is sent again under the same sequence numbers, and the audit relay service dedupes it
+against its archive, so a shard has no gap and no lost row.
+
+The watermark moves only through `uts.advance_audit_watermark()` (migration 0002, SECURITY
+DEFINER); the app login has no UPDATE on the watermarks. The function locks the shard's row and
+accepts a move only from the current `last_seq`, forward, to a row of the shard below the oldest
+open transaction, and only when the sequence advances by exactly the count of the shard's rows it
+passes (1 to 500, one index range read). A login that moves a watermark without sending therefore
+leaves a sequence gap, which the audit relay service holds and pages, rather than a silently
+skipped row.
+
+There is no archive confirmation: UTS cannot bind the archive or the audit relay service. A
+partition is dropped only when every row in it is relayed and it is past the 7-day tier, which
+leaves the audit relay service days to retry on top of the queue's own retries. The watermark
+marks the newest row the queue accepted (the comment on the table in `0002_audit_outbox.sql`).
+
+The relay read for one shard has this shape (`RELAY_READ` in `src/audit/outbox.ts`;
+`test/db/audit-maintenance.test.ts` checks the plan):
 
 ```sql
-SELECT event.*
+SELECT watermark.last_seq AS watermark_seq, event.*
 FROM uts.audit_relay_watermarks AS watermark
 CROSS JOIN LATERAL (
   SELECT candidate.*
@@ -683,6 +708,23 @@ ORDER BY event.txid, event.id
 The watermark drives the inner query, so the row comparison is the index condition on every
 partition's (`shard`, `txid`, `id`) index and the read never touches a relayed row. A join that
 filters on the watermark instead walks every relayed row of the shard on each read.
+
+The minute cron (`src/scheduled.ts`) arms the 8 relay objects and, on one connection, runs
+partition maintenance, the partition alerts, OAuth row maintenance and the lag check
+(`src/audit/maintenance.ts`). Each step logs its own failure and the next step still runs, so a
+partition call that gives up still leaves the kept-partition alerts and the runway check to run.
+It does nothing while `IDENTITY_STORE` is unbound. Its error log lines are the alert signals for
+an Axiom monitor:
+
+| Log event | Meaning |
+|---|---|
+| `uts.audit_relay.lagging` | A shard's first unrelayed row is over 60 seconds old (`shard`, `ageSeconds`) |
+| `uts.audit_relay.failed` | A relay run failed (`stream`, `failure`: `retryable` or `permanent`, `reason`, `failedRuns`, `retryInMs`) |
+| `uts.audit_relay.not_started` | The cron could not arm a shard's relay object |
+| `uts.audit_partitions.kept_unrelayed` | A partition past the 7-day tier still holds an unrelayed row |
+| `uts.audit_partitions.runway_short` | Fewer than today's and the next 7 days' partitions exist |
+| `uts.oauth_rows.behind` | A kind still deleted a full batch on the run's last maintenance call |
+| `uts.maintenance.failed` | A cron step failed (`step`, `sqlState`, `constraint`, `table`) |
 
 `uts.maintain_audit_partitions()` runs one step per call: it creates the first missing partition of
 the next 7 days. Otherwise it takes the first partition whose upper bound, as attached, is at least
@@ -750,11 +792,11 @@ spread ages:
 
 The app login cannot delete credential rows, so `uts.maintain_oauth_rows()` (SECURITY DEFINER)
 removes the rows no statement reads again and ends the families of blocked clients. Each call
-handles at most 5,000 rows of each kind and returns one `(kind, deleted)` row per kind. Like
-`uts.maintain_audit_partitions()`, it has no caller in this service yet: the UTS cron that slice
-3.9 adds calls both, this one until every count is under 5,000. `uts_app` holds EXECUTE on it by
-choice until then; it takes no input and every step is time- or status-gated, so a caller can
-only do the same work sooner. Slice 3.9 moves it to a dedicated maintenance role. It handles:
+handles at most 5,000 rows of each kind and returns one `(kind, deleted)` row per kind. The minute
+cron calls it until every count is under 5,000 (at most 20 calls per run). `uts_app` holds EXECUTE
+on it; it takes no input and every step is time- or status-gated, so a caller can only do the same
+work sooner. A dedicated maintenance role needs its own login and Hyperdrive config, and is not
+provisioned yet. It handles:
 
 | Rows | When | Why that is safe |
 |---|---|---|
@@ -763,7 +805,7 @@ only do the same work sooner. Slice 3.9 moves it to a dedicated maintenance role
 | `third_party_refresh_tokens` | The current token of a family that is revoked or past its 90-day end | It fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
 | `third_party_rotated_tokens` | Past the family's 90-day end, oldest first | No token of the family can be issued or refreshed again, so no reuse check needs the tombstone. Until then a replaced token that comes back revokes the family, however long ago it was replaced |
 | `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
-| `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
+| `dpop_proofs` | Past `expires_at` (121 seconds), read through `dpop_proofs_expires_idx` (migration 0007), so a call reads only expired proofs | No clock accepts the proof again |
 
 It never deletes a grant, a family row, the current token of a live family, a tombstone of a
 family that can still issue tokens, or a code within its lifetime (`test/db/oauth-grants.test.ts`).

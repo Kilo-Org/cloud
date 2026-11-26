@@ -9,6 +9,7 @@ import {
 import { resolveSecret } from './auth.js';
 import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
+import { modelValidationAudience } from './model-validation-audience.js';
 import { dispatchedKilocodeModelId } from './persistence/model-utils.js';
 import type { PersistenceEnv } from './persistence/types.js';
 
@@ -298,7 +299,7 @@ async function attestCatalogContext(
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
   if (!secret) throw deny();
   try {
-    const audience = context.organizationId ? 'kilo-api' : 'kilo-gateway';
+    const audience = modelValidationAudience(env, context.organizationId);
     const verified = await verifyKiloTokenForPolicy(token, secret, { audience, mode: 'required' });
     if (verified.claims.organizationId !== context.organizationId) throw deny();
     const authorization = verified.claims.runtimeAuthorization;

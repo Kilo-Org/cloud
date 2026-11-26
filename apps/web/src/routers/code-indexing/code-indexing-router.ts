@@ -2,14 +2,20 @@ import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-a
 import {
   baseProcedure,
   createTRPCRouter,
+  requireStaffAuthority,
+  type StaffAuthorityContext,
   type TRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { code_indexing_search, code_indexing_manifest } from '@kilocode/db/schema';
+import { code_indexing_search, code_indexing_manifest, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { getTableName, sql } from 'drizzle-orm';
-import { ensureOrganizationAccessAndFetchOrg } from '@kilocode/web-shared/routers/organizations/utils';
+import { eq, getTableName, sql } from 'drizzle-orm';
+import {
+  ensureOrganizationAccessAndFetchOrg,
+  StaffRequestRefusal,
+  type OrganizationAccessContext,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import {
   ORGANIZATION_MANAGE_ROLES,
   type OrganizationRole,
@@ -22,9 +28,14 @@ import {
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { codeIndexingAdminRouter } from './code-indexing-admin-router';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
-import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
+import { getUserUUID, requireStaffAuthorityForRequest } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
-import { chunkCountToSizeKbSql, isEnabledForUser } from '@/lib/code-indexing/util';
+import {
+  chunkCountToSizeKbSql,
+  isManuallyEnabledForUser,
+  isStaffAuthorityRefusal,
+  personalIndexingNeedsStaffAuthority,
+} from '@/lib/code-indexing/util';
 import {
   CODE_INDEXING_GONE_MESSAGE,
   isCodeIndexingEnabled,
@@ -88,7 +99,7 @@ const CodebaseIndexingSearchResponseSchema = z.array(
   })
 );
 
-const CodebaseIndexingDeleteRequestSchema = z.object({
+export const CodebaseIndexingDeleteRequestSchema = z.object({
   organizationId: z.uuid().nullable().optional(),
   projectId: z.string(),
   gitBranch: z.string().optional(),
@@ -150,36 +161,196 @@ const CodebaseIndexingProjectFilesResponseSchema = z.object({
 });
 
 type Input = { organizationId?: string | null | undefined };
+
+/**
+ * A tRPC context, or the context a code-indexing REST route builds with
+ * `organizationRestAccessContext` from its own `getUserFromAuth` result, its
+ * headers and its exact method. A REST staff branch then admits through
+ * `requireStaffAuthorityForRequest`, and a refusal carries the adapter's
+ * response ({@link StaffRequestRefusal}).
+ */
+export type CodeIndexContext = OrganizationAccessContext & StaffAuthorityContext;
+
+export type CodeIndexAccess = {
+  /** `platform_read` for a query, `platform_write` for a change to the index. */
+  actionClass: 'platform_read' | 'platform_write';
+  roles?: readonly OrganizationRole[];
+};
+
+/**
+ * The staff admission for a personal index the configured list does not
+ * enable. A REST caller admits through its own authentication result; a
+ * `not_staff` refusal there means the primary row is no longer an admin, so
+ * the caller gets the ordinary refusal.
+ */
+async function admitStaffPersonalIndex(
+  ctx: CodeIndexContext,
+  actionClass: CodeIndexAccess['actionClass']
+): Promise<string> {
+  const target = { kind: 'user', id: ctx.user.id } as const;
+  if (!ctx.restAuth) {
+    const admission = await requireStaffAuthority(ctx, { actionClass, target });
+    return getUserUUID(admission.user);
+  }
+  const admitted = await requireStaffAuthorityForRequest(ctx.restAuth, {
+    actionClass,
+    target,
+    requestHeaders: ctx.headersList,
+    requestMethod: ctx.auditMethod,
+  });
+  if (!admitted.authFailedResponse) return getUserUUID(admitted.user);
+  if (admitted.authorizationRefused && !admitted.adminNetworkDenial) {
+    throw accountNotEnabledError();
+  }
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message: 'Admin access required',
+    cause: new StaffRequestRefusal(
+      admitted.authFailedResponse,
+      admitted.stepUp,
+      admitted.adminNetworkDenial
+    ),
+  });
+}
+
+/**
+ * Cause of the documented refusal for an account or organization the code
+ * index is not enabled for, so a REST adapter can answer it with 403 instead of
+ * treating it as an unexpected failure.
+ */
+export class CodeIndexingNotEnabled extends Error {
+  constructor() {
+    super('Code indexing is not enabled');
+    this.name = 'CodeIndexingNotEnabled';
+  }
+}
+
+/** Whether an error is the documented code-index entitlement refusal. */
+export function isCodeIndexingEntitlementDenial(error: unknown): error is TRPCError {
+  return error instanceof TRPCError && error.cause instanceof CodeIndexingNotEnabled;
+}
+
+function accountNotEnabledError(): TRPCError {
+  return new TRPCError({
+    code: 'FORBIDDEN',
+    message: 'Code indexing is not enabled for this account',
+    cause: new CodeIndexingNotEnabled(),
+  });
+}
+
 export async function getCodeIndexOrganizationId(
-  ctx: TRPCContext,
+  ctx: CodeIndexContext,
   input: Input,
-  roles?: readonly OrganizationRole[]
+  access: CodeIndexAccess
 ) {
   if (!isCodeIndexingEnabled()) {
     throw codeIndexingNotAvailable();
   }
 
   if (input.organizationId) {
-    const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId, roles);
+    const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId, access.roles);
     if (org.settings.code_indexing_enabled === false) {
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Code indexing is not enabled for this organization',
+        cause: new CodeIndexingNotEnabled(),
       });
     }
     return input.organizationId;
   }
 
-  if (!isEnabledForUser(ctx.user)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Code indexing is not enabled for this account',
-    });
+  if (isManuallyEnabledForUser(ctx.user.id)) {
+    return getUserUUID(ctx.user);
   }
 
-  return getUserUUID(ctx.user);
+  if (personalIndexingNeedsStaffAuthority(ctx, input.organizationId)) {
+    return admitStaffPersonalIndex(ctx, access.actionClass);
+  }
+
+  throw accountNotEnabledError();
 }
 
+/**
+ * Deletes indexed files of one project, for `codeIndexing.delete` and for
+ * `POST /api/code-indexing/delete` with that route's own REST context. An
+ * ordinary failure answers `{ success: false }`; a staff refusal is rethrown
+ * so the transport answers with it.
+ */
+export async function deleteCodeIndexFiles(
+  ctx: CodeIndexContext,
+  input: z.infer<typeof CodebaseIndexingDeleteRequestSchema>
+): Promise<{ success: boolean; deletedFiles: number }> {
+  // Resolved once: a second resolution would ask a REST staff caller for a
+  // second proof and record a second elevation.
+  let organizationId: string | undefined;
+  try {
+    organizationId = await getCodeIndexOrganizationId(ctx, input, {
+      actionClass: 'platform_write',
+    });
+
+    const deletedFiles = await getStorage().delete({
+      organizationId,
+      projectId: input.projectId,
+      gitBranch: input.gitBranch,
+      filePaths: input.filePaths,
+    });
+
+    trackCodeIndexingDelete({
+      distinctId: ctx.user.google_user_email,
+      organizationId,
+      userId: ctx.user.id,
+      projectId: input.projectId,
+      gitBranch: input.gitBranch,
+      filePathsCount: input.filePaths?.length,
+      deletedFiles,
+      success: true,
+    });
+
+    return { success: true, deletedFiles };
+  } catch (e) {
+    // A staff guard refusal reaches the client as a typed error; the
+    // ordinary failures below keep returning `{ success: false }`.
+    if (isStaffAuthorityRefusal(e)) throw e;
+    if (e instanceof Error) {
+      errorLogger(e.message);
+    } else {
+      errorLogger('error deleting files');
+    }
+
+    if (organizationId !== undefined) {
+      trackCodeIndexingDelete({
+        distinctId: ctx.user.google_user_email,
+        organizationId,
+        userId: ctx.user.id,
+        projectId: input.projectId,
+        gitBranch: input.gitBranch,
+        filePathsCount: input.filePaths?.length,
+        deletedFiles: 0,
+        success: false,
+      });
+    }
+
+    return { success: false, deletedFiles: 0 };
+  }
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The audit target for an `overrideUser` UUID. The UUID names an index
+ * namespace: an organization id, or the id a personal index is stored under
+ * (`getUserUUID`). Runs only after staff admission.
+ */
+async function overrideIndexTarget(indexId: string): Promise<string> {
+  const [organization] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.id, indexId))
+    .limit(1);
+  return organization ? organizationTarget(organization.id) : userTarget(indexId);
+}
+
+/** Resolves the index a stats query reads, including a staff `overrideUser` read. */
 async function resolveOrganizationIdWithOverride(
   ctx: TRPCContext,
   input: { organizationId?: string | null | undefined; overrideUser?: string }
@@ -198,30 +369,37 @@ async function resolveOrganizationIdWithOverride(
       });
     }
 
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (uuidRegex.test(input.overrideUser)) {
+    // Admitted before any lookup the override names, so a refused caller
+    // learns nothing about which accounts or organizations exist. A support
+    // read is a session-class proof, which binds no target.
+    await requireStaffAuthority(ctx, {
+      actionClass: 'support_read',
+      target: { kind: 'none', id: null },
+    });
+
+    if (UUID_PATTERN.test(input.overrideUser)) {
       return await elevateViaKiloAdmin(ctx, {
         reason: 'code_index_user_override',
-        target: organizationTarget(input.overrideUser),
+        target: await overrideIndexTarget(input.overrideUser),
         grant: input.overrideUser,
       });
-    } else {
-      const user = await findUserByEmail(input.overrideUser);
-      if (!user) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: `User not found with email: ${input.overrideUser}`,
-        });
-      }
-      return await elevateViaKiloAdmin(ctx, {
-        reason: 'code_index_user_override',
-        target: userTarget(user.id),
-        grant: getUserUUID(user),
+    }
+
+    const user = await findUserByEmail(input.overrideUser);
+    if (!user) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `User not found with email: ${input.overrideUser}`,
       });
     }
+    return await elevateViaKiloAdmin(ctx, {
+      reason: 'code_index_user_override',
+      target: userTarget(user.id),
+      grant: getUserUUID(user),
+    });
   }
 
-  return await getCodeIndexOrganizationId(ctx, input);
+  return await getCodeIndexOrganizationId(ctx, input, { actionClass: 'platform_read' });
 }
 
 export const codeIndexingRouter = createTRPCRouter({
@@ -229,7 +407,9 @@ export const codeIndexingRouter = createTRPCRouter({
     .input(CodebaseIndexingSearchRequestSchema)
     .output(CodebaseIndexingSearchResponseSchema)
     .query(async ({ ctx, input }) => {
-      const organizationId = await getCodeIndexOrganizationId(ctx, input);
+      const organizationId = await getCodeIndexOrganizationId(ctx, input, {
+        actionClass: 'platform_read',
+      });
 
       const finalResults = await getStorage().search({
         query: input.query,
@@ -273,60 +453,14 @@ export const codeIndexingRouter = createTRPCRouter({
     }),
   delete: codeIndexingProcedure
     .input(CodebaseIndexingDeleteRequestSchema)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const organizationId = await getCodeIndexOrganizationId(ctx, input);
-
-        const deletedFiles = await getStorage().delete({
-          organizationId,
-          projectId: input.projectId,
-          gitBranch: input.gitBranch,
-          filePaths: input.filePaths,
-        });
-
-        trackCodeIndexingDelete({
-          distinctId: ctx.user.google_user_email,
-          organizationId,
-          userId: ctx.user.id,
-          projectId: input.projectId,
-          gitBranch: input.gitBranch,
-          filePathsCount: input.filePaths?.length,
-          deletedFiles,
-          success: true,
-        });
-
-        return { success: true, deletedFiles };
-      } catch (e) {
-        if (e instanceof Error) {
-          errorLogger(e.message);
-        } else {
-          errorLogger('error deleting files');
-        }
-
-        try {
-          const organizationId = await getCodeIndexOrganizationId(ctx, input);
-          trackCodeIndexingDelete({
-            distinctId: ctx.user.google_user_email,
-            organizationId,
-            userId: ctx.user.id,
-            projectId: input.projectId,
-            gitBranch: input.gitBranch,
-            filePathsCount: input.filePaths?.length,
-            deletedFiles: 0,
-            success: false,
-          });
-        } catch {
-          // Ignore tracking errors
-        }
-
-        return { success: false, deletedFiles: 0 };
-      }
-    }),
+    .mutation(({ ctx, input }) => deleteCodeIndexFiles(ctx, input)),
   getManifest: codeIndexingProcedure
     .input(CodebaseIndexingManifestRequestSchema)
     .output(CodebaseIndexingManifestResponseSchema)
     .query(async ({ ctx, input }) => {
-      const organizationId = await getCodeIndexOrganizationId(ctx, input);
+      const organizationId = await getCodeIndexOrganizationId(ctx, input, {
+        actionClass: 'platform_read',
+      });
 
       const manifest = await getStorage().getManifest({
         organizationId: organizationId,
@@ -569,11 +703,10 @@ export const codeIndexingRouter = createTRPCRouter({
   deleteBeforeDate: codeIndexingProcedure
     .input(CodebaseIndexingDeleteBeforeDateRequestSchema)
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await getCodeIndexOrganizationId(
-        ctx,
-        input,
-        ORGANIZATION_MANAGE_ROLES
-      );
+      const organizationId = await getCodeIndexOrganizationId(ctx, input, {
+        actionClass: 'platform_write',
+        roles: ORGANIZATION_MANAGE_ROLES,
+      });
 
       await getStorage().deleteByOrganizationBeforeDate({
         organizationId,

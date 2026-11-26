@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { ZodError } from 'zod';
 import {
   CLOUD_AGENT_STACK_TARGET_DENIED,
   CloudAgentAuthoritySchema,
@@ -27,10 +28,24 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-const { renew } = vi.hoisted(() => ({ renew: vi.fn() }));
+// Every live check goes through `renew`; the wrappers record which kind ran.
+const { renew, checkOnly, singleToken } = vi.hoisted(() => ({
+  renew: vi.fn(),
+  checkOnly: vi.fn(),
+  singleToken: vi.fn(),
+}));
 vi.mock('@kilocode/worker-utils/runtime-authorization', async importActual => ({
   ...(await importActual<typeof RuntimeAuthorizationModule>()),
   renewRuntimeAuthorization: renew,
+  checkRuntimeAuthorization: async (input: unknown) => {
+    checkOnly(input);
+    await renew(input);
+  },
+  renewRuntimeToken: async (input: { destination: 'kilo-api' }) => {
+    singleToken(input);
+    const issued = await renew(input);
+    return { token: issued.tokens[input.destination], expiresAt: issued.expiresAt };
+  },
 }));
 
 const { CloudAgentWorkspaceDO } = await import('./workspace-do.js');
@@ -113,6 +128,7 @@ type Fixture = {
   seed: { current: WorkspaceAuthoritySeed | null };
   exportSeed: ReturnType<typeof vi.fn>;
   getMetadata: ReturnType<typeof vi.fn<(sessionId: string) => Promise<SessionMetadata | null>>>;
+  env: Record<string, unknown>;
 };
 
 function fixture(options: { name?: string } = {}): Fixture {
@@ -143,7 +159,14 @@ function fixture(options: { name?: string } = {}): Fixture {
     id: { name: options.name ?? `${ownerId}:${workspaceSessionId}` },
     storage,
   } as unknown as DurableObjectState;
-  return { workspace: new CloudAgentWorkspaceDO(ctx, env), storage, seed, exportSeed, getMetadata };
+  return {
+    workspace: new CloudAgentWorkspaceDO(ctx, env),
+    storage,
+    seed,
+    exportSeed,
+    getMetadata,
+    env: env as unknown as Record<string, unknown>,
+  };
 }
 
 function childMetadata(sessionId: string, parentId = workspaceSessionId): SessionMetadata {
@@ -177,24 +200,41 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(now);
   renew.mockReset();
+  checkOnly.mockReset();
+  singleToken.mockReset();
   renew.mockImplementation(
-    async ({ authorization: record }: { authorization: RuntimeAuthorization }) =>
-      signModernKiloToken({
-        userId: record.userId,
-        pepper: 'current-account-pepper',
-        secret,
-        audience: ['kilo-api', 'kilo-gateway', 'session-ingest'],
-        tokenPurpose: 'delegated-workload',
-        credentialExchange: false,
-        expiresInSeconds: 3600,
-        extra: {
-          runtimeAuthorization: {
-            id: record.id,
-            resourceKind: record.resourceKind,
-            resourceId: record.resourceId,
+    async ({ authorization: record }: { authorization: RuntimeAuthorization }) => {
+      const sign = (audience: string) =>
+        signModernKiloToken({
+          userId: record.userId,
+          pepper: 'current-account-pepper',
+          secret,
+          audience,
+          tokenPurpose: 'delegated-workload',
+          credentialExchange: false,
+          expiresInSeconds: 3600,
+          extra: {
+            runtimeAuthorization: {
+              id: record.id,
+              resourceKind: record.resourceKind,
+              resourceId: record.resourceId,
+            },
           },
+        });
+      const [api, gateway, ingest] = await Promise.all([
+        sign('kilo-api'),
+        sign('kilo-gateway'),
+        sign('session-ingest'),
+      ]);
+      return {
+        tokens: {
+          'kilo-api': api.token,
+          'kilo-gateway': gateway.token,
+          'session-ingest': ingest.token,
         },
-      })
+        expiresAt: api.expiresAt,
+      };
+    }
   );
 });
 
@@ -377,6 +417,34 @@ describe('workspace authority revocation', () => {
     await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
   });
 
+  it('checks authority under an invalid issuer mode but refuses every token it would sign', async () => {
+    const { workspace, env } = fixture();
+    const issued = await workspace.issueMcpGrant(binding);
+    const authority = CloudAgentAuthoritySchema.parse(scopeOf(issued?.token));
+    env.RUNTIME_TOKEN_AUDIENCE_MODE = 'per-destinaton';
+    renew.mockClear();
+    checkOnly.mockClear();
+    singleToken.mockClear();
+
+    await expect(workspace.assertAuthority(authority)).resolves.toBeUndefined();
+    await expect(workspace.assertStackTarget(authority, worktreeId)).resolves.toBeUndefined();
+    expect(checkOnly).toHaveBeenCalledTimes(2);
+    expect(renew).toHaveBeenCalledTimes(2);
+
+    await expect(workspace.issueMcpGrant(binding)).rejects.toBeInstanceOf(ZodError);
+    await expect(workspace.getSpawnContext(authority)).rejects.toBeInstanceOf(ZodError);
+    await expect(
+      workspace.authorizeChild({ authority, childSessionId: siblingSessionId })
+    ).rejects.toBeInstanceOf(ZodError);
+    await expect(
+      workspace.authorizeChat({ chatSessionId: siblingSessionId })
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(singleToken).not.toHaveBeenCalled();
+    // Only the authorizeChild authority check ran; nothing was signed.
+    expect(renew).toHaveBeenCalledTimes(3);
+    await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
+  });
+
   it('ends every authority once the workspace is deleted, without adopting again', async () => {
     const { workspace, exportSeed, storage } = fixture();
     const issued = await workspace.issueMcpGrant(binding);
@@ -503,6 +571,10 @@ describe('workspace delegation and child registry', () => {
       authority: scopeOf(issued?.token) as never,
       childSessionId: siblingSessionId,
     });
+    // The authority check signs nothing; the MCP grant signed only the web API token.
+    expect(checkOnly).toHaveBeenCalledTimes(1);
+    expect(singleToken).toHaveBeenCalledTimes(1);
+    expect(singleToken).toHaveBeenCalledWith(expect.objectContaining({ destination: 'kilo-api' }));
     const record = await unsealRuntimeAuthorization(delegated.seal, secret, {
       resourceKind: 'cloud-agent-next',
       resourceId: siblingSessionId,
@@ -511,6 +583,17 @@ describe('workspace delegation and child registry', () => {
     });
     expect(record.delegationExpiresAt).toBe(authorization().delegationExpiresAt);
     expect(record.id).not.toBe(authorizationId);
+    expect(renew).toHaveBeenLastCalledWith(expect.objectContaining({ audienceMode: 'combined' }));
+    expect(delegated.token).toBe(delegated.tokens?.['kilo-api']);
+    for (const destination of ['kilo-api', 'kilo-gateway', 'session-ingest'] as const) {
+      expect(jwt.decode(delegated.tokens?.[destination] ?? '')).toMatchObject({
+        aud: destination,
+        runtimeAuthorization: { id: record.id, resourceId: siblingSessionId },
+      });
+    }
+    const spawn = await workspace.getSpawnContext(scopeOf(issued?.token));
+    expect(jwt.decode(spawn.token)).toMatchObject({ aud: 'kilo-api' });
+    expect(singleToken).toHaveBeenCalledTimes(2);
     await expect(
       workspace.authorizeChild({
         authority: scopeOf(issued?.token) as never,

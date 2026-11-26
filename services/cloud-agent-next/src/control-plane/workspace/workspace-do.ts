@@ -2,13 +2,19 @@ import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import {
+  checkRuntimeAuthorization,
   RuntimeAuthorizationExpiredError,
   RuntimeAuthorizationRevokedError,
   renewRuntimeAuthorization,
+  renewRuntimeToken,
   sealRuntimeAuthorization,
   unsealRuntimeAuthorization,
+  type RuntimeAuthorizationBindingRejectionReason,
 } from '@kilocode/worker-utils/runtime-authorization';
-import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import type {
+  RuntimeAuthorization,
+  RuntimeTokens,
+} from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   CLOUD_AGENT_STACK_TARGET_DENIED,
   type CloudAgentAuthority,
@@ -35,6 +41,11 @@ import {
 import { logger } from '../../logger.js';
 import { getSandboxSessionStub, type SessionStub } from '../../sandbox-session/session-stub.js';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
+import {
+  issuedRuntimeTokens,
+  runtimeTokenAudienceMode,
+  type DelegatedRuntimeTokens,
+} from '../../session/runtime-authorization-persistence.js';
 import { sessionIdFromDoName } from '../../session-identity.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -88,7 +99,18 @@ export type WorkspaceAuthorityDescription = {
   organizationId: string | null;
 };
 
-type LiveAuthority = { record: WorkspaceAuthorityRecord; token: string };
+type LiveAuthority<T> = { record: WorkspaceAuthorityRecord; value: T };
+
+/**
+ * The live renewal checks of the stored delegation, as `renewLive` passes them.
+ * It carries no issuer mode: a check that signs nothing never reads it.
+ */
+type LiveRenewalInput = {
+  authorization: RuntimeAuthorization;
+  secret: string;
+  connectionString: string;
+  onBindingRejected: (reason: RuntimeAuthorizationBindingRejectionReason) => void;
+};
 
 function denied(): Error {
   return new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
@@ -119,6 +141,14 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     this.ownerId = workspaceSessionId.success && ownerId.length > 0 ? ownerId : null;
   }
 
+  /** The one token a workspace read needs: the web API's, for balance and MCP pepper. */
+  private readonly renewApiToken = (input: LiveRenewalInput): Promise<{ token: string }> =>
+    renewRuntimeToken({
+      ...input,
+      destination: 'kilo-api',
+      audienceMode: runtimeTokenAudienceMode(this.env),
+    });
+
   /** Issues the workspace MCP credential, or nothing when the workspace cannot launch. */
   async issueMcpGrant(
     binding: WorkspaceMcpBinding
@@ -134,15 +164,15 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
       this.diagnostic('mcp_grant', unavailable);
       return undefined;
     }
-    let live: LiveAuthority;
+    let live: LiveAuthority<{ token: string }>;
     try {
-      live = await this.renewLive(record);
+      live = await this.renewLive(record, this.renewApiToken);
     } catch (error) {
       if (isDenied(error)) return undefined;
       throw error;
     }
     const secret = await this.secret();
-    const verified = await verifyKiloTokenForPolicy(live.token, secret, {
+    const verified = await verifyKiloTokenForPolicy(live.value.token, secret, {
       audience: 'kilo-api',
       mode: 'required',
     });
@@ -157,14 +187,15 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
 
   /** Checks a presented authority against the stored grant and the live owner and organization. */
   async assertAuthority(authority: unknown): Promise<void> {
-    await this.liveAuthority(authority);
+    await this.liveAuthority(authority, checkRuntimeAuthorization);
   }
 
   /** Authority check for a launch, plus the workspace policy the child inherits. */
   async getSpawnContext(authority: unknown): Promise<WorkspaceSpawnContext> {
-    const live = await this.liveAuthority(authority);
+    const live = await this.liveAuthority(authority, this.renewApiToken);
     return {
-      token: live.token,
+      // The caller presents it only to the web API's balance check.
+      token: live.value.token,
       createdOnPlatform: live.record.createdOnPlatform,
       egress: live.record.egress,
       configuration: live.record.spawnConfiguration,
@@ -177,9 +208,9 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     authority: CloudAgentAuthority;
     childSessionId: string;
     stackOnWorktreeId?: string;
-  }): Promise<{ token: string; seal: string }> {
+  }): Promise<DelegatedRuntimeTokens & { seal: string }> {
     const childSessionId = serverAllocatedSessionId(input.childSessionId);
-    const record = (await this.liveAuthority(input.authority)).record;
+    const record = (await this.liveAuthority(input.authority, checkRuntimeAuthorization)).record;
     if (input.stackOnWorktreeId !== undefined) {
       await this.checkStackTarget(input.authority, input.stackOnWorktreeId, record);
     }
@@ -187,7 +218,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
   }
 
   async assertStackTarget(authority: CloudAgentAuthority, worktreeId: string): Promise<void> {
-    const { record } = await this.liveAuthority(authority);
+    const { record } = await this.liveAuthority(authority, checkRuntimeAuthorization);
     await this.checkStackTarget(authority, worktreeId, record);
   }
 
@@ -236,9 +267,9 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     authority: CloudAgentAuthority;
     childSessionId: string;
     chatSessionId: string;
-  }): Promise<{ token: string; seal: string }> {
+  }): Promise<DelegatedRuntimeTokens & { seal: string }> {
     const chatSessionId = serverAllocatedSessionId(input.chatSessionId);
-    const { record } = await this.liveAuthority(input.authority);
+    const { record } = await this.liveAuthority(input.authority, checkRuntimeAuthorization);
     if (
       !(await this.readChildMetadata(input.authority, input.childSessionId))?.workspace?.worktreeId
     )
@@ -247,12 +278,13 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
   }
 
   /** Delegates the workspace authority to a new chat in this workspace (a callback chat). */
-  async authorizeChat(input: { chatSessionId: string }): Promise<{
-    token: string;
-    seal: string;
-    worktreeId: string | null;
-    organizationId: string | null;
-  }> {
+  async authorizeChat(input: { chatSessionId: string }): Promise<
+    DelegatedRuntimeTokens & {
+      seal: string;
+      worktreeId: string | null;
+      organizationId: string | null;
+    }
+  > {
     const chatSessionId = serverAllocatedSessionId(input.chatSessionId);
     const record = await this.record();
     if (record === undefined || workspaceAuthorityUnavailableReason(record, Date.now())) {
@@ -403,30 +435,35 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     }
   }
 
-  private async liveAuthority(authority: unknown): Promise<LiveAuthority> {
+  private async liveAuthority<T>(
+    authority: unknown,
+    renew: (input: LiveRenewalInput) => Promise<T>
+  ): Promise<LiveAuthority<T>> {
     const record = await this.record();
     assertWorkspaceAuthority(record, authority);
-    const live = await this.renewLive(record);
+    const live = await this.renewLive(record, renew);
     assertWorkspaceAuthority(live.record, authority);
     return live;
   }
 
   /**
-   * Renews the stored delegation, which rechecks the owner, organization
-   * membership, credential pepper and admitting device session in the
-   * database. A failed binding persists the revocation. The record must be
-   * unchanged after the check.
+   * Runs the stored delegation's renewal checks, which recheck the owner,
+   * organization membership, credential pepper and admitting device session in
+   * the database, and signs only what `renew` asks for. A failed binding
+   * persists the revocation. The record must be unchanged after the check.
    */
-  private async renewLive(record: WorkspaceAuthorityRecord): Promise<LiveAuthority> {
-    const secret = await this.secret();
-    let token: string;
+  private async renewLive<T>(
+    record: WorkspaceAuthorityRecord,
+    renew: (input: LiveRenewalInput) => Promise<T>
+  ): Promise<LiveAuthority<T>> {
+    let value: T;
     try {
-      ({ token } = await renewRuntimeAuthorization({
+      value = await renew({
         authorization: record.authorization,
-        secret,
+        secret: await this.secret(),
         connectionString: this.env.HYPERDRIVE.connectionString,
         onBindingRejected: reason => this.diagnostic('binding_check', reason),
-      }));
+      });
     } catch (error) {
       if (error instanceof RuntimeAuthorizationRevokedError) {
         await this.revokeIfCurrent(record.authorization.id);
@@ -435,23 +472,24 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
       if (error instanceof RuntimeAuthorizationExpiredError) throw denied();
       throw error;
     }
-    return { record: await this.requireUnchanged(record), token };
+    return { record: await this.requireUnchanged(record), value };
   }
 
   private async delegate(
     record: WorkspaceAuthorityRecord,
     resourceId: string,
     authority?: CloudAgentAuthority
-  ): Promise<{ token: string; seal: string }> {
+  ): Promise<DelegatedRuntimeTokens & { seal: string }> {
     const now = Date.now();
     const delegated = deriveWorkspaceRuntimeAuthorization(record, resourceId, now);
     const secret = await this.secret();
-    let token: string;
+    let tokens: RuntimeTokens;
     try {
-      ({ token } = await renewRuntimeAuthorization({
+      ({ tokens } = await renewRuntimeAuthorization({
         authorization: delegated,
         secret,
         connectionString: this.env.HYPERDRIVE.connectionString,
+        audienceMode: runtimeTokenAudienceMode(this.env),
         onBindingRejected: reason => this.diagnostic('binding_check', reason),
       }));
     } catch (error) {
@@ -464,7 +502,10 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     }
     const current = await this.requireUnchanged(record);
     if (authority !== undefined) assertWorkspaceAuthority(current, authority);
-    return { token, seal: await sealRuntimeAuthorization(delegated, secret) };
+    return {
+      ...issuedRuntimeTokens(tokens),
+      seal: await sealRuntimeAuthorization(delegated, secret),
+    };
   }
 
   private async requireUnchanged(

@@ -14,7 +14,7 @@ import { SecurityAuditLogAction } from '../core/enums';
 import type { SecurityReviewOwner } from '../core/types';
 import { captureException } from '@sentry/nextjs';
 import { REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS } from '@kilocode/worker-utils/security-finding-audit';
-import { currentUserHasPermission } from '@/lib/admin/admin-permissions';
+import type { OrganizationAccess } from '@kilocode/web-shared/lib/admin/support-access';
 import { platformAdminDomains } from '@/lib/admin/platform-admin';
 
 export { SecurityAuditLogAction };
@@ -130,12 +130,15 @@ export async function logSecurityAuditAndWait(
 }
 
 /**
- * Whether the caller may read staff actor details. The platform admin
- * permission decides. The check reads the primary row, so a granted or revoked
- * permission applies to a session that is already signed in.
+ * Whether an organization's audit records show staff actors unmasked. Only a
+ * request the organization procedure admitted through the legacy staff path
+ * (support access off), which the shared guard checked for this exact
+ * operation and organization, sees them. A member, staff included, and a
+ * support grant, which stands in for a customer role, read the masked actors a
+ * customer sees.
  */
-export function canCallerReadStaffAuditActors(callerUserId: string): Promise<boolean> {
-  return currentUserHasPermission(callerUserId, user => user.is_admin);
+export function canCallerReadStaffAuditActors(access: OrganizationAccess): boolean {
+  return access.kind === 'legacy_admin';
 }
 
 const platformAdminEmailSuffixes = platformAdminDomains.map(domain => `@${domain}`);

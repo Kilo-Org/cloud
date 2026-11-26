@@ -74,7 +74,7 @@ describe('receipt queue consumer', () => {
       ],
     });
 
-    await queue(batch, fakeEnv());
+    await queue(batch, fakeEnv(), { waitUntil: vi.fn() });
 
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();

@@ -17,7 +17,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 // that hoist, so the mocks below would register AFTER `createCallerForUser`
 // pulls in the real gitlab-service. Using global `jest` keeps the mocks hoisted.
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -288,7 +288,7 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
       });
       mockIsGitLabCredentialConnected.mockResolvedValue(false);
 
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const status = await caller.organizations.reviewAgent.getGitLabStatus({
         organizationId: organization.id,
       });

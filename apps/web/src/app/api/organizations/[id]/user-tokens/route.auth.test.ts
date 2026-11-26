@@ -12,7 +12,6 @@ import jwt from 'jsonwebtoken';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
-  admin_action_audit_logs,
   device_sessions,
   organizations,
   organization_memberships,
@@ -476,61 +475,42 @@ describe('explicit organization access', () => {
     expect(await auditLogs()).toEqual([]);
   });
 
-  test('retains global-admin explicit issuance without membership', async () => {
+  test('refuses global-admin issuance without membership', async () => {
     await db
       .delete(organization_memberships)
       .where(eq(organization_memberships.organization_id, orgId));
     await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, user.id));
-    for (const headers of [
-      new Headers(),
-      bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
-    ]) {
-      const response = await request(headers, '{"resource":"api"}');
-      expect(response.status).toBe(200);
-      expect(jwt.verify((await response.json()).token, NEXTAUTH_SECRET)).toMatchObject({
-        organizationId: orgId,
-        organizationRole: 'owner',
-      });
+    for (const body of ['{"resource":"api"}', undefined]) {
+      for (const headers of [
+        new Headers(),
+        bearer(generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })),
+      ]) {
+        const response = await request(headers, body);
+        expect(response.status).toBe(404);
+        expect(await response.json()).not.toHaveProperty('token');
+      }
     }
-
-    const mints = await db
-      .select()
-      .from(admin_action_audit_logs)
-      .where(eq(admin_action_audit_logs.actor_id, user.id));
-    expect(mints).toHaveLength(2);
-    expect(mints[0]).toMatchObject({
-      action: 'organization.token.mint',
-      target_type: 'organization',
-      target_id: orgId,
-      metadata: { tokenKind: 'resource', resource: 'api', heldRoles: [] },
-    });
+    expect(await auditLogs()).toEqual([]);
   });
 
-  test('records resource tokens minted by a global admin whose real role cannot mint them', async () => {
+  test('keeps a global admin to the real organization role', async () => {
     await inherited('billing_manager');
     await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, user.id));
-    expect((await request(new Headers(), '{"resource":"api"}')).status).toBe(200);
-
-    const [mint] = await db
-      .select()
-      .from(admin_action_audit_logs)
-      .where(eq(admin_action_audit_logs.actor_id, user.id));
-    expect(mint).toMatchObject({
-      action: 'organization.token.mint',
-      metadata: { resource: 'api', heldRoles: ['billing_manager'] },
-    });
+    const response = await request(new Headers(), '{"resource":"api"}');
+    expect(response.status).toBe(403);
+    expect(await response.json()).not.toHaveProperty('token');
+    expect(await auditLogs()).toEqual([]);
   });
 
-  test('does not record token minting by a global admin who is an organization member', async () => {
+  test('issues to a global admin who is a real organization owner', async () => {
     await inherited('owner');
     await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, user.id));
-    expect((await request(new Headers(), '{"resource":"api"}')).status).toBe(200);
-    expect(
-      await db
-        .select()
-        .from(admin_action_audit_logs)
-        .where(eq(admin_action_audit_logs.actor_id, user.id))
-    ).toEqual([]);
+    const response = await request(new Headers(), '{"resource":"api"}');
+    expect(response.status).toBe(200);
+    expect(jwt.verify((await response.json()).token, NEXTAUTH_SECRET)).toMatchObject({
+      organizationRole: 'owner',
+    });
+    expect(await auditLogs()).toHaveLength(1);
   });
 
   test.each(['owner', 'admin'] as const)(

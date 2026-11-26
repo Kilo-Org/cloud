@@ -3,7 +3,10 @@ import {
   getAuthorizedOrgContext,
   getAuthorizedOrgContextOrSupport,
 } from '@/lib/organizations/organization-auth';
+import { AdminStepUpGate } from '@/lib/admin/require-admin-page';
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+import { AdminAccessDenied } from '@/app/admin/components/AdminAccessDenied';
+import { adminNetworkRefusalFor } from '@kilocode/web-shared/lib/admin/admin-network';
 import { signInUrlWithCallbackPath } from '@kilocode/web-shared/lib/user/server';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { Organization } from '@kilocode/db/schema';
@@ -54,6 +57,16 @@ export async function OrganizationByPageLayout({
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());
     }
+    // A staff grant that needs a fresh proof renders the ceremony, not a redirect.
+    if (result.stepUp) {
+      return <AdminStepUpGate requirement={result.stepUp} />;
+    }
+    // Staff off the admin network get the admin refusal, not a generic redirect.
+    if (result.adminNetworkDenial) {
+      return (
+        <AdminAccessDenied message={adminNetworkRefusalFor(result.adminNetworkDenial).message} />
+      );
+    }
     const denial = result.denial;
     if (
       denial !== undefined &&
@@ -80,8 +93,8 @@ export async function OrganizationByPageLayout({
   }
   const { user, organization, access } = result.data;
   const isSupport = access.kind === 'support';
-  const role =
-    isSupportAccessEnabled() || isSupport ? user.role : user.is_admin ? 'owner' : user.role;
+  // The authorization result already carries any guarded staff grant.
+  const role = user.role;
   return (
     <OrganizationTrialWrapper organizationId={organization.id} role={role} fullBleed={fullBleed}>
       {access.kind === 'support' && <SupportAccessBanner access={access} />}

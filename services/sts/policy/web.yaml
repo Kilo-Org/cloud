@@ -1,0 +1,24 @@
+# The web app (Vercel project kilocode-app). Its STS canary route mints usage-ingest:sts.canary
+# with the function's own OIDC token, exchanged for the STS audience (decision D6c). Production
+# STS serves Vercel production, staging STS the custom environment staging, development STS
+# previews (design 6.2); the Vercel development environment is never accepted.
+workload: web
+environments:
+  - development
+  - staging
+  - production
+identity:
+  kind: vercel-oidc
+  teamSlug: kilocode
+  teamId: team_ItxRShuUkJaEd9GmXMEEgunb
+  projectId: prj_AAnAlIuYPrpU0aDbT1kdm0ymL7hR
+  projectName: kilocode-app
+  environments:
+    - production
+    - preview
+    - customEnvironmentId: env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b
+secrets: []
+audiences:
+  - usage-ingest
+scopes:
+  - usage-ingest:sts.canary

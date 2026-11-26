@@ -72,6 +72,7 @@ const fieldsByParent: Readonly<Record<string, readonly string[]>> = {
     'is_free',
     'abuse_delay',
     'abuse_downgraded_from',
+    'system_prompt_kind',
   ],
   bouncer_usage_event: ['request_id', 'payload'],
 };

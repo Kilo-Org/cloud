@@ -199,6 +199,7 @@ import {
   type ScopeHandleResolution,
 } from './accepted-handles.js';
 import { markLastSentHandle, readLastSentHandleDigest } from './scope-handle-delivery.js';
+import type { RuntimeTokenDestination } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   memberHandleForSession,
   selectHandoffCandidate,
@@ -757,6 +758,7 @@ export type ControlPlaneSessionPeer = HistoryPageSession & {
     sandboxId: string;
     directory: string;
     kiloSessionId: string;
+    destination?: RuntimeTokenDestination;
   }): Promise<ScopeBackingToken | null>;
   /**
    * The member's live delegation expiry in milliseconds, or null when this
@@ -2786,6 +2788,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   async resolveScopeHandle(input: {
     handle: string;
     originProof?: string;
+    /** The service that receives the backing token. Only an earlier Worker version omits it. */
+    destination?: RuntimeTokenDestination;
   }): Promise<ScopeHandleResolution> {
     await this.initialized;
     if (
@@ -2828,6 +2832,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           peer.issueRuntimeProxyBackingToken({
             sandboxId: this.sandboxId,
             ...expectedScopeForCandidate(candidate.member, grant),
+            ...(input.destination === undefined ? {} : { destination: input.destination }),
           }),
           this.scopeBackingTokenMs(),
           'Scope backing token timed out'

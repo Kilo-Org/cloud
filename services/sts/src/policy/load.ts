@@ -1,14 +1,50 @@
-import type { StsEnvironment } from '@kilocode/sts-contracts';
+import type { StsEnvironment, StsScopeRegistry } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
+import type { CloudflareDeployPins } from '../constants';
 import { sha256Base64Url } from '../crypto/hash';
-import { PolicySchema, policyFileProblems, type Policy } from './schema';
+import {
+  PolicySchema,
+  isLeaseDynamicGrant,
+  policyFileProblems,
+  vercelEnvironmentKey,
+  type DynamicGrant,
+  type Policy,
+} from './schema';
 
+/**
+ * One policy as `RefresherDO` stores it to diff the next policy change against. A policy without
+ * token grants leaves out `audiences` and `scopes`, so its entry keeps the format of the version
+ * before token grants, whose strict parser a rollback would run on it.
+ */
 export type PolicySnapshotEntry = {
   workload: string;
   environments: string[];
   identity: string;
   secrets: string[];
+  audiences?: string[];
+  scopes?: string[];
+  /**
+   * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant, and one
+   * `cloudflare-deploy:<permissionSet>:<ttlSeconds>:<maxActive>:<maxPerHour>:<groups>:<zones>` with
+   * the first 8 characters of each sorted id, so a changed group or zone shows. Absent when the
+   * policy has none, so the snapshot and its hash stay what a reader without leases expects (a
+   * rollback to it then parses the stored snapshot).
+   */
+  dynamic?: string[];
 };
+
+function dynamicKey(entry: DynamicGrant): string {
+  if (isLeaseDynamicGrant(entry)) {
+    return `${entry.grant}:${entry.maxTtlSeconds}:${entry.defaultTtlSeconds}:${entry.maxActive}`;
+  }
+  const short = (ids: string[]) =>
+    [...ids]
+      .sort()
+      .map(id => id.slice(0, 8))
+      .join('+');
+  const groups = short(entry.permissionGroups.map(group => group.id));
+  return `${entry.grant}:${entry.permissionSet}:${entry.ttlSeconds}:${entry.maxActive}:${entry.maxPerHour}:${groups}:${short(entry.zones)}`;
+}
 
 export type PolicyIndex = {
   all(): Policy[];
@@ -33,23 +69,46 @@ function canonicalIdentity(policy: Policy): string {
     case 'fly-oidc':
       return `fly-oidc|${identity.org}|${identity.orgId}|${identity.app}|${identity.appId}`;
     case 'github-oidc':
-      return `github-oidc|${identity.repositoryId}|${identity.repositoryOwnerId}|${sortedList(identity.environments)}|${sortedList(identity.refs)}|${sortedList(identity.allowedEvents)}`;
+      return `github-oidc|${identity.repository}|${identity.repositoryId}|${identity.repositoryOwnerId}|${identity.environment ?? ''}|${sortedList(identity.refs)}|${sortedList(identity.jobWorkflowRefs)}|${sortedList(identity.events)}`;
+    case 'vercel-oidc':
+      return `vercel-oidc|${identity.teamSlug}|${identity.teamId}|${identity.projectId}|${identity.projectName}|${sortedList(identity.environments.map(vercelEnvironmentKey))}`;
   }
 }
 
-function bindingKey(policy: Policy): string | null {
+/**
+ * The keys under which a policy accepts a provider token; two policies with a common key would both
+ * match one token, so loading refuses them. A GitHub policy has one key per workflow file: several
+ * policies share a repository, each for its own environment and workflows.
+ */
+function bindingKeys(policy: Policy): string[] {
   const identity = policy.identity;
   switch (identity.kind) {
     case 'worker-binding':
-      return null;
+      return [];
     case 'fly-oidc':
-      return `fly-oidc|${identity.orgId}|${identity.appId}`;
+      return [`fly-oidc|${identity.orgId}|${identity.appId}`];
     case 'github-oidc':
-      return `github-oidc|${identity.repositoryOwnerId}|${identity.repositoryId}`;
+      return identity.jobWorkflowRefs.map(
+        workflow =>
+          `github-oidc|${identity.repositoryOwnerId}|${identity.repositoryId}|${identity.environment ?? ''}|${workflow}`
+      );
+    case 'vercel-oidc':
+      return [`vercel-oidc|${identity.teamId}|${identity.projectId}`];
   }
 }
 
-export function loadPolicies(sources: Record<string, string>): PolicyIndex {
+/**
+ * `scopeRegistry` is the registry token grants are checked against, and `cloudflareDeployPins` the
+ * Cloudflare permission groups and zones deploy grants are checked against (default
+ * `CLOUDFLARE_DEPLOY_PINS`); tests pass their own.
+ */
+export function loadPolicies(
+  sources: Record<string, string>,
+  options: {
+    scopeRegistry?: StsScopeRegistry;
+    cloudflareDeployPins?: CloudflareDeployPins;
+  } = {}
+): PolicyIndex {
   const policies: Policy[] = [];
   for (const [file, source] of Object.entries(sources)) {
     let document: unknown;
@@ -64,7 +123,11 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
       throw new Error(`${file} does not match the policy schema: ${parsed.error.message}`);
     }
     const policy = parsed.data;
-    const problems = policyFileProblems(policy);
+    const problems = policyFileProblems(
+      policy,
+      options.scopeRegistry,
+      options.cloudflareDeployPins
+    );
     if (problems.length > 0) {
       throw new Error(`${file} is invalid: ${problems.join('; ')}`);
     }
@@ -82,13 +145,13 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
       throw new Error(`more than one policy file declares workload ${policy.workload}`);
     }
     workloads.add(policy.workload);
-    const key = bindingKey(policy);
-    if (key === null) continue;
-    const existing = bindings.get(key);
-    if (existing !== undefined) {
-      throw new Error(`workloads ${existing} and ${policy.workload} declare the same identity`);
+    for (const key of bindingKeys(policy)) {
+      const existing = bindings.get(key);
+      if (existing !== undefined) {
+        throw new Error(`workloads ${existing} and ${policy.workload} declare the same identity`);
+      }
+      bindings.set(key, policy.workload);
     }
-    bindings.set(key, policy.workload);
   }
 
   const entries: PolicySnapshotEntry[] = policies.map(policy => ({
@@ -96,6 +159,9 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
     environments: [...policy.environments].sort(),
     identity: canonicalIdentity(policy),
     secrets: [...policy.secrets].sort(),
+    ...(policy.audiences.length > 0 ? { audiences: [...policy.audiences].sort() } : {}),
+    ...(policy.scopes.length > 0 ? { scopes: [...policy.scopes].sort() } : {}),
+    ...(policy.dynamic.length > 0 ? { dynamic: policy.dynamic.map(dynamicKey).sort() } : {}),
   }));
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 

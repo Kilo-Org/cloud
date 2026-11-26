@@ -31,6 +31,7 @@ jest.mock('@kilocode/web-shared/lib/autoTopUp', () => ({
   maybePerformAutoTopUp: jest.fn(async () => undefined),
 }));
 const MAX_PLAN_ID = 'minimax-token-plan-max';
+const ADMIN_USER_ID = 'admin-user-id';
 const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
 const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
 const COST_MICRODOLLARS = 20_000_000;
@@ -53,6 +54,7 @@ async function createSubscription(
     planId === BYTEPLUS_PLAN_ID || planId === BYTEPLUS_PRO_PLAN_ID ? 'byteplus-coding' : 'minimax',
     planId,
     [`cron-key-${crypto.randomUUID()}::${upstreamPlanId}`],
+    ADMIN_USER_ID,
     {
       validateCredential: async ({ providerId }) =>
         providerId === 'byteplus-coding'
@@ -324,6 +326,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(credential.status).toBe('revocation_pending');
     expect(credential.upstream_plan_id).toEqual(expect.any(String));
     expect(credential.encrypted_api_key).toBeNull();
+    expect(credential.encrypted_api_key_envelope).toBeNull();
     expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
   });
 
@@ -400,6 +403,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.cancellation_reason).toBe('insufficient_credits');
     expect(credential.status).toBe('revocation_pending');
     expect(credential.encrypted_api_key).toBeNull();
+    expect(credential.encrypted_api_key_envelope).toBeNull();
   });
 
   it('allows one past-due grace period and one auto-top-up attempt', async () => {
@@ -499,6 +503,7 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.cancellation_reason).toBe('insufficient_credits');
     expect(credential.status).toBe('revocation_pending');
     expect(credential.encrypted_api_key).toBeNull();
+    expect(credential.encrypted_api_key_envelope).toBeNull();
   });
 
   it('preserves a replacement provider key when scheduled cancellation is processed', async () => {

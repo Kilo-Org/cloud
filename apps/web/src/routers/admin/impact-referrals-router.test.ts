@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   impact_advocate_participants,
@@ -200,7 +200,7 @@ async function insertReferralInvestigationRow(params: {
 
 describe('admin impact referrals investigation', () => {
   it('rejects non-admin users', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.impactReferrals.investigateReferrer({ search: referrer.id })
@@ -223,7 +223,7 @@ describe('admin impact referrals investigation', () => {
       reportState: 'failed',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.impactReferrals.investigateReferrer({
       search: referrer.google_user_email,
       product: 'kiloclaw',
@@ -324,7 +324,7 @@ describe('admin impact referrals investigation', () => {
       rewardStatus: 'review_required',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.impactReferrals.investigateReferrer({
       search: referrer.id,
       product: 'kilo_pass',

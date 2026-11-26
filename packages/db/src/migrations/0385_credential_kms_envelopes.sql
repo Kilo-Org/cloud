@@ -1,0 +1,2 @@
+ALTER TABLE "coding_plan_key_inventory" ADD COLUMN "encrypted_api_key_envelope" jsonb;--> statement-breakpoint
+ALTER TABLE "openai_chatgpt_connections" ADD COLUMN "encrypted_connection_envelope" jsonb;

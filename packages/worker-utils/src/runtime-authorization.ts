@@ -6,12 +6,21 @@ import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy.js';
 import { sha256Hex } from './sha256.js';
-import type { RuntimeAuthorization, RuntimeEnvironment } from './runtime-authorization-contract.js';
+import type {
+  RuntimeAuthorization,
+  RuntimeEnvironment,
+  RuntimeTokenAudienceMode,
+  RuntimeTokenDestination,
+  RuntimeTokens,
+} from './runtime-authorization-contract.js';
 import {
+  RUNTIME_TOKEN_DESTINATIONS,
   RuntimeAuthorizationSchema,
   runtimeAuthorizationMaximumLifetimeMs,
   RuntimeEnvironmentSchema,
   RuntimeResourceKindSchema,
+  RuntimeTokenAudienceModeSchema,
+  RuntimeTokenDestinationSchema,
 } from './runtime-authorization-contract.js';
 export { RuntimeAuthorizationSchema };
 export type { RuntimeAuthorization };
@@ -88,7 +97,12 @@ type CommonInput = {
   secret: string;
   connectionString: string;
   adapters?: RuntimeAuthorizationAdapters;
+  /** Defaults to `combined`, the rollout fallback; per-destination tokens are opt-in. */
+  audienceMode?: RuntimeTokenAudienceMode;
 };
+
+type RuntimeTokenSet = { tokens: RuntimeTokens; expiresAt: string };
+type RuntimeToken = { token: string; expiresAt: string };
 
 export class RuntimeAuthorizationRevokedError extends Error {
   constructor() {
@@ -288,7 +302,7 @@ export async function createRuntimeAuthorization(
       lifetimeMs?: number;
       now?: Date;
     }
-): Promise<{ authorization: RuntimeAuthorization; token: string; expiresAt: string }> {
+): Promise<{ authorization: RuntimeAuthorization } & RuntimeTokenSet> {
   const resourceKind = RuntimeResourceKindSchema.parse(input.resourceKind);
   const resourceId = z.string().min(1).parse(input.resourceId);
   const environment = RuntimeEnvironmentSchema.parse(input.environment);
@@ -407,31 +421,34 @@ export async function createRuntimeAuthorization(
     },
     env: environment,
   });
-  const signed = await issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
+  const signed = await issueRuntimeTokens(
+    authorization,
+    user.apiTokenPepper,
+    input.secret,
+    now,
+    input.audienceMode
+  );
   return { authorization, ...signed };
 }
 
-async function issueRuntimeToken(
+function signRuntimeToken(
   authorization: RuntimeAuthorization,
   pepper: string | null,
   secret: string,
-  now: Date
-): Promise<{ token: string; expiresAt: string }> {
+  now: Date,
+  audience: string | string[]
+): Promise<RuntimeToken> {
   const maximumExpiration = Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000);
   const issuedAt = Math.floor(now.getTime() / 1000);
   const expiresInSeconds = Math.min(60 * 60, maximumExpiration - issuedAt);
   if (expiresInSeconds <= 0) throw new RuntimeAuthorizationExpiredError();
-  const audiences =
-    authorization.resourceKind === 'cloud-agent-next'
-      ? ['kilo-api', 'kilo-gateway', 'session-ingest']
-      : ['kilo-api', 'kilo-gateway'];
   return signModernKiloToken({
     userId: authorization.userId,
     pepper,
     secret,
     expiresInSeconds,
     now,
-    audience: audiences,
+    audience,
     tokenPurpose: 'delegated-workload',
     credentialExchange: false,
     env: authorization.env,
@@ -449,9 +466,42 @@ async function issueRuntimeToken(
   });
 }
 
-export async function renewRuntimeAuthorization(
-  input: CommonInput & BindingDiagnostics & { authorization: RuntimeAuthorization; now?: Date }
-): Promise<{ token: string; expiresAt: string }> {
+async function issueRuntimeTokens(
+  authorization: RuntimeAuthorization,
+  pepper: string | null,
+  secret: string,
+  now: Date,
+  audienceMode: RuntimeTokenAudienceMode | undefined
+): Promise<RuntimeTokenSet> {
+  const sign = (audience: string | string[]) =>
+    signRuntimeToken(authorization, pepper, secret, now, audience);
+  if (RuntimeTokenAudienceModeSchema.default('combined').parse(audienceMode) === 'combined') {
+    const { token, expiresAt } = await sign([...RUNTIME_TOKEN_DESTINATIONS]);
+    return {
+      tokens: { 'kilo-api': token, 'kilo-gateway': token, 'session-ingest': token },
+      expiresAt,
+    };
+  }
+  const [api, gateway, ingest] = await Promise.all([
+    sign('kilo-api'),
+    sign('kilo-gateway'),
+    sign('session-ingest'),
+  ]);
+  return {
+    tokens: {
+      'kilo-api': api.token,
+      'kilo-gateway': gateway.token,
+      'session-ingest': ingest.token,
+    },
+    expiresAt: api.expiresAt,
+  };
+}
+
+type RenewalInput = CommonInput &
+  BindingDiagnostics & { authorization: RuntimeAuthorization; now?: Date };
+
+/** The live checks every renewal runs before it signs: state, deadline and bindings. */
+async function checkLiveAuthorization(input: RenewalInput) {
   const authorization = RuntimeAuthorizationSchema.parse(input.authorization);
   if (authorization.state !== 'active') throw new RuntimeAuthorizationRevokedError();
   const now = currentDate(input.now);
@@ -459,7 +509,38 @@ export async function renewRuntimeAuthorization(
     throw new RuntimeAuthorizationExpiredError();
   }
   const { user } = await requireBindings(input, authorization);
-  return issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
+  return { authorization, pepper: user.apiTokenPepper, now };
+}
+
+/** Runs the renewal checks of a stored authorization without issuing any token. */
+export async function checkRuntimeAuthorization(input: RenewalInput): Promise<void> {
+  await checkLiveAuthorization(input);
+}
+
+/** Renews the tokens of every destination after one set of live checks. */
+export async function renewRuntimeAuthorization(input: RenewalInput): Promise<RuntimeTokenSet> {
+  const live = await checkLiveAuthorization(input);
+  return issueRuntimeTokens(
+    live.authorization,
+    live.pepper,
+    input.secret,
+    live.now,
+    input.audienceMode
+  );
+}
+
+/**
+ * Renews the token of one destination: its own audience in `per-destination`
+ * mode, the combined token in `combined` mode.
+ */
+export async function renewRuntimeToken(
+  input: RenewalInput & { destination: RuntimeTokenDestination }
+): Promise<RuntimeToken> {
+  const destination = RuntimeTokenDestinationSchema.parse(input.destination);
+  const live = await checkLiveAuthorization(input);
+  const mode = RuntimeTokenAudienceModeSchema.default('combined').parse(input.audienceMode);
+  const audience = mode === 'combined' ? [...RUNTIME_TOKEN_DESTINATIONS] : destination;
+  return signRuntimeToken(live.authorization, live.pepper, input.secret, live.now, audience);
 }
 
 const sealedRecord = z.object({

@@ -103,9 +103,12 @@ export async function fetchTopUpTransactionForStripeSession(
 
   let ownerFilter;
   if (sessionOrganizationId) {
+    // Payments are on the support never-list: only a real (direct or inherited)
+    // billing role may read an organization checkout. Server actions are POSTs.
     const organizationContext = await getAuthorizedOrgContext(
       sessionOrganizationId,
-      ORGANIZATION_BILLING_ROLES
+      ORGANIZATION_BILLING_ROLES,
+      { requestMethod: 'POST', membershipOnly: true }
     );
     if (!organizationContext.success) {
       return { status: 'unavailable' };

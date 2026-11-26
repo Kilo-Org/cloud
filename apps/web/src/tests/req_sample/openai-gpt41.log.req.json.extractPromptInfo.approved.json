@@ -1,5 +1,4 @@
 {
-  "system_prompt_prefix": "You are Kilo Code, a highly skilled software engineer with extensive knowledge in many programming l",
   "system_prompt_length": 122,
-  "user_prompt_prefix": "<task>\nsrc/app/api/openrouter/[...path]/route.ts:151-160\n```\nfunction makeProxiedResponseHeaders(hea"
+  "system_prompt_kind": "kilo"
 }

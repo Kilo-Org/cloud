@@ -71,6 +71,9 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
         endTime,
       } = input;
 
+      // Staff actor details follow the access this procedure already admitted.
+      const callerReadsStaffActors = canCallerReadStaffAuditActors(ctx.organizationAccess);
+
       const whereConditions = [eq(security_audit_log.owned_by_organization_id, organizationId)];
 
       if (action && action.length > 0) {
@@ -125,7 +128,6 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
         resultLogs.reverse();
       }
 
-      const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
       const maskedLogs = maskKiloAdminActors(resultLogs, callerReadsStaffActors);
 
       const hasNext = hasMore;
@@ -175,6 +177,10 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
   export: organizationBillingProcedure.input(ExportInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, format, startTime, endTime, action } = input;
 
+    // Staff actor details follow the access this export already admitted, so
+    // an unmasked export spends no proof beyond its own.
+    const callerReadsStaffActors = canCallerReadStaffAuditActors(ctx.organizationAccess);
+
     const whereConditions = [eq(security_audit_log.owned_by_organization_id, organizationId)];
     if (startTime) whereConditions.push(gte(security_audit_log.created_at, startTime));
     if (endTime) whereConditions.push(lte(security_audit_log.created_at, endTime));
@@ -217,7 +223,6 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
       metadata: { format, rowCount: logs.length, startTime, endTime },
     });
 
-    const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
     const maskedLogs = maskKiloAdminActors(logs, callerReadsStaffActors);
 
     if (format === 'csv') {

@@ -30,15 +30,9 @@ import { loadOrCreateKey } from '../crypto/key-store';
 import * as schema from '../db/refresher-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import { InfisicalClient, type ManagerFolder } from '../infisical/client';
-import {
-  currentPolicyHash,
-  policiesFor,
-  policyFor,
-  policySnapshot,
-  workloadPolicyHash,
-} from '../policy';
-import type { PolicySnapshotEntry } from '../policy/load';
-import { PolicySnapshotSchema, type Policy } from '../policy/schema';
+import { policyIndex } from '../policy';
+import type { PolicyIndex, PolicySnapshotEntry } from '../policy/load';
+import { PolicySnapshotSchema, bundleFolder, type Policy } from '../policy/schema';
 import type { FillResult, WorkloadBundle } from '../types';
 import { getBundleStub, getSignerStub } from './stubs';
 
@@ -48,8 +42,33 @@ type RefresherDatabase = DrizzleSqliteDODatabase<typeof schema>;
 const SEAL_KEY_NAME = 'refresher-seal-key';
 type RefresherState = typeof schema.refresherState.$inferSelect;
 
-/** Both folder copies from one successful read pair. */
-type ManagerView = { workloads: FolderCopy; shared: FolderCopy; fetchedAt: number };
+/** A folder copy with its own age, and whether its last read failed (it is then served stale). */
+type DatedCopy = { copy: FolderCopy; fetchedAt: number; stale: boolean };
+
+/**
+ * The folder copies of one successful `/workloads` and `/shared` read. `ci` is the last `/ci` copy:
+ * a failed `/ci` read keeps it and marks it stale without holding back the other two folders. It is
+ * null where no policy reads `/ci`, or before the first `/ci` read that succeeded.
+ */
+type ManagerView = {
+  workloads: FolderCopy;
+  shared: FolderCopy;
+  fetchedAt: number;
+  ci: DatedCopy | null;
+};
+
+const EMPTY_FOLDER: FolderCopy = { entries: [], refused: [] };
+
+/** The copy a policy's own folder resolves from; null for a CI policy without a `/ci` copy. */
+function ownFolder(policy: Policy, view: ManagerView): DatedCopy | null {
+  if (bundleFolder(policy).root === '/workloads') {
+    return { copy: view.workloads, fetchedAt: view.fetchedAt, stale: false };
+  }
+  if (view.ci === null) return null;
+  return { ...view.ci, fetchedAt: Math.min(view.fetchedAt, view.ci.fetchedAt) };
+}
+
+type FolderRead = Exclude<FolderOutcome, { status: 'unreachable' }>;
 
 type ReadOutcome =
   | { status: 'ok'; view: ManagerView }
@@ -88,24 +107,32 @@ function errorName(error: unknown): string {
 }
 
 /**
- * One object per environment. It reads the manager's `/workloads` and `/shared` folders together
- * every 4 minutes, sooner after a signed `secrets.modified` webhook (merged per 30-second window)
- * or a policy change, and with backoff after a failure. Each read rebuilds every workload's bundle
- * from policy and pushes it to that workload's object. Concurrent reads, including the logins they
- * need, merge into one. It also owns the policy-change and refused-reference audit events.
+ * One object per environment. It reads the manager's `/workloads` and `/shared` folders, and `/ci`
+ * when a GitHub policy here needs it, together every 4 minutes, sooner after a signed
+ * `secrets.modified` webhook (merged per 30-second window) or a policy change, and with backoff
+ * after a failure of `/workloads` or `/shared`. A failed `/ci` read leaves CI bundles on their last
+ * copy, marked stale, and holds back nothing else. Each read rebuilds every workload's bundle from
+ * policy and pushes it to that workload's object. Concurrent reads, including the logins they need,
+ * merge into one. It also owns the policy-change and refused-reference audit events.
  */
 export class RefresherDO extends DurableObject<Env> {
+  /** The policies this object serves; a test fixture's subclass sets its own. */
+  static readonly policies: PolicyIndex = policyIndex;
+
   private readonly config: StsConfig;
   private readonly db: RefresherDatabase;
   private readonly audit: AuditLog;
   private readonly stream: string;
   private readonly client: InfisicalClient;
+  // An instance field, not a method: RPC exposes prototype methods, never instance fields.
+  private readonly policies: PolicyIndex;
   private pendingRead: Promise<ReadOutcome> | null = null;
   private sealKey: Promise<string> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.config = readConfig(env);
+    this.policies = new.target.policies;
     this.db = drizzle(ctx.storage, { schema });
     this.stream = `sts:${this.config.environment}:refresher`;
     this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
@@ -156,28 +183,36 @@ export class RefresherDO extends DurableObject<Env> {
 
   /**
    * Builds one bundle for an empty bundle object. A manager copy from the current cadence is used
-   * as is; otherwise this reads the manager, unless a backoff is running. With no new read, the
-   * last copy is served stale.
+   * as is; otherwise this reads the manager, unless a backoff is running or, for a CI bundle, the
+   * other folders are current and `/ci` failed within the last refresh interval: a refused `/ci`
+   * must not cost a manager read per CI request. With no new read, the last copy is served stale.
    */
   async buildBundle(workload: string): Promise<FillResult> {
-    const policy = policyFor(this.config.environment, WorkloadNameSchema.parse(workload));
+    const policy = this.policies.get(this.config.environment, WorkloadNameSchema.parse(workload));
     if (policy === null) return { status: 'no_policy' };
     const now = Date.now();
     const stored = await this.storedView();
     const state = this.state(now);
-    const current =
-      stored !== null && state.failures === 0 && now - stored.fetchedAt <= SNAPSHOT_FILL_MAX_AGE_MS;
-    if (current) return { status: 'built', bundle: await this.bundleFor(policy, stored, false) };
-
-    if (state.failures === 0 || now >= state.nextRefreshAt) {
-      const read = await this.readManager();
-      if (read.status === 'ok') {
-        return { status: 'built', bundle: await this.bundleFor(policy, read.view, false) };
+    const current = stored !== null && now - stored.fetchedAt <= SNAPSHOT_FILL_MAX_AGE_MS;
+    if (stored !== null && state.failures === 0) {
+      const own = ownFolder(policy, stored);
+      if (own !== null && now - own.fetchedAt <= SNAPSHOT_FILL_MAX_AGE_MS) {
+        return await this.fillResult(policy, stored, false);
       }
+    }
+
+    const ciHeldBack =
+      bundleFolder(policy).root === '/ci' &&
+      current &&
+      state.ciFailedAt !== null &&
+      now - state.ciFailedAt < REFRESH_INTERVAL_MS;
+    if (!ciHeldBack && (state.failures === 0 || now >= state.nextRefreshAt)) {
+      const read = await this.readManager();
+      if (read.status === 'ok') return await this.fillResult(policy, read.view, false);
       await this.scheduleAlarm(Date.now(), false);
     }
     if (stored === null) return { status: 'unavailable' };
-    return { status: 'built', bundle: await this.bundleFor(policy, stored, true) };
+    return await this.fillResult(policy, stored, true);
   }
 
   /** One refresh now, regardless of the schedule. The alarm calls it when due. */
@@ -230,22 +265,34 @@ export class RefresherDO extends DurableObject<Env> {
     return pending;
   }
 
+  /** `/ci` holds the bundles of GitHub policies only, so it is read where one of them applies. */
+  private managerFolders(): ManagerFolder[] {
+    const readsCi = this.policies
+      .forEnvironment(this.config.environment)
+      .some(policy => bundleFolder(policy).root === '/ci');
+    return readsCi ? ['/workloads', '/shared', '/ci'] : ['/workloads', '/shared'];
+  }
+
   private async performRead(): Promise<ReadOutcome> {
     const startedAt = Date.now();
     const stored = await this.storedFolders();
-    const [workloads, shared] = await Promise.all([
-      this.readFolder('/workloads', stored.get('/workloads') ?? null),
-      this.readFolder('/shared', stored.get('/shared') ?? null),
-    ]);
-    if (workloads.status === 'unreachable') return this.failedRead(startedAt, workloads);
-    if (shared.status === 'unreachable') return this.failedRead(startedAt, shared);
+    const outcomes = await Promise.all(
+      this.managerFolders().map(
+        async folder => [folder, await this.readFolder(folder, stored.get(folder) ?? null)] as const
+      )
+    );
+    const reads: Array<readonly [ManagerFolder, FolderRead]> = [];
+    let ciFailure: string | null = null;
+    for (const [folder, outcome] of outcomes) {
+      if (outcome.status !== 'unreachable') reads.push([folder, outcome]);
+      else if (folder === '/ci') ciFailure = outcome.detail;
+      else return this.failedRead(startedAt, outcome);
+    }
 
     const key = await this.snapshotKey();
-    const outcomes = [
-      ['/workloads', workloads],
-      ['/shared', shared],
-    ] as const;
-    for (const [folder, outcome] of outcomes) {
+    const copies = new Map<ManagerFolder, FolderCopy>();
+    for (const [folder, outcome] of reads) {
+      copies.set(folder, outcome.copy);
       if (outcome.status === 'unchanged') {
         this.db
           .update(schema.managerFolder)
@@ -273,9 +320,34 @@ export class RefresherDO extends DurableObject<Env> {
       await this.reportRefused(outcome.newlyRefused);
     }
     this.recordSuccess(startedAt);
+
+    let ci: DatedCopy | null = null;
+    const ciCopy = copies.get('/ci');
+    if (ciCopy !== undefined) ci = { copy: ciCopy, fetchedAt: startedAt, stale: false };
+    if (ciFailure !== null) {
+      // The next regular refresh retries it; a backoff would also hold back the other folders.
+      console.warn('sts: /ci read failed; CI bundles keep their last copy, marked stale', {
+        environment: this.config.environment,
+        detail: ciFailure,
+      });
+      const last = stored.get('/ci');
+      if (last?.copy) ci = { copy: last.copy, fetchedAt: last.fetchedAt, stale: true };
+    }
+    if (ciFailure !== null || ciCopy !== undefined) {
+      this.db
+        .update(schema.refresherState)
+        .set({ ciFailedAt: ciFailure === null ? null : startedAt })
+        .where(eq(schema.refresherState.id, 1))
+        .run();
+    }
     return {
       status: 'ok',
-      view: { workloads: workloads.copy, shared: shared.copy, fetchedAt: startedAt },
+      view: {
+        workloads: copies.get('/workloads') ?? EMPTY_FOLDER,
+        shared: copies.get('/shared') ?? EMPTY_FOLDER,
+        fetchedAt: startedAt,
+        ci,
+      },
     };
   }
 
@@ -383,8 +455,10 @@ export class RefresherDO extends DurableObject<Env> {
 
   private async pushAll(view: ManagerView, stale: boolean): Promise<void> {
     await Promise.all(
-      policiesFor(this.config.environment).map(async policy => {
+      this.policies.forEnvironment(this.config.environment).map(async policy => {
         const bundle = await this.bundleFor(policy, view, stale);
+        // A CI policy before the first `/ci` read that succeeded: its object keeps what it has.
+        if (bundle === null) return;
         try {
           const result = await withDORetry(
             () => getBundleStub(this.env, this.config, policy.workload),
@@ -406,29 +480,37 @@ export class RefresherDO extends DurableObject<Env> {
     );
   }
 
+  private async fillResult(policy: Policy, view: ManagerView, stale: boolean): Promise<FillResult> {
+    const bundle = await this.bundleFor(policy, view, stale);
+    return bundle === null ? { status: 'unavailable' } : { status: 'built', bundle };
+  }
+
+  /** Null for a CI policy while no `/ci` copy exists. */
   private async bundleFor(
     policy: Policy,
     view: ManagerView,
     stale: boolean
-  ): Promise<WorkloadBundle> {
+  ): Promise<WorkloadBundle | null> {
+    const own = ownFolder(policy, view);
+    if (own === null) return null;
     const { secrets, missing } = resolveWorkloadSecrets(
-      policy.workload,
+      bundleFolder(policy).path,
       policy.secrets,
-      view.workloads,
+      own.copy,
       view.shared
     );
     return {
       workload: policy.workload,
       secrets,
       missing,
-      fetchedAt: new Date(view.fetchedAt).toISOString(),
-      policyHash: await workloadPolicyHash(policy.workload),
-      stale,
+      fetchedAt: new Date(own.fetchedAt).toISOString(),
+      policyHash: await this.policies.workloadHash(policy.workload),
+      stale: stale || own.stale,
     };
   }
 
   private async applyPolicyChange(): Promise<boolean> {
-    const hash = await currentPolicyHash();
+    const hash = await this.policies.hash();
     const state = this.db
       .select()
       .from(schema.policyState)
@@ -437,7 +519,7 @@ export class RefresherDO extends DurableObject<Env> {
     if (state?.hash === hash) return false;
 
     const previous: PolicySnapshotEntry[] = state ? PolicySnapshotSchema.parse(state.snapshot) : [];
-    const current = policySnapshot();
+    const current = this.policies.snapshot();
     await this.audit.append(
       this.stream,
       policyChangedEvent({
@@ -477,16 +559,23 @@ export class RefresherDO extends DurableObject<Env> {
     return folders;
   }
 
-  /** The last successful read pair, or null when this object has never completed one. */
+  /**
+   * The last successful read of `/workloads` and `/shared`, or null without one, plus the last `/ci`
+   * copy where a policy here reads it.
+   */
   private async storedView(): Promise<ManagerView | null> {
-    const folders = await this.storedFolders();
-    const workloads = folders.get('/workloads');
-    const shared = folders.get('/shared');
+    const stored = await this.storedFolders();
+    const workloads = stored.get('/workloads');
+    const shared = stored.get('/shared');
     if (!workloads?.copy || !shared?.copy) return null;
+    const ci = this.managerFolders().includes('/ci') ? stored.get('/ci') : undefined;
+    // A copy whose last `/ci` read failed is stale, as in the read that kept it.
+    const ciStale = this.state(Date.now()).ciFailedAt !== null;
     return {
       workloads: workloads.copy,
       shared: shared.copy,
       fetchedAt: Math.min(workloads.fetchedAt, shared.fetchedAt),
+      ci: ci?.copy ? { copy: ci.copy, fetchedAt: ci.fetchedAt, stale: ciStale } : null,
     };
   }
 
@@ -537,6 +626,7 @@ export class RefresherDO extends DurableObject<Env> {
       failures: 0,
       webhookRefreshAt: null,
       lastRefreshAt: null,
+      ciFailedAt: null,
     };
     this.db.insert(schema.refresherState).values(initial).run();
     return initial;

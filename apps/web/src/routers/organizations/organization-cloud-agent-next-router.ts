@@ -18,6 +18,7 @@ import {
   ensureOrganizationAccess,
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
+  organizationMemberOnlyMutationProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { resolveGitHubPrepareParams } from '@/lib/cloud-agent-next/github-prepare-params';
@@ -629,7 +630,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       }
     }),
 
-  createWorktreeChat: organizationMemberMutationProcedure
+  createWorktreeChat: organizationMemberOnlyMutationProcedure
     .input(CreateWorktreeChatInput)
     .output(baseCreateWorktreeChatNextOutputSchema)
     .mutation(({ ctx, input }) =>

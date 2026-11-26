@@ -25,6 +25,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import { classifySystemPrompt } from '@kilocode/web-shared/lib/ai-gateway/system-prompt-kind';
 
 const responsesUsageSchema = usageCostSchema.extend({
   input_tokens: z.number().nullish(),
@@ -294,31 +295,21 @@ export function extractInputItemTextContent(
   return null;
 }
 
-export function extractResponsesPromptInfo(body: GatewayResponsesRequest): PromptInfo {
+export function extractResponsesSystemPromptText(body: GatewayResponsesRequest): string {
   const input = Array.isArray(body.input) ? body.input : [];
   const systemRoles = new Set(['system', 'developer']);
-  const userRoles = new Set(['user']);
-  const systemPrompt = [
+  return [
     typeof body.instructions === 'string' ? body.instructions : null,
     ...input.map(item => extractInputItemTextContent(item, systemRoles)),
   ]
     .filter((text): text is string => text !== null && text !== '')
     .join('\n');
+}
 
-  let userPrompt = '';
-  if (typeof body.input === 'string') {
-    userPrompt = body.input;
-  } else {
-    const lastUserText = input
-      .map(item => extractInputItemTextContent(item, userRoles))
-      .filter((t): t is string => t !== null)
-      .at(-1);
-    userPrompt = lastUserText ?? '';
-  }
-
+export function extractResponsesPromptInfo(body: GatewayResponsesRequest): PromptInfo {
+  const systemPrompt = extractResponsesSystemPromptText(body);
   return {
-    system_prompt_prefix: systemPrompt.slice(0, 100),
     system_prompt_length: systemPrompt.length,
-    user_prompt_prefix: userPrompt.slice(0, 100),
+    system_prompt_kind: classifySystemPrompt(systemPrompt),
   };
 }

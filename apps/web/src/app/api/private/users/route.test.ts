@@ -56,7 +56,7 @@ describe('GET /api/private/users', () => {
     expect(response).toBe(authFailedResponse);
   });
 
-  test('exempts only human bearer keys from the step-up guard', async () => {
+  test('uses the plain admin guard with no credential exemption', async () => {
     await setAdminAuth();
 
     await GET(makeRequest('someone@example.com'));
@@ -64,7 +64,6 @@ describe('GET /api/private/users', () => {
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: true,
       requestMethod: 'GET',
-      stepUpExemptCredentials: ['human_bearer'],
     });
   });
 

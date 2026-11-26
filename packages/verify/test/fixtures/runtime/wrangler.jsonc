@@ -1,0 +1,13 @@
+// Test-only Worker that test/runtime.test.ts starts in local workerd. It is never deployed: the
+// production deploy job (deploy-workers.yml) only finds configs under services/, and skips any
+// under test/fixtures/. Its one binding, SELF, sends real requests to this Worker, so a test can
+// cancel one. It has no nodejs_compat flag, so the run also shows that @kilocode/verify needs
+// nothing beyond the Web platform APIs workerd provides.
+{
+  "$schema": "../../../../../node_modules/wrangler/config-schema.json",
+  "name": "verify-runtime-test",
+  "main": "worker.ts",
+  "compatibility_date": "2026-06-10",
+  "observability": { "traces": { "enabled": false } },
+  "services": [{ "binding": "SELF", "service": "verify-runtime-test" }],
+}

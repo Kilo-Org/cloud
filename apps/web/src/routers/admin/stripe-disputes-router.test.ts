@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import type * as StripeDisputesModule from '@/lib/stripe/disputes';
 import type * as StripeDisputesRouterModule from '@/routers/admin/stripe-disputes-router';
 import type * as TestUtilsModule from '@/routers/test-utils';
+import type * as WebSessionRevocationModule from '@kilocode/web-shared/lib/web-session-revocation';
 
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -33,6 +34,9 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({
+  ...jest.requireActual<typeof WebSessionRevocationModule>(
+    '@kilocode/web-shared/lib/web-session-revocation'
+  ),
   revokeWebSessions: jest.fn(async () => undefined),
 }));
 
@@ -51,12 +55,12 @@ async function adminAuditRows(actorId: string) {
 
 let StripeDisputeCaseActionError: typeof StripeDisputesModule.StripeDisputeCaseActionError;
 let disputeAcceptTRPCError: typeof StripeDisputesRouterModule.disputeAcceptTRPCError;
-let createCallerForUser: typeof TestUtilsModule.createCallerForUser;
+let createSessionCallerForUser: typeof TestUtilsModule.createSessionCallerForUser;
 
 beforeAll(async () => {
   ({ StripeDisputeCaseActionError } = await import('@/lib/stripe/disputes'));
   ({ disputeAcceptTRPCError } = await import('@/routers/admin/stripe-disputes-router'));
-  ({ createCallerForUser } = await import('@/routers/test-utils'));
+  ({ createSessionCallerForUser } = await import('@/routers/test-utils'));
 });
 
 let admin: User;
@@ -79,7 +83,7 @@ beforeEach(async () => {
 
 describe('admin disputes router', () => {
   it('rejects non-admin users', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(caller.admin.disputes.list({ page: 1, limit: 25 })).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -156,7 +160,7 @@ describe('admin disputes router', () => {
       result_reference_id: 'dp_personal_list',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const summary = await caller.admin.disputes.summary();
     const needsAction = await caller.admin.disputes.list({ page: 1, limit: 25 });
     const organizationReview = await caller.admin.disputes.list({
@@ -222,7 +226,7 @@ describe('admin disputes router', () => {
       client: { disputes: { close: jest.Mock<() => Promise<unknown>> } };
     };
     client.disputes.close.mockResolvedValue({ id: 'dp_accept_audit', status: 'lost' });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.admin.disputes.accept({ caseId: caseRow.id })).resolves.toEqual({
       status: 'accepted',
@@ -242,7 +246,7 @@ describe('admin disputes router', () => {
 
   it('records a failure row when the dispute case cannot be accepted', async () => {
     const caseId = crypto.randomUUID();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.admin.disputes.accept({ caseId })).rejects.toMatchObject({
       code: 'BAD_REQUEST',

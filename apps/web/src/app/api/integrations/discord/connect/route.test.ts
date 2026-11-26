@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getDiscordOAuthUrl } from '@/lib/integrations/discord-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { beginProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
@@ -16,14 +16,14 @@ jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   beginProviderOAuthAttempt: jest.fn(async () => undefined),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedGetDiscordOAuthUrl = jest.mocked(getDiscordOAuthUrl);
 const mockedBeginProviderOAuthAttempt = jest.mocked(beginProviderOAuthAttempt);
 
@@ -52,7 +52,7 @@ describe('GET /api/integrations/discord/connect', () => {
       user: { id: USER_ID },
       authFailedResponse: null,
     } as never);
-    mockedEnsureOrganizationAccess.mockResolvedValue('billing_manager');
+    mockedEnsureMemberOrganizationAccess.mockResolvedValue('billing_manager');
     mockedGetDiscordOAuthUrl.mockReturnValue(
       'https://discord.com/oauth2/authorize?client_id=test&state=signed'
     );
@@ -63,8 +63,8 @@ describe('GET /api/integrations/discord/connect', () => {
       makeRequest(`/api/integrations/discord/connect?organizationId=${ORGANIZATION_ID}`)
     );
 
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      { user: expect.objectContaining({ id: USER_ID }) },
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_BILLING_ROLES
     );
@@ -87,7 +87,7 @@ describe('GET /api/integrations/discord/connect', () => {
   });
 
   test('refuses an organization state for a member without the integration role', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have the required organizational role to access this feature',
@@ -108,7 +108,7 @@ describe('GET /api/integrations/discord/connect', () => {
   test('keeps a personal connection free of an organization role check', async () => {
     await callDiscordConnect(makeRequest('/api/integrations/discord/connect'));
 
-    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
     const state = mockedGetDiscordOAuthUrl.mock.calls[0]?.[0];
     expect(verifyOAuthState(state ?? null)).toEqual(
       expect.objectContaining({ owner: `user_${USER_ID}`, userId: USER_ID })

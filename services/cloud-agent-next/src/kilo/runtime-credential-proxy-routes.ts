@@ -29,18 +29,24 @@ type ResolveRuntimeCredentialProxyScopedV2Input = Omit<
 const ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ORGANIZATION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
+/**
+ * Decodes a facade pathname once. An accepted result never contains `%`, so
+ * checking it again returns the same value without decoding it a second time.
+ */
 function safePathname(value: string): string | null {
   if (!value.startsWith('/') || value.includes('\\') || /%(?:2f|5c)/i.test(value)) return null;
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(value);
-  } catch {
-    return null;
+  let decoded = value;
+  if (value.includes('%')) {
+    try {
+      decoded = decodeURIComponent(value);
+    } catch {
+      return null;
+    }
   }
   if (
+    decoded.includes('%') ||
     decoded.includes('\\') ||
     decoded.includes('//') ||
-    /%(?:2e|2f|5c)/i.test(decoded) ||
     decoded.split('/').some(segment => segment === '.' || segment === '..')
   ) {
     return null;
@@ -128,14 +134,35 @@ const ORGANIZATION_MODEL_CATALOG_PATH =
  * organization model catalog with the shared web (kilo-api) tRPC context, so a
  * provider-facade request to it must carry a kilo-api attestation.
  */
-export function runtimeProxyAttestationAudience(
+function attestationAudience(
   route: RuntimeCredentialProxyRoute,
-  pathname: string
+  path: string
 ): RuntimeProxyAttestationAudience {
   if (route === 'backend') return 'kilo-api';
   if (route === 'ingest') return 'session-ingest';
-  if (route === 'provider' && ORGANIZATION_MODEL_CATALOG_PATH.test(pathname)) return 'kilo-api';
+  if (route === 'provider' && ORGANIZATION_MODEL_CATALOG_PATH.test(path)) return 'kilo-api';
   return 'kilo-gateway';
+}
+
+export type RuntimeCredentialProxyPath = {
+  /** The decoded pathname; pass it to the route resolvers. */
+  path: string;
+  /** The service that verifies the forwarded bearer and attestation for `path`. */
+  audience: RuntimeProxyAttestationAudience;
+};
+
+/**
+ * Decodes and checks a facade pathname once, then selects its attestation
+ * audience from that decoded path. The route resolvers apply their allowlists
+ * to the same `path`, so the destination token and the upstream always agree.
+ * Returns null for a pathname that no resolver can accept.
+ */
+export function classifyRuntimeCredentialProxyPath(
+  route: RuntimeCredentialProxyRoute,
+  pathname: string
+): RuntimeCredentialProxyPath | null {
+  const path = safePathname(pathname);
+  return path === null ? null : { path, audience: attestationAudience(route, path) };
 }
 
 function logicalProviderPath(pathname: string, organizationId: string | undefined): string | null {

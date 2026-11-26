@@ -82,12 +82,16 @@ describe('admin webhook request policy', () => {
           ? { scope, userId: owner.id, triggerId }
           : { scope, organizationId, triggerId };
 
-      await expect(createCaller({ user: admin }).listRequests(input)).rejects.toMatchObject({
+      await expect(
+        createCaller({ user: admin, credential: 'session' }).listRequests(input)
+      ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
       expect(mockListWorkerRequests).not.toHaveBeenCalled();
 
-      const response = await createCaller({ user: viewer }).listRequests(input);
+      const response = await createCaller({ user: viewer, credential: 'session' }).listRequests(
+        input
+      );
 
       expect(response).toEqual([
         {

@@ -1,4 +1,4 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   admin_action_audit_logs,
@@ -96,7 +96,7 @@ describe('organization admin router', () => {
 
   describe('admin action audit logging', () => {
     it('records create, trial override, and delete against the organization', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const { organization } = await caller.organizations.admin.create({ name: 'Audited Org' });
       await caller.organizations.admin.updateFreeTrialEndAt({
         organizationId: organization.id,
@@ -180,7 +180,7 @@ describe('organization admin router', () => {
           },
         ]);
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await caller.organizations.admin.delete({ organizationId: organization.id });
         await runScheduledAfterResponse();
 
@@ -270,7 +270,7 @@ describe('organization admin router', () => {
           },
         ]);
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.organizations.admin.delete({ organizationId: organization.id })
         ).resolves.toBeDefined();
@@ -389,7 +389,7 @@ describe('organization admin router', () => {
         },
       ]);
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.organizations.admin.getDetails({
         organizationId: testOrganization.id,
       });
@@ -406,7 +406,7 @@ describe('organization admin router', () => {
         .set({ stripe_customer_id: 'cus_admin_details_test' })
         .where(eq(organizations.id, testOrganization.id));
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.organizations.admin.getDetails({
         organizationId: testOrganization.id,
       });
@@ -431,7 +431,7 @@ describe('organization admin router', () => {
     });
 
     it('should successfully nullify credits with valid organization and balance', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -454,7 +454,7 @@ describe('organization admin router', () => {
     });
 
     it('should throw NOT_FOUND error when organization does not exist', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const nonExistentOrgId = '550e8400-e29b-41d4-a716-446655440099';
 
       await expect(
@@ -470,7 +470,7 @@ describe('organization admin router', () => {
         .set({ total_microdollars_acquired: 0 })
         .where(eq(organizations.id, testOrganization.id));
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await expect(
         caller.organizations.admin.nullifyCredits({
@@ -488,7 +488,7 @@ describe('organization admin router', () => {
         })
         .where(eq(organizations.id, testOrganization.id));
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await expect(
         caller.organizations.admin.nullifyCredits({
@@ -498,7 +498,7 @@ describe('organization admin router', () => {
     });
 
     it('should create correct credit transaction with negative amount', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -524,7 +524,7 @@ describe('organization admin router', () => {
 
     it('should use custom description when provided', async () => {
       const customDescription = 'Fraud detected - nullifying credits';
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -541,7 +541,7 @@ describe('organization admin router', () => {
 
     it('should trim whitespace from description', async () => {
       const descriptionWithWhitespace = '  Trimmed description  ';
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -557,7 +557,7 @@ describe('organization admin router', () => {
     });
 
     it('should use default description when empty string is provided', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -573,7 +573,7 @@ describe('organization admin router', () => {
     });
 
     it('should reject admins without credit management access', async () => {
-      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const caller = await createSessionCallerForUser(adminWithoutCreditAccess.id);
 
       await expect(
         caller.organizations.admin.nullifyCredits({
@@ -583,7 +583,7 @@ describe('organization admin router', () => {
     });
 
     it('should reject non-admin users', async () => {
-      const caller = await createCallerForUser(nonAdminUser.id);
+      const caller = await createSessionCallerForUser(nonAdminUser.id);
 
       await expect(
         caller.organizations.admin.nullifyCredits({
@@ -593,7 +593,7 @@ describe('organization admin router', () => {
     });
 
     it('should validate organizationId format', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await expect(
         caller.organizations.admin.nullifyCredits({
@@ -608,7 +608,7 @@ describe('organization admin router', () => {
         .set({ total_microdollars_acquired: 1 })
         .where(eq(organizations.id, testOrganization.id));
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -638,7 +638,7 @@ describe('organization admin router', () => {
     });
 
     it('marks explicitly paid grants as principal and ignores promotional expiry overrides', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 10,
@@ -658,7 +658,7 @@ describe('organization admin router', () => {
     });
 
     it('should successfully grant positive credits', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const amount = 10;
 
       const result = await caller.organizations.admin.grantCredit({
@@ -691,7 +691,7 @@ describe('organization admin router', () => {
     });
 
     it('should successfully grant negative credits with description', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const amount = -5;
       const description = 'Correction';
 
@@ -721,7 +721,7 @@ describe('organization admin router', () => {
     });
 
     it('records repeated negative grants under the stable organization_custom category', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       for (const description of ['First correction', 'Second correction']) {
         await caller.organizations.admin.grantCredit({
@@ -747,7 +747,7 @@ describe('organization admin router', () => {
     });
 
     it('should fail to grant negative credits without description', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const amount = -5;
 
       await expect(
@@ -759,7 +759,7 @@ describe('organization admin router', () => {
     });
 
     it('should reject admins without credit management access', async () => {
-      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const caller = await createSessionCallerForUser(adminWithoutCreditAccess.id);
 
       await expect(
         caller.organizations.admin.grantCredit({
@@ -770,7 +770,7 @@ describe('organization admin router', () => {
     });
 
     it('should fail to grant zero credits', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await expect(
         caller.organizations.admin.grantCredit({
@@ -781,7 +781,7 @@ describe('organization admin router', () => {
     });
 
     it('should store expiry_date on credit transaction', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const expiryDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
 
       await caller.organizations.admin.grantCredit({
@@ -801,7 +801,7 @@ describe('organization admin router', () => {
     });
 
     it('should refuse an expiry_date that is not in the future', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await expect(
         caller.organizations.admin.grantCredit({
@@ -822,7 +822,7 @@ describe('organization admin router', () => {
     });
 
     it('should allow a past expiry_date on paid credits and negative grants', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const pastDate = '2024-06-01T00:00:00.000Z';
 
       // Paid credits store the purchase policy expiry, not the supplied one.
@@ -850,7 +850,7 @@ describe('organization admin router', () => {
     });
 
     it('should store expiry from expiry_hours', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const beforeMs = Date.now();
 
       await caller.organizations.admin.grantCredit({
@@ -873,7 +873,7 @@ describe('organization admin router', () => {
     });
 
     it('should pick the earlier of expiry_date and expiry_hours', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       // Set expiry_date far in the future and expiry_hours to 1 hour from now
       const farFuture = '2030-01-01T00:00:00.000Z';
@@ -896,7 +896,7 @@ describe('organization admin router', () => {
     });
 
     it('should update next_credit_expiration_at on org', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const expiryDate = new Date(Date.now() + 45 * 24 * 3600 * 1000).toISOString();
 
       await caller.organizations.admin.grantCredit({
@@ -914,7 +914,7 @@ describe('organization admin router', () => {
     });
 
     it('should keep earlier next_credit_expiration_at when granting later expiry', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       // First grant with earlier expiry
       await caller.organizations.admin.grantCredit({
@@ -942,7 +942,7 @@ describe('organization admin router', () => {
     });
 
     it('should ignore expiry params for negative grants', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
@@ -968,7 +968,7 @@ describe('organization admin router', () => {
         .set({ microdollars_used: 2_000_000, total_microdollars_acquired: 5_000_000 })
         .where(eq(organizations.id, testOrganization.id));
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 10,
@@ -998,7 +998,7 @@ describe('organization admin router', () => {
         is_free: true,
       });
 
-      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const caller = await createSessionCallerForUser(adminWithoutCreditAccess.id);
       const [transaction] = await caller.organizations.admin.creditTransactions({
         organizationId: testOrganization.id,
       });
@@ -1041,7 +1041,7 @@ describe('organization admin router', () => {
         original_baseline_microdollars_used: 0,
       });
 
-      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const caller = await createSessionCallerForUser(adminWithoutCreditAccess.id);
       const result = await caller.organizations.admin.nextCreditExpiration({
         organizationId: testOrganization.id,
       });
@@ -1080,8 +1080,8 @@ describe('organization admin router', () => {
         },
       ]);
 
-      const firstCaller = await createCallerForUser(adminWithoutCreditAccess.id);
-      const secondCaller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const firstCaller = await createSessionCallerForUser(adminWithoutCreditAccess.id);
+      const secondCaller = await createSessionCallerForUser(adminWithoutCreditAccess.id);
       const results = await Promise.all([
         firstCaller.organizations.admin.nextCreditExpiration({
           organizationId: testOrganization.id,
@@ -1133,7 +1133,7 @@ describe('organization admin router', () => {
     });
 
     it('should clear next_credit_expiration_at on nullification', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -1150,7 +1150,7 @@ describe('organization admin router', () => {
     });
 
     it('should set microdollars_balance to 0 on nullification', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
@@ -1189,7 +1189,7 @@ describe('organization admin router', () => {
     });
 
     it('does not double-count a nullified grant after re-granting with a new expiry', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       // 1. Grant $100 expiring in the future.
       await caller.organizations.admin.grantCredit({
@@ -1225,7 +1225,7 @@ describe('organization admin router', () => {
     });
 
     it('retires multiple still-open grants on nullification', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
@@ -1284,7 +1284,7 @@ describe('organization admin router', () => {
         .returning();
 
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const result = await caller.organizations.admin.list({
           page: 1,
           limit: 25,
@@ -1309,7 +1309,7 @@ describe('organization admin router', () => {
     });
 
     it('returns a total when no stripe_status filter is set', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.organizations.admin.list({
         page: 1,
         limit: 25,
@@ -1335,7 +1335,7 @@ describe('organization admin router', () => {
       try {
         await addUserToOrganization(org.id, member.id, 'member');
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const result = await caller.organizations.admin.list({
           page: 1,
           limit: 25,
@@ -1372,7 +1372,7 @@ describe('organization admin router', () => {
         await addUserToOrganization(org.id, billingManager.id, 'billing_manager');
         await addUserToOrganization(org.id, bot.id, 'member');
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const resultBeforeRegularMember = await caller.organizations.admin.list({
           page: 1,
           limit: 25,
@@ -1444,7 +1444,7 @@ describe('organization admin router', () => {
           .set({ parent_organization_id: parentOrganization.id })
           .where(inArray(organizations.id, [childOrganization.id, siblingOrganization.id]));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const childHierarchy = await caller.organizations.admin.getHierarchy({
           organizationId: childOrganization.id,
         });
@@ -1505,7 +1505,7 @@ describe('organization admin router', () => {
         adminUser.id,
         0
       );
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       let childOrganizationId: string | null = null;
 
       try {
@@ -1565,7 +1565,7 @@ describe('organization admin router', () => {
       );
 
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await caller.organizations.admin.setParent({
           organizationId: childOrganization.id,
           parentOrganizationId: parentOrganization.id,
@@ -1630,7 +1630,7 @@ describe('organization admin router', () => {
           .update(organizations)
           .set({ anthropic_user_profile_id: 'uprof_child_own' })
           .where(eq(organizations.id, childOrganization.id));
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await caller.organizations.admin.setParent({
           organizationId: childOrganization.id,
@@ -1707,7 +1707,7 @@ describe('organization admin router', () => {
           .set({ parent_organization_id: parentCandidate.id })
           .where(eq(organizations.id, childOfCandidate.id));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const results = await caller.organizations.admin.search({
           search: searchPrefix,
           limit: 20,
@@ -1758,7 +1758,7 @@ describe('organization admin router', () => {
           .set({ parent_organization_id: rootOrganization.id })
           .where(eq(organizations.id, childOrganization.id));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const results = await caller.organizations.admin.search({
           search: searchPrefix,
           limit: 20,
@@ -1802,7 +1802,7 @@ describe('organization admin router', () => {
           .set({ parent_organization_id: parentOrganization.id })
           .where(eq(organizations.id, childOrganization.id));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.organizations.admin.setParent({
             organizationId: parentOrganization.id,
@@ -1846,7 +1846,7 @@ describe('organization admin router', () => {
           .set({ parent_organization_id: rootOrganization.id })
           .where(eq(organizations.id, childOrganization.id));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.organizations.admin.setParent({
             organizationId: newChildOrganization.id,
@@ -1905,7 +1905,7 @@ describe('organization admin router', () => {
           .set({ parent_organization_id: existingParentOrganization.id })
           .where(eq(organizations.id, existingChildOrganization.id));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.organizations.admin.setParent({
             organizationId: existingParentOrganization.id,
@@ -1939,7 +1939,7 @@ describe('organization admin router', () => {
       );
 
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.organizations.admin.setParent({
             organizationId: organization.id,
@@ -2076,7 +2076,7 @@ describe('organization admin router', () => {
 
       it('blocks detaching a child with a nonzero initial allocation', async () => {
         const { child } = await createAllocatedChild({ initialCapacity: 1 });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await expect(
           caller.organizations.admin.setParent({
@@ -2093,7 +2093,7 @@ describe('organization admin router', () => {
           initialCapacity: 0,
           issuedCreditsOnly: true,
         });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await caller.organizations.admin.setParent({
           organizationId: child.id,
@@ -2112,7 +2112,7 @@ describe('organization admin router', () => {
           initialCapacity: 0,
           futureCapacity: 1,
         });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await expect(
           caller.organizations.admin.setParent({
@@ -2130,7 +2130,7 @@ describe('organization admin router', () => {
           futureCapacity: 0,
           futureIsEffective: true,
         });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await caller.organizations.admin.setParent({
           organizationId: child.id,
@@ -2149,7 +2149,7 @@ describe('organization admin router', () => {
           initialCapacity: 1,
           futureCapacity: 0,
         });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await expect(
           caller.organizations.admin.setParent({
@@ -2166,7 +2166,7 @@ describe('organization admin router', () => {
           initialCapacity: 0,
           futureCapacity: 0,
         });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await caller.organizations.admin.setParent({
           organizationId: child.id,
@@ -2182,7 +2182,7 @@ describe('organization admin router', () => {
 
       it('blocks archiving a child with a nonzero allocation', async () => {
         const { child } = await createAllocatedChild({ initialCapacity: 1 });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await expect(
           caller.organizations.admin.delete({ organizationId: child.id })
@@ -2193,7 +2193,7 @@ describe('organization admin router', () => {
 
       it('allows archiving a child with only zero allocations', async () => {
         const { child } = await createAllocatedChild({ initialCapacity: 0 });
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await caller.organizations.admin.delete({ organizationId: child.id });
 
@@ -2246,7 +2246,7 @@ describe('organization admin router', () => {
           })
           .where(eq(organizations.id, endingSoonOrg.id));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const result = await caller.organizations.admin.list({
           page: 1,
           limit: 25,
@@ -2339,7 +2339,7 @@ describe('organization admin router', () => {
           .returning({ id: kilo_pass_org_agreements.id });
         agreementIds.push(...agreements.map(agreement => agreement.id));
 
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const result = await caller.organizations.admin.list({
           page: 1,
           limit: 1,
@@ -2390,7 +2390,7 @@ describe('organization admin router', () => {
     it('grants an exemption with a trimmed reason, actor, and history row', async () => {
       const org = await createExemptionTestOrganization();
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const result = await caller.organizations.admin.setServiceFeeExemption({
           organizationId: org.id,
           isExempt: true,
@@ -2429,7 +2429,7 @@ describe('organization admin router', () => {
     it('revokes an exemption and returns the newest history first', async () => {
       const org = await createExemptionTestOrganization();
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await caller.organizations.admin.setServiceFeeExemption({
           organizationId: org.id,
           isExempt: true,
@@ -2466,7 +2466,7 @@ describe('organization admin router', () => {
     it('allows repeating the same state with a new reason and appends another row', async () => {
       const org = await createExemptionTestOrganization();
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const first = await caller.organizations.admin.setServiceFeeExemption({
           organizationId: org.id,
           isExempt: true,
@@ -2499,7 +2499,7 @@ describe('organization admin router', () => {
     it('rejects non-admin users from reading and mutating exemption state', async () => {
       const org = await createExemptionTestOrganization();
       try {
-        const caller = await createCallerForUser(nonAdminUser.id);
+        const caller = await createSessionCallerForUser(nonAdminUser.id);
 
         await expect(
           caller.organizations.admin.getServiceFeeExemption({ organizationId: org.id })
@@ -2519,7 +2519,7 @@ describe('organization admin router', () => {
     it('rejects blank and undersized reasons', async () => {
       const org = await createExemptionTestOrganization();
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await expect(
           caller.organizations.admin.setServiceFeeExemption({
@@ -2549,7 +2549,7 @@ describe('organization admin router', () => {
     it('rejects oversized reasons', async () => {
       const org = await createExemptionTestOrganization();
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await expect(
           caller.organizations.admin.setServiceFeeExemption({
@@ -2567,7 +2567,7 @@ describe('organization admin router', () => {
       const org = await createExemptionTestOrganization();
       try {
         await markOrganizationAsDeleted(org.id);
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
 
         await expect(
           caller.organizations.admin.setServiceFeeExemption({
@@ -2595,14 +2595,14 @@ describe('organization admin router', () => {
         0
       );
       try {
-        const adminCaller = await createCallerForUser(adminUser.id);
+        const adminCaller = await createSessionCallerForUser(adminUser.id);
         await adminCaller.organizations.admin.setServiceFeeExemption({
           organizationId: org.id,
           isExempt: true,
           reason: 'granted for customer surface check',
         });
 
-        const customerCaller = await createCallerForUser(nonAdminUser.id);
+        const customerCaller = await createSessionCallerForUser(nonAdminUser.id);
         const customerOrganizations = await customerCaller.organizations.list();
         const row = customerOrganizations.find(entry => entry.organizationId === org.id);
 
@@ -2663,7 +2663,7 @@ describe('organization admin router', () => {
         .returning({ id: kilo_pass_org_agreements.id });
 
       try {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.organizations.admin.getKiloPassSummary({ organizationId: child.id })
         ).resolves.toMatchObject({
@@ -2714,7 +2714,7 @@ describe('organization admin router', () => {
         .update(organizations)
         .set({ parent_organization_id: parent.id })
         .where(eq(organizations.id, child.id));
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await expect(
         caller.organizations.admin.addMember({
@@ -2744,7 +2744,7 @@ describe('organization admin router', () => {
         .update(organizations)
         .set({ parent_organization_id: parent.id })
         .where(eq(organizations.id, child.id));
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.organizations.admin.addMember({
         organizationId: child.id,
@@ -2782,7 +2782,7 @@ describe('organization admin router', () => {
         .set({ parent_organization_id: parent.id })
         .where(eq(organizations.id, child.id));
       await markOrganizationAsDeleted(parent.id);
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await expect(
         caller.organizations.admin.addMember({
@@ -2818,7 +2818,7 @@ describe('organization admin router', () => {
         .update(organizations)
         .set({ parent_organization_id: parent.id })
         .where(eq(organizations.id, child.id));
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.organizations.admin.searchParentMembers({
         organizationId: child.id,

@@ -103,7 +103,11 @@ export async function deliverParentWorkspaceCallback(
     if (delegated.worktreeId !== workspaceId) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Parent workspace callback denied' });
     }
-    const runtimeAuthorization = { token: delegated.token, seal: delegated.seal };
+    const runtimeAuthorization = {
+      token: delegated.token,
+      tokens: delegated.tokens,
+      seal: delegated.seal,
+    };
     const created = await createWorkspaceCallbackSession({
       env,
       userId: source.userId,

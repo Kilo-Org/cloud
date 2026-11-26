@@ -1,5 +1,10 @@
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn(),
+  openAiChatGptOwnerKey: (
+    jest.requireActual('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store') as {
+      openAiChatGptOwnerKey: unknown;
+    }
+  ).openAiChatGptOwnerKey,
   openAiChatGptSharedServicesOwner: (organizationId: string) => ({
     organizationId,
     scope: 'shared_services',
@@ -44,6 +49,7 @@ jest.mock('next/server', () => ({
   }),
 }));
 
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
@@ -938,6 +944,61 @@ describe('checkOpenAiChatGptByok', () => {
       .mockResolvedValue(storedConnection({ isEnabled: false }));
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
+  });
+
+  describe('when the KMS service cannot open the stored payload', () => {
+    const kmsFailure = new CredentialKmsError(
+      new Error('BYOK KMS /decrypt failed: stored-refresh-token')
+    );
+
+    async function withLoggedErrors<T>(run: () => Promise<T>): Promise<[T, string]> {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const result = await run();
+        return [result, JSON.stringify(errorSpy.mock.calls)];
+      } finally {
+        errorSpy.mockRestore();
+      }
+    }
+
+    it('is not eligible, so the request keeps its ordinary route', async () => {
+      jest.mocked(getOpenAiChatGptStoredConnection).mockRejectedValue(kmsFailure);
+
+      const [result] = await withLoggedErrors(() => checkOpenAiChatGptByok(routingInput()));
+
+      expect(result).toBeNull();
+      expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+    });
+
+    it('logs only the error name and the owner, never the message', async () => {
+      jest.mocked(getOpenAiChatGptStoredConnection).mockRejectedValue(kmsFailure);
+
+      const [, logged] = await withLoggedErrors(() => checkOpenAiChatGptByok(routingInput()));
+
+      // The name of the underlying KMS failure, never its message.
+      expect(logged).toContain('"Error"');
+      expect(logged).toContain(`${USER_ID}:personal`);
+      expect(logged).not.toContain('stored-refresh-token');
+      expect(logged).not.toContain('/decrypt');
+    });
+
+    it('still fails the request when the database read fails, instead of changing who pays', async () => {
+      const databaseFailure = new Error('connection timeout');
+      jest.mocked(getOpenAiChatGptStoredConnection).mockRejectedValue(databaseFailure);
+
+      await expect(checkOpenAiChatGptByok(routingInput())).rejects.toBe(databaseFailure);
+      expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+    });
+
+    it('offers no model set', async () => {
+      jest.mocked(getOpenAiChatGptStoredConnection).mockRejectedValue(kmsFailure);
+
+      const [modelIds] = await withLoggedErrors(() =>
+        getOpenAiChatGptByokModelIds(USER_OWNER, [REQUESTED_MODEL])
+      );
+
+      expect(modelIds).toBeNull();
+    });
   });
 });
 

@@ -1,8 +1,4 @@
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
-jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => ({ evaluateStepUp: jest.fn() }));
-jest.mock('@kilocode/web-shared/lib/admin/step-up-observation', () => ({
-  reportStepUpFailure: jest.fn(),
-}));
 jest.mock('./unauthorized/page', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/components/ui/sidebar', () => ({
   SidebarProvider: ({ children }: { children: unknown }) => children,
@@ -33,12 +29,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const mockGetUserFromAuth = (
   jest.requireMock('@kilocode/web-shared/lib/user/server') as { getUserFromAuth: jest.Mock }
 ).getUserFromAuth;
-const mockEvaluateStepUp = (
-  jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
-    evaluateStepUp: jest.Mock;
-  }
-).evaluateStepUp;
-const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
 
 import type AdminLayoutDefault from './layout';
 type Layout = typeof AdminLayoutDefault;
@@ -56,75 +46,53 @@ beforeAll(async () => {
 });
 
 afterEach(() => {
-  process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
   jest.clearAllMocks();
 });
 
-describe('AdminLayout step-up gate', () => {
-  it('renders children when the switch is off without evaluating', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+function stepUpRefusal(code: string) {
+  return {
+    user: null,
+    stepUp: {
+      code,
+      actionClass: 'platform_read',
+      purpose: 'session',
+      maxAgeSeconds: 1800,
+      binding: null,
+    },
+  };
+}
+
+describe('AdminLayout staff admission', () => {
+  it('runs the server-component admission, with no exemption from step-up', async () => {
     mockGetUserFromAuth.mockResolvedValue({ user, credential: 'session' } as never);
 
     const html = await render(React.createElement('div', null, 'PAGE_CONTENT'));
 
     expect(html).toContain('PAGE_CONTENT');
-    expect(mockEvaluateStepUp).not.toHaveBeenCalled();
+    expect(mockGetUserFromAuth).toHaveBeenCalledWith({
+      adminOnly: true,
+      stepUpSurface: 'server-component',
+    });
   });
 
-  it('renders only the interstitial when on and stale', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    mockGetUserFromAuth.mockResolvedValue({
-      user,
-      credential: 'session',
-      webSessionId: 'session-1',
-    } as never);
-    mockEvaluateStepUp.mockResolvedValue({
-      state: { status: 'required' },
-      proof: null,
-      passkeyCount: 1,
-    } as never);
+  it.each(['MFA_REQUIRED', 'SESSION_UNBOUND', 'BEARER_NOT_ALLOWED', 'STEP_UP_UNAVAILABLE'])(
+    'renders only the interstitial for %s',
+    async code => {
+      mockGetUserFromAuth.mockResolvedValue(stepUpRefusal(code) as never);
+
+      const html = await render(React.createElement('div', null, 'PAGE_CONTENT'));
+
+      expect(html).toContain(`INTERSTITIAL:${code}`);
+      expect(html).not.toContain('PAGE_CONTENT');
+    }
+  );
+
+  it('renders the non-admin page for any other refusal', async () => {
+    mockGetUserFromAuth.mockResolvedValue({ user: null } as never);
 
     const html = await render(React.createElement('div', null, 'PAGE_CONTENT'));
 
-    expect(html).toContain('INTERSTITIAL:MFA_REQUIRED');
-    expect(html).not.toContain('PAGE_CONTENT');
-  });
-
-  it('renders children when on and fresh', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    mockGetUserFromAuth.mockResolvedValue({
-      user,
-      credential: 'session',
-      webSessionId: 'session-1',
-    } as never);
-    mockEvaluateStepUp.mockResolvedValue({
-      state: {
-        status: 'fresh',
-        method: 'webauthn_uv',
-        verifiedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      },
-      proof: null,
-      passkeyCount: 1,
-    } as never);
-
-    const html = await render(React.createElement('div', null, 'PAGE_CONTENT'));
-
-    expect(html).toContain('PAGE_CONTENT');
-  });
-
-  it('fails closed when evaluation errors', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    mockGetUserFromAuth.mockResolvedValue({
-      user,
-      credential: 'session',
-      webSessionId: 'session-1',
-    } as never);
-    mockEvaluateStepUp.mockRejectedValue(new Error('db down') as never);
-
-    const html = await render(React.createElement('div', null, 'PAGE_CONTENT'));
-
-    expect(html).toContain('INTERSTITIAL:STEP_UP_UNAVAILABLE');
+    expect(html).not.toContain('INTERSTITIAL');
     expect(html).not.toContain('PAGE_CONTENT');
   });
 });

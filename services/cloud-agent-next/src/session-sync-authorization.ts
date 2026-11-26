@@ -50,7 +50,8 @@ export class SessionSyncAuthorization extends WorkerEntrypoint<Env> {
     if (!claims) return null;
     const credential = await withDORetry(
       () => getSandboxSessionStub(this.env, claims.userId, claims.sessionId),
-      stub => stub.resolveRuntimeCredentialProxyGrant(handle, originProof),
+      // The token is not forwarded: this reads only the grant's identity.
+      stub => stub.resolveRuntimeCredentialProxyGrant(handle, originProof, 'session-ingest'),
       'resolveSessionSyncUploadAuthorization',
       retryConfig
     );

@@ -1008,9 +1008,8 @@ describe('usage accounting error reports', () => {
       provider: 'openrouter',
       requested_model: 'anthropic/claude-3.7-sonnet',
       promptInfo: {
-        system_prompt_prefix: contextSentinel.system_prompt_prefix,
         system_prompt_length: contextSentinel.system_prompt_prefix.length,
-        user_prompt_prefix: contextSentinel.user_prompt_prefix,
+        system_prompt_kind: null,
       },
       fraudHeaders: getFraudDetectionHeaders(
         new Headers({ 'user-agent': 'zzq-agent', 'x-forwarded-for': '203.0.113.7' })
@@ -1238,9 +1237,8 @@ describe('logMicrodollarUsage', () => {
       is_free: false,
       custom_llm_pricing: null,
       promptInfo: {
-        system_prompt_prefix: 'You are a helpful assistant',
         system_prompt_length: 'You are a helpful assistant'.length,
-        user_prompt_prefix: 'Please help me with',
+        system_prompt_kind: null,
       },
       max_tokens: 200,
       has_middle_out_transform: true,
@@ -1628,7 +1626,8 @@ describe('logMicrodollarUsage', () => {
       expect(usageRecord?.provider).toBe('openrouter');
       expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
       expect(metadataRecord?.system_prompt_length).toBe(27);
-      expect(metadataRecord?.user_prompt_prefix).toBe('Please help me with');
+      expect(metadataRecord?.user_prompt_prefix).toBeNull();
+      expect(metadataRecord?.system_prompt_prefix_id).toBeNull();
       expect(metadataRecord?.max_tokens).toBe(200);
       expect(metadataRecord?.has_middle_out_transform).toBe(true);
       if (expected === null) {
@@ -1648,6 +1647,31 @@ describe('logMicrodollarUsage', () => {
       expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
     }
   );
+
+  test('stores the system prompt kind through its lookup table', async () => {
+    const user = await insertTestUser({
+      id: 'test-system-prompt-kind',
+      google_user_email: 'test-system-prompt-kind@example.com',
+    });
+    const usageStats = { ...BASE_USAGE_STATS, messageId: 'test-msg-system-prompt-kind' };
+    const baseContext = createBaseUsageContext(user);
+    const usageContext = {
+      ...baseContext,
+      promptInfo: { ...baseContext.promptInfo, system_prompt_kind: 'codex' as const },
+    };
+
+    await logMicrodollarUsage(usageStats, usageContext);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, usageStats.messageId),
+    });
+    const [usageViewRecord] = await db
+      .select({ system_prompt_kind: microdollar_usage_view.system_prompt_kind })
+      .from(microdollar_usage_view)
+      .where(eq(microdollar_usage_view.id, metadataRecord!.id))
+      .limit(1);
+    expect(usageViewRecord?.system_prompt_kind).toBe('codex');
+  });
 
   test.each([
     { region: 'eu', stored: true },
@@ -1746,11 +1770,7 @@ describe('logMicrodollarUsage', () => {
       requested_model: 'openai/gpt-4.1',
       isStreaming: false,
       has_middle_out_transform: false,
-      promptInfo: {
-        system_prompt_prefix: '',
-        system_prompt_length: 0,
-        user_prompt_prefix: 'error test',
-      },
+      promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
     };
 
     const usageIdentity = await logMicrodollarUsage(usageStats, usageContext);
@@ -1820,14 +1840,10 @@ describe('logMicrodollarUsage', () => {
     const usageContext1: MicrodollarUsageContext = {
       ...baseContext1,
       fraudHeaders: getFraudDetectionHeaders(new Headers(req1headers)),
-      promptInfo: {
-        system_prompt_prefix: 'You are helpful',
-        system_prompt_length: 'You are helpful'.length,
-        user_prompt_prefix: 'Test message',
-      },
+      promptInfo: { system_prompt_length: 'You are helpful'.length, system_prompt_kind: null },
     };
 
-    // Record 2: overlapping IP, country, ja4, and system prompt with record 1
+    // Record 2: overlapping IP, country, and ja4 with record 1
     const usageStats2 = { ...BASE_USAGE_STATS, messageId: 'dedup-msg-2', cost_mUsd: 400 };
     const baseContext2 = createBaseUsageContext(user);
     const usageContext2: MicrodollarUsageContext = {
@@ -1839,11 +1855,7 @@ describe('logMicrodollarUsage', () => {
           'x-vercel-ip-city': 'LA',
         })
       ),
-      promptInfo: {
-        system_prompt_prefix: 'You are helpful', // same system prompt as record 1
-        system_prompt_length: 'You are helpful'.length,
-        user_prompt_prefix: 'Test message',
-      },
+      promptInfo: { system_prompt_length: 'You are helpful'.length, system_prompt_kind: null },
     };
 
     // Record 3: overlapping user-agent and city with record 1, different others
@@ -1859,11 +1871,7 @@ describe('logMicrodollarUsage', () => {
           'x-vercel-ja4-digest': 'digest2',
         })
       ),
-      promptInfo: {
-        system_prompt_prefix: 'You are an assistant', // different system prompt
-        system_prompt_length: 'You are an assistant'.length,
-        user_prompt_prefix: 'Test message',
-      },
+      promptInfo: { system_prompt_length: 'You are an assistant'.length, system_prompt_kind: null },
     };
 
     await logMicrodollarUsage(usageStats1, usageContext1);
@@ -1914,9 +1922,11 @@ describe('logMicrodollarUsage', () => {
     expect(metadata1.ja4_digest_id).toBe(metadata2.ja4_digest_id);
     expect(metadata1.ja4_digest_id).not.toBe(metadata3.ja4_digest_id);
 
-    // Records 1 and 2 should share the same system prompt prefix ID (both use 'You are helpful')
-    expect(metadata1.system_prompt_prefix_id).toBe(metadata2.system_prompt_prefix_id);
-    expect(metadata1.system_prompt_prefix_id).not.toBe(metadata3.system_prompt_prefix_id);
+    // Prompt text is never recorded, whatever the request sent
+    for (const metadata of [metadata1, metadata2, metadata3]) {
+      expect(metadata.system_prompt_prefix_id).toBeNull();
+      expect(metadata.user_prompt_prefix).toBeNull();
+    }
 
     // All records should have their expected non-shared metadata
     expect(metadata1.max_tokens).toBe(200);
@@ -3244,7 +3254,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
   // realistically carry NULs in production. The realistic vector is fields
   // sourced from the JSON request body or upstream LLM responses:
   // `model`, `requested_model`, `inference_provider`, `upstream_id`,
-  // `finish_reason`, `message_id`, `system_prompt_prefix`, `user_prompt_prefix`.
+  // `finish_reason`, `message_id`.
   // The sanitizer still covers every string field defensively.
   const makeUsageContext = (overrides: Partial<MicrodollarUsageContext> = {}) =>
     ({
@@ -3258,11 +3268,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       requested_model: 'provider/requested-model',
       is_free: false,
       custom_llm_pricing: null,
-      promptInfo: {
-        system_prompt_prefix: 'sys-prefix',
-        system_prompt_length: 10,
-        user_prompt_prefix: 'usr-prefix',
-      },
+      promptInfo: { system_prompt_length: 10, system_prompt_kind: null },
       max_tokens: null,
       has_middle_out_transform: null,
       status_code: null,
@@ -3294,11 +3300,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     };
     const usageContext = makeUsageContext({
       requested_model: 'req\u0000model',
-      promptInfo: {
-        system_prompt_prefix: 'sys\u0000prefix',
-        system_prompt_length: 10,
-        user_prompt_prefix: 'usr\u0000prefix',
-      },
+      promptInfo: { system_prompt_length: 10, system_prompt_kind: null },
     });
 
     const { core, metadata } = await toInsertableDbUsageRecord(
@@ -3311,9 +3313,9 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(core.inference_provider).toBe('prov');
     expect(core.requested_model).toBe('reqmodel');
 
-    // metadata fields (from prompt extraction + upstream response)
-    expect(metadata.system_prompt_prefix).toBe('sysprefix');
-    expect(metadata.user_prompt_prefix).toBe('usrprefix');
+    // metadata fields (prompt text is never recorded; the rest come from the upstream response)
+    expect(metadata.system_prompt_prefix).toBeNull();
+    expect(metadata.user_prompt_prefix).toBeNull();
     expect(metadata.upstream_id).toBe('up');
     expect(metadata.finish_reason).toBe('stop');
     expect(metadata.message_id).toBe('msgid');
@@ -3422,7 +3424,7 @@ describe('toInsertableDbUsageRecord header-derived metadata bounds', () => {
     requested_model: 'provider/requested-model',
     is_free: false,
     custom_llm_pricing: null,
-    promptInfo: { system_prompt_prefix: 'sys', system_prompt_length: 3, user_prompt_prefix: 'usr' },
+    promptInfo: { system_prompt_length: 3, system_prompt_kind: null },
     max_tokens: null,
     has_middle_out_transform: null,
     status_code: 200,

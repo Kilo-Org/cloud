@@ -3,7 +3,7 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config, type User } from '@kilocode/db/schema';
 import type { CustomPricingConfig } from '@kilocode/db/schema-types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 
 let admin: User;
 let nonAdmin: User;
@@ -41,7 +41,7 @@ beforeEach(async () => {
 
 describe('adminCustomPricingRouter', () => {
   it('rejects a non-admin caller', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
     await expect(caller.admin.customPricing.get()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(caller.admin.customPricing.set({ config })).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -49,7 +49,7 @@ describe('adminCustomPricingRouter', () => {
   });
 
   it('returns null when unset', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(caller.admin.customPricing.get()).resolves.toEqual({
       config: null,
     });
@@ -61,7 +61,7 @@ describe('adminCustomPricingRouter', () => {
       config: { vercel_routing_opt_out_models: [] },
       preferred_models: preferredModels,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.customPricing.set({ config });
     expect((await caller.admin.customPricing.get()).config).toEqual(config);
@@ -81,7 +81,7 @@ describe('adminCustomPricingRouter', () => {
   });
 
   it('rejects an invalid config without writing', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [entry] = config.models;
     await expect(
       caller.admin.customPricing.set({
@@ -94,7 +94,7 @@ describe('adminCustomPricingRouter', () => {
   });
 
   it('rejects an entry for a latest alias without writing', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const [entry] = config.models;
     await expect(
       caller.admin.customPricing.set({

@@ -13,6 +13,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 
 interface CreditCategoryDetailPageProps {
   params: Promise<{
@@ -21,6 +22,11 @@ interface CreditCategoryDetailPageProps {
 }
 
 export default async function CreditCategoryDetailPage({ params }: CreditCategoryDetailPageProps) {
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
+  }
+
   const { key } = await params;
   // The dynamic segment arrives percent-encoded; Next rejects malformed encodings with 400 first.
   const categoryKey = decodeURIComponent(key);

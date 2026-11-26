@@ -3,6 +3,7 @@ import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -15,6 +16,7 @@ import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } fro
 import { openAiChatGptConnectorGone } from './connector';
 import {
   getOpenAiChatGptStoredConnection,
+  openAiChatGptOwnerKey,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
   type OpenAiChatGptStoredConnection,
@@ -239,7 +241,21 @@ async function readServableStoredConnection(
   owner: OpenAiChatGptOwner,
   onSharedConnectorGone?: (organizationId: string, connectorId: string) => void
 ): Promise<OpenAiChatGptStoredConnection | null> {
-  const stored = await getOpenAiChatGptStoredConnection(owner);
+  let stored: OpenAiChatGptStoredConnection | null;
+  try {
+    stored = await getOpenAiChatGptStoredConnection(owner);
+  } catch (error) {
+    // Only a payload the KMS service could not open keeps the existing route, like a
+    // transient refresh failure. A database failure still fails the request, as it did
+    // before envelopes existed, rather than quietly changing who pays.
+    if (!(error instanceof CredentialKmsError)) throw error;
+    console.error(
+      '[openai-chatgpt] stored connection unreadable: %s (%s)',
+      error.causeName,
+      openAiChatGptOwnerKey(owner)
+    );
+    return null;
+  }
   if (!isUsableStoredConnection(stored)) return null;
 
   if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {

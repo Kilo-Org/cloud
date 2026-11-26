@@ -4,6 +4,17 @@ import type * as userServerModule from '@kilocode/web-shared/lib/user/server';
 import type * as domainGatesModule from '@kilocode/web-shared/lib/user/domain-gates';
 import type * as signInContextModule from '@/lib/auth/sign-in-context';
 import type * as securityNoticesModule from '@/lib/security-notices';
+import type * as utilsModule from '@kilocode/web-shared/lib/utils.server';
+
+const mockSecurityLog = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual<typeof utilsModule>('@kilocode/web-shared/lib/utils.server'),
+  sentryLogger:
+    (source: string, severity?: string) =>
+    (message: string, ...args: unknown[]) =>
+      mockSecurityLog(source, severity, message, ...args),
+}));
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(), headers: jest.fn() }));
 jest.mock('@/lib/user/sso', () => ({ processSSOUserLogin: jest.fn() }));
@@ -60,10 +71,12 @@ import {
   preserveSignInRedirectContext,
 } from '@/lib/user/next-auth-options';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { clearEmailBlacklistCache } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { createSignInTicket } from '@/lib/auth/passkey';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 import {
   auth_audit_logs,
+  blacklisted_domains,
   openai_chatgpt_connections,
   organizations,
   passkey_sign_in_tickets,
@@ -87,6 +100,7 @@ import {
   OPENAI_TOKEN_SHARING_SCOPE,
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { authAuditEmailHash } from '@/lib/auth/auth-audit';
@@ -334,6 +348,7 @@ describe('sessionAuthOptions', () => {
 
 describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
   const jwtCallback = authOptions.callbacks?.jwt;
+  const kms = useFakeByokKms();
 
   async function seedOpenAiUser(sub: string) {
     const email = `openai-${crypto.randomUUID()}@example.com`;
@@ -486,6 +501,49 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });
+  });
+
+  test('seals the delegated connection for the signing-in user and stores both forms', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    const [row] = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(
+        and(
+          eq(openai_chatgpt_connections.kilo_user_id, user.id),
+          isNull(openai_chatgpt_connections.organization_id)
+        )
+      );
+    for (const stored of [row?.encrypted_connection, row?.encrypted_connection_envelope]) {
+      expect(JSON.stringify(stored)).not.toContain('signin-access-token');
+      expect(JSON.stringify(stored)).not.toContain('signin-refresh-token');
+    }
+    expect(kms.requests.find(request => request.path === '/data-key')?.body).toMatchObject({
+      owner_type: 'user',
+      owner_id: user.id,
+      provider_id: 'openai-chatgpt-oauth:personal',
+      actor_user_id: user.id,
+      key_id: row?.encrypted_connection_envelope?.key_id,
+    });
+  });
+
+  test('does not fail the sign-in when the KMS service cannot create a data key', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    kms.fail('/data-key');
+
+    const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    expect(token.kiloUserId).toBe(user.id);
+    const rows = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, user.id));
+    expect(rows).toHaveLength(0);
   });
 
   test('does not fail the sign-in when storing the connection fails', async () => {
@@ -843,23 +901,31 @@ describe('Sign-in verification address', () => {
     process.env = { ...originalEnv };
     delete process.env.VERCEL;
     delete process.env.VERCEL_ENV;
+    mockSecurityLog.mockClear();
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    jest.restoreAllMocks();
   });
 
-  async function signInWithTurnstile(turnstileIp: string, requestHeaders: Headers) {
+  async function signInWithTurnstile(
+    turnstileIp: string,
+    requestHeaders: Headers,
+    { token, domain = 'gmail.com' }: { token?: string; domain?: string } = {}
+  ) {
     const user = await insertTestUserAndGoogleAuth({
-      google_user_email: `turnstile-${crypto.randomUUID()}@gmail.com`,
+      google_user_email: `turnstile-${crypto.randomUUID()}@${domain}`,
       google_user_name: 'Turnstile User',
     });
     const now = Math.floor(Date.now() / 1000);
-    const verification = jwt.sign(
-      { guid: turnstileGuid, ip: turnstileIp, iat: now, exp: now + 3600 },
-      NEXTAUTH_SECRET,
-      { algorithm: 'HS256' }
-    );
+    const verification =
+      token ??
+      jwt.sign(
+        { guid: turnstileGuid, ip: turnstileIp, iat: now, exp: now + 3600 },
+        NEXTAUTH_SECRET,
+        { algorithm: 'HS256' }
+      );
 
     jest.mocked(cookies).mockResolvedValue({
       get: (name: string) => (name === 'turnstile_jwt' ? { name, value: verification } : undefined),
@@ -902,10 +968,16 @@ describe('Sign-in verification address', () => {
     ).resolves.toBe(true);
   });
 
-  test('accepts a single-entry forwarded header for the recorded address', async () => {
+  test('accepts a matching client address and logs only provider and outcome', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+
     await expect(
       signInWithTurnstile('203.0.113.7', new Headers({ 'x-forwarded-for': '203.0.113.7' }))
     ).resolves.toBe(true);
+
+    expect(
+      log.mock.calls.filter(([message]) => message === 'Turnstile verification validated')
+    ).toEqual([['Turnstile verification validated', { provider: 'google', outcome: 'validated' }]]);
   });
 
   test('accepts the platform address when Vercel labels a multi-entry chain', async () => {
@@ -922,6 +994,22 @@ describe('Sign-in verification address', () => {
     ).resolves.toBe(true);
   });
 
+  test('refuses an invalid token and omits the verification error details', async () => {
+    const result = await signInWithTurnstile('203.0.113.7', new Headers(), {
+      token: 'invalid-fixture-token',
+    });
+
+    expect(result).toContain('error=INVALID_VERIFICATION');
+    expect(mockSecurityLog.mock.calls).toEqual([
+      [
+        'turnstile-auth',
+        undefined,
+        'SECURITY: Invalid Turnstile JWT',
+        { provider: 'google', outcome: 'invalid_token' },
+      ],
+    ]);
+  });
+
   test('refuses a client address that differs from the recorded one', async () => {
     const result = await signInWithTurnstile(
       '203.0.113.7',
@@ -929,6 +1017,14 @@ describe('Sign-in verification address', () => {
     );
 
     expect(result).toContain('error=IP_MISMATCH');
+    expect(mockSecurityLog.mock.calls).toEqual([
+      [
+        'turnstile-auth',
+        undefined,
+        'SECURITY: IP mismatch',
+        { provider: 'google', outcome: 'address_mismatch' },
+      ],
+    ]);
   });
 
   test('refuses an unlabelled forwarded chain when Vercel labels the sign-in', async () => {
@@ -949,6 +1045,36 @@ describe('Sign-in verification address', () => {
     );
 
     expect(result).toContain('error=IP_MISMATCH');
+    expect(mockSecurityLog.mock.calls).toEqual([
+      [
+        'turnstile-auth',
+        undefined,
+        'SECURITY: IP mismatch',
+        { provider: 'google', outcome: 'address_unresolved' },
+      ],
+    ]);
+  });
+
+  test('refuses a blocked email and omits the address and account details', async () => {
+    const domain = 'blocked-sign-in.example';
+    await db.insert(blacklisted_domains).values({ domain });
+    clearEmailBlacklistCache();
+
+    try {
+      const result = await signInWithTurnstile('203.0.113.7', new Headers(), { domain });
+      expect(result).toContain('error=BLOCKED');
+      expect(mockSecurityLog.mock.calls).toEqual([
+        [
+          'auth',
+          'warning',
+          'SECURITY: Blocked sign-in email',
+          { provider: 'google', outcome: 'blocked_email' },
+        ],
+      ]);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, domain));
+      clearEmailBlacklistCache();
+    }
   });
 });
 

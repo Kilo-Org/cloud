@@ -8,6 +8,7 @@ import {
   OPENAI_TOKEN_ENDPOINT,
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import {
+  createOpenAiChatGptConnectionSealingKey,
   decryptOpenAiChatGptConnection,
   healthyOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,
@@ -17,6 +18,10 @@ import {
   type OpenAiChatGptDatabase,
   type OpenAiChatGptOwner,
 } from './store';
+import {
+  OPENAI_CHATGPT_REFRESH_KMS_ACTOR,
+  type OpenAiChatGptSealingKey,
+} from './connection-encryption';
 import type { OpenAiChatGptConnection } from './types';
 
 /*
@@ -86,6 +91,9 @@ const RETRYABLE_REFRESH_ERROR_CODE = 'refresh_token_conflict';
 
 /** The code logged, and never the credential, when the request budget runs out. */
 const REFRESH_REQUEST_TIMEOUT_ERROR_CODE = 'request_timeout';
+
+/** The code logged when no data key could be created to store a rotated token set. */
+const KMS_UNAVAILABLE_ERROR_CODE = 'kms_unavailable';
 
 /**
  * The outcome of resolving a usable delegated access token. `terminal` is
@@ -279,7 +287,8 @@ function isRetryableRefreshFailure(response: Response, errorCode: string | undef
 async function attemptRefresh(
   tx: OpenAiChatGptDatabase,
   owner: OpenAiChatGptOwner,
-  connection: OpenAiChatGptConnection
+  connection: OpenAiChatGptConnection,
+  sealingKey: OpenAiChatGptSealingKey
 ): Promise<RefreshAttempt> {
   const refreshToken = connection.refresh_token;
   if (!refreshToken) {
@@ -320,7 +329,7 @@ async function attemptRefresh(
         token_type: readStringField(body, 'token_type') ?? connection.token_type,
       });
 
-      await writeOpenAiChatGptConnection(tx, owner, updated);
+      await writeOpenAiChatGptConnection(tx, owner, updated, sealingKey);
 
       return { kind: 'access_token', accessToken };
     }
@@ -349,6 +358,25 @@ async function attemptRefresh(
 }
 
 /**
+ * The data key every write of one refresh shares, created at most once. OpenAI rotates
+ * the refresh token on use, so the key must exist before the token request is sent: a
+ * rotated pair that cannot be stored would leave only the spent refresh token behind.
+ */
+type SealingKeySource = () => Promise<OpenAiChatGptSealingKey>;
+
+function memoizedSealingKey(owner: OpenAiChatGptOwner): SealingKeySource {
+  let pending: Promise<OpenAiChatGptSealingKey> | null = null;
+  return () => {
+    pending ??= createOpenAiChatGptConnectionSealingKey(owner, OPENAI_CHATGPT_REFRESH_KMS_ACTOR);
+    // A failed attempt is not reused, so the next attempt asks the KMS service again.
+    pending.catch(() => {
+      pending = null;
+    });
+    return pending;
+  };
+}
+
+/**
  * Re-reads the connection under the row lock so a sibling instance that already
  * refreshed is not refreshed again, then returns the fresh token, decides to
  * refresh, or reports why it cannot. A disabled row is no connection: the row
@@ -361,25 +389,37 @@ async function attemptRefresh(
  */
 async function resolveInsideLock(
   tx: OpenAiChatGptDatabase,
-  owner: OpenAiChatGptOwner
+  owner: OpenAiChatGptOwner,
+  sealingKeySource: SealingKeySource
 ): Promise<RefreshAttempt> {
   const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
   if (!row || !row.is_enabled) return { kind: 'no_connection' };
 
-  const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
+  const connection = await decryptOpenAiChatGptConnection(row);
   if (!connection) return { kind: 'no_connection' };
 
   if (isUsableWithoutRefresh(connection, nowSeconds())) {
     return { kind: 'access_token', accessToken: connection.access_token };
   }
 
-  const attempt = await attemptRefresh(tx, owner, connection);
+  // Usually already created before the lock was taken; a row the replica had not shown
+  // yet creates it here, still before anything is sent to OpenAI.
+  let sealingKey: OpenAiChatGptSealingKey;
+  try {
+    sealingKey = await sealingKeySource();
+  } catch {
+    logRefreshFailure(owner, KMS_UNAVAILABLE_ERROR_CODE);
+    return { kind: 'failed' };
+  }
+
+  const attempt = await attemptRefresh(tx, owner, connection, sealingKey);
   if (attempt.kind === 'terminal') {
     await markOpenAiChatGptConnectionErrored(
       tx,
       owner,
       connection,
-      OPENAI_CHATGPT_RECONNECT_MESSAGE
+      OPENAI_CHATGPT_RECONNECT_MESSAGE,
+      sealingKey
     );
   }
   return attempt;
@@ -402,14 +442,25 @@ async function resolveOpenAiChatGptAccessTokenUncached(
     // The replica is enough here: a lagging row still holds an unexpired token,
     // and the refresh below re-reads the row on the primary under the lock.
     const row = await readOpenAiChatGptConnectionRow(readDb, owner);
-    const current =
-      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
+    const current = row?.is_enabled === true ? await decryptOpenAiChatGptConnection(row) : null;
     if (current && isUsableWithoutRefresh(current, nowSeconds())) {
       return { kind: 'access_token', accessToken: current.access_token };
     }
 
+    // A live row needs a refresh, so its data key is created now, before the row lock,
+    // keeping the KMS round trip out of the time the lock is held.
+    const sealingKeySource = memoizedSealingKey(owner);
+    if (current) {
+      try {
+        await sealingKeySource();
+      } catch {
+        logRefreshFailure(owner, KMS_UNAVAILABLE_ERROR_CODE);
+        return { kind: 'failed' };
+      }
+    }
+
     for (let attempt = 1; attempt <= OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS; attempt++) {
-      const decision = await db.transaction(tx => resolveInsideLock(tx, owner));
+      const decision = await db.transaction(tx => resolveInsideLock(tx, owner, sealingKeySource));
 
       // A terminal decision has already disabled the row inside that transaction.
       if (decision.kind !== 'retry') return decision;

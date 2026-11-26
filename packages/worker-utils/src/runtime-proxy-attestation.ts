@@ -1,7 +1,10 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { verifyKiloTokenSignature } from './kilo-token-verification';
-import { Sha256HexDigestSchema } from './runtime-authorization-contract';
+import {
+  RuntimeTokenDestinationSchema,
+  Sha256HexDigestSchema,
+} from './runtime-authorization-contract';
 import { sha256Hex } from './sha256';
 
 export const RUNTIME_PROXY_ATTESTATION_HEADER = 'X-Kilo-Runtime-Proxy-Attestation';
@@ -14,11 +17,8 @@ export const RUNTIME_PROXY_ATTESTATION_MAX_ACCEPTED_AGE_SECONDS = 120;
 /** Sanity bound on the untrusted header value in characters, checked before any JWT parsing runs. */
 export const RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH = 4096;
 
-export const RuntimeProxyAttestationAudienceSchema = z.enum([
-  'kilo-api',
-  'kilo-gateway',
-  'session-ingest',
-]);
+/** An attestation names the one destination whose runtime token it accompanies. */
+export const RuntimeProxyAttestationAudienceSchema = RuntimeTokenDestinationSchema;
 export type RuntimeProxyAttestationAudience = z.infer<typeof RuntimeProxyAttestationAudienceSchema>;
 
 export const CloudAgentNextRuntimeAuthorizationClaimSchema = z

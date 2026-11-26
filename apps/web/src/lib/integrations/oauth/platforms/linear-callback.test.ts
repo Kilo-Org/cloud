@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { exchangeLinearOAuthCode } from '@/lib/integrations/linear-service';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
@@ -15,7 +15,7 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -119,7 +119,7 @@ describe('handleLinearOAuthCallback diagnostics', () => {
       authFailedResponse: null,
     } as never);
     mockedConsumeProviderOAuthAttempt.mockResolvedValue(true);
-    jest.mocked(ensureOrganizationAccess).mockResolvedValue('owner');
+    jest.mocked(ensureMemberOrganizationAccess).mockResolvedValue('owner');
   });
 
   test('reports a provider error with the shared callback context', async () => {

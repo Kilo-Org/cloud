@@ -11,7 +11,6 @@ import {
   verifyRuntimeProxyAttestation,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { NextResponse } from 'next/server';
-import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -30,7 +29,7 @@ import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-t
 import { hasEffectiveOrganizationAccess } from '@kilocode/worker-utils/organization-membership';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import {
   logExceptInTest,
@@ -48,20 +47,28 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   deriveCredentialKind,
-  StepUpRequiredError,
   type PrivilegedActionClass,
   type PrivilegedCredentialKind,
+  type PrivilegedTarget,
   type PrivilegedTargetKind,
   type StepUpRequirementPayload,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
-import { runStepUpGuard, stepUpRefusalPayload } from '@kilocode/web-shared/lib/admin/step-up-guard';
-import { isCredentialExemptibleClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
+import {
+  stepUpRefusalPayload,
+  stepUpRequirement,
+} from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import {
-  adminNetworkRefusal,
-  type AdminNetworkDenialReason,
-  type AdminNetworkRefusal,
+  admitStaff,
+  type StaffAdmissionResult,
+  type StaffAuthorization,
+  type StaffProof,
+  type StaffRefusal,
+} from '@kilocode/web-shared/lib/admin/admin-guard';
+import type {
+  AdminNetworkDenialReason,
+  AdminNetworkRefusal,
 } from '@kilocode/web-shared/lib/admin/admin-network';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
@@ -194,33 +201,17 @@ export type RequiredPermissions = {
   /** How this admin read arrived; server components are not REST routes. */
   stepUpSurface?: 'rest' | 'server-component';
   /**
-   * Layout-only escape hatch: authenticate the admin but let the caller render
-   * the verification interstitial instead of returning a 403. Never use on a
-   * data route.
+   * The exact record an admin request acts on, for its operation proof. It runs
+   * only for an admin browser session that passed the current role, network,
+   * session and pepper checks, receives that current primary row, and runs
+   * before the proof is claimed, so the proof binds the id the handler will act
+   * on. It must name the route's inventory target kind and must not throw for
+   * ordinary input: an input it cannot resolve, or a caller it must not resolve
+   * for, names a null id, and the handler then refuses without acting. A throw
+   * or a different kind fails closed as STEP_UP_UNAVAILABLE.
    */
-  skipStepUpGuard?: boolean;
-  /**
-   * Non-session credential kinds that skip the passkey step-up guard for this
-   * call, for a read-only, low-risk data route that has been explicitly
-   * approved to accept them (`GET /api/private/users`, for Pylon webhooks).
-   *
-   * Three limits hold regardless of what a caller passes:
-   * - Matched against the kind `getUserFromAuth` derives for the request, not
-   *   against headers.
-   * - `'session'` is not accepted: the type excludes it and the runtime check
-   *   ignores it, so a browser session always faces step-up.
-   * - The exemption applies only when the request's action class is
-   *   `credentialExemptible` in `step-up-policy.ts` (read-grade classes).
-   *   Writes and operation-bound classes keep the guard.
-   *
-   * Admin authentication still applies in full. Do not add routes without a
-   * security review. Pass `requestMethod` so the action class is not inferred
-   * from a missing header.
-   */
-  stepUpExemptCredentials?: readonly StepUpExemptibleCredential[];
+  requestTarget?: (currentUser: User) => Promise<PrivilegedTarget>;
 };
-
-export type StepUpExemptibleCredential = Exclude<PrivilegedCredentialKind, 'session'>;
 
 type GetAuthResponse =
   | {
@@ -259,6 +250,12 @@ type GetAuthResponse =
       rejectionReason?: 'empty_organization_context';
       /** Set when the admin network allowlist refused an admin. */
       adminNetworkDenial?: AdminNetworkDenialReason;
+      /**
+       * Set when the staff admission refused a missing or stale passkey proof,
+       * or a request without a browser session. A server component renders the
+       * verification interstitial from it.
+       */
+      stepUp?: StepUpRequirementPayload;
       isNewUser?: undefined;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -281,6 +278,7 @@ type GetAuthResponse =
       refusalReason?: undefined;
       rejectionReason?: undefined;
       adminNetworkDenial?: undefined;
+      stepUp?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -326,144 +324,104 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && (result.user || authViaToken)) {
     // One header read and one privileged-inventory lookup per admin request, so
-    // the step-up guard and the token outcome event that reports it cannot name
+    // the admission and the outcome event that reports it cannot name
     // different actions.
     const route = routeFromHeaders(headersList);
     const method = methodFromHeaders(headersList, opts.requestMethod);
-    let attribution:
-      | {
-          actionClass: PrivilegedActionClass;
-          inventoryId: string | null;
-          targetKind: PrivilegedTargetKind;
-        }
-      | undefined;
-    const routeAttribution = () =>
-      (attribution ??= actionClassForRoute({ surface, route: route ?? '', method }));
-
-    // `wouldBlock` sizes bearer traffic that step-up enforcement would refuse. A
-    // request the caller exempted is never refused, so it must not count as one.
-    // Server-component layouts skip the guard but still refuse bearer
-    // credentials themselves, so they keep reporting `wouldBlock` for
-    // non-session traffic. The exemption needs both a listed credential kind and
-    // an exemptible action class; the class is only resolved when the kind is
-    // listed.
-    const stepUpExempt =
-      credential !== 'session' &&
-      (opts.stepUpExemptCredentials?.some(kind => kind === credential) ?? false) &&
-      isCredentialExemptibleClass(routeAttribution().actionClass);
-    const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
-
-    if (result.user) {
-      const networkRefusal = adminNetworkRefusal(headersList, {
-        route,
-        kiloUserId: result.user.id,
-      });
-      if (networkRefusal) {
-        if (credential !== 'session') {
-          const { actionClass, inventoryId } = routeAttribution();
-          emitPrivilegedAccessEvent({
-            surface,
-            user: result.user,
-            credential,
-            outcome: 'denied',
-            actionClass,
-            actionId: inventoryId,
-            target: null,
-            wouldBlock: true,
-            userAgentProduct: userAgentProductFromHeaders(headersList),
-            tokenSource: result.tokenSource ?? null,
-            route,
-            method,
-            // The network decision's address, never `x-forwarded-for`.
-            ip: networkRefusal.clientAddress,
-          });
-        }
-        return adminNetworkAuthFailure(result, networkRefusal);
-      }
-
-      emitAdminAccessEvent({
-        surface,
-        kind: 'admin_guard',
-        user: result.user,
-        authViaToken,
-        tokenSource: result.tokenSource ?? null,
-        credential,
-        wouldBlock: wouldBlockUnderStepUp,
-        route,
-        method,
-        userAgentProduct: userAgentProductFromHeaders(headersList),
-        ip: clientIpFromHeaders(headersList),
-      });
-
-      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard && !stepUpExempt) {
-        const { actionClass, inventoryId, targetKind } = routeAttribution();
-        try {
-          await runStepUpGuard({
-            userId: result.user.id,
-            credential,
-            webSessionId: result.webSessionId,
-            actionClass,
-            target: { kind: targetKind, id: null },
-            enabled: true,
-            route,
-            method,
-            surface,
-          });
-        } catch (error) {
-          // One privileged-access outcome per guarded non-session request:
-          // `denied` for a policy verdict, `failed` for an unexpected throw.
-          // Session traffic stays on `admin_guard`.
-          const emitOutcome = (outcome: 'denied' | 'failed') => {
-            if (credential === 'session') return;
-            emitPrivilegedAccessEvent({
-              surface,
-              user: result.user,
-              credential,
-              outcome,
-              actionClass,
-              actionId: inventoryId,
-              target: null,
-              wouldBlock: true,
-              userAgentProduct: userAgentProductFromHeaders(headersList),
-              tokenSource: result.tokenSource ?? null,
-              route,
-              method,
-              ip: clientIpFromHeaders(headersList),
-            });
-          };
-          if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
-            emitOutcome('denied');
-            return authError(403, error.cause.code, result.user.id, {
-              stepUp: stepUpRefusalPayload(error.cause),
-            });
-          }
-          // Fail closed. The guard normally converts evaluation failures itself;
-          // this covers anything unexpected around it.
-          emitOutcome('failed');
-          reportStepUpFailure('admin_step_up_rest', error);
-          return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
-        }
-      }
-    }
-
-    if (authViaToken) {
-      const { actionClass, inventoryId } = routeAttribution();
+    const { actionClass, inventoryId, targetKind } = actionClassForRoute({
+      surface,
+      route: route ?? '',
+      method,
+    });
+    // A non-session credential never holds staff authority, so every bearer
+    // outcome is a denial.
+    const isBearer = credential !== 'session';
+    const emitBearerDenied = (ip: string | null = clientIpFromHeaders(headersList)) => {
+      if (!isBearer) return;
       emitPrivilegedAccessEvent({
         surface,
         user: result.user ?? undefined,
         credential,
-        outcome: result.user ? 'succeeded' : 'denied',
+        outcome: 'denied',
         actionClass,
         actionId: inventoryId,
         target: null,
-        wouldBlock: wouldBlockUnderStepUp,
+        wouldBlock: true,
         userAgentProduct: userAgentProductFromHeaders(headersList),
         tokenSource: result.tokenSource ?? null,
         route,
         method,
+        ip,
+      });
+    };
+
+    if (!result.user) {
+      emitBearerDenied();
+      return result;
+    }
+    const admin = result.user;
+    // One event per admin that passed the role and network checks, whatever
+    // the proof decides.
+    const emitAdminGuard = () =>
+      emitAdminAccessEvent({
+        surface,
+        kind: 'admin_guard',
+        user: admin,
+        authViaToken,
+        tokenSource: result.tokenSource ?? null,
+        credential,
+        wouldBlock: isBearer,
+        route,
+        method,
+        userAgentProduct: userAgentProductFromHeaders(headersList),
         ip: clientIpFromHeaders(headersList),
       });
+
+    let admitted: StaffAdmissionResult;
+    try {
+      admitted = await admitStaff({
+        user: admin,
+        // An admin browser session read its row from the primary (see
+        // `resolveUserFromAuth`), so the admission reuses it.
+        primaryUser: isBearer ? undefined : admin,
+        credential,
+        webSessionId: result.webSessionId,
+        webSessionPepper: result.webSessionPepper,
+        headers: headersList,
+        surface,
+        route,
+        method,
+        actionClass,
+        proof: requestProof(opts.requestTarget, targetKind),
+      });
+    } catch (error) {
+      // Fail closed. Only the proof check can throw here, after the role and
+      // network checks passed: the step-up guard converts evaluation failures
+      // itself, and this covers anything unexpected around it.
+      emitAdminGuard();
+      reportStepUpFailure('admin_step_up_rest', error);
+      return authError(403, 'STEP_UP_UNAVAILABLE', admin.id, {
+        stepUp: stepUpRefusalPayload(
+          stepUpRequirement({ code: 'STEP_UP_UNAVAILABLE', actionClass, operation: null })
+        ),
+      });
     }
+
+    if (!admitted.ok && admitted.refusal.kind === 'network') {
+      // The network decision's address, never `x-forwarded-for`.
+      emitBearerDenied(admitted.refusal.denial.clientAddress);
+      return staffRefusalAuthFailure(admitted.refusal, result);
+    }
+    if (!admitted.ok && admitted.refusal.kind === 'not_staff') {
+      emitBearerDenied();
+      return staffRefusalAuthFailure(admitted.refusal, result);
+    }
+    emitAdminGuard();
+    if (!admitted.ok) {
+      emitBearerDenied();
+      return staffRefusalAuthFailure(admitted.refusal, result);
+    }
+    return { ...result, user: admitted.admission.user, credential };
   }
 
   if (result.user) {
@@ -490,6 +448,34 @@ async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthRes
   return resolveUserFromSession(opts, db);
 }
 
+/**
+ * The proof of an admin REST request: bound to the record `requestTarget`
+ * names for the current primary row, or to the route's target kind alone.
+ */
+function requestProof(
+  requestTarget: RequiredPermissions['requestTarget'],
+  targetKind: PrivilegedTargetKind
+): StaffProof {
+  if (!requestTarget) return { kind: 'request', target: { kind: targetKind, id: null } };
+  let current: User | null = null;
+  return {
+    kind: 'request',
+    // `admitStaff` calls `authorize` with the current primary row right before
+    // it resolves the target.
+    authorize: async currentUser => {
+      current = currentUser;
+    },
+    target: async () => {
+      if (!current) throw new Error('A request target needs the admitted primary row');
+      const target = await requestTarget(current);
+      if (target.kind !== targetKind) {
+        throw new Error('A request target must name the route inventory target kind');
+      }
+      return target;
+    },
+  };
+}
+
 export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
   return resolveSessionOnly({ adminOnly: false });
 }
@@ -498,16 +484,100 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
  * Session-only read for MFA step-up. It refuses any bearer credential and
  * reads the primary so a proof minted a moment ago is usable immediately. The
  * caller still enforces the route's Origin check before trusting the session.
+ *
+ * This is one of the two staff requests that need no proof (the other is
+ * `stepUp.getStatus`), because it mints the proof. The admission still checks
+ * the current role, the network and the session.
  */
 export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
   const result = await resolveSessionOnly({ adminOnly: true });
   if (!result.user) return result;
   const headersList = await headers();
-  const refusal = adminNetworkRefusal(headersList, {
+  const admitted = await admitStaff({
+    user: result.user,
+    primaryUser: result.user,
+    credential: 'session',
+    webSessionId: result.webSessionId,
+    webSessionPepper: result.webSessionPepper,
+    headers: headersList,
+    surface: 'rest',
     route: routeFromHeaders(headersList),
-    kiloUserId: result.user.id,
+    method: 'POST',
+    actionClass: 'platform_read',
+    proof: { kind: 'bootstrap' },
   });
-  return refusal ? adminNetworkAuthFailure(result, refusal) : result;
+  if (!admitted.ok) return staffRefusalAuthFailure(admitted.refusal, result);
+  return { ...result, user: admitted.admission.user, credential: 'session' };
+}
+
+/**
+ * Staff authority for a REST handler or server component that serves ordinary
+ * users too, such as an organization route that lets staff act without a
+ * membership. Call it only on the staff branch, with the successful
+ * `getUserFromAuth` result.
+ *
+ * It admits a request proof for exactly `actionClass` and `target`. An
+ * optional `authorize` callback runs inside the admission, after the current
+ * role, network and session checks and before the proof; it receives the
+ * primary row and throws to refuse, and its error propagates unchanged, so a
+ * path that validates an organization or grant first never spends a proof when
+ * that fails. On success the result's `user` is the primary row; use it for
+ * every later decision. A refusal has the same response shapes as
+ * `getUserFromAuth({ adminOnly: true })`. It writes no audit event: the caller
+ * records its own elevation.
+ */
+export async function requireStaffAuthorityForRequest(
+  auth: Extract<GetAuthResponse, { authFailedResponse: null }>,
+  params: {
+    actionClass: PrivilegedActionClass;
+    target: PrivilegedTarget;
+    authorize?: StaffAuthorization;
+    surface?: 'rest' | 'server-component';
+    requestHeaders?: Headers;
+    requestMethod?: string;
+  }
+): Promise<GetAuthResponse> {
+  const headersList = params.requestHeaders ?? (await headers());
+  const admitted = await admitStaff({
+    user: auth.user,
+    credential: auth.credential,
+    webSessionId: auth.webSessionId,
+    webSessionPepper: auth.webSessionPepper,
+    headers: headersList,
+    surface: params.surface ?? 'rest',
+    route: routeFromHeaders(headersList),
+    method: methodFromHeaders(headersList, params.requestMethod),
+    actionClass: params.actionClass,
+    proof: { kind: 'request', target: params.target, authorize: params.authorize },
+  });
+  if (!admitted.ok) return staffRefusalAuthFailure(admitted.refusal, auth);
+  return { ...auth, user: admitted.admission.user };
+}
+
+/** The REST answer for a refused staff admission. */
+function staffRefusalAuthFailure(
+  refusal: StaffRefusal,
+  admin: Pick<GetAuthResponse, 'internalApiUse' | 'tokenSource' | 'cloudAgentAuthority'> & {
+    user: User;
+  }
+): GetAuthResponse {
+  switch (refusal.kind) {
+    case 'not_staff':
+      return authError(403, 'Access denied (nonadmin)', admin.user.id, {
+        authorizationRefused: true,
+        internalApiUse: admin.internalApiUse,
+        tokenSource: admin.tokenSource,
+        cloudAgentAuthority: admin.cloudAgentAuthority,
+      });
+    case 'network':
+      return adminNetworkAuthFailure(admin, refusal.denial);
+    case 'reauth':
+      return authError(401, 'Reauthentication required', admin.user.id);
+    case 'step_up':
+      return authError(403, refusal.cause.code, admin.user.id, {
+        stepUp: stepUpRefusalPayload(refusal.cause),
+      });
+  }
 }
 
 /** The 403 for an admin whose request the admin network allowlist refused. */
@@ -688,6 +758,7 @@ async function resolveUserFromAuth(
       expectedAudience: opts.expectedAudience,
       runtimeProxyAttestationVerified,
       requestPathname: opts.requestPathname,
+      observeAdmission: true,
     });
     if (authorizationValidationResult.error != undefined) {
       return authError(401, authorizationValidationResult.error, '?', {
@@ -763,7 +834,9 @@ async function resolveUserFromAuth(
   }
 
   // On apps/ai-gateway `readSession` finds no session, so this is the anonymous result.
-  return resolveUserFromSession(opts, readDb);
+  // An admin request reads the row from the primary: the staff admission needs
+  // the current role and pepper, and this read then serves both.
+  return resolveUserFromSession(opts, opts.adminOnly ? db : readDb);
 }
 
 async function resolveUserFromSession(
@@ -878,6 +951,7 @@ function authError(
     cloudAgentAuthority: options?.cloudAgentAuthority,
     ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
     ...(options?.adminNetworkDenial && { adminNetworkDenial: options.adminNetworkDenial }),
+    ...(options?.stepUp && { stepUp: options.stepUp }),
   };
 }
 

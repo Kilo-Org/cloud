@@ -189,7 +189,7 @@ describe('ProfileVariablesScreen', () => {
     // The renderer keeps host props untyped; the stub's props are the screen's own.
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
     expect(queryError.variant).toBe('server');
-    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(queryError.title).toBe("Couldn't load environment variables");
     expect(typeof queryError.onRetry).toBe('function');
     act(() => {
       queryError.onRetry?.();

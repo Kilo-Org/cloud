@@ -12,7 +12,11 @@ describe('selectProfileReadErrorView', () => {
     'names %s as a permission state and offers no retry',
     code => {
       expect(
-        selectProfileReadErrorView({ error: makeTrpcError(code), connectivity: 'online' })
+        selectProfileReadErrorView({
+          error: makeTrpcError(code),
+          connectivity: 'online',
+          loadFailedTitleKey: 'profiles.loadFailed',
+        })
       ).toEqual({
         variant: 'permission',
         showRetry: false,
@@ -31,6 +35,7 @@ describe('selectProfileReadErrorView', () => {
       selectProfileReadErrorView({
         error: { data: { code: 'UNAUTHORIZED', authRequired: true } },
         connectivity: 'online',
+        loadFailedTitleKey: 'profiles.loadFailed',
       })
     ).toEqual({
       variant: 'permission',
@@ -42,7 +47,11 @@ describe('selectProfileReadErrorView', () => {
 
   it('names NOT_FOUND as missing and offers no retry', () => {
     expect(
-      selectProfileReadErrorView({ error: makeTrpcError('NOT_FOUND'), connectivity: 'unknown' })
+      selectProfileReadErrorView({
+        error: makeTrpcError('NOT_FOUND'),
+        connectivity: 'unknown',
+        loadFailedTitleKey: 'profiles.loadFailed',
+      })
     ).toEqual({
       variant: 'not-found',
       showRetry: false,
@@ -54,7 +63,11 @@ describe('selectProfileReadErrorView', () => {
   it('names a terminal refusal that is not an access outcome as missing', () => {
     for (const code of ['BAD_REQUEST', 'UNPROCESSABLE_CONTENT']) {
       expect(
-        selectProfileReadErrorView({ error: makeTrpcError(code), connectivity: 'unknown' })
+        selectProfileReadErrorView({
+          error: makeTrpcError(code),
+          connectivity: 'unknown',
+          loadFailedTitleKey: 'profiles.loadFailed',
+        })
       ).toEqual({
         variant: 'not-found',
         showRetry: false,
@@ -66,7 +79,13 @@ describe('selectProfileReadErrorView', () => {
 
   it('keeps a server fault retryable and titled as a load failure', () => {
     for (const error of [makeTrpcError('INTERNAL_SERVER_ERROR'), new Error('boom'), undefined]) {
-      expect(selectProfileReadErrorView({ error, connectivity: 'unknown' })).toEqual({
+      expect(
+        selectProfileReadErrorView({
+          error,
+          connectivity: 'unknown',
+          loadFailedTitleKey: 'profiles.loadFailed',
+        })
+      ).toEqual({
         variant: 'server',
         showRetry: true,
         titleKey: 'profiles.loadFailed',
@@ -80,6 +99,7 @@ describe('selectProfileReadErrorView', () => {
       selectProfileReadErrorView({
         error: new RequestDeadlineError(15_000),
         connectivity: 'online',
+        loadFailedTitleKey: 'profiles.loadFailed',
       })
     ).toEqual({
       variant: 'timeout',
@@ -93,6 +113,7 @@ describe('selectProfileReadErrorView', () => {
           cause: new RequestDeadlineError(15_000),
         }),
         connectivity: 'unknown',
+        loadFailedTitleKey: 'profiles.loadFailed',
       })
     ).toEqual({
       variant: 'timeout',
@@ -104,7 +125,13 @@ describe('selectProfileReadErrorView', () => {
 
   it('keeps a non-tRPC error with a bare terminal code retryable under the server copy', () => {
     for (const error of [{ code: 'FORBIDDEN' }, { code: 'NOT_FOUND' }, { code: 'BAD_REQUEST' }]) {
-      expect(selectProfileReadErrorView({ error, connectivity: 'online' })).toEqual({
+      expect(
+        selectProfileReadErrorView({
+          error,
+          connectivity: 'online',
+          loadFailedTitleKey: 'profiles.loadFailed',
+        })
+      ).toEqual({
         variant: 'server',
         showRetry: true,
         titleKey: 'profiles.loadFailed',
@@ -118,6 +145,7 @@ describe('selectProfileReadErrorView', () => {
       selectProfileReadErrorView({
         error: makeTrpcError('UNAUTHORIZED'),
         connectivity: 'offline',
+        loadFailedTitleKey: 'profiles.loadFailed',
       })
     ).toEqual({
       variant: 'permission',
@@ -129,7 +157,11 @@ describe('selectProfileReadErrorView', () => {
 
   it('keeps NOT_FOUND when the device reports offline: the server answered', () => {
     expect(
-      selectProfileReadErrorView({ error: makeTrpcError('NOT_FOUND'), connectivity: 'offline' })
+      selectProfileReadErrorView({
+        error: makeTrpcError('NOT_FOUND'),
+        connectivity: 'offline',
+        loadFailedTitleKey: 'profiles.loadFailed',
+      })
     ).toEqual({
       variant: 'not-found',
       showRetry: false,
@@ -143,6 +175,7 @@ describe('selectProfileReadErrorView', () => {
       selectProfileReadErrorView({
         error: new Error('network request failed'),
         connectivity: 'offline',
+        loadFailedTitleKey: 'profiles.loadFailed',
       })
     ).toEqual({
       variant: 'offline',
@@ -150,6 +183,25 @@ describe('selectProfileReadErrorView', () => {
       titleKey: 'profiles.loadFailed',
       descriptionKey: null,
     });
+  });
+
+  it("returns the caller's own load-failure title", () => {
+    // Each section names what failed to load, so the caller's key comes back
+    // from both load-failure branches and the selector invents none of its own.
+    expect(
+      selectProfileReadErrorView({
+        error: makeTrpcError('INTERNAL_SERVER_ERROR'),
+        connectivity: 'online',
+        loadFailedTitleKey: 'profiles.skillsLoadFailed',
+      }).titleKey
+    ).toBe('profiles.skillsLoadFailed');
+    expect(
+      selectProfileReadErrorView({
+        error: new Error('network request failed'),
+        connectivity: 'offline',
+        loadFailedTitleKey: 'profiles.skillsLoadFailed',
+      }).titleKey
+    ).toBe('profiles.skillsLoadFailed');
   });
 });
 

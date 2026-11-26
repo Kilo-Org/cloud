@@ -195,7 +195,7 @@ describe('ProfileMcpScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
     expect(queryError.variant).toBe('server');
-    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(queryError.title).toBe("Couldn't load MCP servers");
     expect(typeof queryError.onRetry).toBe('function');
     act(() => {
       queryError.onRetry?.();

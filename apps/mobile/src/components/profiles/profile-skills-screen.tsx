@@ -168,6 +168,7 @@ export function ProfileSkillsScreen({
   const readError = selectProfileReadErrorView({
     error: profileQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.skillsLoadFailed',
   });
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);

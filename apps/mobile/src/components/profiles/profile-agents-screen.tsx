@@ -58,6 +58,7 @@ export function ProfileAgentsScreen({
   const readError = selectProfileReadErrorView({
     error: profileQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.agentsLoadFailed',
   });
   // A failed read with no retry the screen offers leaves nothing to act on, so
   // the header's create control stays out of the way of the error state.

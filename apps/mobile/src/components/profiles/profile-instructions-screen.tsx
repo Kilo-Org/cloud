@@ -191,6 +191,7 @@ export function ProfileInstructionsScreen({
   const readError = selectProfileReadErrorView({
     error: profileQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.instructionsLoadFailed',
   });
   const { createInstruction, updateInstruction, deleteInstruction, setInstructionEnabled } =
     useAgentProfileInstructionMutations(organizationId);

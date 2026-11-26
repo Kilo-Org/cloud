@@ -56,7 +56,11 @@ export function ProfilePickerSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const connectivity = useCommittedConnectivityStatus();
-  const readError = selectProfileReadErrorView({ error, connectivity });
+  const readError = selectProfileReadErrorView({
+    error,
+    connectivity,
+    loadFailedTitleKey: 'profiles.loadFailed',
+  });
 
   let body = null;
   if (isLoading) {

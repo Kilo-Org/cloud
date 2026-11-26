@@ -816,7 +816,7 @@ describe('ProfileAgentsScreen load errors', () => {
       | RenderedQueryError
       | undefined;
     expect(queryError?.variant).toBe('server');
-    expect(queryError?.title).toBe("Couldn't load profiles");
+    expect(queryError?.title).toBe("Couldn't load agents");
     expect(typeof queryError?.onRetry).toBe('function');
     act(() => {
       queryError?.onRetry?.();

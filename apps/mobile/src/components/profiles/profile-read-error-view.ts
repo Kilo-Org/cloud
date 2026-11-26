@@ -30,6 +30,10 @@
 //
 // The variant and retry decision reuse the shared tRPC helpers, so these reads
 // and the organization Members list classify an error the same way.
+//
+// A read that fails to load names what it failed to load: the caller supplies
+// its own load-failure title, because one shared title would describe every
+// section but the one on screen.
 
 import { type QueryErrorVariant } from '@/components/query-error';
 import { isUnauthorizedTrpcError } from '@/lib/auth/trpc-unauthorized';
@@ -42,11 +46,28 @@ import {
   trpcErrorVariant,
 } from '@/lib/trpc-error';
 
+/**
+ * The load-failure title a profile read names, so each section says what failed
+ * to load.
+ */
+export type ProfileReadLoadFailedKey =
+  | 'profiles.loadFailed'
+  | 'profiles.skillsLoadFailed'
+  | 'profiles.variablesLoadFailed'
+  | 'profiles.commandsLoadFailed'
+  | 'profiles.agentsLoadFailed'
+  | 'profiles.instructionsLoadFailed'
+  | 'profiles.mcpLoadFailed'
+  | 'profiles.slashCommandsLoadFailed'
+  | 'profiles.repoBindingsLoadFailed'
+  | 'profiles.pinnedReposLoadFailed'
+  | 'common.couldNotLoadRepositories';
+
 export type ProfileReadErrorView = {
   variant: QueryErrorVariant;
   showRetry: boolean;
   /** The read's own load-failure title, or null to use the variant's copy. */
-  titleKey: 'profiles.loadFailed' | null;
+  titleKey: ProfileReadLoadFailedKey | null;
   /** Replaces the variant's own description, or null. */
   descriptionKey: 'organization.boundary.accessDeniedDescription' | null;
 };
@@ -54,7 +75,13 @@ export type ProfileReadErrorView = {
 export function selectProfileReadErrorView({
   error,
   connectivity,
-}: Readonly<{ error: unknown; connectivity: BannerState }>): ProfileReadErrorView {
+  loadFailedTitleKey,
+}: Readonly<{
+  error: unknown;
+  connectivity: BannerState;
+  /** The title this read uses when it fails to load: the section's own. */
+  loadFailedTitleKey: ProfileReadLoadFailedKey;
+}>): ProfileReadErrorView {
   const envelope = isTrpcClientError(error);
   const code = envelope ? readTrpcErrorField(error, 'code') : undefined;
   // A coded verdict comes first: the server answered, so Retry cannot change
@@ -90,7 +117,7 @@ export function selectProfileReadErrorView({
     return {
       variant: 'offline',
       showRetry: true,
-      titleKey: 'profiles.loadFailed',
+      titleKey: loadFailedTitleKey,
       descriptionKey: null,
     };
   }
@@ -107,7 +134,7 @@ export function selectProfileReadErrorView({
     // A permission or not-found state has its own title and description; the
     // read's "couldn't load" title would describe the wrong cause. A slow
     // response keeps the variant's own copy.
-    titleKey: answered === 'server' ? 'profiles.loadFailed' : null,
+    titleKey: answered === 'server' ? loadFailedTitleKey : null,
     descriptionKey: null,
   };
 }

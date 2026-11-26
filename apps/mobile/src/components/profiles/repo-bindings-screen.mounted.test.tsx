@@ -201,7 +201,7 @@ describe('RepoBindingsScreen', () => {
 
     // The renderer keeps host props untyped; the stub's props are the screen's own.
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
-    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(queryError.title).toBe("Couldn't load default profiles");
     expect(queryError.variant).toBe('server');
     act(() => {
       queryError.onRetry?.();
@@ -301,7 +301,7 @@ describe('RepoBindingsScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
     expect(queryError.variant).toBe('offline');
-    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(queryError.title).toBe("Couldn't load default profiles");
     expect(typeof queryError.onRetry).toBe('function');
     act(() => {
       queryError.onRetry?.();

@@ -105,7 +105,11 @@ export function ProfilePickerSheet({
   const sideInsetStyle = useSideInsetStyle();
   const ownerLabel = useProfileOwnerLabel();
   const connectivity = useCommittedConnectivityStatus();
-  const readError = selectProfileReadErrorView({ error, connectivity });
+  const readError = selectProfileReadErrorView({
+    error,
+    connectivity,
+    loadFailedTitleKey: 'profiles.loadFailed',
+  });
   // The same split and order the profile manager renders: an organization
   // group, then a personal one, and a single untitled list in a personal
   // scope where there is only one owner to name.

@@ -64,6 +64,7 @@ export function ProfileKiloCommandsScreen({
   const readError = selectProfileReadErrorView({
     error: profileQuery.error,
     connectivity: committedConnectivity,
+    loadFailedTitleKey: 'profiles.slashCommandsLoadFailed',
   });
   const {
     createKiloCommand,

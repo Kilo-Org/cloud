@@ -20,12 +20,34 @@ export const STS_CANARY_VERIFY_PATH = '/sts-canary/verify';
 export const STS_CANARY_RUN_HEADER = 'x-sts-canary-run';
 export const StsCanaryRunIdSchema = z.uuid();
 
+/**
+ * Time budget of one canary run (services/usage-ingest README, "STS canary"). The web route
+ * verifies the caller (a cold key-set fetch takes up to 5 s, `JWKS_FETCH_TIMEOUT_MS` of
+ * `@kilocode/verify`), waits at most the HTTP client's 30 s attempt (`HTTP_ATTEMPT_TIMEOUT_MS` of
+ * `@kilocode/service-token-client`: a 20 s shared Vercel exchange plus a 10 s mint), then makes at
+ * most four calls to usage-ingest of `STS_CANARY_VERIFY_CALL_TIMEOUT_MS` each: 5 + 30 + 4 x 10 =
+ * 75 s. usage-ingest waits 80 s (`WEB_CALL_TIMEOUT_MS` there), so it reads the route's report even
+ * in the slowest run, and the route's 90 s `maxDuration`, after which Vercel ends the function,
+ * stays above both.
+ */
+export const STS_CANARY_VERIFY_CALL_TIMEOUT_MS = 10_000;
+export const STS_CANARY_VERIFY_CALLS_MAX = 4;
+/** `maxDuration` of the web route; Next.js needs the literal there, a test keeps the two equal. */
+export const STS_CANARY_ROUTE_MAX_DURATION_SECONDS = 90;
+
+/** Longest `detail` of a check; the web route truncates to it before it logs or answers. */
+export const STS_CANARY_DETAIL_MAX = 200;
+
+export function stsCanaryDetail(text: string): string {
+  return text.length > STS_CANARY_DETAIL_MAX ? text.slice(0, STS_CANARY_DETAIL_MAX) : text;
+}
+
 /** One call the web route made to usage-ingest: the HTTP status it got, or null when it got none. */
 export const StsCanaryCheckSchema = z.strictObject({
   result: z.enum(['ok', 'failed']),
   status: z.number().int().nullable(),
   /** Why a check failed, without a token: a mint denial reason, a refusal error, a timeout. */
-  detail: z.string().max(200).optional(),
+  detail: z.string().max(STS_CANARY_DETAIL_MAX).optional(),
 });
 export type StsCanaryCheck = z.infer<typeof StsCanaryCheckSchema>;
 

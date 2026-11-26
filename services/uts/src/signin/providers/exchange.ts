@@ -299,6 +299,7 @@ async function oidcIdentity(
     email,
     emailProven: oidcEmailProven(spec, claims, email),
     workosConnectionId: null,
+    workosOrganizationId: null,
   };
 }
 
@@ -343,6 +344,7 @@ async function githubIdentity(
     email,
     emailProven: email !== null && primary?.verified === true,
     workosConnectionId: null,
+    workosOrganizationId: null,
   };
 }
 
@@ -384,6 +386,7 @@ async function discordIdentity(
     email,
     emailProven: email !== null && user.verified === true,
     workosConnectionId: null,
+    workosOrganizationId: null,
   };
 }
 
@@ -412,6 +415,8 @@ const WorkosProfileSchema = z.looseObject({
   profile: z.looseObject({
     id: z.string().min(1).max(512),
     connection_id: z.string().min(1).max(255),
+    // WorkOS answers null for a connection that belongs to no organization.
+    organization_id: z.string().min(1).max(255).nullable().optional(),
     email: z.string(),
   }),
 });
@@ -458,6 +463,7 @@ export async function workosIdentity(
         // An SSO sign-in never links by email (design 5.2); its domain is checked instead.
         emailProven: false,
         workosConnectionId: profile.connection_id,
+        workosOrganizationId: profile.organization_id ?? null,
       },
     };
   } catch (error) {

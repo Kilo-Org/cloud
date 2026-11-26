@@ -5,6 +5,8 @@ import {
   utsScopeEntry,
 } from '@kilocode/uts-contracts';
 import { shardAccessTokenKeys } from './account/bearer';
+import { isBrowserSessionPath } from './bff/routes';
+import { webClientUnavailable } from './bff/responses';
 import { type AccountDeps, handleAccountRequest } from './account/routes';
 import { identityStoreAccount } from './account/store';
 import { withIdentityStore } from './db/client';
@@ -125,6 +127,9 @@ export async function handleRequest(
   if (oauth.kind === 'ready') {
     const response = await handleOAuthRequest(request, pathname, oauth.deps);
     if (response !== null) return response;
+  } else if (isBrowserSessionPath(pathname)) {
+    // The web BFF reads this as "not yet", never as "no such session".
+    return webClientUnavailable();
   }
   if (account !== null) {
     const response = await handleAccountRequest(request, pathname, account);

@@ -29,7 +29,9 @@ export async function requestSession(
  * RFC 8252 section 8.6: a client that receives its code on a private-use URI scheme cannot be
  * identified, because another app can claim the same scheme. Its request is approved only from
  * the confirm page's same-origin POST, so every such request shows the user a page (sign-in or
- * confirm) and a request another app started never completes without the user.
+ * confirm) and a request another app started never completes without the user. The web BFF
+ * `kilo-web` receives its code on its exact HTTPS callback, which no other app can claim, and
+ * redeems it only with its client assertion, so its request never shows the confirm page.
  */
 export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
   return async (request, pending) => {
@@ -49,22 +51,21 @@ export function signInHandoff(deps: SignInDeps): AuthorizationHandoff {
       const choices = signInChoices(deps.methods, returnPathOf(`${pathname}${search}`));
       return { status: 'interaction', response: signInPage(choices) };
     }
+    const approval = {
+      clientKind: 'first_party',
+      accountId: session.accountId,
+      browserSessionId: session.sessionId,
+      authTime: session.authTime,
+      amr: session.amr,
+      orgId: pending.orgHint,
+    } as const;
+    if (pending.client.kind === 'confidential_web') return { status: 'approved', approval };
     if (pending.client.redirectKind === 'private_use_scheme' && !isSameOriginPost(request)) {
       return {
         status: 'interaction',
         response: confirmAppPage(pending.client.name, pending.redirectUri),
       };
     }
-    return {
-      status: 'approved',
-      approval: {
-        clientKind: 'first_party',
-        accountId: session.accountId,
-        browserSessionId: session.sessionId,
-        authTime: session.authTime,
-        amr: session.amr,
-        orgId: pending.orgHint,
-      },
-    };
+    return { status: 'approved', approval };
   };
 }

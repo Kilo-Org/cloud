@@ -1,4 +1,9 @@
-import { UTS_GRANT_TYPES, UTS_MAX_TOKENS_PER_CALL, UTS_TOKEN_PATH } from '@kilocode/uts-contracts';
+import {
+  UTS_GRANT_TYPES,
+  UTS_MAX_TOKENS_PER_CALL,
+  UTS_TOKEN_PATH,
+  type UtsAccessTokenClaims,
+} from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
@@ -48,6 +53,13 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
 /** The RFC 8628 device grant, which the device sign-in slice provides. */
 export type DeviceCodeGrant = (request: Request, params: Params) => Promise<Response>;
 
+/** The token endpoint of `kilo-web`, which the BFF slice provides. */
+export type WebClientGrant = (
+  request: Request,
+  grantType: string,
+  params: Params
+) => Promise<Response | null>;
+
 export type TokenDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
@@ -55,6 +67,11 @@ export type TokenDeps = {
   scopes: ScopeRegistry;
   publish: FeedPublish;
   deviceCodeGrant: DeviceCodeGrant | null;
+  /**
+   * `kilo-web`, which authenticates with a client assertion (`handleWebClientToken`,
+   * src/bff/token.ts): its answer, or null for a request without an assertion.
+   */
+  webClient: WebClientGrant;
 };
 
 /** The token endpoint on the issuer origin: the `htu` of every token request's DPoP proof. */
@@ -167,20 +184,23 @@ export function deviceContext(
   };
 }
 
+/** The signed tokens of one mint, in the order of the minted scopes. */
+export type SignedMint = { claims: UtsAccessTokenClaims[]; tokens: string[]; nowMs: number };
+
 /**
- * Signs the minted tokens and answers the token response. The statement already refused a role
- * outside a scope's roles without writing anything (migration 0005), and `/authorize` stored only
- * scopes the client may hold; this last check before signing keeps a token from ever carrying a
- * scope the registry does not allow the client, or an organization scope without `org` or with
- * another role, even if the registry changed after the grant was created.
+ * Signs the minted tokens with `grantId` as their `sid`, or answers the error. The statement
+ * already refused a role outside a scope's roles without writing anything (migration 0005), and
+ * `/authorize` stored only scopes the client may hold; this last check before signing keeps a
+ * token from ever carrying a scope the registry does not allow the client, or an organization
+ * scope without `org` or with another role, even if the registry changed after the grant was
+ * created.
  */
-export async function completeMint(
+export async function signMinted(
   deps: Pick<TokenDeps, 'config' | 'sign' | 'scopes'>,
   client: MintClient,
   grantId: string,
-  minted: Minted,
-  refresh: { token: string; expiresAt: Date } | null
-): Promise<Response> {
+  minted: Minted
+): Promise<SignedMint | Response> {
   const clientId = client.clientId;
   if (clientScopeRefusal(minted.scopes, client, deps.scopes) !== null) {
     console.error(JSON.stringify({ event: 'uts.token.client_scope_refused', client: clientId }));
@@ -200,7 +220,20 @@ export async function completeMint(
   const signed = await deps.sign(grantId, claims);
   if (signed.status === 'unavailable') return temporarilyUnavailable();
   if (signed.status === 'misconfigured') return oauthError('server_error', 500);
-  return jsonResponse(tokenResponseBody(claims, signed.tokens, refresh, nowMs), 200, {
+  return { claims, tokens: signed.tokens, nowMs };
+}
+
+/** Signs the minted tokens and answers the token response. */
+export async function completeMint(
+  deps: Pick<TokenDeps, 'config' | 'sign' | 'scopes'>,
+  client: MintClient,
+  grantId: string,
+  minted: Minted,
+  refresh: { token: string; expiresAt: Date } | null
+): Promise<Response> {
+  const signed = await signMinted(deps, client, grantId, minted);
+  if (signed instanceof Response) return signed;
+  return jsonResponse(tokenResponseBody(signed.claims, signed.tokens, refresh, signed.nowMs), 200, {
     Pragma: 'no-cache',
   });
 }
@@ -330,6 +363,10 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
     return oauthError('invalid_request', 400, 'grant_type is required once');
   }
   try {
+    // A client assertion is `kilo-web`'s, whatever the grant: it never falls back to a public
+    // client's handling.
+    const web = await deps.webClient(request, grantType.value, form.params);
+    if (web !== null) return web;
     switch (grantType.value) {
       case UTS_GRANT_TYPES.authorizationCode:
         return await exchangeCode(request, form.params, deps);

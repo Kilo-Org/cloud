@@ -121,7 +121,9 @@ export const developmentHandoff: AuthorizationHandoff = async (request, pending)
     amr: ['passkey'] as const,
     orgId: pending.orgHint,
   };
-  if (pending.client.kind === 'first_party') {
+  // The synthetic account has no browser session, so a `kilo-web` request ends `access_denied`;
+  // the web BFF's run signs in through the sign-in pages (`dev_handoff=signin`).
+  if (pending.client.kind !== 'third_party') {
     return { status: 'approved', approval: { ...subject, clientKind: 'first_party' } };
   }
   const consentId = z.uuid().safeParse(params.get('dev_consent_id'));

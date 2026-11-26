@@ -26,6 +26,8 @@ export type IssueCodeInput = {
   codeHash: Uint8Array;
   client:
     | { kind: 'first_party'; clientId: string; dpopJkt: Uint8Array }
+    /** The web BFF: no DPoP key; `browserSessionId` names the session it will hold a handle to. */
+    | { kind: 'confidential_web'; clientId: string }
     | { kind: 'third_party'; clientId: string; consentId: string };
   accountId: string;
   browserSessionId: string | null;
@@ -295,7 +297,8 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
           input.environment,
           input.codeHash,
           input.client.clientId,
-          input.client.kind,
+          // `uts.client_kind` has no web kind: the web BFF is a first-party client.
+          input.client.kind === 'third_party' ? 'third_party' : 'first_party',
           input.accountId,
           input.browserSessionId,
           input.redirectUri,

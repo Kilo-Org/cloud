@@ -408,9 +408,17 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
 - First-party clients are `UTS_FIRST_PARTY_CLIENTS` in `@kilocode/uts-contracts`: `kilo-cli` (public
   native, loopback `/callback`), `kilo-web`, the web BFF (confidential, `private_key_jwt`, redirect
   URIs `<app origin>/api/auth/uts/callback` per environment), and `kilo-mobile` (public native,
-  private-use redirect, device attestation required). The authorization endpoint serves only the
-  clients in `src/oauth/clients.ts`: every OAuth endpoint treats `kilo-web` as unknown until the
-  token endpoint verifies a private-key JWT. `test/repo` holds each confidential client to
+  private-use redirect, device attestation required). `kilo-web` authenticates with a private-key
+  JWT under one of the at most two Ed25519 keys of the var `KILO_WEB_CLIENT_JWKS` (`src/bff/`);
+  while the var is unset or invalid, every `kilo-web` request answers 503 with `Retry-After: 60`.
+  Its code names the browser session it was approved in and has no DPoP key; the code exchange
+  returns that session and an opaque handle (migration 0013), and the BFF then calls
+  `POST /account/browser-sessions/{read,token,end,end-all}` and `/account/devices/revoke`
+  (`@kilocode/uts-contracts` `browser-sessions.ts`). The legacy bridge (RFC 8693, subject token
+  `typ` `kilo-legacy-session+jwt`) runs only where `LEGACY_BRIDGE_ENABLED` is `true`; its SSO
+  authority check confirms nothing until UTS holds the SSO authority data, so a bridged session
+  carries no SSO provenance. `scripts/bff-e2e.ts` runs the whole surface locally with a stand-in
+  signer. `test/repo` holds each confidential client to
   `private_key_jwt` and exact HTTPS redirect URIs with a path (a loopback origin in development
   only), each desktop client to a loopback path, and each mobile client to one reverse-domain
   private-use URI and attestation.

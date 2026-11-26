@@ -13,6 +13,12 @@ import {
   UTS_TOKEN_PATH,
   UTS_TICKETS_PATH,
 } from '@kilocode/uts-contracts';
+import { webClientKeys } from '../bff/client-auth';
+import { type WebClientDeps, noSsoAuthority } from '../bff/deps';
+import type { HandleWindows } from '../bff/limits';
+import { handleBrowserSessionRequest } from '../bff/routes';
+import { webSessionAccess } from '../bff/store';
+import { handleWebClientToken } from '../bff/token';
 import type { Env, UtsConfig } from '../env';
 import { grantsAccess, identityStoreBinding } from '../grants/binding';
 import type { GrantsAccess } from '../grants/store';
@@ -66,10 +72,15 @@ export type OAuthDeps = {
   device: DeviceService | null;
   signIn: SignInDeps;
   tickets: TicketDeps;
+  /** The web BFF `kilo-web`: its token grants and the browser-session API (src/bff/). */
+  web: WebClientDeps;
 };
 
 /** The OAuth endpoints are served only where the identity store is bound. */
 export type OAuthService = { kind: 'unprovisioned' } | { kind: 'ready'; deps: OAuthDeps };
+
+/** The browser-session API's per-handle call windows, per isolate (src/bff/limits.ts). */
+const handleWindows: HandleWindows = new Map();
 
 /**
  * Turns the sign-in pages' hand-off into the one the authorization endpoint uses. The deployed
@@ -108,6 +119,7 @@ export function oauthService(
   const signer = sign ?? signerAccess(env, config);
   const secret = userCodeSecret(env);
   const signInPages = signInHandoff(signIn);
+  const publish = feedPublisher(env, config, ctx);
   return {
     kind: 'ready',
     deps: {
@@ -115,7 +127,7 @@ export function oauthService(
       grants: grantsAccess(binding.connectionString, ctx),
       sign: signer,
       scopes,
-      publish: feedPublisher(env, config, ctx),
+      publish,
       handoff: handoff === null ? signInPages : handoff(signInPages),
       device:
         secret === null
@@ -126,6 +138,21 @@ export function oauthService(
             },
       signIn,
       tickets: { config, tickets: ticketAccess(binding.connectionString, ctx) },
+      web: {
+        config,
+        keys: () => webClientKeys(env),
+        sessions: webSessionAccess(binding.connectionString, ctx),
+        sign: signer,
+        scopes,
+        publish,
+        // The authority check stays closed until the identity store holds SSO authority data.
+        bridge:
+          env.LEGACY_BRIDGE_ENABLED === 'true'
+            ? { status: 'on', authority: noSsoAuthority }
+            : { status: 'off' },
+        windows: handleWindows,
+        now: Date.now,
+      },
     },
   };
 }
@@ -170,7 +197,12 @@ export async function handleOAuthRequest(
     case UTS_AUTHORIZE_PATH:
       return await handleAuthorize(request, deps);
     case UTS_TOKEN_PATH:
-      return await handleToken(request, { ...deps, deviceCodeGrant: deps.device?.grant ?? null });
+      return await handleToken(request, {
+        ...deps,
+        deviceCodeGrant: deps.device?.grant ?? null,
+        webClient: (tokenRequest, grantType, params) =>
+          handleWebClientToken(tokenRequest, grantType, params, deps.web),
+      });
     case UTS_REVOKE_PATH:
       return await handleRevoke(request, deps);
     case UTS_INTROSPECT_PATH:
@@ -194,6 +226,6 @@ export async function handleOAuthRequest(
     case UTS_DEVICE_DECISION_PATH:
       return deps.device === null ? null : await handleDeviceDecision(request, deps.device.pages);
     default:
-      return null;
+      return await handleBrowserSessionRequest(request, pathname, deps.web);
   }
 }

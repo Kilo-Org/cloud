@@ -13,7 +13,10 @@ import {
 export type ScopeRegistry = (scope: string) => UtsScopeEntry | null;
 
 /** The client of an OAuth request, as the registry's `allowedClients` names it. */
-export type MintClient = { kind: 'first_party' | 'third_party'; clientId: string };
+export type MintClient = {
+  kind: 'first_party' | 'confidential_web' | 'third_party';
+  clientId: string;
+};
 
 /**
  * The first of `scopes` that `client` may not hold, or null when it may hold every one (design

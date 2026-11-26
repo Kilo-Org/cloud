@@ -2,8 +2,11 @@ import {
   type OAuthErrorCode,
   UTS_MAX_TOKENS_PER_CALL,
   audienceOfScope,
+  firstPartyClient,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { WebClientDeps } from '../bff/deps';
+import { webClientUnavailable } from '../bff/responses';
 import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
@@ -48,7 +51,12 @@ export type AuthorizingClient =
       /** How the client receives the code; a private-use scheme needs a fresh sign-in. */
       redirectKind: RedirectRule['kind'];
     }
-  | { kind: 'third_party'; clientId: string; name: string };
+  | { kind: 'third_party'; clientId: string; name: string }
+  /**
+   * The web BFF `kilo-web` (design 5.1): it receives its code on its exact HTTPS callback, with
+   * PKCE S256 and no DPoP key, and authenticates at the token endpoint with a client assertion.
+   */
+  | { kind: 'confidential_web'; clientId: string; name: string };
 
 /** What the hand-off shows and decides on. */
 export type PendingAuthorization = {
@@ -94,6 +102,8 @@ export type AuthorizeDeps = {
   grants: GrantsAccess;
   scopes: ScopeRegistry;
   handoff: AuthorizationHandoff;
+  /** `kilo-web`'s key set: the client is served only where it is configured. */
+  web: Pick<WebClientDeps, 'keys'>;
 };
 
 /** An error before the redirect URI is trusted: shown, never redirected. */
@@ -124,6 +134,7 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   }
   const redirectUri = redirectParam.value;
   const identity = identifyClient(clientIdParam.value);
+  const webClient = firstPartyClient(clientIdParam.value);
   let client: AuthorizingClient;
   if (identity.kind === 'first_party') {
     if (!isRegisteredRedirect(identity.client, redirectUri)) {
@@ -154,6 +165,12 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }
     client = { kind: 'third_party', clientId: record.clientId, name: record.name };
+  } else if (webClient?.kind === 'confidential_web') {
+    if (!webClient.redirectUris[deps.config.environment].includes(redirectUri)) {
+      return directError('invalid_request', 'redirect_uri is not registered for this client');
+    }
+    if ((await deps.web.keys()).status !== 'ready') return webClientUnavailable();
+    client = { kind: 'confidential_web', clientId: webClient.clientId, name: webClient.name };
   } else {
     return directError('invalid_client', 'unknown client', 401);
   }
@@ -201,6 +218,14 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   }
 
   const resources = params.all('resource');
+  // The web BFF's resource, when it names one, is the UTS issuer, whose account API its
+  // bootstrap scope belongs to.
+  if (
+    client.kind === 'confidential_web' &&
+    resources.some(resource => resource !== deps.config.endpoints.issuer)
+  ) {
+    return fail('invalid_target', 'resource must be the UTS issuer');
+  }
   let audiences = [...new Set(scopes.map(audienceOfScope))];
   if (resources.length > 0) {
     const named = audiencesOfResources(resources, deps.config.environment);
@@ -248,6 +273,12 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   let codeClient: IssueCodeInput['client'];
   if (client.kind === 'first_party' && approval.clientKind === 'first_party' && dpopJkt !== null) {
     codeClient = { kind: 'first_party', clientId: client.clientId, dpopJkt };
+  } else if (client.kind === 'confidential_web' && approval.clientKind === 'first_party') {
+    if (approval.browserSessionId === null) {
+      // The web BFF's session is the browser session the user approved in, so it needs one.
+      return fail('access_denied', 'the authorization needs a signed-in browser session');
+    }
+    codeClient = { kind: 'confidential_web', clientId: client.clientId };
   } else if (client.kind === 'third_party' && approval.clientKind === 'third_party') {
     codeClient = { kind: 'third_party', clientId: client.clientId, consentId: approval.consentId };
   } else {

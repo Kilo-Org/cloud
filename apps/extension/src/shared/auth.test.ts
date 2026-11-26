@@ -116,7 +116,8 @@ describe('device auth API client', () => {
       seenRequests.push(String(input));
       return jsonResponse(
         {
-          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          code: 'cancel-code',
+          device_code: 'device-code',
           user_code: 'ABCD-2345',
           verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
         },
@@ -127,7 +128,8 @@ describe('device auth API client', () => {
     const request = await createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai/', fetch });
 
     expect(request).toMatchObject({
-      code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+      code: 'cancel-code',
+      deviceCode: 'device-code',
       userCode: 'ABCD-2345',
       verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
     });
@@ -138,7 +140,8 @@ describe('device auth API client', () => {
     const fetch: FetchLike = () =>
       jsonResponse(
         {
-          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          code: 'cancel-code',
+          device_code: 'device-code',
           expiresIn: 30,
           user_code: 'ABCD-2345',
           verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
@@ -156,7 +159,8 @@ describe('device auth API client', () => {
     const fetch: FetchLike = () =>
       jsonResponse(
         {
-          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          code: 'cancel-code',
+          device_code: 'device-code',
           user_code: 'ABCD-2345',
           verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
         },
@@ -197,7 +201,7 @@ describe('device auth API client', () => {
     });
   });
 
-  it('cancels a pending request with its poll secret', async () => {
+  it('cancels a pending request with its cancellation code', async () => {
     const seenRequests: { method: string | undefined; url: string }[] = [];
     const fetch: FetchLike = (input, init) => {
       seenRequests.push({ method: init?.method, url: String(input) });
@@ -235,26 +239,48 @@ describe('device auth API client', () => {
     ).rejects.toMatchObject({ status: 500 });
   });
 
-  it('rejects a device auth response without a user code', async () => {
-    const fetch: FetchLike = () =>
-      jsonResponse(
-        {
-          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+  it.each(['user_code', 'device_code'] as const)(
+    'rejects a device auth response without %s',
+    async missingField => {
+      const fetch: FetchLike = () =>
+        jsonResponse({
+          code: 'cancel-code',
+          device_code: 'device-code',
+          user_code: 'ABCD-2345',
           verificationUrl: 'https://app.kilo.ai/device-auth?app=1',
-        },
-        { status: 200 }
-      );
+          [missingField]: undefined,
+        });
 
-    await expect(
-      createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai', fetch })
-    ).rejects.toThrow(TypeError);
+      await expect(
+        createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai', fetch })
+      ).rejects.toThrow(TypeError);
+    }
+  );
+
+  it('posts the device code in the request body and forwards the abort signal', async () => {
+    const fetch = vi.fn<FetchLike>(() => jsonResponse({ status: 'pending' }, { status: 202 }));
+    const { signal } = new AbortController();
+
+    await pollDeviceAuthCode({
+      apiBaseUrl: 'https://app.kilo.ai/',
+      deviceCode: 'device-code',
+      fetch,
+      signal,
+    });
+
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('https://app.kilo.ai/api/device-auth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceCode: 'device-code' }),
+      signal,
+    });
   });
 
   it('maps poll status codes to pending, approved, denied, and expired states', async () => {
     const pollWithResponse = (response: Response) =>
       pollDeviceAuthCode({
         apiBaseUrl: 'https://app.kilo.ai',
-        code: 'ABCD-2345',
+        deviceCode: 'device-code',
         fetch: () => response,
       });
 

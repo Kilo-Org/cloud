@@ -21,6 +21,7 @@ export type FetchLike = (input: string, init?: RequestInit) => MaybePromise<Resp
 
 export interface DeviceAuthRequest {
   readonly code: string;
+  readonly deviceCode: string;
   readonly userCode: string;
   readonly verificationUrl: string;
   readonly expiresAt: number;
@@ -67,7 +68,7 @@ interface ApiClientOptions {
 }
 
 interface PollDeviceAuthCodeOptions extends ApiClientOptions {
-  readonly code: string;
+  readonly deviceCode: string;
   readonly signal?: AbortSignal;
 }
 
@@ -92,6 +93,7 @@ const storedAuthSchema = z.object({
 });
 const deviceAuthRequestSchema = z.object({
   code: nonEmptyStringSchema,
+  device_code: nonEmptyStringSchema,
   expiresIn: z.number().positive().optional(),
   user_code: nonEmptyStringSchema,
   verificationUrl: nonEmptyStringSchema,
@@ -153,12 +155,13 @@ const parseDeviceAuthRequest = (value: unknown): DeviceAuthRequest => {
 
   if (!parsed.success) {
     throw new TypeError(
-      'Device auth response did not include a code, user code, and verification URL.'
+      'Device auth response did not include a code, user code, device code, and verification URL.'
     );
   }
 
   return {
     code: parsed.data.code,
+    deviceCode: parsed.data.device_code,
     expiresAt: Date.now() + (parsed.data.expiresIn ?? DEVICE_AUTH_CODE_TTL_SECONDS) * 1000,
     userCode: parsed.data.user_code,
     verificationUrl: parsed.data.verificationUrl,
@@ -223,15 +226,16 @@ export const cancelDeviceAuthRequest = async ({
 
 export const pollDeviceAuthCode = async ({
   apiBaseUrl,
-  code,
+  deviceCode,
   fetch,
   signal,
 }: PollDeviceAuthCodeOptions): Promise<DeviceAuthPollResult> => {
-  const requestInit: RequestInit = signal === undefined ? {} : { signal };
-  const response = await fetch(
-    `${trimTrailingSlash(apiBaseUrl)}/api/device-auth/codes/${encodeURIComponent(code)}`,
-    requestInit
-  );
+  const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/device-auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceCode }),
+    ...(signal === undefined ? {} : { signal }),
+  });
 
   switch (response.status) {
     case 200: {

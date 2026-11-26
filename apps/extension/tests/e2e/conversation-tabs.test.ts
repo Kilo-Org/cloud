@@ -805,24 +805,27 @@ test('conversation remount loads current storage instead of cached query history
 
   try {
     await mockKiloApi(context);
+    const deviceCode = 'device-code';
     await context.route('https://app.kilo.ai/api/device-auth/codes?app=1', route =>
       route.fulfill({
         json: {
-          code: 'poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
+          code: 'cancel-code',
+          device_code: deviceCode,
           user_code: 'ABCD-EFGH',
           verificationUrl: 'https://app.kilo.ai/device-auth',
         },
         status: 200,
       })
     );
-    await context.route(
-      'https://app.kilo.ai/api/device-auth/codes/poll-secret-9f8e7d6c5b4a3210fedcba9876543210abc',
-      route =>
-        route.fulfill({
-          json: { token: 'token-2', userEmail: 'user@kilo.ai' },
-          status: 200,
-        })
-    );
+    await context.route('https://app.kilo.ai/api/device-auth/token', async route => {
+      const request = route.request();
+      expect(request.method()).toBe('POST');
+      expect(request.postDataJSON()).toStrictEqual({ deviceCode });
+      await route.fulfill({
+        json: { status: 'approved', token: 'token-2', userEmail: 'user@example.com' },
+        status: 200,
+      });
+    });
 
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);

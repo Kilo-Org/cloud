@@ -186,6 +186,7 @@ export const RefreshGrantRowSchema = z.strictObject({
   status: z.enum(enums.GRANT_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  denied_audited_at: timestamp.nullable(),
 });
 
 export const ThirdPartyClientRowSchema = z.strictObject({
@@ -226,19 +227,20 @@ export const ThirdPartyGrantFamilyRowSchema = z.strictObject({
   status: z.enum(enums.GRANT_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  denied_audited_at: timestamp.nullable(),
 });
 
 export const ThirdPartyRefreshTokenRowSchema = z.strictObject({
-  id: uuid,
   family_id: uuid,
-  parent_id: uuid.nullable(),
   token_hash: sha256,
   issued_at: timestamp,
   idle_expires_at: timestamp,
-  status: z.enum(enums.REFRESH_TOKEN_STATUSES),
-  rotated_at: timestamp.nullable(),
-  grace_until: timestamp.nullable(),
-  revoked_at: timestamp.nullable(),
+});
+
+export const ThirdPartyRotatedTokenRowSchema = z.strictObject({
+  token_key: uuid,
+  family_id: uuid,
+  family_expires_at: timestamp,
 });
 
 export const AuthorizationCodeRowSchema = z.strictObject({
@@ -259,6 +261,8 @@ export const AuthorizationCodeRowSchema = z.strictObject({
   expires_at: timestamp,
   status: z.enum(enums.CODE_STATUSES),
   consumed_at: timestamp.nullable(),
+  consent_id: uuid.nullable(),
+  grant_id: uuid.nullable(),
 });
 
 export const DeviceCodeRowSchema = z.strictObject({
@@ -402,6 +406,12 @@ export const RevocationRowSchema = z.strictObject({
   feed_expires_at: timestamp,
 });
 
+export const DpopProofRowSchema = z.strictObject({
+  jkt: sha256,
+  jti: z.string(),
+  expires_at: timestamp,
+});
+
 export const NoticeRowSchema = z.strictObject({
   id: uuid,
   account_id: z.string(),
@@ -453,6 +463,7 @@ export const IDENTITY_STORE_TABLES = {
   third_party_consents: ThirdPartyConsentRowSchema,
   third_party_grant_families: ThirdPartyGrantFamilyRowSchema,
   third_party_refresh_tokens: ThirdPartyRefreshTokenRowSchema,
+  third_party_rotated_tokens: ThirdPartyRotatedTokenRowSchema,
   authorization_codes: AuthorizationCodeRowSchema,
   device_codes: DeviceCodeRowSchema,
   email_codes: EmailCodeRowSchema,
@@ -463,6 +474,7 @@ export const IDENTITY_STORE_TABLES = {
   ci_trust_policies: CiTrustPolicyRowSchema,
   sandbox_grants: SandboxGrantRowSchema,
   revocations: RevocationRowSchema,
+  dpop_proofs: DpopProofRowSchema,
   notices: NoticeRowSchema,
   audit_events: AuditEventRowSchema,
   audit_relay_watermarks: AuditRelayWatermarkRowSchema,

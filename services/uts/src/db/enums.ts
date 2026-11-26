@@ -39,10 +39,10 @@ export const REVOKE_REASONS = [
   'credential_change',
   'reuse_detected',
   'session_ended',
+  'client_blocked',
 ] as const;
 export const SESSION_STATUSES = ['active', 'revoked'] as const;
 export const GRANT_STATUSES = ['active', 'revoked'] as const;
-export const REFRESH_TOKEN_STATUSES = ['active', 'rotated', 'revoked'] as const;
 export const CODE_STATUSES = ['issued', 'consumed'] as const;
 export const DEVICE_CODE_STATUSES = ['pending', 'approved', 'denied', 'consumed'] as const;
 export const EMAIL_CODE_PURPOSES = ['sign_in', 'tier_a'] as const;
@@ -116,7 +116,6 @@ export const IDENTITY_STORE_ENUMS = {
   revoke_reason: REVOKE_REASONS,
   session_status: SESSION_STATUSES,
   grant_status: GRANT_STATUSES,
-  refresh_token_status: REFRESH_TOKEN_STATUSES,
   code_status: CODE_STATUSES,
   device_code_status: DEVICE_CODE_STATUSES,
   email_code_purpose: EMAIL_CODE_PURPOSES,

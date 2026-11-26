@@ -13,9 +13,13 @@ The issuer, key set URL and local ports of each environment live in
 
 ## Mint Worker
 
-- `GET /.well-known/oauth-authorization-server` serves RFC 8414 metadata: `issuer`, `jwks_uri`
-  (on the feed Worker), and empty `response_types_supported` and `grant_types_supported`. An
-  endpoint joins the document in the change that makes it answer, so no listed endpoint returns 404.
+- `GET /.well-known/oauth-authorization-server` serves RFC 8414 metadata: `issuer` and `jwks_uri`
+  (on the feed Worker) always; the token, revocation and introspection endpoints once the
+  environment binds the identity store (`IDENTITY_STORE`); the authorization endpoint and the code
+  grant once a sign-in hand-off is wired; the device grant once its hook is. An endpoint joins the
+  document when it answers, so no listed endpoint returns 404.
+- The OAuth endpoints (`src/oauth/`, see "OAuth endpoints") run in this fetch handler. Staging and
+  production bind no identity store yet, so they serve none of them.
 - Placement runs the fetch handler next to the identity store's primary in Frankfurt:
   `"placement": { "region": "aws:eu-central-1" }`, a Cloudflare placement hint
   (https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region), which
@@ -39,10 +43,10 @@ Each object:
 
 - generates its own Ed25519 keys and keeps them in its KV storage, one record, never in SQL rows
   (a trace would record bound SQL values);
-- exposes only its RPC methods `publicKeys`, `sign` and `removeKid` and the platform's `alarm`.
-  Workers RPC serves every public method of the class, so every other member is `#`-private, and
-  no RPC method returns or accepts a private key (`test/runtime/signer.test.ts` calls the other
-  members through a stub and expects each call to fail);
+- exposes only its RPC methods `publicKeys`, `sign`, `signMany` and `removeKid` and the platform's
+  `alarm`. Workers RPC serves every public method of the class, so every other member is
+  `#`-private, and no RPC method returns or accepts a private key (`test/runtime/signer.test.ts`
+  calls the other members through a stub and expects each call to fail);
 - refuses to create keys under any other name or in any other jurisdiction than its environment's,
   and refuses stored keys in any object but that signer's object of its environment: the id must
   be the one the signer's name gives in the environment's jurisdiction, a check that needs no name
@@ -54,14 +58,15 @@ Each object:
   at or before now, or an `exp` more than 1 hour ahead, the longest UTS token lifetime.
   `src/keys/claims.ts` is the signer's admission check; the published claim contract is phase 2's
   `AccessTokenClaimsSchema` (`@kilocode/sts-contracts`), and every claim set the signer accepts
-  also passes it;
+  also passes it. A mint signs its 1 to 8 tokens in one `signMany(claims[])` call: each claim set
+  passes the same check, one refused set refuses the batch, and all tokens carry the same `kid`;
 - rotates by alarm: a key signs for 30 days. Each rotation creates the next key at once, to sign
   30 days later, so every signer always publishes a current and a next key, and the next key is
   published at least 7 days before it signs (a new object publishes its first two keys at once, the
   second 30 days ahead). A retired key stays published for 1 hour and 10 minutes, until the last
   token it signed has been expired for 10 minutes. That is two alarms per 30-day cycle. A change
-  whose alarm never ran (its retries ran out) is applied by the next `publicKeys` or `sign` call,
-  and `publicKeys` also sets a lost alarm again;
+  whose alarm never ran (its retries ran out) is applied by the next `publicKeys`, `sign` or
+  `signMany` call, and `publicKeys` also sets a lost alarm again;
 - removes a key at once with `removeKid(kid)`, a direct call, not an alarm. A removed current key
   is replaced by the published next key, which verifiers already hold, and a new next key is
   created to sign 30 days later; a removed next key is replaced by a new one published at least 7
@@ -140,9 +145,86 @@ curl -s http://localhost:8801/.well-known/jwks.json
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
 only `wrangler.dev.jsonc` runs, and the claim set must name the development issuer. That config
-cannot be deployed: its build command, which Wrangler runs before `dev`, `deploy` and
-`versions upload` with `WRANGLER_COMMAND` set to the command, fails for every command but `dev`.
-`wrangler.jsonc` holds only the production and staging blocks.
+cannot be deployed: its build command, which Wrangler runs before `dev`, `deploy` and `versions
+upload` with `WRANGLER_COMMAND` set to the command, fails for every command but `dev`, and
+`test/repo` fails any other config that runs the development entry. `wrangler.jsonc` holds only the
+production and staging blocks. The same entry wires the development sign-in hand-off
+(`src/dev.ts`): it approves every authorization request for the synthetic account `dev:uts-local`.
+
+The local config binds the local identity store as `IDENTITY_STORE`. The UTS logins have no password
+in the repository, so give `uts_app_a` one and pass the URL to wrangler:
+
+```sh
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE=postgres://uts_app_a:<password>@127.0.0.1:55432/uts \
+  pnpm exec wrangler dev -c wrangler.dev.jsonc
+UTS_E2E_BASE_URL=http://127.0.0.1:8800/ UTS_E2E_ADMIN_URL=... UTS_E2E_APP_URL=... \
+  pnpm exec tsx scripts/oauth-e2e.ts
+```
+
+`scripts/oauth-e2e.ts` runs code, token, refresh, a replayed proof (also at another grant of the
+same device key), a code-exchange retry and two concurrent exchanges of one code, third-party
+rotation, reuse (the family is revoked), a blocked third-party client, a streamed oversized body,
+revoke and introspect, prints the audit rows (token ids only), checks that no token value reached
+an audit row, and times the mint path.
+
+## OAuth endpoints
+
+| Endpoint | Behaviour | SQL |
+|---|---|---|
+| `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
+| `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A first-party retry of the same request while the code's 60-second lifetime lasts gets the same grant and the same refresh token (below); any other second use of a code, a third-party one included, revokes the grant | `uts.exchange_authorization_code` |
+| `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation with no grace; any later use of a replaced token revokes the family and writes a feed entry, until the family's 90-day end | `uts.refresh_first_party`, `uts.refresh_third_party` |
+| `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; a token issued to another client answers 200 like an unknown token and writes a denied row (at most one per grant per minute); an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
+| `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
+
+Each call verifies at most one DPoP proof before the grant read. The grant statement records the
+proof's `jti` in `uts.dpop_proofs` under the RFC 7638 thumbprint of the proof's key (primary key
+`jkt` and `jti`), so a second use of the proof fails that statement with `dpop_replay`, which
+answers `invalid_dpop_proof`. A proof names its key, method and URL, not a grant, so its `jti`
+is scoped to the key: a proof accepted for one grant of a device key is refused at every other
+grant of that key, and the `htu` check keeps it to one endpoint. A row stays 121 seconds: a
+proof's `iat` is at most 60 seconds ahead and it is accepted until 60 seconds after its `iat`. The
+statement records a `jti` only once the grant and the key match, so a caller without the device
+key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant id><32-byte
+secret>`), so the endpoint knows the grant and its signer before the statement. One call mints one
+access token per scope, up to 8, each with one audience; one `signMany` call to the signer the
+grant id picks signs all of them, and `issued_tokens` lists them. The claims are exactly
+`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
+(`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with `Retry-After`; a
+failure no retry fixes gives 500.
+
+The tokens are signed after the statement commits. When signing fails (or the response is lost),
+a first-party client sends the same code exchange again with a new DPoP proof. While the code's
+60-second lifetime lasts, the same client, redirect URI, PKCE verifier and DPoP key get the grant
+the first attempt created, the same refresh token and new access tokens, and the code does not
+count as reused: the device key and a fresh proof show the same client instance. The refresh
+token's secret is the SHA-256 of a fixed label, the code and the verifier
+(`firstPartyRefreshTokenOfExchange`), so every attempt presents the hash the grant holds and no
+attempt replaces it: when the first answer also reaches the client, after the retry's or before
+it, both carry the one valid refresh token. A retry with another hash is refused and changes
+nothing. The store holds only the SHA-256 of the code and of the verifier, so stored data does not
+give the secret. A third-party client has only its PKCE verifier, so any second use
+of its code revokes the family (OAuth 2.1 section 4.1.2); a third-party client that lost its
+response authorizes again, and its consent stands, so it sees no consent screen. A consumed code
+with another client, redirect URI, verifier or key, or after its lifetime, still revokes the
+grant. The audit row of a mint lists the `jti` of each token the call is about to sign: after a
+failed signing no token carries those ids, and the retry's row (`token.issued`, `rotation`
+`code_retry`) lists the ids of the tokens it signs.
+
+A blocked third-party client (`uts.third_party_clients.status`) gets nothing more: the code
+exchange, the refresh read and the introspection read each check the client's status, so the
+status change alone stops it at once. `uts.maintain_oauth_rows()` then revokes the client's live
+families, at most 5,000 per call, each with its feed entry (`revoke_reason` `client_blocked`), so
+its live access tokens stop at the verifiers within one cron cycle plus feed propagation (they
+expire within 10 minutes anyway). The block itself stays one short statement whatever the client's
+family count. An unblock waits for those batches: the trigger
+`third_party_clients_refuse_early_unblock` refuses `blocked` to `active` while the client still has
+an active family (one probe of `third_party_grant_families_client_idx`), with SQLSTATE 55006 and
+"client still has active families; maintenance is ending them, retry after it reports
+blocked_client_families 0". At 5,000 families per call a client with N families stays blocked for
+about ceil(N / 5,000) cron cycles (about 20 at 100k); the operator path retries on that refusal
+rather than treating it as a failure. Once it succeeds, no family comes back. The batches write
+no audit row; the operator action that blocks or unblocks the client writes it.
 
 ## Tests
 
@@ -152,10 +234,12 @@ cannot be deployed: its build command, which Wrangler runs before `dev`, `deploy
   removal by direct call, the RPC surface, the SignerKeys entrypoint over real service bindings
   (its caller check) and the key-set shards (their names, their 2-second copy with one read in
   flight, at most one signer read per shard per 2 seconds under many concurrent isolates, and the
-  held keys of a failed signer), metadata.
+  held keys of a failed signer), metadata, DPoP proofs, the signer's batch signing, and every OAuth
+  endpoint against a recording grant store.
 - `pnpm test:repo`: the repository config check (`test/repo`), with no database.
 - `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
-  tests (`test/db`, see "Local database and tests").
+  tests (`test/db`, see "Local database and tests"), the OAuth grant functions and the DPoP `jti`
+  check included.
 
 ## Staging proof run (before merge)
 
@@ -217,6 +301,13 @@ naming `https://uts-staging.kiloapps.io` and the feed key set.
    not cover, so it runs where the feed Worker runs. The key-set request above proves it answers
    the feed Worker (`32` keys).
 
+4. **The mint path's p95 under placement is a staging gate (design 3, 5.2).** No environment binds
+   the identity store yet, so this branch measures the mint statement and `POST /token` only
+   through local `wrangler dev`. The slice that binds the staging Hyperdrive config must measure
+   the server-side p95 of `POST /token` refresh in staging, with placement, the production-shaped
+   Hyperdrive pool and the signer objects in their EU data center, and block its merge until the
+   p95 is under 150 ms.
+
 ## Deploys
 
 Both Workers deploy through `.github/workflows/deploy-workers.yml`, which discovers every
@@ -255,7 +346,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations. Holds the privileges of every UTS login (no SET), so `uts.end_long_transactions()` can end their sessions |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the ungated credential tables; on gated rows (gate passes, PATs, org bot keys, CI trust policies, third-party consents, device approvals) SELECT, DELETE and UPDATE of lifecycle columns only; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()` and `uts.end_long_transactions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, audit relay | DML on the ungated credential tables; on gated rows (gate passes, PATs, org bot keys, CI trust policies, third-party consents, device approvals) SELECT, DELETE and UPDATE of lifecycle columns only; codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()` and `uts.end_long_transactions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -332,18 +423,17 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
   id as history; only `gate_pass_id` becomes NULL when the account's passes go with it.
 - `refresh_grants.last_used_at` and `idle_expires_at` move at most once per grant per hour, not on
   every mint; the table leaves 10 percent of each page free (`fillfactor = 90`) for those updates.
-- A third-party refresh token names the token it replaced (`parent_id`). Deleting an old rotated
-  token sets its child's `parent_id` to NULL, so cleanup never takes the family's current token.
+- The app login writes authorization codes, refresh grants, device sessions, third-party families
+  and tokens, revocations and DPoP proof `jti`s only through the security-definer OAuth functions
+  (migration 0004), which write the credential rows and their audit row together; it keeps SELECT
+  on those tables. It still writes the ungated credential tables directly.
+  The account-deletion function will be one more such function: in the same statement, before the
+  delete, it collects the active bot keys the account created (the keys the delete trigger is about
+  to flag) and writes a bot-key-flagged audit row and the org-admin notices for each (design
+  sections 5.8 and 8.1).
 - Time limits compare with `statement_timestamp()` where a statement can run late in a transaction
   (the PAT and bot key lookups), and spell 7 days as 168 hours where the session's time zone could
   stretch or shorten calendar days (the flagged bot key cutoff, partition maintenance).
-- The app login still writes the ungated credential tables directly. When the mint, refresh and
-  revoke functions land, they become security-definer functions that write the credential row and
-  its audit row together, and the app login loses direct writes on those tables, so no credential
-  can change without its audit row. The account-deletion function is one of them: in the same
-  statement, before the delete, it collects the active bot keys the account created (the keys the
-  delete trigger is about to flag) and writes a bot-key-flagged audit row and the org-admin notices
-  for each (design sections 5.8 and 8.1).
 - `IdentityStoreError` keeps only the SQLSTATE, the constraint, the table, and for a failed
   connection the system error code (`ECONNREFUSED`, `ETIMEDOUT`, ...). The server's error detail can
   quote the refused row, so it never leaves `src/db/client.ts`.
@@ -434,6 +524,61 @@ The relay reads only the newest rows, so the tier needs disk more than memory. T
 moves up one compute size when its buffer cache hit ratio stays below 99 percent for an hour at
 peak, and its disk grows before data and indexes pass 70 percent of it.
 
+Third-party refresh tokens are the other table that grows with traffic. A family keeps one
+current token row; each refresh replaces it and keeps the replaced token as a tombstone in
+`third_party_rotated_tokens` (16-byte key, family id, family end) until the family is past its
+90-day end (below). A tombstone with its two index entries takes about 120 bytes. As an upper
+bound, with every family refreshing every 8 minutes, a family gathers 90 days / 8 minutes =
+16,200 tombstones by its end. Size the disk on the "at most" column: tombstones of a revoked
+family stay until its 90-day end too, and a client that authorizes again often (a lost rotation
+answer revokes its family) keeps close to that bound. The average assumes families of evenly
+spread ages:
+
+| Active third-party families | Tombstones, at most | Table and indexes, at most (disk sizing) | Average (evenly spread ages) |
+|---|---|---|---|
+| 10k | 162M | ~19 GB | ~10 GB |
+| 50k | 810M | ~97 GB | ~49 GB |
+| 200k | 3.24B | ~389 GB | ~194 GB |
+
+### OAuth row maintenance
+
+The app login cannot delete credential rows, so `uts.maintain_oauth_rows()` (SECURITY DEFINER)
+removes the rows no statement reads again and ends the families of blocked clients. Each call
+handles at most 5,000 rows of each kind and returns one `(kind, deleted)` row per kind. Like
+`uts.maintain_audit_partitions()`, it has no caller in this service yet: the UTS cron that slice
+3.9 adds calls both, this one until every count is under 5,000. `uts_app` holds EXECUTE on it by
+choice until then; it takes no input and every step is time- or status-gated, so a caller can
+only do the same work sooner. Slice 3.9 moves it to a dedicated maintenance role. It handles:
+
+| Rows | When | Why that is safe |
+|---|---|---|
+| `blocked_client_families` | A live family of a blocked client: revoked (`client_blocked`) with its feed entry, not deleted, so `deleted` counts the families this call revoked; rows a refresh holds wait for the next call (`SKIP LOCKED`) | Every read already refuses the blocked client, so the batch only makes the revocation reach the verifiers; the client's unblock waits until this reports 0 |
+| `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
+| `third_party_refresh_tokens` | The current token of a family that is revoked or past its 90-day end | It fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
+| `third_party_rotated_tokens` | Past the family's 90-day end, oldest first | No token of the family can be issued or refreshed again, so no reuse check needs the tombstone. Until then a replaced token that comes back revokes the family, however long ago it was replaced |
+| `revocations` | Past `feed_expires_at` | The feed no longer carries the entry |
+| `dpop_proofs` | Past `expires_at` (121 seconds) | No clock accepts the proof again |
+
+It never deletes a grant, a family row, the current token of a live family, a tombstone of a
+family that can still issue tokens, or a code within its lifetime (`test/db/oauth-grants.test.ts`).
+At one mint per active client every 8 minutes, the DPoP rows arrive at 21, 104 and 417 per second
+for 10k, 50k and 200k clients: 1,250, 6,250 and 25,000 per minute; in a steady state tombstones
+age out at the rate they arrive, at most the same per third-party family, so a cron that runs
+every minute makes 1 to 5 calls.
+
+### Third-party reuse detection
+
+A third-party client has no sender constraint, so a replaced token that comes back is treated as
+stolen, whoever presents it: the whole family is revoked, a feed entry is written, and the
+refresh fails (`reuse_detected`, which answers `invalid_grant`). A replaced token has no grace
+window: with one, a second holder of a just-replaced token (a thief, or a copy) would get a
+fresh token that outlives the grace and rotates the client's current token away. A client that
+lost a rotation response authorizes again; its consent stands, so it sees no consent screen. The
+tombstone keeps that evidence until the family ends, so a client that returns weeks later with a
+token a thief replaced still revokes the thief's chain (`test/db/oauth-grants.test.ts`,
+"third-party reuse detection"). First-party grants do not rotate; their DPoP key is the sender
+constraint.
+
 ### Hot-path index probes
 
 Each hot-path read reaches its credential through one unique-index probe on the hash, plus
@@ -441,8 +586,9 @@ primary-key probes for the rows that hang off it (`test/db/index-probes.test.ts`
 
 | Read | Indexes |
 |---|---|
-| Mint and first-party refresh | `refresh_grants_token_hash_key`, then `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
-| Third-party refresh | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey` |
+| Mint and first-party refresh (`uts.read_refresh_grant`) | `refresh_grants_token_hash_key`, then `device_sessions_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
+| Third-party refresh (`uts.read_third_party_refresh_token`) | `third_party_refresh_tokens_token_hash_key`, then `third_party_grant_families_pkey`, `third_party_clients_pkey`, `third_party_consents_pkey`, `accounts_pkey`, `org_memberships_pkey`, `org_sso_policies_pkey` |
+| Replaced third-party token (`uts.read_rotated_third_party_token`), only when the hash is no current token | `third_party_rotated_tokens_pkey`, then `third_party_grant_families_pkey` |
 | PAT lookup (`uts.lookup_pat`) | `personal_access_tokens_token_hash_key`, then `accounts_pkey` |
 | Org bot key lookup (`uts.lookup_bot_key`) | `org_bot_keys_token_hash_key` |
 | Web session check | `browser_sessions_token_hash_key` |

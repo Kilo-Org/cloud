@@ -17,6 +17,26 @@ import {
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 
+/** Tables the app login writes only through the OAuth grant functions (migration 0004). */
+const FUNCTION_WRITTEN_TABLES = [
+  'authorization_codes',
+  'refresh_grants',
+  'device_sessions',
+  'third_party_grant_families',
+  'third_party_refresh_tokens',
+  'third_party_rotated_tokens',
+  'revocations',
+  'dpop_proofs',
+];
+
+/** A column each table has, for the refused UPDATE; `status` unless named here. */
+const UPDATE_COLUMN: Partial<Record<string, string>> = {
+  third_party_refresh_tokens: 'token_hash',
+  third_party_rotated_tokens: 'family_id',
+  revocations: 'kind',
+  dpop_proofs: 'jti',
+};
+
 let db: TestDatabase;
 let todayPartition: string;
 
@@ -215,6 +235,21 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     ).toBe('23514');
   });
 
+  it('runs OAuth row maintenance', async () => {
+    const app = await db.connect(login);
+    const maintenance = await app.query<{ kind: string }>(
+      'SELECT kind FROM uts.maintain_oauth_rows()'
+    );
+    expect(maintenance.rows.map(row => row.kind)).toEqual([
+      'blocked_client_families',
+      'authorization_codes',
+      'third_party_refresh_tokens',
+      'third_party_rotated_tokens',
+      'revocations',
+      'dpop_proofs',
+    ]);
+  });
+
   it('inserts audit rows and runs partition maintenance', async () => {
     const app = await db.connect(login);
     await insertAudit(app);
@@ -297,6 +332,37 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     expect(await sqlStateOf(() => app.query(`SELECT * FROM uts.${todayPartition}`))).toBe(
       INSUFFICIENT_PRIVILEGE
     );
+  });
+
+  it.each(FUNCTION_WRITTEN_TABLES)(
+    'cannot insert, update or delete uts.%s directly, only read it',
+    async table => {
+      const app = await db.connect(login);
+      await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
+      const column = UPDATE_COLUMN[table] ?? 'status';
+      for (const statement of [
+        `INSERT INTO uts.${table} DEFAULT VALUES`,
+        `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
+        `DELETE FROM uts.${table} WHERE false`,
+      ]) {
+        expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+      }
+    }
+  );
+
+  it.each([
+    [
+      'revoke a grant without its audit row',
+      `SELECT uts.end_grant('first_party', gen_random_uuid(), 'sign_out')`,
+    ],
+    [
+      'write an audit row through the OAuth writer',
+      `SELECT uts.write_audit_event('development', 'ai.kilo.uts.test', 6003, 1, 'success', NULL, 'a', '{}')`,
+    ],
+    ['read a grant through the hot-path read', `SELECT * FROM uts.read_refresh_grant('\\x00')`],
+  ])('cannot %s', async (_name, statement) => {
+    const app = await db.connect(login);
+    expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
   });
 
   it('changes its own password, which the rotation job needs', async () => {
@@ -523,7 +589,10 @@ describe('table privileges', () => {
     });
     const expected = [
       ...credentialTables.flatMap(table =>
-        ['DELETE', 'INSERT', 'SELECT', 'UPDATE'].map(privilege => app(`uts.${table}`, privilege))
+        (FUNCTION_WRITTEN_TABLES.includes(table)
+          ? ['SELECT']
+          : ['DELETE', 'INSERT', 'SELECT', 'UPDATE']
+        ).map(privilege => app(`uts.${table}`, privilege))
       ),
       app('uts.gate_passes', 'SELECT'),
       ...Object.entries(gatedUpdates).flatMap(([table, columns]) => [
@@ -565,12 +634,19 @@ describe('functions', () => {
     expect(result.rows).toEqual([
       { routine: 'advance_audit_watermark', grantee: 'uts_app' },
       { routine: 'end_long_transactions', grantee: 'uts_app' },
+      { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
       { routine: 'is_scope_set', grantee: 'uts_app' },
+      { routine: 'issue_authorization_code', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
+      { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
+      { routine: 'refresh_first_party', grantee: 'uts_app' },
+      { routine: 'refresh_third_party', grantee: 'uts_app' },
+      { routine: 'revoke_refresh_token', grantee: 'uts_app' },
     ]);
   });
 });

@@ -106,6 +106,7 @@ describe('signer keys', () => {
       const stub = env.UTS_SIGNER_DO.getByName(name);
       expect(await stub.publicKeys()).toEqual({ status: 'misconfigured', reason });
       expect(await stub.sign(claims())).toEqual({ status: 'misconfigured', reason });
+      expect(await stub.signMany([claims()])).toEqual({ status: 'misconfigured', reason });
       expect(await stub.removeKid('uts-token-01-unknown')).toEqual({
         status: 'misconfigured',
         reason,
@@ -177,6 +178,7 @@ describe('RPC surface', () => {
       'settled',
       'scheduleAlarm',
       'refusalFor',
+      'admit',
       'config',
       'phase',
     ]) {
@@ -222,6 +224,38 @@ describe('signing', () => {
     for (const [input, reason] of cases) {
       expect(await signer().sign(input)).toEqual({ status: 'refused', reason });
     }
+  });
+
+  it('signs the claim sets of one mint in one call, in order, under the current kid', async () => {
+    const scopes = ['gateway:models.read', 'gateway:chat.write', 'gateway:usage.read'];
+    const result = await signer().signMany(scopes.map(scope => claims({ scope })));
+    if (result.status !== 'signed') throw new Error(`not signed: ${result.status}`);
+    const { current } = await storedState();
+    expect(result.kid).toBe(current.kid);
+    expect(result.tokens).toHaveLength(3);
+    for (const [index, token] of result.tokens.entries()) {
+      expect(decodeProtectedHeader(token).kid).toBe(current.kid);
+      expect((await verify(token)).payload.scope).toBe(scopes[index]);
+    }
+  });
+
+  it('refuses the whole batch when one claim set is refused, and a batch outside 1 to 8', async () => {
+    expect(
+      await signer().signMany([claims(), claims({ iss: 'https://uts.kiloapps.io' }), claims()])
+    ).toEqual({ status: 'refused', reason: 'issuer_mismatch' });
+    expect(await signer().signMany([claims(), { ...claims(), extra: 'claim' }])).toEqual({
+      status: 'refused',
+      reason: 'invalid_claims',
+    });
+    for (const batch of [[], Array.from({ length: 9 }, () => claims()), claims()]) {
+      expect(await signer().signMany(batch)).toEqual({
+        status: 'refused',
+        reason: 'invalid_batch',
+      });
+    }
+    expect(await signer().signMany(Array.from({ length: 8 }, () => claims()))).toMatchObject({
+      status: 'signed',
+    });
   });
 });
 

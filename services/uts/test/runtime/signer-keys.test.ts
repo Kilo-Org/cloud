@@ -1,4 +1,4 @@
-import { runInDurableObject } from 'cloudflare:test';
+import { createExecutionContext, runInDurableObject } from 'cloudflare:test';
 import { signerOfTokenKid, UTS_ENDPOINTS, UTS_SIGNER_COUNT } from '@kilocode/uts-contracts';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSignerStub, KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
@@ -102,7 +102,8 @@ describe('SignerKeys entrypoint reads', () => {
     expect(await readSignerKeys(env.PROPLESS_MINT)).toEqual({ status: 'refused' });
     const internet = await handleRequest(
       new Request(`${config.endpoints.issuer}/internal/signer-keys`),
-      env
+      env,
+      createExecutionContext()
     );
     expect(internet.status).toBe(404);
     expect(await internet.json()).toEqual({ error: 'not_found' });

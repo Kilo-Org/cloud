@@ -1,4 +1,4 @@
-import type { SignerPublicKeys } from '@kilocode/uts-contracts';
+import { type SignerPublicKeys, UTS_MAX_TOKENS_PER_CALL } from '@kilocode/uts-contracts';
 import { DurableObject } from 'cloudflare:workers';
 import { SignJWT } from 'jose';
 import { z } from 'zod';
@@ -54,6 +54,19 @@ export type SignResult =
   | { status: 'refused'; reason: SignRefusal }
   | Misconfigured;
 
+/** `invalid_batch`: not a list of 1 to 8 claim sets. */
+export type SignManyResult =
+  | { status: 'signed'; kid: string; tokens: string[] }
+  | { status: 'refused'; reason: SignRefusal | 'invalid_batch' }
+  | Misconfigured;
+
+/** One mint signs at most 8 tokens (design 5.3). */
+const ClaimBatchSchema = z.array(z.unknown()).min(1).max(UTS_MAX_TOKENS_PER_CALL);
+
+type Admission =
+  | { status: 'admitted'; claims: SignableClaims }
+  | { status: 'refused'; reason: SignRefusal };
+
 export type PublicKeysResult = ({ status: 'ok' } & SignerPublicKeys) | Misconfigured;
 
 export type RemoveKidResult =
@@ -84,13 +97,20 @@ function logEvents(events: readonly SignerKeyEvent[]): void {
   }
 }
 
+/** A compact JWS over `claims` with header `alg: EdDSA`, `typ: at+jwt` and the current `kid`. */
+async function signWith(loaded: Loaded, claims: SignableClaims): Promise<string> {
+  return await new SignJWT(claims)
+    .setProtectedHeader({ alg: UTS_TOKEN_ALG, typ: UTS_TOKEN_TYPE, kid: loaded.state.current.kid })
+    .sign(loaded.signingKey);
+}
+
 /**
  * One of the 16 UTS token signers (design 5.7). It generates its own Ed25519 keys and keeps them
  * in its own storage. Workers RPC exposes every public method of the class, so the only public
- * members are the RPC methods `publicKeys`, `sign` and `removeKid` and the platform's `alarm`;
- * every other member is `#`-private, and no RPC method returns or accepts a private key. An alarm
- * rotates the signing key every 30 days, creates the next key at each rotation, and drops a
- * retired key once its window ends.
+ * members are the RPC methods `publicKeys`, `sign`, `signMany` and `removeKid` and the platform's
+ * `alarm`; every other member is `#`-private, and no RPC method returns or accepts a private key.
+ * An alarm rotates the signing key every 30 days, creates the next key at each rotation, and drops
+ * a retired key once its window ends.
  */
 export class UtsSignerDO extends DurableObject<Env> {
   readonly #config: UtsConfig;
@@ -126,17 +146,33 @@ export class UtsSignerDO extends DurableObject<Env> {
    * expire within the UTS maximum lifetime, which bounds how long a retired key stays published.
    */
   async sign(claims: unknown): Promise<SignResult> {
-    const parsed = SignableClaimsSchema.safeParse(claims);
-    if (!parsed.success) return { status: 'refused', reason: 'invalid_claims' };
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    const refusal = this.#refusalFor(parsed.data, nowSeconds);
-    if (refusal !== null) return { status: 'refused', reason: refusal };
+    const admission = this.#admit(claims, Math.floor(Date.now() / 1000));
+    if (admission.status === 'refused') return admission;
     const phase = await this.#current();
     if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
-    const token = await new SignJWT(parsed.data)
-      .setProtectedHeader({ alg: UTS_TOKEN_ALG, typ: UTS_TOKEN_TYPE, kid: phase.state.current.kid })
-      .sign(phase.signingKey);
+    const token = await signWith(phase, admission.claims);
     return { status: 'signed', kid: phase.state.current.kid, token };
+  }
+
+  /**
+   * Signs the claim sets of one mint, 1 to 8, in one call (design 5.7), in order and with the same
+   * key. Each set passes the check `sign` applies, and one refused set refuses the whole batch, so a
+   * mint gets every token or none.
+   */
+  async signMany(claims: unknown): Promise<SignManyResult> {
+    const batch = ClaimBatchSchema.safeParse(claims);
+    if (!batch.success) return { status: 'refused', reason: 'invalid_batch' };
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const admitted: SignableClaims[] = [];
+    for (const item of batch.data) {
+      const admission = this.#admit(item, nowSeconds);
+      if (admission.status === 'refused') return admission;
+      admitted.push(admission.claims);
+    }
+    const phase = await this.#current();
+    if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
+    const tokens = await Promise.all(admitted.map(item => signWith(phase, item)));
+    return { status: 'signed', kid: phase.state.current.kid, tokens };
   }
 
   /**
@@ -178,15 +214,30 @@ export class UtsSignerDO extends DurableObject<Env> {
     }));
   }
 
-  #refusalFor(claims: SignableClaims, nowSeconds: number): SignRefusal | null {
-    if (claims.iss !== this.#config.endpoints.issuer) return 'issuer_mismatch';
-    if (claims.env !== this.#config.environment) return 'environment_mismatch';
-    if (Math.abs(claims.iat - nowSeconds) > IAT_SKEW_SECONDS) return 'issued_at_out_of_range';
+  /**
+   * The signer's admission check: the claim set must name this environment's issuer, be issued
+   * now, and expire within the UTS maximum lifetime.
+   */
+  #admit(claims: unknown, nowSeconds: number): Admission {
+    const parsed = SignableClaimsSchema.safeParse(claims);
+    if (!parsed.success) return { status: 'refused', reason: 'invalid_claims' };
+    const checked = parsed.data;
+    if (checked.iss !== this.#config.endpoints.issuer) {
+      return { status: 'refused', reason: 'issuer_mismatch' };
+    }
+    if (checked.env !== this.#config.environment) {
+      return { status: 'refused', reason: 'environment_mismatch' };
+    }
+    if (Math.abs(checked.iat - nowSeconds) > IAT_SKEW_SECONDS) {
+      return { status: 'refused', reason: 'issued_at_out_of_range' };
+    }
     // An `iat` inside the backward skew allows an `exp` after `iat` that is already past; a
     // verifier would refuse that token at once, so the signer does not sign it.
-    if (claims.exp <= nowSeconds) return 'already_expired';
-    if (claims.exp > nowSeconds + UTS_MAX_TOKEN_LIFETIME_SECONDS) return 'expires_too_late';
-    return null;
+    if (checked.exp <= nowSeconds) return { status: 'refused', reason: 'already_expired' };
+    if (checked.exp > nowSeconds + UTS_MAX_TOKEN_LIFETIME_SECONDS) {
+      return { status: 'refused', reason: 'expires_too_late' };
+    }
+    return { status: 'admitted', claims: checked };
   }
 
   /** The phase once loading is done; loading always finishes before a call runs. */

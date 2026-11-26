@@ -42,6 +42,8 @@
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
   ],
+  // No identity-store Hyperdrive binding yet: the OAuth endpoints and their metadata stay off
+  // until the environment's identity store is provisioned (src/grants/binding.ts).
   "env": {
     "staging": {
       "name": "uts-staging",

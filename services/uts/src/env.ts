@@ -33,6 +33,11 @@ export type Env = {
   DO_JURISDICTION: string;
   UTS_SIGNER_DO: DurableObjectNamespace<UtsSignerDO>;
   UTS_KEY_SET_DO: DurableObjectNamespace<UtsKeySetDO>;
+  /**
+   * The identity store's primary Hyperdrive config, bound once the environment's identity store is
+   * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.
+   */
+  IDENTITY_STORE?: Hyperdrive;
 };
 
 /** The mint Worker's deployed name in each environment. */

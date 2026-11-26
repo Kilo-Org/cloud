@@ -23,6 +23,15 @@
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
   ],
+  // The OAuth routes are served once this binding exists. Nothing listens on it: the runtime tests
+  // pass their own grant store, and test/db runs every statement against the local Postgres.
+  "hyperdrive": [
+    {
+      "binding": "IDENTITY_STORE",
+      "id": "uts-test-identity-store",
+      "localConnectionString": "postgres://uts_app_a:unused@127.0.0.1:1/uts",
+    },
+  ],
   // The mint Worker's SignerKeys entrypoint as the development feed Worker binds it, and as two
   // callers it refuses; and the default entrypoint with the feed Worker's props, which serves no
   // signer keys.

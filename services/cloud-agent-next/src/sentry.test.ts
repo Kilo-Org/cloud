@@ -10,6 +10,7 @@ import {
   instrumentCloudAgentWorker,
   shouldCaptureCloudAgentException,
 } from './sentry.js';
+import { SENTRY_ERROR_OPTIONS } from './shared/sentry.js';
 import type { Env } from './types.js';
 
 afterEach(() => {
@@ -334,6 +335,70 @@ describe('Cloud Agent Worker SDK capture', () => {
     expect(events[0]?.exception?.values?.[0]?.stacktrace?.frames?.length).toBeGreaterThan(0);
     expect(JSON.stringify(events)).not.toContain('private-');
     expect(JSON.stringify(events)).not.toContain('203.0.113.14');
+  });
+
+  // An identity whose read throws makes the sanitize step inside beforeSend fail.
+  const throwingIdentity = () => ({
+    get sessionId(): string {
+      throw new Error('unreadable identity');
+    },
+  });
+
+  // A throw from a synchronous beforeSend makes core 10 capture the error as an
+  // internal event that skips beforeSend; a rejected promise does not.
+  it('sends no event when the Worker beforeSend fails', async () => {
+    vi.spyOn(logger, 'withFields').mockImplementation(() => {
+      throw new Error('logger failed');
+    });
+    const itemTypes: string[] = [];
+    const options: Sentry.CloudflareOptions = {
+      ...cloudAgentSentryOptions(telemetryEnv),
+      transport: () => ({
+        send: async envelope => {
+          for (const [header] of envelope[1]) itemTypes.push(String(header.type));
+          return { statusCode: 200 };
+        },
+        flush: async () => true,
+      }),
+    };
+    const worker = Sentry.withSentry((_env: Env) => options, {
+      async fetch(_request: Request, _env: Env, _ctx: ExecutionContext) {
+        throw new TypeError('private-prompt-and-token');
+      },
+    });
+    const { ctx, pending } = executionContext();
+    await expect(
+      worker.fetch(new Request('https://worker.example/send'), telemetryEnv as Env, ctx)
+    ).rejects.toThrow('private-prompt-and-token');
+    await Promise.all(pending);
+    // The internal event is captured after the request's own flush settles and
+    // exposes no promise to await, and the passing case sends nothing at all, so
+    // a short real wait bounds the check.
+    const { promise: settled, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, 100);
+    await settled;
+
+    expect(itemTypes).not.toContain('event');
+  });
+
+  it('resolves beforeSend to null when the sanitize step throws', async () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: { values: [{ type: 'Error', value: 'private-value' }] },
+    };
+    const hint = { originalException: new Error('defect') };
+
+    const withIdentity = cloudAgentSentryOptions(telemetryEnv, 'session', {}, throwingIdentity);
+    await expect(Promise.resolve(withIdentity.beforeSend?.(event, hint))).resolves.toBeNull();
+
+    const unreadable: ErrorEvent = {
+      type: undefined,
+      get exception(): ErrorEvent['exception'] {
+        throw new Error('unreadable exception');
+      },
+    };
+    expect(cloudAgentSentryOptions(telemetryEnv).beforeSend?.(unreadable, hint)).toBeNull();
+    expect(SENTRY_ERROR_OPTIONS.beforeSend(unreadable)).toBeNull();
   });
 
   it.each([

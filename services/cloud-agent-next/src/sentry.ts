@@ -47,53 +47,66 @@ export function cloudAgentSentryOptions(
     debug: false,
     skipOpenTelemetrySetup: true,
     initialScope: { contexts: { cloud_agent: { component, ...identity } } },
+    // The hook never throws or rejects: core then sends an internal event about
+    // the failure, and that event skips beforeSend. Any error drops the event.
     beforeSend(event, hint) {
-      if (!shouldCaptureCloudAgentException(hint.originalException)) return null;
-      const logged = sentryLogIdentity(hint.originalException);
-      const cloudAgent = event.contexts?.cloud_agent;
-      const finish = (stored?: CloudAgentSentryIdentity) => {
-        const sanitized = sanitizeSentryEvent(
-          {
-            ...event,
-            contexts: {
-              cloud_agent: {
-                ...cloudAgent,
-                component,
-                sessionId:
-                  stored?.sessionId ??
-                  cloudAgent?.sessionId ??
-                  identity.sessionId ??
-                  logged.sessionId,
-                sandboxId:
-                  stored?.sandboxId ??
-                  cloudAgent?.sandboxId ??
-                  identity.sandboxId ??
-                  logged.sandboxId,
+      try {
+        if (!shouldCaptureCloudAgentException(hint.originalException)) return null;
+        const logged = sentryLogIdentity(hint.originalException);
+        const cloudAgent = event.contexts?.cloud_agent;
+        const finish = (stored?: CloudAgentSentryIdentity) => {
+          const sanitized = sanitizeSentryEvent(
+            {
+              ...event,
+              contexts: {
+                cloud_agent: {
+                  ...cloudAgent,
+                  component,
+                  sessionId:
+                    stored?.sessionId ??
+                    cloudAgent?.sessionId ??
+                    identity.sessionId ??
+                    logged.sessionId,
+                  sandboxId:
+                    stored?.sandboxId ??
+                    cloudAgent?.sandboxId ??
+                    identity.sandboxId ??
+                    logged.sandboxId,
+                },
               },
             },
-          },
-          {
-            userId:
-              stored?.userId ??
-              (typeof cloudAgent?.userId === 'string' ? cloudAgent.userId : logged.userId),
-            orgId:
-              stored?.orgId ??
-              (typeof cloudAgent?.orgId === 'string' ? cloudAgent.orgId : logged.orgId),
+            {
+              userId:
+                stored?.userId ??
+                (typeof cloudAgent?.userId === 'string' ? cloudAgent.userId : logged.userId),
+              orgId:
+                stored?.orgId ??
+                (typeof cloudAgent?.orgId === 'string' ? cloudAgent.orgId : logged.orgId),
+            }
+          );
+          if (sanitized) {
+            logger
+              .withFields({ sentryEventId: sanitized.event_id, component, ...identity })
+              .error('Cloud Agent exception captured');
           }
-        );
-        if (sanitized) {
-          logger
-            .withFields({ sentryEventId: sanitized.event_id, component, ...identity })
-            .error('Cloud Agent exception captured');
-        }
-        return sanitized;
-      };
-      // A failed identity lookup must not drop the original exception.
-      return readIdentity
-        ? Promise.resolve()
-            .then(readIdentity)
-            .then(finish, () => finish())
-        : finish();
+          return sanitized;
+        };
+        const finishOrDrop = (stored?: CloudAgentSentryIdentity) => {
+          try {
+            return finish(stored);
+          } catch {
+            return null;
+          }
+        };
+        // A failed identity lookup must not drop the original exception.
+        return readIdentity
+          ? Promise.resolve()
+              .then(readIdentity)
+              .then(finishOrDrop, () => finishOrDrop())
+          : finishOrDrop();
+      } catch {
+        return null;
+      }
     },
   };
 }

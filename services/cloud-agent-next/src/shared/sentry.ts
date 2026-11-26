@@ -179,5 +179,12 @@ export const SENTRY_ERROR_OPTIONS = {
   enableLogs: false,
   tracesSampleRate: 0,
   maxBreadcrumbs: 0,
-  beforeSend: (event: ErrorEvent) => sanitizeSentryEvent(event),
+  // Never throws: a throw makes core send an internal event that skips this hook.
+  beforeSend: (event: ErrorEvent) => {
+    try {
+      return sanitizeSentryEvent(event);
+    } catch {
+      return null;
+    }
+  },
 } as const;

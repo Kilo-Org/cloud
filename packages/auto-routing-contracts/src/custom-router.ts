@@ -1255,10 +1255,24 @@ export const AutoRoutingDeniedModelsRequestSchema = z.object({
   userId: z.string().trim().min(1),
   organizationId: z.uuid(),
   modelIds: z.array(ModelIdSchema).max(MAX_DENIED_MODEL_CANDIDATES),
+  classifierModel: ModelIdSchema.optional(),
 });
 export type AutoRoutingDeniedModelsRequest = z.infer<typeof AutoRoutingDeniedModelsRequestSchema>;
 
+const ClassifierRouteSchema = z.object({
+  model: ModelIdSchema,
+  provider: z
+    .object({
+      only: z.array(z.string().min(1)).nonempty().optional(),
+      data_collection: z.enum(['allow', 'deny']).optional(),
+    })
+    .optional(),
+});
+export type ClassifierRoute = z.infer<typeof ClassifierRouteSchema>;
+
 export const AutoRoutingDeniedModelsResponseSchema = z.object({
   deniedModelIds: z.array(z.string()),
+  // Missing from older gateways; only an explicit route authorizes classifier inference.
+  classifierRoute: ClassifierRouteSchema.nullable().optional(),
 });
 export type AutoRoutingDeniedModelsResponse = z.infer<typeof AutoRoutingDeniedModelsResponseSchema>;

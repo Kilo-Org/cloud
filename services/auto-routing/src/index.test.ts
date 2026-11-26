@@ -5,6 +5,7 @@ import {
   SHADOW_ROUTING_TABLE_CONFIG_KEY,
 } from './classifier-config';
 import * as classifierConfig from './classifier-config';
+import { clearOrganizationPolicyCache } from './organization-policy';
 import { clearRoutingTableCache } from './routing-table';
 import { clearModelCapabilitiesCache } from './model-capabilities';
 import type * as ModelCapabilitiesModule from './model-capabilities';
@@ -78,6 +79,7 @@ const env = {
     get: async () => 'classifier-token',
   },
   KILO_WEB_API_BASE_URL: 'https://web.example.test',
+  KILO_AI_GATEWAY_BASE_URL: 'https://gateway.example.test',
   AUTO_ROUTING_CONFIG: {
     get: configGet,
     delete: configDelete,
@@ -276,6 +278,7 @@ function decideRequest(payload: unknown) {
 describe('auto routing worker', () => {
   beforeEach(async () => {
     clearClassifierConfigCache();
+    clearOrganizationPolicyCache();
     clearRoutingTableCache();
     clearModelCapabilitiesCache();
     clearClassificationHotCache();
@@ -339,7 +342,13 @@ describe('auto routing worker', () => {
       cachePutEntry('sticky', value)
     );
     mockedFetch.mockReset();
-    mockedFetch.mockImplementation(async (_url, init) => {
+    mockedFetch.mockImplementation(async (url, init) => {
+      if (url instanceof URL && url.origin === env.KILO_AI_GATEWAY_BASE_URL) {
+        return Response.json({
+          deniedModelIds: [],
+          classifierRoute: { model: 'typesafe/jev-1.13' },
+        });
+      }
       const body = init?.body;
       if (typeof body !== 'string') throw new Error('Expected serialized usage body');
       const usage = UsageRecordRequestSchema.parse(JSON.parse(body));
@@ -875,7 +884,12 @@ describe('auto routing worker', () => {
         normalized: normalizedInput,
       },
     });
-    expect(classifyNormalizedInput).toHaveBeenCalledWith(env, normalizedInput, 'typesafe/jev-1.13');
+    expect(classifyNormalizedInput).toHaveBeenCalledWith(
+      env,
+      normalizedInput,
+      'typesafe/jev-1.13',
+      undefined
+    );
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
@@ -1884,6 +1898,51 @@ describe('auto routing worker', () => {
     }
     expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(1);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([false, true])(
+    'uses the authorized concrete classifier and provider (sticky: %s)',
+    async sticky => {
+      if (sticky)
+        mockStoredConversation().set('sticky', {
+          model: 'google/gemini-2.5-flash-lite',
+          variant: null,
+          routeKey: 'implementation/feature_development',
+        });
+      const provider = { only: ['inference-host'] };
+      mockedFetch.mockResolvedValueOnce(
+        Response.json({
+          deniedModelIds: [],
+          classifierRoute: { model: 'concrete/classifier', provider },
+        })
+      );
+      const response = await decideRequest(
+        mirrorPayload({ organizationId: '00000000-0000-4000-8000-000000000001' })
+      );
+      expect(await response.json()).toMatchObject({
+        decision: { model: 'google/gemini-2.5-flash-lite' },
+        ...(sticky && { classifierResult: null }),
+      });
+      await drainBackgroundTasks();
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+      expect(classifyNormalizedInput).toHaveBeenCalledWith(
+        env,
+        normalizedInput,
+        'concrete/classifier',
+        provider
+      );
+    }
+  );
+
+  it('does not send the mirrored prompt or start background work without a classifier grant', async () => {
+    mockedFetch.mockResolvedValueOnce(Response.json({ deniedModelIds: [], classifierRoute: null }));
+    const response = await decideRequest(
+      mirrorPayload({ organizationId: '00000000-0000-4000-8000-000000000001' })
+    );
+    expect(await response.json()).toEqual({ cost: 0, decision: null, classifierResult: null });
+    await drainBackgroundTasks();
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
   });
 
   it('leaves the sticky route unchanged when background classification fails without usage', async () => {

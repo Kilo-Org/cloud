@@ -5,6 +5,7 @@ import {
   type NormalizedClassifierInput,
 } from '../index';
 import classifierTaxonomy from './taxonomy.json';
+import type { ClassifierRoute } from '../custom-router';
 
 // OpenRouter serves System One models (TypeSafe Jev, Cloudflare Clef) at
 // /systemone and reports usage.cost like chat completions, so the classifier
@@ -327,11 +328,12 @@ export async function requestSystemOne(
 export async function classifyWithSystemOne(
   client: SystemOneClient,
   input: NormalizedClassifierInput,
-  classifierModel: string
+  classifierModel: string,
+  provider?: ClassifierRoute['provider']
 ): Promise<ClassifierRunResult> {
   const response = await requestSystemOne(
     client,
-    buildClassifierRequest(input, classifierModel),
+    { ...buildClassifierRequest(input, classifierModel), ...(provider && { provider }) },
     classifierModel
   );
 

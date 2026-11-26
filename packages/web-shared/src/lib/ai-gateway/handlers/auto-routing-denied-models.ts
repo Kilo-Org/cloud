@@ -1,16 +1,12 @@
-import {
-  AutoRoutingDeniedModelsRequestSchema,
-  type AutoRoutingDeniedModelsResponse,
-} from '@kilocode/auto-routing-contracts';
+import { AutoRoutingDeniedModelsRequestSchema } from '@kilocode/auto-routing-contracts';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
-import { deniedAutoRoutingModelIdsForMember } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import { autoRoutingPolicyForMember } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
-// Internal: the auto-routing worker's CLI decide path applies the gateway's own organization
-// model policy to a custom router's gateway entries (ADR 0005).
+// The worker checks its classifier and CLI pool candidates against the same member policy.
 export async function handleAutoRoutingDeniedModelsRequest(
   request: NextRequest
 ): Promise<NextResponse> {
@@ -25,8 +21,7 @@ export async function handleAutoRoutingDeniedModelsRequest(
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
   try {
-    const deniedModelIds = await deniedAutoRoutingModelIdsForMember(parsed.data);
-    return NextResponse.json({ deniedModelIds } satisfies AutoRoutingDeniedModelsResponse);
+    return NextResponse.json(await autoRoutingPolicyForMember(parsed.data));
   } catch (error) {
     if (
       error instanceof TRPCError &&

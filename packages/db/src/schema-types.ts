@@ -1954,6 +1954,14 @@ export type BYOKApiKeyEnvelope = {
 };
 
 /**
+ * A custom LLM's credentials, encrypted through the BYOK KMS service. `key_id` is the
+ * random id the data key is bound to; copies of a custom LLM share the envelope.
+ */
+export type CustomLlmCredentialsEnvelope = BYOKApiKeyEnvelope & {
+  key_id: string;
+};
+
+/**
  * RSA + AES envelope stored for secrets that are encrypted by the web app
  * and decrypted by a Worker. Kept structural here so the schema package does
  * not need to depend on the runtime encryption implementation.

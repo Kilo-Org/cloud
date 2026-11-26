@@ -28,7 +28,7 @@ import {
   isResourceTokenIssuanceEnabled,
   NEXTAUTH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,

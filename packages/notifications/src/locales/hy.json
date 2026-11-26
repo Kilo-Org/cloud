@@ -8,7 +8,8 @@
       "securityFinding": "Անվտանգության հայտնաբերումն ուշադրության կարիք ունի",
       "securityUpdate": "Անվտանգության ստուգումն ունի թարմացում",
       "agentBriefing": "Ձեր ագենտի հաշվետվությունը պատրաստ է",
-      "activeAgentsGlanceable": "Ակտիվ գործակալներն ունեն թարմացում"
+      "activeAgentsGlanceable": "Ակտիվ գործակալներն ունեն թարմացում",
+      "accountSecurity": "Ձեր հաշվում անվտանգության գործողություն է եղել"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA խախտում"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Ձեր հաշվին ավելացվել է մուտքի բանալի"
+      },
+      "passkeyRemoved": {
+        "title": "Ձեր հաշվից հեռացվել է մուտքի բանալի"
+      },
+      "signInMethodLinked": {
+        "title": "Ձեր հաշվին ավելացվել է մուտքի եղանակ"
+      },
+      "signInMethodUnlinked": {
+        "title": "Ձեր հաշվից հեռացվել է մուտքի եղանակ"
+      },
+      "deviceSignInApproved": {
+        "title": "Սարքից մուտքը հաստատվել է"
+      },
+      "apiKeyReset": {
+        "title": "API տոկենը վերակայվել է"
+      },
+      "browserSessionsRevoked": {
+        "title": "Դուք դուրս եք եկել բոլոր դիտարկիչներից"
+      },
+      "deviceSessionRevoked": {
+        "title": "Սարքը դուրս է եկել ձեր հաշվից"
+      },
+      "signInResetBySupport": {
+        "title": "Մուտքը վերակայվել է Kilo-ի աջակցության կողմից"
+      },
+      "newSignIn": {
+        "title": "Նոր մուտք ձեր հաշիվ"
+      },
+      "body": {
+        "deviceAndLocation": "{{device}}-ից՝ {{location}}-ի մոտակայքում։ Դուք չէի՞ք։ Հիմա ստուգեք ձեր հաշվի անվտանգությունը։",
+        "device": "{{device}}-ից։ Դուք չէի՞ք։ Հիմա ստուգեք ձեր հաշվի անվտանգությունը։",
+        "location": "{{location}}-ի մոտակայքից։ Դուք չէի՞ք։ Հիմա ստուգեք ձեր հաշվի անվտանգությունը։",
+        "unknown": "Դուք չէի՞ք։ Հիմա ստուգեք ձեր հաշվի անվտանգությունը։",
+        "selfNamedDevice": "Մի սարքից, որն իրեն անվանել է «{{name}}»։ Դուք չէի՞ք։ Հիմա ստուգեք ձեր հաշվի անվտանգությունը։",
+        "support": "Կատարվել է Kilo-ի աջակցության կողմից։ Եթե դա չեք խնդրել, դիմեք աջակցությանը։"
+      }
     }
   },
   "sessionReady": {

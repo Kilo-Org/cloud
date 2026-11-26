@@ -1,4 +1,5 @@
 import {
+  accountSecurityPushCopy,
   genericPushContentForPushData,
   SECURITY_FINDING_PUSH_TITLE_KEYS,
   SECURITY_LIFECYCLE_I18N_KEY,
@@ -181,12 +182,29 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
           priority: 'high',
         },
       } satisfies DispatchPushInput;
+    case 'account_security':
+      // The producer's key already names the event (a credential id, a
+      // request id, or a time bucket), so a repeated dispatch of one event is
+      // one push. The channel still applies the recipient's preview choice:
+      // generic previews replace this copy with the content-free sentence.
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `account-security:${input.idempotencyKey}`,
+        badge: null,
+        push: {
+          ...accountSecurityPushCopy(input),
+          data: { type: 'account_security', event: input.event },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
   }
 }
 
 function categoryEnabled(
   prefs: UserNotificationPreferences,
-  kind: Exclude<InternalDispatchRequest['kind'], 'agent_briefing'>
+  kind: Exclude<InternalDispatchRequest['kind'], 'agent_briefing' | 'account_security'>
 ): boolean {
   switch (kind) {
     case 'low_balance':
@@ -224,9 +242,12 @@ function classifyDispatchError(error: string): string {
 }
 
 /**
- * Dispatch a low-balance, spend-alert, or security push to one or more
- * recipients. Per-recipient preference gate runs before any DO call;
- * preference-read throws fail closed without calling dispatchPush.
+ * Dispatch a low-balance, spend-alert, security, or account-security push to
+ * one or more recipients. Per-recipient preference gate runs before any DO
+ * call; preference-read throws fail closed without calling dispatchPush. An
+ * account-security notice has no category gate: like its email, it cannot be
+ * turned off, so it reads no preference here (the channel still reads the
+ * preview choice).
  */
 export async function dispatchInternalPushCore(
   input: InternalDispatchRequest,
@@ -270,18 +291,22 @@ export async function dispatchInternalPushCore(
     recipients.push(input.recipientUserId);
   }
 
+  const kind = input.kind;
+
   const results = await Promise.allSettled(
     recipients.map(async (userId): Promise<Omit<PerRecipientResult, 'userId'>> => {
-      let prefs: UserNotificationPreferences;
-      try {
-        const row = await deps.readPreferences(userId);
-        prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
-      } catch {
-        return { outcome: 'failed', reason: 'preference_read_failed' };
-      }
+      if (kind !== 'account_security') {
+        let prefs: UserNotificationPreferences;
+        try {
+          const row = await deps.readPreferences(userId);
+          prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
+        } catch {
+          return { outcome: 'failed', reason: 'preference_read_failed' };
+        }
 
-      if (!categoryEnabled(prefs, input.kind)) {
-        return { outcome: 'suppressed_preference' };
+        if (!categoryEnabled(prefs, kind)) {
+          return { outcome: 'suppressed_preference' };
+        }
       }
 
       const stub = deps.getRecipientDOStub(userId);

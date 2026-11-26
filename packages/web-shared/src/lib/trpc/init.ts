@@ -36,6 +36,7 @@ import {
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { adminNetworkRefusal } from '@kilocode/web-shared/lib/admin/admin-network';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
@@ -454,7 +455,10 @@ type AdminGuardFn = Parameters<typeof t.middleware>[0];
 const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type, next }) => {
   const attribution = resolveAdminAttribution(ctx, path, type);
   const isBearer = attribution.credential !== 'session';
-  const emitPrivileged = (outcome: 'succeeded' | 'denied' | 'failed') =>
+  const emitPrivileged = (
+    outcome: 'succeeded' | 'denied' | 'failed',
+    ip: string | null = ctx.ip ?? null
+  ) =>
     emitPrivilegedAccessEvent({
       surface: 'trpc',
       user: ctx.user,
@@ -468,7 +472,7 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
       tokenSource: ctx.tokenSource ?? null,
       route: path,
       method: type,
-      ip: ctx.ip ?? null,
+      ip,
     });
 
   if (!ctx.user.is_admin) {
@@ -477,6 +481,16 @@ const adminGuardFn = markPrivilegedGuard<AdminGuardFn>(async ({ ctx, path, type,
       code: 'FORBIDDEN',
       message: 'Admin access required',
     });
+  }
+  const networkRefusal = adminNetworkRefusal(ctx.headersList ?? new Headers(), {
+    route: path,
+    kiloUserId: ctx.user.id,
+  });
+  if (networkRefusal) {
+    // The network decision's address, never `ctx.ip`: that falls back to the
+    // client-settable `x-forwarded-for` when the trusted header is missing.
+    if (isBearer) emitPrivileged('denied', networkRefusal.clientAddress);
+    throw new TRPCError({ code: 'FORBIDDEN', message: networkRefusal.message });
   }
   emitAdminAccessEvent({
     surface: 'trpc',

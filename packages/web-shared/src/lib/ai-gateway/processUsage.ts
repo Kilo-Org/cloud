@@ -1787,7 +1787,7 @@ export async function processTokenData(
 
 /**
  * Records or queues usage and reports the same request to bouncer's usage ledger, after the billing
- * cost is final. Chat and transcription reach it through `processTokenData`; FIM, edit,
+ * cost is final. Chat and transcription reach it through `processTokenData`; FIM,
  * embeddings, and SystemOne call it directly.
  *
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its

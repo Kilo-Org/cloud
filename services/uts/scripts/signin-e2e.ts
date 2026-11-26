@@ -331,11 +331,27 @@ async function main() {
     cliGet.status() === 200 && cliPage === 'Continue to the app',
     'a CLI GET shows the confirm page, not a code'
   );
-  const cliRedirect = await codeFrom(page, cliUrl, false, true);
+  // The confirm page's Continue is a same-origin form POST of the same URL; the browser click on
+  // it is step 2's mobile request, so here the request context sends that POST itself.
+  const confirmed = await context.request.post(cliUrl, {
+    headers: { Origin: base.origin, 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: '',
+    maxRedirects: 0,
+  });
+  const cliRedirect = new URL(z.string().parse(confirmed.headers().location));
+  check(
+    confirmed.status() === 302 &&
+      `${cliRedirect.origin}${cliRedirect.pathname}` === CLI_REDIRECT &&
+      cliRedirect.searchParams.get('code') !== null,
+    'the confirm POST redirects to the CLI with a code'
+  );
   secrets.push(z.string().parse(cliRedirect.searchParams.get('code')));
   log('3 CLI loopback on the session', {
     plainGet: { status: cliGet.status(), page: cliPage },
-    afterContinue: `${cliRedirect.origin}${cliRedirect.pathname}`,
+    confirmPost: {
+      status: confirmed.status(),
+      redirect: `${cliRedirect.origin}${cliRedirect.pathname}`,
+    },
   });
   // The request context shares the page's cookies and follows no redirect.
   const stale = await context.request.get(

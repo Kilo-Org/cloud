@@ -81,6 +81,11 @@ export type Provider = {
    */
   chatGptOwner?: OpenAiChatGptOwner;
   /**
+   * The key id of the stored ChatGPT credential this provider sends, so a refusal can
+   * disable that exact credential. Set together with `chatGptOwner`.
+   */
+  chatGptCredentialKeyId?: string;
+  /**
    * The Claude billing connection that serves this provider. Set only on the
    * Claude billing route; it names whose Claude organization pays.
    */

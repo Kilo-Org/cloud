@@ -9,7 +9,7 @@ import {
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
-import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import {

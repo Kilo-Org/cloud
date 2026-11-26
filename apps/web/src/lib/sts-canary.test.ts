@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { SignJWT, exportJWK, generateKeyPair, type CryptoKey as JoseKey } from 'jose';
 import type { ServiceTokens } from '@kilocode/service-token-client';
-import { ServiceTokenError } from '@kilocode/service-token-client';
+import { ServiceTokenError, createServiceTokens } from '@kilocode/service-token-client';
 import { createVerifier, failureResponse } from '@kilocode/verify';
 import {
   STS_CANARY_ROUTE_MAX_DURATION_SECONDS,
+  type MintRequest,
+  type MintResult,
   type StsCanaryReport,
 } from '@kilocode/sts-contracts';
 import { createStsCanaryHandler } from './sts-canary';
@@ -52,7 +54,7 @@ function verifierFor(audience: string) {
     audience,
     environment: 'production',
     resourceMetadataUrl: `https://${audience}.test/.well-known/oauth-protected-resource`,
-    sts: { issuer: STS, jwks: async () => jwks },
+    sts: { issuer: STS, jwks: async () => ({ body: jwks, age: null, oldestAge: null }) },
   });
 }
 
@@ -79,15 +81,69 @@ function fakeTokens(get: () => Promise<string>): ServiceTokens {
   return { get: jest.fn(get) };
 }
 
-function handler(tokens: ServiceTokens, fetchFn: typeof fetch, now?: () => number) {
+/** What STS answers the `web` workload for the reserved probe: no policy lists the audience `canary`. */
+const DENIED = {
+  status: 'denied',
+  audience: 'canary',
+  scope: 'canary:denied-probe',
+  reason: 'audience_not_allowed',
+} as const;
+
+function deniedTokens(): ServiceTokens {
+  return fakeTokens(async () => {
+    throw new ServiceTokenError(
+      { reason: 'denied', deniedReason: DENIED.reason },
+      { audience: DENIED.audience, scope: DENIED.scope }
+    );
+  });
+}
+
+function handler(
+  tokens: ServiceTokens,
+  fetchFn: typeof fetch,
+  now?: () => number,
+  newTokens: () => ServiceTokens = deniedTokens
+) {
   return createStsCanaryHandler({
     verifier: verifierFor('web'),
     tokens,
+    newTokens,
     verifyUrl: VERIFY_URL,
     waitUntil,
     fetch: fetchFn,
     now,
   });
+}
+
+/**
+ * STS over the real token client: the `web` workload gets `usage-ingest:sts.canary` and is refused
+ * `canary:denied-probe` with `audience_not_allowed`, unless `answerDenied` says otherwise. Records
+ * every call's requested tokens.
+ */
+function sts(
+  answerDenied: (request: MintRequest) => MintResult = () => ({ status: 'ok', tokens: [DENIED] })
+) {
+  const calls: string[][] = [];
+  const transport = async (request: MintRequest): Promise<MintResult> => {
+    calls.push(request.tokens.map(({ audience, scope }) => `${audience} ${scope}`));
+    if (request.tokens.some(({ audience }) => audience === 'canary')) return answerDenied(request);
+    const token = await stsToken('web', 'usage-ingest', 'usage-ingest:sts.canary');
+    return {
+      status: 'ok',
+      tokens: [
+        {
+          status: 'issued',
+          audience: 'usage-ingest',
+          scope: 'usage-ingest:sts.canary',
+          token,
+          jti: crypto.randomUUID(),
+          expiresAt: Math.floor(Date.now() / 1000) + 300,
+        },
+      ],
+    };
+  };
+  const client = () => createServiceTokens(transport, { attemptTimeoutMs: 1_000 });
+  return { calls, tokens: client(), newTokens: client };
 }
 
 async function call(run: (request: Request) => Promise<Response>, token: string | null) {
@@ -144,6 +200,7 @@ describe('STS canary route handler', () => {
         wrongAudience: { result: 'ok', status: 403 },
         forged: { result: 'ok', status: 401 },
         expired: 'skipped',
+        stsDenied: { result: 'ok', status: null },
       },
     } satisfies StsCanaryReport);
     expect(body).not.toContain(own);
@@ -187,6 +244,86 @@ describe('STS canary route handler', () => {
     expect(report.outbound).toMatchObject({ result: 'failed', status: null });
     expect(report.negatives.wrongAudience).toEqual({ result: 'ok', status: 403 });
     expect(report.negatives.forged).toMatchObject({ result: 'failed', status: null });
+  });
+
+  it('asks STS every run, in a call of its own, for the reserved probe and expects audience_not_allowed', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    const { fetchFn } = usageIngest();
+    const stub = sts();
+    const run = handler(stub.tokens, fetchFn, undefined, stub.newTokens);
+    const inbound = await stsToken('usage-ingest', 'web', 'web:sts.canary');
+
+    // Two runs well within the client's 60 s denied state: each still reaches STS.
+    const first = (await (await call(run, inbound)).json()) as StsCanaryReport;
+    const second = (await (await call(run, inbound)).json()) as StsCanaryReport;
+
+    for (const report of [first, second]) {
+      expect(report.outbound).toEqual({ result: 'ok', status: 204 });
+      expect(report.negatives.stsDenied).toEqual({ result: 'ok', status: null });
+    }
+    // The allowed token is minted once and then served from memory; the denial never joins it.
+    expect(stub.calls).toEqual([
+      ['usage-ingest usage-ingest:sts.canary'],
+      ['canary canary:denied-probe'],
+      ['canary canary:denied-probe'],
+    ]);
+    const lines = info.mock.calls.map(
+      ([line]) => JSON.parse(String(line)) as Record<string, unknown>
+    );
+    expect(lines.map(line => line.outcome)).toEqual(['succeeded', 'succeeded']);
+    info.mockRestore();
+  });
+
+  it.each<[string, (request: MintRequest) => MintResult, string]>([
+    [
+      'STS is unavailable',
+      () => ({ status: 'unavailable', retryAfterSeconds: 5 }),
+      'mint unavailable: retry in 5 s',
+    ],
+    [
+      'STS issues the token',
+      () => ({
+        status: 'ok',
+        tokens: [
+          {
+            status: 'issued',
+            audience: 'canary',
+            scope: 'canary:denied-probe',
+            token: 'issued.probe.token',
+            jti: 'jti-probe',
+            expiresAt: Math.floor(Date.now() / 1000) + 300,
+          },
+        ],
+      }),
+      'STS issued the reserved denied probe',
+    ],
+    [
+      'STS denies for another reason',
+      () => ({ status: 'ok', tokens: [{ ...DENIED, reason: 'unknown_scope' }] }),
+      'mint denied: unknown_scope',
+    ],
+    [
+      'STS rejects the identity',
+      () => ({ status: 'identity_rejected' }),
+      'mint denied: identity_rejected',
+    ],
+  ])('fails the run when %s, and the allowed mint still passes', async (_name, answer, detail) => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { fetchFn } = usageIngest();
+    const stub = sts(answer);
+    const response = await call(
+      handler(stub.tokens, fetchFn, undefined, stub.newTokens),
+      await stsToken('usage-ingest', 'web', 'web:sts.canary')
+    );
+    const report = (await response.json()) as StsCanaryReport;
+    expect(report.outbound).toEqual({ result: 'ok', status: 204 });
+    expect(report.negatives.stsDenied).toEqual({ result: 'failed', status: null, detail });
+    expect(JSON.stringify(report)).not.toContain('issued.probe.token');
+    const [line] = warn.mock.calls.map(
+      ([text]) => JSON.parse(String(text)) as Record<string, unknown>
+    );
+    expect(line).toMatchObject({ event: 'sts_canary', outcome: 'failed' });
+    warn.mockRestore();
   });
 
   it('never follows a redirect from usage-ingest: every call is manual and a 3xx fails its check', async () => {

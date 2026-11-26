@@ -4,7 +4,7 @@ import { generateText } from 'ai';
 import { eq, sql } from 'drizzle-orm';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
@@ -13,7 +13,9 @@ import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
 import { CODING_PLAN_IDS } from '@/lib/coding-plans/pricing';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
+import { sealedInventoryColumns } from '@/tests/helpers/coding-plan-inventory.helper';
 import {
+  isFakeByokKmsRequest,
   TEST_BYOK_DATA_KEY,
   testByokEnvelope,
   useFakeByokKms,
@@ -76,7 +78,7 @@ async function insertInventory(
       plan_id: PLAN_ID,
       provider_id: 'minimax',
       upstream_plan_id: `minimax-plan-${crypto.randomUUID()}`,
-      encrypted_api_key: encryptApiKey('old-secret', BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns('old-secret'),
       credential_fingerprint: crypto.randomUUID(),
       status: 'available',
       ...overrides,
@@ -93,8 +95,10 @@ function mockKms() {
   const probe: { onRequest?: () => Promise<void> } = {};
   process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
   process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
-  const fetchMock = jest.fn(async () => {
+  const fetchMock = jest.fn(async (input: RequestInfo | URL) => {
     await probe.onRequest?.();
+    // Inventory rows are sealed with the fake service's key, so reading one needs it back.
+    if (String(input).endsWith('/decrypt')) return Response.json({ data_key: TEST_BYOK_DATA_KEY });
     const data_key = randomBytes(32).toString('base64');
     dataKeys.push(data_key);
     return Response.json({
@@ -633,7 +637,7 @@ describe('coding plans router', () => {
         plan_id: PLAN_ID,
         provider_id: 'minimax',
         upstream_plan_id: `minimax-grandfathered-${crypto.randomUUID()}`,
-        encrypted_api_key: encryptApiKey(managedKey, BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns(managedKey),
         credential_fingerprint: crypto.randomUUID(),
         status: 'assigned',
         assigned_to_user_id: owner.id,
@@ -670,7 +674,13 @@ describe('coding plans router', () => {
       .returning();
     const ownerCaller = await createCallerForUser(owner.id);
     const otherCaller = await createCallerForUser(otherUser.id);
-    const request = jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
+    // Reading the managed credential opens its inventory envelope through the fake KMS service.
+    const kmsFetch = global.fetch;
+    const request = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input, init) =>
+        isFakeByokKmsRequest(input) ? kmsFetch(input, init) : usageResponse()
+      );
 
     const active = await ownerCaller.codingPlans.getUsage({
       subscriptionId: subscription.id,
@@ -710,8 +720,9 @@ describe('coding plans router', () => {
       message: 'Coding Plan subscription not found.',
     });
 
-    expect(request).toHaveBeenCalledTimes(1);
-    for (const call of request.mock.calls) {
+    const usageCalls = request.mock.calls.filter(([input]) => !isFakeByokKmsRequest(input));
+    expect(usageCalls).toHaveLength(1);
+    for (const call of usageCalls) {
       expect(call[0]).toBe('https://api.minimax.io/v1/token_plan/remains');
       expect(call[1]?.headers).toEqual(
         expect.objectContaining({ Authorization: `Bearer ${managedKey}` })
@@ -1046,7 +1057,8 @@ describe('coding plans router', () => {
     for (const row of rows) {
       const wasQueued = queuedIds.includes(row.id);
       expect(row.status).toBe(wasQueued ? 'revocation_pending' : 'available');
-      expect(row.encrypted_api_key).toEqual(wasQueued ? null : expect.anything());
+      expect(row.encrypted_api_key).toEqual(wasQueued ? null : OBSOLETE_STATIC_KEY_PLACEHOLDER);
+      expect(row.encrypted_api_key_envelope === null).toBe(wasQueued);
       if (wasQueued) {
         expect(row.revocation_requested_at).not.toBeNull();
         expect(row.upstream_plan_id).toBe(
@@ -1138,7 +1150,7 @@ describe('coding plans router', () => {
         plan_id: PLAN_ID,
         provider_id: 'minimax',
         upstream_plan_id: 'minimax-deprovision-plan',
-        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('unreturned-secret'),
         credential_fingerprint: crypto.randomUUID(),
         status: 'revocation_pending',
         revocation_requested_at: new Date().toISOString(),
@@ -1184,6 +1196,7 @@ describe('coding plans router', () => {
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     expect(failed.status).toBe('revocation_failed');
     expect(failed.encrypted_api_key).toBeNull();
+    expect(failed.encrypted_api_key_envelope).toBeNull();
     expect(failed.last_revocation_error).toContain('bearer [redacted]');
 
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
@@ -1197,11 +1210,16 @@ describe('coding plans router', () => {
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     expect(credential.status).toBe('available');
     expect(credential.upstream_plan_id).toBe('minimax-deprovision-plan');
-    expect(credential.encrypted_api_key).not.toBeNull();
+    expect(credential.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+    expect(credential.encrypted_api_key_envelope).not.toBeNull();
 
     await db
       .update(coding_plan_key_inventory)
-      .set({ status: 'revocation_pending', encrypted_api_key: null })
+      .set({
+        status: 'revocation_pending',
+        encrypted_api_key: null,
+        encrypted_api_key_envelope: null,
+      })
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     await adminCaller.codingPlans.adminMarkRevocationComplete({ inventoryKeyId: workItem.id });
     const [revoked] = await db
@@ -1211,6 +1229,7 @@ describe('coding plans router', () => {
     expect(revoked.status).toBe('revoked');
     expect(revoked.upstream_plan_id).toBe('minimax-deprovision-plan');
     expect(revoked.encrypted_api_key).toBeNull();
+    expect(revoked.encrypted_api_key_envelope).toBeNull();
   });
 
   it('returns the stored BytePlus username in the admin revocation queue', async () => {
@@ -1254,7 +1273,7 @@ describe('coding plans router', () => {
         plan_id: PLAN_ID,
         provider_id: 'minimax',
         upstream_plan_id: 'minimax-deprovision-plan',
-        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('unreturned-secret'),
         credential_fingerprint: crypto.randomUUID(),
         status: 'revocation_pending',
         revocation_requested_at: new Date().toISOString(),
@@ -1308,7 +1327,7 @@ describe('coding plans router', () => {
         plan_id: PLAN_ID,
         provider_id: 'minimax',
         upstream_plan_id: 'minimax-orphan-plan',
-        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('unreturned-secret'),
         credential_fingerprint: crypto.randomUUID(),
         status: 'revocation_pending',
         revocation_requested_at: new Date().toISOString(),
@@ -1333,7 +1352,7 @@ describe('coding plans router', () => {
         plan_id: PLAN_ID,
         provider_id: 'minimax',
         upstream_plan_id: 'minimax-three-ref-plan',
-        encrypted_api_key: encryptApiKey('unreturned-secret', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('unreturned-secret'),
         credential_fingerprint: crypto.randomUUID(),
         status: 'revocation_pending',
         revocation_requested_at: new Date().toISOString(),
@@ -1672,11 +1691,11 @@ describe('coding plans router', () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
     const available = await insertInventory({
-      encrypted_api_key: encryptApiKey('old-secret', BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns('old-secret'),
       credential_fingerprint: codingPlanCredentialFingerprint('old-secret'),
     });
     const assigned = await insertInventory({
-      encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns('assigned-old-secret'),
       credential_fingerprint: codingPlanCredentialFingerprint('assigned-old-secret'),
       status: 'assigned',
       assigned_to_user_id: user.id,
@@ -1700,7 +1719,7 @@ describe('coding plans router', () => {
       })
     );
     const duplicate = await insertInventory({
-      encrypted_api_key: encryptApiKey('already-present-key', BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns('already-present-key'),
       credential_fingerprint: codingPlanCredentialFingerprint('already-present-key'),
     });
     const pending = await insertInventory({ status: 'revocation_pending' });
@@ -1719,10 +1738,13 @@ describe('coding plans router', () => {
     expect(replacedAvailable.credential_fingerprint).toBe(
       codingPlanCredentialFingerprint('available-replacement-key')
     );
-    expect(replacedAvailable.encrypted_api_key).not.toBeNull();
-    expect(decryptApiKey(replacedAvailable.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe(
-      'available-replacement-key'
-    );
+    expect(replacedAvailable.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+    expect(
+      decryptApiKey(
+        replacedAvailable.encrypted_api_key_envelope!.encrypted_data,
+        TEST_BYOK_DATA_KEY
+      )
+    ).toBe('available-replacement-key');
 
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
     await caller.codingPlans.adminReplaceInventoryCredential({
@@ -1738,10 +1760,10 @@ describe('coding plans router', () => {
       .from(byok_api_keys)
       .where(eq(byok_api_keys.id, installedByok.id));
     expect(replacedAssigned.status).toBe('assigned');
-    expect(replacedAssigned.encrypted_api_key).not.toBeNull();
-    expect(decryptApiKey(replacedAssigned.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe(
-      'assigned-replacement-key'
-    );
+    expect(replacedAssigned.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+    expect(
+      decryptApiKey(replacedAssigned.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)
+    ).toBe('assigned-replacement-key');
     expect(
       decryptApiKey(replacedByok.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)
     ).toBe('assigned-replacement-key');
@@ -1789,7 +1811,7 @@ describe('coding plans router', () => {
       const admin = await insertTestUser({ is_admin: true });
       const user = await insertTestUser();
       const assigned = await insertInventory({
-        encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('assigned-old-secret'),
         credential_fingerprint: codingPlanCredentialFingerprint('assigned-old-secret'),
         status: 'assigned',
         assigned_to_user_id: user.id,
@@ -1877,13 +1899,13 @@ describe('coding plans router', () => {
       const admin = await insertTestUser({ is_admin: true });
       const user = await insertTestUser();
       const previous = await insertInventory({
-        encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('previous-secret'),
         credential_fingerprint: codingPlanCredentialFingerprint('previous-secret'),
         status: 'assigned',
         assigned_to_user_id: user.id,
       });
       await insertInventory({
-        encrypted_api_key: encryptApiKey('pooled-secret', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('pooled-secret'),
         credential_fingerprint: codingPlanCredentialFingerprint('pooled-secret'),
       });
       const [installedByok] = await db
@@ -1920,7 +1942,8 @@ describe('coding plans router', () => {
         subscriptionId: subscription.id,
       });
 
-      expect(lockedDuringKms).toEqual([false]);
+      // One decrypt of the pooled credential, one data key for the installed BYOK key.
+      expect(lockedDuringKms).toEqual([false, false]);
 
       const [reassignedByok] = await db
         .select()
@@ -1933,8 +1956,11 @@ describe('coding plans router', () => {
       expect(
         decryptApiKey(reassignedByok.encrypted_api_key_envelope!.encrypted_data, kms.dataKeys[0])
       ).toBe('pooled-secret');
-      const [, init] = kms.fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-      expect(JSON.parse(String(init.body))).toEqual({
+      const dataKeyCalls = kms.fetchMock.mock.calls.filter(call =>
+        String(call[0]).endsWith('/data-key')
+      ) as unknown as [string, RequestInit][];
+      expect(dataKeyCalls).toHaveLength(1);
+      expect(JSON.parse(String(dataKeyCalls[0][1].body))).toEqual({
         key_id: installedByok.id,
         actor_user_id: admin.id,
         owner_type: 'user',
@@ -1951,13 +1977,13 @@ describe('coding plans router', () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
     const previous = await insertInventory({
-      encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns('previous-secret'),
       credential_fingerprint: codingPlanCredentialFingerprint('previous-secret'),
       status: 'assigned',
       assigned_to_user_id: user.id,
     });
     const pooled = await insertInventory({
-      encrypted_api_key: encryptApiKey('pooled-secret', BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns('pooled-secret'),
       credential_fingerprint: codingPlanCredentialFingerprint('pooled-secret'),
     });
     const [installedByok] = await db
@@ -2002,7 +2028,7 @@ describe('coding plans router', () => {
   it('rejects inventory replacement after the stored credential identity changes', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const available = await insertInventory({
-      encrypted_api_key: encryptApiKey('first-secret', BYOK_ENCRYPTION_KEY),
+      ...sealedInventoryColumns('first-secret'),
       credential_fingerprint: codingPlanCredentialFingerprint('first-secret'),
     });
     const caller = await createSessionCallerForUser(admin.id);
@@ -2015,7 +2041,7 @@ describe('coding plans router', () => {
         .update(coding_plan_key_inventory)
         .set({
           credential_fingerprint: codingPlanCredentialFingerprint('changed-secret'),
-          encrypted_api_key: encryptApiKey('changed-secret', BYOK_ENCRYPTION_KEY),
+          ...sealedInventoryColumns('changed-secret'),
         })
         .where(eq(coding_plan_key_inventory.id, available.id));
       resolveValidation?.();
@@ -2038,7 +2064,9 @@ describe('coding plans router', () => {
     expect(unchanged.credential_fingerprint).toBe(
       codingPlanCredentialFingerprint('changed-secret')
     );
-    expect(decryptApiKey(unchanged.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe('changed-secret');
+    expect(
+      decryptApiKey(unchanged.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)
+    ).toBe('changed-secret');
   });
 
   it('returns bounded subscription summary and selectable-range insight aggregates', async () => {

@@ -29,6 +29,7 @@ import {
 import { expoPushExtrasForPushData } from '../lib/push-message-extras';
 import { agentBriefingDispatchGate, pushIdempotencyTtlMs } from '../lib/agent-briefing-push';
 import { recordNotificationHistory } from '../lib/notification-history';
+import { readNotificationsSecret } from '../secrets';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -84,7 +85,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     await refreshGlanceableSnapshot(
       { userId, organizationId },
       this.ctx.storage,
-      glanceableDeliveryDeps(this.env),
+      glanceableDeliveryDeps(this.env, this.ctx),
       Date.now,
       { approvalChanged }
     );
@@ -378,7 +379,11 @@ export class NotificationChannelDO extends DurableObject<Env> {
       } satisfies ExpoPushMessage;
     });
 
-    const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
+    const accessToken = await readNotificationsSecret(
+      this.env,
+      'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+      this.ctx
+    );
     let briefingSuppression = await agentBriefingDispatchGate(db, input);
     if (briefingSuppression) return briefingSuppression;
     let result: SendResult;
@@ -554,7 +559,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // a failed flush still reschedules the trailing delivery.
     const dueGlanceableRefreshAt = await flushDueGlanceableRefreshesSafely(
       this.ctx.storage,
-      glanceableDeliveryDeps(this.env)
+      glanceableDeliveryDeps(this.env, this.ctx)
     );
     const idemEntries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
     const expiredIdem: string[] = [];

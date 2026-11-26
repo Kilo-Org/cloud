@@ -1,5 +1,12 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
-import type { MintRequest, MintResult } from '@kilocode/sts-contracts';
+import {
+  STS_DENIED_PROBE,
+  STS_DENIED_PROBE_REASON,
+  STS_DENIED_PROBE_WORKLOAD,
+  isStsDeniedProbe,
+  type MintRequest,
+  type MintResult,
+} from '@kilocode/sts-contracts';
 import { decodeJwt, decodeProtectedHeader } from 'jose';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDenialBuffers, recordDenial } from '../../src/audit/denials';
@@ -593,5 +600,52 @@ describe('UTS grants of the shipped web policy', () => {
       aud: 'uts-feed',
       scope: 'uts-feed:revocation.read',
     });
+  });
+});
+
+describe('canary denied probe', () => {
+  it('refuses the web function the reserved probe under the shipped policies and registry, and audits it as token.denied', async () => {
+    const result = await serveMint(env, config, {
+      caller: {
+        channel: 'http',
+        workload: STS_DENIED_PROBE_WORKLOAD,
+        identity: 'vercel',
+        attestationExp: Math.floor(Date.now() / 1000) + 3600,
+        claims: { provider: 'vercel' },
+      },
+      request: {
+        tokens: [STS_DENIED_PROBE, { audience: 'usage-ingest', scope: 'usage-ingest:sts.canary' }],
+      },
+      waitUntil,
+      authority: defaultMintAuthority,
+    });
+    if (result.status !== 'ok') throw new Error(`expected ok, got ${result.status}`);
+    expect(result.tokens[0]).toEqual({
+      status: 'denied',
+      ...STS_DENIED_PROBE,
+      reason: STS_DENIED_PROBE_REASON,
+    });
+    // The denied probe does not affect the token the policy grants.
+    expect(result.tokens[1]).toMatchObject({ status: 'issued', audience: 'usage-ingest' });
+
+    const denials = await flushedDenials();
+    expect(denials).toHaveLength(1);
+    expect(denials[0]).toMatchObject({
+      type: 'ai.kilo.sts.token.denied',
+      data: {
+        outcome: 'denied',
+        outcomeDetail: 'audience_not_allowed',
+        actor: { kind: 'service', id: 'web' },
+        attributes: {
+          channel: 'http',
+          reason: 'audience_not_allowed',
+          workload: 'web',
+          audience: 'canary',
+          scope: 'canary:denied-probe',
+          count: 1,
+        },
+      },
+    });
+    expect(isStsDeniedProbe(denials[0].data.attributes)).toBe(true);
   });
 });

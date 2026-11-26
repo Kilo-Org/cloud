@@ -105,6 +105,57 @@ The body is read only after the token verified, through a 4 KB budget like `/v1/
   one call travel in one denial-object hop. A token that did not verify gets one log line and no
   row.
 
+### Alerts on token denials
+
+The STS canary (services/usage-ingest README, "STS canary") makes one denial on purpose: every
+run, the web app's canary route (workload `web`) asks for `canary:denied-probe` (audience
+`canary`, `STS_DENIED_PROBE` in `@kilocode/sts-contracts`). That scope is reserved
+(`STS_RESERVED_SCOPES`): the registry lists it, so the request passes the registry check, and the
+policy loader refuses any policy that grants it or its audience (see [Policy](#policy)), so every
+request for it is refused by policy with `audience_not_allowed` and audited as a `token.denied`
+row naming the caller: one row per run and environment (`count` 1, as denials merge per minute).
+
+Every detection or alert rule over `token.denied` rows excludes exactly that probe, workload `web`
+and scope `canary:denied-probe` together, and nothing broader: a denial of another scope for
+`web`, and a request for the probe scope by any other workload, still count. The exclusion is
+defined once in `@kilocode/sts-contracts`: `isStsDeniedProbe(attributes)` for code and
+`STS_DENIED_PROBE_APL_EXCLUSION` for Axiom, which is this line:
+
+```kusto
+| where not(tostring(column_ifexists('data.attributes.workload', '')) == 'web' and tostring(column_ifexists('data.attributes.scope', '')) == 'canary:denied-probe')
+```
+
+`column_ifexists` keeps a query valid in a dataset where no row has carried the field yet (Axiom
+answers 400 for a field it has never seen; on 2026-11-26 neither audit dataset had
+`data.attributes.scope`); `tostring` keeps a whole-call refusal, which names no scope.
+
+No monitor reads `token.denied` rows today. Create this one per environment (Axiom, threshold
+monitor):
+
+| Setting | Production | Staging |
+|---|---|---|
+| Name | `sts: token denied` | `sts-staging: token denied` |
+| Dataset | `kilo-audit` | `kilo-audit-staging` |
+| Query | the query below | the query below, dataset `kilo-audit-staging` |
+| Condition | `denials` above 0 | `denials` above 0 |
+| Frequency and range | every 5 minutes, over the last 15 minutes | same |
+| Notifier | Slack `notify-kilo-alerts` (no paging) | same |
+
+```kusto
+['kilo-audit']
+| where type == 'ai.kilo.sts.token.denied'
+| where not(tostring(column_ifexists('data.attributes.workload', '')) == 'web' and tostring(column_ifexists('data.attributes.scope', '')) == 'canary:denied-probe')
+| summarize denials = count()
+```
+
+A row is a refused token of an identified caller: a policy that misses a grant, a caller in the
+wrong environment, or a caller asking for what it may not hold. The probe never fires it; the
+canary's own monitor checks that the probe row still lands. A synthetic check of the filter, run
+in Axiom on 2026-11-26 (`datatable` with the probe row, a `web` denial of `gateway:models.read`, a
+`usage-ingest` request for the probe scope, a `web` whole-call refusal with no scope, and a
+`token.issued` row), kept exactly the middle three; the monitor query also runs on both audit
+datasets today (0 rows).
+
 ### Token-signing keys and rotation
 
 Four `TokenSignerDO` shards per environment (`eu` jurisdiction in production and staging) each hold
@@ -325,11 +376,14 @@ Identity kinds:
 Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
 `STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`: the canary scopes `web:sts.canary` and
-`usage-ingest:sts.canary`, `uts-feed:revocation.read`, and under `uts` the scopes
-`uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` and
-`uts:token-exchange`) and belong to a listed audience, every audience needs at least one scope,
-and no audience may be the workload itself. `dynamic` lists the database lease grants the workload
-may request ([Database leases](#database-leases)) and its Cloudflare deploy-token grant
+`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`, and
+under `uts` the scopes `uts:subjects.revoke`, `uts:browser-sessions.end`,
+`uts:api-credentials.revoke` and `uts:token-exchange`) and belong to a listed audience, every
+audience needs at least one scope, and no audience may be the workload itself. A reserved scope
+(`STS_RESERVED_SCOPES`, today `canary:denied-probe`) and its audience fail the load whatever the
+registry says: no policy may grant them (see [Alerts on token denials](#alerts-on-token-denials)).
+`dynamic` lists the database lease grants the workload may request
+([Database leases](#database-leases)) and its Cloudflare deploy-token grant
 ([Cloudflare deploy tokens](#cloudflare-deploy-tokens)); it defaults to empty, so a policy without
 it leases and mints nothing. No policy may name a minting credential (`CLOUDFLARE_MINTING_TOKEN`)
 in `secrets`, whatever its identity.
@@ -392,6 +446,7 @@ Workloads with a policy, all over `worker-binding`:
 | `audit-relay` | development, staging, production | `services/audit-relay/wrangler.jsonc` |
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
+| `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's

@@ -16,18 +16,20 @@ import { createStsCanaryHandler } from '@/lib/sts-canary';
  * with that token, never with the internal API secret.
  */
 
-// The slowest run is a 5 s key-set fetch, a 30 s mint attempt and four 10 s calls to usage-ingest,
-// 75 s; usage-ingest waits 80 s. `STS_CANARY_ROUTE_MAX_DURATION_SECONDS` in
-// `@kilocode/sts-contracts` states the arithmetic; Next.js needs the literal here.
+// The slowest run is a 5 s key-set fetch, a 30 s mint attempt, then four 10 s calls to usage-ingest
+// with the 30 s denied mint alongside them, 75 s; usage-ingest waits 80 s.
+// `STS_CANARY_ROUTE_MAX_DURATION_SECONDS` in `@kilocode/sts-contracts` states the arithmetic;
+// Next.js needs the literal here.
 export const maxDuration = 90;
 
 let handler: ((request: Request) => Promise<Response>) | null = null;
 
 /**
  * Built on the first request, once per instance, so the verifier's key set, the token client's
- * tokens and the shared Vercel identity serve every later request. A missing or invalid setting
- * leaves it unbuilt and answers 503; so does an `STS_URL` that is not one of `STS_ISSUERS`, since
- * the environment the verifier accepts is the one whose STS that is.
+ * tokens and the shared Vercel identity serve every later request; each run's denied mint gets a
+ * new client over that same identity. A missing or invalid setting leaves it unbuilt and answers
+ * 503; so does an `STS_URL` that is not one of `STS_ISSUERS`, since the environment the verifier
+ * accepts is the one whose STS that is.
  */
 function canaryHandler(): ((request: Request) => Promise<Response>) | null {
   if (handler !== null) return handler;
@@ -36,6 +38,11 @@ function canaryHandler(): ((request: Request) => Promise<Response>) | null {
   if (verifyUrl === undefined || environment === undefined) return null;
   const waitUntil = (promise: Promise<unknown>) => after(promise);
   try {
+    const getIdentityToken = vercelIdentity({
+      stsAudience: STS_URL,
+      // The keys are SHA-256 already; the default 32-bit key hash could let two share an entry.
+      cache: getCache({ namespace: 'sts-exchange', keyHashFunction: key => key }),
+    });
     handler = createStsCanaryHandler({
       verifier: createVerifier({
         audience: 'web',
@@ -45,14 +52,8 @@ function canaryHandler(): ((request: Request) => Promise<Response>) | null {
         resourceMetadataUrl: `${new URL(APP_URL).origin}/.well-known/oauth-protected-resource`,
         sts: { issuer: STS_URL, jwks: httpJwksSource(STS_URL) },
       }),
-      tokens: createHttpServiceTokens({
-        stsUrl: STS_URL,
-        getIdentityToken: vercelIdentity({
-          stsAudience: STS_URL,
-          // The keys are SHA-256 already; the default 32-bit key hash could let two share an entry.
-          cache: getCache({ namespace: 'sts-exchange', keyHashFunction: key => key }),
-        }),
-      }),
+      tokens: createHttpServiceTokens({ stsUrl: STS_URL, getIdentityToken }),
+      newTokens: () => createHttpServiceTokens({ stsUrl: STS_URL, getIdentityToken }),
       verifyUrl,
       waitUntil,
     });

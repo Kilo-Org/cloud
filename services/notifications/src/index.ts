@@ -1,3 +1,4 @@
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
@@ -50,6 +51,7 @@ import {
   pruneNotificationHistory,
 } from './lib/notification-history-prune';
 import { queue } from './queue-consumer';
+import { readNotificationsSecret } from './secrets';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
 
@@ -99,9 +101,10 @@ app.post('/v1/badges/mark-read', async c => {
 async function hasValidInternalSecret(c: {
   req: { header(name: string): string | undefined };
   env: Env;
+  executionCtx: SecretsExecutionContext;
 }): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
-  const expected = await c.env.INTERNAL_API_SECRET.get();
+  const expected = await readNotificationsSecret(c.env, 'INTERNAL_API_SECRET', c.executionCtx);
   if (!provided || !expected) return false;
 
   return timingSafeEqual(provided, expected);
@@ -186,7 +189,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   }
 
   override async queue(batch: MessageBatch): Promise<void> {
-    return queue(batch as Parameters<typeof queue>[0], this.env);
+    return queue(batch as Parameters<typeof queue>[0], this.env, this.ctx);
   }
 
   /**

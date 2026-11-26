@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
-import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 
 /**

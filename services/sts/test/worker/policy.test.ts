@@ -57,6 +57,40 @@ describe('policy token grants', () => {
     );
   });
 
+  it('refuses any policy that grants the reserved denied probe or its audience, whatever the registry says', () => {
+    const probe = `audiences: [canary]\nscopes: ['canary:denied-probe']\n`;
+    // The shipped registry lists the probe, so only its reservation refuses it.
+    expect(() => loadPolicies({ 'app-one.yaml': withGrants(probe) })).toThrow(
+      'scope canary:denied-probe is reserved and no policy may grant it'
+    );
+    expect(() =>
+      loadPolicies(
+        { 'app-one.yaml': withGrants(probe) },
+        { scopeRegistry: { ...REGISTRY, canary: { scopes: ['canary:denied-probe'] } } }
+      )
+    ).toThrow('scope canary:denied-probe is reserved and no policy may grant it');
+    expect(() =>
+      loadPolicies(
+        {
+          'app-one.yaml': withGrants(
+            `audiences: [canary, web]\nscopes: ['canary:other', 'web:sts.canary']\n`
+          ),
+        },
+        {
+          scopeRegistry: {
+            canary: { scopes: ['canary:denied-probe', 'canary:other'] },
+            web: { scopes: ['web:sts.canary'] },
+          },
+        }
+      )
+    ).toThrow('audience canary is reserved and no policy may grant it');
+    // The shipped web policy, which sends the probe, grants neither.
+    expect(policyIndex.get('production', 'web')).toMatchObject({
+      audiences: ['usage-ingest'],
+      scopes: ['usage-ingest:sts.canary'],
+    });
+  });
+
   it('refuses an audience equal to the workload, duplicates, and a dynamic grant that is no lease', () => {
     expect(() =>
       loadPolicies(

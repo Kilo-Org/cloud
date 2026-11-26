@@ -336,7 +336,7 @@ jobs:
 
           # Workers excluded from automatic deployment:
           EXCLUDED=(
-            services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
+            services/kiloclaw  # No CI deploy: its image-and-worker workflow was removed
             services/user-data-export # Automatic deploy suspended
           )
 

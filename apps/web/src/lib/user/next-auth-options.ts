@@ -345,7 +345,7 @@ async function persistOpenAiChatGptConnection(
       organizationId && extendedProfile?.openAiChatGptSharedServices === true
         ? openAiChatGptSharedServicesOwner(organizationId)
         : { kiloUserId: userId, organizationId: organizationId ?? null };
-    await saveOpenAiChatGptConnection(
+    const { credentialKeyId } = await saveOpenAiChatGptConnection(
       owner,
       {
         access_token: accessToken,
@@ -366,7 +366,11 @@ async function persistOpenAiChatGptConnection(
     // that now, so the card explains it instead of the first request failing.
     // The refused row is kept, disabled, so the card can show the reason.
     if (!(await probeOpenAiChatGptEligibility(accessToken))) {
-      await markOpenAiChatGptNotEligible(owner, accessToken, OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE);
+      await markOpenAiChatGptNotEligible(owner, {
+        accessToken,
+        credentialKeyId,
+        message: OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
+      });
     }
   } catch (error) {
     captureException(error, {

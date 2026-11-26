@@ -539,24 +539,29 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
   that session within 10 minutes), then write the pass already consumed and the credential that
   names it in one statement. No statement takes a pass id from its caller, so an expired, used or
   released pass can serve nothing. These write steps have no grant; the account API's SECURITY
-  DEFINER statements, which will call them and write the audit row and the notice in the same
-  statement, arrive in a later pull request of this stack. Only PATs and org bot keys have a write
-  step here: the write paths for CI trust policies, third-party consents and device approval also
-  arrive in later pull requests, and until then none of these flows has a write path.
+  DEFINER statements `uts.create_pat` and `uts.create_bot_key` (migration 0005) call them and
+  write the audit row and the notice in the same statement. They check the organization's SSO
+  rule before the write step, without a lock, so the write step takes the account row lock before
+  any membership lock. Only PATs and org bot keys have a write step here: the write paths for CI
+  trust policies, third-party consents and device approval arrive in later pull requests, and
+  until then none of these flows has a write path.
 - A PAT bound to an organization, and every org bot key, needs an active membership (owner or
   admin for a bot key). The write step locks the account row first, then holds the membership row
   `FOR SHARE` until commit, so a member removal that runs at the same time waits for the new
   credential. The removal sees it only if it updates the membership row in one statement and
   revokes the member's org-bound PATs and flags the member's keys in later statements of a
   VOLATILE function (each statement takes a fresh snapshot), or does that from a row trigger on
-  `uts.org_memberships`. A removal written as one statement, with data-modifying CTEs, keeps the
-  snapshot it took before the wait and misses the new credential. An account holds at most 100
-  live PATs and an organization at most 100 live bot keys, counted behind a lock.
-- The app login can still revoke, flag, keep, deny and record use of gated rows, through column
-  grants that leave out the holder, the hash, the scope, the lifetime and the pass, so an update
-  cannot turn a row into a different credential. A revoked PAT, bot key, CI trust policy or
-  consent, and a denied or consumed device code, keep their status; a flagged bot key becomes only
-  kept or revoked, and its `flagged_at` never changes once set (`uts.refuse_reopening`).
+  `uts.org_memberships`; `uts.remove_org_member` (migration 0005) does the former. A removal
+  written as one statement, with data-modifying CTEs, keeps the snapshot it took before the wait
+  and misses the new credential. An account holds at most 100 live PATs and an organization at
+  most 100 live bot keys, counted behind a lock.
+- The app login can still revoke, flag, keep, deny and record use of CI trust policies,
+  third-party consents and device codes, through column grants that leave out the holder, the
+  hash, the scope, the lifetime and the pass, so an update cannot turn a row into a different
+  credential. PATs and org bot keys lose those grants in migration 0005: only the account
+  functions change them. A revoked PAT, bot key, CI trust policy or consent, and a denied or
+  consumed device code, keep their status; a flagged bot key becomes only kept or revoked, and its
+  `flagged_at` never changes once set (`uts.refuse_reopening`).
 - Every new org bot key needs a gate pass (a `BEFORE INSERT` trigger refuses one without). Deleting
   the creator's account flags the creator's active keys, as member removal does (design section
   5.8), so they stop after 7 days unless an org admin keeps them. `created_by` keeps the creator's

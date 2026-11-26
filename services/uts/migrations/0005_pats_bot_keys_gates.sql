@@ -15,9 +15,11 @@
 --   changing the email. `uts.open_tier_a_gate_pass` opens a pass that the action's own statement
 --   consumes. Each tier A code row records which address it went to (`current` or `new`), and the
 --   gate accepts each code only in its own role.
--- * A create that names an organization, and a keep of a flagged bot key, lock the caller's
---   membership row (`FOR SHARE`) in the role check, so a concurrent removal waits for the new row
---   and then revokes or flags it, or the create waits for the removal and is refused.
+-- * A create that names an organization locks the account row and then the caller's membership
+--   row (`FOR SHARE`) in its write step (`uts.write_gated_pat`, `uts.write_gated_bot_key` in
+--   0001), the order an account deletion takes; a keep of a flagged bot key locks the membership
+--   row in its role check. So a concurrent removal waits for the new row and then revokes or flags
+--   it, or the create waits for the removal and is refused.
 -- * A refused gate writes at most one denied audit row per grant per minute
 --   (`uts.claim_denied_audit`), so a caller cannot grow the audit log at will.
 -- * A revoked PAT or bot key gets a feed entry for 15 minutes, which outlasts every PAT cache layer
@@ -105,34 +107,6 @@ AS $$
     AND account.status = 'active'
 $$;
 
--- The tier B checks the session meets (design 5.11): `recent_sign_in` for a sign-in within 10
--- minutes, `passkey` for a passkey step-up of this session within 10 minutes. Empty when neither.
-CREATE FUNCTION uts.tier_b_checks(
-  p_account_id text,
-  p_device_session_id uuid,
-  p_auth_time timestamptz
-) RETURNS uts.gate_check[]
-LANGUAGE sql
-STABLE
-SET search_path = pg_catalog, pg_temp
-RETURN array_remove(ARRAY[
-  CASE
-    WHEN p_auth_time > now() - interval '10 minutes' AND p_auth_time <= now()
-    THEN 'recent_sign_in'::uts.gate_check
-  END,
-  CASE
-    WHEN EXISTS (
-      SELECT 1 FROM uts.step_ups AS step_up
-      WHERE step_up.account_id = p_account_id
-        AND step_up.completed_at > now() - interval '10 minutes'
-        AND step_up.device_session_id = p_device_session_id
-        AND step_up.purpose = 'gate'
-        AND step_up.expires_at > now()
-    )
-    THEN 'passkey'::uts.gate_check
-  END
-], NULL);
-
 -- A refused gate: one denied audit row per grant per minute at most.
 CREATE FUNCTION uts.audit_gate_refusal(
   p_environment text,
@@ -180,11 +154,11 @@ RETURN EXISTS (
     AND uts.org_requirement_met(p_org_id, membership.status, policy.enforcement, p_amr)
 );
 
--- `uts.org_role_met` for a statement that creates or restores a credential bound to the
--- organization: the membership row it finds stays locked `FOR SHARE` until the statement's
--- transaction ends. `uts.remove_org_member` updates that row first, so it waits until the new
--- credential is committed and then revokes or flags it; a create that comes second waits for the
--- removal, reads the row again, and finds no active membership.
+-- `uts.org_role_met` for a statement that restores a credential bound to the organization (a keep
+-- of a flagged bot key): the membership row it finds stays locked `FOR SHARE` until the
+-- statement's transaction ends. `uts.remove_org_member` updates that row first, so a removal of
+-- the keeper waits until the keep commits, and a keep that comes second waits for the removal,
+-- reads the row again, and finds no active membership.
 CREATE FUNCTION uts.lock_org_role(
   p_org_id uuid,
   p_account_id text,
@@ -208,9 +182,13 @@ END
 $$;
 
 -- POST /account/pats: a tier B gate, then the PAT, its consumed gate pass, the creator's notice and
--- the audit row. Outcomes: `created`; `invalid_session`; `gate_required` (no sign-in or passkey
--- step-up within 10 minutes); `org_denied` (the PAT names an organization the caller cannot act in);
--- `limit_reached` (100 live PATs). The audience is the scope's own (design 5.3).
+-- the audit row. Outcomes: `created`; `invalid_session`; `org_denied` (the PAT names an
+-- organization the caller cannot act in); `gate_required` (no sign-in or passkey step-up within 10
+-- minutes); `limit_reached` (100 live PATs). The audience is the scope's own (design 5.3).
+-- `uts.write_gated_pat` (0001) decides the gate, takes the locks in the order an account deletion
+-- takes them (account row, then membership row) and writes the pass and the PAT; this statement
+-- adds the organization's SSO rule, the audit row and the notice. The SSO rule is read without a
+-- lock first, so no membership lock is taken before the account lock.
 CREATE FUNCTION uts.create_pat(
   p_environment text,
   p_account_id text,
@@ -228,8 +206,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   holder record;
-  checks uts.gate_check[];
-  pass_id uuid;
+  written record;
   event_id uuid;
 BEGIN
   IF p_lifetime_days IS NULL OR p_lifetime_days NOT BETWEEN 1 AND 365 THEN
@@ -241,43 +218,28 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  checks := uts.tier_b_checks(p_account_id, holder.device_session_id, holder.auth_time);
-  IF cardinality(checks) = 0 THEN
-    PERFORM uts.audit_gate_refusal(
-      p_environment, p_account_id, p_grant_id, 'pat_create', 'fresh sign-in required'
-    );
-    outcome := 'gate_required';
-    RETURN NEXT;
-    RETURN;
-  END IF;
-  IF p_org_id IS NOT NULL AND NOT uts.lock_org_role(p_org_id, p_account_id, holder.amr, NULL) THEN
+  IF p_org_id IS NOT NULL AND NOT uts.org_role_met(p_org_id, p_account_id, holder.amr, NULL) THEN
     outcome := 'org_denied';
     RETURN NEXT;
     RETURN;
   END IF;
-  -- Concurrent creates of one account run one after another, so the cap holds.
-  PERFORM 1 FROM uts.accounts AS account WHERE account.id = p_account_id FOR NO KEY UPDATE;
-  IF (
-    SELECT count(*) FROM uts.personal_access_tokens AS pat
-    WHERE pat.account_id = p_account_id AND pat.status = 'active' AND pat.expires_at > now()
-  ) >= 100 THEN
-    outcome := 'limit_reached';
+  SELECT * INTO written FROM uts.write_gated_pat(
+    p_account_id, holder.device_session_id, p_name, p_token_hash, p_last_four, p_scope, p_org_id,
+    p_lifetime_days
+  );
+  IF written.outcome = 'gate_required' THEN
+    PERFORM uts.audit_gate_refusal(
+      p_environment, p_account_id, p_grant_id, 'pat_create', 'fresh sign-in required'
+    );
+  END IF;
+  IF written.outcome <> 'created' THEN
+    outcome := written.outcome;
     RETURN NEXT;
     RETURN;
   END IF;
-
-  INSERT INTO uts.gate_passes (
-    account_id, device_session_id, tier, action, satisfied_by, expires_at, status, consumed_at
-  ) VALUES (
-    p_account_id, holder.device_session_id, 'b', 'pat_create', checks,
-    now() + interval '10 minutes', 'consumed', now()
-  ) RETURNING id INTO pass_id;
-  INSERT INTO uts.personal_access_tokens (
-    account_id, name, token_hash, last_four, audience, scope, org_id, gate_pass_id, expires_at
-  ) VALUES (
-    p_account_id, p_name, p_token_hash, p_last_four, split_part(p_scope, ':', 1), p_scope,
-    p_org_id, pass_id, now() + make_interval(days => p_lifetime_days)
-  ) RETURNING id, created_at, expires_at INTO new_pat_id, pat_created_at, pat_expires_at;
+  new_pat_id := written.new_pat_id;
+  pat_created_at := written.pat_created_at;
+  pat_expires_at := written.pat_expires_at;
   event_id := uts.write_audit_event(
     p_environment, 'ai.kilo.uts.pat.created', 6003, 1, 'success', NULL, p_account_id,
     jsonb_build_object(
@@ -289,8 +251,8 @@ BEGIN
       'expiresAt', to_char(pat_expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
       'lifetimeDays', p_lifetime_days,
       'grantId', p_grant_id,
-      'gatePassId', pass_id,
-      'gateChecks', to_jsonb(checks::text[])
+      'gatePassId', written.new_gate_pass_id,
+      'gateChecks', to_jsonb(written.gate_checks::text[])
     )
   );
   INSERT INTO uts.notices (account_id, kind, details, audit_event_id)
@@ -396,7 +358,11 @@ $$;
 -- POST /account/orgs/<org>/bot-keys: an owner or admin of the organization passes a tier B gate,
 -- then the key, its consumed gate pass, the creator's notice and the audit row. The key belongs to
 -- the organization and records its creator. Outcomes: `created`, `invalid_session`,
--- `gate_required`, `not_org_admin`, `limit_reached` (100 live keys in the organization).
+-- `not_org_admin`, `gate_required`, `limit_reached` (100 live keys in the organization).
+-- `uts.write_gated_bot_key` (0001) decides the gate, takes the locks (account row, then
+-- membership row, then the organization's advisory lock) and writes the pass and the key; this
+-- statement adds the organization's SSO rule, read without a lock first, the audit row and the
+-- notice (see `uts.create_pat`).
 CREATE FUNCTION uts.create_bot_key(
   p_environment text,
   p_account_id text,
@@ -414,8 +380,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   holder record;
-  checks uts.gate_check[];
-  pass_id uuid;
+  written record;
   event_id uuid;
 BEGIN
   IF p_lifetime_days IS NULL OR p_lifetime_days NOT BETWEEN 1 AND 365 THEN
@@ -427,46 +392,28 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  IF NOT uts.lock_org_role(p_org_id, p_account_id, holder.amr, ARRAY['owner', 'admin']::uts.org_role[]) THEN
+  IF NOT uts.org_role_met(p_org_id, p_account_id, holder.amr, ARRAY['owner', 'admin']::uts.org_role[]) THEN
     outcome := 'not_org_admin';
     RETURN NEXT;
     RETURN;
   END IF;
-  checks := uts.tier_b_checks(p_account_id, holder.device_session_id, holder.auth_time);
-  IF cardinality(checks) = 0 THEN
+  SELECT * INTO written FROM uts.write_gated_bot_key(
+    p_account_id, holder.device_session_id, p_org_id, p_name, p_token_hash, p_last_four, p_scope,
+    p_lifetime_days
+  );
+  IF written.outcome = 'gate_required' THEN
     PERFORM uts.audit_gate_refusal(
       p_environment, p_account_id, p_grant_id, 'bot_key_create', 'fresh sign-in required'
     );
-    outcome := 'gate_required';
+  END IF;
+  IF written.outcome <> 'created' THEN
+    outcome := written.outcome;
     RETURN NEXT;
     RETURN;
   END IF;
-  -- Concurrent creates in one organization run one after another, so the cap holds.
-  PERFORM pg_advisory_xact_lock(hashtextextended('uts.org_bot_keys:' || p_org_id::text, 0));
-  IF (
-    SELECT count(*) FROM uts.org_bot_keys AS bot_key
-    WHERE bot_key.org_id = p_org_id
-      AND bot_key.expires_at > now()
-      AND (bot_key.status IN ('active', 'kept')
-        OR (bot_key.status = 'flagged' AND bot_key.flagged_at > now() - interval '7 days'))
-  ) >= 100 THEN
-    outcome := 'limit_reached';
-    RETURN NEXT;
-    RETURN;
-  END IF;
-
-  INSERT INTO uts.gate_passes (
-    account_id, device_session_id, tier, action, satisfied_by, expires_at, status, consumed_at
-  ) VALUES (
-    p_account_id, holder.device_session_id, 'b', 'bot_key_create', checks,
-    now() + interval '10 minutes', 'consumed', now()
-  ) RETURNING id INTO pass_id;
-  INSERT INTO uts.org_bot_keys (
-    org_id, created_by, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at
-  ) VALUES (
-    p_org_id, p_account_id, p_name, p_token_hash, p_last_four, split_part(p_scope, ':', 1),
-    p_scope, pass_id, now() + make_interval(days => p_lifetime_days)
-  ) RETURNING id, created_at, expires_at INTO new_key_id, key_created_at, key_expires_at;
+  new_key_id := written.new_key_id;
+  key_created_at := written.key_created_at;
+  key_expires_at := written.key_expires_at;
   event_id := uts.write_audit_event(
     p_environment, 'ai.kilo.uts.bot_key.created', 6003, 1, 'success', NULL, p_account_id,
     jsonb_build_object(
@@ -478,8 +425,8 @@ BEGIN
       'expiresAt', to_char(key_expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
       'lifetimeDays', p_lifetime_days,
       'grantId', p_grant_id,
-      'gatePassId', pass_id,
-      'gateChecks', to_jsonb(checks::text[])
+      'gatePassId', written.new_gate_pass_id,
+      'gateChecks', to_jsonb(written.gate_checks::text[])
     )
   );
   INSERT INTO uts.notices (account_id, kind, details, audit_event_id)
@@ -531,7 +478,7 @@ BEGIN
       'status', bot_key.status,
       'flagged_at', bot_key.flagged_at,
       'stops_at', CASE WHEN bot_key.status = 'flagged'
-        THEN bot_key.flagged_at + interval '7 days' END,
+        THEN bot_key.flagged_at + interval '168 hours' END,
       'kept_by', bot_key.kept_by,
       'kept_at', bot_key.kept_at
     )) || jsonb_build_object('last_used_at', bot_key.last_used_at)
@@ -541,7 +488,7 @@ BEGIN
   WHERE bot_key.org_id = p_org_id
     AND bot_key.expires_at > now()
     AND (bot_key.status IN ('active', 'kept')
-      OR (bot_key.status = 'flagged' AND bot_key.flagged_at > now() - interval '7 days'));
+      OR (bot_key.status = 'flagged' AND bot_key.flagged_at > now() - interval '168 hours'));
   RETURN NEXT;
 END
 $$;
@@ -640,8 +587,8 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  checks := uts.tier_b_checks(p_account_id, holder.device_session_id, holder.auth_time);
-  IF cardinality(checks) = 0 THEN
+  checks := uts.tier_b_checks(p_account_id, NULL, holder.device_session_id);
+  IF coalesce(cardinality(checks), 0) = 0 THEN
     PERFORM uts.audit_gate_refusal(
       p_environment, p_account_id, p_grant_id, 'bot_key_keep', 'fresh sign-in required'
     );
@@ -656,7 +603,7 @@ BEGIN
     outcome := 'not_found';
   ELSIF found_key.status <> 'flagged' THEN
     outcome := 'not_flagged';
-  ELSIF found_key.flagged_at <= now() - interval '7 days' OR found_key.expires_at <= now() THEN
+  ELSIF found_key.flagged_at <= now() - interval '168 hours' OR found_key.expires_at <= now() THEN
     outcome := 'lapsed';
   ELSE
     UPDATE uts.org_bot_keys AS bot_key
@@ -700,7 +647,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   item record;
-  stops_at timestamptz := now() + interval '7 days';
+  stops_at timestamptz := now() + interval '168 hours';
 BEGIN
   flagged_keys := 0;
   revoked_pats := 0;

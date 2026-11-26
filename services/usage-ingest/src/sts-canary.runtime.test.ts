@@ -92,7 +92,11 @@ beforeAll(async () => {
         STS_CANARY_ENABLED: 'true',
         STS_URL: base,
         WEB_STS_CANARY_URL: `${base}/api/internal/sts-canary`,
-        TEST_SIGNING_JWK: JSON.stringify(await crypto.subtle.exportKey('jwk', signer.privateKey)),
+        // Node exports `alg: "Ed25519"`, which workerd's importKey refuses for an Ed25519 key.
+        TEST_SIGNING_JWK: JSON.stringify({
+          ...(await crypto.subtle.exportKey('jwk', signer.privateKey)),
+          alg: undefined,
+        }),
         TEST_SIGNING_KID: signer.kid,
       },
       services: [{ binding: 'STS', service: name, entrypoint: 'SecretsBroker' }],

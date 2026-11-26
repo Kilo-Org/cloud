@@ -1,3 +1,4 @@
+import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SecretsBroker } from '../../src/broker';
 import { BundleDO } from '../../src/dos/BundleDO';
@@ -22,6 +23,7 @@ import { config, env } from './test-env';
 type RpcTarget = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 type Surface = {
+  /** The class's own prototype; every prototype up to the runtime base class counts. */
   prototype: object;
   /** Every method a caller holding a stub or binding may call. */
   rpc: string[];
@@ -105,6 +107,22 @@ function shapeOf(value: unknown): string {
   return typeof value;
 }
 
+/**
+ * Every property name on the chain from `prototype` up to, not including, the runtime base class
+ * (`WorkerEntrypoint` for an entrypoint, else `DurableObject`): a stub can call a method of any
+ * class in between, so a base class of ours must not add a public method unnoticed.
+ */
+function callableNames(prototype: object): string[] {
+  const names = new Set<string>();
+  let current: object | null = prototype;
+  while (current !== DurableObject.prototype && current !== WorkerEntrypoint.prototype) {
+    if (current === null) throw new Error('the class extends neither runtime base class');
+    for (const name of Object.getOwnPropertyNames(current)) names.add(name);
+    current = Object.getPrototypeOf(current) as object | null;
+  }
+  return [...names].sort();
+}
+
 /** Awaited directly: handing the RPC promise to `expect(...).rejects` left an unhandled rejection. */
 async function callOverRpc(
   target: RpcTarget,
@@ -130,9 +148,7 @@ describe('RPC surface', () => {
   it.each(Object.entries(surfaces))(
     '%s exposes only its RPC methods; everything else is ECMAScript-private',
     async (_name, surface) => {
-      expect(Object.getOwnPropertyNames(surface.prototype).sort()).toEqual(
-        ['constructor', ...surface.rpc].sort()
-      );
+      expect(callableNames(surface.prototype)).toEqual(['constructor', ...surface.rpc].sort());
       if (surface.stub === null) return;
       const target = surface.stub() as RpcTarget;
       for (const [method, args] of surface.internal) {

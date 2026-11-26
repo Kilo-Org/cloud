@@ -306,6 +306,22 @@ async function revocationsDue(): Promise<void> {
   });
 }
 
+/** Fails the next `count` appends to the lease object's own stream; every other log appends. */
+function failLeaseAppends(count: number): void {
+  const append = AuditLog.prototype.append;
+  let left = count;
+  vi.spyOn(AuditLog.prototype, 'append').mockImplementation(async function (
+    this: AuditLog,
+    ...args: Parameters<AuditLog['append']>
+  ) {
+    if (args[0] === `sts:${config.environment}:leases` && left > 0) {
+      left -= 1;
+      throw new Error('storage refused');
+    }
+    await append.apply(this, args);
+  });
+}
+
 /** The lease ids Infisical was asked to revoke, in call order. */
 function revokedIds(manager: LeaseManager): string[] {
   return manager.revokes().map(call => call.path.split('/').pop() ?? '');
@@ -854,9 +870,7 @@ describe('revoke', () => {
         Date.now() - 24 * 60 * 60 * 1000 - 1000
       );
     });
-    vi.spyOn(AuditLog.prototype, 'append')
-      .mockRejectedValueOnce(new Error('storage refused'))
-      .mockRejectedValueOnce(new Error('storage refused'));
+    failLeaseAppends(2);
     const nextAlarm = async (): Promise<number | null> =>
       await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -979,7 +993,7 @@ describe('revoke', () => {
     const created = issued(await lease('bouncer-watch', { grant: 'replica-read' }));
     manager.setRevokeStatus(503);
     const stub = getLeaseStub(env, config);
-    vi.spyOn(AuditLog.prototype, 'append').mockRejectedValueOnce(new Error('storage refused'));
+    failLeaseAppends(1);
     await broker('bouncer-watch').revokeLease(created.leaseId);
     expect(
       (await leaseEvents()).filter(event => event.type === 'ai.kilo.sts.lease.revoked')

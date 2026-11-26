@@ -80,6 +80,7 @@ const ROW_MAINTENANCE = {
   sign_in_rows: 'SELECT kind, deleted FROM uts.maintain_sign_in_rows()',
   provider_sign_in_rows: 'SELECT kind, deleted FROM uts.maintain_provider_sign_in_rows()',
   subject_operation_rows: 'SELECT kind, deleted FROM uts.maintain_subject_operation_rows()',
+  attestation_rows: 'SELECT kind, deleted FROM uts.maintain_attestation_rows()',
 } as const;
 
 export type RowMaintenance = keyof typeof ROW_MAINTENANCE;

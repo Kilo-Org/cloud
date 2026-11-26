@@ -5,6 +5,7 @@ import {
   type UtsAccessTokenClaims,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import { type AttestationService, attestCodeExchange } from '../attest/gate';
 import type { UtsConfig } from '../env';
 import { type ExchangeService, handleTokenExchange } from '../exchange/endpoint';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
@@ -44,7 +45,9 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * exchange while the code's 60-second lifetime lasts gets the same grant and the same refresh
  * token, which derives from the code and the PKCE verifier. A third-party client that lost an
  * answer authorizes again: a second use of its code, like a second use of a replaced refresh
- * token, revokes the family.
+ * token, revokes the family. A code exchange of a client that needs device attestation
+ * (`kilo-mobile`) first runs the attestation step (src/attest/gate.ts): two more statements and,
+ * for Android, one Play Integrity call, once per code; a retry of an attested exchange runs one.
  *
  * A refused exchange or third-party refresh whose statement revoked a grant (a second use of a
  * code, a reused rotated token) publishes the statement's feed entries before it answers; a failed
@@ -78,6 +81,12 @@ export type TokenDeps = {
    * wired, and the grant is then not offered.
    */
   exchange: ExchangeService | null;
+  /**
+   * Device attestation of a client that needs it (src/attest/gate.ts): `verified` runs the
+   * attestation step before the exchange statement; `unattested_development` skips it, in
+   * development without attestation config only; `refused` refuses the client.
+   */
+  attestation: AttestationService;
 };
 
 /** The token endpoint on the issuer origin: the `htu` of every token request's DPoP proof. */
@@ -262,6 +271,8 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
   if (!isRandomCredential(code)) return grantError('invalid_grant');
 
   const grantId = await grantIdOfCode(code);
+  const codeHash = await sha256(code);
+  const codeChallenge = await s256Challenge(verifier);
   let binding: ExchangeCodeInput['binding'];
   let refreshToken: string;
   if (identity.kind === 'first_party') {
@@ -269,6 +280,26 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
     if (device instanceof Response) return device;
     const proof = await firstPartyProof(request, tokenEndpointUrl(deps.config));
     if (proof instanceof Response) return proof;
+    if (identity.client.attestation === 'required') {
+      if (deps.attestation.kind === 'refused') {
+        return oauthError('unauthorized_client', 400, 'device attestation is not configured here');
+      }
+      if (deps.attestation.kind === 'verified') {
+        const gate = await attestCodeExchange(
+          params,
+          {
+            code,
+            codeHash,
+            clientId: identity.client.clientId,
+            redirectUri,
+            codeChallenge,
+            dpopJkt: proof.jkt,
+          },
+          deps.attestation.gate
+        );
+        if (gate instanceof Response) return gate;
+      }
+    }
     binding = {
       kind: 'first_party',
       proof,
@@ -287,10 +318,10 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
   const result = await deps.grants(async grants =>
     grants.exchangeCode({
       environment: deps.config.environment,
-      codeHash: await sha256(code),
+      codeHash,
       clientId,
       redirectUri,
-      codeChallenge: await s256Challenge(verifier),
+      codeChallenge,
       binding,
       grantId,
       refreshTokenHash: await sha256(refreshToken),

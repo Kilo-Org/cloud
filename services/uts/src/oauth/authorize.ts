@@ -5,6 +5,7 @@ import {
   firstPartyClient,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { AttestationService } from '../attest/gate';
 import type { WebClientDeps } from '../bff/deps';
 import { webClientUnavailable } from '../bff/responses';
 import type { AUTH_METHODS } from '../db/enums';
@@ -122,6 +123,8 @@ export type AuthorizeDeps = {
   clients: ThirdPartyClients;
   /** `kilo-web`'s key set: the client is served only where it is configured. */
   web: Pick<WebClientDeps, 'keys'>;
+  /** Whether a client that needs device attestation is served here (src/attest/gate.ts). */
+  attestation: AttestationService;
 };
 
 /** An error before the redirect URI is trusted: shown, never redirected. */
@@ -158,10 +161,18 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
     if (!isRegisteredRedirect(identity.client, redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }
-    if (!clientServedIn(identity.client, deps.config.environment)) {
+    if (!clientServedIn(identity.client, deps.attestation.kind)) {
+      if (deps.attestation.kind === 'refused' && deps.attestation.problems.length > 0) {
+        console.error(
+          JSON.stringify({
+            event: 'uts.attestation.misconfigured',
+            problems: deps.attestation.problems,
+          })
+        );
+      }
       return directError(
         'unauthorized_client',
-        'this client needs device attestation, which this environment does not verify yet'
+        'this client needs device attestation, which this environment is not configured to verify'
       );
     }
     client = {

@@ -182,6 +182,8 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
     },
     thirdParty: unexpectedStore,
     exchange: null,
+    // The runtime pool runs in development without attestation config (src/attest/config.ts).
+    attestation: { kind: 'unattested_development' },
     web: {
       config,
       keys: async () => ({ status: 'unconfigured' }),

@@ -595,6 +595,24 @@ export const AuditRelayWatermarkRowSchema = z.strictObject({
   updated_at: timestamp,
 });
 
+export const AppAttestKeyRowSchema = z.strictObject({
+  key_id: sha256,
+  public_key: bytes,
+  sign_count: z.bigint(),
+  created_at: timestamp,
+  last_used_at: timestamp,
+});
+
+export const CodeAttestationRowSchema = z.strictObject({
+  code_hash: sha256,
+  attestation_type: z.enum(enums.IDENTITY_STORE_ENUMS.attestation_type),
+  key_id: sha256.nullable(),
+  state: z.enum(enums.ATTESTATION_STATES),
+  claim_id: uuid,
+  claimed_at: timestamp,
+  settled_at: timestamp.nullable(),
+});
+
 /** Each row schema by its table name in the `uts` schema. */
 export const IDENTITY_STORE_TABLES = {
   accounts: AccountRowSchema,
@@ -639,4 +657,6 @@ export const IDENTITY_STORE_TABLES = {
   app_account_events: AppAccountEventRowSchema,
   audit_events: AuditEventRowSchema,
   audit_relay_watermarks: AuditRelayWatermarkRowSchema,
+  app_attest_keys: AppAttestKeyRowSchema,
+  code_attestations: CodeAttestationRowSchema,
 } as const;

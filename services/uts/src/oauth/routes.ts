@@ -14,6 +14,8 @@ import {
   UTS_TOKEN_PATH,
   UTS_TICKETS_PATH,
 } from '@kilocode/uts-contracts';
+import { type AttestationService, attestationService } from '../attest/gate';
+import { attestationAccess } from '../attest/store';
 import { webClientKeys } from '../bff/client-auth';
 import { type WebClientDeps, noSsoAuthority } from '../bff/deps';
 import type { HandleWindows } from '../bff/limits';
@@ -91,6 +93,8 @@ export type OAuthDeps = {
   thirdParty: ThirdPartyAccess;
   /** The RFC 8693 broker exchange; null until an STS token verifier is wired. */
   exchange: ExchangeService | null;
+  /** Device attestation of `kilo-mobile` (src/attest/gate.ts). */
+  attestation: AttestationService;
 };
 
 /** The OAuth endpoints are served only where the identity store is bound. */
@@ -202,6 +206,11 @@ export function oauthService(
               windows: exchangeWindows,
               now: Date.now,
             },
+      attestation: attestationService(
+        env,
+        config,
+        attestationAccess(binding.connectionString, ctx)
+      ),
     },
   };
 }

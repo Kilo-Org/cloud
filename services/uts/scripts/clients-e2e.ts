@@ -210,6 +210,18 @@ async function main() {
   const host = metadataHost();
   const sts = await fakeSts();
   await admin.connect();
+  // The admin login owns no table; the schema owner reads and seeds them.
+  await admin.query('SET ROLE uts_owner');
+  // Wake both feed objects (a one-second stop loads each and starts its backfill alarm), so one
+  // of them vouches for its list by the time the withdrawal publishes.
+  for (const feed of [0, 1]) {
+    await fetch(new URL('__dev/feed/stop', base), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feed, seconds: 1 }),
+    });
+  }
+  await new Promise(resolve => setTimeout(resolve, 12_000));
   try {
     // Seed: an account and a browser session signed in a minute ago, as the sign-in slice writes.
     const cookie = token();

@@ -62,15 +62,17 @@ const INSPECT_PAIR_PATTERN =
   /(^|[\s{,])(?:'([A-Za-z0-9_.$-]{1,64})'|([A-Za-z_$][\w$]{0,63}))(:[ \t]{0,8})(?:'((?:[^'\\]|\\.)*)'|(\d{1,20}))/g;
 
 // A `Name: value` header line in log or error text. An authorization or cookie
-// header at the start of the text or of a line is filtered to the end of that
-// line, because its value can hold any scheme or several cookies. Elsewhere,
+// header at the start of the text or of a line, after at most a short indent and
+// a `>` or `<` marker (curl's verbose request and response lines), is filtered
+// to the end of that line, because its value can hold any scheme or several
+// cookies. The lookbehind for that line start has a bounded length. Elsewhere,
 // such as inside a one-line provider payload, an authorization value is filtered
 // with the word before it, and the fields after it stay. Any other value is
 // either quoted or a run whose class excludes every character the prefix can be,
 // so no match attempt starts inside an earlier value and each character is read
 // a bounded number of times.
 const HEADER_LINE_PATTERN =
-  /(^|[\s"'{,])(?:(?<![^\r\n])((?:proxy-)?authorization|(?:set-)?cookie)(:[ \t]{0,8})([^\r\n]*)|((?:proxy-)?authorization)(:[ \t]{0,8})([A-Za-z][\w-]{0,24}[ \t]{1,8})?(?:"(?:[^"\\]|\\.)*"|[^\s"',;{}]+)|([A-Za-z0-9_.-]{1,64})(:[ \t]{0,8})((?:basic|bearer|bot|digest|dpop|key|negotiate|token)[ \t]{1,8})?(?:"((?:[^"\\]|\\.)*)"|([^\s"',;{}]+)))/gi;
+  /(^|[\s"'{,])(?:(?<=(?:^|[\r\n])[ \t]{0,8}(?:[<>][ \t]{0,8})?)((?:proxy-)?authorization|(?:set-)?cookie)(:[ \t]{0,8})([^\r\n]*)|((?:proxy-)?authorization)(:[ \t]{0,8})([A-Za-z][\w-]{0,24}[ \t]{1,8})?(?:"(?:[^"\\]|\\.)*"|[^\s"',;{}]+)|([A-Za-z0-9_.-]{1,64})(:[ \t]{0,8})((?:basic|bearer|bot|digest|dpop|key|negotiate|token)[ \t]{1,8})?(?:"((?:[^"\\]|\\.)*)"|([^\s"',;{}]+)))/gi;
 // A known authorization scheme stays readable in front of the filtered value.
 const AUTHORIZATION_SCHEME = /^(?:basic|bearer|bot|digest|dpop|key|negotiate|token)[ \t]{1,8}/i;
 

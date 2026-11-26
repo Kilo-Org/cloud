@@ -335,6 +335,21 @@ describe('redactSecretValues', () => {
       'request failed cookie: kilo_sid=fake-0000; model=gpt-5',
       'request failed cookie: [Filtered]; model=gpt-5',
     ],
+    [
+      'a curl request cookie line',
+      '* Connected\n> GET /v1 HTTP/2\n> Cookie: a=b; x_sid=fake-0000\n> Accept: */*',
+      '* Connected\n> GET /v1 HTTP/2\n> Cookie: [Filtered]\n> Accept: */*',
+    ],
+    [
+      'a curl response set-cookie line',
+      '< HTTP/2 200\n< set-cookie: theme=dark; kilo_sid=fake-0000; Path=/',
+      '< HTTP/2 200\n< set-cookie: [Filtered]',
+    ],
+    [
+      'an indented authorization line',
+      'headers:\n\tAuthorization: Splunk fake-hec-0000 extra',
+      'headers:\n\tAuthorization: [Filtered]',
+    ],
   ])('replaces %s', (_name, input, expected) => {
     expect(redactSecretValues(input)).toBe(expected);
   });
@@ -435,6 +450,16 @@ describe('redactSecretValues', () => {
     ['header line: repeated inline authorization fields', nearMatches(' authorization: a ')],
     ['header line: repeated line-start authorization fields', nearMatches('\nauthorization:')],
     ['header line: repeated inline cookie fields', nearMatches(' cookie: a=')],
+    ['header line: repeated curl cookie lines', nearMatches('\n> cookie:')],
+    ['header line: repeated indented marker starts', nearMatches('\n  < \t')],
+    [
+      'header line: one unterminated quoted authorization value',
+      ` authorization: "${'a'.repeat(200_000)}`,
+    ],
+    [
+      'header line: one unterminated quoted value after a scheme',
+      ` authorization: Bearer "${'a'.repeat(200_000)}`,
+    ],
   ])('redacts 200 KB of %s in linear time', (_name, input) => {
     const started = performance.now();
     redactSecretValues(input, input.length);

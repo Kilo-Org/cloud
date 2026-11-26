@@ -868,14 +868,20 @@ RETURN (
   WHERE num_nonnulls(p_browser_session_id, p_device_session_id) = 1
 );
 
--- The write step of creating a PAT (design sections 5.3 and 5.11). Outcomes, checked in order:
+-- The write step of creating a PAT (design sections 5.3 and 5.11). It locks the account row first
+-- (the order an account deletion takes too, so the two cannot deadlock). Outcomes, checked in
+-- order:
 -- * `invalid_session`: the device session is not a live session of the account;
 -- * `org_denied`: the PAT names an organization in which the account has no active membership.
 --   The membership row stays locked FOR SHARE until commit, so a removal of the member that runs
---   at the same time waits, then revokes the new PAT with the member's other org-bound PATs;
+--   at the same time waits for this statement to commit. The removal then sees the new PAT only
+--   if it updates the membership row in one statement and revokes the member's org-bound PATs in
+--   a later statement (each statement of a VOLATILE function takes a fresh snapshot), or revokes
+--   them from a row trigger on `uts.org_memberships`. A removal written as one statement keeps
+--   the snapshot it took before the wait and misses the new PAT;
 -- * `gate_required`: the session meets no tier B check;
 -- * `limit_reached`: the account holds 100 live PATs. Creates of one account run one after
---   another behind a lock on the account row, so the count holds;
+--   another behind the lock on the account row, so the count holds;
 -- * `created`: one statement wrote the consumed tier B pass and the PAT that names it.
 -- The audience is the scope's own (design 5.3). A lifetime outside 1 to 365 days raises 22023.
 CREATE FUNCTION uts.write_gated_pat(
@@ -908,6 +914,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
+  PERFORM 1 FROM uts.accounts AS account WHERE account.id = p_account_id FOR NO KEY UPDATE;
   IF p_org_id IS NOT NULL THEN
     PERFORM 1 FROM uts.org_memberships AS membership
     WHERE membership.org_id = p_org_id
@@ -925,7 +932,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
-  PERFORM 1 FROM uts.accounts AS account WHERE account.id = p_account_id FOR NO KEY UPDATE;
+  -- The account row is locked above, so concurrent creates of one account count one at a time.
   IF (
     SELECT count(*) FROM uts.personal_access_tokens AS pat
     WHERE pat.account_id = p_account_id AND pat.status = 'active' AND pat.expires_at > now()
@@ -958,11 +965,16 @@ END
 $$;
 
 -- The write step of creating an org bot key (design sections 5.3, 5.8 and 5.11). The key belongs
--- to the organization and records its creator. Outcomes, checked in order:
+-- to the organization and records its creator. It takes a key-share lock on the creator's account
+-- row first (the order an account deletion takes too, so the two cannot deadlock). Outcomes,
+-- checked in order:
 -- * `invalid_session`: the device session is not a live session of the account;
 -- * `not_org_admin`: the account is not an active owner or admin of the organization. The
 --   membership row stays locked FOR SHARE until commit, so a removal of the member that runs at
---   the same time waits, then flags the new key with the member's other keys;
+--   the same time waits for this statement to commit. The removal then sees the new key only if
+--   it updates the membership row in one statement and flags the member's keys in a later
+--   statement of a VOLATILE function, or flags them from a row trigger on `uts.org_memberships`
+--   (see `uts.write_gated_pat`);
 -- * `gate_required`: the session meets no tier B check;
 -- * `limit_reached`: the organization holds 100 live keys (a flagged key is live until 7 days
 --   after it was flagged). Creates in one organization run one after another behind an advisory
@@ -999,6 +1011,7 @@ BEGIN
     RETURN NEXT;
     RETURN;
   END IF;
+  PERFORM 1 FROM uts.accounts AS account WHERE account.id = p_account_id FOR KEY SHARE;
   PERFORM 1 FROM uts.org_memberships AS membership
   WHERE membership.org_id = p_org_id
     AND membership.account_id = p_account_id
@@ -1052,36 +1065,47 @@ $$;
 
 -- A credential, consent or device code in a final state keeps it: an update cannot bring back a
 -- revoked PAT, bot key, CI trust policy or consent, nor reopen a denied or consumed device code,
--- because each of those needs a new gate pass.
+-- because each of those needs a new gate pass. A flagged org bot key becomes only kept or revoked,
+-- and its `flagged_at` never changes once set, so an update can neither clear a flag nor move its
+-- 7-day cutoff; keeping a key is a gated step of its own (design section 5.8). The trigger's
+-- argument names the column it guards.
 CREATE FUNCTION uts.refuse_reopening() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
-  RAISE EXCEPTION 'a % row in a final state keeps its status', TG_TABLE_NAME
-    USING ERRCODE = 'check_violation', TABLE = TG_TABLE_NAME, COLUMN = 'status';
+  RAISE EXCEPTION 'a % row cannot change % this way', TG_TABLE_NAME, TG_ARGV[0]
+    USING ERRCODE = 'check_violation', TABLE = TG_TABLE_NAME, COLUMN = TG_ARGV[0];
 END
 $$;
 CREATE TRIGGER personal_access_tokens_stay_revoked
   BEFORE UPDATE ON uts.personal_access_tokens
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
-  EXECUTE FUNCTION uts.refuse_reopening();
+  EXECUTE FUNCTION uts.refuse_reopening('status');
 CREATE TRIGGER org_bot_keys_stay_revoked
   BEFORE UPDATE ON uts.org_bot_keys
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
-  EXECUTE FUNCTION uts.refuse_reopening();
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE TRIGGER org_bot_keys_flag_moves_on
+  BEFORE UPDATE ON uts.org_bot_keys
+  FOR EACH ROW WHEN (OLD.status = 'flagged' AND NEW.status NOT IN ('flagged', 'kept', 'revoked'))
+  EXECUTE FUNCTION uts.refuse_reopening('status');
+CREATE TRIGGER org_bot_keys_flag_time_fixed
+  BEFORE UPDATE ON uts.org_bot_keys
+  FOR EACH ROW WHEN (OLD.flagged_at IS NOT NULL AND NEW.flagged_at IS DISTINCT FROM OLD.flagged_at)
+  EXECUTE FUNCTION uts.refuse_reopening('flagged_at');
 CREATE TRIGGER ci_trust_policies_stay_revoked
   BEFORE UPDATE ON uts.ci_trust_policies
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
-  EXECUTE FUNCTION uts.refuse_reopening();
+  EXECUTE FUNCTION uts.refuse_reopening('status');
 CREATE TRIGGER third_party_consents_stay_revoked
   BEFORE UPDATE ON uts.third_party_consents
   FOR EACH ROW WHEN (OLD.status = 'revoked' AND NEW.status <> 'revoked')
-  EXECUTE FUNCTION uts.refuse_reopening();
+  EXECUTE FUNCTION uts.refuse_reopening('status');
 CREATE TRIGGER device_codes_stay_final
   BEFORE UPDATE ON uts.device_codes
   FOR EACH ROW WHEN (OLD.status IN ('denied', 'consumed') AND NEW.status <> OLD.status)
-  EXECUTE FUNCTION uts.refuse_reopening();
+  EXECUTE FUNCTION uts.refuse_reopening('status');
 
 -- Sandbox grants (design section 5.10): UTS mints delegated tokens only against one of these, and
 -- the grant ends with the sandbox session.

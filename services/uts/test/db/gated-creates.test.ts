@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   TestDatabase,
   insertAccount,
@@ -260,42 +260,154 @@ describe('uts.write_gated_bot_key', () => {
     expect(keys.rowCount).toBe(0);
   });
 
-  it('hold the membership row until commit, so a removal waits for the new key', async () => {
+  it('make an account deletion wait on the account row, then flag the new key', async () => {
+    const adminId = await insertAccount(owner);
+    const orgId = await joinOrg(adminId, 'admin');
+    const sessionId = await sessionSignedIn(adminId, 1);
+    const creator = await db.connectAsOwner();
+    const deleter = await db.connectAsOwner();
+    const deleterPid = (await deleter.query<{ pid: number }>('SELECT pg_backend_pid() AS pid'))
+      .rows[0].pid;
+    await creator.query('BEGIN');
+    const key = await creator.query<{ new_key_id: string }>(
+      `SELECT new_key_id
+       FROM uts.write_gated_bot_key($1, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
+      [adminId, sessionId, orgId, randomHash()]
+    );
+    const deleted = deleter.query('DELETE FROM uts.accounts WHERE id = $1', [adminId]);
+    // Both take the account row first, so the deletion queues there (a tuple lock on the account
+    // table) rather than on the membership row in its cascade, where it could deadlock.
+    await vi.waitFor(
+      async () => {
+        const locks = await owner.query<{ relation: string }>(
+          `SELECT relation::regclass::text AS relation FROM pg_locks
+           WHERE pid = $1 AND locktype = 'tuple'`,
+          [deleterPid]
+        );
+        expect(locks.rows).toEqual([{ relation: 'uts.accounts' }]);
+      },
+      { timeout: 5_000, interval: 20 }
+    );
+    await creator.query('COMMIT');
+    await deleted;
+    const flagged = await owner.query(
+      'SELECT status::text, gate_pass_id FROM uts.org_bot_keys WHERE id = $1',
+      [key.rows[0].new_key_id]
+    );
+    expect(flagged.rows).toEqual([{ status: 'flagged', gate_pass_id: null }]);
+  });
+});
+
+describe('a member removal that races a create', () => {
+  /**
+   * A stand-in for the removal statement a later pull request adds: it updates the membership row
+   * in its first statement and revokes and flags in later ones, so each later statement takes a
+   * fresh snapshot after the wait on the create's membership lock.
+   */
+  const REMOVE_IN_STEPS = `
+    CREATE FUNCTION uts.test_remove_member(p_org_id uuid, p_account_id text) RETURNS void
+    LANGUAGE plpgsql VOLATILE
+    SET search_path = pg_catalog, pg_temp
+    AS $$
+    BEGIN
+      UPDATE uts.org_memberships
+      SET status = 'removed', removed_at = now(), event_version = event_version + 1
+      WHERE org_id = p_org_id AND account_id = p_account_id AND status = 'active';
+      UPDATE uts.personal_access_tokens
+      SET status = 'revoked', revoked_at = now(), revoke_reason = 'member_removed'
+      WHERE account_id = p_account_id AND org_id = p_org_id AND status = 'active';
+      UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now()
+      WHERE org_id = p_org_id AND created_by = p_account_id AND status = 'active';
+    END
+    $$`;
+  /** The same removal as one statement: every part shares the snapshot taken before the wait. */
+  const REMOVE_IN_ONE_STATEMENT = `
+    WITH removed AS (
+      UPDATE uts.org_memberships
+      SET status = 'removed', removed_at = now(), event_version = event_version + 1
+      WHERE org_id = $1 AND account_id = $2 AND status = 'active'
+      RETURNING org_id, account_id
+    ), pats AS (
+      UPDATE uts.personal_access_tokens AS pat
+      SET status = 'revoked', revoked_at = now(), revoke_reason = 'member_removed'
+      FROM removed
+      WHERE pat.account_id = removed.account_id AND pat.org_id = removed.org_id
+        AND pat.status = 'active'
+      RETURNING pat.id
+    ), keys AS (
+      UPDATE uts.org_bot_keys AS bot_key SET status = 'flagged', flagged_at = now()
+      FROM removed
+      WHERE bot_key.org_id = removed.org_id AND bot_key.created_by = removed.account_id
+        AND bot_key.status = 'active'
+      RETURNING bot_key.id
+    )
+    SELECT (SELECT count(*) FROM pats) AS pats, (SELECT count(*) FROM keys) AS keys`;
+
+  beforeAll(async () => {
+    await owner.query(REMOVE_IN_STEPS);
+  });
+
+  /**
+   * Creates an org PAT and a bot key in one open transaction, starts `removal` while the
+   * create's membership lock is held, commits the create once the removal waits on that lock,
+   * and returns the final status of both credentials.
+   */
+  async function race(
+    removal: (remover: pg.Client, orgId: string, accountId: string) => Promise<unknown>
+  ) {
     const adminId = await insertAccount(owner);
     const orgId = await joinOrg(adminId, 'admin');
     const sessionId = await sessionSignedIn(adminId, 1);
     const creator = await db.connectAsOwner();
     const remover = await db.connectAsOwner();
+    const removerPid = (await remover.query<{ pid: number }>('SELECT pg_backend_pid() AS pid'))
+      .rows[0].pid;
+
     await creator.query('BEGIN');
-    try {
-      const created = await creator.query<{ outcome: string }>(
-        `SELECT outcome
-         FROM uts.write_gated_bot_key($1, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
-        [adminId, sessionId, orgId, randomHash()]
-      );
-      expect(created.rows).toEqual([{ outcome: 'created' }]);
-      // A member removal updates the membership row; it cannot pass the create's share lock, so
-      // it runs after the key exists and flags it with the member's other keys.
-      await remover.query(`SET lock_timeout = '200ms'`);
-      expect(
-        await sqlStateOf(() =>
-          remover.query(
-            `UPDATE uts.org_memberships SET status = 'removed', removed_at = now(),
-               event_version = 2
-             WHERE org_id = $1 AND account_id = $2`,
-            [orgId, adminId]
-          )
-        )
-      ).toBe('55P03');
-    } finally {
-      await creator.query('COMMIT');
-    }
-    const removed = await remover.query(
-      `UPDATE uts.org_memberships SET status = 'removed', removed_at = now(), event_version = 2
-       WHERE org_id = $1 AND account_id = $2 AND status = 'active'`,
-      [orgId, adminId]
+    const key = await creator.query<{ outcome: string; new_key_id: string }>(
+      `SELECT outcome, new_key_id
+       FROM uts.write_gated_bot_key($1, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
+      [adminId, sessionId, orgId, randomHash()]
     );
-    expect(removed.rowCount).toBe(1);
-    expect((await writeBotKey(adminId, sessionId, orgId)).outcome).toBe('not_org_admin');
+    const pat = await creator.query<{ outcome: string; new_pat_id: string }>(
+      `SELECT outcome, new_pat_id
+       FROM uts.write_gated_pat($1, $2, 'ci', $3, 'abcd', 'gateway:models.read', $4, 90)`,
+      [adminId, sessionId, randomHash(), orgId]
+    );
+    expect([key.rows[0].outcome, pat.rows[0].outcome]).toEqual(['created', 'created']);
+
+    const removed = removal(remover, orgId, adminId);
+    await vi.waitFor(
+      async () => {
+        const waiting = await owner.query('SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted', [
+          removerPid,
+        ]);
+        expect(waiting.rowCount).toBe(1);
+      },
+      { timeout: 5_000, interval: 20 }
+    );
+    await creator.query('COMMIT');
+    await removed;
+
+    const statuses = await owner.query<{ key: string; pat: string }>(
+      `SELECT (SELECT status::text FROM uts.org_bot_keys WHERE id = $1) AS key,
+              (SELECT status::text FROM uts.personal_access_tokens WHERE id = $2) AS pat`,
+      [key.rows[0].new_key_id, pat.rows[0].new_pat_id]
+    );
+    return statuses.rows[0];
+  }
+
+  it('flag the new key and revoke the new org PAT when the removal revokes in later statements', async () => {
+    const statuses = await race((remover, orgId, accountId) =>
+      remover.query('SELECT uts.test_remove_member($1, $2)', [orgId, accountId])
+    );
+    expect(statuses).toEqual({ key: 'flagged', pat: 'revoked' });
+  });
+
+  it('miss both when the removal is one statement, which is why the removal must not be one', async () => {
+    const statuses = await race((remover, orgId, accountId) =>
+      remover.query(REMOVE_IN_ONE_STATEMENT, [orgId, accountId])
+    );
+    expect(statuses).toEqual({ key: 'active', pat: 'active' });
   });
 });

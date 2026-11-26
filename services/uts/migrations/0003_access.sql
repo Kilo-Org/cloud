@@ -11,11 +11,15 @@
 --
 -- Gated rows (design section 5.11): the app role writes no gate pass, PAT, org bot key, CI trust
 -- policy or third-party consent, and cannot approve a device code. A gated row comes only from a
--- SECURITY DEFINER statement that writes its pass already consumed in the same statement
--- (`uts.write_gated_pat`, `uts.write_gated_bot_key` in 0001_identity.sql). The app role may still
--- revoke, flag, keep, deny and record use, through the column grants below, which leave out every
--- column that names the holder, the hash, the scope, the lifetime or the pass, so an update cannot
--- turn a row into a different credential; a row in a final state keeps it
+-- SECURITY DEFINER statement that writes its pass already consumed in the same statement. This
+-- migration has the write steps for PATs and org bot keys only (`uts.write_gated_pat`,
+-- `uts.write_gated_bot_key` in 0001_identity.sql), and no SECURITY DEFINER entry point calls them
+-- yet. The entry points for those two, and the write paths for CI trust policies, third-party
+-- consents and device approval, arrive in later pull requests of this stack; until then none of
+-- these flows has a write path. The app role may still revoke, flag, keep, deny and record use,
+-- through the column grants below, which leave out every column that names the holder, the hash,
+-- the scope, the lifetime or the pass, so an update cannot turn a row into a different
+-- credential; a row in a final state keeps it, and a flagged bot key becomes only kept or revoked
 -- (`uts.refuse_reopening`).
 
 CREATE SCHEMA uts_read AUTHORIZATION uts_owner;

@@ -235,6 +235,9 @@ BEGIN
     WHERE passed.shard = p_shard
       AND (passed.txid, passed.id) > (current.last_txid, current.last_id)
       AND (passed.txid, passed.id) <= (p_to_txid, p_to_id)
+    -- The index order keeps PL/pgSQL's generic plan on ordered index scans that stop at 501
+    -- rows; without it the planner may take a bitmap scan that reads the whole window first.
+    ORDER BY passed.txid, passed.id
     LIMIT 501
   ) AS window_rows;
   IF covered <> p_to_seq - p_from_seq THEN
@@ -424,9 +427,11 @@ BEGIN
 END
 $$;
 
--- The entry point that UTS calls through the app role: the minute cron, and each audit relay run
--- before it reads. The limit is fixed at 30 seconds, so a caller cannot widen it, and a UTS
--- session holds the relay back for at most that limit plus the time to the next call.
+-- The entry point for the app role. The audit relay slice's minute cron and each of its relay runs
+-- call it before they read; until that slice lands nothing calls it, so the bound below holds only
+-- from then. The limit is fixed at 30 seconds, so a caller cannot widen it, and once the relay
+-- calls it a UTS session holds the relay back for at most that limit plus the time to the next
+-- call.
 CREATE FUNCTION uts.end_long_transactions()
 RETURNS TABLE (pid integer, login text, transaction_started_at timestamptz)
 LANGUAGE sql

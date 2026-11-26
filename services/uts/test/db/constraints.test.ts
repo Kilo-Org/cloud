@@ -786,6 +786,47 @@ describe('gate pass binding', () => {
     ).toBe(CHECK_VIOLATION);
   });
 
+  it('let a flagged bot key become only kept or revoked, with its flag time fixed', async () => {
+    const flaggedKey = async () => {
+      const key = await insertBotKeyFor(
+        accountId,
+        crypto.randomUUID(),
+        await insertGatePass(owner, accountId, 'bot_key_create')
+      );
+      await app.query(
+        `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() WHERE id = $1`,
+        [key.rows[0].id]
+      );
+      return key.rows[0].id;
+    };
+
+    const cleared = await flaggedKey();
+    expect(
+      await rejects(
+        `UPDATE uts.org_bot_keys SET status = 'active', flagged_at = NULL WHERE id = $1`,
+        [cleared]
+      )
+    ).toBe(CHECK_VIOLATION);
+    // Moving the flag time would move the key's 7-day cutoff.
+    expect(
+      await rejects(
+        `UPDATE uts.org_bot_keys SET flagged_at = flagged_at + interval '6 days' WHERE id = $1`,
+        [cleared]
+      )
+    ).toBe(CHECK_VIOLATION);
+
+    await app.query(
+      `UPDATE uts.org_bot_keys SET status = 'kept', kept_by = 'admin', kept_at = now()
+       WHERE id = $1`,
+      [await flaggedKey()]
+    );
+    await app.query(
+      `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
+       WHERE id = $1`,
+      [await flaggedKey()]
+    );
+  });
+
   it('bind a device approval to the approving account and one code', async () => {
     const approve = (approver: string, gatePassId: string) =>
       owner.query(

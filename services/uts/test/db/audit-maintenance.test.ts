@@ -201,6 +201,86 @@ describe('audit reads at volume', () => {
   });
 });
 
+describe('watermark guard at volume', () => {
+  /**
+   * The row count `uts.advance_audit_watermark` checks (0002_audit_outbox.sql), with the
+   * function's variables as parameters: `$1` the shard, `$2`/`$3` the old position, `$4`/`$5` the
+   * new one. PL/pgSQL plans it once per session and may keep a generic plan, so the generic plan
+   * is the one that must stay on the index.
+   */
+  const WATERMARK_COUNT = `SELECT count(*) FROM (
+      SELECT 1
+      FROM uts.audit_events AS passed
+      WHERE passed.shard = $1
+        AND (passed.txid, passed.id) > ($2, $3)
+        AND (passed.txid, passed.id) <= ($4, $5)
+      ORDER BY passed.txid, passed.id
+      LIMIT 501
+    ) AS window_rows`;
+  const LOWER_BOUND = /ROW\((\w+\.)?txid, (\w+\.)?id\) > ROW\(\$2, \$3\)/;
+  const UPPER_BOUND = /ROW\((\w+\.)?txid, (\w+\.)?id\) <= ROW\(\$4, \$5\)/;
+
+  it('pin the count query to the function body', async () => {
+    const body = await owner.query<{ prosrc: string }>(
+      `SELECT prosrc FROM pg_proc
+       WHERE oid = 'uts.advance_audit_watermark(smallint, bigint, xid8, bigint, bigint)'::regprocedure`
+    );
+    const squash = (text: string) => text.replaceAll(/\s+/g, ' ');
+    expect(squash(body.rows[0].prosrc)).toContain(
+      squash(`ORDER BY passed.txid, passed.id
+    LIMIT 501`)
+    );
+  });
+
+  it('count a 500-row move with both row comparisons as the index condition of every partition', async () => {
+    const watermark = await owner.query<{ last_txid: string; last_id: string }>(
+      `SELECT last_txid::text, last_id::text FROM uts.audit_relay_watermarks WHERE shard = 3`
+    );
+    const target = await owner.query<{ txid: string; id: string }>(
+      `SELECT event.txid::text, event.id::text
+       FROM uts.audit_events AS event, uts.audit_relay_watermarks AS watermark
+       WHERE watermark.shard = 3 AND event.shard = 3
+         AND (event.txid, event.id) > (watermark.last_txid, watermark.last_id)
+       ORDER BY event.txid, event.id
+       OFFSET ${AUDIT_BATCH_MAX_EVENTS - 1} LIMIT 1`
+    );
+    const [from] = watermark.rows;
+    const [to] = target.rows;
+    await owner.query('SET plan_cache_mode = force_generic_plan');
+    await owner.query(
+      `PREPARE watermark_count(smallint, xid8, bigint, xid8, bigint) AS ${WATERMARK_COUNT}`
+    );
+    try {
+      const { nodes, executionMs } = await explain(
+        owner,
+        `EXECUTE watermark_count(3, '${from.last_txid}', ${from.last_id}, '${to.txid}', ${to.id})`
+      );
+      const scans = nodes.filter(node => node['Relation Name']?.startsWith('audit_events_'));
+      expect(scans.map(scan => scan['Relation Name']).sort()).toEqual(await partitions());
+      for (const scan of scans) {
+        expect(['Index Scan', 'Index Only Scan']).toContain(scan['Node Type']);
+        expect(scan['Index Name']).toBe(`${scan['Relation Name']}_shard_txid_id_idx`);
+        expect(scan['Index Cond']).toMatch(LOWER_BOUND);
+        expect(scan['Index Cond']).toMatch(UPPER_BOUND);
+      }
+      const relayed = scans.find(scan => scan['Relation Name'] === OLD_PARTITION);
+      expect(relayed?.['Actual Rows']).toBe(0);
+      const read = scans.reduce(
+        (total, scan) => total + scan['Actual Rows'] * scan['Actual Loops'],
+        0
+      );
+      expect(read).toBe(AUDIT_BATCH_MAX_EVENTS);
+      expect(read).toBeLessThanOrEqual(501);
+      console.info(
+        `watermark count (generic plan) of a ${AUDIT_BATCH_MAX_EVENTS}-row move over ${OLD_ROWS} relayed rows: ${executionMs} ms`
+      );
+    } finally {
+      await owner.query('DEALLOCATE watermark_count');
+      await owner.query('RESET plan_cache_mode');
+    }
+  });
+});
+
 describe('partition maintenance under insert load', () => {
   it('truncate a relayed partition without locking the parent table', async () => {
     const maintainer = await db.connectAsOwner();

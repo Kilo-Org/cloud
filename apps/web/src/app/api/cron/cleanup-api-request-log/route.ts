@@ -10,6 +10,10 @@ import { api_request_log_2 } from '@kilocode/db/schema';
 import { asc, inArray, lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { deleteExpiredRequestLoggingOptIns } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import {
+  apiRequestLogBlobKey,
+  deleteApiRequestLogBlobs,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 
 const RETENTION_DAYS = 30;
 const BATCH_SIZE = 10_000;
@@ -33,20 +37,23 @@ export async function GET(request: Request) {
   try {
     const cutoffDate = getDaysAgo(RETENTION_DAYS).toISOString();
     const expiredRows = await db
-      .select({ id: api_request_log_2.id })
+      .select({ id: api_request_log_2.id, created_at: api_request_log_2.created_at })
       .from(api_request_log_2)
       .where(lt(api_request_log_2.created_at, cutoffDate))
       .orderBy(asc(api_request_log_2.created_at))
       .limit(BATCH_SIZE + 1);
 
-    const batchIds = expiredRows.slice(0, BATCH_SIZE).map(row => row.id);
-    const result =
-      batchIds.length > 0
-        ? await db.delete(api_request_log_2).where(inArray(api_request_log_2.id, batchIds))
-        : null;
+    const batch = expiredRows.slice(0, BATCH_SIZE);
+    let deletedApiRequestLogCount = 0;
+    if (batch.length > 0) {
+      // Keep the rows if blob deletion fails so the next run can retry.
+      await deleteApiRequestLogBlobs(batch.map(apiRequestLogBlobKey));
+      const ids = batch.map(row => row.id);
+      const result = await db.delete(api_request_log_2).where(inArray(api_request_log_2.id, ids));
+      deletedApiRequestLogCount = result.rowCount ?? 0;
+    }
 
     const deletedOptInCount = await deleteExpiredRequestLoggingOptIns();
-    const deletedApiRequestLogCount = result?.rowCount ?? 0;
     const hasMore = expiredRows.length > BATCH_SIZE;
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {

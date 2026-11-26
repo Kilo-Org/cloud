@@ -1,4 +1,6 @@
+import type { DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { NextRequest } from 'next/server';
+import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
@@ -14,15 +16,28 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
+  jest
+    .requireActual<{
+      createFakeR2ClientModule: () => FakeR2ClientModule;
+    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
+    .createFakeR2ClientModule()
+);
+
 import { ai_gateway_request_logging_opt_ins, api_request_log_2 } from '@kilocode/db/schema';
 import { getRequestLoggingOptIns } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
+import { apiRequestLogBlobKey } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { GET } from './route';
 
+const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+  '@kilocode/web-shared/lib/r2/create-client'
+);
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 
 const BATCH_SIZE = 10_000;
+const BUCKET = 'test-api-request-log';
 
 function daysAgo(days: number): string {
   const date = new Date();
@@ -60,8 +75,13 @@ async function insertApiRequestLogRecords(count: number, created_at: string) {
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
+    fakeR2.objects.clear();
     await db.delete(api_request_log_2).where(sql`true`);
     await db.delete(ai_gateway_request_logging_opt_ins).where(sql`true`);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('rejects requests without authorization header', async () => {
@@ -127,10 +147,13 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     );
   });
 
-  it('deletes records older than thirty days and preserves recent records', async () => {
-    await insertApiRequestLogRecord(daysAgo(45));
+  it('deletes expired rows and blobs, even when some blobs are missing', async () => {
+    const expired = await insertApiRequestLogRecord(daysAgo(45));
     await insertApiRequestLogRecord(daysAgo(31));
     const recent = await insertApiRequestLogRecord(daysAgo(29));
+    const recentObject = `${BUCKET}/${apiRequestLogBlobKey(recent)}`;
+    fakeR2.objects.set(`${BUCKET}/${apiRequestLogBlobKey(expired)}`, 'expired blob');
+    fakeR2.objects.set(recentObject, 'recent blob');
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
@@ -149,6 +172,55 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     const remaining = await db.select().from(api_request_log_2);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe(recent.id);
+    expect([...fakeR2.objects.entries()]).toEqual([[recentObject, 'recent blob']]);
+  });
+
+  it('keeps rows after a per-object delete error and retries the batch', async () => {
+    const expired1 = await insertApiRequestLogRecord(daysAgo(45));
+    const expired2 = await insertApiRequestLogRecord(daysAgo(31));
+    const firstObject = `${BUCKET}/${apiRequestLogBlobKey(expired1)}`;
+    const secondKey = apiRequestLogBlobKey(expired2);
+    const secondObject = `${BUCKET}/${secondKey}`;
+    fakeR2.objects.set(firstObject, 'first blob');
+    fakeR2.objects.set(secondObject, 'second blob');
+    jest.spyOn(fakeR2, 'send').mockImplementationOnce(async () => {
+      fakeR2.objects.delete(firstObject);
+      return {
+        $metadata: {},
+        Errors: [{ Code: 'AccessDenied', Key: secondKey, Message: 'provider detail' }],
+      };
+    });
+
+    const request = makeRequest({ authorization: 'Bearer cron-secret' });
+    await expect(GET(request)).rejects.toThrow(
+      /^API request log blob delete failed \(object count: 1\)$/
+    );
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
+      outcome: 'failed',
+      exception_name: 'ApiRequestLogBlobDeleteError',
+    });
+    const retained = await db.select({ id: api_request_log_2.id }).from(api_request_log_2);
+    expect(retained.map(row => row.id).sort()).toEqual([expired1.id, expired2.id].sort());
+    expect([...fakeR2.objects.keys()]).toEqual([secondObject]);
+
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ deletedCount: 2, hasMore: false });
+    expect(await db.select().from(api_request_log_2)).toEqual([]);
+    expect(fakeR2.objects.size).toBe(0);
+  });
+
+  it('keeps rows and omits provider details when a storage request fails', async () => {
+    const expired = await insertApiRequestLogRecord(daysAgo(45));
+    jest.spyOn(fakeR2, 'send').mockRejectedValueOnce(new Error('provider detail'));
+
+    await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow(
+      /^API request log blob delete request failed$/
+    );
+
+    expect(await db.select({ id: api_request_log_2.id }).from(api_request_log_2)).toEqual([
+      { id: expired.id },
+    ]);
   });
 
   it('still enforces log retention when persisted opt-in state cannot be parsed', async () => {
@@ -171,6 +243,7 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     await insertApiRequestLogRecords(BATCH_SIZE + 5, daysAgo(45));
     const recent1 = await insertApiRequestLogRecord(daysAgo(1));
     const recent2 = await insertApiRequestLogRecord(new Date().toISOString());
+    const send = jest.spyOn(fakeR2, 'send');
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 
@@ -179,6 +252,10 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(body.deletedCount).toBe(BATCH_SIZE);
     expect(body.batchSize).toBe(BATCH_SIZE);
     expect(body.hasMore).toBe(true);
+    const deleteBatchSizes = send.mock.calls.map(
+      ([command]) => (command as DeleteObjectsCommand).input.Delete?.Objects?.length
+    );
+    expect(deleteBatchSizes).toEqual(Array<number>(10).fill(1_000));
 
     const remaining = await db.select().from(api_request_log_2);
     expect(remaining).toHaveLength(7);
@@ -188,7 +265,7 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
   });
 
   it('emits one failure event and preserves rejected database failure semantics', async () => {
-    const select = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+    jest.spyOn(db, 'select').mockImplementationOnce(() => {
       throw new Error('database unavailable');
     });
 
@@ -200,7 +277,5 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
       outcome: 'failed',
       exception_name: 'Error',
     });
-
-    select.mockRestore();
   });
 });

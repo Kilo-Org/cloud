@@ -1,4 +1,11 @@
-import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  NoSuchKey,
+  PutObjectCommand,
+  type DeleteObjectsCommandOutput,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import type { ApiRequestLog2 } from '@kilocode/db/schema';
 import {
@@ -44,6 +51,12 @@ export function apiRequestLogBlobKey({
 }: Pick<ApiRequestLog2, 'id' | 'created_at'>): string {
   const date = new Date(created_at).toISOString().slice(0, 10).replaceAll('-', '/');
   return `${date}/${id}.json`;
+}
+
+const DELETE_OBJECTS_LIMIT = 1_000;
+
+class ApiRequestLogBlobDeleteError extends Error {
+  override readonly name = 'ApiRequestLogBlobDeleteError';
 }
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };
@@ -112,5 +125,34 @@ export async function getApiRequestLogBlob(key: string): Promise<string | null> 
       return null;
     }
     throw error;
+  }
+}
+
+/** Deletes the specified blobs. Missing objects count as deleted. */
+export async function deleteApiRequestLogBlobs(keys: readonly string[]): Promise<void> {
+  if (keys.length === 0) return;
+
+  const { client, bucket } = getStorage();
+  for (let start = 0; start < keys.length; start += DELETE_OBJECTS_LIMIT) {
+    const objects = keys.slice(start, start + DELETE_OBJECTS_LIMIT).map(Key => ({ Key }));
+    let result: DeleteObjectsCommandOutput;
+    try {
+      result = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: objects, Quiet: true },
+        })
+      );
+    } catch {
+      // The cron framework can log thrown errors. Keep provider details out of the error.
+      throw new ApiRequestLogBlobDeleteError('API request log blob delete request failed');
+    }
+
+    const failedCount = result.Errors?.filter(error => error.Code !== 'NoSuchKey').length ?? 0;
+    if (failedCount > 0) {
+      throw new ApiRequestLogBlobDeleteError(
+        `API request log blob delete failed (object count: ${failedCount})`
+      );
+    }
   }
 }

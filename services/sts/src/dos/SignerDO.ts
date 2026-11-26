@@ -54,31 +54,32 @@ const StoredSigningKeySchema = z.strictObject({
 /**
  * Holds the ECDSA P-256 key STS logs in to the manager with (design 4.2, 4.4). The key is generated
  * here and its private half never leaves this object; only the public half is served, at a key-set
- * URL of its own.
+ * URL of its own. A stub can call every prototype method, so everything but `signManagerToken` and
+ * `getJwks` is ECMAScript-private: no caller reaches the signing key.
  */
 export class SignerDO extends DurableObject<Env> {
-  private readonly login: ManagerLoginClaims;
-  private readonly db: SignerDatabase;
-  private signing: SigningState | null = null;
+  readonly #login: ManagerLoginClaims;
+  readonly #db: SignerDatabase;
+  #signing: SigningState | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.login = readConfig(env).manager.login;
-    this.db = drizzle(ctx.storage, { schema });
+    this.#login = readConfig(env).manager.login;
+    this.#db = drizzle(ctx.storage, { schema });
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
-      this.signing = await this.loadOrCreateKey();
+      await migrate(this.#db, migrations);
+      this.#signing = await this.#loadOrCreateKey();
     });
   }
 
   /** A login JWT with the exact issuer, audience and subject this environment's identity trusts. */
   async signManagerToken(): Promise<string> {
-    const signing = this.requireSigning();
+    const signing = this.#requireSigning();
     return await new SignJWT({})
       .setProtectedHeader({ alg: ALGORITHM, kid: signing.kid, typ: 'JWT' })
-      .setIssuer(this.login.issuer)
-      .setAudience(this.login.audience)
-      .setSubject(this.login.subject)
+      .setIssuer(this.#login.issuer)
+      .setAudience(this.#login.audience)
+      .setSubject(this.#login.subject)
       .setJti(crypto.randomUUID())
       .setIssuedAt()
       .setExpirationTime(LOGIN_JWT_LIFETIME)
@@ -86,15 +87,15 @@ export class SignerDO extends DurableObject<Env> {
   }
 
   async getJwks(): Promise<ManagerJwks> {
-    return this.requireSigning().jwks;
+    return this.#requireSigning().jwks;
   }
 
-  private requireSigning(): SigningState {
-    if (this.signing === null) throw new Error('signing key is not initialised');
-    return this.signing;
+  #requireSigning(): SigningState {
+    if (this.#signing === null) throw new Error('signing key is not initialised');
+    return this.#signing;
   }
 
-  private async loadOrCreateKey(): Promise<SigningState> {
+  async #loadOrCreateKey(): Promise<SigningState> {
     const stored = await loadOrCreateKey({
       storage: this.ctx.storage,
       name: SIGNING_KEY_NAME,
@@ -111,10 +112,10 @@ export class SignerDO extends DurableObject<Env> {
         };
       },
     });
-    return await this.adoptKey(stored.kid, stored.privateJwk, stored.publicJwk);
+    return await this.#adoptKey(stored.kid, stored.privateJwk, stored.publicJwk);
   }
 
-  private async adoptKey(
+  async #adoptKey(
     kid: string,
     privateJwkJson: string,
     publicJwkJson: string

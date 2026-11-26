@@ -11,10 +11,11 @@ export const UTS_AUTHORIZATION_SERVER_METADATA_PATH = '/.well-known/oauth-author
 
 /**
  * Design 5.7: a verifier keeps the key set 5 minutes and may serve it up to a day on error. The
- * feed Worker sends these limits unchanged beside `Age` (RFC 9111 section 5.1), so a standard cache
- * counts the age once.
+ * feed Worker sends these limits beside `Age` (RFC 9111 section 5.1), so a standard cache counts
+ * the age once, and cuts them so that a standard cache keeps no key longer than its 24-hour hold.
  */
-export const UTS_JWKS_CACHE_CONTROL = 'max-age=300, stale-if-error=86400';
+export const UTS_JWKS_MAX_AGE_SECONDS = 300;
+export const UTS_JWKS_STALE_IF_ERROR_SECONDS = 24 * 60 * 60;
 
 /**
  * Response header with the seconds since the oldest keys in the key set were read from their

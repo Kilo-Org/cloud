@@ -48,8 +48,17 @@ export class TestDatabase {
     return client;
   }
 
+  /**
+   * Ends every connection opened so far. A file that opens connections in most of its tests calls
+   * it after each one, so it stays under the server's connection limit.
+   */
+  async endConnections(): Promise<void> {
+    const clients = this.#clients.splice(0);
+    await Promise.allSettled(clients.map(client => client.end()));
+  }
+
   async drop(): Promise<void> {
-    await Promise.allSettled(this.#clients.map(client => client.end()));
+    await this.endConnections();
     await withAdmin(undefined, client =>
       client.query(`DROP DATABASE IF EXISTS ${this.name} WITH (FORCE)`)
     );

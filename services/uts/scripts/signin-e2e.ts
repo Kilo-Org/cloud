@@ -1,5 +1,5 @@
 /**
- * Local end-to-end run of the sign-in surface against `wrangler dev --env local` and the local
+ * Local end-to-end run of the sign-in surface against `wrangler dev -c wrangler.dev.jsonc` and the
  * identity store (README, "Local development"), with Chromium and a WebAuthn virtual
  * authenticator (CDP `WebAuthn` domain):
  *

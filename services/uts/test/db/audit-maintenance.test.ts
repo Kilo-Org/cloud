@@ -243,7 +243,7 @@ describe('expired DPoP proofs at volume', () => {
     await owner.query('ANALYZE uts.dpop_proofs');
     const { nodes, executionMs } = await explain(
       owner,
-      `SELECT stale.grant_id, stale.jti FROM uts.dpop_proofs AS stale
+      `SELECT stale.jkt, stale.jti FROM uts.dpop_proofs AS stale
        WHERE stale.expires_at < now() LIMIT 5000`
     );
     const indexScans = nodes.filter(node => node['Index Name'] === 'dpop_proofs_expires_idx');

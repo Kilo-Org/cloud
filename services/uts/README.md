@@ -550,8 +550,9 @@ stand-ins. Each registration lists the callback of its environment's issuer:
 `https://uts-staging.kiloapps.io/signin/sso/callback` for staging, `https://uts.kiloapps.io/...`
 for production.
 
-`scripts/provider-signin-e2e.ts` runs the whole surface locally against `wrangler dev --env local`
-and three stand-in providers it serves itself (OpenID Connect, GitHub-style, WorkOS-style): sign-in
+`scripts/provider-signin-e2e.ts` runs the whole surface locally against
+`wrangler dev -c wrangler.dev.jsonc` and three stand-in providers it serves itself (OpenID Connect,
+GitHub-style, WorkOS-style): sign-in
 -> code -> token for each, Apple's `form_post`, the email lock, the linking refusals, and a check
 that no audit row names a token, a code or an address.
 
@@ -653,7 +654,7 @@ the page must render them as escaped text, never as markup or a link. The route 
 API's bearer check, so the deployed entry serves it once that check is wired; the development
 entry serves it with a caller check from the `Kilo-Dev-Account` and `Kilo-Dev-Grant` headers.
 
-`scripts/notices-e2e.ts` runs the whole path against `wrangler dev --env local`: real code
+`scripts/notices-e2e.ts` runs the whole path against `wrangler dev -c wrangler.dev.jsonc`: real code
 exchanges (baseline, new device on a new network, a second new device, the first one again),
 every notice kind through the development routes, a retried email through the background pass,
 and the security view before and after `/revoke`.

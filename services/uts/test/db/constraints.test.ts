@@ -862,21 +862,25 @@ describe('gate pass binding', () => {
     const code = await writer.query<{ id: string }>(
       `INSERT INTO uts.device_codes
          (device_code_hash, user_code_hash, client_id, scopes, expires_at, status, account_id,
-          gate_pass_id, approved_at, consumed_at)
+          gate_pass_id, approved_at, consumed_at, auth_time, amr, grant_id, dpop_jkt)
        VALUES ($1, $2, 'kilo-cli', '{gateway:models.read}', now() + interval '10 minutes',
-               'consumed', $3, $4, now(), now())
+               'consumed', $3, $4, now(), now(), now(), '{passkey}', $5, $6)
        RETURNING id`,
       [
         randomHash(),
         randomHash(),
         accountId,
         await insertGatePass(writer, accountId, 'device_approve'),
+        crypto.randomUUID(),
+        randomHash(),
       ]
     );
     // A second exchange of one approval would need the code back in `approved`.
     expect(
       await rejects(
-        `UPDATE uts.device_codes SET status = 'approved', consumed_at = NULL WHERE id = $1`,
+        `UPDATE uts.device_codes
+         SET status = 'approved', consumed_at = NULL, grant_id = NULL, dpop_jkt = NULL
+         WHERE id = $1`,
         [code.rows[0].id]
       )
     ).toBe(CHECK_VIOLATION);

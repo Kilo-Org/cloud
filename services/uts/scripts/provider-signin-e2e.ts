@@ -1,6 +1,7 @@
 /**
- * Local end-to-end run of the provider, SSO and email sign-in against `wrangler dev --env local`,
- * the local identity store and three stand-in providers this script serves on loopback ports: an
+ * Local end-to-end run of the provider, SSO and email sign-in against
+ * `wrangler dev -c wrangler.dev.jsonc`, the local identity store and three stand-in providers this
+ * script serves on loopback ports: an
  * OpenID Connect provider (as Google, and as Apple with `form_post` and its ES256 client secret), a
  * GitHub-style OAuth provider, and a WorkOS-style SSO provider. The script acts as the browser: it
  * follows each redirect by hand and keeps the cookies.
@@ -17,7 +18,7 @@
  * 5. The audit rows of the run name no token, code, binder or address.
  *
  * Synthetic data only: every key and secret is generated for the run, written to a 0600
- * `.dev.vars.local` that the run deletes, and never printed.
+ * `.dev.vars.local` that `wrangler dev --env-file` reads and the run deletes, and never printed.
  *
  *   UTS_E2E_ADMIN_URL   admin login to the identity-store database (loopback only)
  *   UTS_E2E_APP_URL     app login to the same database, for the Worker's Hyperdrive binding
@@ -383,8 +384,10 @@ async function main() {
     './node_modules/.bin/wrangler',
     [
       'dev',
-      '--env',
-      'local',
+      '-c',
+      'wrangler.dev.jsonc',
+      '--env-file',
+      '.dev.vars.local',
       '--port',
       String(PORT),
       '--inspector-port',

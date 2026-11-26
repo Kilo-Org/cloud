@@ -19,6 +19,9 @@ import {
   internalDispatchRequestSchema,
   markBadgeReadInputSchema,
   refreshGlanceableSessionsInputSchema,
+  sendAgentSessionNotificationInputSchema,
+  sendCloudAgentSessionNotificationInputSchema,
+  sendSessionReadyNotificationInputSchema,
   type RefreshGlanceableSessionsParams,
   type ClearBadgeBucketForUserInput,
   type ClearBadgeBucketForUserOutput,
@@ -50,8 +53,9 @@ import {
   NOTIFICATION_HISTORY_PRUNE_CRON,
   pruneNotificationHistory,
 } from './lib/notification-history-prune';
+import { skipProviderPush } from './lib/push-gate';
 import { queue } from './queue-consumer';
-import { readNotificationsSecret } from './secrets';
+import { readNotificationsSecret, secretsSource } from './secrets';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
 
@@ -104,6 +108,11 @@ async function hasValidInternalSecret(c: {
   executionCtx: SecretsExecutionContext;
 }): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
+  // A deployment that binds no internal secret (the closed staging environment)
+  // has no caller to authorize: refuse it as unauthorized, not as a failed read.
+  if (secretsSource(c.env) === 'secrets-store' && c.env.INTERNAL_API_SECRET === undefined) {
+    return false;
+  }
   const expected = await readNotificationsSecret(c.env, 'INTERNAL_API_SECRET', c.executionCtx);
   if (!provided || !expected) return false;
 
@@ -128,11 +137,18 @@ app.post('/internal/v1/dispatch', async c => {
     return c.json({ error: 'Invalid body' }, 400);
   }
 
-  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  // Staging push gate (`lib/push-gate.ts`): no database client and no
+  // preference read. Each recipient still takes the shared dedupe and result
+  // mapping through its user DO, whose own gate records the refusal and
+  // answers `no_tokens`; a missing row means default preferences, which let
+  // every kind reach it.
+  const db = skipProviderPush(c.env, 'push_entrypoint')
+    ? null
+    : getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const result = await dispatchInternalPushCore(parsed.data, {
     getRecipientDOStub: (userId: string) =>
       c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
-    readPreferences: async userId => readPreferencesRow(db, userId),
+    readPreferences: async userId => (db === null ? null : readPreferencesRow(db, userId)),
   });
   const failedRecipients = result.perRecipient.filter(r => r.outcome === 'failed').length;
   if (failedRecipients > 0) {
@@ -219,6 +235,9 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendCloudAgentSessionNotification(
     params: SendCloudAgentSessionNotificationParams
   ): Promise<SendCloudAgentSessionNotificationResult> {
+    if (refusedByPushGate(this.env, sendCloudAgentSessionNotificationInputSchema, params)) {
+      return { dispatched: false };
+    }
     return dispatchCloudAgentSessionPush(params, this.cloudAgentSessionPushDeps());
   }
 
@@ -226,6 +245,8 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void> {
     const { userId, cliSessionIds, approvalChangedSessionIds, cardFollowSessionIds } =
       refreshGlanceableSessionsInputSchema.parse(params);
+    // Staging push gate: no session or token read and no DO refresh.
+    if (skipProviderPush(this.env, 'glanceable_refresh')) return;
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     // A caller that only refreshes the session card names the sessions whose
     // new content must reach a card. One indexed read decides whether any of
@@ -309,10 +330,15 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendAgentSessionNotification(
     params: SendAgentSessionNotificationParams
   ): Promise<SendAgentSessionNotificationResult> {
-    const result = await dispatchAgentSessionNotificationPush(
-      params,
-      this.agentSessionNotificationPushDeps()
-    );
+    let result: SendAgentSessionNotificationResult;
+    if (refusedByPushGate(this.env, sendAgentSessionNotificationInputSchema, params)) {
+      result = { dispatched: false, reason: 'no_tokens' };
+    } else {
+      result = await dispatchAgentSessionNotificationPush(
+        params,
+        this.agentSessionNotificationPushDeps()
+      );
+    }
     // Deterministic outcome observer (§4.15). Identifiers and outcome only;
     // never the user-supplied message content.
     console.log({
@@ -373,6 +399,9 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendSessionReadyNotification(
     params: SendSessionReadyNotificationParams
   ): Promise<SendSessionReadyNotificationResult> {
+    if (refusedByPushGate(this.env, sendSessionReadyNotificationInputSchema, params)) {
+      return { dispatched: false };
+    }
     return dispatchSessionReadyPush(params, this.cloudAgentSessionPushDeps());
   }
 
@@ -451,4 +480,19 @@ async function readPreferencesRow(
     .limit(1);
   if (!row) return null;
   return row;
+}
+
+/**
+ * Staging push gate for a push-only RPC (`lib/push-gate.ts`), checked before
+ * the RPC's first database read. Input is still validated, so a malformed call
+ * throws whether or not the gate is closed. A refused RPC reports no delivery.
+ */
+function refusedByPushGate(
+  env: Env,
+  inputSchema: { parse(value: unknown): unknown },
+  params: unknown
+): boolean {
+  if (!skipProviderPush(env, 'push_entrypoint')) return false;
+  inputSchema.parse(params);
+  return true;
 }

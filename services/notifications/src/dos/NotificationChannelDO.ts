@@ -17,6 +17,7 @@ import {
 } from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
+import { skipProviderPush } from '../lib/push-gate';
 import { isPushSinkEnabled } from '../lib/push-sink';
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
@@ -24,6 +25,7 @@ import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
 import {
   foldPendingGlanceableRefreshDeadline,
   flushDueGlanceableRefreshesSafely,
+  reclaimUndeliverableGlanceableRefreshesSafely,
   refreshGlanceableSnapshot,
 } from '../lib/glanceable-refresh';
 import { expoPushExtrasForPushData } from '../lib/push-message-extras';
@@ -35,9 +37,17 @@ type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
 // `pending` means badge mutation happened before an Expo attempt and must not
 // repeat. `accepted` means Expo accepted at least one push and only post-send
-// bookkeeping may be retried. Terminal stages make later attempts duplicates.
+// bookkeeping may be retried. Terminal stages make later attempts duplicates;
+// `push_disabled` records a dispatch the staging push gate stopped before Expo.
 type TerminalIdemRecord = {
-  stage: 'pending' | 'delivered' | 'suppressed' | 'suppressed_rate_limit' | 'no_tokens' | 'failed';
+  stage:
+    | 'pending'
+    | 'delivered'
+    | 'suppressed'
+    | 'suppressed_rate_limit'
+    | 'no_tokens'
+    | 'push_disabled'
+    | 'failed';
   ts: number;
 };
 
@@ -81,6 +91,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
     organizationId: string | null;
     approvalChanged?: boolean;
   }): Promise<void> {
+    // Staging push gate: a refresh exists only to reach devices, so a gated
+    // deployment writes no refresh state and reads no snapshot, database row
+    // or credential. The adapter gates below stay as a second line.
+    if (skipProviderPush(this.env, 'glanceable_refresh')) return;
     const { userId, organizationId, approvalChanged } = params;
     await refreshGlanceableSnapshot(
       { userId, organizationId },
@@ -123,20 +137,36 @@ export class NotificationChannelDO extends DurableObject<Env> {
       existing?.stage === 'suppressed' ||
       existing?.stage === 'suppressed_rate_limit' ||
       existing?.stage === 'no_tokens' ||
+      existing?.stage === 'push_disabled' ||
       existing?.stage === 'failed'
     ) {
       return { kind: 'duplicate' };
     }
     const isRetry = existing?.stage === 'pending';
 
+    // Staging push gate (`lib/push-gate.ts`), before presence, the rate limit
+    // and any database client: a gated deployment calls no presence service,
+    // reads no token and never reaches the local sink or Expo. An optional
+    // badge still applies exactly once, as below. Recorded as `push_disabled`
+    // and terminal like `no_tokens`, the outcome it reports, so a replay
+    // answers `duplicate`; never `failed`, so no caller retries it, and never
+    // `delivered`.
+    if (skipProviderPush(this.env, 'expo_push')) {
+      if (input.badge && !isRetry) await this.applyBadgeOnce(idemKey, input.badge);
+      const ts = Date.now();
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'push_disabled', ts });
+      await this.ensureCleanupAlarm(ts);
+      return { kind: 'no_tokens' };
+    }
+
     // 2. Presence
     if (input.presenceContext) {
       let inContext = false;
       try {
-        inContext = await this.env.EVENT_SERVICE.isUserInContext(
-          input.userId,
-          input.presenceContext
-        );
+        // An unbound presence service fails like a failed lookup: delivery continues.
+        const eventService = this.env.EVENT_SERVICE;
+        if (eventService === undefined) throw new Error('EVENT_SERVICE binding is missing');
+        inContext = await eventService.isUserInContext(input.userId, input.presenceContext);
       } catch (err) {
         console.warn('Presence lookup failed while dispatching push; continuing delivery', {
           presenceContext: input.presenceContext,
@@ -182,14 +212,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // 4. Badge math. On a retry the badge was already incremented during
     //    the prior attempt; re-applying the delta would double-count.
     if (input.badge && !isRetry) {
-      // Mark `pending` BEFORE the increment so any later failure path
-      // is gated on the marker and a retry skips the increment.
-      const ts = Date.now();
-      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
-      // Also schedule cleanup at this point — if Expo keeps failing and
-      // no future push ever lands, `pending` would otherwise leak.
-      await this.ensureCleanupAlarm(ts);
-      await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
+      await this.applyBadgeOnce(idemKey, input.badge);
     }
 
     // 5. Tokens. Missing Expo tokens only means no OS push can be sent; the
@@ -484,19 +507,31 @@ export class NotificationChannelDO extends DurableObject<Env> {
   private async completeAcceptedDelivery(
     idemKey: string,
     record: AcceptedDeliveryIdemRecord,
-    db = getWorkerDb(this.env.HYPERDRIVE.connectionString)
+    db?: ReturnType<typeof getWorkerDb>
   ): Promise<string | null> {
+    // An acceptance recorded before the staging push gate closed settles from
+    // Durable Object storage alone: its stale-token cleanup and receipt check
+    // would reach the database, the queue and then Expo, so neither runs and
+    // no database client is created. The open path resolves the client where
+    // the former default argument did, before the `try`.
+    const gated = skipProviderPush(this.env, 'accepted_bookkeeping');
+    const workerDb = gated ? null : (db ?? getWorkerDb(this.env.HYPERDRIVE.connectionString));
     try {
-      if (record.staleTokens.length > 0) {
-        await db
-          .delete(user_push_tokens)
-          .where(inArray(user_push_tokens.token, record.staleTokens));
-      }
+      if (workerDb !== null) {
+        if (record.staleTokens.length > 0) {
+          await workerDb
+            .delete(user_push_tokens)
+            .where(inArray(user_push_tokens.token, record.staleTokens));
+        }
 
-      const receiptMsg = {
-        ticketTokenPairs: record.ticketTokenPairs,
-      } satisfies ReceiptCheckMessage;
-      await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+        const receiptMsg = {
+          ticketTokenPairs: record.ticketTokenPairs,
+        } satisfies ReceiptCheckMessage;
+        // An unbound queue fails the bookkeeping like a failed send, so it is repaired.
+        const receipts = this.env.RECEIPTS_QUEUE;
+        if (receipts === undefined) throw new Error('RECEIPTS_QUEUE binding is missing');
+        await receipts.send(receiptMsg, { delaySeconds: 900 });
+      }
 
       const ts = Date.now();
       await this.ctx.storage.put<IdemRecord>(idemKey, { stage: record.finalStage, ts });
@@ -557,10 +592,19 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // safely: a failure inside it must not skip the idem/rate-limit GC below,
     // which is storage reclamation. The fold re-reads the pending deadlines, so
     // a failed flush still reschedules the trailing delivery.
-    const dueGlanceableRefreshAt = await flushDueGlanceableRefreshesSafely(
-      this.ctx.storage,
-      glanceableDeliveryDeps(this.env, this.ctx)
-    );
+    //
+    // Under the staging push gate nothing is flushed and no due time re-arms
+    // the alarm: a record still worth delivering stays for the push path once
+    // the gate reopens, an expired one is reclaimed, and the alarm comes back
+    // once, at the earliest remaining expiry. A gated refresh writes no new
+    // record, so there is nothing to fold in again at the end.
+    const glanceableGated = skipProviderPush(this.env, 'glanceable_refresh');
+    const glanceableAlarmAt = glanceableGated
+      ? await reclaimUndeliverableGlanceableRefreshesSafely(this.ctx.storage)
+      : await flushDueGlanceableRefreshesSafely(
+          this.ctx.storage,
+          glanceableDeliveryDeps(this.env, this.ctx)
+        );
     const idemEntries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
     const expiredIdem: string[] = [];
     let nextAlarmAt: number | undefined;
@@ -569,7 +613,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
         nextAlarmAt = deadline;
       }
     };
-    if (dueGlanceableRefreshAt !== null) requestAlarmAtOrBefore(dueGlanceableRefreshAt);
+    if (glanceableAlarmAt !== null) requestAlarmAtOrBefore(glanceableAlarmAt);
 
     for (const [key, rec] of idemEntries) {
       if (rec.stage === 'accepted') {
@@ -609,7 +653,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // A deferral can land during the awaits above. Fold the pending deadline in
     // again rather than trusting the flush's earlier capture, so the final
     // setAlarm cannot overwrite it and delay the trailing delivery.
-    const alarmAt = await foldPendingGlanceableRefreshDeadline(this.ctx.storage, nextAlarmAt);
+    const alarmAt = glanceableGated
+      ? nextAlarmAt
+      : await foldPendingGlanceableRefreshDeadline(this.ctx.storage, nextAlarmAt);
     if (alarmAt !== undefined) {
       await this.ctx.storage.setAlarm(alarmAt);
     }
@@ -667,6 +713,20 @@ export class NotificationChannelDO extends DurableObject<Env> {
     });
     await this.ensureCleanupAlarm(now);
     return { kind: 'allowed' };
+  }
+
+  // Mark `pending` BEFORE the increment so any later failure path is gated on
+  // the marker and a retry skips the increment. Also schedule cleanup at this
+  // point: if Expo keeps failing and no future push ever lands, `pending`
+  // would otherwise leak.
+  private async applyBadgeOnce(
+    idemKey: string,
+    badge: { badgeBucket: string; delta: number }
+  ): Promise<void> {
+    const ts = Date.now();
+    await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
+    await this.ensureCleanupAlarm(ts);
+    await this.incrementBucket(badge.badgeBucket, badge.delta);
   }
 
   // Read-modify-write of a bucket counter. The DO is single-threaded, so

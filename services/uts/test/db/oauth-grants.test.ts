@@ -1242,6 +1242,14 @@ describe('a blocked third-party client', () => {
       })
     ).toEqual({ outcome: 'invalid_grant' });
 
+    // An unblock is refused, retryably, while any family of the client is still active.
+    const OBJECT_IN_USE = '55006';
+    const unblock = () =>
+      app.query(`UPDATE uts.third_party_clients SET status = 'active' WHERE client_id = $1`, [
+        family.clientId,
+      ]);
+    expect(await sqlStateOf(unblock)).toBe(OBJECT_IN_USE);
+
     // Maintenance ends the families one batch per call, each with its feed entry.
     const ended = async () =>
       (
@@ -1251,6 +1259,7 @@ describe('a blocked third-party client', () => {
       ).rows.find(row => row.kind === 'blocked_client_families')?.deleted;
     expect(await ended()).toBe(5000);
     expect(await live()).toBe(1);
+    expect(await sqlStateOf(unblock)).toBe(OBJECT_IN_USE);
     expect(await ended()).toBe(1);
     expect(await ended()).toBe(0);
     expect(await live()).toBe(0);
@@ -1264,10 +1273,9 @@ describe('a blocked third-party client', () => {
     );
     expect(feed.rows).toEqual([{ entries: 5001, reasons: ['client_blocked'] }]);
 
-    // An unblock brings no family back; another client's family is untouched.
-    await app.query(`UPDATE uts.third_party_clients SET status = 'active' WHERE client_id = $1`, [
-      family.clientId,
-    ]);
+    // Once the batches finish, the unblock succeeds and brings no family back; another client's
+    // family is untouched.
+    await unblock();
     expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
       outcome: 'invalid_grant',
     });

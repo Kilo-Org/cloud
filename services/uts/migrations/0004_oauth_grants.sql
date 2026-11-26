@@ -396,6 +396,31 @@ CREATE INDEX third_party_grant_families_client_idx ON uts.third_party_grant_fami
 CREATE INDEX third_party_clients_blocked_idx ON uts.third_party_clients (client_id)
   WHERE status = 'blocked';
 
+-- An unblock waits until maintenance has ended every family the client held when it was blocked:
+-- otherwise those families would serve again, and the block would not have revoked them. At 5,000
+-- families per maintenance call, a client with N families stays blocked for about ceil(N / 5,000)
+-- cron cycles (about 20 at 100k). The refusal is retryable (SQLSTATE 55006, object in use): the
+-- operator path retries after maintenance reports `blocked_client_families` 0.
+CREATE FUNCTION uts.refuse_unblock_with_active_families() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM uts.third_party_grant_families AS family
+    WHERE family.client_id = NEW.client_id AND family.status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'client still has active families; maintenance is ending them, retry after it reports blocked_client_families 0'
+      USING ERRCODE = 'object_in_use', TABLE = 'third_party_clients', COLUMN = 'status';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER third_party_clients_refuse_early_unblock
+  BEFORE UPDATE OF status ON uts.third_party_clients
+  FOR EACH ROW WHEN (OLD.status = 'blocked' AND NEW.status = 'active')
+  EXECUTE FUNCTION uts.refuse_unblock_with_active_families();
+
 -- Whether a refused attempt on a grant writes its denied audit row: true for the first refusal in
 -- a minute, which claims that minute; false while the grant's last denied row is under a minute
 -- old, so refusals in between write no row.

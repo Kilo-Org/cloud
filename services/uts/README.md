@@ -200,9 +200,15 @@ exchange, the refresh read and the introspection read each check the client's st
 status change alone stops it at once. `uts.maintain_oauth_rows()` then revokes the client's live
 families, at most 5,000 per call, each with its feed entry (`revoke_reason` `client_blocked`), so
 its live access tokens stop at the verifiers within one cron cycle plus feed propagation (they
-expire within 10 minutes anyway) and an unblock brings no family back. The block itself stays one
-short statement whatever the client's family count. The batches write no audit row; the operator
-action that blocks the client writes it.
+expire within 10 minutes anyway). The block itself stays one short statement whatever the client's
+family count. An unblock waits for those batches: the trigger
+`third_party_clients_refuse_early_unblock` refuses `blocked` to `active` while the client still has
+an active family (one probe of `third_party_grant_families_client_idx`), with SQLSTATE 55006 and
+"client still has active families; maintenance is ending them, retry after it reports
+blocked_client_families 0". At 5,000 families per call a client with N families stays blocked for
+about ceil(N / 5,000) cron cycles (about 20 at 100k); the operator path retries on that refusal
+rather than treating it as a failure. Once it succeeds, no family comes back. The batches write
+no audit row; the operator action that blocks or unblocks the client writes it.
 
 ## Tests
 
@@ -480,7 +486,7 @@ only do the same work sooner. Slice 3.9 moves it to a dedicated maintenance role
 
 | Rows | When | Why that is safe |
 |---|---|---|
-| `blocked_client_families` | A live family of a blocked client: revoked (`client_blocked`) with its feed entry, not deleted; rows a refresh holds wait for the next call (`SKIP LOCKED`) | Every read already refuses the blocked client, so the batch only makes the revocation reach the verifiers |
+| `blocked_client_families` | A live family of a blocked client: revoked (`client_blocked`) with its feed entry, not deleted, so `deleted` counts the families this call revoked; rows a refresh holds wait for the next call (`SKIP LOCKED`) | Every read already refuses the blocked client, so the batch only makes the revocation reach the verifiers; the client's unblock waits until this reports 0 |
 | `authorization_codes` | 1 hour past the code's 60-second lifetime, used or not | Until then a second use of a used code still revokes its grant |
 | `third_party_refresh_tokens` | The current token of a family that is revoked or past its 90-day end | It fails anyway: every reader checks the family's status, so a family revoke writes only the family row |
 | `third_party_rotated_tokens` | Past the family's 90-day end, oldest first | No token of the family can be issued or refreshed again, so no reuse check needs the tombstone. Until then a replaced token that comes back revokes the family, however long ago it was replaced |

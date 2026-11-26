@@ -37,9 +37,9 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  *
  * Every entry is written to `admin_action_audit_logs` and emitted in an
  * `event:"admin_action"` structured log line (Axiom `vercel` dataset): one line
- * per single-entry call, one line per stored insert chunk for a bulk call (see
- * {@link AdminActionBulkEvent}), and one line per entry of a chunk that was not
- * stored, so the log keeps everything the missing rows would hold. The table is
+ * per single-entry call, and for a bulk call one line per insert chunk and
+ * action/outcome pair, split into lines of at most 100 entries for a chunk
+ * that was not stored (see {@link AdminActionBulkEvent}). The table is
  * browsable in the admin console and pruned after the retention window; the
  * log line carries request metadata (IP, auth source) that the table
  * deliberately does not store.
@@ -106,33 +106,45 @@ export type AdminActionEntryEvent = AdminActionEventAttribution & {
 };
 
 /**
- * The log line of a call that records several entries: one per stored insert
- * chunk and action/outcome pair, listing the row ids and target ids in entry
- * order. `targetType`, `message` and `metadata` are set when every listed
- * entry shares them and null otherwise; the rows hold each entry's own values.
- * A failure line lists each entry's `errorCode` in `errorCodes`, aligned with
- * `targetIds`; a success line has `errorCodes: null`. A chunk whose insert
- * failed is logged one {@link AdminActionEntryEvent} per entry instead.
+ * The log line of a call that records several entries: one per insert chunk
+ * and action/outcome pair, listing the target ids in entry order. A failure
+ * line lists each entry's `errorCode` in `errorCodes`, aligned with
+ * `targetIds`; a success line has `errorCodes: null`. `targetType`, `message`
+ * and `metadata` are set when every listed entry shares them and null
+ * otherwise.
+ *
+ * A stored chunk's rows hold each entry's id, message and metadata, so its line
+ * lists no row ids and no per-entry messages or metadata. A chunk whose insert
+ * failed is logged `persisted:false` in
+ * lines of at most {@link UNSTORED_LINE_ENTRIES} entries that also list the
+ * messages and metadata the rows would hold in `messages` and `metadatas`,
+ * aligned with `targetIds`, unless the line's shared value already names them.
  */
 export type AdminActionBulkEvent = AdminActionEventAttribution & {
   event: 'admin_action';
   action: AdminActionAuditAction;
   outcome: AdminActionAuditOutcome;
   entryCount: number;
-  auditLogIds: string[];
-  persisted: true;
+  persisted: boolean;
   targetType: AdminActionAuditTargetType | null;
   targetIds: (string | null)[];
   errorCodes: string[] | null;
   message: string | null;
   metadata: Record<string, unknown> | null;
+  messages: string[] | null;
+  metadatas: (Record<string, unknown> | null)[] | null;
 };
 
 export type AdminActionEvent = AdminActionEntryEvent | AdminActionBulkEvent;
 
 // Stays well under PostgreSQL's 65,535 bind-parameter limit for bulk actions,
-// and keeps a bulk log line's id and code arrays far below Vercel's 256 KB line limit.
+// and keeps a stored chunk's line (target ids and error codes) small enough
+// that a large call stays under Vercel's per-request log volume.
 const INSERT_CHUNK_SIZE = 1_000;
+
+// An unstored line carries every entry's message and metadata, so it holds
+// fewer entries; a failed 1,000-entry chunk writes 10 lines, not 1,000.
+const UNSTORED_LINE_ENTRIES = 100;
 
 export type AdminActionSink = (event: AdminActionEvent) => void;
 
@@ -228,12 +240,7 @@ async function writeAdminActions(
     const end = Math.min(start + INSERT_CHUNK_SIZE, entries.length);
     // Chunks are inserted in order and the first failed insert stops the rest,
     // so a chunk is stored exactly when its last entry has a row id.
-    if (end > insertedIds.length) {
-      for (let index = start; index < end; index++) {
-        emit(entryEvent(attribution, entries[index], null));
-      }
-      continue;
-    }
+    const stored = end <= insertedIds.length;
     const groups = new Map<string, number[]>();
     for (let index = start; index < end; index++) {
       const entry = entries[index];
@@ -243,7 +250,11 @@ async function writeAdminActions(
       else groups.set(key, [index]);
     }
     for (const indexes of groups.values()) {
-      emit(bulkEvent(attribution, entries, insertedIds, indexes));
+      const lineEntries = stored ? indexes.length : UNSTORED_LINE_ENTRIES;
+      for (let offset = 0; offset < indexes.length; offset += lineEntries) {
+        const listed = indexes.slice(offset, offset + lineEntries).map(index => entries[index]);
+        emit(bulkEvent(attribution, listed, stored));
+      }
     }
   }
 }
@@ -269,33 +280,34 @@ function entryEvent(
 
 function bulkEvent(
   attribution: AdminActionEventAttribution,
-  entries: readonly AdminActionEntry[],
-  insertedIds: readonly string[],
-  indexes: readonly number[]
+  listed: readonly AdminActionEntry[],
+  persisted: boolean
 ): AdminActionBulkEvent {
-  const listed = indexes.map(index => entries[index]);
   const [first] = listed;
-  function shared<T>(read: (entry: AdminActionEntry) => T): T | null {
-    const value = read(first);
-    const key = JSON.stringify(value);
-    return listed.every(entry => JSON.stringify(read(entry)) === key) ? value : null;
+  function allEqual(read: (entry: AdminActionEntry) => unknown): boolean {
+    const key = JSON.stringify(read(first));
+    return listed.every(entry => JSON.stringify(read(entry)) === key);
   }
+  const sharedTargetType = allEqual(entry => entry.target?.type ?? null);
+  const sharedMessage = allEqual(entry => entry.message);
+  const sharedMetadata = allEqual(storedMetadata);
   return {
     event: 'admin_action',
     action: first.action,
     outcome: first.outcome ?? 'success',
     entryCount: listed.length,
-    auditLogIds: indexes.map(index => insertedIds[index]),
-    persisted: true,
+    persisted,
     ...attribution,
-    targetType: shared(entry => entry.target?.type ?? null),
+    targetType: sharedTargetType ? (first.target?.type ?? null) : null,
     targetIds: listed.map(entry => entry.target?.id ?? null),
     errorCodes:
       first.outcome === 'failure'
         ? listed.flatMap(entry => (entry.outcome === 'failure' ? [entry.errorCode] : []))
         : null,
-    message: shared(entry => entry.message),
-    metadata: shared(storedMetadata),
+    message: sharedMessage ? first.message : null,
+    metadata: sharedMetadata ? storedMetadata(first) : null,
+    messages: persisted || sharedMessage ? null : listed.map(entry => entry.message),
+    metadatas: persisted || sharedMetadata ? null : listed.map(storedMetadata),
   };
 }
 

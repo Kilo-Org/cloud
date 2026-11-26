@@ -170,10 +170,12 @@ describe('recordAdminAction', () => {
       metadata: null,
     });
     expect(events[1]).toMatchObject({ entryCount: 1, targetIds: [userIds[1_000]] });
-    expect(events.every(event => 'errorCodes' in event && event.errorCodes === null)).toBe(true);
-    const loggedIds = events.flatMap(event => ('auditLogIds' in event ? event.auditLogIds : []));
-    expect([...loggedIds].sort()).toEqual(rows.map(row => row.id).sort());
-    expect(Math.max(...events.map(event => JSON.stringify(event).length))).toBeLessThan(128_000);
+    // The rows hold each entry's id, message and metadata; the lines stay small.
+    for (const event of events) {
+      expect(event).toMatchObject({ errorCodes: null, messages: null, metadatas: null });
+      expect(event).not.toHaveProperty('auditLogIds');
+    }
+    expect(Math.max(...events.map(event => JSON.stringify(event).length))).toBeLessThan(64_000);
   });
 
   test('splits a bulk log line by action and outcome', async () => {
@@ -217,8 +219,8 @@ describe('recordAdminAction', () => {
     ]);
   });
 
-  test('logs each entry of a chunk that was not stored on its own line', async () => {
-    const userIds = Array.from({ length: 1_002 }, (_, index) => `bulk-user-${index}`);
+  test('logs a chunk that was not stored in lines of at most 100 entries', async () => {
+    const userIds = Array.from({ length: 2_000 }, (_, index) => `bulk-user-${index}`);
     const insertRows = db.insert.bind(db);
     let inserts = 0;
     const insert = jest.spyOn(db, 'insert').mockImplementation(((table: never) => {
@@ -244,26 +246,39 @@ describe('recordAdminAction', () => {
     }
 
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(1_000);
-    expect(events).toHaveLength(3);
+    // One line for the stored chunk, ten for the 1,000 entries that were not.
+    expect(events).toHaveLength(11);
     expect(events[0]).toMatchObject({
       entryCount: 1_000,
       persisted: true,
       targetIds: userIds.slice(0, 1_000),
       errorCodes: Array.from({ length: 1_000 }, () => 'Error'),
+      messages: null,
+      metadatas: null,
     });
-    expect(events.slice(1)).toEqual(
-      userIds.slice(1_000).map(userId =>
-        expect.objectContaining({
-          action: 'user.unblock',
-          outcome: 'failure',
-          auditLogId: null,
-          persisted: false,
-          targetType: 'user',
-          targetId: userId,
-          message: `Unblock of ${userId} failed`,
-          metadata: { userId, errorCode: 'Error' },
-        })
-      )
+
+    const unstored = events.slice(1).map(event => {
+      if (!('targetIds' in event)) throw new Error('expected a bulk line');
+      expect(event).toMatchObject({ action: 'user.unblock', outcome: 'failure', persisted: false });
+      expect(event.entryCount).toBeLessThanOrEqual(100);
+      expect(event).not.toHaveProperty('auditLogIds');
+      return event;
+    });
+    const logged = unstored.flatMap(event =>
+      event.targetIds.map((targetId, index) => ({
+        targetId,
+        errorCode: event.errorCodes?.[index],
+        message: event.messages?.[index] ?? event.message,
+        metadata: event.metadatas?.[index] ?? event.metadata,
+      }))
+    );
+    expect(logged).toEqual(
+      userIds.slice(1_000).map(userId => ({
+        targetId: userId,
+        errorCode: 'Error',
+        message: `Unblock of ${userId} failed`,
+        metadata: { userId, errorCode: 'Error' },
+      }))
     );
   });
 

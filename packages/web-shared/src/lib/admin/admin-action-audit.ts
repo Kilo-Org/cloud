@@ -394,6 +394,7 @@ export async function runElevatedOrganizationWrite<TResult>(
     recordCalls: 0,
     actor: null,
     failureAction: null,
+    inputParsingStarted: false,
   };
   const heldRoles = await bypassedOrganizationHeldRoles(ctx, write);
   if (heldRoles === undefined) return adminAuditScope.run(state, run);

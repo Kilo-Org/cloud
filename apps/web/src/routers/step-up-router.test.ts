@@ -64,11 +64,39 @@ describe('stepUp.getStatus', () => {
     });
   });
 
-  it('refuses a bearer credential', async () => {
+  it('refuses a bearer credential whether or not step-up is on', async () => {
+    for (const value of ['true', 'false']) {
+      process.env.ADMIN_STEP_UP_ENABLED = value;
+      const user = await admin();
+      const caller = await createBearerCallerForUser(user.id);
+
+      await expect(caller.stepUp.getStatus()).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+      });
+    }
+  });
+
+  it('answers a legacy session without a session id so the dialog can ask it to sign in again', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'true';
     const user = await admin();
-    const caller = await createBearerCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id, { webSessionId: '' });
 
-    await expect(caller.stepUp.getStatus()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.stepUp.getStatus()).resolves.toMatchObject({
+      sessionBound: false,
+      fresh: false,
+      status: { status: 'session_unbound' },
+    });
+  });
+
+  it('refuses a session whose pepper was revoked on the primary', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const user = await admin();
+    const caller = await createSessionCallerForUser(user.id, { webSessionPepper: 'stale-pepper' });
+
+    await expect(caller.stepUp.getStatus()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Reauthentication required',
+    });
   });
 });

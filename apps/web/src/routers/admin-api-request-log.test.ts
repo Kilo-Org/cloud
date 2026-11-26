@@ -1,5 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { api_request_log_2, kilocode_users } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
@@ -24,16 +24,16 @@ describe('admin.apiRequestLog.getSummary authorization', () => {
     const sessionViewer = await createUser({ is_admin: true, can_view_sessions: true });
 
     await expect(
-      (await createCallerForUser(nonAdmin.id)).admin.apiRequestLog.getSummary()
+      (await createSessionCallerForUser(nonAdmin.id)).admin.apiRequestLog.getSummary()
     ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Admin access required' });
     await expect(
-      (await createCallerForUser(admin.id)).admin.apiRequestLog.getSummary()
+      (await createSessionCallerForUser(admin.id)).admin.apiRequestLog.getSummary()
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
       message: 'API request log export access required',
     });
     await expect(
-      (await createCallerForUser(sessionViewer.id)).admin.apiRequestLog.getSummary()
+      (await createSessionCallerForUser(sessionViewer.id)).admin.apiRequestLog.getSummary()
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
       message: 'API request log export access required',
@@ -50,7 +50,9 @@ describe('admin.apiRequestLog.getSummary authorization', () => {
       created_at: '2026-08-01T12:00:00.000Z',
     });
 
-    const summary = await (await createCallerForUser(exporter.id)).admin.apiRequestLog.getSummary();
+    const summary = await (
+      await createSessionCallerForUser(exporter.id)
+    ).admin.apiRequestLog.getSummary();
 
     expect(summary.recordCount).toBeGreaterThan(0);
     expect(summary.sizeBytes).toBeGreaterThan(0);

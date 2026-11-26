@@ -7,7 +7,11 @@ import {
   resolveAuthorizedOwner,
   optionalOrgInput,
 } from '@/lib/integrations/resolve-owner';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import * as dolthubService from '@/lib/integrations/dolthub-service';
 
@@ -50,11 +54,20 @@ export const dolthubRouter = createTRPCRouter({
    * The token is a bearer secret — only return it to the authenticated
    * owner of an *active* integration. Mirrors the `installed` check used
    * by `getInstallation` so a stale, non-active row never leaks its token.
+   * Credential issuer: an organization token needs a real billing membership;
+   * neither a staff admission nor a support grant stands in.
    */
   getInstallationCredentials: baseProcedure
     .input(optionalOrgInput)
     .query(async ({ ctx, input }) => {
-      const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
+      if (input?.organizationId) {
+        await ensureMemberOrganizationAccess(
+          ctx.user,
+          input.organizationId,
+          ORGANIZATION_BILLING_ROLES
+        );
+      }
+      const owner = resolveOwner(ctx, input?.organizationId);
       const integration = await dolthubService.getInstallation(owner);
       if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
         return null;

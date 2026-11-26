@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import type { createCallerForUser as createCallerForUserType } from '@/routers/test-utils';
+import type { createSessionCallerForUser as createCallerForUserType } from '@/routers/test-utils';
 import { admin_action_audit_logs, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -37,12 +37,12 @@ const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
 );
 
-let createCallerForUser: typeof createCallerForUserType;
+let createSessionCallerForUser: typeof createCallerForUserType;
 let adminUser: User;
 let nonAdminUser: User;
 
 beforeAll(async () => {
-  ({ createCallerForUser } = await import('@/routers/test-utils'));
+  ({ createSessionCallerForUser } = await import('@/routers/test-utils'));
 });
 
 describe('admin KiloClaw provider rollout router', () => {
@@ -76,7 +76,7 @@ describe('admin KiloClaw provider rollout router', () => {
       rollout: input,
       availability: { northflank: false },
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await caller.admin.kiloclawProviders.updateRollout(input);
 
@@ -101,7 +101,7 @@ describe('admin KiloClaw provider rollout router', () => {
   });
 
   it('rejects invalid traffic percentages', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.kiloclawProviders.updateRollout({
@@ -115,7 +115,7 @@ describe('admin KiloClaw provider rollout router', () => {
   });
 
   it('rejects non-admin users', async () => {
-    const caller = await createCallerForUser(nonAdminUser.id);
+    const caller = await createSessionCallerForUser(nonAdminUser.id);
 
     await expect(caller.admin.kiloclawProviders.getRollout()).rejects.toThrow();
   });

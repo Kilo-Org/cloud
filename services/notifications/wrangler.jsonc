@@ -4,10 +4,13 @@
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   "compatibility_date": "2026-02-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "unhandled_rejection_after_microtask_checkpoint"],
   "dev": { "port": 8804 },
   "placement": { "mode": "smart" },
-  "observability": { "enabled": true },
+  // Traces stay off: a trace records outbound URLs and Durable Object SQL
+  // bindings, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
+  "observability": { "enabled": true, "traces": { "enabled": false } },
   // Notification history retention. `NotificationsService.scheduled` prunes rows
   // older than the 90-day history window; see
   // src/lib/notification-history-prune.ts.
@@ -23,6 +26,11 @@
     "APNS_TOPIC": "com.kilocode.kiloapp",
     "APNS_TEAM_ID": "X96D76J65Z",
     "APNS_KEY_ID": "KRYMZL626P",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store
+    // bindings below) or `sts` (the STS bundle over the `STS` binding). An
+    // absent value means `secrets-store`; any other value refuses every read.
+    // The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
 
   "routes": [
@@ -72,8 +80,22 @@
       "binding": "EVENT_SERVICE",
       "service": "event-service",
     },
+    // STS serves the runtime secret bundle over the account-internal binding.
+    // `props.caller` is what STS authorizes on and must equal this Worker's
+    // top-level name. This config deploys only production, so it binds the
+    // production `sts`; services/sts/policy/notifications.yaml grants the four
+    // names. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "notifications" },
+    },
   ],
 
+  // Secrets Store bindings: the `secrets-store` source reads these. They stay
+  // bound while STS reads are proven, so a rollback is one redeploy with
+  // SECRETS_SOURCE set to `secrets-store`.
   "secrets_store_secrets": [
     {
       // The APNs .p8 auth key, stored as one line: `pemToDer()` strips every
@@ -105,4 +127,9 @@
       "new_classes": ["NotificationChannelDO"],
     },
   ],
+
+  // No named environments. Declaring the empty map makes Wrangler refuse an
+  // undeclared `--env` (for example `--env staging`) instead of resolving it
+  // to this production config and its bindings.
+  "env": {},
 }

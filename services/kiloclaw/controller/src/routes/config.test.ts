@@ -197,9 +197,15 @@ describe('/_kilo/config/patch routes', () => {
     expect(wrongAuth.status).toBe(401);
   });
 
-  it('deep-merges patch into existing config', async () => {
+  it('deep-merges a config patch and logs only its top-level key count', async ({
+    onTestFinished,
+  }) => {
     const app = new Hono();
     registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    onTestFinished(() => {
+      logSpy.mockRestore();
+    });
 
     const existingConfig = {
       agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.6' } } },
@@ -225,6 +231,7 @@ describe('/_kilo/config/patch routes', () => {
     expect(written.agents.defaults.model.primary).toBe('kilocode/anthropic/claude-sonnet-4.5');
     // Existing keys preserved
     expect(written.gateway.port).toBe(3001);
+    expect(logSpy.mock.calls).toEqual([['[controller] Config patched:', { patchKeyCount: 1 }]]);
   });
 
   it('rejects a patch that would stop the gateway from starting', async () => {

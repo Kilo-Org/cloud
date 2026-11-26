@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 
 /**
@@ -8,9 +9,17 @@ import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/
  * requests do not use the plan.
  */
 export async function ChatGptUsageLink({ kiloUserId }: { kiloUserId: string }) {
+  // A payload the KMS service cannot open hides the link instead of failing the page.
   const connection = await getOpenAiChatGptConnection({
     kiloUserId,
     organizationId: null,
+  }).catch((error: unknown) => {
+    if (!(error instanceof CredentialKmsError)) throw error;
+    console.warn(
+      '[openai-chatgpt] usage link hidden: stored connection unreadable: %s',
+      error.causeName
+    );
+    return null;
   });
   if (connection?.status !== 'connected') return null;
 

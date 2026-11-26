@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { adminFetch } from '@/lib/admin/admin-fetch';
 import { roundAIAdoptionDateRange } from '@/lib/organizations/ai-adoption-date-range';
 import type { Organization } from '@kilocode/db/schema';
 import {
@@ -825,7 +826,7 @@ export function useOrganizationDefaults(organizationId?: string) {
         return { defaultModel: PRIMARY_DEFAULT_MODEL };
       }
 
-      const response = await fetch(`/api/organizations/${organizationId}/defaults`);
+      const response = await adminFetch(`/api/organizations/${organizationId}/defaults`);
       if (!response.ok) {
         throw new Error(`Failed to fetch defaults: ${response.status} ${response.statusText}`);
       }

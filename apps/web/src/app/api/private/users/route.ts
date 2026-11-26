@@ -31,13 +31,11 @@ export async function GET(
   const searchTerm = searchParams.get('search')?.trim() || '';
 
   try {
-    // Pylon webhooks authenticate with an admin bearer token and cannot complete passkey
-    // step-up. This is a read-only exact-email lookup, so human bearer keys skip the
-    // step-up guard; browser sessions and other credential kinds still go through it.
+    // An admin browser session only, from an allowed network, like every admin
+    // route. A bearer credential cannot hold staff authority.
     const { authFailedResponse } = await getUserFromAuth({
       adminOnly: true,
       requestMethod: request.method,
-      stepUpExemptCredentials: ['human_bearer'],
     });
     if (authFailedResponse) {
       return authFailedResponse;

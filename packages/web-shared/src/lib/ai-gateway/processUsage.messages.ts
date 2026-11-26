@@ -24,6 +24,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import { classifySystemPrompt } from '@kilocode/web-shared/lib/ai-gateway/system-prompt-kind';
 
 const messagesUsageSchema = usageCostSchema.extend({
   input_tokens: z.number().nullish(),
@@ -297,32 +298,18 @@ export function parseMessagesMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
+export function extractMessagesSystemPromptText(body: GatewayMessagesRequest): string {
+  return typeof body.system === 'string'
+    ? body.system
+    : Array.isArray(body.system)
+      ? body.system.map(b => b.text).join('\n')
+      : '';
+}
+
 export function extractMessagesPromptInfo(body: GatewayMessagesRequest): PromptInfo {
-  const systemContent =
-    typeof body.system === 'string'
-      ? body.system
-      : Array.isArray(body.system)
-        ? body.system.map(b => b.text).join('\n')
-        : '';
-
-  const lastUserMessage = body.messages.filter(m => m.role === 'user').at(-1);
-
-  let userPrompt = '';
-  if (lastUserMessage) {
-    const content = lastUserMessage.content;
-    if (typeof content === 'string') {
-      userPrompt = content;
-    } else {
-      userPrompt = content
-        .filter((c): c is { type: 'text'; text: string } => c != null && c.type === 'text')
-        .map(c => c.text)
-        .join('\n');
-    }
-  }
-
+  const systemPrompt = extractMessagesSystemPromptText(body);
   return {
-    system_prompt_prefix: systemContent.slice(0, 100),
-    system_prompt_length: systemContent.length,
-    user_prompt_prefix: userPrompt.slice(0, 100),
+    system_prompt_length: systemPrompt.length,
+    system_prompt_kind: classifySystemPrompt(systemPrompt),
   };
 }

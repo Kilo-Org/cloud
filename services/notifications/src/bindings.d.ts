@@ -1,3 +1,4 @@
+import type { BundleBinding } from '@kilocode/secrets-client';
 import type {} from './worker-configuration.d.ts';
 
 // Augment the wrangler-generated Env with RPC method signatures for service
@@ -8,6 +9,9 @@ declare global {
     EVENT_SERVICE: Fetcher & {
       isUserInContext(userId: string, context: string): Promise<boolean>;
     };
+    // `wrangler types` types the cross-Worker entrypoint binding as a plain
+    // `Service`; this layers on the `SecretsBroker` RPC shape.
+    STS: Service & BundleBinding;
     // Local dev / E2E push sink mode. Absent from `wrangler.jsonc` (which
     // is single-config production); supplied via `.dev.vars` by
     // `pnpm dev:env`. The runtime check is string equality on `'log'`.

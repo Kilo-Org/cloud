@@ -48,10 +48,18 @@
     "MANAGER_BASE_URL": "https://eu.infisical.com",
     // Merge gate and post-merge steps: README.md#merge-gate-the-merge-to-main-is-the-first-production-deploy.
     "MANAGER_PROJECT_ID": "8cf601df-1c5a-4c8f-9e21-7e9af6728b06",
+    // The lease API takes the slug; empty turns leases off here (README "Database leases").
+    "MANAGER_PROJECT_SLUG": "",
     "MANAGER_ENVIRONMENT_SLUG": "production",
     "MANAGER_IDENTITY_ID": "c531ad9b-eec9-4f93-b173-e14d3d94f6ef",
     // Durable Objects hold secret material, so production and staging pin them to the EU.
     "DO_JURISDICTION": "eu",
+    // Emergency removal of a service-token signing key: comma list of kids (README runbook).
+    "TOKEN_SIGNING_KIDS_REVOKED": "",
+    // `<host>:<port>/<database>` a ci-migration lease returns; empty returns none.
+    "LEASE_CI_MIGRATION_TARGET": "",
+    // Cloudflare account STS mints CI deploy tokens in; empty mints none (README "Cloudflare deploy tokens").
+    "CF_DEPLOY_ACCOUNT_ID": "",
   },
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }],
@@ -62,11 +70,17 @@
       { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
       { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
       { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+      { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+      { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+      { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["LeaseDO"] },
+    { "tag": "v5", "new_sqlite_classes": ["DeployTokenDO"] },
   ],
   "env": {
     "staging": {
@@ -85,9 +99,13 @@
         "STS_ISSUER": "https://sts-staging.kiloapps.io",
         "MANAGER_BASE_URL": "https://eu.infisical.com",
         "MANAGER_PROJECT_ID": "8cf601df-1c5a-4c8f-9e21-7e9af6728b06",
+        "MANAGER_PROJECT_SLUG": "",
         "MANAGER_ENVIRONMENT_SLUG": "staging",
         "MANAGER_IDENTITY_ID": "5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4",
         "DO_JURISDICTION": "eu",
+        "TOKEN_SIGNING_KIDS_REVOKED": "",
+        "LEASE_CI_MIGRATION_TARGET": "",
+        "CF_DEPLOY_ACCOUNT_ID": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }],
@@ -98,6 +116,9 @@
           { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
           { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+          { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+          { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+          { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
         ],
       },
     },
@@ -112,10 +133,14 @@
         "STS_ISSUER": "http://localhost:8825",
         "MANAGER_BASE_URL": "https://eu.infisical.com",
         "MANAGER_PROJECT_ID": "8cf601df-1c5a-4c8f-9e21-7e9af6728b06",
+        "MANAGER_PROJECT_SLUG": "",
         "MANAGER_ENVIRONMENT_SLUG": "development",
         "MANAGER_IDENTITY_ID": "8c46d33c-6f3b-465b-b99a-ebfb734e2c8c",
         // workerd enforces no data residency, so local development keeps objects unscoped.
         "DO_JURISDICTION": "none",
+        "TOKEN_SIGNING_KIDS_REVOKED": "",
+        "LEASE_CI_MIGRATION_TARGET": "",
+        "CF_DEPLOY_ACCOUNT_ID": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }],
@@ -126,6 +151,9 @@
           { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
           { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+          { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+          { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+          { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
         ],
       },
     },

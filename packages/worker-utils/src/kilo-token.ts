@@ -10,6 +10,7 @@ import {
   checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
 } from './kilo-token-verification';
+import { observeSharedVerifierAdmission } from './kilo-token-admission-observation';
 
 export { KILO_TOKEN_VERSION };
 
@@ -162,5 +163,9 @@ export async function verifyKiloToken(
     assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
 
-  return kiloTokenPayload.parse(payload);
+  const verified = kiloTokenPayload.parse(payload);
+  if (options?.audience !== undefined) {
+    observeSharedVerifierAdmission('exact_audience', options.audience, payload);
+  }
+  return verified;
 }

@@ -253,6 +253,66 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   return true;
 }
 
+// The JSON characters that copies made by `spreadTypedAnyOf` may add to one schema.
+const SPREAD_COPY_BUDGET = 1_000_000;
+
+/**
+ * Moves the keys beside the `anyOf` of a typed node into every branch:
+ * `A and anyOf(B, C)` equals `anyOf(A and B, A and C)`. Gemini 3 behind Vercel
+ * AI Gateway rejects both the keys beside the `anyOf` and a branch without a
+ * type, so `{ type: "object", properties, anyOf: [{ required: ["a"] }, ...] }`
+ * and the `{ type: "array", anyOf: [...] }` that Kilo CLI versions before
+ * Kilo-Org/kilocode#16540 send for MCP tools both fail there.
+ *
+ * Unlike `distributeAnyOfSiblings`, this copies subschemas such as `properties`
+ * into every branch. `budget` holds the JSON characters all copies may still
+ * add, which bounds the size of a repaired schema. A node is left alone when a
+ * branch sets a moved key to another value or sets `nullable`, since merging
+ * those would change what it accepts. A branch with its own `anyOf` is spread
+ * the same way, because the moved keys would otherwise sit beside it.
+ */
+function spreadTypedAnyOf(node: Record<string, unknown>, budget: { remaining: number }): boolean {
+  if (!isJsonType(node.type) || !Array.isArray(node.anyOf)) return false;
+  const anyOf = node.anyOf as unknown[];
+  if (anyOf.length === 0 || !anyOf.every(isRecord)) return false;
+  const keys = Object.keys(node).filter(key => !ANY_OF_KEYS.has(key));
+  const conflicts = anyOf.some(
+    branch =>
+      'nullable' in branch ||
+      keys.some(key => key in branch && JSON.stringify(branch[key]) !== JSON.stringify(node[key]))
+  );
+  if (conflicts) return false;
+
+  const moved = Object.fromEntries(keys.map(key => [key, node[key]]));
+  // Every branch costs at least one character, so an empty `moved` stays bounded.
+  const cost = (JSON.stringify(moved).length + 1) * anyOf.length;
+  if (cost > budget.remaining) return false;
+  budget.remaining -= cost;
+
+  const branches = anyOf.map(branch => {
+    const merged: Record<string, unknown> = { ...structuredClone(moved), ...branch };
+    spreadTypedAnyOf(merged, budget);
+    return merged;
+  });
+  const nullable = node.nullable === true ? { nullable: true } : {};
+  replaceContents(node, { anyOf: branches, ...nullable, ...descriptionOf(node) });
+  return true;
+}
+
+/**
+ * Gives an array schema without `items` the empty schema, which accepts any
+ * item. Gemini behind Vercel AI Gateway rejects such a node with "items: missing
+ * field", including a typed array beside an `anyOf` or `oneOf`, which Kilo CLI
+ * versions before Kilo-Org/kilocode#16540 send for MCP tools.
+ */
+function addMissingArrayItems(node: Record<string, unknown>): boolean {
+  if ('items' in node) return false;
+  const type = node.type;
+  if (type !== 'array' && !(Array.isArray(type) && type.includes('array'))) return false;
+  node.items = {};
+  return true;
+}
+
 /**
  * Rewrites the schema nodes below the root that Gemini rejects. The root of a
  * tool schema stays an object schema, and a schema over the node or depth
@@ -262,13 +322,23 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
 export function repairGeminiJsonSchema(schema: unknown): number {
   if (!isRecord(schema) || !withinSchemaBudget(schema)) return 0;
   let repaired = 0;
+  const budget = { remaining: SPREAD_COPY_BUDGET };
   const visit = (node: unknown) => {
     if (!isRecord(node)) return;
     forEachChildSchema(node, visit);
+    if (spreadTypedAnyOf(node, budget)) repaired++;
     if (lowerMixedTypeArray(node)) repaired++;
     if (distributeAnyOfSiblings(node)) repaired++;
   };
   forEachChildSchema(schema, visit);
+  // A separate pass, so that `items` added to a branch does not count as a
+  // conflict when distributing, and the array branches created above get it too.
+  const addItems = (node: unknown) => {
+    if (!isRecord(node)) return;
+    forEachChildSchema(node, addItems);
+    if (addMissingArrayItems(node)) repaired++;
+  };
+  forEachChildSchema(schema, addItems);
   return repaired;
 }
 

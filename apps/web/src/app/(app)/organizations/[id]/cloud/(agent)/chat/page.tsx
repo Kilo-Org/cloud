@@ -7,6 +7,9 @@ import { readKnownModels } from '@/components/cloud-agent-next/server/read-known
 import { redirectToSessionScope } from '@/components/cloud-agent-next/server/redirect-to-session-scope';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { signInUrlWithCallbackPath } from '@kilocode/web-shared/lib/user/server';
+import { AdminStepUpGate } from '@/lib/admin/require-admin-page';
+import { AdminAccessDenied } from '@/app/admin/components/AdminAccessDenied';
+import { adminNetworkRefusalFor } from '@kilocode/web-shared/lib/admin/admin-network';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -23,6 +26,17 @@ export default async function OrganizationCloudChatPage({ params, searchParams }
   if (!result.success) {
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());
+    }
+    // Staff without a membership who still need a passkey step-up verify here,
+    // so the current URL survives verification.
+    if (result.stepUp) {
+      return <AdminStepUpGate requirement={result.stepUp} />;
+    }
+    // Staff off the admin network get the admin refusal, not a generic redirect.
+    if (result.adminNetworkDenial) {
+      return (
+        <AdminAccessDenied message={adminNetworkRefusalFor(result.adminNetworkDenial).message} />
+      );
     }
     redirect('/profile');
   }

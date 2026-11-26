@@ -10,7 +10,7 @@ jest.mock('@/lib/session-ingest-client', () => ({
 }));
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import {
   getSessionContainerMetrics,
   getSessionContainerMetricsForInfo,
@@ -39,34 +39,34 @@ describe('admin.sessionTraces authorization', () => {
   test.each([
     [
       'resolveCloudAgentSession',
-      (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>) =>
         caller.admin.sessionTraces.resolveCloudAgentSession({
           cloud_agent_session_id: 'agent_not_authorized',
         }),
     ],
     [
       'get',
-      (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>) =>
         caller.admin.sessionTraces.get({ session_id: crypto.randomUUID() }),
     ],
     [
       'getMessages',
-      (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>) =>
         caller.admin.sessionTraces.getMessages({ session_id: crypto.randomUUID() }),
     ],
     [
       'getContainerInfo',
-      (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>) =>
         caller.admin.sessionTraces.getContainerInfo({ session_id: crypto.randomUUID() }),
     ],
     [
       'getContainerMetrics',
-      (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>) =>
         caller.admin.sessionTraces.getContainerMetrics({ session_id: crypto.randomUUID() }),
     ],
     [
       'getApiConversationHistory',
-      (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+      (caller: Awaited<ReturnType<typeof createSessionCallerForUser>>) =>
         caller.admin.sessionTraces.getApiConversationHistory({ session_id: crypto.randomUUID() }),
     ],
   ] as const)(
@@ -76,15 +76,15 @@ describe('admin.sessionTraces authorization', () => {
       const ordinaryAdmin = await insertAdmin();
       const superadmin = await insertAdmin({ is_super_admin: true });
 
-      await expect(call(await createCallerForUser(nonAdmin.id))).rejects.toMatchObject({
+      await expect(call(await createSessionCallerForUser(nonAdmin.id))).rejects.toMatchObject({
         code: 'FORBIDDEN',
         message: 'Admin access required',
       });
-      await expect(call(await createCallerForUser(ordinaryAdmin.id))).rejects.toMatchObject({
+      await expect(call(await createSessionCallerForUser(ordinaryAdmin.id))).rejects.toMatchObject({
         code: 'FORBIDDEN',
         message: 'Session viewing access required',
       });
-      await expect(call(await createCallerForUser(superadmin.id))).rejects.toMatchObject({
+      await expect(call(await createSessionCallerForUser(superadmin.id))).rejects.toMatchObject({
         code: 'FORBIDDEN',
         message: 'Session viewing access required',
       });
@@ -108,7 +108,7 @@ describe('admin.sessionTraces authorization', () => {
     const v2Id = `ses_${crypto.randomUUID()}`;
     await db.insert(cli_sessions_v2).values({ session_id: v2Id, kilo_user_id: owner.id });
 
-    const caller = await createCallerForUser(ordinaryAdmin.id);
+    const caller = await createSessionCallerForUser(ordinaryAdmin.id);
     await expect(
       caller.admin.sessionTraces.getMessages({ session_id: v1.session_id })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -135,7 +135,7 @@ describe('admin.sessionTraces authorization', () => {
       .returning();
     if (!session) throw new Error('Failed to create v1 session');
 
-    const caller = await createCallerForUser(viewer.id);
+    const caller = await createSessionCallerForUser(viewer.id);
     mockGetBlobContent
       .mockResolvedValueOnce([{ type: 'user', text: 'hello' }])
       .mockResolvedValueOnce([{ role: 'user', content: 'hello' }]);
@@ -184,7 +184,7 @@ describe('admin.sessionTraces authorization', () => {
       cloud_agent_session_id: cloudAgentSessionId,
     });
 
-    const caller = await createCallerForUser(viewer.id);
+    const caller = await createSessionCallerForUser(viewer.id);
     mockFetchSessionSnapshot.mockResolvedValue({
       info: { id: sessionId },
       messages: [{ info: { id: 'message-1', role: 'user' }, parts: [] }],
@@ -235,7 +235,7 @@ describe('admin.sessionTraces authorization', () => {
       cloud_agent_session_scope_id: cloudAgentSessionId,
     });
 
-    const caller = await createCallerForUser(viewer.id);
+    const caller = await createSessionCallerForUser(viewer.id);
     await expect(
       caller.admin.sessionTraces.resolveCloudAgentSession({
         cloud_agent_session_id: cloudAgentSessionId,
@@ -252,7 +252,7 @@ describe('admin.sessionTraces authorization', () => {
       kilo_user_id: owner.id,
     });
 
-    const caller = await createCallerForUser(viewer.id);
+    const caller = await createSessionCallerForUser(viewer.id);
     // The session-ingest export streams in ingest order, which can differ from
     // conversation order (assistant turn ingested before its user prompt).
     mockFetchSessionSnapshot.mockResolvedValue({
@@ -329,7 +329,7 @@ describe('admin.sessionTraces authorization', () => {
       },
     });
 
-    const caller = await createCallerForUser(viewer.id);
+    const caller = await createSessionCallerForUser(viewer.id);
     await expect(
       caller.admin.sessionTraces.getContainerInfo({ session_id: sessionId })
     ).resolves.toMatchObject({

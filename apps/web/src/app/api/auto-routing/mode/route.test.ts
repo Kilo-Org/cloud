@@ -4,6 +4,7 @@ import {
   type AutoRoutingModeResponse,
 } from '@kilocode/auto-routing-contracts';
 import {
+  admin_action_audit_logs,
   auto_routing_custom_routers,
   organization_memberships,
   type User,
@@ -14,12 +15,17 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import {
+  getUserFromAuth,
+  requireStaffAuthorityForRequest,
+} from '@kilocode/web-shared/lib/user/server';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { staffStepUpRefusal } from '@/tests/helpers/staff-refusal.helper';
 import { GET, PUT } from './route';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client');
@@ -30,6 +36,7 @@ const mockedGetMode = jest.mocked(getAutoRoutingMode);
 const mockedUpdateMode = jest.mocked(updateAutoRoutingMode);
 const mockedRequireActiveSubscription = jest.mocked(requireActiveSubscriptionOrTrial);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockedStaffAuthority = jest.mocked(requireStaffAuthorityForRequest);
 
 function request(query = '', body?: unknown) {
   return new NextRequest(`http://localhost:3000/api/auto-routing/mode${query}`, {
@@ -190,6 +197,89 @@ describe('/api/auto-routing/mode', () => {
     expect((await PUT(request(query, { mode: 'best_accuracy' }))).status).toBe(401);
     expect(mockedGetMode).not.toHaveBeenCalled();
     expect(mockedUpdateMode).not.toHaveBeenCalled();
+  });
+
+  describe('staff without a membership', () => {
+    let staff: User;
+    let query: string;
+    let organizationId: string;
+
+    beforeEach(async () => {
+      const organization = await createTestOrganization('Staff mode', user.id, 0);
+      organizationId = organization.id;
+      query = `?organizationId=${organization.id}`;
+      staff = await insertTestUser({ is_admin: true });
+      signIn(staff);
+      mockedStaffAuthority.mockImplementation(async (_auth, params) =>
+        staffStepUpRefusal(params, '/api/auto-routing/mode')
+      );
+    });
+
+    test('a read returns the staff guard session step-up refusal and reads nothing', async () => {
+      const response = await GET(request(query));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        success: false,
+        error: 'MFA_REQUIRED',
+        stepUp: {
+          code: 'MFA_REQUIRED',
+          actionClass: 'support_read',
+          purpose: 'session',
+          maxAgeSeconds: 1800,
+          binding: null,
+        },
+      });
+      expect(mockedGetMode).not.toHaveBeenCalled();
+    });
+
+    test('a write returns the operation step-up refusal for this organization and writes nothing', async () => {
+      const response = await PUT(request(query, { mode: 'best_accuracy' }));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        stepUp: {
+          actionClass: 'support_write',
+          purpose: 'operation',
+          binding: { method: 'put', targetKind: 'organization', targetId: organizationId },
+        },
+      });
+      expect(mockedUpdateMode).not.toHaveBeenCalled();
+      expect(mockedRequireActiveSubscription).not.toHaveBeenCalled();
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    });
+
+    test('an admitted staff member reads and writes the organization mode, and the write is recorded', async () => {
+      mockedStaffAuthority.mockImplementation(async auth => ({ ...auth, user: staff }));
+
+      expect((await GET(request(query))).status).toBe(200);
+      expect((await PUT(request(query, { mode: 'best_accuracy' }))).status).toBe(200);
+      expect(mockedUpdateMode).toHaveBeenCalledWith({
+        ownerType: 'org',
+        ownerId: organizationId,
+        mode: 'best_accuracy',
+      });
+      expect(mockedStaffAuthority).toHaveBeenCalledTimes(2);
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([
+        expect.objectContaining({
+          actor_id: staff.id,
+          action: 'organization.auto_routing_mode.set',
+          outcome: 'success',
+          target_type: 'organization',
+          target_id: organizationId,
+          metadata: { mode: 'best_accuracy', heldRoles: [] },
+        }),
+      ]);
+    });
+
+    test('staff who hold a real billing role never reach the staff guard', async () => {
+      await addUserToOrganization(organizationId, staff.id, 'billing_manager');
+
+      expect((await GET(request(query))).status).toBe(200);
+      expect((await PUT(request(query, { mode: 'cheapest' }))).status).toBe(200);
+      expect(mockedStaffAuthority).not.toHaveBeenCalled();
+      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    });
   });
 
   test('keeps expired organization settings readable while blocking writes', async () => {

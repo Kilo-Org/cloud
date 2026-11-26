@@ -23,7 +23,6 @@ import {
   fetchBitbucketUser,
   fetchBitbucketWorkspaces,
 } from '@/lib/integrations/platforms/bitbucket/adapter';
-import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platforms/bitbucket/repository-cache';
 import { handleBitbucketOAuthCallback } from './bitbucket-callback';
 
 const testKeyPair = generateKeyPairSync('rsa', {
@@ -68,9 +67,6 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedExchangeBitbucketOAuthCode = jest.mocked(exchangeBitbucketOAuthCode);
 const mockedFetchBitbucketUser = jest.mocked(fetchBitbucketUser);
 const mockedFetchBitbucketWorkspaces = jest.mocked(fetchBitbucketWorkspaces);
-const mockedScheduleBitbucketRepositoryCachePrime = jest.mocked(
-  scheduleBitbucketRepositoryCachePrime
-);
 
 let organization: Organization;
 let owner: User;
@@ -193,43 +189,19 @@ afterEach(async () => {
 });
 
 describe('Bitbucket OAuth callback organization connect records', () => {
-  it('records the organization connect and one admin row for an admin without an organization role', async () => {
+  it('refuses an admin without an organization role before the token exchange', async () => {
     const response = await connectAs(adminWithoutRole, 'org');
 
     expect(redirectStatus(response)).toEqual({
       pathname: `/organizations/${organization.id}/integrations/bitbucket`,
-      success: 'connected',
-      error: null,
+      success: null,
+      error: 'unauthorized',
     });
 
-    const [integration] = await db
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
-    if (!integration) throw new Error('Expected the organization integration');
-
-    const audits = await organizationAuditRows();
-    expect(audits).toHaveLength(1);
-    expect(audits[0]).toMatchObject({
-      action: 'organization.settings.change',
-      actor_id: adminWithoutRole.id,
-      organization_id: organization.id,
-    });
-
-    const adminAudits = await adminAuditRows(adminWithoutRole.id);
-    expect(adminAudits).toHaveLength(1);
-    expect(adminAudits[0]).toMatchObject({
-      action: 'organization.bitbucket.update',
-      target_type: 'organization',
-      target_id: organization.id,
-      message: 'Bitbucket: OAuth connection created',
-      metadata: {
-        operation: 'oauth_connect',
-        integrationId: integration.id,
-        heldRoles: [],
-      },
-    });
-    expect(mockedScheduleBitbucketRepositoryCachePrime).toHaveBeenCalledTimes(1);
+    expect(mockedExchangeBitbucketOAuthCode).not.toHaveBeenCalled();
+    await expect(organizationAuditRows()).resolves.toEqual([]);
+    await expect(adminAuditRows(adminWithoutRole.id)).resolves.toEqual([]);
+    await expect(db.select().from(platform_integrations)).resolves.toEqual([]);
   });
 
   it('records the organization connect for the owner and no admin row', async () => {

@@ -326,63 +326,11 @@ describe('getOrganizationProviderPrivacy', () => {
 });
 
 describe('extractEmbeddingPromptInfo', () => {
-  it('should extract prefix from a single string input', () => {
-    const result = extractEmbeddingPromptInfo({ input: 'Hello world' });
-
-    expect(result.user_prompt_prefix).toBe('Hello world');
-    expect(result.system_prompt_prefix).toBe('');
-    expect(result.system_prompt_length).toBe(0);
-  });
-
-  it('should extract the first element from a string array input', () => {
-    const result = extractEmbeddingPromptInfo({ input: ['First sentence', 'Second sentence'] });
-
-    expect(result.user_prompt_prefix).toBe('First sentence');
-  });
-
-  it('should fall back to JSON.stringify for an empty array', () => {
-    const result = extractEmbeddingPromptInfo({ input: [] });
-
-    expect(result.user_prompt_prefix).toBe('[]');
-  });
-
-  it('should fall back to JSON.stringify for a number array (token input)', () => {
-    const result = extractEmbeddingPromptInfo({ input: [1, 2, 3] });
-
-    expect(result.user_prompt_prefix).toBe('[1,2,3]');
-  });
-
-  it('should fall back to JSON.stringify for a nested number array (token batch)', () => {
-    const result = extractEmbeddingPromptInfo({
-      input: [
-        [1, 2],
-        [3, 4],
-      ],
+  it('should always return a zero system_prompt_length', () => {
+    expect(extractEmbeddingPromptInfo()).toEqual({
+      system_prompt_length: 0,
+      system_prompt_kind: null,
     });
-
-    expect(result.user_prompt_prefix).toBe('[[1,2],[3,4]]');
-  });
-
-  it('should truncate long string input to 100 characters', () => {
-    const longInput = 'x'.repeat(200);
-    const result = extractEmbeddingPromptInfo({ input: longInput });
-
-    expect(result.user_prompt_prefix).toHaveLength(100);
-    expect(result.user_prompt_prefix).toBe('x'.repeat(100));
-  });
-
-  it('should truncate long first element of string array to 100 characters', () => {
-    const longInput = 'y'.repeat(200);
-    const result = extractEmbeddingPromptInfo({ input: [longInput] });
-
-    expect(result.user_prompt_prefix).toHaveLength(100);
-  });
-
-  it('should always return empty system_prompt_prefix and zero system_prompt_length', () => {
-    const result = extractEmbeddingPromptInfo({ input: 'any input' });
-
-    expect(result.system_prompt_prefix).toBe('');
-    expect(result.system_prompt_length).toBe(0);
   });
 });
 
@@ -777,11 +725,7 @@ describe('countAndStoreFimUsage', () => {
       kiloUserId: 'user-fim-test',
       provider: 'mistral',
       requested_model: 'mistralai/codestral-2508',
-      promptInfo: {
-        system_prompt_prefix: '',
-        system_prompt_length: 0,
-        user_prompt_prefix: '',
-      },
+      promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
       max_tokens: 100,
       has_middle_out_transform: null,
       fraudHeaders: {},
@@ -1299,11 +1243,7 @@ describe.each<{
     status_code: 200,
     usageId: 'usage-recovery-id',
     organizationId: 'usage-organization',
-    promptInfo: {
-      system_prompt_prefix: 'private-prompt',
-      user_prompt_prefix: 'private-prompt',
-      system_prompt_length: 14,
-    },
+    promptInfo: { system_prompt_length: 14, system_prompt_kind: null },
   });
 
   const validPayload = {

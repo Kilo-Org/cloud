@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, test, expect, jest } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import {
   admin_action_audit_logs,
   kilo_pass_subscriptions,
   kilocode_users,
   organizations,
+  passkey_credentials,
+  session_step_up_proofs,
   transactional_email_log,
   user_admin_notes,
   user_auth_provider,
 } from '@kilocode/db/schema';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   createDeletionInProgressBlockedReason,
   createSoftDeletedBlockedReason,
@@ -20,7 +25,7 @@ import {
   deleteTransactionalEmailLogForUsers,
   insertTestUser,
 } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { getAllUserProviders } from '@/lib/user';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
@@ -51,7 +56,7 @@ describe('admin.users.updateBlockStatus', () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser({ api_token_pepper: 'initial-pepper' });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.users.updateBlockStatus({
       userId: user.id,
       blocked_reason: 'manual admin block',
@@ -74,7 +79,7 @@ describe('admin.users.updateBlockStatus', () => {
       blocked_at: new Date().toISOString(),
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.users.updateBlockStatus({
       userId: user.id,
       blocked_reason: null,
@@ -97,7 +102,7 @@ describe('admin.users.updateBlockStatus', () => {
       blocked_at: new Date().toISOString(),
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.updateBlockStatus({
       userId: user.id,
       blocked_reason: 'second reason',
@@ -120,7 +125,7 @@ describe('admin.users.updateBlockStatus', () => {
       blocked_by_kilo_user_id: admin.id,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.users.updateBlockStatus({
         userId: user.id,
@@ -146,7 +151,7 @@ describe('admin.users.updateBlockStatus', () => {
       blocked_by_kilo_user_id: admin.id,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.users.updateBlockStatus({
         userId: user.id,
@@ -180,7 +185,7 @@ describe('admin action audit logging', () => {
       blocked_by_kilo_user_id: blocker.id,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null });
 
     const audits = await getAdminActionAudits(admin.id);
@@ -201,7 +206,7 @@ describe('admin action audit logging', () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null });
     await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: 'abuse' });
 
@@ -236,7 +241,7 @@ describe('admin action audit logging', () => {
       )
     );
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.bulkBlock.unblockRecentBlock({
       blocked_reason: 'bulk spam wave',
       date: '2026-01-15',
@@ -252,7 +257,7 @@ describe('admin action audit logging', () => {
   test('a bulk unblock that matches no users records one summary row', async () => {
     const admin = await insertTestUser({ is_admin: true });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.bulkBlock.unblockRecentBlock({
       blocked_reason: 'no such wave',
       date: '2026-01-15',
@@ -280,7 +285,7 @@ describe('admin action audit logging', () => {
       blocked_at: new Date().toISOString(),
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -299,7 +304,7 @@ describe('admin action audit logging', () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.resetAPIKey({ userId: user.id });
     await caller.admin.users.signOutBrowserSessions({ userId: user.id });
 
@@ -333,7 +338,7 @@ describe('admin action audit logging', () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.users.recomputeBalances({ userId: user.id, dryRun: false });
 
     const audits = await getAdminActionAudits(admin.id);
@@ -376,7 +381,7 @@ describe('admin.users.releaseEmailAddress', () => {
         kind: 'ambiguous',
       });
 
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await expect(
         caller.admin.users.releaseEmailAddress({
           userId: duplicate.id,
@@ -424,7 +429,7 @@ describe('admin.users.releaseEmailAddress', () => {
       hosted_domain: null,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.users.releaseEmailAddress({
         userId: duplicate.id,
@@ -455,7 +460,7 @@ describe('admin.users.releaseEmailAddress', () => {
       })
       .where(eq(kilocode_users.id, duplicate.id));
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.users.releaseEmailAddress({
         userId: duplicate.id,
@@ -480,7 +485,7 @@ describe('admin.users.releaseEmailAddress', () => {
     });
     await insertTestUser({ normalized_email: 'inferred-google@example.com' });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.users.releaseEmailAddress({
         userId: duplicate.id,
@@ -498,7 +503,7 @@ describe('admin.users.releaseEmailAddress', () => {
       hosted_domain: hosted_domain_specials.email,
       normalized_email: 'no-conflict@example.com',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.releaseEmailAddress({
@@ -529,7 +534,7 @@ describe('admin.users.releaseEmailAddress', () => {
       normalized_email: 'firstcandidate@gmail.com',
       hosted_domain: hosted_domain_specials.email,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const results = await Promise.allSettled([
       caller.admin.users.releaseEmailAddress({
         userId: first.id,
@@ -557,7 +562,7 @@ describe('admin.users.releaseEmailAddress', () => {
 
   test('refuses self-targeting and missing users', async () => {
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.releaseEmailAddress({
@@ -583,7 +588,7 @@ describe('admin.users.releaseEmailAddress', () => {
       hosted_domain: hosted_domain_specials.email,
       blocked_reason,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.releaseEmailAddress({
@@ -604,7 +609,7 @@ describe('admin.users.releaseEmailAddress', () => {
       email_domain: 'released.invalid',
       hosted_domain: hosted_domain_specials.email,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.releaseEmailAddress({
@@ -629,7 +634,7 @@ describe('admin.users.releaseEmailAddress', () => {
       normalized_email: 'member@sso-release.example.com',
       hosted_domain: hosted_domain_specials.email,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.users.releaseEmailAddress({
@@ -645,7 +650,7 @@ describe('admin.users.releaseEmailAddress', () => {
   test('requires admin access', async () => {
     const nonAdmin = await insertTestUser({ is_admin: false });
     const target = await insertTestUser();
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.users.releaseEmailAddress({
@@ -682,7 +687,7 @@ describe('admin.cancelAndRefundKiloPass', () => {
     const target = await insertTestUser();
     await insertActiveKiloPass(target.id, `sub_guard_${crypto.randomUUID()}`);
 
-    const caller = await createCallerForUser(platformAdmin.id);
+    const caller = await createSessionCallerForUser(platformAdmin.id);
     await expect(
       caller.admin.users.cancelAndRefundKiloPass({ userId: target.id, reason: 'policy' })
     ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Superadmin access required' });
@@ -710,7 +715,7 @@ describe('admin.cancelAndRefundKiloPass', () => {
     } as never);
     jest.spyOn(stripeClient.refunds, 'create').mockResolvedValue({ amount: 1900 } as never);
 
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
     const result = await caller.admin.users.cancelAndRefundKiloPass({
       userId: target.id,
       reason: 'chargeback reported by victim@example.com',
@@ -756,7 +761,7 @@ describe('admin.cancelAndRefundKiloPass', () => {
     jest.spyOn(stripeClient.subscriptions, 'cancel').mockResolvedValue({} as never);
     jest.spyOn(stripeClient.invoices, 'list').mockResolvedValue({ data: [] } as never);
 
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
     const result = await caller.admin.users.cancelAndRefundKiloPass({
       userId: target.id,
       reason: 'policy',
@@ -791,7 +796,7 @@ describe('admin.cancelAndRefundKiloPass', () => {
     } as never);
     jest.spyOn(stripeClient.refunds, 'create').mockRejectedValue(new Error('Stripe boom'));
 
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
     await expect(
       caller.admin.users.cancelAndRefundKiloPass({ userId: target.id, reason: 'chargeback' })
     ).rejects.toThrow('Stripe boom');
@@ -810,7 +815,7 @@ describe('admin.cancelAndRefundKiloPass', () => {
   test('rejects a reason longer than the bounded length', async () => {
     const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
 
-    const caller = await createCallerForUser(superadmin.id);
+    const caller = await createSessionCallerForUser(superadmin.id);
     await expect(
       caller.admin.users.cancelAndRefundKiloPass({
         userId: 'length-bound-target',
@@ -862,7 +867,7 @@ describe('admin.syncProviders manual sync', () => {
   test('is disabled in production', async () => {
     process.env.VERCEL_ENV = 'production';
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
+    const caller = await createSessionCallerForUser(admin.id, { headers: allowedAddress });
 
     await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(false);
     await expect(caller.admin.syncProviders.triggerSync()).rejects.toMatchObject({
@@ -879,7 +884,7 @@ describe('admin.syncProviders manual sync', () => {
   test.each(['preview', 'development'])('is enabled when VERCEL_ENV is %s', async vercelEnv => {
     process.env.VERCEL_ENV = vercelEnv;
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
+    const caller = await createSessionCallerForUser(admin.id, { headers: allowedAddress });
 
     await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(true);
   });
@@ -896,7 +901,7 @@ describe('admin.users.addNote', () => {
       app_store_account_token: appStoreAccountToken,
     });
     const target = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const note = await caller.admin.users.addNote({
       kilo_user_id: target.id,
@@ -912,5 +917,149 @@ describe('admin.users.addNote', () => {
     expect(serialized).not.toContain('add-note-api-pepper');
     expect(serialized).not.toContain('add-note-web-pepper');
     expect(serialized).not.toContain(appStoreAccountToken);
+  });
+});
+
+describe('admin.users.deleteNote step-up binding', () => {
+  const webSessionId = 'delete-note-web-session';
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+
+  beforeEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+  });
+  afterEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+  });
+
+  async function insertNote(adminId: string, ownerId: string) {
+    const [note] = await db
+      .insert(user_admin_notes)
+      .values({ kilo_user_id: ownerId, note_content: 'note', admin_kilo_user_id: adminId })
+      .returning({ id: user_admin_notes.id });
+    return note!.id;
+  }
+
+  /** A proof minted for deleting one note: the hash the guard computes for that request. */
+  async function insertDeleteNoteProof(adminId: string, noteId: string) {
+    const [credential] = await db
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: adminId,
+        credential_id: `delete-note-${crypto.randomUUID()}`,
+        public_key: 'unused-public-key',
+      })
+      .returning();
+    const verifiedAt = new Date();
+    const [proof] = await db
+      .insert(session_step_up_proofs)
+      .values({
+        kilo_user_id: adminId,
+        session_id_hash: hashWebSessionId(webSessionId),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'operation',
+        action_binding_hash: hashStepUpBinding('sensitive_write', {
+          surface: 'trpc',
+          route: 'admin.users.deleteNote',
+          method: 'mutation',
+          target: { kind: 'none', id: noteId },
+        }),
+        verified_at: verifiedAt.toISOString(),
+        expires_at: new Date(verifiedAt.getTime() + 5 * 60_000).toISOString(),
+      })
+      .returning({ id: session_step_up_proofs.id });
+    return proof!.id;
+  }
+
+  async function proofConsumedAt(proofId: string) {
+    const [row] = await db
+      .select({ consumedAt: session_step_up_proofs.consumed_at })
+      .from(session_step_up_proofs)
+      .where(eq(session_step_up_proofs.id, proofId));
+    return row?.consumedAt ?? null;
+  }
+
+  async function noteExists(noteId: string) {
+    const rows = await db
+      .select({ id: user_admin_notes.id })
+      .from(user_admin_notes)
+      .where(eq(user_admin_notes.id, noteId));
+    return rows.length === 1;
+  }
+
+  async function stepUpRefusal(promise: Promise<unknown>) {
+    const error = await promise.then(
+      () => null,
+      (rejection: unknown) => rejection
+    );
+    return error instanceof TRPCError && error.cause instanceof StepUpRequiredError
+      ? error.cause
+      : null;
+  }
+
+  async function deleteNoteAuditRows(actorId: string) {
+    return db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(
+        and(
+          eq(admin_action_audit_logs.action, 'user.note.delete'),
+          eq(admin_action_audit_logs.actor_id, actorId)
+        )
+      );
+  }
+
+  test('admits a proof bound to the note it deletes once, and audits the note owner', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const noteId = await insertNote(admin.id, owner.id);
+    const proofId = await insertDeleteNoteProof(admin.id, noteId);
+    const caller = await createSessionCallerForUser(admin.id, { webSessionId });
+
+    await expect(caller.admin.users.deleteNote({ note_id: noteId })).resolves.toEqual({
+      success: true,
+    });
+    expect(await noteExists(noteId)).toBe(false);
+    expect(await proofConsumedAt(proofId)).not.toBeNull();
+    expect(await deleteNoteAuditRows(admin.id)).toEqual([
+      expect.objectContaining({
+        outcome: 'success',
+        actor_id: admin.id,
+        target_type: 'user',
+        target_id: owner.id,
+        metadata: expect.objectContaining({ noteId }),
+      }),
+    ]);
+
+    const replay = await stepUpRefusal(caller.admin.users.deleteNote({ note_id: noteId }));
+    expect(replay?.code).toBe('MFA_REQUIRED');
+  });
+
+  test('refuses a proof bound to another note without spending it', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const noteA = await insertNote(admin.id, owner.id);
+    const noteB = await insertNote(admin.id, owner.id);
+    const proofA = await insertDeleteNoteProof(admin.id, noteA);
+    const caller = await createSessionCallerForUser(admin.id, { webSessionId });
+
+    const cause = await stepUpRefusal(caller.admin.users.deleteNote({ note_id: noteB }));
+    expect(cause?.code).toBe('MFA_REQUIRED');
+    expect(cause?.binding).toMatchObject({
+      actionClass: 'sensitive_write',
+      route: 'admin.users.deleteNote',
+      targetKind: 'none',
+      targetId: noteB,
+    });
+    expect(await noteExists(noteB)).toBe(true);
+    expect(await proofConsumedAt(proofA)).toBeNull();
+    expect(await deleteNoteAuditRows(admin.id)).toEqual([
+      expect.objectContaining({ outcome: 'failure', target_type: null, target_id: null }),
+    ]);
+
+    await expect(caller.admin.users.deleteNote({ note_id: noteA })).resolves.toEqual({
+      success: true,
+    });
+    expect(await noteExists(noteB)).toBe(true);
   });
 });

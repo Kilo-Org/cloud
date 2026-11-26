@@ -18,7 +18,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/platforms/bitbucket/adapter', () => ({
   exchangeBitbucketOAuthCode: jest.fn(),

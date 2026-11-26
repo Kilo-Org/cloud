@@ -175,6 +175,8 @@ async function sealedRuntimeAuthorization(
   const token = jwt.sign(
     {
       runtimeAuthorization: { id: authorizationId },
+      // The combined audience the test Worker's default issuer mode reuses.
+      aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
       exp: Math.floor((now + 60 * 60_000) / 1000),
     },
     SECRET
@@ -353,6 +355,41 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(second.credentials.proxy.handle).toBe(sharedHandle);
     expect(await creator.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
     expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
+
+    // A revoked local grant under the split issuer mode: a caller without a
+    // destination is denied locally without asking the scope members, while an
+    // explicit destination still reaches the surviving sibling.
+    const saved = await runInDurableObject(creator, async (instance, state) => {
+      const authorization =
+        await state.storage.get<Record<string, unknown>>(RUNTIME_AUTHORIZATION_KEY);
+      const mode: unknown = Reflect.get(instance.env, 'RUNTIME_TOKEN_AUDIENCE_MODE');
+      await state.storage.put(RUNTIME_AUTHORIZATION_KEY, { ...authorization, state: 'revoked' });
+      Object.assign(instance.env, { RUNTIME_TOKEN_AUDIENCE_MODE: 'per-destination' });
+      return { authorization, mode };
+    });
+    const scopeResolution = vi.spyOn(SandboxControlV2.prototype, 'resolveScopeHandle');
+    try {
+      expect(await creator.resolveRuntimeCredentialProxyGrant(sharedHandle)).toBeNull();
+      expect(scopeResolution).not.toHaveBeenCalled();
+      const reclaimed = await creator.resolveRuntimeCredentialProxyGrant(
+        sharedHandle,
+        undefined,
+        'kilo-api'
+      );
+      expect(reclaimed?.runtimeAuthorization.resourceId).toBe(siblingId);
+      expect(scopeResolution).toHaveBeenCalledOnce();
+    } finally {
+      scopeResolution.mockRestore();
+      await runInDurableObject(creator, async (instance, state) => {
+        await state.storage.put(RUNTIME_AUTHORIZATION_KEY, saved.authorization);
+        if (saved.mode === undefined) {
+          Reflect.deleteProperty(instance.env, 'RUNTIME_TOKEN_AUDIENCE_MODE');
+        } else {
+          Object.assign(instance.env, { RUNTIME_TOKEN_AUDIENCE_MODE: saved.mode });
+        }
+      });
+    }
+    expect(await creator.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
     await creator.deleteSession();
     // The adopted handle survives the creator's deletion: the survivor serves it.
     const afterRelease = await creator.resolveRuntimeCredentialProxyGrant(sharedHandle);
@@ -436,10 +473,13 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       let membershipReads = 0;
       let membershipGate: Promise<void> | undefined;
       await runInDurableObject(sessionStub, instance => {
-        // Keep the real persisted renewal and binding policy; only the database reads are fake.
-        instance['getStoredRuntimeToken'] = async (secret, beforeRenew) =>
+        // Keep the real persisted renewal and binding policy; only the database reads are
+        // fake. The issuer mints one token per destination here.
+        instance['getStoredRuntimeToken'] = async (secret, destination, beforeRenew) =>
           renewStoredRuntimeAuthorization({
             beforeRenew,
+            audienceMode: () => 'per-destination',
+            destination,
             metadata: await instance.getMetadata(),
             getAuthorization: () => instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY),
             putAuthorization: authorization =>
@@ -449,10 +489,11 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
               await instance.ctx.storage.put('session_metadata', updated);
               Object.assign(instance, { metadata: updated });
             },
-            renew: authorization =>
+            renew: (authorization, audienceMode) =>
               renewRuntimeAuthorization({
                 authorization,
                 secret,
+                audienceMode,
                 connectionString: 'fake',
                 now: new Date(Date.now()),
                 adapters: {
@@ -484,6 +525,11 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         `/api/session/${kiloId}/ingest`,
       ];
       const methods = ['POST', 'GET', 'POST'];
+      const audienceOf: Record<string, string> = {
+        '/chat/completions': 'kilo-gateway',
+        '/api/profile': 'kilo-api',
+        [`/api/session/${kiloId}/ingest`]: 'session-ingest',
+      };
       vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
         const request = input instanceof Request ? input : new Request(input);
         const url = new URL(request.url);
@@ -493,6 +539,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         const claims = jwt.verify(bearer, SECRET) as jwt.JwtPayload;
         expect(bearer === token).toBe(false);
         expect(claims.runtimeAuthorization.resourceId).toBe(sessionId);
+        expect(claims.aud).toBe(audienceOf[url.pathname]);
         expect(claims.organizationId).toBe(ORG_ID);
         expect(claims.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
         expect(request.headers.get('x-kilocode-organizationid')).toBe(ORG_ID);
@@ -693,6 +740,30 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const fence = vi.spyOn(SandboxControlV2.prototype, 'getRuntimeCredentialProxyFence');
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
     expect(fence).toHaveBeenCalledOnce();
+
+    // A caller without a destination under the split issuer mode is a permanent
+    // denial (401) after the one fence read that admits the handle, not a
+    // retryable failure.
+    const configuredMode = await runInDurableObject(sessionStub, instance => {
+      const value: unknown = Reflect.get(instance.env, 'RUNTIME_TOKEN_AUDIENCE_MODE');
+      Object.assign(instance.env, { RUNTIME_TOKEN_AUDIENCE_MODE: 'per-destination' });
+      return value;
+    });
+    fence.mockClear();
+    try {
+      await expect(
+        sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')
+      ).resolves.toBeNull();
+      expect(fence).toHaveBeenCalledOnce();
+    } finally {
+      await runInDurableObject(sessionStub, instance => {
+        if (configuredMode === undefined) {
+          Reflect.deleteProperty(instance.env, 'RUNTIME_TOKEN_AUDIENCE_MODE');
+        } else {
+          Object.assign(instance.env, { RUNTIME_TOKEN_AUDIENCE_MODE: configuredMode });
+        }
+      });
+    }
 
     // Compatibility release: readers accept proof, but allocations do not require it yet.
     const originProof = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');

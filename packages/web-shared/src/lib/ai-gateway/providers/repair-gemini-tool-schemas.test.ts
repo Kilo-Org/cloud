@@ -304,6 +304,226 @@ describe('repairGeminiJsonSchema', () => {
     expect(schema).toEqual(expected);
   });
 
+  it.each([
+    [{ type: 'array' }, { type: 'array', items: {} }],
+    [
+      { type: 'array', items: { type: 'array' } },
+      { type: 'array', items: { type: 'array', items: {} } },
+    ],
+    [
+      { type: 'array', prefixItems: [{ type: 'string' }] },
+      { type: 'array', prefixItems: [{ type: 'string' }], items: {} },
+    ],
+    [{ type: ['array', 'null'] }, { type: ['array', 'null'], items: {} }],
+    [
+      { anyOf: [{ type: 'array' }, { type: 'string' }] },
+      { anyOf: [{ type: 'array', items: {} }, { type: 'string' }] },
+    ],
+  ])('adds the empty items schema to array schema %j', (schema, expected) => {
+    expect(repaired(schema)).toEqual(expected);
+  });
+
+  // Kilo CLI before Kilo-Org/kilocode#16540 sends these for typed arrays beside a combiner.
+  it.each([
+    [
+      { type: 'array', anyOf: [{ minItems: 1 }, { maxItems: 3 }] },
+      {
+        anyOf: [
+          { type: 'array', minItems: 1, items: {} },
+          { type: 'array', maxItems: 3, items: {} },
+        ],
+      },
+    ],
+    [
+      {
+        type: 'array',
+        oneOf: [{ items: { type: 'integer' } }, { maxItems: 2 }],
+        nullable: true,
+        description: 'ids',
+      },
+      {
+        type: 'array',
+        items: {},
+        oneOf: [{ items: { type: 'integer' } }, { maxItems: 2 }],
+        nullable: true,
+        description: 'ids',
+      },
+    ],
+    [
+      {
+        anyOf: [
+          { type: 'array', anyOf: [{ minLength: 1 }, { minItems: 1 }] },
+          { type: 'string', anyOf: [{ minLength: 1 }, { minItems: 1 }] },
+        ],
+      },
+      {
+        anyOf: [
+          {
+            anyOf: [
+              { type: 'array', minLength: 1, items: {} },
+              { type: 'array', minItems: 1, items: {} },
+            ],
+          },
+          {
+            anyOf: [
+              { type: 'string', minLength: 1 },
+              { type: 'string', minItems: 1 },
+            ],
+          },
+        ],
+      },
+    ],
+  ])('repairs a typed array beside a combiner %j', (schema, expected) => {
+    expect(repaired(schema)).toEqual(expected);
+  });
+
+  describe('typed node beside anyOf', () => {
+    it('copies the object keywords into every branch', () => {
+      const properties = { a: { type: 'string' }, b: { type: 'string' } };
+
+      expect(
+        repaired({
+          type: 'object',
+          description: 'one of a or b',
+          properties,
+          anyOf: [{ required: ['a'] }, { required: ['b'] }],
+        })
+      ).toEqual({
+        anyOf: [
+          { type: 'object', properties, required: ['a'] },
+          { type: 'object', properties, required: ['b'] },
+        ],
+        description: 'one of a or b',
+      });
+    });
+
+    it('does not share copied subschemas between branches', () => {
+      const result = repaired({
+        type: 'array',
+        items: { type: 'string' },
+        anyOf: [{ minItems: 1 }, { maxItems: 3 }],
+      }) as { anyOf: { items: unknown }[] };
+
+      expect(result.anyOf[0].items).toEqual({ type: 'string' });
+      expect(result.anyOf[0].items).not.toBe(result.anyOf[1].items);
+    });
+
+    it('keeps a declared items schema and a branch key equal to the copied one', () => {
+      expect(
+        repaired({
+          type: 'array',
+          items: { type: 'integer' },
+          anyOf: [{ items: { type: 'integer' }, minItems: 1 }, { maxItems: 2 }],
+        })
+      ).toEqual({
+        anyOf: [
+          { type: 'array', items: { type: 'integer' }, minItems: 1 },
+          { type: 'array', items: { type: 'integer' }, maxItems: 2 },
+        ],
+      });
+    });
+
+    it('keeps nullable beside the anyOf', () => {
+      expect(
+        repaired({ type: 'string', nullable: true, anyOf: [{ enum: ['a'] }, { enum: ['b'] }] })
+      ).toEqual({
+        anyOf: [
+          { type: 'string', enum: ['a'] },
+          { type: 'string', enum: ['b'] },
+        ],
+        nullable: true,
+      });
+    });
+
+    it('spreads a nested typed anyOf', () => {
+      expect(
+        repaired({
+          type: 'array',
+          anyOf: [{ type: 'array', anyOf: [{ minItems: 1 }, { maxItems: 2 }] }, { maxItems: 5 }],
+        })
+      ).toEqual({
+        anyOf: [
+          {
+            anyOf: [
+              { type: 'array', minItems: 1, items: {} },
+              { type: 'array', maxItems: 2, items: {} },
+            ],
+          },
+          { type: 'array', maxItems: 5, items: {} },
+        ],
+      });
+    });
+
+    it('spreads into a branch with its own untyped anyOf', () => {
+      const properties = { a: { type: 'string' } };
+
+      expect(
+        repaired({
+          type: 'object',
+          properties,
+          anyOf: [{ anyOf: [{ required: ['a'] }, { minProperties: 1 }] }, { maxProperties: 0 }],
+        })
+      ).toEqual({
+        anyOf: [
+          {
+            anyOf: [
+              { type: 'object', properties, required: ['a'] },
+              { type: 'object', properties, minProperties: 1 },
+            ],
+          },
+          { type: 'object', properties, maxProperties: 0 },
+        ],
+      });
+    });
+
+    it.each([
+      [{ type: 'string', anyOf: [{ type: 'integer' }, { minLength: 1 }] }],
+      [
+        {
+          type: 'array',
+          items: { type: 'string' },
+          anyOf: [{ items: { type: 'integer' } }, { maxItems: 2 }],
+        },
+      ],
+      [{ type: 'string', anyOf: [{ minLength: 1 }, true] }],
+      [{ type: 'string', anyOf: [{ minLength: 1, nullable: true }, { maxLength: 3 }] }],
+    ])('leaves %j alone when merging would change what it accepts', property => {
+      const expected = structuredClone(property);
+
+      expect(repaired(property)).toEqual(expected);
+    });
+
+    it('leaves a node alone when its copies would exceed the copy budget', () => {
+      const property = {
+        type: 'string',
+        enum: Array.from({ length: 20_000 }, (_, i) => `value-${i}`),
+        anyOf: Array.from({ length: 2_000 }, () => ({})),
+      };
+      const expected = structuredClone(property);
+
+      expect(repaired(property)).toEqual(expected);
+    });
+  });
+
+  it('keeps the added items schema on the array branch of a lowered type array', () => {
+    expect(repaired({ type: ['array', 'string'], enum: ['a', ['b']] })).toEqual({
+      anyOf: [
+        { type: 'array', enum: [['b']], items: {} },
+        { type: 'string', enum: ['a'] },
+      ],
+    });
+  });
+
+  it.each([
+    [{ type: 'array', items: { type: 'string' } }],
+    [{ type: 'array', items: false }],
+    [{ type: 'object', properties: { items: { type: 'string' } } }],
+  ])('leaves array schema %j with items unchanged', schema => {
+    const expected = structuredClone(schema);
+
+    expect(repaired(schema)).toEqual(expected);
+  });
+
   it.each([null, 'string', 42, []])('ignores non-object schema %p', schema => {
     expect(repairGeminiJsonSchema(schema)).toBe(0);
   });

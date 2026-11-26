@@ -4,6 +4,8 @@ import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-aut
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { createCallerFactory, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import type * as TrpcInitModule from '@kilocode/web-shared/lib/trpc/init';
+import type * as OrganizationUtilsModule from '@kilocode/web-shared/routers/organizations/utils';
+import { TRPCError } from '@trpc/server';
 import type * as ZodModule from 'zod';
 
 type VerifyResult = { kiloSessionId: string };
@@ -35,6 +37,16 @@ const mockAssertSessionWorktree = jest.fn<(db: unknown, input: unknown) => Promi
 const mockEnsureOrganizationAccess = jest.fn<
   (ctx: unknown, organizationId: string) => Promise<string>
 >(async () => 'member');
+// No case here holds a real membership, so the membership-only gate refuses
+// unless a test grants it.
+const mockEnsureMemberOrganizationAccess = jest.fn<
+  typeof OrganizationUtilsModule.ensureMemberOrganizationAccess
+>(async () => {
+  throw new TRPCError({
+    code: 'UNAUTHORIZED',
+    message: 'You do not have access to this organization',
+  });
+});
 const mockCreateControlTokenForRequest = jest.fn<
   (user: User, audience: string, options: unknown) => Promise<{ token: string }>
 >(async () => ({ token: 'scoped-worker-token' }));
@@ -72,6 +84,12 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
     ensureOrganizationAccess: mockEnsureOrganizationAccess,
     organizationMemberProcedure: organizationProcedure,
     organizationMemberMutationProcedure: organizationProcedure,
+    organizationMemberOnlyMutationProcedure: trpcInit.baseProcedure
+      .input(z.object({ organizationId: z.uuid() }))
+      .use(async ({ ctx, input, next }) => {
+        await mockEnsureMemberOrganizationAccess(ctx.user, input.organizationId);
+        return next();
+      }),
   };
 });
 

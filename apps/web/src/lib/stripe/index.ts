@@ -685,33 +685,6 @@ async function isKiloPassInvoiceStoreManaged(input: {
   return Boolean(row && row.payment_provider !== KiloPassPaymentProvider.Stripe);
 }
 
-export async function detachAllPaymentMethods(user: User) {
-  const paymentMethods = await client.paymentMethods.list({
-    customer: user.stripe_customer_id,
-    type: 'card',
-  });
-
-  await Promise.all(
-    (paymentMethods?.data || []).map(async paymentMethod => {
-      console.log(`Detaching payment method for user ${user.id}`, paymentMethod);
-      await client.paymentMethods.detach(paymentMethod.id);
-    })
-  );
-  // Cards changed for this customer; the next payment-method read must ask
-  // Stripe again instead of serving the answer cached before the removal.
-  invalidateStripePaymentMethodCache(user.stripe_customer_id);
-
-  // Also clear auto-top-up settings
-  await db
-    .update(kilocode_users)
-    .set({
-      auto_top_up_enabled: false,
-    })
-    .where(eq(kilocode_users.id, user.id));
-
-  await db.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, user.id));
-}
-
 export async function ensurePaymentMethodStored(
   kiloUserId: string,
   paymentMethod: Stripe.PaymentMethod,

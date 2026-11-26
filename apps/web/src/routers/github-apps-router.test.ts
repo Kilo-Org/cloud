@@ -6,6 +6,7 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type * as OrganizationAuditLogsModule from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   GITHUB_LISTING_BUDGET_MESSAGE,
   GitHubListingBudgetExceededError,
@@ -85,6 +86,11 @@ const mockEnsureOrganizationAccess =
       roles?: readonly OrganizationRole[]
     ) => Promise<OrganizationRole>
   >();
+const mockRequireOrganizationStaffAuthority =
+  jest.fn<(ctx: { user: User }, organizationId: string) => Promise<unknown>>();
+type CreateAuditLog = typeof OrganizationAuditLogsModule.createAuditLog;
+const mockCreateAuditLog = jest.fn<CreateAuditLog>();
+let mockRealCreateAuditLog: CreateAuditLog;
 const mockGetGitHubAppTypeForOrganization =
   jest.fn<(organizationId: string | null) => Promise<GitHubAppType>>();
 const mockCreateInstallState =
@@ -116,7 +122,29 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
     organizationId: string,
     roles?: readonly OrganizationRole[]
   ) => mockEnsureOrganizationAccess(ctx, organizationId, roles),
+  requireOrganizationStaffAuthority: (ctx: { user: User }, organizationId: string) =>
+    mockRequireOrganizationStaffAuthority(ctx, organizationId),
+  ensureMemberOrganizationAccess: (
+    user: User,
+    organizationId: string,
+    roles?: readonly OrganizationRole[]
+  ) => mockEnsureOrganizationAccess({ user }, organizationId, roles),
 }));
+
+// Pass through to the real audit writer; only the isolated organization cancel
+// cases below replace it.
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => {
+  const actual = jest.requireActual<typeof OrganizationAuditLogsModule>(
+    '@kilocode/web-shared/lib/organizations/organization-audit-logs'
+  );
+  mockRealCreateAuditLog = actual.createAuditLog;
+  mockCreateAuditLog.mockImplementation(mockRealCreateAuditLog);
+  return {
+    ...actual,
+    createAuditLog: (entry: Parameters<typeof actual.createAuditLog>[0]) =>
+      mockCreateAuditLog(entry),
+  };
+});
 
 jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
   getGitHubAppCredentials: jest.fn(),
@@ -954,6 +982,110 @@ describe('githubAppsRouter pending installation cancel', () => {
       caller.cancelPendingInstallation({ integrationId: otherPendingId })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
+    expect(mockCancelPendingInstallation).not.toHaveBeenCalled();
+  });
+});
+
+describe('githubAppsRouter organization pending installation cancel', () => {
+  const otherRequester = {
+    id: integrationId,
+    platform_installation_id: '98765',
+    platform_account_login: 'existing-org',
+    github_app_type: 'standard',
+    kilo_requester_user_id: 'someone-else',
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.SUPPORT_ACCESS_ENABLED;
+    mockGetIntegrationForOwner.mockResolvedValue(otherRequester as TestIntegration);
+    mockCancelPendingInstallation.mockResolvedValue({ success: true });
+    // Isolated: records nothing and answers the row the writer would return.
+    mockCreateAuditLog.mockImplementation(async entry => ({
+      id: 'audit-log',
+      created_at: new Date(0).toISOString(),
+      action: entry.action,
+      actor_email: entry.actor_email,
+      actor_id: entry.actor_id,
+      actor_name: entry.actor_name,
+      message: entry.message,
+      organization_id: entry.organization_id,
+      details: entry.details ?? null,
+    }));
+  });
+
+  afterEach(() => {
+    mockCreateAuditLog.mockImplementation(mockRealCreateAuditLog);
+  });
+
+  it.each(['owner', 'admin'] as const)(
+    'lets a staff %s cancel without a staff grant',
+    async role => {
+      mockEnsureOrganizationAccess.mockResolvedValue(role);
+      const caller = createCaller({ user: { id: 'staff-1', is_admin: true } as User });
+
+      await expect(
+        caller.cancelPendingInstallation({ organizationId, integrationId })
+      ).resolves.toEqual({ success: true });
+
+      expect(mockRequireOrganizationStaffAuthority).not.toHaveBeenCalled();
+    }
+  );
+
+  it('requires a verified staff grant for a staff member without a managing role', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockRequireOrganizationStaffAuthority.mockResolvedValue({});
+    const caller = createCaller({ user: { id: 'staff-1', is_admin: true } as User });
+
+    await expect(
+      caller.cancelPendingInstallation({ organizationId, integrationId })
+    ).resolves.toEqual({ success: true });
+
+    expect(mockRequireOrganizationStaffAuthority).toHaveBeenCalledTimes(1);
+    expect(mockRequireOrganizationStaffAuthority.mock.calls[0]?.[1]).toBe(organizationId);
+  });
+
+  it('cancels nothing when the staff grant is refused', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockRequireOrganizationStaffAuthority.mockRejectedValue(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Reauthentication required' })
+    );
+    const caller = createCaller({ user: { id: 'staff-1', is_admin: true } as User });
+
+    await expect(
+      caller.cancelPendingInstallation({ organizationId, integrationId })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Reauthentication required' });
+
+    expect(mockCancelPendingInstallation).not.toHaveBeenCalled();
+    expect(mockCreateAuditLog).not.toHaveBeenCalled();
+  });
+
+  it('refuses staff without a grant attempt when support access is enabled', async () => {
+    process.env.SUPPORT_ACCESS_ENABLED = 'true';
+    try {
+      mockEnsureOrganizationAccess.mockResolvedValue('member');
+      const caller = createCaller({ user: { id: 'staff-1', is_admin: true } as User });
+
+      await expect(
+        caller.cancelPendingInstallation({ organizationId, integrationId })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
+
+      expect(mockRequireOrganizationStaffAuthority).not.toHaveBeenCalled();
+      expect(mockCancelPendingInstallation).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.SUPPORT_ACCESS_ENABLED;
+    }
+  });
+
+  it('refuses an ordinary member who did not request the install', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.cancelPendingInstallation({ organizationId, integrationId })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockRequireOrganizationStaffAuthority).not.toHaveBeenCalled();
     expect(mockCancelPendingInstallation).not.toHaveBeenCalled();
   });
 });

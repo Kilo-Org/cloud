@@ -45,6 +45,9 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260707.2
+  # The Vercel function's own OIDC token for STS: apps/web reads it through the
+  # service-token client's `/vercel` subpath, which tests against the same pin.
+  '@vercel/oidc': 4.0.9
   # vitest 4, for the workspaces that cannot run vitest 5; the `catalogs.vitest5`
   # note below says which workspaces stay here and why.
   '@vitest/coverage-v8': 4.1.12

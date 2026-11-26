@@ -9,7 +9,7 @@ import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCredit
 import type { AddCreditRequest } from '@/types/admin';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
-import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
+import { credit_transactions, kilocode_users, type User } from '@kilocode/db/schema';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { lockCreditOwners, retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
@@ -30,7 +30,22 @@ import {
 export const POST = auditedAdminRoute(
   { kind: 'handler', actions: ['user.credit.grant', 'user.credit.debit'] },
   async (request: NextRequest): Promise<NextResponse<{ error: string } | { message: string }>> => {
-    const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+    // One body read and one recipient lookup per request, shared by the proof
+    // binding and the handler, so the proof names the account this request credits.
+    let recipientLookup: Promise<RecipientLookup> | null = null;
+    const lookupRecipient = () => (recipientLookup ??= readRecipient(request));
+    const { user: operator, authFailedResponse } = await getUserFromAuth({
+      adminOnly: true,
+      // Runs after the role, network and session checks and before the proof.
+      // A caller without credit management names no recipient, so it cannot
+      // learn whether an email resolves; an unknown recipient names none either,
+      // and the handler refuses both below without writing.
+      requestTarget: async currentUser => {
+        if (!userCanManageCredits(currentUser)) return { kind: 'user', id: null };
+        const { recipient } = await lookupRecipient();
+        return { kind: 'user', id: recipient?.id ?? null };
+      },
+    });
     if (authFailedResponse) return authFailedResponse;
     setAdminAuditActor(operator);
     if (!userCanManageCredits(operator)) {
@@ -38,7 +53,9 @@ export const POST = auditedAdminRoute(
     }
 
     const auditContext = adminActionContextFromHeaders(operator, request.headers);
-    const requestData = (await request.json()) as AddCreditRequest;
+    const lookup = await lookupRecipient();
+    if (!lookup.ok) throw lookup.error;
+    const requestData = lookup.requestData;
     const force200 = request.nextUrl.searchParams.get('force_200_response') === 'true';
     const auditAction =
       (requestData.amount_usd ?? requestData.creditAmount ?? 0) < 0
@@ -67,10 +84,7 @@ export const POST = auditedAdminRoute(
       return warnAndCreateErrorResponse('Invalid email parameter');
     }
 
-    const user = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.google_user_email, email),
-    });
-
+    const user = lookup.recipient;
     if (!user) return warnAndCreateErrorResponse(`User with email ${email} not found in database`);
     auditTarget = userActionTarget(user.id);
     setAdminAuditTarget(auditTarget);
@@ -240,3 +254,27 @@ export const POST = auditedAdminRoute(
     });
   }
 );
+
+type RecipientLookup =
+  | { ok: true; requestData: AddCreditRequest; recipient: User | undefined }
+  | { ok: false; error: unknown; recipient: undefined };
+
+/**
+ * Read the body and the account it names. An unreadable body is kept, not
+ * thrown, so the proof binding never turns it into STEP_UP_UNAVAILABLE; the
+ * handler rethrows it after admission as before.
+ */
+async function readRecipient(request: NextRequest): Promise<RecipientLookup> {
+  let requestData: AddCreditRequest;
+  try {
+    requestData = (await request.json()) as AddCreditRequest;
+  } catch (error) {
+    return { ok: false, error, recipient: undefined };
+  }
+  const email: unknown = (requestData as Partial<AddCreditRequest> | null)?.email;
+  if (typeof email !== 'string') return { ok: true, requestData, recipient: undefined };
+  const recipient = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.google_user_email, email),
+  });
+  return { ok: true, requestData, recipient };
+}

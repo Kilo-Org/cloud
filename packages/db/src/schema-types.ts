@@ -1168,6 +1168,7 @@ export const AdminActionAuditAction = z.enum([
   'security_advisor.content.upsert',
   'security_advisor.content.delete',
   'organization.bitbucket.code_review.trigger',
+  'code_index.delete_before_date',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -2179,6 +2180,32 @@ export type BYOKApiKeyEnvelope = {
  * random id the data key is bound to; copies of a custom LLM share the envelope.
  */
 export type CustomLlmCredentialsEnvelope = BYOKApiKeyEnvelope & {
+  key_id: string;
+};
+
+/**
+ * A credential encrypted through the BYOK KMS service.
+ *
+ * @deprecated `legacy_digest` only keeps a rollback to the dual-write release working: that
+ * release reads an envelope only while its digest matches the obsolete static-key column.
+ * Current code writes the digest of the placeholder it stores in that column and never
+ * reads it. Remove it together with the obsolete columns.
+ */
+export type KmsCredentialEnvelope = BYOKApiKeyEnvelope & {
+  legacy_digest: string;
+};
+
+/**
+ * A Coding Plan inventory credential's KMS envelope. Its data key is bound to the
+ * inventory row id, so it does not record a key id of its own.
+ */
+export type CodingPlanInventoryCredentialEnvelope = KmsCredentialEnvelope;
+
+/**
+ * A ChatGPT connection payload's KMS envelope. `key_id` is the random id its data key is
+ * bound to; a reconnect upserts the row, so the row id is not known before the write.
+ */
+export type OpenAiChatGptConnectionEnvelope = KmsCredentialEnvelope & {
   key_id: string;
 };
 

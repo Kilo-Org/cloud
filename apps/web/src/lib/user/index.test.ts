@@ -184,6 +184,7 @@ import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 import { recordSignInContext } from '@/lib/auth/sign-in-context';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
+import { sealedOpenAiChatGptConnectionColumns } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
 import {
   insertTestUser,
@@ -307,6 +308,20 @@ async function linkNoticeKeys(userId: string) {
       )
     );
   return rows.map(row => row.key).filter(key => key?.startsWith('sign_in_method_linked:'));
+}
+
+/** The payload columns of a stored ChatGPT connection, sealed as the writers do. */
+function chatGptConnectionColumns(accessToken: string) {
+  return sealedOpenAiChatGptConnectionColumns({
+    access_token: accessToken,
+    refresh_token: `refresh-${accessToken}`,
+    expires_at: 1_800_000_000,
+    issuer: 'https://auth.openai.com',
+    client_id: 'client-id',
+    subject: 'subject-1',
+    connected_at: '2026-09-16T00:00:00.000Z',
+    status: 'connected',
+  });
 }
 
 describe('User', () => {
@@ -2783,20 +2798,17 @@ describe('User', () => {
         user.id,
         0
       );
-      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
-      const encrypted_connection = encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY);
       await db.insert(openai_chatgpt_connections).values([
         {
           kilo_user_id: user.id,
           organization_id: null,
-          encrypted_connection,
+          ...chatGptConnectionColumns('token'),
           created_by: user.id,
         },
         {
           kilo_user_id: user.id,
           organization_id: organization.id,
-          encrypted_connection,
+          ...chatGptConnectionColumns('token'),
           created_by: user.id,
         },
       ]);
@@ -2916,13 +2928,11 @@ describe('User', () => {
         connector.id,
         0
       );
-      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: connector.id,
         organization_id: organization.id,
         is_shared_services: true,
-        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        ...chatGptConnectionColumns('token'),
         created_by: connector.id,
       });
 
@@ -8328,17 +8338,17 @@ describe('User', () => {
     });
 
     it('should terminate managed Coding Plan access and anonymize inventory on soft delete', async () => {
-      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
+      const { sealedInventoryColumnsWithStaticKeyCopy } =
+        await import('@/tests/helpers/coding-plan-inventory.helper');
       const user = await insertTestUser();
-      const encrypted = encryptApiKey('test-key-for-gdpr', BYOK_ENCRYPTION_KEY);
       const [inventoryKey] = await db
         .insert(coding_plan_key_inventory)
         .values({
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
           upstream_plan_id: 'minimax-gdpr-plan',
-          encrypted_api_key: encrypted,
+          // A static-key copy written before the KMS migration must be removed too.
+          ...sealedInventoryColumnsWithStaticKeyCopy('test-key-for-gdpr', 'static-key-for-gdpr'),
           credential_fingerprint: `gdpr-${randomUUID()}`,
           status: 'assigned',
           assigned_to_user_id: user.id,
@@ -8388,6 +8398,7 @@ describe('User', () => {
       expect(retainedInventory.status).toBe('revocation_pending');
       expect(retainedInventory.upstream_plan_id).toBe('minimax-gdpr-plan');
       expect(retainedInventory.encrypted_api_key).toBeNull();
+      expect(retainedInventory.encrypted_api_key_envelope).toBeNull();
       expect(retainedInventory.assigned_to_user_id).toBeNull();
       expect(retainedInventory.revocation_requested_at).not.toBeNull();
 
@@ -8904,23 +8915,19 @@ describe('User', () => {
     }
 
     async function seedOpenAiConnection(userId: string) {
-      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: userId,
         organization_id: null,
-        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        ...chatGptConnectionColumns('token'),
         created_by: userId,
       });
     }
 
     async function seedOpenAiOrganizationConnection(organizationId: string, createdBy: string) {
-      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: createdBy,
         organization_id: organizationId,
-        encrypted_connection: encryptApiKey('{"access_token":"org-token"}', BYOK_ENCRYPTION_KEY),
+        ...chatGptConnectionColumns('org-token'),
         created_by: createdBy,
       });
     }

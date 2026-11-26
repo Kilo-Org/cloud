@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { organizations, stripe_early_fraud_warning_cases, type User } from '@kilocode/db/schema';
 import {
@@ -29,7 +29,7 @@ beforeEach(async () => {
 
 describe('admin early fraud warnings list', () => {
   it('rejects non-admin users', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.earlyFraudWarnings.list({ page: 1, limit: 25 })
@@ -75,7 +75,7 @@ describe('admin early fraud warnings list', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.earlyFraudWarnings.list({ page: 1, limit: 25 });
 
     expect(result.pagination).toEqual({ page: 1, limit: 25, total: 2, totalPages: 1 });
@@ -133,7 +133,7 @@ describe('admin early fraud warnings list', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const firstPage = await caller.admin.earlyFraudWarnings.list({ page: 1, limit: 1 });
     const secondPage = await caller.admin.earlyFraudWarnings.list({ page: 2, limit: 1 });
     const thirdPage = await caller.admin.earlyFraudWarnings.list({ page: 3, limit: 1 });

@@ -23,13 +23,8 @@ import {
 import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platforms/bitbucket/repository-cache';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import {
-  addAdminAuditMetadata,
-  adminActionContextFromHeaders,
-  runElevatedOrganizationWrite,
-  setAdminAuditOutcome,
-} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { User } from '@kilocode/db/schema';
 
 type CallbackState = { owner: string; returnTo?: string };
 type CallbackPhase =
@@ -38,13 +33,7 @@ type CallbackPhase =
   | 'token_exchange'
   | 'provider_profile'
   | 'store_integration';
-type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
-/**
- * Redirects with the callback's result, and names it as the outcome an elevated
- * organization write records: a `returnTo` with its own query or fragment keeps
- * the redirect target from saying it reliably.
- */
 function redirectWithStatus(
   state: CallbackState | null,
   key: 'success' | 'error',
@@ -58,18 +47,17 @@ function redirectWithStatus(
   const path = state?.returnTo
     ? appendIntegrationOAuthRedirectQuery(state.returnTo, `${key}=${encodeURIComponent(value)}`)
     : `${defaultPath}?${key}=${encodeURIComponent(value)}`;
-  setAdminAuditOutcome(
-    key === 'success' ? { outcome: 'success' } : { outcome: 'failure', errorCode: value }
-  );
   return NextResponse.redirect(new URL(path, APP_URL));
 }
 
-async function authorizeOwner(owner: Owner, user: AuthenticatedOAuthUser): Promise<void> {
+// Storing an organization credential is membership-only: OAuth state and staff
+// grants never stand in for an owner or billing membership.
+async function authorizeOwner(owner: Owner, user: User): Promise<void> {
   if (owner.type === 'user') {
     if (owner.id !== user.id) throw new Error('OAuth owner mismatch');
     return;
   }
-  await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
+  await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_BILLING_ROLES);
 }
 
 export async function handleBitbucketOAuthCallback(request: NextRequest): Promise<Response> {
@@ -111,61 +99,44 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
       return redirectWithStatus(verifiedState, 'error', 'unauthorized');
     }
 
-    const connect = async () => {
-      if (searchParams.get('error')) {
-        return redirectWithStatus(verifiedState, 'error', 'authorization_cancelled');
-      }
+    if (searchParams.get('error')) {
+      return redirectWithStatus(verifiedState, 'error', 'authorization_cancelled');
+    }
 
-      const code = validOAuthCode(searchParams.get('code'));
-      if (!code) {
-        return redirectWithStatus(verifiedState, 'error', 'missing_code');
-      }
+    const code = validOAuthCode(searchParams.get('code'));
+    if (!code) {
+      return redirectWithStatus(verifiedState, 'error', 'missing_code');
+    }
 
-      callbackPhase = 'token_exchange';
-      const tokens = await exchangeBitbucketOAuthCode(code);
-      callbackPhase = 'provider_profile';
-      const [bitbucketUser, availableWorkspaces] = await Promise.all([
-        fetchBitbucketUser(tokens.accessToken),
-        fetchBitbucketWorkspaces(tokens.accessToken),
-      ]);
-      if (availableWorkspaces.length === 0) {
-        return redirectWithStatus(verifiedState, 'error', 'no_workspaces');
-      }
+    callbackPhase = 'token_exchange';
+    const tokens = await exchangeBitbucketOAuthCode(code);
+    callbackPhase = 'provider_profile';
+    const [bitbucketUser, availableWorkspaces] = await Promise.all([
+      fetchBitbucketUser(tokens.accessToken),
+      fetchBitbucketWorkspaces(tokens.accessToken),
+    ]);
+    if (availableWorkspaces.length === 0) {
+      return redirectWithStatus(verifiedState, 'error', 'no_workspaces');
+    }
 
-      callbackPhase = 'store_integration';
-      const storedIntegration = await storeBitbucketIntegration({
+    callbackPhase = 'store_integration';
+    const storedIntegration = await storeBitbucketIntegration({
+      owner,
+      authorizedByUserId: user.id,
+      bitbucketUser,
+      tokens,
+      availableWorkspaces,
+    });
+
+    if (storedIntegration.status === 'connected') {
+      scheduleBitbucketRepositoryCachePrime({
         owner,
-        authorizedByUserId: user.id,
-        bitbucketUser,
-        tokens,
-        availableWorkspaces,
+        kiloUserId: user.id,
+        integrationId: storedIntegration.integrationId,
       });
-      addAdminAuditMetadata({ integrationId: storedIntegration.integrationId });
+    }
 
-      if (storedIntegration.status === 'connected') {
-        scheduleBitbucketRepositoryCachePrime({
-          owner,
-          kiloUserId: user.id,
-          integrationId: storedIntegration.integrationId,
-        });
-      }
-
-      return redirectWithStatus(verifiedState, 'success', storedIntegration.status);
-    };
-
-    if (owner.type !== 'org') return await connect();
-    return await runElevatedOrganizationWrite(
-      adminActionContextFromHeaders(user, request.headers),
-      {
-        organizationId: owner.id,
-        requiredRoles: ORGANIZATION_BILLING_ROLES,
-        membershipScope: 'direct',
-        action: 'organization.bitbucket.update',
-        message: 'Bitbucket: OAuth connection created',
-        metadata: { operation: 'oauth_connect' },
-      },
-      connect
-    );
+    return redirectWithStatus(verifiedState, 'success', storedIntegration.status);
   } catch (error) {
     if (error instanceof BitbucketIntegrationAuthorizationError) {
       return redirectWithStatus(verifiedState, 'error', 'unauthorized');

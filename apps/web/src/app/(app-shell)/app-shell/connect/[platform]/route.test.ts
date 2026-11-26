@@ -9,7 +9,7 @@ import { shellUser } from '@/tests/helpers/shell-user.helper';
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({ findUserById: jest.fn() }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware', () => ({
   requireActiveSubscriptionOrTrial: jest.fn(),

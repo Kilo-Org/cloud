@@ -21,7 +21,10 @@
   },
   "dependencies": {
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
+    "@kilocode/verify": "workspace:*",
     "@kilocode/worker-utils": "workspace:*"
   }
 }

@@ -554,6 +554,128 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     });
   });
 
+  it('serves a reusable stored token under an invalid issuer mode but never mints under it', async () => {
+    const secret = 'test-nextauth-secret';
+    const sessionId = newSessionId();
+    const stub = sessions.getByName(sessionId);
+    await runInDurableObject(stub, instance => {
+      instance.env.NEXTAUTH_SECRET = secret;
+      instance.env.WORKER_URL = WORKER_URL;
+      instance.sandboxPeerFor = () => new FakeSandboxPeer();
+    });
+    const admission = await stub.createSessionWithInitialAdmission({
+      metadata: metadata({
+        sessionId,
+        kiloSessionId: kiloSessionId(),
+        sandboxId: await generateSandboxId(sessionId),
+        kiloToken: runtimeAuthorizedKiloToken(),
+      }),
+      message: promptPayload(messageId()),
+      sandboxSelection: { provider: 'cloudflare-containers' },
+      runtimeAuthorizationSeal: await sealFor(sessionId, secret),
+    });
+    expect(admission.success).toBe(true);
+
+    const unsigned = (claims: Record<string, unknown>) =>
+      `${b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }))}.${b64url(JSON.stringify(claims))}.sig`;
+    const storeTokens = (expiresInMs: number, combined = false) =>
+      runInDurableObject(stub, async (instance, state) => {
+        const authorization = await state.storage.get<{ id: string }>('runtime_authorization');
+        const stored = await instance.getMetadata();
+        if (!authorization || !stored) throw new Error('Missing runtime authorization fixture');
+        const exp = Math.floor((Date.now() + expiresInMs) / 1000);
+        const token = (aud: string | string[]) =>
+          unsigned({ aud, exp, runtimeAuthorization: { id: authorization.id } });
+        const combinedToken = token(['kilo-api', 'kilo-gateway', 'session-ingest']);
+        const runtimeTokens = combined
+          ? {
+              'kilo-api': combinedToken,
+              'kilo-gateway': combinedToken,
+              'session-ingest': combinedToken,
+            }
+          : {
+              'kilo-api': token('kilo-api'),
+              'kilo-gateway': token('kilo-gateway'),
+              'session-ingest': token('session-ingest'),
+            };
+        const updated = {
+          ...stored,
+          auth: {
+            ...stored.auth,
+            kilocodeToken: runtimeTokens['kilo-api'],
+            runtimeTokens: combined ? undefined : runtimeTokens,
+          },
+        };
+        await state.storage.put('session_metadata', updated);
+        Object.assign(instance, { metadata: updated });
+        return runtimeTokens;
+      });
+    const setMode = (value: string) =>
+      runInDurableObject(stub, instance => {
+        Object.assign(instance.env, { RUNTIME_TOKEN_AUDIENCE_MODE: value });
+      });
+    const configured = await runInDurableObject(stub, instance =>
+      Reflect.get(instance.env, 'RUNTIME_TOKEN_AUDIENCE_MODE')
+    );
+
+    const reusable = await storeTokens(30 * 60_000);
+    try {
+      await setMode('per-destinaton');
+      await runInDurableObject(stub, async instance => {
+        for (const destination of ['kilo-api', 'kilo-gateway', 'session-ingest'] as const) {
+          await expect(instance.getRuntimeToken(destination)).resolves.toBe(reusable[destination]);
+        }
+        // A caller without a destination never gets a split token, under any mode.
+        await expect(instance.getRuntimeToken()).rejects.toThrow(/per-destination/);
+      });
+      await setMode('per-destination');
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getRuntimeToken()).rejects.toThrow(
+          'Runtime token destination required'
+        );
+      });
+
+      const due = await storeTokens(60_000);
+      await setMode('per-destinaton');
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getRuntimeToken('kilo-gateway')).rejects.toThrow(/per-destination/);
+        expect((await instance.getMetadata())?.auth.runtimeTokens).toEqual(due);
+      });
+      await expect(stub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
+        state: 'active',
+      });
+
+      // A reusable combined token goes to a caller without a destination only
+      // in combined mode; an explicit destination still gets it in any mode.
+      const combined = await storeTokens(30 * 60_000, true);
+      await setMode('per-destinaton');
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getRuntimeToken('kilo-gateway')).resolves.toBe(
+          combined['kilo-gateway']
+        );
+        await expect(instance.getRuntimeToken()).rejects.toThrow(/per-destination/);
+      });
+      await setMode('per-destination');
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getRuntimeToken()).rejects.toThrow(
+          'Runtime token destination required'
+        );
+      });
+      await setMode('combined');
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getRuntimeToken()).resolves.toBe(combined['kilo-api']);
+      });
+    } finally {
+      await runInDurableObject(stub, instance => {
+        if (configured === undefined) {
+          Reflect.deleteProperty(instance.env, 'RUNTIME_TOKEN_AUDIENCE_MODE');
+        } else {
+          Object.assign(instance.env, { RUNTIME_TOKEN_AUDIENCE_MODE: configured });
+        }
+      });
+    }
+  });
+
   it('rejects invalid modern proxy configuration without installing session or authorization state', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);

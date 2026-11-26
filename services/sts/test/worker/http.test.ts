@@ -63,6 +63,23 @@ describe('bundle HTTP route', () => {
     expect(await response.json()).toEqual({ status: 'denied', reason: 'unknown_workload' });
   });
 
+  it('recognizes a Vercel team slug issuer that no policy names and refuses the team id form', async () => {
+    // `kilocode` is named by the web policy, so the slug here is one no policy names.
+    for (const [team, status, reason] of [
+      ['acme', 403, 'unknown_workload'],
+      ['team_ItxRShuUkJaEd9GmXMEEgunb', 401, 'identity_rejected'],
+    ] as const) {
+      const response = await SELF.fetch(`${config.issuer}/v1/bundle`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${unsignedToken({ iss: `https://oidc.vercel.com/${team}`, aud: config.issuer })}`,
+        },
+      });
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual({ status: 'denied', reason });
+    }
+  });
+
   it('sends the stale flag and fetchedAt as headers on a 304', async () => {
     const fetchedAt = new Date().toISOString();
     const response = bundleResponse({ status: 'not_modified', etag: ETAG, stale: true, fetchedAt });

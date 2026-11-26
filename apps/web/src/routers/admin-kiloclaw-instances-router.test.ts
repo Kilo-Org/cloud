@@ -1,4 +1,4 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -197,7 +197,7 @@ afterEach(async () => {
 
 describe('admin.kiloclawInstances.listKiloCliRuns', () => {
   it('returns all runs for a user when instanceId is omitted', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.listKiloCliRuns({
       userId: cliRunUser.id,
     });
@@ -226,7 +226,7 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
       .returning({ id: kiloclaw_cli_runs.id });
 
     try {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       // Without instanceId — returns both
       const allResult = await caller.admin.kiloclawInstances.listKiloCliRuns({
@@ -260,7 +260,7 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
 
 describe('admin.kiloclawInstances.list and stats', () => {
   it('separates inactive trial stopped instances from active instances', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const baselineStats = await caller.admin.kiloclawInstances.stats({ days: 7 });
 
     const [activeInstance, inactiveTrialStoppedInstance] = await db
@@ -344,7 +344,7 @@ describe('admin.kiloclawInstances.fileTree', () => {
       sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.kiloclawInstances.fileTree({
       userId: regularUser.id,
       instanceId,
@@ -377,7 +377,7 @@ describe('admin.kiloclawInstances.machineStart', () => {
       status: 'trialing',
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.machineStart({
       userId: regularUser.id,
       instanceId: instance.id,
@@ -421,7 +421,7 @@ describe('admin.kiloclawInstances.machineStart', () => {
       status: 'trialing',
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.machineStart({
       userId: regularUser.id,
       instanceId: instance.id,
@@ -446,7 +446,7 @@ describe('admin.kiloclawInstances.machineStart', () => {
 
 describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyFlyMachine({
         userId: testUserId,
@@ -462,7 +462,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     mockGetDebugStatus.mockResolvedValue(flyDebugStatus());
     mockDestroyFlyMachine.mockResolvedValue({ ok: true });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.destroyFlyMachine({
       userId: testUserId,
       appName: testAppName,
@@ -482,7 +482,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   it('throws BAD_REQUEST when appName does not match DO state', async () => {
     mockGetDebugStatus.mockResolvedValue(flyDebugStatus({ flyAppName: 'acct-different' }));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyFlyMachine({
         userId: testUserId,
@@ -497,7 +497,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   it('throws BAD_REQUEST when machineId does not match DO state', async () => {
     mockGetDebugStatus.mockResolvedValue(flyDebugStatus({ flyMachineId: 'differentmachineid' }));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyFlyMachine({
         userId: testUserId,
@@ -513,7 +513,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     mockGetDebugStatus.mockResolvedValue(flyDebugStatus());
     mockDestroyFlyMachine.mockResolvedValue({ ok: true });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.kiloclawInstances.destroyFlyMachine({
       userId: testUserId,
       appName: testAppName,
@@ -542,7 +542,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     mockGetDebugStatus.mockResolvedValue(flyDebugStatus());
     mockDestroyFlyMachine.mockRejectedValue(new Error('Fly API timeout'));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyFlyMachine({
         userId: testUserId,
@@ -563,7 +563,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
       new KiloClawApiError(404, JSON.stringify({ error: 'machine not found' }))
     );
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyFlyMachine({
         userId: testUserId,
@@ -574,7 +574,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 
   it('rejects invalid appName format', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyFlyMachine({
         userId: testUserId,
@@ -587,7 +587,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 
   it('rejects invalid machineId format', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyFlyMachine({
         userId: testUserId,
@@ -624,7 +624,7 @@ describe('admin.kiloclawInstances.extendVolume', () => {
     });
 
     try {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.extendVolume({
           userId: otherUser.id,
@@ -665,7 +665,7 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
     });
 
     try {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.startKiloCliRun({
           userId: otherUser.id,
@@ -689,7 +689,7 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
       .set({ destroyed_at: '2026-04-08T12:02:00.000Z' })
       .where(eq(kiloclaw_instances.id, cliRunInstanceId));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     try {
       await caller.admin.kiloclawInstances.startKiloCliRun({
         userId: cliRunUser.id,
@@ -722,7 +722,7 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
       )
     );
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     try {
       await caller.admin.kiloclawInstances.startKiloCliRun({
         userId: cliRunUser.id,
@@ -753,7 +753,7 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
       )
     );
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.startKiloCliRun({
         userId: cliRunUser.id,
@@ -787,7 +787,7 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
       status: 'running',
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.startKiloCliRun({
       userId: cliRunUser.id,
       instanceId: cliRunInstanceId,
@@ -846,7 +846,7 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
 
     mockStartKiloCliRun.mockRejectedValue(new KiloClawApiError(409, ''));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.startKiloCliRun({
         userId: cliRunUser.id,
@@ -872,7 +872,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
       prompt: 'newer admin run',
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.getKiloCliRunStatus({
       userId: cliRunUser.id,
       instanceId: cliRunInstanceId,
@@ -904,7 +904,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
       prompt: null,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.getKiloCliRunStatus({
       userId: cliRunUser.id,
       instanceId: cliRunInstanceId,
@@ -926,7 +926,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
   });
 
   it('lists the initiating admin email for admin-started runs', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.listAllCliRuns({
       offset: 0,
       limit: 10,
@@ -942,7 +942,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
   });
 
   it('returns the instance_id on each run', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.listAllCliRuns({
       offset: 0,
       limit: 10,
@@ -955,7 +955,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
   });
 
   it('finds runs when searching by full instance_id', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.listAllCliRuns({
       offset: 0,
       limit: 10,
@@ -968,7 +968,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
   });
 
   it('finds runs when searching by a substring of the instance_id', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const fragment = cliRunInstanceId.slice(0, 8);
     const result = await caller.admin.kiloclawInstances.listAllCliRuns({
       offset: 0,
@@ -982,7 +982,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
   });
 
   it('returns no runs when searching by an instance_id that does not match', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.listAllCliRuns({
       offset: 0,
       limit: 10,
@@ -1022,7 +1022,7 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
       .returning({ id: kiloclaw_cli_runs.id });
 
     try {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       // Without instanceId — returns runs from both instances
       const allRuns = await caller.admin.kiloclawInstances.listKiloCliRuns({
@@ -1057,7 +1057,7 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
 describe('admin.kiloclawInstances inbound email controls', () => {
   it('cycles the active alias and writes an audit log', async () => {
     const { instanceId, alias } = await insertInboundEmailInstance();
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.admin.kiloclawInstances.cycleInboundEmailAddress({
       id: instanceId,
@@ -1089,7 +1089,7 @@ describe('admin.kiloclawInstances inbound email controls', () => {
 
   it('disables inbound email and writes an audit log', async () => {
     const { instanceId } = await insertInboundEmailInstance();
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await caller.admin.kiloclawInstances.setInboundEmailEnabled({ id: instanceId, enabled: false });
 
@@ -1127,7 +1127,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
   }
 
   it('throws before calling the controller when the scoped CLI run row does not exist', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.kiloclawInstances.cancelKiloCliRun({
@@ -1142,7 +1142,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
   });
 
   it('falls back to the run row when an explicit instance is missing', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const missingInstanceId = crypto.randomUUID();
     mockGetKiloCliRunStatus.mockResolvedValue({
       hasRun: true,
@@ -1184,7 +1184,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
       })
       .returning({ id: kiloclaw_instances.id });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     try {
       await expect(
@@ -1213,7 +1213,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
       })
       .where(eq(kiloclaw_cli_runs.id, cliRunId));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.cancelKiloCliRun({
         userId: cliRunUser.id,
@@ -1238,7 +1238,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
     });
     mockCancelKiloCliRun.mockResolvedValue({ ok: false });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.cancelKiloCliRun({
         userId: cliRunUser.id,
@@ -1262,7 +1262,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
     });
     mockCancelKiloCliRun.mockResolvedValue({ ok: true });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.cancelKiloCliRun({
         userId: cliRunUser.id,
@@ -1328,7 +1328,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
       });
       mockCancelKiloCliRun.mockResolvedValue({ ok: true });
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.cancelKiloCliRun({
           userId: cliRunUser.id,
@@ -1421,7 +1421,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
   });
 
   it('throws FORBIDDEN for non-admin callers', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(
       caller.admin.kiloclawInstances.restartMachine({
         instanceId: testInstanceId,
@@ -1439,7 +1439,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
       pinned_by: regularUser.id,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.restartMachine({
       instanceId: testInstanceId,
     });
@@ -1456,7 +1456,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
   });
 
   it('version change with no pin succeeds without acknowledgeOverride', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.restartMachine({
       instanceId: testInstanceId,
       imageTag: newerTag,
@@ -1476,7 +1476,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
       pinned_by: regularUser.id,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.restartMachine({
         instanceId: testInstanceId,
@@ -1505,7 +1505,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
       pinned_by: adminUser.id,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.restartMachine({
         instanceId: testInstanceId,
@@ -1526,7 +1526,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
       pinned_by: regularUser.id,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.restartMachine({
       instanceId: testInstanceId,
       imageTag: newerTag,
@@ -1554,7 +1554,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
       pinned_by: adminUser.id,
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.restartMachine({
       instanceId: testInstanceId,
       imageTag: newerTag,
@@ -1573,7 +1573,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
 
   it('is direction-agnostic — older imageTag works the same as newer', async () => {
     // No pin: admin can switch to an older tag without override.
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.restartMachine({
       instanceId: testInstanceId,
       imageTag: olderTag,
@@ -1587,7 +1587,7 @@ describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
   });
 
   it('NOT_FOUND when instance does not exist', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.restartMachine({
         instanceId: crypto.randomUUID(),
@@ -1688,7 +1688,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('throws FORBIDDEN for non-admin callers', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(
       caller.admin.kiloclawInstances.bulkChangeVersion({
         instanceIds: [unpinnedId],
@@ -1700,7 +1700,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('Zod rejects empty instanceIds', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.bulkChangeVersion({
         instanceIds: [],
@@ -1712,7 +1712,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('Zod rejects more than 500 instanceIds', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const tooMany = Array.from({ length: 501 }, () => crypto.randomUUID());
     await expect(
       caller.admin.kiloclawInstances.bulkChangeVersion({
@@ -1723,7 +1723,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('Zod rejects malformed imageTag', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.bulkChangeVersion({
         instanceIds: [unpinnedId],
@@ -1735,7 +1735,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('BAD_REQUEST when target tag is not in catalog', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.bulkChangeVersion({
         instanceIds: [unpinnedId],
@@ -1747,7 +1747,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('BAD_REQUEST when target tag is disabled', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.bulkChangeVersion({
         instanceIds: [unpinnedId],
@@ -1759,7 +1759,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('partitions a mixed batch correctly with overridePins=false', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
       instanceIds: [unpinnedId, userPinnedId, adminPinnedId, destroyedId, alreadyOnTargetId],
       imageTag: newerTag,
@@ -1793,7 +1793,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('overridePins=true shifts user-pinned and admin-pinned into applied', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
       instanceIds: [unpinnedId, userPinnedId, adminPinnedId, destroyedId, alreadyOnTargetId],
       imageTag: newerTag,
@@ -1831,7 +1831,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValue({ success: true, message: 'restarting' });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
       instanceIds: [unpinnedId, userPinnedId, adminPinnedId],
       imageTag: newerTag,
@@ -1850,7 +1850,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
 
   it('returns failed:not_found for instanceIds that do not exist', async () => {
     const ghostId = crypto.randomUUID();
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
       instanceIds: [unpinnedId, ghostId],
       imageTag: newerTag,
@@ -1862,7 +1862,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('plain happy path with a single unpinned instance', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.bulkChangeVersion({
       instanceIds: [unpinnedId],
       imageTag: newerTag,
@@ -1876,7 +1876,7 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
   });
 
   it('writes an admin audit log capturing the bulk action', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await caller.admin.kiloclawInstances.bulkChangeVersion({
       instanceIds: [unpinnedId, userPinnedId],
       imageTag: newerTag,
@@ -2013,7 +2013,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
 
   describe('scheduleAction', () => {
     it('throws FORBIDDEN for non-admin callers', async () => {
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createSessionCallerForUser(regularUser.id);
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
@@ -2024,7 +2024,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('rejects scheduledAt within 1 minute of now', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
@@ -2039,7 +2039,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('rejects unknown instanceId with NOT_FOUND', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
@@ -2056,7 +2056,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         .set({ destroyed_at: new Date().toISOString() })
         .where(eq(kiloclaw_instances.id, testInstanceId));
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
@@ -2068,7 +2068,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
 
     it('happy path creates parent + stage + target rows and writes audit log', async () => {
       const scheduledAt = new Date(Date.now() + 60 * 60_000).toISOString();
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId],
@@ -2134,7 +2134,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         })
         .returning({ id: kiloclaw_instances.id });
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId, secondInstance.id],
@@ -2176,7 +2176,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         })
         .returning({ id: kiloclaw_instances.id });
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId, destroyedInstance.id],
@@ -2226,7 +2226,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         })
         .returning({ id: kiloclaw_instances.id });
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
@@ -2240,7 +2240,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('rejects with CONFLICT when an instance already has a pending scheduled action', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       // First schedule succeeds.
       await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
@@ -2262,7 +2262,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('dedupes duplicate instanceIds in the input', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId, testInstanceId, testInstanceId],
@@ -2333,7 +2333,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       });
 
       it('happy path stamps target_image_tag + override_pins on parent and target', async () => {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         const result = await caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'version_change',
           instanceIds: [testInstanceId],
@@ -2377,7 +2377,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       });
 
       it('rejects unknown imageTag with BAD_REQUEST', async () => {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.admin.kiloclawInstances.scheduleAction({
             actionType: 'version_change',
@@ -2392,7 +2392,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       });
 
       it('rejects disabled imageTag with BAD_REQUEST', async () => {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.admin.kiloclawInstances.scheduleAction({
             actionType: 'version_change',
@@ -2407,7 +2407,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       });
 
       it('Zod rejects malformed imageTag (regex)', async () => {
-        const caller = await createCallerForUser(adminUser.id);
+        const caller = await createSessionCallerForUser(adminUser.id);
         await expect(
           caller.admin.kiloclawInstances.scheduleAction({
             actionType: 'version_change',
@@ -2424,21 +2424,21 @@ describe('admin.kiloclawInstances scheduled actions', () => {
 
   describe('listScheduledActions / getScheduledAction', () => {
     it('throws FORBIDDEN for non-admin callers (listScheduledActions)', async () => {
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createSessionCallerForUser(regularUser.id);
       await expect(caller.admin.kiloclawInstances.listScheduledActions({})).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
     });
 
     it('throws FORBIDDEN for non-admin callers (getScheduledAction)', async () => {
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createSessionCallerForUser(regularUser.id);
       await expect(
         caller.admin.kiloclawInstances.getScheduledAction({ id: crypto.randomUUID() })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
     it('lists scheduled actions and getScheduledAction returns parent + stages + targets', async () => {
-      const adminCaller = await createCallerForUser(adminUser.id);
+      const adminCaller = await createSessionCallerForUser(adminUser.id);
       const created = await adminCaller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId],
@@ -2462,7 +2462,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
   describe('fleet upgrade', () => {
     it('throws FORBIDDEN for non-admin preview callers', async () => {
       const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.10' });
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createSessionCallerForUser(regularUser.id);
 
       await expect(
         caller.admin.kiloclawInstances.previewFleetUpgrade({
@@ -2491,7 +2491,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       await insertFleetInstance({ trackedImageTag: unknownTag });
       await insertFleetInstance({ trackedImageTag: null });
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [conflictId],
@@ -2532,7 +2532,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       );
       const startsAt = new Date(Date.now() + 120 * 60_000).toISOString();
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.createFleetUpgrade({
         versionBelow: '2026.2.10',
         targetImageTag: targetTag,
@@ -2641,7 +2641,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       const oldTag = await insertFleetCatalogEntry({ openclawVersion: '2026.2.1' });
       const targetTag = await insertFleetCatalogEntry({ openclawVersion: '2026.3.1' });
       const instanceId = await insertFleetInstance({ trackedImageTag: oldTag });
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [instanceId],
@@ -2668,21 +2668,21 @@ describe('admin.kiloclawInstances scheduled actions', () => {
 
   describe('cancelScheduledAction', () => {
     it('throws FORBIDDEN for non-admin callers', async () => {
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createSessionCallerForUser(regularUser.id);
       await expect(
         caller.admin.kiloclawInstances.cancelScheduledAction({ id: crypto.randomUUID() })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
     it('throws NOT_FOUND for an unknown id', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.cancelScheduledAction({ id: crypto.randomUUID() })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
     it('cancels a scheduled action and marks pending stages + targets cancelled', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId],
@@ -2728,7 +2728,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('returns no-op when called twice (idempotent)', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId],
@@ -2752,7 +2752,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       // row per default channel (email, webapp) per target. After cancel,
       // those rows must transition to 'failed' so selectDueNotifications
       // never picks them up again.
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId],
@@ -2817,7 +2817,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         })
         .returning({ id: kiloclaw_instances.id });
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId, secondInstance.id],
@@ -2885,7 +2885,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       // separate outcome (e.g. skipped:pinned) that has nothing to do
       // with this cancel. The notification gate must still fire for it
       // — the user never got the announced change.
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId],
@@ -2944,7 +2944,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       // eagerly from that snapshot is wrong: if the target goes on to
       // apply, a "cancelled" notification would be sent for a change
       // that actually happened.
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId],
@@ -3034,7 +3034,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         })
         .returning({ id: kiloclaw_instances.id });
 
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
         instanceIds: [testInstanceId, secondInstance.id],
@@ -3101,7 +3101,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
     });
 
     const destroyedMs = Date.parse(destroyedAt);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const firstBatch = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
       destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
@@ -3180,7 +3180,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
     // A narrow window around this instance's destruction so the result is
     // deterministic regardless of other rows in the test database.
     const destroyedMs = Date.parse(destroyedAt);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
       destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
@@ -3246,7 +3246,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
     });
 
     const destroyedMs = Date.parse(destroyedAt);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
       destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
@@ -3337,7 +3337,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
 
     // Window matches only the OLDER provision's destruction.
     const oldMs = Date.parse(oldDestroyedAt);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: new Date(oldMs - 60_000).toISOString(),
       destroyedBefore: new Date(oldMs + 60_000).toISOString(),
@@ -3403,7 +3403,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
       ],
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: '2026-05-15T10:00:00.000Z',
       destroyedBefore: '2026-05-15T10:15:00.000Z',
@@ -3450,7 +3450,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
       volumes: [],
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: new Date(inWindowDestroyedAt.getTime() - 1_000).toISOString(),
       destroyedBefore: new Date(inWindowDestroyedAt.getTime() + 1_000).toISOString(),
@@ -3501,7 +3501,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
     });
 
     const destroyedMs = Date.parse(destroyedAt);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
       destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
@@ -3535,7 +3535,7 @@ describe('admin.kiloclawInstances.findOrphanVolumes', () => {
     });
 
     const destroyedMs = Date.parse(destroyedAt);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.findOrphanVolumes({
       destroyedAfter: new Date(destroyedMs - 60_000).toISOString(),
       destroyedBefore: new Date(destroyedMs + 60_000).toISOString(),
@@ -3575,7 +3575,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
   }
 
   it('rejects when the instance does not exist', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyOrphanVolume({
         instanceId: crypto.randomUUID(),
@@ -3594,7 +3594,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
         sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
       })
       .returning({ id: kiloclaw_instances.id });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyOrphanVolume({
         instanceId: instance.id,
@@ -3606,7 +3606,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
 
   it('rejects while the instance is within the 7-day grace period', async () => {
     const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(2) });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
@@ -3634,7 +3634,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
       destroyed_at: daysAgo(2),
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyOrphanVolume({
         instanceId: oldInstance.id,
@@ -3669,7 +3669,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
       volumeName: 'kiloclaw_grace',
       alreadyGone: false,
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
       instanceId: instance.id,
@@ -3719,7 +3719,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
         volumeName: 'kiloclaw_scoped',
         alreadyGone: false,
       });
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
         instanceId: targetInstanceId,
@@ -3739,7 +3739,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
       destroyedAt: daysAgo(30),
       subscriptionStatus: 'active',
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -3772,7 +3772,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
       status: 'canceled',
       transferred_to_subscription_id: successorSubscription.id,
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.kiloclawInstances.destroyOrphanVolume({ instanceId, volumeId: VOLUME_ID })
@@ -3789,7 +3789,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
       alreadyGone: false,
     });
     const instanceId = await insertDestroyedInstance({ destroyedAt: daysAgo(30) });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
       instanceId,
@@ -3817,7 +3817,7 @@ describe('admin.kiloclawInstances.destroyOrphanVolume', () => {
       destroyedAt: daysAgo(30),
       subscriptionStatus: 'canceled',
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.admin.kiloclawInstances.destroyOrphanVolume({
       instanceId,

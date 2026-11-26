@@ -2,6 +2,7 @@ import { environmentReferenceSchema } from '../environment-build/reference.js';
 import { hostedGitHubRepositoriesSchema } from './hosted-github-repositories.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { RuntimeTokensSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   cloudAgentWorktreeIdSchema,
@@ -95,7 +96,13 @@ const MetadataIdentitySchema = z
 const MetadataAuthSchema = z
   .object({
     kiloSessionId: z.string().optional(),
+    /**
+     * The session's Kilo credential. For a runtime-authorized session it is the
+     * combined runtime token, or the `kilo-api` token beside `runtimeTokens`.
+     */
     kilocodeToken: z.string().optional(),
+    /** One runtime token per destination; absent while the issuer mints combined tokens. */
+    runtimeTokens: RuntimeTokensSchema.optional(),
   })
   .strip();
 

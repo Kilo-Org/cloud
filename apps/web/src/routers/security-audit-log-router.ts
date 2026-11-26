@@ -20,7 +20,6 @@ import {
 } from 'drizzle-orm';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import {
-  canCallerReadStaffAuditActors,
   logSecurityAudit,
   maskKiloAdminActors,
 } from '@/lib/security-agent/services/audit-log-service';
@@ -117,8 +116,8 @@ export const securityAuditLogRouter = createTRPCRouter({
       resultLogs.reverse();
     }
 
-    const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
-    const maskedLogs = maskKiloAdminActors(resultLogs, callerReadsStaffActors);
+    // An account's own log shows staff actors masked, staff included.
+    const maskedLogs = maskKiloAdminActors(resultLogs, false);
 
     const hasNext = hasMore;
     const hasPrevious = !!after || (!!before && logs.length > 0);
@@ -205,8 +204,7 @@ export const securityAuditLogRouter = createTRPCRouter({
       metadata: { format, rowCount: logs.length, startTime, endTime },
     });
 
-    const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
-    const maskedLogs = maskKiloAdminActors(logs, callerReadsStaffActors);
+    const maskedLogs = maskKiloAdminActors(logs, false);
 
     if (format === 'csv') {
       const header =

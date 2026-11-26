@@ -4,7 +4,7 @@ import {
   addUserToOrganization,
   createOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 let organization: Organization;
@@ -25,27 +25,31 @@ beforeAll(async () => {
 
 describe('getOnboardingChecklist procedure', () => {
   it.each([
-    ['owner', () => owner],
-    ['billing manager', () => billingManager],
-    ['Kilo admin', () => admin],
-  ] as const)('allows an %s to read semantic checklist state', async (_label, getUser) => {
-    const caller = await createCallerForUser(getUser().id);
+    ['owner', () => owner, createCallerForUser],
+    ['billing manager', () => billingManager, createCallerForUser],
+    // Staff authority is admitted only for a browser session.
+    ['Kilo admin', () => admin, createSessionCallerForUser],
+  ] as const)(
+    'allows an %s to read semantic checklist state',
+    async (_label, getUser, createCaller) => {
+      const caller = await createCaller(getUser().id);
 
-    const result = await caller.organizations.getOnboardingChecklist({
-      organizationId: organization.id,
-    });
+      const result = await caller.organizations.getOnboardingChecklist({
+        organizationId: organization.id,
+      });
 
-    expect(result).toEqual({
-      steps: [
-        { key: 'source-control', done: false },
-        { key: 'code-reviewer', done: false },
-        { key: 'invite-team', done: true },
-      ],
-      completedCount: 1,
-      totalCount: 3,
-      connectedPlatform: null,
-    });
-  });
+      expect(result).toEqual({
+        steps: [
+          { key: 'source-control', done: false },
+          { key: 'code-reviewer', done: false },
+          { key: 'invite-team', done: true },
+        ],
+        completedCount: 1,
+        totalCount: 3,
+        connectedPlatform: null,
+      });
+    }
+  );
 
   it('rejects an ordinary organization member', async () => {
     const caller = await createCallerForUser(member.id);

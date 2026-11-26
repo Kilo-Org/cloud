@@ -128,7 +128,7 @@ else
 fi
 
 # ---------- Store content hash of image sources ----------
-# Mirrors the source list used in deploy-kiloclaw.yml and dev-start.sh.
+# Mirrors the source list used in push-dev-kiloclaw.yml and dev-start.sh.
 
 if [ "$USE_LOCAL" = true ]; then
   CONTENT_HASH="$("$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile.local --openclaw-tarball "$LOCAL_OPENCLAW_TARBALL")"

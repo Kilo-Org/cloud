@@ -1,7 +1,7 @@
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationBillingProcedure,
-  organizationBillingMutationProcedure,
+  organizationBillingMemberMutationProcedure,
   OrganizationIdInputSchema,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -87,7 +87,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
     return { enabled: org.auto_top_up_enabled, amountCents, thresholdCents, paymentMethod };
   }),
 
-  toggle: organizationBillingMutationProcedure
+  toggle: organizationBillingMemberMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         currentEnabled: z.boolean(),
@@ -173,7 +173,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       }
     }),
 
-  changePaymentMethod: organizationBillingMutationProcedure
+  changePaymentMethod: organizationBillingMemberMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         amountCents: OrgAutoTopUpAmountCentsSchema.optional(),
@@ -227,7 +227,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       return { redirectUrl };
     }),
 
-  updateAmount: organizationBillingMutationProcedure
+  updateAmount: organizationBillingMemberMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         amountCents: OrgAutoTopUpAmountCentsSchema,
@@ -250,7 +250,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       return successResult();
     }),
 
-  updateThreshold: organizationBillingMutationProcedure
+  updateThreshold: organizationBillingMemberMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         thresholdCents: OrgAutoTopUpThresholdCentsSchema,
@@ -276,7 +276,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       return successResult();
     }),
 
-  removePaymentMethod: organizationBillingMutationProcedure.mutation(async ({ input }) => {
+  removePaymentMethod: organizationBillingMemberMutationProcedure.mutation(async ({ input }) => {
     const { organizationId } = input;
 
     await db

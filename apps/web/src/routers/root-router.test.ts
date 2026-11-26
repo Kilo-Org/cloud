@@ -1,4 +1,4 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { rootRouter } from './root-router';
@@ -83,8 +83,8 @@ describe('trpc tests', () => {
 
   describe('admin permissions', () => {
     it('returns the authenticated admin credit capability', async () => {
-      const adminCaller = await createCallerForUser(adminUser.id);
-      const creditManagerCaller = await createCallerForUser(creditManagerUser.id);
+      const adminCaller = await createSessionCallerForUser(adminUser.id);
+      const creditManagerCaller = await createSessionCallerForUser(creditManagerUser.id);
 
       await expect(adminCaller.admin.getPermissions()).resolves.toEqual({
         isSuperadmin: false,
@@ -103,7 +103,7 @@ describe('trpc tests', () => {
 
   describe('adminHello procedure', () => {
     it('should return hello world for admin users', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.test.adminHello();
 
       expect(result).toEqual({

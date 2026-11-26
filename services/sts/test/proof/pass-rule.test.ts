@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { sharedChecks, type SharedRunFacts } from '../../proof/vercel-exchange/lib/pass-rule';
+import {
+  sharedChecks,
+  tokenExpOk,
+  type SharedRunFacts,
+} from '../../proof/vercel-exchange/lib/pass-rule';
 
 // The proof run 3 pass rule (design 4.4): the hard limit of about 100 exchanges and, separately,
 // the claim step holding on the real Runtime Cache (at most 3 attempts per region, no 429).
@@ -46,5 +50,29 @@ describe('proof run 3 pass rule', () => {
 
   it('is inconclusive below 200 instances', () => {
     expect(sharedChecks({ ...PASSING, distinctInstances: 199 }).coldWave).toBe(false);
+  });
+});
+
+describe('served token exp check', () => {
+  const now = 1_795_648_600;
+
+  it('needs the exchanging invocation to see its base token exp', () => {
+    const exchanged = { source: 'exchanged', baseExp: now + 7200, nowSeconds: now };
+    expect(tokenExpOk({ ...exchanged, exchangedExp: now + 7200 })).toBe(true);
+    expect(tokenExpOk({ ...exchanged, exchangedExp: now + 7167 })).toBe(false);
+  });
+
+  it('accepts a cached token from an earlier base token while it has 60 s left', () => {
+    // Vercel renewed the base token 33 s after the one the cached token was exchanged from.
+    const renewed = { baseExp: now + 7233, exchangedExp: now + 7200, nowSeconds: now };
+    for (const source of ['memory', 'cache', 'cache_after_jitter', 'poll']) {
+      expect(tokenExpOk({ ...renewed, source })).toBe(true);
+    }
+    expect(tokenExpOk({ ...renewed, source: 'cache', exchangedExp: now + 60 })).toBe(true);
+    expect(tokenExpOk({ ...renewed, source: 'cache', exchangedExp: now + 59 })).toBe(false);
+  });
+
+  it('fails a served answer without an exchanged exp', () => {
+    expect(tokenExpOk({ source: 'cache', baseExp: now + 7200, exchangedExp: null, nowSeconds: now })).toBe(false);
   });
 });

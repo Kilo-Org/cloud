@@ -91,7 +91,6 @@ export async function POST(request: Request): Promise<Response> {
       detail: outcome.status === 'failed' ? outcome.detail : undefined,
       ...outcome.report,
       ...times,
-      tokenExpMatchesBase: times.exchangedExp !== null && times.exchangedExp === times.baseExp,
       rateLimitHeaders,
       exchangedClaims,
     },

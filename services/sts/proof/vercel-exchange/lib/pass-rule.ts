@@ -20,6 +20,22 @@ export const MIN_DISTINCT_INSTANCES = 200;
 /** Design 3: about 2,200 Vercel instance starts per release, reported next to the measured count. */
 export const DESIGN_PEAK_INSTANCES = 2_200;
 
+/** The client hands out no token with less left (lib/shared-token.ts). */
+export const MIN_REMAINING_SECONDS = 60;
+
+/**
+ * The `exp` check for one served `/api/shared` answer. The exchange keeps the base token's `exp`,
+ * so the invocation that exchanged must see the two equal. Any other source may serve a token
+ * exchanged from an earlier base token (Vercel renews it during a deployment's life), so it only
+ * needs the 60 seconds the client keeps in reserve.
+ */
+export function tokenExpOk(answer: Readonly<Record<string, unknown>>): boolean {
+  const { source, baseExp, exchangedExp, nowSeconds } = answer;
+  if (typeof exchangedExp !== 'number') return false;
+  if (source === 'exchanged') return exchangedExp === baseExp;
+  return typeof nowSeconds === 'number' && exchangedExp - nowSeconds >= MIN_REMAINING_SECONDS;
+}
+
 export type SharedRunFacts = {
   invocations: number;
   served: number;
@@ -30,6 +46,7 @@ export type SharedRunFacts = {
   rateLimited: number;
   timeToTokenP99: number | null;
   timeToTokenMax: number | null;
+  /** Every served answer passes `tokenExpOk`. */
   expMatchesBase: boolean;
   actOk: boolean;
   distinctInstances: number;

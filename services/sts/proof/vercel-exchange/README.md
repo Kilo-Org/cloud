@@ -224,7 +224,9 @@ The pull writes the proof project's own (dummy) values to a 0700 temp directory,
 - `claimHolds`: exchange attempts per region (one audience per run) at most 3, and no 429. A run
   inside the hard limit but above 3 per region shows the claim does not hold on the real cache.
 - `withinTimeToTokenBudget`: time to token inside the function p99 at most 3 s and max at most 20 s.
-- `expMatchesBase`: every token's `exp` equals the base token's `exp`.
+- `expMatchesBase`: the invocation that exchanged got a token whose `exp` equals its base token's
+  `exp`; every other served token (memory, cache, poll) has at least 60 s left, since it may come
+  from an earlier base token than the reader holds.
 - `actOk`: the exchanged token's `act` is an object whose `aud` is `https://vercel.com/kilocode`,
   with no nested `act` (STS refuses anything else).
 - `coldWave`: at least 200 distinct instances, otherwise the run is inconclusive.

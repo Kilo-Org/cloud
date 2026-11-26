@@ -7,8 +7,8 @@
 // Worker gets a replica-read lease over its binding with the lifetime it asked for, that a lifetime
 // above the policy maximum is shortened, that a third concurrent lease is refused, that a GitHub
 // job gets a ci-migration lease with the primary target, that each caller can revoke only its own
-// lease, and that the lease rows reach the audit queue with no username or password. Every key,
-// id and credential is synthetic. Exits 1 on the first failure.
+// lease (a GitHub lease only from its own run), and that the lease rows reach the audit queue with
+// no username or password. Every key, id and credential is synthetic. Exits 1 on the first failure.
 import {
   LeaseResultSchema,
   LeaseRevokeResultSchema,
@@ -119,8 +119,8 @@ const JOB_CLAIMS: JWTPayload = {
   runner_environment: 'github-hosted',
 };
 
-async function jobToken(): Promise<string> {
-  return await new SignJWT(JOB_CLAIMS)
+async function jobToken(claims: JWTPayload = JOB_CLAIMS): Promise<string> {
+  return await new SignJWT(claims)
     .setProtectedHeader({ alg: 'RS256', kid: KID, typ: 'JWT' })
     .setIssuer(GITHUB_ISSUER)
     .setAudience(BASE)
@@ -141,11 +141,15 @@ async function probeRevoke(leaseId: string): Promise<LeaseRevokeResult> {
 
 async function githubPost(
   path: string,
-  body: unknown
+  body: unknown,
+  claims: JWTPayload = JOB_CLAIMS
 ): Promise<{ status: number; result: unknown }> {
   const response = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${await jobToken()}`, 'content-type': 'application/json' },
+    headers: {
+      authorization: `Bearer ${await jobToken(claims)}`,
+      'content-type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
   return { status: response.status, result: await response.json() };
@@ -220,9 +224,19 @@ check(
 );
 const crossed = await probeRevoke(migrationLease.leaseId);
 check(crossed.status === 'not_found', "the probe cannot revoke the GitHub job's lease", crossed);
+const otherRun = await githubPost(
+  '/v1/lease/revoke',
+  { leaseId: migrationLease.leaseId },
+  { ...JOB_CLAIMS, run_id: '515152' }
+);
+check(
+  otherRun.status === 404,
+  "another run of the same workflow cannot revoke the job's lease",
+  otherRun
+);
 check(
   managerCalls.filter(call => call.method === 'DELETE').length === 0,
-  'neither refused revoke reached Infisical'
+  'no refused revoke reached Infisical'
 );
 const own = await probeRevoke(hourly.leaseId);
 check(own.status === 'revoked', 'the probe revokes its own lease', own);
@@ -255,6 +269,7 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
   if (
     denied('too_many_active') &&
     denied('not_owner') &&
+    denied('other_run') &&
     events.filter(event => event.type === 'ai.kilo.sts.lease.created').length >= 4 &&
     events.filter(event => event.type === 'ai.kilo.sts.lease.revoked').length >= 4
   ) {
@@ -288,6 +303,7 @@ check(
 );
 check(denied('too_many_active'), 'the refused third lease is audited as lease.denied');
 check(denied('not_owner'), 'both cross revokes are audited as lease.denied not_owner');
+check(denied('other_run'), 'the other run is audited as lease.denied other_run');
 const all = JSON.stringify(events);
 check(
   !all.includes('e2e-password-') && !all.includes('e2e_lease_user_'),

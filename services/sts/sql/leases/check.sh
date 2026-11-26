@@ -127,8 +127,18 @@ else
 fi
 super -c 'drop role if exists kilo_probe' >/dev/null
 
+# Both setup files run with the server at log_statement = ddl: neither admin password may reach the
+# server log. The template roles' CREATE ROLE must be there, so the check sees logged DDL.
+super -c "alter system set log_statement = 'ddl'" -c 'select pg_reload_conf()' >/dev/null
+sleep 1
 owner -v replica_admin_password="$REPLICA_ADMIN_PW" -f "$HERE/setup.sql" >"$TMP/setup.out"
 pass 'setup.sql ran as postgres'
+docker logs "$NAME" >"$TMP/setup.log" 2>&1
+grep -qF 'statement: CREATE ROLE kilo_lease_replica_read NOLOGIN' "$TMP/setup.log" ||
+  fail 'the server logs the DDL of setup.sql under log_statement = ddl'
+if grep -qF "$REPLICA_ADMIN_PW" "$TMP/setup.log"; then fail 'setup.sql keeps the replica admin password out of the server log under log_statement = ddl'; fi
+if grep -qF "$REPLICA_ADMIN_PW" "$TMP/setup.out"; then fail 'setup.sql does not print the replica admin password'; fi
+pass 'under log_statement = ddl setup.sql keeps the replica admin password out of the server log and its output'
 
 # Known limit (README Risks, design decision Q64): `postgres` administers every role it created,
 # so it can reset the replica admin's password. An owner role in between would not help: ADMIN
@@ -139,8 +149,15 @@ pass 'KNOWN after setup.sql, postgres can reset the replica admin password'
 if owner -v migration_admin_password="$MIGRATION_ADMIN_PW" -f "$HERE/setup-ci-migration.sql" >/dev/null 2>"$TMP/err"; then
   fail 'setup-ci-migration.sql needs a superuser'
 fi
-super -v migration_admin_password="$MIGRATION_ADMIN_PW" -f "$HERE/setup-ci-migration.sql" >/dev/null
+super -v migration_admin_password="$MIGRATION_ADMIN_PW" -f "$HERE/setup-ci-migration.sql" >"$TMP/setup-ci-migration.out"
 pass 'setup-ci-migration.sql fails as postgres and runs as the superuser'
+docker logs "$NAME" >"$TMP/setup.log" 2>&1
+super -c "alter system reset log_statement" -c 'select pg_reload_conf()' >/dev/null
+grep -qF 'statement: CREATE ROLE kilo_lease_migration NOLOGIN' "$TMP/setup.log" ||
+  fail 'the server logs the DDL of setup-ci-migration.sql under log_statement = ddl'
+if grep -qF "$MIGRATION_ADMIN_PW" "$TMP/setup.log"; then fail 'setup-ci-migration.sql keeps the migration admin password out of the server log under log_statement = ddl'; fi
+if grep -qF "$MIGRATION_ADMIN_PW" "$TMP/setup-ci-migration.out"; then fail 'setup-ci-migration.sql does not print the migration admin password'; fi
+pass 'under log_statement = ddl setup-ci-migration.sql keeps the migration admin password out of the server log and its output'
 for admin in kilo_lease_replica_admin kilo_lease_migration_admin; do
   if owner -c "alter role $admin password 'reset-by-postgres'" >/dev/null 2>&1; then
     fail "after setup-ci-migration.sql, postgres cannot reset the $admin password"

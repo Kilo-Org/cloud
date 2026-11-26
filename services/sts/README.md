@@ -801,6 +801,13 @@ that `VALID UNTIL` refuses new logins and leaves an open session alone until a r
   `log_min_duration_statement` at a threshold the call exceeds, or as the statement of an error
   (`log_min_error_statement`), and `pg_stat_activity` shows it to roles that may read other
   sessions' queries while the call runs. The trial checks these settings before the first lease.
+- The setup files never put an admin login's password into a top-level DDL statement either:
+  `setup.sql` and `setup-ci-migration.sql` pass it in a transaction-local setting
+  (`SELECT set_config(...)`) to a `DO` block that runs the `CREATE ROLE` through `EXECUTE` and
+  clears the setting, so `log_statement = 'ddl'` logs neither admin password (`check.sh` runs both
+  files with the server at `ddl` and greps the log). The same settings as for a lease password
+  still log it, and an admin password lives until someone rotates it, so the trial checks them
+  before setup runs.
 
 **Database setup, per environment (staging first).** On the primary's direct endpoint
 (`db.<project ref>.supabase.co:5432`, not Supavisor), PostgreSQL 16 or later, as `postgres`:
@@ -1112,8 +1119,9 @@ non-superuser owner of the database and `public`, member of `pg_signal_backend`;
 `pg_net`'s PUBLIC grants; `dblink` in `extensions`). It runs `setup.sql` as `postgres` and
 `setup-ci-migration.sql` as the superuser, and each statement file the way Infisical does. It
 proves that the setup report lists what PUBLIC reaches and that `setup.sql` removed PUBLIC's
-`EXECUTE` on definer functions in `public`; that under `log_statement = 'ddl'` the lease password
-stays out of the server log; that `postgres` can reset the replica
+`EXECUTE` on definer functions in `public`; that under `log_statement = 'ddl'` neither admin
+password (both setup files) nor the lease password reaches the server log; that `postgres` can
+reset the replica
 admin's password until `setup-ci-migration.sql` ran and neither afterwards; that a malformed
 username is refused; that a `replica-read` role reads and cannot write, create or run a definer
 function even with read-only mode turned off; that neither admin login can end an application

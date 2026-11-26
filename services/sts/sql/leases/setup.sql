@@ -62,7 +62,19 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT ON TABL
 -- rights. It holds no lease role's rights either: kilo_lease.revoke_lease grants it a lease role,
 -- for DROP OWNED, only inside the revocation that drops the role. It cannot end another role's
 -- session: kilo_lease.end_sessions below ends only lease sessions.
-CREATE ROLE kilo_lease_replica_admin LOGIN CREATEROLE CONNECTION LIMIT 4 PASSWORD :'replica_admin_password';
+--
+-- The password reaches the CREATE ROLE through a transaction-local setting and EXECUTE, so no
+-- top-level DDL statement carries it and `log_statement = 'ddl'` does not log it (check.sh). It is
+-- still logged under `log_statement = 'all'`, pgaudit or `log_min_duration_statement`, and as the
+-- statement or context of an error. The SELECT returns no column, so psql does not print it.
+SELECT FROM pg_catalog.set_config('kilo_lease.admin_password', :'replica_admin_password', true);
+DO $$
+BEGIN
+  EXECUTE format('CREATE ROLE kilo_lease_replica_admin LOGIN CREATEROLE CONNECTION LIMIT 4 PASSWORD %L',
+    pg_catalog.current_setting('kilo_lease.admin_password'));
+  PERFORM pg_catalog.set_config('kilo_lease.admin_password', '', true);
+END
+$$;
 GRANT kilo_lease_replica_read TO kilo_lease_replica_admin WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 
 -- The lease statements' helpers. Each knows its caller's template by `session_user`, which a

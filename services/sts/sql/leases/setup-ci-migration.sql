@@ -28,7 +28,16 @@ GRANT postgres TO kilo_lease_migration WITH INHERIT FALSE, SET TRUE;
 -- The login Infisical creates and drops migration lease roles with: CREATEROLE, and ADMIN on its
 -- template without INHERIT or SET. Created here, not by `postgres`, so a ci-migration lease (which
 -- can act as `postgres`) cannot reset its password.
-CREATE ROLE kilo_lease_migration_admin LOGIN CREATEROLE CONNECTION LIMIT 4 PASSWORD :'migration_admin_password';
+-- The password goes through a transaction-local setting and EXECUTE, as in setup.sql, so
+-- `log_statement = 'ddl'` does not log it.
+SELECT FROM pg_catalog.set_config('kilo_lease.admin_password', :'migration_admin_password', true);
+DO $$
+BEGIN
+  EXECUTE format('CREATE ROLE kilo_lease_migration_admin LOGIN CREATEROLE CONNECTION LIMIT 4 PASSWORD %L',
+    pg_catalog.current_setting('kilo_lease.admin_password'));
+  PERFORM pg_catalog.set_config('kilo_lease.admin_password', '', true);
+END
+$$;
 GRANT kilo_lease_migration TO kilo_lease_migration_admin WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 GRANT USAGE ON SCHEMA kilo_lease TO kilo_lease_migration_admin;
 GRANT EXECUTE ON FUNCTION kilo_lease.caller_template(), kilo_lease.check_username(text),

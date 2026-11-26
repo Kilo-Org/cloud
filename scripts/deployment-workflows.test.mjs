@@ -925,6 +925,83 @@ test('staging and production Worker changes use independent deployment baselines
   }
 });
 
+test('a manual nonproduction deploy requires the named Worker environment before any deploy work', () => {
+  // Without its own env.<target> object Wrangler warns and deploys the top-level
+  // production configuration, so the manual path stops before installing,
+  // publishing a runtime, provisioning or calling Wrangler.
+  const steps = workers.jobs['deploy-manual'].steps;
+  const index = steps.findIndex(step => step.name === 'Require the named Worker environment');
+  const preflight = steps[index];
+  assert.equal(steps[index - 1].name, 'Setup Node.js');
+  assert.equal(preflight.if, "inputs.target_environment != 'production'");
+  assert.deepEqual(preflight.env, {
+    WORKER: '${{ inputs.worker }}',
+    TARGET_ENVIRONMENT: '${{ inputs.target_environment }}',
+  });
+  assert.ok(!preflight.run.includes('${{'), 'inputs reach the shell only through env');
+  for (const earlier of steps.slice(0, index)) {
+    assert.ok(!(earlier.run ?? '').includes('pnpm'), earlier.name);
+    assert.ok(!(earlier.uses ?? '').startsWith('cloudflare/'), earlier.name);
+  }
+  // The matrix skip reads the same checker rather than a second parser.
+  const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
+  assert.ok(
+    detect.run.includes('node scripts/has-named-environment.mjs "$1" "$TARGET_ENVIRONMENT"')
+  );
+  assert.ok(!detect.run.includes('stripJsonComments'));
+
+  const dir = mkdtempSync(join(tmpdir(), 'named-environment-'));
+  try {
+    symlinkSync(fileURLToPath(new URL('.', import.meta.url)), join(dir, 'scripts'));
+    const write = (worker, contents) => {
+      mkdirSync(join(dir, worker), { recursive: true });
+      writeFileSync(join(dir, worker, 'wrangler.jsonc'), contents);
+    };
+    // Comment-looking text, escaped quotes and `,}` inside strings stay literal.
+    write(
+      'services/genuine',
+      '{\n  // top level is production\n  "name": "w", /* note */\n  "env": { "staging": {\n    "name": "w-staging",\n    "route": "https://x.example/* not a comment */ // nor this",\n    "quoted": "a\\\\\\"b,}",\n  }, },\n}\n'
+    );
+    write('services/absent', '{ "name": "w", "env": { "production": {} } }');
+    write('services/no-env', '{ "name": "w", "vars": { "env": { "staging": {} } } }');
+    write('services/not-object', '{ "name": "w", "env": { "staging": true } }');
+    write('services/malformed', '{ "name": "w", "env": { "staging": { ');
+    write('services/unterminated', '{ "env": { "staging": {} } /* never closed ');
+    write('services/merged', '{ "env": { "staging": {} }, "port": 80/**/80 }');
+    write('services/empty-comma', '{ "env": { "staging": {} }, "routes": [,] }');
+    mkdirSync(join(dir, 'services/missing'), { recursive: true });
+
+    const run = (worker, environment = 'staging') =>
+      spawnSync('bash', ['-e', '-c', preflight.run], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: { ...process.env, WORKER: worker, TARGET_ENVIRONMENT: environment },
+      });
+    const admitted = run('services/genuine');
+    assert.equal(admitted.status, 0, admitted.stderr);
+    for (const worker of [
+      'services/absent',
+      'services/no-env',
+      'services/not-object',
+      'services/malformed',
+      'services/missing',
+      'services/unterminated',
+      'services/merged',
+      'services/empty-comma',
+    ]) {
+      const result = run(worker);
+      assert.equal(result.status, 1, worker);
+      assert.match(result.stderr, /refusing to deploy/, worker);
+      assert.doesNotMatch(result.stderr, /Unexpected|ENOENT|"env"/, worker);
+    }
+    assert.equal(run('services/genuine', '').status, 1, 'an empty target fails closed');
+    assert.equal(run('services/genuine', 'constructor').status, 1, 'only own keys count');
+    assert.equal(run('services/genuine', '$(exit 0)').status, 1, 'the target is not evaluated');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('Worker detection and deploy run beside the Vercel chain in both pipelines', () => {
   // Detection reads only the SHAs check-changes publishes, and the deploy call
   // reads only the detected matrix, so neither waits for a Vercel deploy or a

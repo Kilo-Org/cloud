@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -8,15 +8,25 @@ import { useSearchParams } from 'next/navigation';
 function VerifyMagicLinkContent() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const started = useRef(false);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const callbackUrl = searchParams.get('callbackUrl') || '/users/after-sign-in';
+    if (!searchParams || started.current) return;
+    started.current = true;
+
+    const url = new URL(window.location.href);
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    const token = fragment.get('token') || url.searchParams.get('token');
+    const callbackUrl = url.searchParams.get('callbackUrl') || '/users/after-sign-in';
 
     if (!token) {
       window.location.href = '/users/sign_in?error=INVALID_VERIFICATION';
       return;
     }
+
+    url.searchParams.delete('token');
+    url.hash = '';
+    window.history.replaceState(window.history.state, '', url);
 
     signIn('email', {
       token,

@@ -406,9 +406,9 @@ export function getMagicLinkUrl(
   callbackUrl?: string
 ): string {
   const url = new URL(`${NEXTAUTH_URL}/auth/verify-magic-link`);
-  url.searchParams.set('token', plaintext_token);
   if (callbackUrl) {
     url.searchParams.set('callbackUrl', callbackUrl);
   }
+  url.hash = new URLSearchParams({ token: plaintext_token }).toString();
   return url.toString();
 }

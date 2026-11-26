@@ -950,6 +950,37 @@ scopes: ['gateway:models.read']
     );
   });
 
+  it('refuses the reserved denied probe and its audience inside an environment grant, whatever the registry says', () => {
+    // The registry lists the probe, so only its reservation can refuse it.
+    const registry = {
+      ...REGISTRY,
+      canary: { scopes: ['canary:denied-probe', 'canary:other'] },
+    };
+    const grant = (body: string) => () =>
+      loadPolicies(
+        { 'app-one.yaml': `${allEnvironments}environmentGrants:\n  development:\n${body}` },
+        { scopeRegistry: registry }
+      );
+    expect(grant(`    audiences: [canary]\n    scopes: ['canary:denied-probe']\n`)).toThrow(
+      'development: scope canary:denied-probe is reserved and no policy may grant it'
+    );
+    expect(grant(`    audiences: [canary]\n    scopes: ['canary:other']\n`)).toThrow(
+      'development: audience canary is reserved and no policy may grant it'
+    );
+    // The shipped registry lists the probe too, and the shipped web policy grants it nowhere.
+    expect(() =>
+      loadPolicies({
+        'app-one.yaml': `${allEnvironments.replace(
+          "audiences: [gateway]\nscopes: ['gateway:models.read']\n",
+          ''
+        )}environmentGrants:\n  development:\n    audiences: [canary]\n    scopes: ['canary:denied-probe']\n`,
+      })
+    ).toThrow('development: scope canary:denied-probe is reserved and no policy may grant it');
+    for (const environment of ['development', 'staging', 'production'] as const) {
+      expect(policyFor(environment, 'web')?.audiences).not.toContain('canary');
+    }
+  });
+
   it('stores the grants of its own environment merged into the lists a rollback reads', () => {
     const index = load(`${allEnvironments}${developmentGrants}`);
     const [entry] = index.snapshot('development');

@@ -19,6 +19,7 @@ import {
   auditedAdminRoute,
   recordAdminAction,
   setAdminAuditActor,
+  setAdminAuditFailureAction,
   setAdminAuditTarget,
   userActionTarget,
   type AdminActionTarget,
@@ -49,6 +50,7 @@ async function addCredit(
       ? 'user.credit.debit'
       : 'user.credit.grant';
   addAdminAuditMetadata({ adjustment: auditAction });
+  setAdminAuditFailureAction(auditAction);
   let auditTarget: AdminActionTarget | null = null;
   async function warnAndCreateErrorResponse(message: string) {
     console.warn(message);

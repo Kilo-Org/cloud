@@ -464,7 +464,8 @@ describe('organization admin bypass write sites are audited', () => {
     for (const discovered of discoverRESTRoutes()) {
       if (!discovered.organizationContext || discovered.route.startsWith('/admin/')) continue;
       for (const method of discovered.methods) {
-        if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') continue;
+        // GET is checked too: an OAuth callback writes on a GET.
+        if (method === 'HEAD' || method === 'OPTIONS') continue;
         if (!classified.has(`${discovered.route} ${method}`)) {
           unclassified.push(
             `${discovered.route} ${method} (${path.relative(REPO_ROOT, discovered.file)})`

@@ -33,23 +33,32 @@ import {
 import { platform_integrations } from '@kilocode/db/schema';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
-import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  addAdminAuditMetadata,
+  runElevatedOrganizationWrite,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 // Bitbucket credential changes by a Kilo admin without an owner or billing
-// role in the organization are recorded durably. Tokens are never logged.
-async function recordBitbucketWrite(
+// role in the organization are recorded durably, failures included. Tokens are
+// never logged.
+function runBitbucketWrite<TResult>(
   ctx: TRPCContext,
   organizationId: string,
   operation: string,
-  metadata: Record<string, unknown> = {}
-) {
-  await recordElevatedOrganizationAdminAction(ctx, {
-    organizationId,
-    requiredRoles: ORGANIZATION_BILLING_ROLES,
-    action: 'organization.bitbucket.update',
-    message: `Bitbucket: ${operation}`,
-    metadata: { operation, ...metadata },
-  });
+  metadata: Record<string, unknown>,
+  run: () => Promise<TResult>
+): Promise<TResult> {
+  return runElevatedOrganizationWrite(
+    ctx,
+    {
+      organizationId,
+      requiredRoles: ORGANIZATION_BILLING_ROLES,
+      action: 'organization.bitbucket.update',
+      message: `Bitbucket: ${operation}`,
+      metadata: { operation, ...metadata },
+    },
+    run
+  );
 }
 
 const AccessTokenSchema = z.string().trim().min(1).max(8_192);
@@ -177,55 +186,60 @@ export const organizationBitbucketRouter = createTRPCRouter({
     return oauthStatus ?? { ...workspaceAccessTokenStatus, canManage };
   }),
 
-  connect: organizationBillingProcedure
-    .input(ConnectInputSchema)
-    .mutation(async ({ ctx, input }) => {
+  connect: organizationBillingProcedure.input(ConnectInputSchema).mutation(({ ctx, input }) =>
+    runBitbucketWrite(ctx, input.organizationId, 'connect_workspace_access_token', {}, async () => {
       try {
-        const result = await connectBitbucketWorkspaceAccessToken({
+        return await connectBitbucketWorkspaceAccessToken({
           organizationId: input.organizationId,
           actorUserId: ctx.user.id,
           accessToken: input.accessToken,
         });
-        await recordBitbucketWrite(ctx, input.organizationId, 'connect_workspace_access_token');
-        return result;
       } catch (error) {
         rethrowBitbucketMutationError(error);
       }
-    }),
+    })
+  ),
 
   replaceToken: organizationBillingProcedure
     .input(ReplaceTokenInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const result = await rotateBitbucketWorkspaceAccessToken({
-          organizationId: input.organizationId,
-          actorUserId: ctx.user.id,
-          integrationId: input.integrationId,
-          accessToken: input.accessToken,
-        });
-        await recordBitbucketWrite(ctx, input.organizationId, 'replace_workspace_access_token', {
-          integrationId: input.integrationId,
-        });
-        return result;
-      } catch (error) {
-        rethrowBitbucketMutationError(error);
-      }
-    }),
+    .mutation(({ ctx, input }) =>
+      runBitbucketWrite(
+        ctx,
+        input.organizationId,
+        'replace_workspace_access_token',
+        { integrationId: input.integrationId },
+        async () => {
+          try {
+            return await rotateBitbucketWorkspaceAccessToken({
+              organizationId: input.organizationId,
+              actorUserId: ctx.user.id,
+              integrationId: input.integrationId,
+              accessToken: input.accessToken,
+            });
+          } catch (error) {
+            rethrowBitbucketMutationError(error);
+          }
+        }
+      )
+    ),
 
   selectWorkspace: organizationBillingProcedure
     .input(SelectWorkspaceInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const result = await selectBitbucketOAuthWorkspace({
-        owner: { type: 'org', id: input.organizationId },
-        kiloUserId: ctx.user.id,
-        workspaceUuid: input.workspaceUuid,
-        workspaceSlug: input.workspaceSlug,
-      });
-      await recordBitbucketWrite(ctx, input.organizationId, 'select_workspace', {
-        workspaceSlug: input.workspaceSlug,
-      });
-      return result;
-    }),
+    .mutation(({ ctx, input }) =>
+      runBitbucketWrite(
+        ctx,
+        input.organizationId,
+        'select_workspace',
+        { workspaceSlug: input.workspaceSlug },
+        () =>
+          selectBitbucketOAuthWorkspace({
+            owner: { type: 'org', id: input.organizationId },
+            kiloUserId: ctx.user.id,
+            workspaceUuid: input.workspaceUuid,
+            workspaceSlug: input.workspaceSlug,
+          })
+      )
+    ),
 
   refreshRepositories: organizationBillingProcedure
     .input(ExistingIntegrationInputSchema)
@@ -252,38 +266,38 @@ export const organizationBitbucketRouter = createTRPCRouter({
 
   disconnect: organizationBillingProcedure
     .input(ExistingIntegrationInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const integration = await findOrganizationBitbucketIntegration(input);
-        if (integration.integrationType === 'oauth') {
-          const disconnected = await disconnectBitbucketOAuthIntegration({
-            owner: { type: 'org', id: input.organizationId },
-            integrationId: input.integrationId,
-          });
-          await recordBitbucketWrite(ctx, input.organizationId, 'disconnect', {
-            integrationId: input.integrationId,
-            integrationType: 'oauth',
-          });
-          return { integrationId: disconnected.integrationId };
-        }
+    .mutation(({ ctx, input }) =>
+      runBitbucketWrite(
+        ctx,
+        input.organizationId,
+        'disconnect',
+        { integrationId: input.integrationId },
+        async () => {
+          try {
+            const integration = await findOrganizationBitbucketIntegration(input);
+            addAdminAuditMetadata({ integrationType: integration.integrationType });
+            if (integration.integrationType === 'oauth') {
+              const disconnected = await disconnectBitbucketOAuthIntegration({
+                owner: { type: 'org', id: input.organizationId },
+                integrationId: input.integrationId,
+              });
+              return { integrationId: disconnected.integrationId };
+            }
 
-        await cleanupBitbucketCodeReviewerForIntegration({
-          organizationId: input.organizationId,
-          integrationId: input.integrationId,
-          workspace: integration.workspace,
-        });
-        const result = await disconnectBitbucketWorkspaceAccessToken({
-          organizationId: input.organizationId,
-          actorUserId: ctx.user.id,
-          integrationId: input.integrationId,
-        });
-        await recordBitbucketWrite(ctx, input.organizationId, 'disconnect', {
-          integrationId: input.integrationId,
-          integrationType: 'workspace_access_token',
-        });
-        return result;
-      } catch (error) {
-        rethrowBitbucketMutationError(error);
-      }
-    }),
+            await cleanupBitbucketCodeReviewerForIntegration({
+              organizationId: input.organizationId,
+              integrationId: input.integrationId,
+              workspace: integration.workspace,
+            });
+            return await disconnectBitbucketWorkspaceAccessToken({
+              organizationId: input.organizationId,
+              actorUserId: ctx.user.id,
+              integrationId: input.integrationId,
+            });
+          } catch (error) {
+            rethrowBitbucketMutationError(error);
+          }
+        }
+      )
+    ),
 });

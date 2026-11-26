@@ -6,6 +6,12 @@ import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+  setAdminAuditTarget,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import {
   classifyExportHealth,
   type ExportEmailStatus,
   type ExportHealthInput,
@@ -620,33 +626,42 @@ export const adminUserDataExportsRouter = createTRPCRouter({
     };
   }),
 
-  redispatch: adminProcedure.input(RecoveryInputSchema).mutation(async ({ ctx, input }) => {
-    const result = await db.transaction(async tx => {
-      const target = await lockRecoveryTarget(tx, input);
-      if (!ACTIVE_STATUSES.includes(target.status as (typeof ACTIVE_STATUSES)[number])) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Only active exports can be redispatched',
-        });
-      }
-      if (target.lease_expires_at && new Date(target.lease_expires_at).getTime() > Date.now()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'A worker is still processing this export',
-        });
-      }
-      if (target.r2_object_key !== null) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Exports with completed artifacts must be canceled and retried',
-        });
-      }
-      const nextGeneration = target.dispatch_generation + 1;
-      await tx.execute(sql`
+  redispatch: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user_data_export.redispatch',
+        target: inputFieldTarget('other', 'exportId'),
+      },
+    })
+    .input(RecoveryInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const result = await db.transaction(async tx => {
+        const target = await lockRecoveryTarget(tx, input);
+        if (!ACTIVE_STATUSES.includes(target.status as (typeof ACTIVE_STATUSES)[number])) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Only active exports can be redispatched',
+          });
+        }
+        if (target.lease_expires_at && new Date(target.lease_expires_at).getTime() > Date.now()) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'A worker is still processing this export',
+          });
+        }
+        if (target.r2_object_key !== null) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Exports with completed artifacts must be canceled and retried',
+          });
+        }
+        const nextGeneration = target.dispatch_generation + 1;
+        await tx.execute(sql`
         DELETE FROM user_data_export_outbox
         WHERE export_id = ${target.id} AND sent_at IS NULL
       `);
-      const updated = await tx.execute<{ id: string }>(sql`
+        const updated = await tx.execute<{ id: string }>(sql`
         UPDATE user_data_exports
         SET status = 'queued', dispatch_generation = ${nextGeneration},
           current_source = NULL, source_cursor = NULL, next_part_number = 1,
@@ -660,63 +675,85 @@ export const adminUserDataExportsRouter = createTRPCRouter({
         WHERE id = ${target.id} AND dispatch_generation = ${target.dispatch_generation}
         RETURNING id
       `);
-      if (!updated.rows[0]) conflict('This export changed while it was being redispatched');
-      await tx.execute(sql`DELETE FROM user_data_export_parts WHERE export_id = ${target.id}`);
-      await tx.execute(sql`
+        if (!updated.rows[0]) conflict('This export changed while it was being redispatched');
+        await tx.execute(sql`DELETE FROM user_data_export_parts WHERE export_id = ${target.id}`);
+        await tx.execute(sql`
         INSERT INTO user_data_export_outbox (export_id, generation, operation, available_at)
         VALUES (${target.id}, ${nextGeneration}, 'generate', now())
       `);
-      return { exportId: target.id, kiloUserId: target.kilo_user_id, generation: nextGeneration };
-    });
-    recordDataExportRecovery({
-      action: 'redispatch',
-      actorAdminId: ctx.user.id,
-      exportOwnerId: result.kiloUserId,
-      exportId: result.exportId,
-      expectedGeneration: input.expectedGeneration,
-      resultingGeneration: result.generation,
-      replacementExportId: null,
-      cleanupQueued: false,
-    });
-    return {
-      exportId: result.exportId,
-      generation: result.generation,
-      ...(await dispatchAfterCommit(result)),
-    };
-  }),
+        return { exportId: target.id, kiloUserId: target.kilo_user_id, generation: nextGeneration };
+      });
+      recordDataExportRecovery({
+        action: 'redispatch',
+        actorAdminId: ctx.user.id,
+        exportOwnerId: result.kiloUserId,
+        exportId: result.exportId,
+        expectedGeneration: input.expectedGeneration,
+        resultingGeneration: result.generation,
+        replacementExportId: null,
+        cleanupQueued: false,
+      });
+      setAdminAuditTarget(userActionTarget(result.kiloUserId));
+      addAdminAuditMetadata({ exportId: result.exportId, generation: result.generation });
+      return {
+        exportId: result.exportId,
+        generation: result.generation,
+        ...(await dispatchAfterCommit(result)),
+      };
+    }),
 
-  cancelAndPurge: adminProcedure.input(RecoveryInputSchema).mutation(async ({ ctx, input }) => {
-    const result = await db.transaction(async tx => {
-      const target = await lockRecoveryTarget(tx, input);
-      const cleanupQueued = await scheduleCleanup(tx, target, 'admin_cancel');
-      const deleted = await tx.execute<{ id: string }>(sql`
+  cancelAndPurge: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user_data_export.cancel_and_purge',
+        target: inputFieldTarget('other', 'exportId'),
+      },
+    })
+    .input(RecoveryInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const result = await db.transaction(async tx => {
+        const target = await lockRecoveryTarget(tx, input);
+        const cleanupQueued = await scheduleCleanup(tx, target, 'admin_cancel');
+        const deleted = await tx.execute<{ id: string }>(sql`
         DELETE FROM user_data_exports
         WHERE id = ${target.id} AND dispatch_generation = ${target.dispatch_generation}
         RETURNING id
       `);
-      if (!deleted.rows[0]) conflict('This export changed while it was being canceled');
-      return { exportId: target.id, kiloUserId: target.kilo_user_id, cleanupQueued };
-    });
-    recordDataExportRecovery({
-      action: 'cancel_and_purge',
-      actorAdminId: ctx.user.id,
-      exportOwnerId: result.kiloUserId,
-      exportId: result.exportId,
-      expectedGeneration: input.expectedGeneration,
-      resultingGeneration: null,
-      replacementExportId: null,
-      cleanupQueued: result.cleanupQueued,
-    });
-    return {
-      exportId: result.exportId,
-      cleanup: result.cleanupQueued ? ('queued' as const) : ('not_needed' as const),
-    };
-  }),
+        if (!deleted.rows[0]) conflict('This export changed while it was being canceled');
+        return { exportId: target.id, kiloUserId: target.kilo_user_id, cleanupQueued };
+      });
+      recordDataExportRecovery({
+        action: 'cancel_and_purge',
+        actorAdminId: ctx.user.id,
+        exportOwnerId: result.kiloUserId,
+        exportId: result.exportId,
+        expectedGeneration: input.expectedGeneration,
+        resultingGeneration: null,
+        replacementExportId: null,
+        cleanupQueued: result.cleanupQueued,
+      });
+      setAdminAuditTarget(userActionTarget(result.kiloUserId));
+      addAdminAuditMetadata({ exportId: result.exportId, cleanupQueued: result.cleanupQueued });
+      return {
+        exportId: result.exportId,
+        cleanup: result.cleanupQueued ? ('queued' as const) : ('not_needed' as const),
+      };
+    }),
 
-  cancelAndRetry: adminProcedure.input(RecoveryInputSchema).mutation(async ({ ctx, input }) => {
-    const result = await db.transaction(async tx => {
-      const target = await lockRecoveryTarget(tx, input);
-      const blocker = await tx.execute<{ id: string }>(sql`
+  cancelAndRetry: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user_data_export.cancel_and_retry',
+        target: inputFieldTarget('other', 'exportId'),
+      },
+    })
+    .input(RecoveryInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const result = await db.transaction(async tx => {
+        const target = await lockRecoveryTarget(tx, input);
+        const blocker = await tx.execute<{ id: string }>(sql`
         SELECT id FROM user_data_exports
         WHERE id <> ${target.id}
           AND subject_type = ${target.subject_type}
@@ -733,23 +770,23 @@ export const adminUserDataExportsRouter = createTRPCRouter({
           )
         LIMIT 1
       `);
-      if (blocker.rows[0]) {
-        conflict(
-          `This ${target.subject_type === 'organization' ? 'organization' : 'user'} already has another active or downloadable export`
-        );
-      }
-      const cleanupQueued = await scheduleCleanup(tx, target, 'admin_replace');
-      const deleted = await tx.execute<{ id: string }>(sql`
+        if (blocker.rows[0]) {
+          conflict(
+            `This ${target.subject_type === 'organization' ? 'organization' : 'user'} already has another active or downloadable export`
+          );
+        }
+        const cleanupQueued = await scheduleCleanup(tx, target, 'admin_replace');
+        const deleted = await tx.execute<{ id: string }>(sql`
         DELETE FROM user_data_exports
         WHERE id = ${target.id} AND dispatch_generation = ${target.dispatch_generation}
         RETURNING id
       `);
-      if (!deleted.rows[0]) conflict('This export changed while it was being replaced');
-      const replacement = await tx.execute<{
-        id: string;
-        kilo_user_id: string;
-        dispatch_generation: number;
-      }>(sql`
+        if (!deleted.rows[0]) conflict('This export changed while it was being replaced');
+        const replacement = await tx.execute<{
+          id: string;
+          kilo_user_id: string;
+          dispatch_generation: number;
+        }>(sql`
         INSERT INTO user_data_exports (
           kilo_user_id, subject_type, organization_id, schema_version, snapshot_at, requested_at
         )
@@ -767,36 +804,42 @@ export const adminUserDataExportsRouter = createTRPCRouter({
         )
         RETURNING id, kilo_user_id, dispatch_generation
       `);
-      const row = replacement.rows[0];
-      if (!row) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Retry failed' });
-      await tx.execute(sql`
+        const row = replacement.rows[0];
+        if (!row) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Retry failed' });
+        await tx.execute(sql`
         INSERT INTO user_data_export_outbox (export_id, generation, operation, available_at)
         VALUES (${row.id}, ${row.dispatch_generation}, 'generate', now())
       `);
+        return {
+          exportId: row.id,
+          replacementExportId: row.id,
+          kiloUserId: row.kilo_user_id,
+          generation: row.dispatch_generation,
+          cleanupQueued,
+        };
+      });
+      recordDataExportRecovery({
+        action: 'cancel_and_retry',
+        actorAdminId: ctx.user.id,
+        exportOwnerId: result.kiloUserId,
+        exportId: input.exportId,
+        expectedGeneration: input.expectedGeneration,
+        resultingGeneration: result.generation,
+        replacementExportId: result.replacementExportId,
+        cleanupQueued: result.cleanupQueued,
+      });
+      setAdminAuditTarget(userActionTarget(result.kiloUserId));
+      addAdminAuditMetadata({
+        exportId: input.exportId,
+        replacementExportId: result.replacementExportId,
+        cleanupQueued: result.cleanupQueued,
+      });
       return {
-        exportId: row.id,
-        replacementExportId: row.id,
-        kiloUserId: row.kilo_user_id,
-        generation: row.dispatch_generation,
-        cleanupQueued,
+        exportId: result.exportId,
+        replacementExportId: result.replacementExportId,
+        generation: result.generation,
+        cleanup: result.cleanupQueued ? ('queued' as const) : ('not_needed' as const),
+        ...(await dispatchAfterCommit(result)),
       };
-    });
-    recordDataExportRecovery({
-      action: 'cancel_and_retry',
-      actorAdminId: ctx.user.id,
-      exportOwnerId: result.kiloUserId,
-      exportId: input.exportId,
-      expectedGeneration: input.expectedGeneration,
-      resultingGeneration: result.generation,
-      replacementExportId: result.replacementExportId,
-      cleanupQueued: result.cleanupQueued,
-    });
-    return {
-      exportId: result.exportId,
-      replacementExportId: result.replacementExportId,
-      generation: result.generation,
-      cleanup: result.cleanupQueued ? ('queued' as const) : ('not_needed' as const),
-      ...(await dispatchAfterCommit(result)),
-    };
-  }),
+    }),
 });

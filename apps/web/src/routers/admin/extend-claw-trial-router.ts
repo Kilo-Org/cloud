@@ -1,4 +1,11 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  adminAuditErrorCode,
+  recordAdminActions,
+  userActionTarget,
+  type AdminActionContext,
+  type AdminActionEntry,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { kilocode_users, kiloclaw_subscriptions, kiloclaw_email_log } from '@kilocode/db/schema';
@@ -108,28 +115,37 @@ const EMAIL_TYPES_TO_CLEAR = [
   'claw_instance_destroyed',
 ] as const;
 
+/** One email's outcome, with the stable code its audit row records when it failed. */
+type ProcessedEmail = { result: ExtendTrialResult; errorCode: string | null };
+
 async function processOneEmail(
   email: string,
   usersByEmail: Map<string, { id: string; email: string }>,
   latestSubByUserId: Map<string, typeof kiloclaw_subscriptions.$inferSelect>,
   trialDays: number,
   ctx: AdminContext
-): Promise<ExtendTrialResult> {
+): Promise<ProcessedEmail> {
   const user = usersByEmail.get(email);
 
   if (!user) {
-    return { email, userId: '', instanceId: null, success: false, error: 'User not found' };
+    return {
+      result: { email, userId: '', instanceId: null, success: false, error: 'User not found' },
+      errorCode: 'user_not_found',
+    };
   }
 
   const subscription = latestSubByUserId.get(user.id);
 
   if (!subscription) {
     return {
-      email,
-      userId: user.id,
-      instanceId: null,
-      success: false,
-      error: 'No KiloClaw subscription found. User must provision an instance first.',
+      result: {
+        email,
+        userId: user.id,
+        instanceId: null,
+        success: false,
+        error: 'No KiloClaw subscription found. User must provision an instance first.',
+      },
+      errorCode: 'no_subscription',
     };
   }
 
@@ -158,11 +174,14 @@ async function processOneEmail(
     if (!updated) {
       // Subscription status changed between match and extend (e.g. user subscribed).
       return {
-        email,
-        userId: user.id,
-        instanceId: subscription.instance_id,
-        success: false,
-        error: 'Subscription status changed since match — please re-match and retry.',
+        result: {
+          email,
+          userId: user.id,
+          instanceId: subscription.instance_id,
+          success: false,
+          error: 'Subscription status changed since match — please re-match and retry.',
+        },
+        errorCode: 'subscription_status_changed',
       };
     }
 
@@ -198,12 +217,15 @@ async function processOneEmail(
     }
 
     return {
-      email,
-      userId: user.id,
-      instanceId: subscription.instance_id,
-      success: true,
-      action: 'extended',
-      newTrialEndsAt: updated.trial_ends_at ?? undefined,
+      result: {
+        email,
+        userId: user.id,
+        instanceId: subscription.instance_id,
+        success: true,
+        action: 'extended',
+        newTrialEndsAt: updated.trial_ends_at ?? undefined,
+      },
+      errorCode: null,
     };
   }
 
@@ -255,11 +277,14 @@ async function processOneEmail(
     if (!resurrected) {
       // Subscription status changed between match and extend (e.g. user reactivated).
       return {
-        email,
-        userId: user.id,
-        instanceId: subscription.instance_id,
-        success: false,
-        error: 'Subscription status changed since match — please re-match and retry.',
+        result: {
+          email,
+          userId: user.id,
+          instanceId: subscription.instance_id,
+          success: false,
+          error: 'Subscription status changed since match — please re-match and retry.',
+        },
+        errorCode: 'subscription_status_changed',
       };
     }
 
@@ -308,23 +333,81 @@ async function processOneEmail(
     }
 
     return {
-      email,
-      userId: user.id,
-      instanceId: subscription.instance_id,
-      success: true,
-      action: 'restarted',
-      newTrialEndsAt: newEnd.toISOString(),
+      result: {
+        email,
+        userId: user.id,
+        instanceId: subscription.instance_id,
+        success: true,
+        action: 'restarted',
+        newTrialEndsAt: newEnd.toISOString(),
+      },
+      errorCode: null,
     };
   }
 
   // Active paid subscription (active, past_due, unpaid) — must not be reset.
   return {
-    email,
-    userId: user.id,
-    instanceId: subscription.instance_id,
-    success: false,
-    error: `Cannot extend trial: subscription status is "${subscription.status}". Only trialing or canceled subscriptions can be modified.`,
+    result: {
+      email,
+      userId: user.id,
+      instanceId: subscription.instance_id,
+      success: false,
+      error: `Cannot extend trial: subscription status is "${subscription.status}". Only trialing or canceled subscriptions can be modified.`,
+    },
+    errorCode: 'subscription_not_trial_or_canceled',
   };
+}
+
+/**
+ * One admin row per requested user, in request order: a success row for each
+ * trial that changed, a failure row with a stable code (and the account when
+ * one matched, never the address) for each that did not. An empty request
+ * records one summary row.
+ */
+async function recordTrialGrants(
+  ctx: AdminActionContext,
+  trialDays: number,
+  processed: readonly ProcessedEmail[]
+) {
+  await recordAdminActions(
+    ctx,
+    processed.length > 0
+      ? processed.map(({ result, errorCode }): AdminActionEntry => {
+          const target = result.userId === '' ? null : userActionTarget(result.userId);
+          const metadata = {
+            trialDays,
+            outcome: result.action ?? null,
+            instanceId: result.instanceId,
+          };
+          if (errorCode !== null) {
+            return {
+              action: 'kiloclaw.subscription.bulk_trial_grant',
+              outcome: 'failure',
+              errorCode,
+              target,
+              message: 'Failed to extend KiloClaw trial',
+              metadata,
+            };
+          }
+          return {
+            action: 'kiloclaw.subscription.bulk_trial_grant',
+            target,
+            message:
+              result.action === 'restarted'
+                ? 'Restarted KiloClaw trial'
+                : 'Extended KiloClaw trial',
+            metadata,
+          };
+        })
+      : [
+          {
+            action: 'kiloclaw.subscription.bulk_trial_grant',
+            target: null,
+            message: 'Extended no KiloClaw trials',
+            metadata: { trialDays, requestedCount: 0 },
+          },
+        ]
+  );
 }
 
 export const extendClawTrialRouter = createTRPCRouter({
@@ -416,6 +499,7 @@ export const extendClawTrialRouter = createTRPCRouter({
    * - active / past_due / unpaid: skipped with an error.
    */
   extendTrials: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['kiloclaw.subscription.bulk_trial_grant'] } })
     .input(
       z.object({
         emails: z.array(z.string().email()).max(MAX_USERS),
@@ -425,7 +509,10 @@ export const extendClawTrialRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<ExtendTrialResult[]> => {
       const { emails, trialDays } = input;
 
-      if (emails.length === 0) return [];
+      if (emails.length === 0) {
+        await recordTrialGrants(ctx, trialDays, []);
+        return [];
+      }
 
       const normalizedEmails = [...new Set(emails.map(e => e.toLowerCase()))];
 
@@ -451,16 +538,21 @@ export const extendClawTrialRouter = createTRPCRouter({
         )
       );
 
-      return settled.map((outcome, i) => {
+      const processed = settled.map((outcome, i): ProcessedEmail => {
         if (outcome.status === 'fulfilled') return outcome.value;
         const email = normalizedEmails[i];
         return {
-          email,
-          userId: usersByEmail.get(email)?.id ?? '',
-          instanceId: null,
-          success: false,
-          error: outcome.reason instanceof Error ? outcome.reason.message : 'Unknown error',
+          result: {
+            email,
+            userId: usersByEmail.get(email)?.id ?? '',
+            instanceId: null,
+            success: false,
+            error: outcome.reason instanceof Error ? outcome.reason.message : 'Unknown error',
+          },
+          errorCode: adminAuditErrorCode(outcome.reason),
         };
       });
+      await recordTrialGrants(ctx, trialDays, processed);
+      return processed.map(({ result }) => result);
     }),
 });

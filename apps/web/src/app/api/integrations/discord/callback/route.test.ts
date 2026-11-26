@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { eq } from 'drizzle-orm';
+import { admin_action_audit_logs, kilocode_users } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
@@ -610,5 +614,44 @@ describe('handleDiscordOAuthCallback', () => {
 
     expectRedirectLocation(response, '/integrations/discord?error=installation_failed');
     expectRedactedDiagnostic(state, 'authorization-code');
+  });
+
+  test('records a Kilo admin organization install as a success when the return path keeps an earlier error', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null } as never);
+    mockedConsumeProviderOAuthAttempt.mockResolvedValue(true);
+    const returnTo = `/organizations/${ORGANIZATION_ID}/integrations/discord?error=access_denied`;
+    const state = createOAuthState(`org_${ORGANIZATION_ID}`, admin.id, returnTo, {
+      provider: 'discord',
+      purpose: 'provider_install',
+    });
+
+    try {
+      const response = await callDiscordCallback(makeRequest(state));
+
+      const location = new URL(response.headers.get('location') ?? '');
+      expect(location.searchParams.get('error')).toBe('access_denied');
+      expect(location.searchParams.get('success')).toBe('discord_installed');
+      expect(mockedUpsertDiscordInstallation).toHaveBeenCalledTimes(1);
+      expect(
+        await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(eq(admin_action_audit_logs.actor_id, admin.id))
+      ).toEqual([
+        expect.objectContaining({
+          action: 'organization.discord.connect',
+          outcome: 'success',
+          target_type: 'organization',
+          target_id: ORGANIZATION_ID,
+          metadata: expect.objectContaining({ heldRoles: [] }),
+        }),
+      ]);
+    } finally {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    }
   });
 });

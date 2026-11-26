@@ -23,12 +23,14 @@ import {
 import type * as InstallStateModule from '@/lib/integrations/github/install-state';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  admin_action_audit_logs,
   github_install_states,
   kilocode_users,
   organizations,
   platform_integrations,
   type GitHubInstallState,
 } from '@kilocode/db/schema';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -1884,6 +1886,57 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expect(nonAdminLogs[0][0]).not.toContain('code_absent');
 
     logSpy.mockRestore();
+  });
+
+  test('records a failed organization install by a Kilo admin when the return path fragment hides the error', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organizationId = randomUUID();
+    const returnTo = `/organizations/${organizationId}/integrations/github#repositories`;
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null } as never);
+    mockConsumedInstallState({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: admin.id,
+      owner_type: 'org',
+      owner_id: organizationId,
+      github_app_type: 'standard',
+      return_to: returnTo,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedAssertUserAdministersInstallation.mockResolvedValue(false);
+
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+        ) as never
+      );
+
+      const location = new URL(response.headers.get('location') ?? '');
+      expect(location.searchParams.get('error')).toBeNull();
+      expect(location.hash).toBe('#repositories?error=not_installation_admin');
+      expect(
+        await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(eq(admin_action_audit_logs.actor_id, admin.id))
+      ).toEqual([
+        expect.objectContaining({
+          action: 'organization.github.connect',
+          outcome: 'failure',
+          target_type: 'organization',
+          target_id: organizationId,
+          metadata: expect.objectContaining({ errorCode: 'not_installation_admin', heldRoles: [] }),
+        }),
+      ]);
+    } finally {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    }
   });
 });
 

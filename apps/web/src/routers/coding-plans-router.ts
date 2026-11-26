@@ -46,6 +46,10 @@ import {
   isCodingPlanDisabledForNewSignups,
 } from '@/lib/coding-plans/pricing';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
 import {
@@ -801,6 +805,12 @@ export const codingPlansRouter = createTRPCRouter({
     .query(({ input }) => getKeyInventoryCounts(input.planId)),
 
   adminUploadKeys: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.inventory.upload_keys',
+      },
+    })
     .input(
       z.object({
         providerId: CodingPlanProviderIdSchema,
@@ -809,6 +819,11 @@ export const codingPlansRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
+      addAdminAuditMetadata({
+        providerId: input.providerId,
+        planId: input.planId,
+        keyCount: input.entries.length,
+      });
       try {
         return await uploadKeysToInventory(input.providerId, input.planId, input.entries);
       } catch (error) {
@@ -832,6 +847,12 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminReduceInventory: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.inventory.reduce',
+      },
+    })
     .input(
       z.object({
         planId: CodingPlanIdSchema,
@@ -839,6 +860,7 @@ export const codingPlansRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      addAdminAuditMetadata({ planId: input.planId, count: input.count });
       try {
         return await queueAvailableInventoryForRevocation(input.planId, input.count, ctx.user.id);
       } catch (error) {
@@ -851,6 +873,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminTerminateSubscription: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.subscription.terminate',
+        target: inputFieldTarget('coding_plan', 'subscriptionId'),
+      },
+    })
     .input(z.object({ subscriptionId: SubscriptionIdSchema }))
     .mutation(async ({ input }) => {
       try {
@@ -865,6 +894,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminCancelSubscription: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.subscription.cancel',
+        target: inputFieldTarget('coding_plan', 'subscriptionId'),
+      },
+    })
     .input(z.object({ subscriptionId: SubscriptionIdSchema }))
     .mutation(async ({ input }) => {
       try {
@@ -879,6 +915,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminExtendSubscriptionPeriod: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.subscription.extend',
+        target: inputFieldTarget('coding_plan', 'subscriptionId'),
+      },
+    })
     .input(
       z.object({
         subscriptionId: SubscriptionIdSchema,
@@ -886,6 +929,7 @@ export const codingPlansRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      addAdminAuditMetadata({ days: input.days });
       try {
         return await extendCodingPlanSubscriptionPeriod(
           input.subscriptionId,
@@ -902,6 +946,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminReplaceInventoryCredential: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.inventory.replace_credential',
+        target: inputFieldTarget('coding_plan', 'inventoryKeyId'),
+      },
+    })
     .input(
       z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1).max(500) })
     )
@@ -920,6 +971,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminReassignSubscriptionCredential: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.subscription.reassign_credential',
+        target: inputFieldTarget('coding_plan', 'subscriptionId'),
+      },
+    })
     .input(z.object({ subscriptionId: SubscriptionIdSchema }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -958,6 +1016,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminMarkRevocationComplete: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.revocation.complete',
+        target: inputFieldTarget('coding_plan', 'inventoryKeyId'),
+      },
+    })
     .input(z.object({ inventoryKeyId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       try {
@@ -969,6 +1034,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminReplaceRevocationCredential: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.revocation.replace_credential',
+        target: inputFieldTarget('coding_plan', 'inventoryKeyId'),
+      },
+    })
     .input(
       z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1).max(500) })
     )
@@ -985,6 +1057,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminMarkRevocationFailed: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.revocation.fail',
+        target: inputFieldTarget('coding_plan', 'inventoryKeyId'),
+      },
+    })
     .input(
       z.object({ inventoryKeyId: z.string().uuid(), reason: z.string().trim().min(1).max(300) })
     )
@@ -998,6 +1077,13 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminRequeueRevocation: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'coding_plan.revocation.requeue',
+        target: inputFieldTarget('coding_plan', 'inventoryKeyId'),
+      },
+    })
     .input(z.object({ inventoryKeyId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       try {

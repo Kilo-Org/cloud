@@ -4,9 +4,6 @@ name: SBOM
 # syft reads pnpm-lock.yaml directly, so no `pnpm install` is needed — a fresh
 # checkout has no node_modules and therefore no filesystem-duplicate noise.
 # The SBOM is uploaded as a retained workflow artifact (never committed).
-#
-# Container-image SBOMs are handled separately in deploy-kiloclaw.yml, where
-# they are attested against the image digest in GHCR.
 
 on:
   push:

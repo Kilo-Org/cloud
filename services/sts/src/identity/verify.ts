@@ -94,11 +94,12 @@ function claim(payload: JWTPayload, name: string): string | null {
 /** GitHub's run ids are decimal; anything else (or longer than 20 digits) is left out. */
 const RUN_NUMBER = /^[0-9]{1,20}$/;
 
+/** Runs once `job_workflow_ref` equals a listed entry, which the policy schema bounds. */
 function githubRun(payload: JWTPayload): GithubRun | null {
   const jobWorkflowRef = claim(payload, 'job_workflow_ref');
   const runId = claim(payload, 'run_id');
   if (jobWorkflowRef === null || runId === null || !RUN_NUMBER.test(runId)) return null;
-  const run = { jobWorkflowRef: jobWorkflowRef.slice(0, 200), runId };
+  const run = { jobWorkflowRef, runId };
   const runAttempt = claim(payload, 'run_attempt');
   return runAttempt !== null && RUN_NUMBER.test(runAttempt) ? { ...run, runAttempt } : run;
 }

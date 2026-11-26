@@ -689,10 +689,10 @@ for a revoke the caller heard as `not_found`, `not_owner` (another workload's le
 `unknown_lease`. No row carries a username or a password. Infisical's own audit log records each
 lease and revocation, the expiry revocation included.
 
-**Replica sessions (decision D13).** Infisical creates and drops the role on the primary, through
-its direct endpoint; no dynamic engine can write to a standby. The role reaches the replica through
-replication, so a consumer that logs in right after the lease is created may have to retry for the
-replication delay. The revocation statement ends the role's sessions on the primary only: a
+**Replica sessions (design decision Q63).** Infisical creates and drops the role on the primary,
+through its direct endpoint; no dynamic engine can write to a standby. The role reaches the replica
+through replication, so a consumer that logs in right after the lease is created may have to retry
+for the replication delay. The revocation statement ends the role's sessions on the primary only: a
 session on the replica runs on after a revocation or the expiry. What bounds it there is the
 consumer's own run deadline (bouncer-watch: 55 and 130 minutes, under the 60 and 150-minute
 leases), `VALID UNTIL` and the dropped role (no new login on either node), and the consumer's
@@ -701,7 +701,8 @@ leaves an open session alone.
 
 **Risks.**
 
-- A `ci-migration` lease is `postgres` for up to an hour: owner-level DDL, `CREATE EXTENSION` and
+- A `ci-migration` lease is `postgres` for up to an hour (design decision Q64, which needs Igor's
+  security acceptance before any production use): owner-level DDL, `CREATE EXTENSION` and
   every row. What stands between a workflow and it: the GitHub environment's protection (branch
   `main`, a required reviewer), the policy's exact workflow list and event allowlist, the 1-hour
   expiry, `CONNECTION LIMIT 2`, and the revocation at the end of the job.
@@ -755,7 +756,9 @@ each into its dynamic secret below. The last query of `setup.sql` must print `f|
    renew, then let one expire with a session open on the primary and see it ended and the role
    dropped.
 7. STS: set `MANAGER_PROJECT_SLUG` (Infisical → project settings) and `LEASE_CI_MIGRATION_TARGET`
-   in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants.
+   in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants. In
+   production, leave `LEASE_CI_MIGRATION_TARGET` empty and grant no `ci-migration` until Igor has
+   accepted design decision Q64.
 
 **Cost.** One lease is one `LeaseDO` call and one Infisical create, plus a login and one `SignerDO`
 call when the object's 10-minute token has lapsed (leases are sparse, so assume it has), and one

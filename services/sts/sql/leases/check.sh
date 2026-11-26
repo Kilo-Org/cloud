@@ -141,7 +141,7 @@ infisical kilo_lease_replica_admin "$REPLICA_ADMIN_PW" "$HERE/renew.sql" "$RR1" 
 [ "$(super -c "select rolvaliduntil > now() + interval '50 minutes' from pg_roles where rolname = '$RR1'")" = t ] || fail 'renew moves VALID UNTIL'
 pass 'renewal moves VALID UNTIL'
 
-# Expiry: VALID UNTIL refuses new logins, and an open session lives on (design D13).
+# Expiry: VALID UNTIL refuses new logins, and an open session lives on (design decision Q63).
 RR2=$(role_name rr)
 RR2_PW=$(secret)
 create_replica "$RR2" "$RR2_PW" "$(expires_in 10)"

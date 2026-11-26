@@ -178,6 +178,17 @@ export const SENTRY_ERROR_OPTIONS = {
   sendClientReports: false,
   enableLogs: false,
   tracesSampleRate: 0,
+  // An incoming `sentry-trace` header with a positive decision outranks the
+  // rate; a sampler outranks the header. Transactions skip beforeSend.
+  tracesSampler: () => 0,
+  beforeSendTransaction: () => null,
   maxBreadcrumbs: 0,
-  beforeSend: (event: ErrorEvent) => sanitizeSentryEvent(event),
+  // Never throws: a throw makes core send an internal event that skips this hook.
+  beforeSend: (event: ErrorEvent) => {
+    try {
+      return sanitizeSentryEvent(event);
+    } catch {
+      return null;
+    }
+  },
 } as const;

@@ -2682,6 +2682,13 @@
       "when": 1795686762907,
       "tag": "0382_user_sign_in_contexts",
       "breakpoints": true
+    },
+    {
+      "idx": 383,
+      "version": "7",
+      "when": 1795692248073,
+      "tag": "0383_admin_audit_outcome_auth_audit_logs",
+      "breakpoints": true
     }
   ]
 }

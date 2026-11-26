@@ -910,6 +910,38 @@ function describeRequestFields(request: unknown): Record<string, string> {
 }
 
 const ERROR_BODY_DIAGNOSTIC_LIMIT = 16 * 1024;
+const UPSTREAM_ERROR_FIELD_LIMIT = 512;
+
+// The error fields that the common provider error schemas (OpenAI, Anthropic,
+// OpenRouter, Google) carry as short identifiers. Free-text fields such as the
+// message are left out: an upstream can echo request input or a credential there.
+const UPSTREAM_ERROR_FIELDS = {
+  type: 'upstreamErrorType',
+  code: 'upstreamErrorCode',
+  param: 'upstreamErrorParam',
+  status: 'upstreamErrorStatus',
+} as const;
+
+function describeUpstreamError(responseText: string): Record<string, string> {
+  const parsed = parseJson(responseText);
+  if (!('value' in parsed) || !isRecord(parsed.value) || !isRecord(parsed.value.error)) {
+    return {};
+  }
+  const error = parsed.value.error;
+  const fields: Record<string, string> = {};
+  for (const [field, name] of Object.entries(UPSTREAM_ERROR_FIELDS)) {
+    const value = error[field];
+    if (typeof value === 'string' || typeof value === 'number') {
+      fields[name] = String(value).slice(0, UPSTREAM_ERROR_FIELD_LIMIT);
+    }
+  }
+  // OpenRouter names the provider that failed behind its router.
+  const providerName = isRecord(error.metadata) ? error.metadata.provider_name : undefined;
+  if (typeof providerName === 'string') {
+    fields.upstreamProviderName = providerName.slice(0, UPSTREAM_ERROR_FIELD_LIMIT);
+  }
+  return fields;
+}
 
 // An upstream error body can be very large, so only the prefix the diagnostics
 // use is read and the rest of the stream is cancelled.
@@ -970,20 +1002,22 @@ export async function captureProxyError(params: {
         ...describeRequestFields(request),
       };
 
+      // Only the length of the body and allowlisted error fields go to Sentry.
+      // The server log also gets a redacted prefix of the body.
+      let logOnlyFields: Record<string, string> = {};
       try {
         const responseText = await readTextPrefix(response.clone(), ERROR_BODY_DIAGNOSTIC_LIMIT);
-        extraErrorData.first4kOfResponse = redactSecretValues(responseText, 4096);
-        const parsed = parseJson(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT));
-        if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
-          const { param, code } = parsed.value.error;
-          if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);
-          if (typeof code === 'string') extraErrorData.upstreamErrorCode = code.slice(0, 512);
-        }
+        extraErrorData.responseBodyReadLength = responseText.length;
+        Object.assign(
+          extraErrorData,
+          describeUpstreamError(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT))
+        );
+        logOnlyFields = { first4kOfResponse: redactSecretValues(responseText, 4096) };
       } catch {
         // ignore errors when already handling errors...
       }
 
-      errorExceptInTest(errorMessage, extraErrorData);
+      errorExceptInTest(errorMessage, { ...extraErrorData, ...logOnlyFields });
       if (trackInSentry) {
         captureMessage(errorMessage, {
           level: 'error',

@@ -36,6 +36,13 @@ import {
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import {
+  isAdminAuditInputRejection,
+  noteAdminAuditInputParsing,
+  reportAdminAuditGap,
+  runAdminAuditScope,
+  type AdminAuditSpec,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { adminNetworkRefusal } from '@kilocode/web-shared/lib/admin/admin-network';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
@@ -273,11 +280,19 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
   };
 };
 
+/**
+ * Procedure meta. `adminAudit` declares how an admin mutation is audited; the
+ * admin audit middleware on `adminProcedure` enforces it.
+ */
+export type TRPCMeta = {
+  adminAudit?: AdminAuditSpec;
+};
+
 // Avoid exporting the entire t-object
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-const t = initTRPC.context<TRPCContext>().create({
+const t = initTRPC.context<TRPCContext>().meta<TRPCMeta>().create({
   errorFormatter: trpcErrorFormatter,
 });
 
@@ -570,6 +585,54 @@ const adminStepUpEnforcementMiddleware = t.middleware(
   }
 );
 
+// Audits every admin mutation, including those of the specialized procedures
+// chained on `adminProcedure`, from its `adminAudit` meta. It runs after the
+// admin guard, so a refused non-admin records nothing, and before the step-up
+// guard and any specialized guard chained later, so their refusals are
+// recorded as failures. A failure keeps its spec target only when the input
+// parsed (see `adminAuditInputParsingMiddleware`).
+const adminAuditMiddleware = t.middleware(({ ctx, meta, path, type, getRawInput, next }) => {
+  if (type !== 'mutation') return next();
+  const spec = meta?.adminAudit;
+  if (spec === undefined) {
+    reportAdminAuditGap(`${path} declares no adminAudit meta`);
+    return next();
+  }
+  return runAdminAuditScope({
+    spec,
+    route: path,
+    context: () => ctx,
+    input: getRawInput,
+    reportsInputParsing: true,
+    run: () => next(),
+    outcomeOf: result =>
+      result.ok
+        ? { outcome: 'success' }
+        : {
+            outcome: 'failure',
+            errorCode: result.error.code,
+            inputRejected: isAdminAuditInputRejection(result.error),
+          },
+  });
+});
+
+// tRPC runs a procedure's `.input()` parser as a middleware after every `.use()`
+// chained before it, so the guards a refusal can come from (the step-up check
+// above, and the narrower guards chained on `adminProcedure`) run before it,
+// and none of them reads the raw input after this point. The first read of the
+// reader handed on here is therefore the parser's: it tells the audit scope
+// that a later failure came after parsing began.
+const adminAuditInputParsingMiddleware = t.middleware(({ getRawInput, next }) =>
+  next({
+    getRawInput: () => {
+      noteAdminAuditInputParsing();
+      return getRawInput();
+    },
+  })
+);
+
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)
-  .use(adminStepUpEnforcementMiddleware);
+  .use(adminAuditMiddleware)
+  .use(adminStepUpEnforcementMiddleware)
+  .use(adminAuditInputParsingMiddleware);

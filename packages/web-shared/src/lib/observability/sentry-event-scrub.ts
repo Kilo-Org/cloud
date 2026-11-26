@@ -6,7 +6,7 @@ import type { Breadcrumb, Contexts, Event } from '@sentry/nextjs';
 import { sanitizeSentryRequestData } from '@kilocode/web-shared/lib/observability/sentry-request-data';
 import {
   FILTERED_VALUE,
-  isSensitiveKey,
+  isSensitiveEntry,
   redactSecretValues,
   scrubSecretRecord,
   scrubSecrets,
@@ -23,7 +23,7 @@ function scrubContexts(contexts: Contexts): Contexts {
 function scrubTags(tags: NonNullable<Event['tags']>): NonNullable<Event['tags']> {
   const scrubbed: NonNullable<Event['tags']> = {};
   for (const [key, value] of Object.entries(tags)) {
-    if (isSensitiveKey(key)) {
+    if (isSensitiveEntry(key, value)) {
       scrubbed[key] = FILTERED_VALUE;
     } else {
       scrubbed[key] = typeof value === 'string' ? redactSecretValues(value) : value;
@@ -50,9 +50,42 @@ function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
   };
 }
 
+// The SDK copies the root span name into the trace header of every envelope and
+// into the baggage header of outgoing requests. Neither path runs beforeSend, and
+// a span name can hold a URL. Tracing is off, so no sampling decision reads it.
+export function dropTraceTransactionName(dsc: { transaction?: string }): void {
+  delete dsc.transaction;
+}
+
+// The request policy keeps the URL path and the allowed header values. A path
+// can hold a capability token and a kept query value can hold a credential, so
+// those values get the free-text scrub too. The referer keeps its origin and
+// path only, because its query belongs to another page.
+function scrubRequest(request: NonNullable<Event['request']>): void {
+  if (typeof request.url === 'string') {
+    request.url = redactSecretValues(request.url);
+  }
+  const headers = request.headers;
+  if (!headers) {
+    return;
+  }
+  for (const [name, value] of Object.entries(headers)) {
+    const scrubbed = redactSecretValues(value);
+    headers[name] =
+      name.toLowerCase() === 'referer' ? (scrubbed.split(/[?#]/, 1)[0] ?? '') : scrubbed;
+  }
+}
+
 export function scrubSentryEvent<T extends Event>(event: T): T {
   sanitizeSentryRequestData(event);
   delete event.request?.env;
+  if (event.request) {
+    scrubRequest(event.request);
+  }
+  // Sentry also shows the transaction name as the `transaction` tag.
+  if (event.transaction !== undefined) {
+    event.transaction = redactSecretValues(event.transaction);
+  }
   if (event.message !== undefined) {
     event.message = redactSecretValues(event.message);
   }

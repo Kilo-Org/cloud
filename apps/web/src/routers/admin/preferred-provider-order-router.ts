@@ -19,14 +19,17 @@ export const adminPreferredProviderOrderRouter = createTRPCRouter({
     return { config: row?.config ?? null };
   }),
 
-  set: adminProcedure.input(SetPreferredProviderOrderConfigSchema).mutation(async ({ input }) => {
-    await db
-      .insert(ai_gateway_config)
-      .values({ preferred_provider_order: input.config })
-      .onConflictDoUpdate({
-        target: ai_gateway_config.id,
-        set: { preferred_provider_order: input.config },
-      });
-    return { config: input.config };
-  }),
+  set: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'preferred_provider_order.set' } })
+    .input(SetPreferredProviderOrderConfigSchema)
+    .mutation(async ({ input }) => {
+      await db
+        .insert(ai_gateway_config)
+        .values({ preferred_provider_order: input.config })
+        .onConflictDoUpdate({
+          target: ai_gateway_config.id,
+          set: { preferred_provider_order: input.config },
+        });
+      return { config: input.config };
+    }),
 });

@@ -139,4 +139,17 @@ describe('sanitizeAnalyticsUrl', () => {
     expect(sanitizeAnalyticsPathname('/share/abc')).toBe('/share/:share_id');
     expect(sanitizeAnalyticsPathname('/cloud/sessions')).toBe('/cloud/sessions');
   });
+
+  it('redacts the device-auth user code from the legacy poll path', () => {
+    expect(sanitizeAnalyticsPathname('/api/device-auth/codes/FAKE-CODE')).toBe(
+      '/api/device-auth/codes/:code'
+    );
+    expect(
+      sanitizeAnalyticsUrl('https://app.kilo.ai', '/api/device-auth/codes/FAKE-CODE', 'x=1')
+    ).toBe('https://app.kilo.ai/api/device-auth/codes/:code?x=1');
+    expect(sanitizeAnalyticsText('GET /api/device-auth/codes/FAKE-CODE')).toBe(
+      'GET /api/device-auth/codes/:code'
+    );
+    expect(sanitizeAnalyticsPathname('/api/device-auth/codes')).toBe('/api/device-auth/codes');
+  });
 });

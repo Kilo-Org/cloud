@@ -801,8 +801,9 @@ ${dynamic}`;
     expect(baseReader.safeParse(JSON.parse(JSON.stringify(plain.snapshot()))).success).toBe(true);
     const leasing = loadPolicies({ 'app-one.yaml': worker(grant('replica-read', 3600, 3600, 1)) });
     expect(baseReader.safeParse(leasing.snapshot()).success).toBe(false);
+    // The reader fills the token-grant lists a policy without token grants leaves out.
     expect(PolicySnapshotSchema.parse(JSON.parse(JSON.stringify(plain.snapshot())))).toEqual(
-      plain.snapshot()
+      plain.snapshot().map(entry => ({ audiences: [], scopes: [], ...entry }))
     );
   });
 });

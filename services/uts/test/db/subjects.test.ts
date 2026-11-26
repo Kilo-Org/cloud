@@ -758,6 +758,29 @@ describe('authority sync', () => {
   });
 });
 
+describe('uts.subject_revoked_since after migrations 0013 and 0014', () => {
+  it('keeps the attributes 0013 gave it: SQL, STABLE, invoker rights, fixed search_path, no grant', async () => {
+    const result = await owner.query(
+      `SELECT l.lanname AS language, p.provolatile AS volatility, p.prosecdef AS definer,
+              p.proconfig AS config, pg_get_function_identity_arguments(p.oid) AS arguments,
+              (SELECT count(*)::int FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS acl
+               WHERE acl.grantee <> p.proowner) AS other_grantees
+       FROM pg_proc AS p JOIN pg_language AS l ON l.oid = p.prolang
+       WHERE p.pronamespace = 'uts'::regnamespace AND p.proname = 'subject_revoked_since'`
+    );
+    expect(result.rows).toEqual([
+      {
+        language: 'sql',
+        volatility: 's',
+        definer: false,
+        config: ['search_path=pg_catalog, pg_temp'],
+        arguments: 'p_account_id text, p_issued_at timestamp with time zone',
+        other_grantees: 0,
+      },
+    ]);
+  });
+});
+
 describe('round-1 review fixes', () => {
   const email = (subject: string, address: string, version: number) =>
     subjects.syncPrimaryEmail({

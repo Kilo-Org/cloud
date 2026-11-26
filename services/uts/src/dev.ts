@@ -1,6 +1,7 @@
 import { UtsFeedIndexSchema } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { devMetadataFetcher, devStsCallers } from './dev-clients';
 import { handleDevNoticeRequest } from './dev-notices';
 import type { DevUtsFeedDO } from './dev-feed';
 import { getFeedStub, getSignerStub } from './dos/stubs';
@@ -46,6 +47,8 @@ import type { SignerAccess } from './token/mint';
  *   check (`src/dev-notices.ts`).
  * * The `/internal/` routes take a stand-in STS token, `uts-dev-sts:<workload>:<scope>`, for the
  *   subject-operation end-to-end run (`developmentServiceTokens`).
+ * * The client metadata fetch of test domains and the stand-in STS token verifier of the broker
+ *   exchange, each when its var is set (`src/dev-clients.ts`).
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 export const DEV_FEED_STOP_PATH = '/__dev/feed/stop';
@@ -139,7 +142,9 @@ export const developmentHandoff: AuthorizationHandoff = async (request, pending)
     amr: ['passkey'] as const,
     orgId: pending.orgHint,
   };
-  if (pending.client.kind === 'first_party') {
+  // The synthetic account has no browser session, so a `kilo-web` request ends `access_denied`;
+  // the web BFF's run signs in through the sign-in pages (`dev_handoff=signin`).
+  if (pending.client.kind !== 'third_party') {
     return { status: 'approved', approval: { ...subject, clientKind: 'first_party' } };
   }
   const consentId = z.uuid().safeParse(params.get('dev_consent_id'));
@@ -189,6 +194,8 @@ export async function handleDevRequest(
       scopes: developmentScopes,
       mailer: recordingMailer,
       serviceTokens: developmentServiceTokens,
+      metadataFetcher: devMetadataFetcher(env) ?? ((url, init) => fetch(url, init)),
+      stsCallers: devStsCallers(env),
     });
   }
   if (request.method !== 'POST') {

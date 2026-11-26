@@ -121,6 +121,13 @@ export type Env = {
    * is served only where it is set (src/signin/device/user-code.ts).
    */
   DEVICE_USER_CODE_KEY?: string;
+  /**
+   * The public keys of the web BFF `kilo-web` (`KiloWebClientJwksSchema`): one or two Ed25519
+   * JWKs as JSON. `kilo-web` is served only where it is set (src/bff/client-auth.ts).
+   */
+  KILO_WEB_CLIENT_JWKS?: string;
+  /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
+  LEGACY_BRIDGE_ENABLED?: string;
 } & SignInEnv;
 
 /**

@@ -65,6 +65,25 @@ export type UtsScopeEntry = {
    * that allow it.
    */
   delegable: boolean;
+  /**
+   * How a token for it is minted. `grant`: from an authorization code, a refresh or a device
+   * grant. `token_exchange`: only by the RFC 8693 broker exchange at `/token`, as a delegated token
+   * whose `act` names the calling workload (design 5.9); `/authorize` and every grant mint refuse
+   * such a scope.
+   */
+  issuance: 'grant' | 'token_exchange';
+  /**
+   * The `token_exchange` scopes that a token for this scope may be exchanged for. A consent to this
+   * scope covers them: the consent row stores only this scope, and the exchange derives the
+   * delegation from this field when it runs, so a withdrawn consent ends both.
+   */
+  delegatesTo: readonly string[];
+  /**
+   * The one consent line a third-party client's consent screen shows for this scope (design 5.9),
+   * exactly when a third-party client can ask for it at `/authorize`; otherwise null. A new line
+   * needs a new consent from each client.
+   */
+  consentText: string | null;
 };
 
 /** The web BFF, the CLI and the mobile app; `clients.ts` registers all three. */
@@ -95,6 +114,25 @@ export const UTS_SECURITY_READ_SCOPE = 'uts:security.read';
  */
 export const UTS_BROWSER_SESSION_READ_SCOPE = 'uts:browser-session.read';
 
+/** The audience of Kilo MCP (`services/kilo-mcp`), the resource server of MCP clients. */
+export const KILO_MCP_AUDIENCE = 'kilo-mcp';
+/** Read the Kilo tool catalog through Kilo MCP; the one scope an MCP client asks for. */
+export const KILO_MCP_CATALOG_READ_SCOPE = 'kilo-mcp:catalog.read';
+/**
+ * The Kilo API reads that Kilo MCP makes for its subject (design 5.9): the tool catalog and the
+ * global `models.preferred` and `models.providerNames` queries, with no user, organization, usage
+ * or billing data. Minted only by the broker exchange, with `act` naming Kilo MCP.
+ */
+export const KILO_API_MCP_READ_SCOPE = 'kilo-api:mcp.read';
+/** Use the tools of the `pages-dev` deployment, the first-party Pages service. */
+export const PAGES_DEV_TOOLS_USE_SCOPE = 'pages-dev:tools.use';
+/**
+ * The consent line of `kilo-mcp:catalog.read`. It covers exactly what `kilo-api:mcp.read`, the
+ * scope it delegates to, reads; a later permission needs a new line and a new consent.
+ */
+export const KILO_MCP_CATALOG_CONSENT_TEXT =
+  "Read your Kilo tool catalog and Kilo's global preferred models and model provider names through Kilo MCP";
+
 /** Scopes that change credentials. No PAT or bot key may carry one, so a PAT never makes a PAT. */
 export const UTS_CREDENTIAL_SCOPES: readonly string[] = [
   UTS_PATS_MANAGE_SCOPE,
@@ -114,6 +152,9 @@ const ACCOUNT_API = {
   requiresSession: true,
   requiresOrgClaim: false,
   delegable: false,
+  issuance: 'grant',
+  delegatesTo: [],
+  consentText: null,
 } as const satisfies UtsScopeEntry;
 
 /**
@@ -145,6 +186,9 @@ function firstPartyScope(
     requiresSession: options.requiresSession,
     requiresOrgClaim: options.orgRoles !== undefined,
     delegable: false,
+    issuance: 'grant',
+    delegatesTo: [],
+    consentText: null,
   };
 }
 
@@ -171,6 +215,9 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
     requiresSession: false,
     requiresOrgClaim: false,
     delegable: false,
+    issuance: 'grant',
+    delegatesTo: [],
+    consentText: null,
   },
   // The CLI's Kilo API routes (phase 4 caller map). Each route keeps its own authorization and
   // resource checks; there is no generic write scope.
@@ -252,6 +299,45 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
   }),
   // One chat credential serves the client's reads and writes.
   'kilo-chat:chat.use': firstPartyScope('kilo-chat', [BFF], { requiresSession: true }),
+  // Pages (design 5.9): the `pages-dev` deployment's tools, for the web app's Pages exchange only.
+  [PAGES_DEV_TOOLS_USE_SCOPE]: firstPartyScope('pages-dev', [BFF], {
+    requiresSession: true,
+    lifetimeSeconds: SHORT_LIFETIME_SECONDS,
+  }),
+  // Kilo MCP (design 5.9). A third-party grant names its consent family in `sid`, not a session.
+  [KILO_MCP_CATALOG_READ_SCOPE]: {
+    audience: KILO_MCP_AUDIENCE,
+    maxLifetimeSeconds: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
+    allowedClients: [THIRD_PARTY_CLIENTS, CLI],
+    subjects: { kind: 'any_user' },
+    thirdPartySafe: true,
+    stepUp: false,
+    patEligible: false,
+    privileged: false,
+    requiresSession: false,
+    requiresOrgClaim: false,
+    delegable: false,
+    issuance: 'grant',
+    delegatesTo: [KILO_API_MCP_READ_SCOPE],
+    consentText: KILO_MCP_CATALOG_CONSENT_TEXT,
+  },
+  // Only the broker exchange mints it, from a `kilo-mcp:catalog.read` token of the same client.
+  [KILO_API_MCP_READ_SCOPE]: {
+    audience: KILO_API_AUDIENCE,
+    maxLifetimeSeconds: SHORT_LIFETIME_SECONDS,
+    allowedClients: [THIRD_PARTY_CLIENTS, CLI],
+    subjects: { kind: 'any_user' },
+    thirdPartySafe: true,
+    stepUp: false,
+    patEligible: false,
+    privileged: false,
+    requiresSession: false,
+    requiresOrgClaim: false,
+    delegable: true,
+    issuance: 'token_exchange',
+    delegatesTo: [],
+    consentText: null,
+  },
 };
 
 /** The registry entry of `scope`, or null when the registry does not list it. */

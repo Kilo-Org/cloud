@@ -42,6 +42,11 @@ export type ProviderIdentity = {
   emailProven: boolean;
   /** The WorkOS connection an SSO profile names; null for other providers. */
   workosConnectionId: string | null;
+  /**
+   * The WorkOS organization an SSO profile names; null for other providers and for a connection
+   * without one. The sign-in records it on the session for the web BFF (migration 0013).
+   */
+  workosOrganizationId: string | null;
 };
 
 export type CompleteFlowInput = {
@@ -275,7 +280,7 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
 
     async completeFlow(input) {
       const row = await one(
-        'SELECT * FROM uts.complete_provider_sign_in($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
+        'SELECT * FROM uts.complete_provider_sign_in($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)',
         [
           input.environment,
           input.stateHash,
@@ -285,6 +290,7 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
           input.identity.email,
           input.identity.emailProven,
           input.identity.workosConnectionId,
+          input.identity.workosOrganizationId,
           input.sessionTokenHash,
           ...networkValues(input.network),
           input.newAccountId,

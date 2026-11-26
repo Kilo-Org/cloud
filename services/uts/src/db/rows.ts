@@ -125,7 +125,8 @@ export const PasskeyCredentialRowSchema = z.strictObject({
 export const BrowserSessionRowSchema = z.strictObject({
   id: uuid,
   account_id: z.string(),
-  token_hash: sha256,
+  /** Null for a session the legacy bridge created, which has no sign-in cookie. */
+  token_hash: sha256.nullable(),
   auth_time: timestamp,
   amr,
   created_at: timestamp,
@@ -140,6 +141,13 @@ export const BrowserSessionRowSchema = z.strictObject({
   denied_audited_at: timestamp.nullable(),
   cleanup_kept_at: timestamp.nullable(),
   device_key_hash: sha256.nullable(),
+  /** The web BFF's handle (migration 0013): its hash, issue time and the sign-in it carries. */
+  handle_hash: sha256.nullable(),
+  handle_issued_at: timestamp.nullable(),
+  handle_auth_time: timestamp.nullable(),
+  handle_amr: amr.nullable(),
+  sso_connection_id: z.string().nullable(),
+  sso_organization_id: z.string().nullable(),
 });
 
 export const DeviceSessionRowSchema = z.strictObject({

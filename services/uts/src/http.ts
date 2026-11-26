@@ -5,6 +5,8 @@ import {
   utsScopeEntry,
 } from '@kilocode/uts-contracts';
 import { shardAccessTokenKeys } from './account/bearer';
+import { isBrowserSessionPath } from './bff/routes';
+import { webClientUnavailable } from './bff/responses';
 import { type AccountDeps, handleAccountRequest } from './account/routes';
 import { identityStoreAccount } from './account/store';
 import { withIdentityStore } from './db/client';
@@ -23,15 +25,19 @@ import type { SignInMailer } from './signin/email/mailer';
 import { subjectDeps } from './subjects/deps';
 import { handleInternalRequest } from './subjects/routes';
 import { type ServiceTokenVerifier, noServiceTokenVerifier } from './subjects/service-tokens';
+import type { MetadataFetcher } from './third-party/metadata';
 import type { SignerAccess } from './token/mint';
+import type { StsCallerVerifier } from './exchange/endpoint';
 
 /**
  * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
- * signer for the local end-to-end run, the development fixture scopes on top of the scope registry,
- * a recording mail port for the email sign-in and a stand-in STS token check for the `/internal/`
- * routes (src/dev.ts). The deployed options are the sign-in pages, the grant's signer, the
- * registry alone, no mail port, and no STS token check, so every `/internal/` route answers 503
- * until the mint Worker carries `@kilocode/verify`.
+ * signer for the local end-to-end run, the development fixture scopes on top of the scope
+ * registry, a recording mail port for the email sign-in, a metadata fetch that serves the local
+ * end-to-end run's client documents, a stand-in STS token verifier of the broker exchange and a
+ * stand-in STS token check for the `/internal/` routes (src/dev.ts). The deployed options are the
+ * sign-in pages, the grant's signer, the registry alone, no mail port, the platform `fetch`, no STS
+ * token verifier (the broker exchange waits for `@kilocode/verify`) and no STS token check, so
+ * every `/internal/` route answers 503 until the mint Worker carries `@kilocode/verify`.
  */
 export type MintOptions = {
   authorizationHandoff: HandoffChoice | null;
@@ -39,6 +45,8 @@ export type MintOptions = {
   scopes: ScopeRegistry;
   mailer: SignInMailer | null;
   serviceTokens: ServiceTokenVerifier;
+  metadataFetcher: MetadataFetcher;
+  stsCallers: StsCallerVerifier | null;
 };
 
 const DEPLOYED: MintOptions = {
@@ -47,6 +55,8 @@ const DEPLOYED: MintOptions = {
   scopes: utsScopeEntry,
   mailer: null,
   serviceTokens: noServiceTokenVerifier,
+  metadataFetcher: (url, init) => fetch(url, init),
+  stsCallers: null,
 };
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
@@ -102,20 +112,14 @@ export async function handleRequest(
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
-  const oauth = oauthService(
-    env,
-    ctx,
-    config,
-    options.authorizationHandoff,
-    options.signer,
-    options.scopes,
-    options.mailer
-  );
+  const oauth = oauthService(env, ctx, config, options);
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
     }
-    return jsonResponse(authorizationServerMetadata(config, oauth), 200, {
+    const webClientReady =
+      oauth.kind === 'ready' && (await oauth.deps.web.keys()).status === 'ready';
+    return jsonResponse(authorizationServerMetadata(config, oauth, webClientReady), 200, {
       'Cache-Control': 'public, max-age=300',
     });
   }
@@ -134,6 +138,9 @@ export async function handleRequest(
   if (oauth.kind === 'ready') {
     const response = await handleOAuthRequest(request, pathname, oauth.deps);
     if (response !== null) return response;
+  } else if (isBrowserSessionPath(pathname)) {
+    // The web BFF reads this as "not yet", never as "no such session".
+    return webClientUnavailable();
   }
   const internal = await handleInternalRequest(request, pathname, {
     serviceTokens: options.serviceTokens,

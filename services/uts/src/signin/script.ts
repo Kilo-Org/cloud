@@ -216,6 +216,32 @@ const SCRIPT = `'use strict';
     await decide(false);
     status('Device sign-in denied.');
   });
+
+  // The consent form's Allow button when the session needs the tier B passkey check first: the
+  // step-up runs, then the same button submits the form, which the page checked already.
+  const consentForm = document.getElementById('consent-form');
+  if (consentForm) {
+    consentForm.addEventListener('submit', async event => {
+      const submitter = event.submitter;
+      if (!submitter || !submitter.hasAttribute('data-step-up')) return;
+      event.preventDefault();
+      submitter.disabled = true;
+      try {
+        status('Confirm with your passkey.');
+        await assertion('step_up');
+        submitter.removeAttribute('data-step-up');
+        submitter.disabled = false;
+        consentForm.requestSubmit(submitter);
+      } catch (error) {
+        if (error instanceof Error && error.message === UNAVAILABLE) {
+          showUnavailable();
+          return;
+        }
+        status('That did not work: ' + (error instanceof Error ? error.message : 'failed'));
+        submitter.disabled = false;
+      }
+    });
+  }
 })();
 `;
 

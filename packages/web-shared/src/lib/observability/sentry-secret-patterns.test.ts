@@ -137,19 +137,6 @@ describe('redactSecretValues', () => {
     expect(redactSecretValues(input)).toBe(input);
   });
 
-  test.each([
-    ['repeated JWT starts', 'eyJ-'.repeat(50_000)],
-    ['repeated JWT starts after one dot', `eyJ.${'eyJ-'.repeat(50_000)}`],
-    ['a JWT start with one long segment', `eyJa.${'a'.repeat(200_000)}`],
-    ['a bearer prefix with long whitespace', `Bearer${' '.repeat(200_000)}`],
-    ['repeated key prefixes', 'sk-x '.repeat(40_000)],
-    ['a Sentry token prefix with no delimiter', `sntrys_eyJ${'a'.repeat(200_000)}`],
-  ])('redacts 200 KB of %s in linear time', (_name, input) => {
-    const started = performance.now();
-    redactSecretValues(input, input.length);
-    expect(performance.now() - started).toBeLessThan(100);
-  });
-
   test('keeps text up to the length limit unchanged', () => {
     const text = 'a '.repeat(MAX_REDACTED_TEXT_LENGTH / 2);
 
@@ -435,17 +422,23 @@ describe('redactSecretValues', () => {
   });
 
   // Each case is built from near matches of a pattern at two sizes. The length
-  // argument skips the cut, so the patterns run on all of the text. Linear
-  // redaction of the large text does the same work as SIZE_FACTOR redactions of
-  // the small text, so the time ratio is about 1; a pattern that rescans its
-  // input makes it about SIZE_FACTOR. Both spans of a pair are about equally
-  // long and run one after the other, so a slow or busy runner stretches both
-  // by about the same factor. The median of several pairs leaves out a pair in
-  // which pattern compilation, garbage collection or a change in load falls on
-  // one span only.
+  // argument skips the cut, so the patterns run on all of the text. Each run
+  // times three spans one after the other:
+  // - SIZE_FACTOR redactions of the small text. Linear redaction of the large
+  //   text does the same work, so the growth ratio is about 1; a pattern that
+  //   rescans its input makes it about SIZE_FACTOR.
+  // - One redaction of the large text.
+  // - One redaction of plain prose of the same length. The cost ratio limits the
+  //   work per character, so a pattern that rescans a bounded window or
+  //   backtracks a lot on each fragment fails too, although its growth is linear.
+  // The spans are short and adjacent, so a slow or busy runner stretches them by
+  // about the same factor. The median of several runs leaves out a run in which
+  // pattern compilation, garbage collection or a change in load falls on one
+  // span only.
   const LARGE_SIZE = 100_000;
   const SIZE_FACTOR = 16;
-  const MAX_TIME_RATIO = 4;
+  const MAX_GROWTH_RATIO = 4;
+  const MAX_COST_RATIO = 16;
   const RUNS = 5;
   type Build = (size: number) => string;
   const nearMatches =
@@ -463,7 +456,15 @@ describe('redactSecretValues', () => {
     }
     return performance.now() - started;
   };
+  const median = (values: number[]) => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  const plain = nearMatches('The quick brown fox jumps over the lazy dog. ')(LARGE_SIZE);
   test.each<[string, Build]>([
+    ['value: repeated JWT starts', nearMatches('eyJ-')],
+    ['value: repeated JWT starts after one dot', longValue('eyJ.', 'eyJ-')],
+    ['value: a JWT start with one long segment', longValue('eyJa.')],
+    ['value: a bearer prefix with long whitespace', longValue('Bearer', ' ')],
+    ['value: repeated key prefixes', nearMatches('sk-x ')],
+    ['value: a Sentry token prefix with no delimiter', longValue('sntrys_eyJ')],
     ['parameter: repeated plain pairs', nearMatches('?a=b')],
     ['parameter: one long value', longValue('?a=', 'b')],
     ['parameter: one long percent-encoded value', longValue('?a=', '%41')],
@@ -518,11 +519,17 @@ describe('redactSecretValues', () => {
   ])('redacts %s in linear time', (_name, build) => {
     const small = build(LARGE_SIZE / SIZE_FACTOR);
     const large = build(LARGE_SIZE);
-    const ratios = Array.from({ length: RUNS }, () => {
+    const growth: number[] = [];
+    const cost: number[] = [];
+    for (let run = 0; run < RUNS; run++) {
       const smallTime = redactionTime(small, SIZE_FACTOR);
-      return redactionTime(large, 1) / smallTime;
-    }).sort((a, b) => a - b);
-    expect(ratios[Math.floor(RUNS / 2)]).toBeLessThan(MAX_TIME_RATIO);
+      const largeTime = redactionTime(large, 1);
+      const plainTime = redactionTime(plain, 1);
+      growth.push(largeTime / smallTime);
+      cost.push(largeTime / plainTime);
+    }
+    expect(median(growth)).toBeLessThan(MAX_GROWTH_RATIO);
+    expect(median(cost)).toBeLessThan(MAX_COST_RATIO);
   });
 });
 

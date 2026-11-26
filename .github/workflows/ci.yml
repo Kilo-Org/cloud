@@ -1764,8 +1764,9 @@ jobs:
           --health-interval 2s
           --health-timeout 5s
           --health-retries 25
+        # Published on the runner's loopback only, as local-db.sh publishes it.
         ports:
-          - 5432:5432
+          - 127.0.0.1:5432:5432
 
     env:
       UTS_PG_PORT: 5432

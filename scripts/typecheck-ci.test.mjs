@@ -2042,9 +2042,10 @@ test('the UTS Postgres job installs the UTS closure and tests against its servic
   assert.equal(bootstrap.env.UTS_PG_CONTAINER, '${{ job.services.postgres.id }}');
   const adminUrl = new URL(job.env.UTS_TEST_ADMIN_URL);
   assert.equal(adminUrl.hostname, '127.0.0.1', 'the suite accepts only a loopback host');
-  assert.ok(
-    job.services.postgres.ports.includes(`${adminUrl.port}:5432`),
-    'the admin URL port is the one the service publishes'
+  assert.deepEqual(
+    job.services.postgres.ports,
+    [`127.0.0.1:${adminUrl.port}:5432`],
+    'the service publishes the admin URL port on loopback only'
   );
   const run = job.steps.find(step => step.name === 'Run UTS identity-store tests');
   assert.equal(run.run, 'pnpm --filter cloudflare-uts test:postgres');

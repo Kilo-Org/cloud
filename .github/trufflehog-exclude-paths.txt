@@ -79,3 +79,9 @@ apps/mobile/src/components/chat/mcp-settings-state-remote-servers\.test\.ts
 # those commits stay in branch history. Exclude the fixture path so the
 # historical commits do not fail the scan.
 services/uts/test/db/operator-connection\.test\.ts
+
+# API request log redaction fixtures. redact-api-request-log.test.ts asserts that
+# synthetic credential URLs ("admin:hunter2@db", "user:pass@mcp.example.com") are
+# redacted before a request body is stored. Exclude the fixture path so the
+# synthetic credential URIs do not fail the scan.
+packages/web-shared/src/lib/ai-gateway/redact-api-request-log\.test\.ts

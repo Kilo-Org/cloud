@@ -38,6 +38,31 @@ export type FolderRead =
   | { status: 'not_modified' }
   | { status: 'unreachable'; detail: string; retryAfterMs: number | null };
 
+/**
+ * One Infisical dynamic secret: its name and the folder it sits in. Each sits alone in its own
+ * folder, because a `dynamic-secrets` permission is scoped by folder and cannot name a secret.
+ */
+export type DynamicSecretRef = { name: string; path: string };
+
+/**
+ * https://infisical.com/docs/api-reference/endpoints/dynamic-secrets/create-lease. `data` is the
+ * provider's output; the SQL provider returns the role's name and password under these keys.
+ */
+const LeaseCreatedSchema = z.object({
+  lease: z.object({ id: z.uuid(), expireAt: z.iso.datetime({ offset: true }) }),
+  data: z.object({ DB_USERNAME: z.string().min(1), DB_PASSWORD: z.string().min(1) }),
+});
+
+export type LeaseCreation =
+  | { status: 'created'; leaseId: string; expiresAt: number; username: string; password: string }
+  | { status: 'unreachable'; detail: string; retryAfterMs: number | null };
+
+/** `gone`: Infisical no longer has the lease (it expired, or was revoked before). */
+export type LeaseRevocation =
+  | { status: 'revoked' }
+  | { status: 'gone' }
+  | { status: 'unreachable'; detail: string; retryAfterMs: number | null };
+
 /** Tokens are reused until this long before they expire (design 4.2: they live 10 minutes). */
 const TOKEN_EXPIRY_MARGIN_MS = 60_000;
 
@@ -200,4 +225,99 @@ export class InfisicalClient {
     }
     return { status: 'fresh', entries, hidden, etag: response.headers.get('etag') };
   }
+
+  /**
+   * Creates one lease of `secret` for `ttlSeconds`. Never retried: a create that timed out may still
+   * have made a role, which Infisical drops at its expiry and whose password nobody received. Any
+   * refusal (a 4xx, such as a lifetime above the dynamic secret's Max TTL, or a login refused), a
+   * 5xx, a timeout or a malformed body is unreachable, with a status-only detail.
+   */
+  async createLease(secret: DynamicSecretRef, ttlSeconds: number): Promise<LeaseCreation> {
+    try {
+      const response = await this.managerCall('lease create', '/api/v1/dynamic-secrets/leases', {
+        method: 'POST',
+        body: {
+          dynamicSecretName: secret.name,
+          ...this.leaseScope(secret),
+          ttl: `${ttlSeconds}s`,
+        },
+      });
+      if (!response.ok) throw unreachableFor(response, 'lease create');
+      const parsed = LeaseCreatedSchema.safeParse(await response.json().catch(() => null));
+      if (!parsed.success) {
+        throw new ManagerUnreachableError('manager lease response did not match', null);
+      }
+      return {
+        status: 'created',
+        leaseId: parsed.data.lease.id,
+        expiresAt: Date.parse(parsed.data.lease.expireAt),
+        username: parsed.data.data.DB_USERNAME,
+        password: parsed.data.data.DB_PASSWORD,
+      };
+    } catch (error) {
+      return unreachableOutcome(error);
+    }
+  }
+
+  /** Revokes one lease: Infisical runs the revocation statement, then forgets the lease. */
+  async revokeLease(secret: DynamicSecretRef, leaseId: string): Promise<LeaseRevocation> {
+    try {
+      const response = await this.managerCall(
+        'lease revoke',
+        `/api/v1/dynamic-secrets/leases/${encodeURIComponent(leaseId)}`,
+        { method: 'DELETE', body: this.leaseScope(secret) }
+      );
+      if (response.status === 404) {
+        await response.body?.cancel();
+        return { status: 'gone' };
+      }
+      if (!response.ok) throw unreachableFor(response, 'lease revoke');
+      await response.body?.cancel();
+      return { status: 'revoked' };
+    } catch (error) {
+      return unreachableOutcome(error);
+    }
+  }
+
+  private leaseScope(secret: DynamicSecretRef): Record<string, string> {
+    if (this.config.projectSlug === null) {
+      throw new ManagerUnreachableError('no project slug is configured for leases', null);
+    }
+    return {
+      projectSlug: this.config.projectSlug,
+      environmentSlug: this.config.environmentSlug,
+      path: secret.path,
+    };
+  }
+
+  /** One JSON call with the current access token; a 401 or 403 drops the token for the next call. */
+  private async managerCall(
+    action: string,
+    path: string,
+    request: { method: 'POST' | 'DELETE'; body: Record<string, string> }
+  ): Promise<Response> {
+    const token = await this.login();
+    const response = await managerFetch(`${this.config.baseUrl}${path}`, {
+      method: request.method,
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(request.body),
+    });
+    if (response.status === 401 || response.status === 403) {
+      this.token = null;
+      await response.body?.cancel();
+      throw unreachableFor(response, action);
+    }
+    return response;
+  }
+}
+
+function unreachableOutcome(error: unknown): {
+  status: 'unreachable';
+  detail: string;
+  retryAfterMs: number | null;
+} {
+  if (error instanceof ManagerUnreachableError) {
+    return { status: 'unreachable', detail: error.detail, retryAfterMs: error.retryAfterMs };
+  }
+  throw error;
 }

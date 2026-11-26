@@ -5,17 +5,25 @@ import {
   JWKS_PATH,
   STS_BUNDLE_HTTP_PATH,
   STS_FETCHED_AT_HEADER,
+  STS_LEASE_HTTP_PATH,
+  STS_LEASE_REVOKE_HTTP_PATH,
   STS_STALE_HEADER,
   bundleResultHttpStatus,
+  leaseResultHttpStatus,
+  leaseRevokeResultHttpStatus,
   mintResultHttpStatus,
   type BundleRequest,
   type BundleResult,
+  type LeaseCallerDeniedReason,
+  type LeaseResult,
+  type LeaseRevokeResult,
   type MintResult,
 } from '@kilocode/sts-contracts';
 import { recordDenial } from './audit/denials';
 import { serveBundle } from './broker';
 import {
   BUNDLE_REQUEST_MAX_BODY_BYTES,
+  LEASE_REQUEST_MAX_BODY_BYTES,
   TOKEN_JWKS_CACHE_MS,
   TOKEN_REQUEST_MAX_BODY_BYTES,
   TOKEN_SIGNER_DEADLINE_MS,
@@ -29,6 +37,7 @@ import type { TokenJwks } from './dos/TokenSignerDO';
 import { MANAGER_JWKS_PATH, readConfig, type Env, type StsConfig } from './env';
 import { IdentityVerifier } from './identity/verify';
 import { WebhookGate, type WebhookOutcome } from './infisical/webhook';
+import { recordLeaseDenial, serveLease, serveLeaseRevoke, type LeaseCaller } from './leases/serve';
 import type { PolicyIndex } from './policy/load';
 import { callWithDeadline } from './rpc';
 import {
@@ -385,6 +394,101 @@ async function bundleRequest(
   );
 }
 
+/** Maps a lease answer to its HTTP response; exported for the response-shape tests. */
+export function leaseResponse(result: LeaseResult): Response {
+  return leaseJson(result, leaseResultHttpStatus(result));
+}
+
+/** Maps a revoke answer to its HTTP response; exported for the response-shape tests. */
+export function leaseRevokeResponse(result: LeaseRevokeResult): Response {
+  return leaseJson(result, leaseRevokeResultHttpStatus(result));
+}
+
+function leaseJson(result: LeaseResult | LeaseRevokeResult, status: number): Response {
+  const headers = new Headers({ 'cache-control': 'no-store', 'content-type': 'application/json' });
+  if ('retryAfterSeconds' in result) headers.set('retry-after', String(result.retryAfterSeconds));
+  return new Response(JSON.stringify(result), { status, headers });
+}
+
+/** The answers both lease routes give before their own logic runs. */
+type LeaseCallerRefusal =
+  | { status: 'denied'; reason: LeaseCallerDeniedReason }
+  | { status: 'unavailable'; retryAfterSeconds: number }
+  | { status: 'invalid_request' };
+
+/**
+ * `POST /v1/lease` and `POST /v1/lease/revoke`: a provider OIDC token in `Authorization` (a GitHub
+ * job for `ci-migration`), a JSON body. As on `/v1/token`, a token that did not verify is refused
+ * and only logged, a verified identity the verifier refused is audited as a lease denial with the
+ * verifier's reason, and the body (at most 1 KB) is read only after the token verified.
+ */
+async function leaseRoute<Result extends LeaseResult | LeaseRevokeResult>(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  config: StsConfig,
+  policies: PolicyIndex,
+  serve: (
+    caller: LeaseCaller,
+    body: unknown,
+    waitUntil: (promise: Promise<unknown>) => void
+  ) => Promise<Result>,
+  respond: (result: Result | LeaseCallerRefusal) => Response
+): Promise<Response> {
+  const waitUntil = (promise: Promise<unknown>) => ctx.waitUntil(promise);
+  const token = bearerToken(request);
+  if (token.length === 0) return respond({ status: 'denied', reason: 'identity_rejected' });
+
+  const outcome = await identityVerifier(config, policies).verify(token);
+  if (outcome.status === 'unavailable') {
+    return respond({ status: 'unavailable', retryAfterSeconds: VERIFIER_RETRY_AFTER_SECONDS });
+  }
+  if (outcome.status === 'denied') {
+    const { subject } = outcome;
+    if (subject === undefined) {
+      console.warn('sts: lease request refused: token not verified', {
+        environment: config.environment,
+        reason: outcome.reason,
+      });
+    } else {
+      recordLeaseDenial(
+        env,
+        config,
+        {
+          channel: 'http',
+          workload: subject.actor,
+          claims: { provider: subject.provider, ...subject.claims },
+        },
+        waitUntil,
+        outcome.reason
+      );
+    }
+    return respond({ status: 'denied', reason: outcome.reason });
+  }
+  const caller: LeaseCaller = {
+    workload: outcome.workload,
+    identity: outcome.provider,
+    channel: 'http',
+    run: outcome.run,
+    claims: { provider: outcome.provider },
+  };
+
+  const text = await readCappedText(request, LEASE_REQUEST_MAX_BODY_BYTES);
+  if (text === null) {
+    return new Response(JSON.stringify({ status: 'invalid_request' }), {
+      status: 413,
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return respond({ status: 'invalid_request' });
+  }
+  return respond(await serve(caller, body, waitUntil));
+}
+
 function webhookGate(env: Env, config: StsConfig): WebhookGate {
   const cached = gateCache;
   if (cached !== null && cached.environment === config.environment) return cached.gate;
@@ -480,6 +584,31 @@ export async function handleRequest(
   }
   if (request.method === 'POST' && pathname === STS_BUNDLE_HTTP_PATH) {
     return await bundleRequest(request, env, ctx, config, authority);
+  }
+  if (request.method === 'POST' && pathname === STS_LEASE_HTTP_PATH) {
+    const { policies } = authority;
+    return await leaseRoute<LeaseResult>(
+      request,
+      env,
+      ctx,
+      config,
+      policies,
+      (caller, body, waitUntil) =>
+        serveLease(env, config, { caller, request: body, policies, waitUntil }),
+      leaseResponse
+    );
+  }
+  if (request.method === 'POST' && pathname === STS_LEASE_REVOKE_HTTP_PATH) {
+    return await leaseRoute<LeaseRevokeResult>(
+      request,
+      env,
+      ctx,
+      config,
+      authority.policies,
+      (caller, body, waitUntil) =>
+        serveLeaseRevoke(env, config, { caller, request: body, waitUntil }),
+      leaseRevokeResponse
+    );
   }
   if (request.method === 'POST' && pathname === MANAGER_WEBHOOK_PATH) {
     return await managerWebhook(request, env, config);

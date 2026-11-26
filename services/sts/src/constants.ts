@@ -141,3 +141,31 @@ export const TOKEN_AUDIT_RETENTION_MS = 60 * 60 * 1000;
 
 /** How often a token signer prunes; a prune that hits its batch bound runs again next alarm. */
 export const TOKEN_AUDIT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
+
+/** A lease or revoke request body is a grant and a lifetime, or a lease id; above this is refused. */
+export const LEASE_REQUEST_MAX_BODY_BYTES = 1024;
+
+/**
+ * The lease object gives up on a lease whose creation took longer than this, measured from the
+ * call's start: it revokes the lease and answers `unavailable`, so no lease outlives a caller that
+ * already stopped waiting. A creation is a login and one create call, 8 seconds each at most.
+ */
+export const LEASE_CREATE_BUDGET_MS = 20_000;
+
+/** STS stops waiting for the lease object after this long, past the object's own budget. */
+export const LEASE_OBJECT_DEADLINE_MS = 25_000;
+
+/** A failed lease or revoke call: the caller retries after this many seconds. */
+export const LEASE_RETRY_AFTER_SECONDS = 30;
+
+/** Lease creations one workload may start per minute, whatever their outcome. */
+export const LEASE_CREATES_PER_MINUTE = 4;
+
+/**
+ * Infisical's lease expiry may differ from the requested lifetime by this much (clock skew and the
+ * call's own duration); a lease outside it is revoked at once.
+ */
+export const LEASE_EXPIRY_TOLERANCE_MS = 2 * 60 * 1000;
+
+/** A lease row stays this long after the lease ended, for revoke answers and the rate count. */
+export const LEASE_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;

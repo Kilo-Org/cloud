@@ -102,19 +102,18 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
   const provider = PROVIDERS[rawProvider];
   const key = requireEncryptionKey();
-  const credentials = await Promise.all(
-    Array.from({ length: count }, async (_, index) => {
-      const plaintext = `${KEY_PREFIX}:${scenario}:${index + 1}`;
-      const id = randomUUID();
-      return {
-        id,
-        upstreamPlanId: `${KEY_PREFIX}:${rawProvider}-plan:${scenario}:${index + 1}`,
-        fingerprint: credentialFingerprint(plaintext, key),
-        sealed: await sealInventoryCredential(id, plaintext),
-      };
-    })
-  );
-  const fingerprints = credentials.map(credential => credential.fingerprint);
+  const planned = Array.from({ length: count }, (_, index) => {
+    const plaintext = `${KEY_PREFIX}:${scenario}:${index + 1}`;
+    return {
+      id: randomUUID(),
+      plaintext,
+      upstreamPlanId: `${KEY_PREFIX}:${rawProvider}-plan:${scenario}:${index + 1}`,
+      fingerprint: credentialFingerprint(plaintext, key),
+    };
+  });
+  const fingerprints = planned.map(credential => credential.fingerprint);
+  // Both checks run before any credential is sealed: sealing asks the KMS service for a
+  // data key, which an aborted run must not do.
   assertLocalSeedDatabase('coding-plans:available-credentials');
   const db = getSeedDb();
 
@@ -125,6 +124,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (consumed.some(credential => credential.status !== 'available')) {
     throw new Error('This scenario has already assigned inventory. Use a new scenario name.');
   }
+
+  const credentials = await Promise.all(
+    planned.map(async credential => ({
+      ...credential,
+      sealed: await sealInventoryCredential(credential.id, credential.plaintext),
+    }))
+  );
 
   const inserted = await db.transaction(async tx => {
     await tx

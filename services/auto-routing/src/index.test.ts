@@ -1258,7 +1258,7 @@ describe('auto routing worker', () => {
         new Date(generation).toISOString()
       );
       expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(1);
-      expect(cacheRecordClassifierUsage).toHaveBeenCalledWith(expected);
+      expect(cacheRecordClassifierUsage).toHaveBeenCalledWith(toUsageRecordWireBody(expected));
       expect(mockedFetch).toHaveBeenCalledTimes(1);
       const body = mockedFetch.mock.calls[0]?.[1]?.body;
       expect(typeof body).toBe('string');

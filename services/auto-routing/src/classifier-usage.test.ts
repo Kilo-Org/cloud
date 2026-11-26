@@ -197,7 +197,7 @@ describe('classifier usage delivery', () => {
         costUsd,
         createdAt
       );
-      expect(record).toHaveBeenCalledExactlyOnceWith(expected);
+      expect(record).toHaveBeenCalledExactlyOnceWith(toUsageRecordWireBody(expected));
       expect(idFromName).toHaveBeenCalledExactlyOnceWith(`efficient:${identity.conversationKey}`);
     }
   );

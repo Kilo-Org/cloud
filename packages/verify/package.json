@@ -1,0 +1,27 @@
+{
+  "name": "@kilocode/verify",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/verify/src packages/verify/test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:vitest5",
+    "wrangler": "catalog:"
+  }
+}

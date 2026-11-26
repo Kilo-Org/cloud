@@ -2145,6 +2145,31 @@ importers:
         specifier: catalog:vitest5
         version: 5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@5.1.0)(jsdom@29.1.1)(vite@8.1.7(@types/node@25.5.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/verify:
+    dependencies:
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../sts-contracts
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.17
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260707.2
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: catalog:vitest5
+        version: 5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@5.1.0)(jsdom@29.1.1)(vite@8.1.7(@types/node@25.5.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.9.1))
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.2.0)(utf-8-validate@6.0.6)
+
   packages/web-shared:
     dependencies:
       '@ai-sdk/anthropic':

@@ -120,19 +120,25 @@ call should the alarm be late:
 - the current key signs for 30 days;
 - the next key is generated and published 7 days before it becomes current (if the object slept
   through that date, the next key still waits a full 7 days after it is published);
-- a retired key stays published until 10 minutes after the last token it signed expires. The
-  object keeps that latest `exp` per key, rounded up to a whole minute, so it writes it at most
-  once a minute.
+- a retired key drops its private key at once and stays published until 1 minute (the verifier
+  clock skew) after the last token it signed expires; after that no legitimate token verifies
+  under it. The object keeps that latest `exp` per key, rounded up to a whole minute, so it writes
+  it at most once a minute.
 
 Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `created`, `published`,
 `activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys
-with `Cache-Control: public, max-age=300, stale-if-error=86400`. Each isolate serves it from memory
+with `Cache-Control: no-store`: removing a kid from this set is the only recall of an STS token
+(design 6.1), so no HTTP cache may hold it or serve it stale while STS answers 503; a verifier
+keeps its own copy for 5 minutes and never serves it longer. Each isolate serves it from memory
 for 5 minutes, together with the `TOKEN_SIGNING_KIDS_REVOKED` list it was built under; a request
 that finds no fresh copy, or a copy built under another list, calls the four shards itself, in
 parallel (each bounded at 5 s and retried like the manager key set), and stores the plain result
 only when all four answered; otherwise it answers 503 with `Retry-After: 30`. Requests that find the
 copy stale at the same moment each load it, because no promise is shared across requests: a few
-extra shard calls per isolate per 5 minutes, accepted.
+extra shard calls per isolate per 5 minutes, accepted. So a scheduled removal (a retired key
+leaving its ring) reaches verifiers up to 10 minutes later: up to 5 minutes in an isolate copy,
+then up to 5 in the verifier's. An emergency removal is filtered from every answer, so it reaches
+them within 5 minutes (see the runbook below for the rollout of the list itself).
 
 ### Cost per request
 
@@ -186,9 +192,10 @@ key out of service:
 5. Verify: `curl -s https://sts.kiloapps.io/.well-known/jwks.json` no longer lists the kid or its
    shard's old next kid, and a new token's header names another kid.
 
-Worst case for the removed key: a verifier keeps a removed kid until its key-set copy expires
-(max-age 300 s), and a token signed just before the removal lives up to 300 s, so the old key stops
-being accepted everywhere about 10 minutes after the deploy.
+Worst case for the removed key: a verifier keeps a removed kid until its own key-set copy expires
+(5 minutes; the response is `no-store`, so no HTTP cache adds to that), and a token signed just
+before the removal lives up to 300 s, so the old key stops being accepted everywhere about 10
+minutes after the deploy.
 
 Worst case for the fresh key: an isolate of the old version that is still serving during the
 rollout can answer with its copy of the old set for up to one isolate cache period (5 minutes);

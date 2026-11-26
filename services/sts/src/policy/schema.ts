@@ -148,7 +148,7 @@ export const PolicySnapshotEntrySchema = z.strictObject({
   environments: z.array(z.string()),
   identity: z.string(),
   secrets: z.array(z.string()),
-  // A snapshot stored before token grants existed has none.
+  // Left out for a policy without token grants, and in a snapshot stored before grants existed.
   audiences: z.array(z.string()).default([]),
   scopes: z.array(z.string()).default([]),
 });

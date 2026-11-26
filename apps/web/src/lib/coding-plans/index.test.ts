@@ -2,8 +2,8 @@
 import { randomBytes } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 
-import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   cancelCodingPlanSubscription,
@@ -32,6 +32,7 @@ import {
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { sealedInventoryColumns } from '@/tests/helpers/coding-plan-inventory.helper';
 import {
   byok_api_keys,
   coding_plan_availability_intents,
@@ -229,7 +230,7 @@ describe('coding plans', () => {
         plan_id: PLAN_ID,
         provider_id: PROVIDER_ID,
         upstream_plan_id: `minimax-grandfathered-${crypto.randomUUID()}`,
-        encrypted_api_key: encryptApiKey('grandfathered-minimax-key', BYOK_ENCRYPTION_KEY),
+        ...sealedInventoryColumns('grandfathered-minimax-key'),
         credential_fingerprint: crypto.randomUUID(),
         status: 'assigned',
         assigned_to_user_id: user.id,
@@ -883,7 +884,8 @@ describe('coding plans', () => {
     });
     expect(credential.status).toBe('available');
     expect(credential.upstream_plan_id).toBe('byteplus-replace-plan');
-    expect(credential.encrypted_api_key).not.toBeNull();
+    expect(credential.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+    expect(credential.encrypted_api_key_envelope).not.toBeNull();
     expect(credential.assigned_to_user_id).toBeNull();
     expect(credential.revocation_requested_at).toBeNull();
     expect(credential.revocation_attempt_count).toBe(1);

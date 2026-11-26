@@ -6,10 +6,7 @@ import { addDays } from 'date-fns';
 import { and, eq, inArray, isNotNull, ne, notInArray, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
-import type {
-  CodingPlanInventoryCredentialEnvelope,
-  EncryptedData,
-} from '@kilocode/db/schema-types';
+import type { CodingPlanInventoryCredentialEnvelope } from '@kilocode/db/schema-types';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { getByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
@@ -18,7 +15,7 @@ import {
   type ByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
-import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import {
   CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
   createCodingPlanInventoryDataKey,
@@ -112,9 +109,17 @@ const INVENTORY_DATA_KEY_CONCURRENCY = 10;
 /** The credential columns a raw `RETURNING` clause yields for a claimed inventory row. */
 type ClaimedInventoryCredential = {
   id: string;
-  encrypted_api_key: EncryptedData | null;
   encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope | null;
 };
+
+/**
+ * Inventory a subscriber can be given: available, and holding a KMS envelope. A row without
+ * one cannot be opened, so it is not stock for availability, the waitlist or a claim.
+ */
+const claimableInventory = and(
+  eq(coding_plan_key_inventory.status, 'available'),
+  isNotNull(coding_plan_key_inventory.encrypted_api_key_envelope)
+);
 
 /** An available inventory credential decrypted before the claiming transaction. */
 type PreparedInventoryCredential = { row: ClaimedInventoryCredential; plaintext: string };
@@ -139,7 +144,7 @@ const PREPARED_INVENTORY_BUDGET_MS = 2_000;
  * KMS round trip does not run while the transaction holds the user, subscription and
  * inventory row locks. The claim prefers this row; when a concurrent claim took it, or it
  * changed, the claimed row is decrypted under the lock instead. A row whose credential
- * does not open is skipped, within a bound, and never read from its static-key copy.
+ * does not open is skipped, within a bound.
  */
 async function prepareAvailableInventoryCredential(
   planId: string,
@@ -156,7 +161,6 @@ async function prepareAvailableInventoryCredential(
     const [row] = await db
       .select({
         id: coding_plan_key_inventory.id,
-        encrypted_api_key: coding_plan_key_inventory.encrypted_api_key,
         encrypted_api_key_envelope: coding_plan_key_inventory.encrypted_api_key_envelope,
       })
       .from(coding_plan_key_inventory)
@@ -164,7 +168,7 @@ async function prepareAvailableInventoryCredential(
         and(
           eq(coding_plan_key_inventory.plan_id, planId),
           eq(coding_plan_key_inventory.provider_id, providerId),
-          eq(coding_plan_key_inventory.status, 'available'),
+          claimableInventory,
           unreadableIds.length > 0
             ? notInArray(coding_plan_key_inventory.id, unreadableIds)
             : undefined
@@ -212,7 +216,6 @@ async function openClaimedInventoryCredential(
   if (
     candidate &&
     claimed.id === candidate.row.id &&
-    isDeepStrictEqual(claimed.encrypted_api_key, candidate.row.encrypted_api_key) &&
     isDeepStrictEqual(claimed.encrypted_api_key_envelope, candidate.row.encrypted_api_key_envelope)
   ) {
     return candidate.plaintext;
@@ -248,7 +251,6 @@ export async function getAssignedCodingPlanUsageContext(input: {
       providerId: coding_plan_key_inventory.provider_id,
       status: coding_plan_key_inventory.status,
       assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
-      encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
       encryptedApiKeyEnvelope: coding_plan_key_inventory.encrypted_api_key_envelope,
       upstreamUsageId: coding_plan_key_inventory.upstream_usage_id,
     })
@@ -271,11 +273,10 @@ export async function getAssignedCodingPlanUsageContext(input: {
       : null;
   }
 
-  if (assignment.providerId !== 'minimax' || !assignment.encryptedApiKey) return null;
+  if (assignment.providerId !== 'minimax' || !assignment.encryptedApiKeyEnvelope) return null;
   try {
     const apiKey = await openCodingPlanInventoryCredential({
       id: assignment.id,
-      encrypted_api_key: assignment.encryptedApiKey,
       encrypted_api_key_envelope: assignment.encryptedApiKeyEnvelope,
     });
     return apiKey === null ? null : { providerId: 'minimax', apiKey };
@@ -326,9 +327,6 @@ export async function subscribeToCodingPlan(
   const plan = getCodingPlanPrice(planId);
   if (!plan) {
     throw new Error(`Plan "${planId}" is not available as a coding plan.`);
-  }
-  if (!BYOK_ENCRYPTION_KEY) {
-    throw new Error('BYOK encryption is not configured');
   }
 
   const requestKey = idempotencyFingerprint(idempotencyKey);
@@ -453,12 +451,13 @@ export async function subscribeToCodingPlan(
         SELECT id FROM coding_plan_key_inventory
         WHERE plan_id = ${plan.planId}
           AND status = 'available'
+          AND encrypted_api_key_envelope IS NOT NULL
           ${excludeUnreadableInventory(prepared.unreadableIds)}
         ORDER BY (id = ${prepared.candidate?.row.id ?? null}::uuid) IS TRUE DESC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
-      RETURNING id, encrypted_api_key, encrypted_api_key_envelope
+      RETURNING id, encrypted_api_key_envelope
     `);
     const inventoryKey = inventoryRows[0];
     // A KMS failure rolls the purchase back before anything is charged.
@@ -633,10 +632,6 @@ export async function reassignSubscriptionCredential(
   subscriptionId: string,
   adminUserId: string
 ): Promise<{ inventoryKeyId: string }> {
-  if (!BYOK_ENCRYPTION_KEY) {
-    throw credentialReassignmentError('BYOK encryption is not configured');
-  }
-
   // The data key request carries no plaintext, so it is issued before the transaction to
   // keep the network call from holding the subscription and inventory row locks. The
   // identifiers it binds to are re-checked under the lock.
@@ -739,12 +734,13 @@ export async function reassignSubscriptionCredential(
           WHERE plan_id = ${subscription.planId}
             AND provider_id = ${subscription.providerId}
             AND status = 'available'
+            AND encrypted_api_key_envelope IS NOT NULL
             ${excludeUnreadableInventory(prepared.unreadableIds)}
           ORDER BY (id = ${prepared.candidate?.row.id ?? null}::uuid) IS TRUE DESC
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, encrypted_api_key, encrypted_api_key_envelope
+        RETURNING id, encrypted_api_key_envelope
       `);
       const claimed = claimedRows[0];
       const plaintext = claimed ? await openClaimedInventoryCredential(claimed, prepared) : null;
@@ -956,7 +952,7 @@ export async function getAvailableCodingPlanIds(): Promise<string[]> {
   const rows = await db
     .selectDistinct({ planId: coding_plan_key_inventory.plan_id })
     .from(coding_plan_key_inventory)
-    .where(eq(coding_plan_key_inventory.status, 'available'));
+    .where(claimableInventory);
   return rows.map(row => row.planId);
 }
 
@@ -1004,12 +1000,7 @@ export async function requestCodingPlanAvailabilityNotification(
     const [availableCredential] = await tx
       .select({ id: coding_plan_key_inventory.id })
       .from(coding_plan_key_inventory)
-      .where(
-        and(
-          eq(coding_plan_key_inventory.plan_id, plan.planId),
-          eq(coding_plan_key_inventory.status, 'available')
-        )
-      )
+      .where(and(eq(coding_plan_key_inventory.plan_id, plan.planId), claimableInventory))
       .limit(1);
     if (availableCredential) {
       throw new Error(`${plan.providerName} ${plan.name} is currently available.`);

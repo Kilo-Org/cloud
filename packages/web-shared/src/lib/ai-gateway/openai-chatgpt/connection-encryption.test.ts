@@ -1,22 +1,24 @@
 import { describe, expect, it } from '@jest/globals';
-import type { EncryptedData } from '@kilocode/db/schema-types';
+import { createHash } from 'node:crypto';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   testByokEnvelope,
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
-import { sealedOpenAiChatGptConnectionColumns } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
+import {
+  sealedOpenAiChatGptConnectionColumns,
+  staticKeyOpenAiChatGptConnection,
+} from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import {
   CredentialKmsError,
-  legacyCiphertextDigest,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+  OBSOLETE_STATIC_KEY_PLACEHOLDER,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import {
   createOpenAiChatGptSealingKey,
   openAiChatGptKmsOwnerFor,
   openAiChatGptKmsOwnerOfRow,
   openOpenAiChatGptConnection,
-  openOpenAiChatGptConnectionForComparison,
   sealOpenAiChatGptConnection,
   type OpenAiChatGptConnectionOwnerColumns,
   type OpenAiChatGptKmsOwner,
@@ -55,6 +57,11 @@ function connection(): OpenAiChatGptConnection {
     connected_at: '2026-09-16T00:00:00.000Z',
     status: 'connected',
   };
+}
+
+/** A row whose obsolete column holds a real static-key ciphertext of the connection. */
+function withStaticKeyCopy<Row extends object>(row: Row) {
+  return { ...row, encrypted_connection: staticKeyOpenAiChatGptConnection(connection()) };
 }
 
 function storedColumns(owner: OpenAiChatGptConnectionOwnerColumns) {
@@ -138,7 +145,7 @@ describe('createOpenAiChatGptSealingKey', () => {
 });
 
 describe('sealOpenAiChatGptConnection', () => {
-  it('stores the sealing key id in the envelope and the static-key digest next to it', async () => {
+  it('stores the sealing key id in the envelope and the placeholder in the obsolete column', async () => {
     const sealingKey = await createOpenAiChatGptSealingKey(
       openAiChatGptKmsOwnerFor({ kind: 'member', kiloUserId: USER_ID, organizationId: null }),
       'actor'
@@ -147,8 +154,9 @@ describe('sealOpenAiChatGptConnection', () => {
     const sealed = sealOpenAiChatGptConnection(connection(), sealingKey);
 
     expect(sealed.encrypted_connection_envelope.key_id).toBe(sealingKey.keyId);
+    expect(sealed.encrypted_connection).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(sealed.encrypted_connection_envelope.legacy_digest).toBe(
-      legacyCiphertextDigest(sealed.encrypted_connection)
+      createHash('sha256').update('..').digest('hex')
     );
     expect(JSON.stringify(sealed)).not.toContain('access-token-1');
     expect(JSON.stringify(sealed)).not.toContain('refresh-token-1');
@@ -255,38 +263,50 @@ describe('openOpenAiChatGptConnection', () => {
     ).resolves.toBeNull();
   });
 
-  it('reads null for a static-key copy that does not decrypt when no envelope exists', async () => {
-    const corrupt: EncryptedData = { iv: 'not-base64!!!', data: 'also-not', authTag: 'nope' };
-
+  it('reads null for a row without an envelope even if the obsolete column holds a static-key ciphertext', async () => {
     await expect(
-      openOpenAiChatGptConnection({
-        ...personalRow,
-        encrypted_connection: corrupt,
-        encrypted_connection_envelope: null,
-      })
+      openOpenAiChatGptConnection(
+        withStaticKeyCopy({ ...personalRow, encrypted_connection_envelope: null })
+      )
     ).resolves.toBeNull();
-  });
-
-  it('reads a row without an envelope from its static-key copy', async () => {
-    await expect(
-      openOpenAiChatGptConnection({
-        ...personalRow,
-        encrypted_connection: encryptApiKey(JSON.stringify(connection()), BYOK_ENCRYPTION_KEY),
-        encrypted_connection_envelope: null,
-      })
-    ).resolves.toEqual(connection());
     expect(kms.requests).toEqual([]);
   });
 
-  /** A row whose envelope is current but holds `plaintext`, which is not a connection. */
+  it('ignores the obsolete column when the envelope holds another connection', async () => {
+    const other = { ...connection(), access_token: 'envelope-access-token' };
+
+    await expect(
+      openOpenAiChatGptConnection(
+        withStaticKeyCopy({ ...personalRow, ...sealedOpenAiChatGptConnectionColumns(other) })
+      )
+    ).resolves.toEqual(other);
+  });
+
+  it('throws a CredentialKmsError when the KMS service refuses the envelope', async () => {
+    const row = storedColumns(personalRow);
+    kms.refuseDecryptFor(row.encrypted_connection_envelope.key_id);
+
+    await expect(openOpenAiChatGptConnection(row)).rejects.toBeInstanceOf(CredentialKmsError);
+  });
+
+  it('throws a CredentialKmsError without using the static-key copy when the decrypt fails', async () => {
+    kms.fail('/decrypt', 500);
+
+    await expect(
+      openOpenAiChatGptConnection(
+        withStaticKeyCopy({ ...personalRow, ...sealedOpenAiChatGptConnectionColumns(connection()) })
+      )
+    ).rejects.toBeInstanceOf(CredentialKmsError);
+  });
+
+  /** A row whose envelope holds `plaintext`, which is not a connection. */
   function corruptRow(plaintext: string) {
-    const legacy = encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY);
     return {
       ...personalRow,
-      encrypted_connection: legacy,
+      encrypted_connection: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY),
       encrypted_connection_envelope: {
         ...testByokEnvelope(plaintext),
-        legacy_digest: legacyCiphertextDigest(legacy),
+        legacy_digest: 'digest',
         key_id: 'key-1',
       },
     };
@@ -335,35 +355,6 @@ describe('organization id spelling', () => {
     const [dataKeyRequest, decryptRequest] = kms.requests;
     const { actor_user_id: _actor, ...dataKeyContext } = dataKeyRequest.body;
     expect(decryptRequest.body).toMatchObject(dataKeyContext);
-  });
-});
-
-describe('openOpenAiChatGptConnectionForComparison', () => {
-  it('reads the static-key copy when the KMS service refuses the current envelope', async () => {
-    const row = storedColumns(personalRow);
-    kms.refuseDecryptFor(row.encrypted_connection_envelope.key_id);
-
-    await expect(openOpenAiChatGptConnection(row)).rejects.toBeInstanceOf(CredentialKmsError);
-    await expect(openOpenAiChatGptConnectionForComparison(row)).resolves.toEqual(connection());
-  });
-
-  it('prefers the envelope while the KMS service answers', async () => {
-    const row = storedColumns(personalRow);
-
-    await expect(openOpenAiChatGptConnectionForComparison(row)).resolves.toEqual(connection());
-    expect(kms.requests.map(request => request.path)).toEqual(['/decrypt']);
-  });
-});
-
-describe('sealOpenAiChatGptConnection without a data key', () => {
-  it('writes only the static-key copy and clears the envelope', async () => {
-    const columns = sealOpenAiChatGptConnection(connection(), null);
-
-    expect(columns.encrypted_connection_envelope).toBeNull();
-    await expect(openOpenAiChatGptConnection({ ...personalRow, ...columns })).resolves.toEqual(
-      connection()
-    );
-    expect(kms.requests).toEqual([]);
   });
 });
 

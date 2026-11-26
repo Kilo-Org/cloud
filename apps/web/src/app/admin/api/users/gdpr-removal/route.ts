@@ -57,71 +57,70 @@ export async function GET(request: NextRequest): Promise<NextResponse<GdprRemova
 
 export const POST = auditedAdminRoute(
   { kind: 'declarative', action: 'user.gdpr_removal.enqueue' },
-  enqueueGdprRemoval
+  async (request: NextRequest): Promise<NextResponse<GdprRemovalPostResponse>> => {
+    const { user: admin, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(admin);
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
+    const userId =
+      typeof body === 'object' &&
+      body !== null &&
+      'userId' in body &&
+      typeof body.userId === 'string'
+        ? body.userId
+        : undefined;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    const user = await findUserById(userId);
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    setAdminAuditTarget(userActionTarget(user.id));
+
+    try {
+      const [result] = await enqueueUserDeletionTargets({
+        actor: { kiloUserId: admin.id, email: admin.google_user_email },
+        targets: [{ email: user.google_user_email, trustedUserId: user.id }],
+        catalogVersion: 2,
+      });
+
+      if (!result) {
+        return NextResponse.json({ error: 'User deletion could not be queued' }, { status: 500 });
+      }
+
+      if (result.status === 'refused' || result.status === 'invalid') {
+        addAdminAuditMetadata({ refusalCode: result.code });
+        return NextResponse.json({ error: enqueueFailureMessage(result.code) }, { status: 400 });
+      }
+
+      addAdminAuditMetadata({ requestId: result.requestId, status: result.status });
+
+      return NextResponse.json(
+        { requestId: result.requestId, status: result.status },
+        { status: 202 }
+      );
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'gdpr-removal' },
+        extra: { userId },
+      });
+      return NextResponse.json(
+        { error: 'User deletion failed — check Sentry for details' },
+        { status: 500 }
+      );
+    }
+  }
 );
-
-async function enqueueGdprRemoval(
-  request: NextRequest
-): Promise<NextResponse<GdprRemovalPostResponse>> {
-  const { user: admin, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
-  setAdminAuditActor(admin);
-
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
-  }
-
-  const userId =
-    typeof body === 'object' && body !== null && 'userId' in body && typeof body.userId === 'string'
-      ? body.userId
-      : undefined;
-
-  if (!userId) {
-    return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-  }
-
-  const user = await findUserById(userId);
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
-  setAdminAuditTarget(userActionTarget(user.id));
-
-  try {
-    const [result] = await enqueueUserDeletionTargets({
-      actor: { kiloUserId: admin.id, email: admin.google_user_email },
-      targets: [{ email: user.google_user_email, trustedUserId: user.id }],
-      catalogVersion: 2,
-    });
-
-    if (!result) {
-      return NextResponse.json({ error: 'User deletion could not be queued' }, { status: 500 });
-    }
-
-    if (result.status === 'refused' || result.status === 'invalid') {
-      addAdminAuditMetadata({ refusalCode: result.code });
-      return NextResponse.json({ error: enqueueFailureMessage(result.code) }, { status: 400 });
-    }
-
-    addAdminAuditMetadata({ requestId: result.requestId, status: result.status });
-
-    return NextResponse.json(
-      { requestId: result.requestId, status: result.status },
-      { status: 202 }
-    );
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'gdpr-removal' },
-      extra: { userId },
-    });
-    return NextResponse.json(
-      { error: 'User deletion failed — check Sentry for details' },
-      { status: 500 }
-    );
-  }
-}
 
 function enqueueFailureMessage(code: DeletionRefusalCode): string {
   if (

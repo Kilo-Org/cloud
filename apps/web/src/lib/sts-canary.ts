@@ -2,6 +2,8 @@ import {
   AccessTokenClaimsSchema,
   STS_CANARY_RUN_HEADER,
   STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
+  STS_DENIED_PROBE,
+  STS_DENIED_PROBE_REASON,
   StsCanaryRunIdSchema,
   TOKEN_CLOCK_SKEW_SECONDS,
   USAGE_INGEST_CANARY_TOKEN,
@@ -17,14 +19,21 @@ import { failureResponse, type Verifier } from '@kilocode/verify';
 /**
  * The web side of the STS canary (decision D6c). usage-ingest calls it every 5 minutes with a
  * `web:sts.canary` token; it verifies that token, mints `usage-ingest:sts.canary` with the
- * function's own Vercel identity, presents it to usage-ingest, and presents three tokens that
- * usage-ingest must refuse. It answers a report of every check and never a token.
+ * function's own Vercel identity, presents it to usage-ingest, presents three tokens that
+ * usage-ingest must refuse, and asks STS for the reserved denied probe `canary:denied-probe`,
+ * which no policy can grant. It answers a report of every check and never a token.
  */
 export type StsCanaryDeps = {
   /** Verifies `web:sts.canary` STS tokens; one per instance. */
   verifier: Verifier<false>;
   /** The HTTP service-token client with the Vercel identity; one per instance. */
   tokens: ServiceTokens;
+  /**
+   * A new HTTP client with the same Vercel identity, made for each run's denied mint. A client
+   * answers a denial from memory for `DENIED_RECHECK_MS`, so a shared one could skip STS on a run
+   * within a minute of the last; a new one asks STS every run and leaves no state behind.
+   */
+  newTokens: () => ServiceTokens;
   /** usage-ingest's `POST /sts-canary/verify`. */
   verifyUrl: string;
   waitUntil: (promise: Promise<unknown>) => void;
@@ -46,6 +55,15 @@ function expOf(token: string): number | null {
   }
   const parsed = ExpClaimSchema.safeParse(claims);
   return parsed.success ? parsed.data.exp : null;
+}
+
+/** A mint failure as a check's `detail`, without a token. */
+function mintFailure(error: unknown): string {
+  return stsCanaryDetail(
+    error instanceof ServiceTokenError
+      ? `mint ${error.reason}: ${error.deniedReason ?? `retry in ${error.retryAfterSeconds} s`}`
+      : 'mint failed'
+  );
 }
 
 /**
@@ -124,6 +142,25 @@ export function createStsCanaryHandler(
     return `${header}.${payload}.${Buffer.from(signature).toString('base64url')}`;
   }
 
+  /**
+   * Asks STS for `STS_DENIED_PROBE`, a reserved scope no policy can grant. `ok` only when STS
+   * refused exactly that token with `STS_DENIED_PROBE_REASON`, a refusal of this identified
+   * function that STS records as an `ai.kilo.sts.token.denied` row; an unavailable STS, an issued
+   * token or any other reason fails. The client reports a per-token denial only when STS's answer
+   * names the audience and scope it asked for. Never rejects.
+   */
+  async function deniedMint(): Promise<StsCanaryCheck> {
+    try {
+      await deps.newTokens().get(STS_DENIED_PROBE, { waitUntil: deps.waitUntil });
+      return { result: 'failed', status: null, detail: 'STS issued the reserved denied probe' };
+    } catch (error) {
+      if (error instanceof ServiceTokenError && error.deniedReason === STS_DENIED_PROBE_REASON) {
+        return { result: 'ok', status: null };
+      }
+      return { result: 'failed', status: null, detail: mintFailure(error) };
+    }
+  }
+
   return async request => {
     const inbound = await deps.verifier.verify(
       request,
@@ -142,18 +179,20 @@ export function createStsCanaryHandler(
       return failureResponse(inbound);
     }
 
-    let own: string | null = null;
-    let outbound: StsCanaryCheck;
+    let minted: { token: string } | { failure: StsCanaryCheck };
     try {
-      own = await deps.tokens.get(USAGE_INGEST_CANARY_TOKEN, { waitUntil: deps.waitUntil });
-      outbound = check(await present(own, run), 204);
+      minted = {
+        token: await deps.tokens.get(USAGE_INGEST_CANARY_TOKEN, { waitUntil: deps.waitUntil }),
+      };
     } catch (error) {
-      const detail =
-        error instanceof ServiceTokenError
-          ? `mint ${error.reason}: ${error.deniedReason ?? `retry in ${error.retryAfterSeconds} s`}`
-          : 'mint failed';
-      outbound = { result: 'failed', status: null, detail: stsCanaryDetail(detail) };
+      minted = { failure: { result: 'failed', status: null, detail: mintFailure(error) } };
     }
+    // After the route's own mint, so it never shares that STS call, and alongside the calls to
+    // usage-ingest: its 30 s attempt ends within their 4 x 10 s.
+    const stsDenied = deniedMint();
+    const own = 'token' in minted ? minted.token : null;
+    const outbound =
+      'token' in minted ? check(await present(minted.token, run), 204) : minted.failure;
 
     const authorization = request.headers.get('authorization') ?? '';
     const wrongAudience = check(await present(authorization.replace(/^Bearer /, ''), run), 403);
@@ -175,7 +214,7 @@ export function createStsCanaryHandler(
     const report: StsCanaryReport = {
       inbound: 'ok',
       outbound,
-      negatives: { wrongAudience, forged, expired },
+      negatives: { wrongAudience, forged, expired, stsDenied: await stsDenied },
     };
     // One line per run with every check and no token: the Vercel log drain carries it to Axiom,
     // where the canary's monitors read `outcome` (services/usage-ingest README, "STS canary").

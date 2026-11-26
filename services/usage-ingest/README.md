@@ -773,15 +773,16 @@ deployments; no usage publish or consume code, queue or credential takes part in
 
 One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
 
-1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (default `"false"` in both
-   environments).
+1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (on in both environments;
+   set any other value to stop it).
 2. Gets a `web:sts.canary` token from `@kilocode/service-token-client` over the `STS` service
    binding (`SecretsBroker`, `props.caller: "usage-ingest"`; `sts` in production, `sts-staging` in
    staging). The token lives 300 s and renews at 240 s, so a warm isolate mints at most about once
    per run.
 3. Posts to `WEB_STS_CANARY_URL` with `Authorization: Bearer <token>` and `x-sts-canary-run:
-   <run id>`; staging adds `x-vercel-protection-bypass` from the optional
-   `USAGE_WRITER_PROTECTION_BYPASS` secret. The web route verifies the token (`web:sts.canary`),
+   <run id>`; it adds `x-vercel-protection-bypass` whenever the optional
+   `USAGE_WRITER_PROTECTION_BYPASS` secret is set, which only staging needs (production must leave
+   it unset). The web route verifies the token (`web:sts.canary`),
    mints `usage-ingest:sts.canary` with its Vercel identity, calls `POST /sts-canary/verify` here
    (expect 204), presents the `web` token it received (expect 403 `insufficient_scope`), the same
    claims signed by a key STS never held (expect 401) and, when the instance holds one, an earlier
@@ -789,14 +790,27 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
    (`StsCanaryReportSchema` in `@kilocode/sts-contracts`; each `detail` at most 200 characters).
    Every call that carries a token or the bypass secret uses `redirect: 'manual'`: a 3xx fails
    the check (web side) or the run (`StsCanaryWebRefused` here), and is never followed.
+   After its own mint, the route also asks STS, with the same Vercel identity, for the denied probe
+   `canary:denied-probe` (audience `canary`; `STS_DENIED_PROBE` in `@kilocode/sts-contracts`), a
+   reserved scope that no policy can grant: the scope registry lists it, and the STS policy loader
+   refuses any policy that grants it or its audience. STS identifies the function and refuses that
+   token with `audience_not_allowed` (`decide` in `services/sts/src/tokens/mint.ts`), which it
+   records as an `ai.kilo.sts.token.denied` row through `DenialDO`. The check
+   (`negatives.stsDenied`) is `ok` only for that answer; an unavailable STS, an issued token or
+   any other reason fails it, and with it the run. It never skips. Its request is a separate STS
+   call from a client made for that run, over the instance's identity: the run's own mint never
+   shares it, a client answers a denial from memory for 60 s (`DENIED_RECHECK_MS`) so a shared
+   client could skip STS, and no denial or backoff state outlives the run.
    usage-ingest waits 80 s for the answer: the route's slowest run is a 5 s key-set fetch, a
-   30 s mint attempt (both tries after an identity refusal end within it) and four 10 s calls
-   here, 75 s, and its `maxDuration` is 90 s.
+   30 s mint attempt (both tries after an identity refusal end within it), then four 10 s calls
+   here with the 30 s denied mint running alongside them, 75 s, and its `maxDuration` is 90 s.
 4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
    `succeeded` only when every check passed, with `mint_result`, `web_status`, and
-   `<check>_result`/`_status` for `outbound`, `negative_wrong_audience`, `negative_forged` and
-   `negative_expired`. The report's `detail` text is never copied: it comes from another service,
-   and the web route's own line carries it. A failure carries `exception_name`:
+   `<check>_result`/`_status` for `outbound`, `negative_wrong_audience`, `negative_forged`,
+   `negative_expired` and `negative_sts_denied` (result only: the route sees no HTTP status of
+   that STS call, so its status is null and not logged). The report's `detail` text is never
+   copied: it comes from another service, and the web route's own line carries it. A failure
+   carries `exception_name`:
    `ServiceTokenError` (STS refused or failed the mint; `mint_detail` names the reason),
    `StsCanaryWebRefused` (the web route answered other than 200), `StsCanaryReportInvalid`,
    `StsCanaryCheckFailed` or `StsCanaryNotConfigured`. No token appears in any log line.
@@ -814,7 +828,7 @@ the run id), never the token. The route works whether or not the flag is on.
 
 | Var | Production | Staging |
 |---|---|---|
-| `STS_CANARY_ENABLED` | `"false"` | `"false"` |
+| `STS_CANARY_ENABLED` | `"true"` | `"true"` |
 | `STS_URL` | `https://sts.kiloapps.io` | `https://sts-staging.kiloapps.io` |
 | `STS_ENVIRONMENT` | `"production"` | `"staging"` |
 | `WEB_STS_CANARY_URL` | `https://app.kilo.ai/api/internal/sts-canary` | `https://staging-app.kilo.ai/api/internal/sts-canary` |
@@ -838,6 +852,9 @@ environment on `sts_canary` lines, notifying the existing alert route:
 - no line with `outcome` `succeeded` in 15 minutes;
 - any line with `outcome` `failed` in 15 minutes.
 
+Both cover the denied mint: a run whose `negatives.stsDenied.result` is `failed` logs `outcome`
+`failed`.
+
 A run whose call never reaches the web route (usage-ingest down, usage-ingest's own mint denied
 or failed, a network failure, a redirect) writes no web line, and a run the route refuses writes
 only `sts_canary_refused`; both show as a missing success.
@@ -848,21 +865,40 @@ from at least two runs earlier (past `exp` plus 60 s); a run on a fresh instance
 and alerts the same route without paging: no `sts_canary` line whose `negatives.expired.result`
 is `ok` in 24 hours.
 
+The route sees STS's refusal, not the audit row STS writes after its answer. A fourth monitor per
+environment tracks that the row lands, and alerts the same route without paging when this query
+over `kilo-audit` (staging `kilo-audit-staging`) counts 0 in 1 hour (the audit relay retries a
+message for up to 24 minutes, so a shorter window would alert on a slow relay):
+
+```kusto
+['kilo-audit']
+| where type == 'ai.kilo.sts.token.denied'
+| where tostring(column_ifexists('data.attributes.workload', '')) == 'web'
+    and tostring(column_ifexists('data.attributes.scope', '')) == 'canary:denied-probe'
+    and tostring(column_ifexists('data.attributes.reason', '')) == 'audience_not_allowed'
+| summarize probes = count()
+```
+
+Every other rule over `token.denied` rows leaves exactly these rows out, through the shared
+exclusion (`isStsDeniedProbe` and `STS_DENIED_PROBE_APL_EXCLUSION` in `@kilocode/sts-contracts`;
+services/sts README, "Alerts on token denials").
+
 ### Cost
 
 A token lives 300 s and renews at 240 s, and a held token stops being served 30 s before `exp`,
-so with a run every 300 s each side mints once per run, warm or cold. Per run and environment:
+so with a run every 300 s each side mints once per run, warm or cold; the web route's denied mint
+reaches STS every run. Per run and environment:
 
 | Item | Per run | Per day (288 runs) |
 |---|---|---|
 | usage-ingest invocations | 1 scheduled + 3 verify-route calls (4 once the web instance holds a token past `exp` + 60 s) | 288 + 864 to 1,152 |
 | Web function invocations | 1 | 288 |
-| STS mint calls | 2: one RPC over the binding (usage-ingest), one `POST /v1/token` (web); each one signer Durable Object request | 576 |
-| STS audit rows | 2 `token.issued` (a denial adds one `token.denied`) | 576 |
-| Audit queue messages | at most 2; the signer relays up to 500 events per message, so usually they share one with other rows | at most 576 |
+| STS mint calls | 3: one RPC over the binding (usage-ingest), two `POST /v1/token` (web: its own mint and the denied mint). The two issuing calls each make one signer Durable Object request; the denied mint makes none, and one `DenialDO` request instead | 864 (576 signer and 288 `DenialDO` requests) |
+| STS audit rows | 2 `token.issued` and 1 `token.denied`; `DenialDO` merges identical denials per minute, so each run's refusal is one row with `count` 1 (a refusal of either side's own mint adds another) | 576 issued and 288 denied |
+| Audit queue messages | at most 3; the signers relay up to 500 events per message, so usually they share one with other rows, and `DenialDO`'s alarm relays the minute's merged denials of its own stream together | at most 864 |
 | STS key-set fetches | one per verifier isolate per 5 minutes: each usage-ingest isolate that serves a verify-route call and each web instance that serves the route fetches once when its copy is older than 5 minutes. The 3 or 4 verify calls and the scheduled run can land on different isolates, so a run can cost several. The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | at most (usage-ingest isolates + web instances) x 288 |
 | Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt. When STS refuses that fresh token too, the client writes a refusal marker for the deployment and audience that lives 60 s (`DENIED_RECHECK_MS`): until it expires no instance of the deployment drops a cached token or exchanges, each answers from its denied state. A deployment STS keeps refusing (a `web.yaml` naming the wrong project or environment) so costs at most 1 exchange per 60 s per audience and region, however many instances it runs; 17 such deployments spend about 17 of the project's roughly 100 exchanges a minute, a limit previews share with production, where without the marker each could spend about 6 | at most 288; in practice one per base-token renewal or new deployment |
-| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal | at most about 1,700 operations |
+| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal. The denied mint shares the instance's identity source and starts after the run's own mint, so its identity token is normally an instance memory hit and adds no exchange or cache operation; only when the run's own exchange failed does the probe try one more exchange, so a run makes at most 2 | at most about 1,700 operations |
 | Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
 
 Both environments together double each daily figure, except the Vercel rows: the web app's

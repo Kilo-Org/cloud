@@ -23,9 +23,9 @@ import type { AuthorizationHandoff, PendingAuthorization } from '../../src/oauth
 import { type OAuthDeps, handleOAuthRequest } from '../../src/oauth/routes';
 import { s256Challenge } from '../../src/oauth/pkce';
 import {
-  createFirstPartyRefreshToken,
+  firstPartyRefreshToken,
+  firstPartyRefreshTokenOfExchange,
   grantIdOfCode,
-  grantIdOfFirstPartyRefreshToken,
   randomCredential,
 } from '../../src/token/credentials';
 import { keySet } from './support';
@@ -183,7 +183,7 @@ describe('token endpoint: authorization_code', () => {
     }
   });
 
-  it('answers a retry after a failed signing with the same grant and a new refresh token', async () => {
+  it('answers a retry after a failed signing with the same grant and the same refresh token', async () => {
     const grants = fakeGrants({
       exchangeCode: async () => ({
         outcome: 'issued',
@@ -217,12 +217,15 @@ describe('token endpoint: authorization_code', () => {
     const [first, second] = grants.calls.map(({ input }) => input as ExchangeCodeInput);
     expect(second.grantId).toBe(first.grantId);
     expect(first.grantId).toBe(await grantIdOfCode(code));
-    expect(Buffer.from(second.refreshTokenHash)).not.toEqual(Buffer.from(first.refreshTokenHash));
+    // The refresh token derives from the code and the verifier, so every attempt sends one hash.
+    expect(Buffer.from(second.refreshTokenHash)).toEqual(Buffer.from(first.refreshTokenHash));
     if (first.binding.kind !== 'first_party' || second.binding.kind !== 'first_party') {
       throw new Error('first-party bindings expected');
     }
     expect(second.binding.proof.jti).not.toBe(first.binding.proof.jti);
-    expect(grantIdOfFirstPartyRefreshToken(body.refresh_token ?? '')).toBe(first.grantId);
+    expect(body.refresh_token).toBe(
+      await firstPartyRefreshTokenOfExchange(first.grantId, code, VERIFIER)
+    );
     expect((await verifiedClaims(body.access_token, 'gateway')).claims.sid).toBe(first.grantId);
   });
 });
@@ -230,7 +233,7 @@ describe('token endpoint: authorization_code', () => {
 describe('token endpoint: refresh_token', () => {
   const firstParty = async (key = Promise.resolve(dpopKey())) => {
     const grantId = crypto.randomUUID();
-    return { grantId, token: createFirstPartyRefreshToken(grantId), key: await key };
+    return { grantId, token: firstPartyRefreshToken(grantId, randomCredential()), key: await key };
   };
 
   it('mints from a DPoP-bound first-party grant without a new refresh token', async () => {
@@ -778,7 +781,7 @@ describe('authorization endpoint', () => {
 describe('revocation endpoint', () => {
   it('revokes a refresh token and answers 200 for unknown and malformed tokens', async () => {
     const grants = fakeGrants({ revoke: async () => 'revoked' });
-    const token = createFirstPartyRefreshToken(crypto.randomUUID());
+    const token = firstPartyRefreshToken(crypto.randomUUID(), randomCredential());
     const revoked = await call(
       formRequest('/revoke', { token, client_id: 'kilo-cli' }),
       oauthDeps(grants.access)
@@ -872,7 +875,7 @@ describe('introspection endpoint', () => {
     const grants = fakeGrants({
       introspect: async () => ({ outcome: 'active', kind: 'first_party', ...active }),
     });
-    const token = createFirstPartyRefreshToken(active.grantId);
+    const token = firstPartyRefreshToken(active.grantId, randomCredential());
     const proof = await dpopProof(key, INTROSPECT_URL);
     const response = await call(
       formRequest('/introspect', { token, client_id: 'kilo-cli' }, { DPoP: proof }),
@@ -899,7 +902,10 @@ describe('introspection endpoint', () => {
     const response = await call(
       formRequest(
         '/introspect',
-        { token: createFirstPartyRefreshToken(active.grantId), client_id: 'kilo-cli' },
+        {
+          token: firstPartyRefreshToken(active.grantId, randomCredential()),
+          client_id: 'kilo-cli',
+        },
         { DPoP: await dpopProof(await dpopKey(), INTROSPECT_URL) }
       ),
       oauthDeps(grants.access)
@@ -909,7 +915,7 @@ describe('introspection endpoint', () => {
   });
 
   it('needs the proof for the introspection URL from a first-party client', async () => {
-    const token = createFirstPartyRefreshToken(active.grantId);
+    const token = firstPartyRefreshToken(active.grantId, randomCredential());
     const wrongUrl = await call(
       formRequest(
         '/introspect',

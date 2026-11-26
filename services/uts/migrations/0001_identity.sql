@@ -67,11 +67,10 @@ CREATE TYPE uts.client_class AS ENUM ('desktop', 'mobile');
 CREATE TYPE uts.client_kind AS ENUM ('first_party', 'third_party');
 CREATE TYPE uts.revoke_reason AS ENUM (
   'sign_out', 'user_revoke', 'admin_revoke', 'org_admin_revoke', 'account_blocked',
-  'member_removed', 'credential_change', 'reuse_detected', 'session_ended'
+  'member_removed', 'credential_change', 'reuse_detected', 'session_ended', 'client_blocked'
 );
 CREATE TYPE uts.session_status AS ENUM ('active', 'revoked');
 CREATE TYPE uts.grant_status AS ENUM ('active', 'revoked');
-CREATE TYPE uts.refresh_token_status AS ENUM ('active', 'rotated');
 CREATE TYPE uts.code_status AS ENUM ('issued', 'consumed');
 CREATE TYPE uts.device_code_status AS ENUM ('pending', 'approved', 'denied', 'consumed');
 CREATE TYPE uts.email_code_purpose AS ENUM ('sign_in', 'tier_a');
@@ -425,8 +424,9 @@ CREATE UNIQUE INDEX third_party_consents_active_key
   WHERE status = 'active';
 
 -- Third-party refresh tokens rotate on every use. A family is one consented grant: 90 days
--- maximum. Each token lives at most 30 days idle; a rotated token stays usable for a 60-second
--- grace, and a reuse after that revokes the family (design sections 5.3 and 5.4).
+-- maximum. It holds one current token, which lives at most 30 days idle; a rotation replaces the
+-- token and keeps the replaced one as a tombstone (`uts.third_party_rotated_tokens`, migration
+-- 0004), and any later use of a replaced token revokes the family (design sections 5.3 and 5.4).
 CREATE TABLE uts.third_party_grant_families (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uts.account_id NOT NULL REFERENCES uts.accounts (id) ON DELETE CASCADE,
@@ -454,36 +454,18 @@ CREATE INDEX third_party_grant_families_account_idx ON uts.third_party_grant_fam
   WHERE status = 'active';
 CREATE INDEX third_party_grant_families_consent_idx ON uts.third_party_grant_families (consent_id);
 
+-- The current token of each family. A revoked or ended family keeps its row: every reader checks
+-- the family's status.
 CREATE TABLE uts.third_party_refresh_tokens (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  family_id uuid NOT NULL REFERENCES uts.third_party_grant_families (id) ON DELETE CASCADE,
-  -- The token this one replaced; the chain runs back to the oldest token the family keeps. NULL
-  -- for the family's first token, and once the replaced token is deleted: a rotated token is kept
-  -- 30 days (`uts.maintain_oauth_rows`), and its deletion must not take the live chain with it.
-  parent_id uuid UNIQUE REFERENCES uts.third_party_refresh_tokens (id) ON DELETE SET NULL,
+  family_id uuid PRIMARY KEY REFERENCES uts.third_party_grant_families (id) ON DELETE CASCADE,
   token_hash uts.sha256 NOT NULL,
   issued_at timestamptz NOT NULL DEFAULT now(),
   idle_expires_at timestamptz NOT NULL,
-  -- A revoked or ended family revokes its tokens without touching their rows: every reader checks
-  -- the family's status.
-  status uts.refresh_token_status NOT NULL DEFAULT 'active',
-  rotated_at timestamptz,
-  grace_until timestamptz,
   CONSTRAINT third_party_refresh_tokens_token_hash_key UNIQUE (token_hash),
   CONSTRAINT third_party_refresh_tokens_lifetime CHECK (
     idle_expires_at > issued_at AND idle_expires_at <= issued_at + interval '30 days'
-  ),
-  -- `IS NOT DISTINCT FROM`, not `=`: a CHECK that evaluates to NULL passes, so a missing grace
-  -- time must compare as false.
-  CONSTRAINT third_party_refresh_tokens_status_shape CHECK (
-    grace_until IS NOT DISTINCT FROM rotated_at + interval '60 seconds'
-    AND (status = 'rotated') = (rotated_at IS NOT NULL)
   )
 );
--- One live token per family.
-CREATE UNIQUE INDEX third_party_refresh_tokens_active_key
-  ON uts.third_party_refresh_tokens (family_id)
-  WHERE status = 'active';
 
 -- Authorization codes: OAuth 2.1 with PKCE S256 only, about 60 seconds, single use.
 CREATE TABLE uts.authorization_codes (

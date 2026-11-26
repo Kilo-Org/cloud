@@ -14,7 +14,8 @@ import {
 } from '../../src/oauth/params';
 import { s256Challenge } from '../../src/oauth/pkce';
 import {
-  createFirstPartyRefreshToken,
+  firstPartyRefreshToken,
+  firstPartyRefreshTokenOfExchange,
   grantIdOfCode,
   grantIdOfFirstPartyRefreshToken,
   isRandomCredential,
@@ -46,6 +47,50 @@ describe('request parameters', () => {
     ).toMatchObject({ status: 'ok' });
     expect(await form('{}', 'application/json')).toMatchObject({ status: 'invalid' });
     expect(await form(`a=${'x'.repeat(16 * 1024)}`)).toMatchObject({ status: 'invalid' });
+  });
+
+  it('cancel a body without a Content-Length once it passes 16 KiB, without reading the rest', async () => {
+    const chunk = new TextEncoder().encode(`a=${'x'.repeat(4094)}`);
+    let pulled = 0;
+    let cancelled = false;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const request = new Request('http://localhost/token', {
+      method: 'POST',
+      body: endless,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(request.headers.get('Content-Length')).toBeNull();
+    expect(await readForm(request)).toEqual({
+      status: 'invalid',
+      description: 'the body is too large',
+    });
+    expect(cancelled).toBe(true);
+    // Four 4 KiB chunks fit; the fifth passes the limit, and the stream is cancelled there.
+    expect(pulled).toBeLessThanOrEqual(6);
+  });
+
+  it('count UTF-8 bytes, not characters, against the 16 KiB limit', async () => {
+    // 6,000 characters of 3 UTF-8 bytes each: under 16 Ki characters, over 16 KiB.
+    const body = new TextEncoder().encode(`a=${'€'.repeat(6000)}`);
+    const request = new Request('http://localhost/token', {
+      method: 'POST',
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(body);
+          controller.close();
+        },
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(await readForm(request)).toMatchObject({ status: 'invalid' });
   });
 
   it('parse a scope list of UTS scopes, each once, up to the limit', () => {
@@ -242,7 +287,7 @@ describe('clients', () => {
 describe('credentials', () => {
   it('name the grant in a first-party refresh token and nowhere else', () => {
     const grantId = crypto.randomUUID();
-    const token = createFirstPartyRefreshToken(grantId);
+    const token = firstPartyRefreshToken(grantId, randomCredential());
     expect(token).toMatch(/^kilo_rt_[A-Za-z0-9_-]{65}$/);
     expect(grantIdOfFirstPartyRefreshToken(token)).toBe(grantId);
     expect(grantIdOfFirstPartyRefreshToken(randomCredential())).toBeNull();
@@ -267,7 +312,26 @@ describe('credentials', () => {
     );
     expect(await grantIdOfCode(code)).toBe(grantId);
     expect(await grantIdOfCode(randomCredential())).not.toBe(grantId);
-    expect(grantIdOfFirstPartyRefreshToken(createFirstPartyRefreshToken(grantId))).toBe(grantId);
+    expect(
+      grantIdOfFirstPartyRefreshToken(firstPartyRefreshToken(grantId, randomCredential()))
+    ).toBe(grantId);
+  });
+
+  it('derive one first-party refresh token per code and verifier, naming the code grant', async () => {
+    const code = randomCredential();
+    const verifier = randomCredential();
+    const grantId = await grantIdOfCode(code);
+    const token = await firstPartyRefreshTokenOfExchange(grantId, code, verifier);
+    expect(token).toMatch(/^kilo_rt_[A-Za-z0-9_-]{65}$/);
+    expect(grantIdOfFirstPartyRefreshToken(token)).toBe(grantId);
+    expect(await firstPartyRefreshTokenOfExchange(grantId, code, verifier)).toBe(token);
+    expect(await firstPartyRefreshTokenOfExchange(grantId, code, randomCredential())).not.toBe(
+      token
+    );
+    const otherCode = randomCredential();
+    expect(
+      (await firstPartyRefreshTokenOfExchange(grantId, otherCode, verifier)).slice(-43)
+    ).not.toBe(token.slice(-43));
   });
 
   it('compute the RFC 7636 S256 challenge (appendix B)', async () => {

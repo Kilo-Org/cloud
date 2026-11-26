@@ -1,9 +1,11 @@
 /**
  * Local end-to-end run of the OAuth endpoints against `wrangler dev --env local` and the local
- * identity store (README, "Local development"): code, token, refresh, a replayed DPoP proof, a code
- * exchange whose signing fails and its retry, a second use of that code, third-party rotation,
- * reuse (the family is revoked), revoke and introspect, then the audit rows from the database
- * and a timing of the mint path. Synthetic data only; it prints token ids (`jti`), never a token.
+ * identity store (README, "Local development"): code, token, refresh, a replayed DPoP proof, a
+ * proof of one device key replayed at another grant of that key, a code exchange whose signing
+ * fails and its retry, two concurrent exchanges of one code, a second use of a code, third-party
+ * rotation, reuse (the family is revoked), a blocked third-party client, a streamed oversized
+ * body, revoke and introspect, then the audit rows from the database and a timing of the mint
+ * path. Synthetic data only; it prints token ids (`jti`), never a token.
  *
  *   UTS_E2E_BASE_URL   the mint Worker, such as http://127.0.0.1:8800
  *   UTS_E2E_ADMIN_URL  admin login to the identity-store database (loopback only), for the seed
@@ -12,7 +14,7 @@
  *   UTS_E2E_TIMING     mint calls to time (default 200)
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { setTimeout as sleep } from 'node:timers/promises';
+import { request } from 'node:http';
 import { UTS_ENDPOINTS } from '@kilocode/uts-contracts';
 import { SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import pg from 'pg';
@@ -104,6 +106,43 @@ async function authorize(params: Record<string, string>): Promise<string> {
     iss: location.searchParams.get('iss'),
   });
   return code;
+}
+
+/**
+ * POSTs `count` copies of `chunk` with chunked transfer encoding, so the request carries no
+ * `Content-Length`, on a connection of its own.
+ */
+function postChunked(
+  path: string,
+  chunk: string,
+  count: number
+): Promise<{ status: number; body: string }> {
+  const { promise, resolve, reject } = Promise.withResolvers<{ status: number; body: string }>();
+  let answered = false;
+  const outgoing = request(
+    `${base}${path.slice(1)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Connection: 'close' },
+    },
+    incoming => {
+      answered = true;
+      let body = '';
+      incoming.setEncoding('utf8');
+      incoming.on('data', (part: string) => {
+        body += part;
+      });
+      incoming.on('end', () => resolve({ status: incoming.statusCode ?? 0, body }));
+    }
+  );
+  // The Worker may answer and close before every chunk is sent; only an error before the answer
+  // fails the call.
+  outgoing.on('error', error => {
+    if (!answered) reject(error);
+  });
+  for (let sent = 0; sent < count; sent += 1) outgoing.write(chunk);
+  outgoing.end();
+  return promise;
 }
 
 async function seed(admin: pg.Client): Promise<string> {
@@ -264,6 +303,53 @@ async function main() {
     grantsForCode: grantOfCode.grants,
   });
 
+  // Two exchanges of one code at once (a client that retried while the first answer was still
+  // on its way): both answers carry the one refresh token the grant holds.
+  const raceCode = await authorize({
+    response_type: 'code',
+    client_id: 'kilo-cli',
+    redirect_uri: CALLBACK,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    scope: 'gateway:models.read',
+    state: 'e2e-race',
+    dpop_jkt: device.jkt,
+  });
+  secrets.push(raceCode);
+  const raceExchange = { ...exchange, code: raceCode };
+  const [raceA, raceB] = await Promise.all([
+    device.proof('/token').then(proof => post('/token', raceExchange, proof)),
+    device.proof('/token').then(proof => post('/token', raceExchange, proof)),
+  ]);
+  const raceTokens = [raceA, raceB].map(answer =>
+    z.string().parse(TokenSchema.parse(answer.body).refresh_token)
+  );
+  secrets.push(...raceTokens);
+  const raceRefresh = await post(
+    '/token',
+    { grant_type: 'refresh_token', refresh_token: raceTokens[0], client_id: 'kilo-cli' },
+    await device.proof('/token')
+  );
+  log('two exchanges of one code at once', {
+    statuses: [raceA.status, raceB.status],
+    sameRefreshToken: raceTokens[0] === raceTokens[1],
+    refreshAfterwards: raceRefresh.status,
+  });
+
+  // One device key holds both grants: a proof accepted for one is refused at the other.
+  const sharedProof = await device.proof('/token');
+  const atFirstGrant = await post('/token', { ...refreshOnce, refresh_token: grant }, sharedProof);
+  const atOtherGrant = await post(
+    '/token',
+    { ...refreshOnce, refresh_token: retriedGrant },
+    sharedProof
+  );
+  log('one proof at two grants of a key', {
+    first: atFirstGrant.status,
+    other: atOtherGrant.status,
+    body: atOtherGrant.body,
+  });
+
   // A second use of that code with another verifier still revokes the grant.
   const reused = await post(
     '/token',
@@ -281,7 +367,7 @@ async function main() {
     body: afterCodeReuse.body,
   });
 
-  // Third party: code, token, rotation, reuse after the 60-second grace.
+  // Third party: code, token, rotation, and reuse of the replaced token at once (no grace).
   const thirdCode = await authorize({
     response_type: 'code',
     client_id: THIRD_PARTY,
@@ -319,24 +405,82 @@ async function main() {
   log('rotate (third party)', { status: rotated.status, rotated: t2 !== t1 });
   const introspected = await post('/introspect', { token: t2, client_id: THIRD_PARTY });
   log('introspect rotated token', introspected.body);
-  console.log('waiting 61 seconds for the grace of the first token to end');
-  await sleep(61_000);
   const reuse = await post('/token', {
     grant_type: 'refresh_token',
     refresh_token: t1,
     client_id: THIRD_PARTY,
   });
-  log('reuse of the rotated token', { status: reuse.status, body: reuse.body });
+  log('reuse of the replaced token', { status: reuse.status, body: reuse.body });
   const afterReuse = await post('/token', {
     grant_type: 'refresh_token',
     refresh_token: t2,
     client_id: THIRD_PARTY,
   });
-  log('newest token after reuse', { status: afterReuse.status, body: afterReuse.body });
+  log('current token after reuse', { status: afterReuse.status, body: afterReuse.body });
   log(
     'introspect after reuse',
     (await post('/introspect', { token: t2, client_id: THIRD_PARTY })).body
   );
+
+  // The client authorizes again (its consent stands), and then it is blocked.
+  const againCode = await authorize({
+    response_type: 'code',
+    client_id: THIRD_PARTY,
+    redirect_uri: 'https://client.example.com/callback',
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    scope: 'mcp:tools.read',
+    state: 'e2e-3p-again',
+    dev_consent_id: consentId,
+  });
+  secrets.push(againCode);
+  const again = await post('/token', {
+    grant_type: 'authorization_code',
+    code: againCode,
+    redirect_uri: 'https://client.example.com/callback',
+    client_id: THIRD_PARTY,
+    code_verifier: verifier,
+  });
+  const t3 = z.string().parse(TokenSchema.parse(again.body).refresh_token);
+  secrets.push(t3);
+  await admin.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [
+    THIRD_PARTY,
+  ]);
+  const blockedRefresh = await post('/token', {
+    grant_type: 'refresh_token',
+    refresh_token: t3,
+    client_id: THIRD_PARTY,
+  });
+  const familyOfT3 = async () =>
+    (
+      await admin.query<{ status: string; revoke_reason: string | null; feed: number }>(
+        `SELECT family.status, family.revoke_reason,
+                (SELECT count(*)::int FROM uts.revocations AS entry
+                 WHERE entry.kind = 'third_party_family' AND entry.subject_id = family.id::text) AS feed
+         FROM uts.authorization_codes AS code
+         JOIN uts.third_party_grant_families AS family ON family.id = code.grant_id
+         WHERE code.code_hash = $1`,
+        [sha256(againCode)]
+      )
+    ).rows[0];
+  log('refresh after the client is blocked', {
+    status: blockedRefresh.status,
+    body: blockedRefresh.body,
+    family: await familyOfT3(),
+  });
+  log(
+    'introspect after the block',
+    (await post('/introspect', { token: t3, client_id: THIRD_PARTY })).body
+  );
+  // The row-maintenance cron ends the blocked client's families in batches.
+  const maintained = await admin.query<{ kind: string; deleted: number }>(
+    'SELECT kind, deleted FROM uts.maintain_oauth_rows()'
+  );
+  log('maintenance after the block', {
+    blockedClientFamilies: maintained.rows.find(row => row.kind === 'blocked_client_families')
+      ?.deleted,
+    family: await familyOfT3(),
+  });
 
   // Timing of the first-party mint path, before the grant is revoked.
   const http: number[] = [];
@@ -418,6 +562,15 @@ async function main() {
       )
     ).body
   );
+
+  // A body without a Content-Length that grows past 16 KiB is cut off, not buffered. It runs
+  // last, on its own connection, because the Worker answers before the client finishes sending.
+  const streamed = await postChunked(
+    '/token',
+    `grant_type=refresh_token&pad=${'x'.repeat(4096)}`,
+    64
+  );
+  log('streamed 256 KiB body, no Content-Length', streamed);
 
   const rows = await admin.query<{
     id: string;

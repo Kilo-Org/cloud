@@ -25,6 +25,7 @@ const FUNCTION_WRITTEN_TABLES = [
   'device_sessions',
   'third_party_grant_families',
   'third_party_refresh_tokens',
+  'third_party_rotated_tokens',
   'revocations',
   'dpop_proofs',
   'personal_access_tokens',
@@ -33,7 +34,12 @@ const FUNCTION_WRITTEN_TABLES = [
 ];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
-const UPDATE_COLUMN: Partial<Record<string, string>> = { revocations: 'kind', dpop_proofs: 'jti' };
+const UPDATE_COLUMN: Partial<Record<string, string>> = {
+  third_party_refresh_tokens: 'token_hash',
+  third_party_rotated_tokens: 'family_id',
+  revocations: 'kind',
+  dpop_proofs: 'jti',
+};
 
 let db: TestDatabase;
 let todayPartition: string;
@@ -132,9 +138,10 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
       'SELECT kind FROM uts.maintain_oauth_rows()'
     );
     expect(maintenance.rows.map(row => row.kind)).toEqual([
+      'blocked_client_families',
       'authorization_codes',
       'third_party_refresh_tokens',
-      'rotated_refresh_tokens',
+      'third_party_rotated_tokens',
       'revocations',
       'dpop_proofs',
     ]);

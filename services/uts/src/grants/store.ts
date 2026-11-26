@@ -44,7 +44,7 @@ type TokenSelection = { scopes: readonly string[] | null; resources: readonly st
 
 /**
  * A verified DPoP proof: the RFC 7638 thumbprint of its key, as the raw 32 bytes a grant stores,
- * and its `jti`, which the statement records under the grant so the proof is accepted once.
+ * and its `jti`, which the statement records under that key so the proof is accepted once.
  */
 export type ProofBinding = { jkt: Uint8Array; jti: string };
 
@@ -95,7 +95,7 @@ export type Minted = {
 
 type SelectionFailure = 'invalid_grant' | 'invalid_scope' | 'invalid_target';
 
-/** `dpop_replay`: the proof's `jti` was recorded under the grant before. */
+/** `dpop_replay`: the proof's `jti` was recorded under its key before. */
 export type ExchangeResult =
   | ({ outcome: 'issued'; refreshExpiresAt: Date } & Minted)
   | { outcome: SelectionFailure | 'dpop_replay' };

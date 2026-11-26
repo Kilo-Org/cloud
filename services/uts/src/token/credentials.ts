@@ -3,15 +3,18 @@ import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 
 /**
- * Opaque credential values. Each carries 32 random bytes and is stored only as its SHA-256 hash
- * (design 5.2). A first-party refresh grant also names its grant id, so the token endpoint knows
- * the grant, and the signer object the grant id picks, before it reads the grant (design 5.3):
- * `kilo_rt_<grant id, 22 base64url characters><32 random bytes, 43 base64url characters>`. The
- * grant id is not secret (it is the `sid` of every access token); the random part is the secret.
+ * Opaque credential values, each stored only as its SHA-256 hash (design 5.2). An authorization
+ * code and a third-party refresh token are 32 random bytes. A first-party refresh grant also
+ * names its grant id, so the token endpoint knows the grant, and the signer object the grant id
+ * picks, before it reads the grant (design 5.3):
+ * `kilo_rt_<grant id, 22 base64url characters><secret, 43 base64url characters>`. The grant id
+ * is not secret (it is the `sid` of every access token); the secret part is.
  */
 
 /** Separates the grant id derivation from the stored code hash, a SHA-256 of the code alone. */
 const GRANT_ID_LABEL = 'kilo-uts-grant-id:';
+/** Separates the refresh secret derivation from the grant id and the stored hashes. */
+const REFRESH_SECRET_LABEL = 'kilo-uts-first-party-refresh:';
 
 const RANDOM_BYTES = 32;
 /** 32 bytes in base64url without padding. */
@@ -68,9 +71,28 @@ export async function grantIdOfCode(code: string): Promise<string> {
   return uuidOfBytes(bytes);
 }
 
-export function createFirstPartyRefreshToken(grantId: string): string {
+/** A first-party refresh token: the grant id and the 43-character secret in the token format. */
+export function firstPartyRefreshToken(grantId: string, secret: string): string {
   const grantIdBytes = Buffer.from(UuidSchema.parse(grantId).replaceAll('-', ''), 'hex');
-  return `${UTS_REFRESH_TOKEN_PREFIX}${base64url(grantIdBytes)}${randomCredential()}`;
+  return `${UTS_REFRESH_TOKEN_PREFIX}${base64url(grantIdBytes)}${secret}`;
+}
+
+/**
+ * The refresh token a first-party code exchange returns for the grant `grantIdOfCode(code)`. Its
+ * secret is SHA-256 over a fixed label, the code and the PKCE verifier, so every attempt with one
+ * code and verifier returns the same token: when a client retries while the first answer is still
+ * on its way, both answers carry the one token the grant holds, whichever arrives last (design
+ * 5.4). The code is 32 random bytes that only the client and the exchange see, the verifier never
+ * leaves the client before the exchange, and the identity store keeps only the SHA-256 of each
+ * alone, so stored data does not give the secret.
+ */
+export async function firstPartyRefreshTokenOfExchange(
+  grantId: string,
+  code: string,
+  verifier: string
+): Promise<string> {
+  const secret = base64url(await sha256(`${REFRESH_SECRET_LABEL}${code}:${verifier}`));
+  return firstPartyRefreshToken(grantId, secret);
 }
 
 /** The grant id a first-party refresh token names, or null when the value has another shape. */

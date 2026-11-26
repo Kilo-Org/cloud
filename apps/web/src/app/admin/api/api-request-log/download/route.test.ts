@@ -27,10 +27,13 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/admin/admin-action-audit', () => ({
-  ...jest.requireActual('@kilocode/web-shared/lib/admin/admin-action-audit'),
-  recordAdminAction: jest.fn().mockResolvedValue(undefined),
-}));
+// The spy keeps the real recorder, so the route's audit scope sees the row it writes.
+jest.mock('@kilocode/web-shared/lib/admin/admin-action-audit', () => {
+  const actual = jest.requireActual<
+    Record<string, unknown> & { recordAdminAction: typeof recordAdminAction }
+  >('@kilocode/web-shared/lib/admin/admin-action-audit');
+  return { ...actual, recordAdminAction: jest.fn(actual.recordAdminAction) };
+});
 
 jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest

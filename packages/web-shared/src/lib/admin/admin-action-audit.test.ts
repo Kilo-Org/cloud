@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { eq } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import { admin_action_audit_logs, organizations } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -15,14 +16,16 @@ import {
   isAuditedAdminRoute,
   organizationActionTarget,
   recordAdminAction,
-  recordElevatedOrganizationAdminAction,
   recordAdminActions,
   redactEmailAddressesInAuditText,
+  runElevatedOrganizationWrite,
   setAdminActionSinkForTest,
   setAdminAuditActor,
+  setAdminAuditOutcome,
   userActionTarget,
   type AdminActionContext,
   type AdminActionEvent,
+  type AdminAuditOutcome,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 function ctxFor(overrides: Partial<AdminActionContext> = {}): AdminActionContext {
@@ -401,7 +404,7 @@ describe('redactEmailAddressesInAuditText', () => {
   });
 });
 
-describe('recordElevatedOrganizationAdminAction', () => {
+describe('runElevatedOrganizationWrite', () => {
   beforeEach(() => setAdminActionSinkForTest(() => {}));
   afterEach(async () => {
     setAdminActionSinkForTest(null);
@@ -416,48 +419,159 @@ describe('recordElevatedOrganizationAdminAction', () => {
       .update(organizations)
       .set({ parent_organization_id: parent.id })
       .where(eq(organizations.id, child.id));
-    return { admin, childId: child.id };
+    return { admin, parentId: parent.id, childId: child.id };
   }
 
-  function record(
-    admin: Awaited<ReturnType<typeof insertTestUser>>,
+  function write<TResult>(
+    user: Awaited<ReturnType<typeof insertTestUser>>,
     organizationId: string,
+    run: () => Promise<TResult>,
     scope?: 'direct'
   ) {
-    return recordElevatedOrganizationAdminAction(
-      { ...ctxFor(), user: admin },
+    return runElevatedOrganizationWrite(
+      { ...ctxFor(), user },
       {
         organizationId,
         requiredRoles: ['owner'],
         membershipScope: scope,
         action: 'organization.gitlab_webhook_secret.rotate',
         message: 'GitLab webhook secret: rotate',
-      }
+      },
+      run
     );
   }
+
+  const succeed = async () => 'done';
 
   test('an inherited owner role satisfies inherited-scope guards but not direct-only guards', async () => {
     const { admin, childId } = await adminWithInheritedOwnerRole();
 
-    await record(admin, childId);
+    await write(admin, childId, succeed);
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
 
-    await record(admin, childId, 'direct');
+    await expect(write(admin, childId, succeed, 'direct')).resolves.toBe('done');
     const rows = await db.select().from(admin_action_audit_logs);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.metadata).toEqual({ heldRoles: [] });
+    expect(rows).toEqual([
+      expect.objectContaining({ outcome: 'success', metadata: { heldRoles: [] } }),
+    ]);
   });
 
-  test('does not record non-admins or admins holding a sufficient direct role', async () => {
+  test('a role held only in a soft-deleted parent counts as no role, as it does for the guard', async () => {
+    const { admin, parentId, childId } = await adminWithInheritedOwnerRole();
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, parentId));
+
+    await expect(write(admin, childId, succeed)).resolves.toBe('done');
+
+    expect(await db.select().from(admin_action_audit_logs)).toEqual([
+      expect.objectContaining({
+        outcome: 'success',
+        target_type: 'organization',
+        target_id: childId,
+        metadata: { heldRoles: [] },
+      }),
+    ]);
+  });
+
+  test('records nothing for non-admins or admins holding a sufficient role, even when the write fails', async () => {
     const owner = await insertTestUser({ is_admin: false });
     const organization = await createOrganization('Owned Org', owner.id);
     const adminOwner = await insertTestUser({ is_admin: true });
     await addUserToOrganization(organization.id, adminOwner.id, 'owner');
+    const fail = async () => {
+      throw new TRPCError({ code: 'NOT_FOUND' });
+    };
 
-    await record(owner, organization.id);
-    await record(adminOwner, organization.id, 'direct');
+    await write(owner, organization.id, succeed);
+    await write(adminOwner, organization.id, succeed, 'direct');
+    await expect(write(owner, organization.id, fail)).rejects.toThrow(TRPCError);
+    await expect(write(adminOwner, organization.id, fail)).rejects.toThrow(TRPCError);
 
     expect(await db.select().from(admin_action_audit_logs)).toHaveLength(0);
+  });
+
+  test('a failed write records a failure row with its code and the metadata it added, then rethrows', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organizationId = crypto.randomUUID();
+    const error = new TRPCError({ code: 'PRECONDITION_FAILED', message: 'secret text' });
+
+    await expect(
+      write(admin, organizationId, async () => {
+        addAdminAuditMetadata({ integrationId: 'integration-1' });
+        throw error;
+      })
+    ).rejects.toBe(error);
+
+    const rows = await db.select().from(admin_action_audit_logs);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'organization.gitlab_webhook_secret.rotate',
+        outcome: 'failure',
+        target_type: 'organization',
+        target_id: organizationId,
+        metadata: {
+          integrationId: 'integration-1',
+          heldRoles: [],
+          errorCode: 'PRECONDITION_FAILED',
+        },
+      }),
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('secret text');
+  });
+
+  test('judges a response by its status when the write names no outcome', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const response = Response.json({ error: 'nope' }, { status: 403 });
+
+    await expect(write(admin, crypto.randomUUID(), async () => response)).resolves.toBe(response);
+
+    const [row] = await db.select().from(admin_action_audit_logs);
+    expect(row?.outcome).toBe('failure');
+    expect(row?.metadata).toEqual({ heldRoles: [], errorCode: '403' });
+  });
+
+  test.each<[string, string, AdminAuditOutcome, Record<string, unknown>]>([
+    [
+      'a failure whose code the return path fragment hides',
+      'http://localhost/integrations#repositories?error=installation_failed',
+      { outcome: 'failure', errorCode: 'installation_failed' },
+      { heldRoles: [], errorCode: 'installation_failed' },
+    ],
+    [
+      'a success whose return path keeps an earlier error parameter',
+      'http://localhost/integrations?error=access_denied&success=installed',
+      { outcome: 'success' },
+      { heldRoles: [] },
+    ],
+  ])('records the outcome a redirect names: %s', async (_label, location, named, metadata) => {
+    const admin = await insertTestUser({ is_admin: true });
+    const response = Response.redirect(location, 302);
+
+    await expect(
+      write(admin, crypto.randomUUID(), async () => {
+        setAdminAuditOutcome(named);
+        return response;
+      })
+    ).resolves.toBe(response);
+
+    const [row] = await db.select().from(admin_action_audit_logs);
+    expect(row?.outcome).toBe(named.outcome);
+    expect(row?.metadata).toEqual(metadata);
+  });
+
+  test('reports a redirecting write that names no outcome as an audit gap and records a failure', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+
+    await expect(
+      write(admin, crypto.randomUUID(), async () =>
+        Response.redirect('http://localhost/integrations?success=installed', 302)
+      )
+    ).rejects.toThrow('Admin audit gap');
+
+    const [row] = await db.select().from(admin_action_audit_logs);
+    expect(row?.outcome).toBe('failure');
   });
 
   test('records with unknown held roles instead of throwing when the membership lookup fails', async () => {
@@ -466,7 +580,7 @@ describe('recordElevatedOrganizationAdminAction', () => {
       throw new Error('database unavailable');
     });
     try {
-      await expect(record(admin, crypto.randomUUID())).resolves.toBeUndefined();
+      await expect(write(admin, crypto.randomUUID(), succeed)).resolves.toBe('done');
     } finally {
       select.mockRestore();
     }

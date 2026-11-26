@@ -3,14 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import {
-  admin_action_audit_logs,
-  organization_memberships,
-  organizations,
-  type User,
-} from '@kilocode/db/schema';
-import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
-import { and, eq, inArray } from 'drizzle-orm';
+import { admin_action_audit_logs, organization_memberships, type User } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 import {
   AdminActionAuditAction,
   type AdminActionAuditOutcome,
@@ -29,6 +23,7 @@ import {
   targetIdFromInput,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -54,7 +49,10 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  * scope ({@link runAdminAuditScope}) declared by an {@link AdminAuditSpec}. The
  * scope records the success row itself for a declarative spec, records a
  * failure row whenever the action fails, and reports a handler-recorded action
- * that finished without recording anything.
+ * that finished without recording anything. Organization writes a Kilo admin
+ * makes through the admin bypass run inside
+ * {@link runElevatedOrganizationWrite}, which records their outcome the same
+ * way.
  *
  * `message` and `metadata` are stored and logged verbatim. Never include
  * tokens, credentials, or customer email addresses; reference users and
@@ -351,100 +349,148 @@ export function organizationActionTarget(organizationId: string): AdminActionTar
 }
 
 /**
- * Records an organization write made through the `is_admin` escape hatch, i.e.
- * by a Kilo admin whose own membership in the organization would not have
- * allowed it. Admins acting within a role they actually hold are ordinary
- * members and are not recorded.
+ * Runs an organization write and records it when a Kilo admin makes it through
+ * the `is_admin` escape hatch, i.e. when their own membership in the
+ * organization would not allow it. Admins acting within a role they actually
+ * hold are ordinary members: their writes, like everyone else's, run without a
+ * row.
+ *
+ * Whether the bypass is used is decided before `run` starts, from the roles
+ * the admin holds at that moment, so a write that changes the admin's own
+ * membership (e.g. self-removal) is judged by the roles it started with. Start
+ * it right after the guard admitted the caller. The row is written once `run`
+ * ends: a failure row with a stable `errorCode` when it throws (the error is
+ * rethrown unchanged), else the outcome `run` named with
+ * {@link setAdminAuditOutcome}, else the one `outcomeOf` reports. Without
+ * either, a `Response` result is judged by {@link responseAuditOutcome} and any
+ * other result is a success.
  *
  * `requiredRoles` and `membershipScope` must mirror the guard the admin
  * bypassed: some guards accept roles inherited from a parent organization,
- * others only a direct membership. Pass `heldRoles` when the action itself
- * changes the actor's membership (e.g. self-removal) and the roles were read
- * beforehand.
+ * others only a direct membership. The inherited scope reads the admin's roles
+ * through the organization guards' own membership lookup, so a role held only
+ * in a soft-deleted parent counts as no role, as it does for the guard. The
+ * row's metadata is `metadata`, anything `run` adds with
+ * {@link addAdminAuditMetadata}, and the admin's `heldRoles`.
  *
- * Reads stay as `kilo_admin_elevation` log lines; call this only from
- * mutations, after they succeed. Like {@link recordAdminAction} it never
- * throws: if the membership lookup fails, the action is recorded with
- * `heldRoles: null` rather than failing a request that already took effect.
+ * Like {@link recordAdminAction}, the audit never fails the write: if the
+ * membership lookup fails, the write is recorded with `heldRoles: null`.
+ * Reads stay as `kilo_admin_elevation` log lines; use this only for writes.
  */
-export async function recordElevatedOrganizationAdminAction(
+export async function runElevatedOrganizationWrite<TResult>(
   ctx: AdminActionContext & { user: { is_admin: boolean } },
-  params: {
-    organizationId: string;
-    requiredRoles: readonly OrganizationRole[];
-    membershipScope?: OrganizationMembershipScope;
-    heldRoles?: OrganizationRole[];
-    action: AdminActionAuditAction;
-    message: string;
-    metadata?: Record<string, unknown>;
-  }
-): Promise<void> {
+  write: ElevatedOrganizationWrite<TResult>,
+  run: () => Promise<TResult>
+): Promise<TResult> {
   // Counts as the audit of an enclosing scope even when nothing is written: an
   // admin acting within a role they hold is an ordinary member.
   noteAdminAuditRecordCall();
-  if (!ctx.user.is_admin) return;
+  // Its own scope, so metadata `run` adds never reaches an enclosing scope.
+  const state: AdminAuditScopeState = {
+    actions: [write.action],
+    target: { kind: 'unset' },
+    metadata: {},
+    recordCalls: 0,
+    actor: null,
+    failureAction: null,
+    inputParsingStarted: false,
+    outcome: null,
+  };
+  const heldRoles = await bypassedOrganizationHeldRoles(ctx, write);
+  if (heldRoles === undefined) return adminAuditScope.run(state, run);
 
-  let heldRoles: OrganizationRole[] | null = params.heldRoles ?? null;
-  if (heldRoles === null) {
-    try {
-      heldRoles = await getOrganizationMembershipRoles(
-        ctx.user.id,
-        params.organizationId,
-        params.membershipScope ?? 'direct_or_inherited'
-      );
-    } catch (error) {
-      captureException(error, { tags: { operation: 'admin_action_membership_lookup' } });
+  let outcome: AdminAuditOutcome | undefined;
+  try {
+    const result = await adminAuditScope.run(state, run);
+    outcome =
+      state.outcome ??
+      (write.outcomeOf
+        ? write.outcomeOf(result)
+        : result instanceof Response
+          ? responseAuditOutcome(result)
+          : { outcome: 'success' });
+    return result;
+  } catch (error) {
+    outcome = { outcome: 'failure', errorCode: adminAuditErrorCode(error) };
+    throw error;
+  } finally {
+    if (outcome) {
+      await writeAdminActions(ctx, [
+        {
+          ...outcome,
+          action: write.action,
+          target: organizationActionTarget(write.organizationId),
+          message: write.message,
+          metadata: { ...write.metadata, ...state.metadata, heldRoles },
+        },
+      ]);
     }
   }
-  if (heldRoles?.some(role => params.requiredRoles.includes(role))) return;
+}
 
-  await writeAdminActions(ctx, [
-    {
-      action: params.action,
-      target: organizationActionTarget(params.organizationId),
-      message: params.message,
-      metadata: { ...params.metadata, heldRoles },
-    },
-  ]);
+export type ElevatedOrganizationWrite<TResult> = {
+  organizationId: string;
+  requiredRoles: readonly OrganizationRole[];
+  membershipScope?: OrganizationMembershipScope;
+  action: AdminActionAuditAction;
+  message: string;
+  metadata?: Record<string, unknown>;
+  outcomeOf?: (result: TResult) => AdminAuditOutcome;
+};
+
+/**
+ * The roles an admin about to bypass an organization guard holds there: null
+ * when the lookup failed, undefined when no bypass is involved (not an admin,
+ * or an admin holding a role the guard accepts).
+ */
+async function bypassedOrganizationHeldRoles(
+  ctx: { user: { id: string; is_admin: boolean } },
+  write: Pick<
+    ElevatedOrganizationWrite<unknown>,
+    'organizationId' | 'requiredRoles' | 'membershipScope'
+  >
+): Promise<OrganizationRole[] | null | undefined> {
+  if (!ctx.user.is_admin) return undefined;
+  let heldRoles: OrganizationRole[] | null = null;
+  try {
+    heldRoles = await getOrganizationMembershipRoles(
+      ctx.user.id,
+      write.organizationId,
+      write.membershipScope ?? 'direct_or_inherited'
+    );
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_action_membership_lookup' } });
+  }
+  if (heldRoles?.some(role => write.requiredRoles.includes(role))) return undefined;
+  return heldRoles;
 }
 
 export type OrganizationMembershipScope = 'direct' | 'direct_or_inherited';
 
 /**
- * The caller's real roles in an organization: direct memberships, plus roles
- * inherited from a parent organization when `scope` allows, mirroring
- * ensureOrganizationAccess for non-admins.
+ * The caller's real roles in an organization: its direct memberships, or with
+ * the inherited scope the effective roles the organization guards read
+ * (direct memberships in a live organization plus roles inherited from a live
+ * parent), mirroring ensureOrganizationAccess for non-admins.
  */
-export async function getOrganizationMembershipRoles(
+async function getOrganizationMembershipRoles(
   userId: string,
   organizationId: string,
   scope: OrganizationMembershipScope
 ): Promise<OrganizationRole[]> {
-  const direct = await db
-    .select({ role: organization_memberships.role })
-    .from(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, userId),
-        eq(organization_memberships.organization_id, organizationId)
-      )
-    );
-  const inherited =
+  const rows =
     scope === 'direct'
-      ? []
-      : await db
+      ? await db
           .select({ role: organization_memberships.role })
-          .from(organizations)
-          .innerJoin(
-            organization_memberships,
+          .from(organization_memberships)
+          .where(
             and(
-              eq(organization_memberships.organization_id, organizations.parent_organization_id),
               eq(organization_memberships.kilo_user_id, userId),
-              inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+              eq(organization_memberships.organization_id, organizationId)
             )
           )
-          .where(eq(organizations.id, organizationId));
-  return [...new Set([...direct, ...inherited].map(row => row.role))];
+      : await loadEffectiveMembershipRows(userId, organizationId);
+  return [...new Set(rows.map(row => row.role))];
 }
 
 /** Audit context for REST route handlers, which have request headers instead of a tRPC context. */
@@ -471,7 +517,7 @@ export function adminActionContextFromHeaders(
  *   where `input` is the raw tRPC input or the awaited REST route params. Do
  *   not also record the same action in the handler.
  * - `handler`: the handler records its own rows with {@link recordAdminAction},
- *   {@link recordAdminActions} or {@link recordElevatedOrganizationAdminAction}.
+ *   {@link recordAdminActions} or {@link runElevatedOrganizationWrite}.
  *   A call that succeeds without one is reported (and throws in tests).
  * - `exempt`: nothing is recorded. Only for mutation-typed reads and
  *   development-only operators; `reason` says which.
@@ -519,6 +565,8 @@ type AdminAuditScopeState = {
   failureAction: AdminActionAuditAction | null;
   /** Whether the call's input parser has read its input (see {@link AdminAuditRun}). */
   inputParsingStarted: boolean;
+  /** The outcome the call named with {@link setAdminAuditOutcome}, if any. */
+  outcome: AdminAuditOutcome | null;
 };
 
 const adminAuditScope = new AsyncLocalStorage<AdminAuditScopeState>();
@@ -562,6 +610,17 @@ export function setAdminAuditActor(user: AdminAuditActor): void {
   if (state) state.actor = user;
 }
 
+/**
+ * Names the outcome the enclosing audit scope records when the call returns,
+ * in place of judging its result. A handler whose result does not reliably say
+ * how it went, such as a redirect, names it on every branch it returns from. A
+ * throw still records a failure with the thrown value's code.
+ */
+export function setAdminAuditOutcome(outcome: AdminAuditOutcome): void {
+  const state = adminAuditScope.getStore();
+  if (state) state.outcome = outcome;
+}
+
 function noteAdminAuditRecordCall(): void {
   const state = adminAuditScope.getStore();
   if (state) state.recordCalls += 1;
@@ -581,6 +640,25 @@ export function noteAdminAuditInputParsing(): void {
 export type AdminAuditOutcome =
   | { outcome: 'success' }
   | { outcome: 'failure'; errorCode: string; inputRejected?: boolean };
+
+/**
+ * The outcome of a write answered with a `Response` that named none with
+ * {@link setAdminAuditOutcome}. A status of 400 or above fails with the status
+ * as its code. A redirect's target does not reliably say how the write went
+ * (an OAuth callback appends its result to a caller-chosen return path, which
+ * can carry its own query or fragment), so a write answered with a redirect
+ * must name its outcome: one that names none is reported as an audit gap and
+ * recorded as a failure with code `outcome_unrecorded`. Any other response is
+ * a success.
+ */
+function responseAuditOutcome(response: Response): AdminAuditOutcome {
+  if (response.status >= 400) return { outcome: 'failure', errorCode: String(response.status) };
+  if (response.status >= 300) {
+    reportAdminAuditGap('a redirect response named no audit outcome');
+    return { outcome: 'failure', errorCode: 'outcome_unrecorded' };
+  }
+  return { outcome: 'success' };
+}
 
 export type AdminAuditRun<TResult> = {
   spec: AdminAuditSpec;
@@ -624,6 +702,7 @@ export async function runAdminAuditScope<TResult>(
     actor: null,
     failureAction: null,
     inputParsingStarted: false,
+    outcome: null,
   };
   let result: TResult;
   try {
@@ -637,7 +716,7 @@ export async function runAdminAuditScope<TResult>(
     throw error;
   }
 
-  const outcome = params.outcomeOf(result);
+  const outcome = state.outcome ?? params.outcomeOf(result);
   if (outcome.outcome === 'failure') {
     await recordScopeFailure(params, state, outcome);
   } else if (spec.kind === 'declarative') {
@@ -735,11 +814,11 @@ export function reportAdminAuditGap(message: string): void {
 const AUDITED_ADMIN_ROUTE = Symbol.for('kilocode.auditedAdminRoute');
 
 /**
- * Wraps an App Router admin write handler in an audit scope. A response
- * status below 400 is a success; 400 and above records a failure row whose
- * `errorCode` is the status; a throw records a failure row and is rethrown.
- * The handler must call {@link setAdminAuditActor} once it has authenticated
- * the admin; until then a failure records nothing.
+ * Wraps an App Router admin write handler in an audit scope. The response is
+ * judged by {@link responseAuditOutcome}: a failure records a failure row with
+ * its code; a throw records a failure row and is rethrown. The handler must
+ * call {@link setAdminAuditActor} once it has authenticated the admin; until
+ * then a failure records nothing.
  */
 export function auditedAdminRoute<TArgs extends [Request, ...unknown[]]>(
   spec: AdminAuditSpec,
@@ -758,10 +837,7 @@ export function auditedAdminRoute<TArgs extends [Request, ...unknown[]]>(
       input: () => routeParams(routeContext),
       reportsInputParsing: false,
       run: () => handler(...args),
-      outcomeOf: response =>
-        response.status < 400
-          ? { outcome: 'success' }
-          : { outcome: 'failure', errorCode: String(response.status) },
+      outcomeOf: response => responseAuditOutcome(response),
     });
   };
   Object.defineProperty(wrapped, AUDITED_ADMIN_ROUTE, { value: spec, enumerable: false });

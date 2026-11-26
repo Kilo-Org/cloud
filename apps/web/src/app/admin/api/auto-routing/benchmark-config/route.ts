@@ -9,6 +9,11 @@ import {
   getBenchmarkConfig,
   updateBenchmarkConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import {
+  addAdminAuditMetadata,
+  auditedAdminRoute,
+  setAdminAuditActor,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET(request?: NextRequest) {
@@ -23,23 +28,27 @@ export async function GET(request?: NextRequest) {
   return NextResponse.json(result.body, { status: result.status });
 }
 
-export async function PUT(request: NextRequest) {
-  const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
+export const PUT = auditedAdminRoute(
+  { kind: 'declarative', action: 'auto_routing.benchmark_config.update' },
+  async (request: NextRequest) => {
+    const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(user);
 
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const parsed = BenchmarkConfigSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid benchmark config' }, { status: 400 });
+    }
+    addAdminAuditMetadata({ router: parsed.data.router });
+
+    const result = await updateBenchmarkConfig(parsed.data, user.google_user_email);
+    return NextResponse.json(result.body, { status: result.status });
   }
-
-  const parsed = BenchmarkConfigSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid benchmark config' }, { status: 400 });
-  }
-
-  const email = user?.google_user_email ?? '';
-  const result = await updateBenchmarkConfig(parsed.data, email);
-  return NextResponse.json(result.body, { status: result.status });
-}
+);

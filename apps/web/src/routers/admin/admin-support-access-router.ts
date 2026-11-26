@@ -11,7 +11,7 @@ import {
   isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
-import { loadEffectiveMembershipRows } from '@kilocode/web-shared/routers/organizations/utils';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import {
   addAdminAuditMetadata,

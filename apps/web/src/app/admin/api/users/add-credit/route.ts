@@ -13,174 +13,230 @@ import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { lockCreditOwners, retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  auditedAdminRoute,
+  recordAdminAction,
+  setAdminAuditActor,
+  setAdminAuditFailureAction,
+  setAdminAuditTarget,
+  userActionTarget,
+  type AdminActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse<{ error: string } | { message: string }>> {
-  const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
-  if (!operator || !userCanManageCredits(operator)) {
-    return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
-  }
-
-  const requestData = (await request.json()) as AddCreditRequest;
-  const force200 = request.nextUrl.searchParams.get('force_200_response') === 'true';
-  function warnAndCreateErrorResponse(message: string) {
-    console.warn(message);
-    return NextResponse.json({ error: message }, { status: force200 ? 200 : 400 });
-  }
-  const { email } = requestData;
-
-  if (typeof email !== 'string') {
-    return warnAndCreateErrorResponse('Invalid email parameter');
-  }
-
-  const user = await db.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.google_user_email, email),
-  });
-
-  if (!user) return warnAndCreateErrorResponse(`User with email ${email} not found in database`);
-  if (user.blocked_reason) return warnAndCreateErrorResponse(`User with email ${email} is blocked`);
-  const credit_category = requestData.credit_category ?? requestData.idempotencyKey;
-  if (!credit_category) {
-    return warnAndCreateErrorResponse('Credit category is required');
-  }
-  const creditKind = requestData.creditKind ?? 'promotional';
-  if (creditKind !== 'paid' && creditKind !== 'promotional') {
-    return warnAndCreateErrorResponse('Invalid credit kind');
-  }
-  const credit_expiry_date = requestData.credit_expiry_date ?? requestData.creditExpiryDate;
-  const amount_usd = requestData.amount_usd ?? requestData.creditAmount;
-  if (creditKind === 'promotional' && credit_expiry_date) {
-    const expiryTime = new Date(credit_expiry_date).getTime();
-    if (Number.isNaN(expiryTime)) {
-      return warnAndCreateErrorResponse('Credit expiry date is not a valid date');
+// A refusal answers 400, which the audit scope records, or 200 when the caller
+// asks for `force_200_response`, which the handler records itself.
+export const POST = auditedAdminRoute(
+  { kind: 'handler', actions: ['user.credit.grant', 'user.credit.debit'] },
+  async (request: NextRequest): Promise<NextResponse<{ error: string } | { message: string }>> => {
+    const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(operator);
+    if (!userCanManageCredits(operator)) {
+      return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
     }
-    // Negative grants (debits) never store an expiry, so their supplied date has no effect.
-    if (amount_usd == null || amount_usd > 0) {
-      if (expiryTime <= Date.now()) {
-        // A replay of an idempotent category writes nothing, so the expiry rule
-        // does not apply to it. These are the terms of the partial unique index
-        // that makes the grant insert conflict.
-        const category = promoCreditCategoriesByKey.get(credit_category);
-        if (category?.is_idempotent) {
-          const [existing] = await db
+
+    const auditContext = adminActionContextFromHeaders(operator, request.headers);
+    const requestData = (await request.json()) as AddCreditRequest;
+    const force200 = request.nextUrl.searchParams.get('force_200_response') === 'true';
+    const auditAction =
+      (requestData.amount_usd ?? requestData.creditAmount ?? 0) < 0
+        ? 'user.credit.debit'
+        : 'user.credit.grant';
+    addAdminAuditMetadata({ adjustment: auditAction });
+    setAdminAuditFailureAction(auditAction);
+    let auditTarget: AdminActionTarget | null = null;
+    async function warnAndCreateErrorResponse(message: string) {
+      console.warn(message);
+      if (force200) {
+        await recordAdminAction(auditContext, {
+          action: auditAction,
+          outcome: 'failure',
+          errorCode: '400',
+          target: auditTarget,
+          message: 'Credit adjustment refused',
+          metadata: { forced200: true },
+        });
+      }
+      return NextResponse.json({ error: message }, { status: force200 ? 200 : 400 });
+    }
+    const { email } = requestData;
+
+    if (typeof email !== 'string') {
+      return warnAndCreateErrorResponse('Invalid email parameter');
+    }
+
+    const user = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.google_user_email, email),
+    });
+
+    if (!user) return warnAndCreateErrorResponse(`User with email ${email} not found in database`);
+    auditTarget = userActionTarget(user.id);
+    setAdminAuditTarget(auditTarget);
+    if (user.blocked_reason)
+      return warnAndCreateErrorResponse(`User with email ${email} is blocked`);
+    const credit_category = requestData.credit_category ?? requestData.idempotencyKey;
+    if (!credit_category) {
+      return warnAndCreateErrorResponse('Credit category is required');
+    }
+    const creditKind = requestData.creditKind ?? 'promotional';
+    if (creditKind !== 'paid' && creditKind !== 'promotional') {
+      return warnAndCreateErrorResponse('Invalid credit kind');
+    }
+    const credit_expiry_date = requestData.credit_expiry_date ?? requestData.creditExpiryDate;
+    const amount_usd = requestData.amount_usd ?? requestData.creditAmount;
+    if (creditKind === 'promotional' && credit_expiry_date) {
+      const expiryTime = new Date(credit_expiry_date).getTime();
+      if (Number.isNaN(expiryTime)) {
+        return warnAndCreateErrorResponse('Credit expiry date is not a valid date');
+      }
+      // Negative grants (debits) never store an expiry, so their supplied date has no effect.
+      if (amount_usd == null || amount_usd > 0) {
+        if (expiryTime <= Date.now()) {
+          // A replay of an idempotent category writes nothing, so the expiry rule
+          // does not apply to it. These are the terms of the partial unique index
+          // that makes the grant insert conflict.
+          const category = promoCreditCategoriesByKey.get(credit_category);
+          if (category?.is_idempotent) {
+            const [existing] = await db
+              .select({ id: credit_transactions.id })
+              .from(credit_transactions)
+              .where(
+                and(
+                  eq(credit_transactions.kilo_user_id, user.id),
+                  eq(credit_transactions.credit_category, credit_category),
+                  eq(credit_transactions.check_category_uniqueness, true)
+                )
+              )
+              .limit(1);
+            if (existing) {
+              return warnAndCreateErrorResponse(
+                `Code ${credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${email}.`
+              );
+            }
+          }
+          return warnAndCreateErrorResponse('Credit expiry date must be in the future');
+        }
+      }
+    }
+    const requested_expiry_hours = requestData.expiry_hours ?? requestData.creditExpiryHours;
+    // A negative hour count would store an expiry before the current instant,
+    // and the ledger must not show an expiry in the past. A debit does not store
+    // the supplied expiry, so its supplied hours have no effect here.
+    if (
+      creditKind === 'promotional' &&
+      requested_expiry_hours != null &&
+      (amount_usd == null || amount_usd > 0)
+    ) {
+      const hours: unknown = requested_expiry_hours;
+      // An unparseable count cannot be trusted, and a negative one would store an
+      // expiry before the current instant. Report each cause on its own.
+      if (typeof hours !== 'number' || !Number.isFinite(hours)) {
+        return warnAndCreateErrorResponse('Expiry hours must be a number');
+      }
+      if (hours < 0) {
+        return warnAndCreateErrorResponse('Expiry hours must not be negative');
+      }
+    }
+    const options = {
+      amount_usd: requestData.amount_usd ?? requestData.creditAmount ?? undefined,
+      creditKind,
+      description: requestData.description ?? requestData.creditDescription ?? undefined,
+      credit_expiry_date:
+        creditKind === 'promotional' && credit_expiry_date
+          ? new Date(credit_expiry_date)
+          : undefined,
+      expiry_hours:
+        creditKind === 'promotional'
+          ? (requestData.expiry_hours ?? requestData.creditExpiryHours ?? undefined)
+          : undefined,
+      credit_category: credit_category,
+      counts_as_selfservice: false,
+      created_by_kilo_user_id: operator.id,
+    };
+    if (options.amount_usd !== undefined && options.amount_usd < 0) {
+      const category = promoCreditCategoriesByKey.get(credit_category);
+      if (!category) return warnAndCreateErrorResponse(`Category ${credit_category} not found`);
+      // Only operator-facing debit categories; system ledger categories such as credits_expired are written by their own flows.
+      if (!category.expect_negative_amount || !category.adminUI_label) {
+        return warnAndCreateErrorResponse(
+          `Category ${credit_category} does not allow admin debits`
+        );
+      }
+      const owner = { type: 'user' as const, id: user.id };
+      const applied = await db.transaction(async tx => {
+        // The owner lock serializes replays, so the idempotency check below cannot race a concurrent debit.
+        await lockCreditOwners(tx, [owner]);
+        if (category.is_idempotent) {
+          const [existing] = await tx
             .select({ id: credit_transactions.id })
             .from(credit_transactions)
             .where(
               and(
                 eq(credit_transactions.kilo_user_id, user.id),
-                eq(credit_transactions.credit_category, credit_category),
-                eq(credit_transactions.check_category_uniqueness, true)
+                isNull(credit_transactions.organization_id),
+                eq(credit_transactions.credit_category, credit_category)
               )
             )
             .limit(1);
-          if (existing) {
-            return warnAndCreateErrorResponse(
-              `Code ${credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${email}.`
-            );
-          }
+          if (existing) return false;
         }
-        return warnAndCreateErrorResponse('Credit expiry date must be in the future');
-      }
-    }
-  }
-  const requested_expiry_hours = requestData.expiry_hours ?? requestData.creditExpiryHours;
-  // A negative hour count would store an expiry before the current instant,
-  // and the ledger must not show an expiry in the past. A debit does not store
-  // the supplied expiry, so its supplied hours have no effect here.
-  if (
-    creditKind === 'promotional' &&
-    requested_expiry_hours != null &&
-    (amount_usd == null || amount_usd > 0)
-  ) {
-    const hours: unknown = requested_expiry_hours;
-    // An unparseable count cannot be trusted, and a negative one would store an
-    // expiry before the current instant. Report each cause on its own.
-    if (typeof hours !== 'number' || !Number.isFinite(hours)) {
-      return warnAndCreateErrorResponse('Expiry hours must be a number');
-    }
-    if (hours < 0) {
-      return warnAndCreateErrorResponse('Expiry hours must not be negative');
-    }
-  }
-  const options = {
-    amount_usd: requestData.amount_usd ?? requestData.creditAmount ?? undefined,
-    creditKind,
-    description: requestData.description ?? requestData.creditDescription ?? undefined,
-    credit_expiry_date:
-      creditKind === 'promotional' && credit_expiry_date ? new Date(credit_expiry_date) : undefined,
-    expiry_hours:
-      creditKind === 'promotional'
-        ? (requestData.expiry_hours ?? requestData.creditExpiryHours ?? undefined)
-        : undefined,
-    credit_category: credit_category,
-    counts_as_selfservice: false,
-    created_by_kilo_user_id: operator.id,
-  };
-  if (options.amount_usd !== undefined && options.amount_usd < 0) {
-    const category = promoCreditCategoriesByKey.get(credit_category);
-    if (!category) return warnAndCreateErrorResponse(`Category ${credit_category} not found`);
-    // Only operator-facing debit categories; system ledger categories such as credits_expired are written by their own flows.
-    if (!category.expect_negative_amount || !category.adminUI_label) {
-      return warnAndCreateErrorResponse(`Category ${credit_category} does not allow admin debits`);
-    }
-    const owner = { type: 'user' as const, id: user.id };
-    const applied = await db.transaction(async tx => {
-      // The owner lock serializes replays, so the idempotency check below cannot race a concurrent debit.
-      await lockCreditOwners(tx, [owner]);
-      if (category.is_idempotent) {
-        const [existing] = await tx
-          .select({ id: credit_transactions.id })
-          .from(credit_transactions)
-          .where(
-            and(
-              eq(credit_transactions.kilo_user_id, user.id),
-              isNull(credit_transactions.organization_id),
-              eq(credit_transactions.credit_category, credit_category)
-            )
-          )
-          .limit(1);
-        if (existing) return false;
-      }
-      await retireCreditBalance(tx, {
-        owner,
-        actorId: operator.id,
-        creditCategory: credit_category,
-        description: options.description ?? 'Admin credit debit',
-        amountMicrodollars: -toMicrodollars(options.amount_usd ?? 0),
+        await retireCreditBalance(tx, {
+          owner,
+          actorId: operator.id,
+          creditCategory: credit_category,
+          description: options.description ?? 'Admin credit debit',
+          amountMicrodollars: -toMicrodollars(options.amount_usd ?? 0),
+        });
+        return true;
       });
-      return true;
-    });
-    if (!applied) {
-      return warnAndCreateErrorResponse(
-        `Code ${credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${email}.`
-      );
+      if (!applied) {
+        return warnAndCreateErrorResponse(
+          `Code ${credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${email}.`
+        );
+      }
+      await recordAdminAction(auditContext, {
+        action: 'user.credit.debit',
+        target: auditTarget,
+        message: 'Applied an admin credit debit',
+        metadata: { amountUsd: options.amount_usd, creditCategory: credit_category },
+      });
+      return NextResponse.json({
+        message: 'Credit debit applied',
+        creditsAmount: options.amount_usd,
+      });
     }
+    const result = await grantCreditForCategory(user, options);
+
+    console.log(
+      [
+        result.success ? '[SUCCESS]' : '[FAILURE]',
+        `Processing single email: ${email}`,
+        `Credit amount: $${options.amount_usd}`,
+        `Credit description: "${options.description}"`,
+        `Credit expiry date: ${options.credit_expiry_date?.toISOString() ?? '<no expiry>'}`,
+        `Expiry hours: ${options.expiry_hours ?? '<no expiry hours>'}`,
+        `Credit Category: ${options.credit_category ?? '<no credit category>'}`,
+        `Message: ${result.message}`,
+      ].join(' | ')
+    );
+
+    if (!result.success) return warnAndCreateErrorResponse(result.message);
+
+    await recordAdminAction(auditContext, {
+      action: 'user.credit.grant',
+      target: auditTarget,
+      message: 'Granted credits',
+      metadata: {
+        amountUsd: result.amount_usd,
+        creditKind,
+        creditCategory: credit_category,
+      },
+    });
     return NextResponse.json({
-      message: 'Credit debit applied',
-      creditsAmount: options.amount_usd,
+      message: result.message,
+      creditsAmount: result.amount_usd,
     });
   }
-  const result = await grantCreditForCategory(user, options);
-
-  console.log(
-    [
-      result.success ? '[SUCCESS]' : '[FAILURE]',
-      `Processing single email: ${email}`,
-      `Credit amount: $${options.amount_usd}`,
-      `Credit description: "${options.description}"`,
-      `Credit expiry date: ${options.credit_expiry_date?.toISOString() ?? '<no expiry>'}`,
-      `Expiry hours: ${options.expiry_hours ?? '<no expiry hours>'}`,
-      `Credit Category: ${options.credit_category ?? '<no credit category>'}`,
-      `Message: ${result.message}`,
-    ].join(' | ')
-  );
-
-  if (!result.success) return warnAndCreateErrorResponse(result.message);
-
-  return NextResponse.json({
-    message: result.message,
-    creditsAmount: result.amount_usd,
-  });
-}
+);

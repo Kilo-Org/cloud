@@ -14,12 +14,17 @@ The issuer, key set URL and local ports of each environment live in
 ## Mint Worker
 
 - `GET /.well-known/oauth-authorization-server` serves RFC 8414 metadata: `issuer` and `jwks_uri`
-  (on the feed Worker) always; the token, revocation and introspection endpoints once the
-  environment binds the identity store (`IDENTITY_STORE`); the authorization endpoint and the code
-  grant once a sign-in hand-off is wired; the device grant once its hook is. An endpoint joins the
-  document when it answers, so no listed endpoint returns 404.
-- The OAuth endpoints (`src/oauth/`, see "OAuth endpoints") run in this fetch handler. Staging and
-  production bind no identity store yet, so they serve none of them.
+  (on the feed Worker) always; the authorization, token, revocation and introspection endpoints
+  once the environment binds the identity store (`IDENTITY_STORE`); the device grant once
+  `DEVICE_USER_CODE_KEY` is set. An endpoint joins the document when it answers, so no listed
+  endpoint returns 404.
+- The OAuth endpoints (`src/oauth/`, see "OAuth endpoints"), the sign-in pages and passkey calls
+  (`src/signin/`), the device grant (`src/signin/device/`) and ticket minting (`src/tickets/`) run
+  in this fetch handler. Staging and production bind no identity store yet, so they serve none of
+  them. Tickets are redeemed only through the `TicketRedeemer` entrypoint, by a caller listed in
+  `TICKET_REDEEMERS` (empty in staging and production).
+- The mobile app (`kilo-mobile`) needs device attestation (design 5.5), which UTS does not verify
+  yet, so the authorization endpoint serves it in development only.
 - Placement runs the fetch handler next to the identity store's primary in Frankfurt:
   `"placement": { "region": "aws:eu-central-1" }`, a Cloudflare placement hint
   (https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region), which
@@ -279,6 +284,15 @@ change, as on the first deploy of an environment, detection takes them out of th
 the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` deploys
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
 order). A change to only one of them deploys in the matrix.
+
+### Provisioning per environment
+
+| Setting | Kind | Value |
+|---|---|---|
+| `IDENTITY_STORE` | Hyperdrive binding | The identity store's primary config (design 5.2); unset, no OAuth or sign-in endpoint is served |
+| `WEBAUTHN_RP_ID` | var | The app host whose passkeys users hold: `app.kilo.ai`, `staging-app.kilo.ai` |
+| `WEBAUTHN_ORIGINS` | var | The issuer origin; the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
+| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset, the device grant is not served. Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
 
 ## Identity store
 

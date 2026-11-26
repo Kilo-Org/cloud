@@ -450,14 +450,27 @@ async function main() {
   );
   const ticket = z.object({ ticket: z.string(), expires_in: z.number() }).parse(issued.body);
   secrets.push(ticket.ticket);
-  const redeem = async () =>
-    await post('/tickets/redeem', { ticket: ticket.ticket, audience: 'kilo-chat' });
-  const firstUse = await redeem();
-  const secondUse = await redeem();
-  check(firstUse.status === 200 && secondUse.status === 400, 'ticket single use');
+  // The development redeemer `uts-ticket-test` may redeem for gateway and kilo-chat only.
+  const redeem = async (audience: string) => {
+    const response = await fetch(new URL('/__dev/tickets/redeem', base), {
+      method: 'POST',
+      body: JSON.stringify({ ticket: ticket.ticket, audience }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return {
+      status: response.status,
+      body: z.looseObject({ status: z.string() }).parse(await response.json()),
+    };
+  };
+  const otherAudience = await redeem('session-ingest');
+  const firstUse = await redeem('kilo-chat');
+  const secondUse = await redeem('kilo-chat');
+  check(otherAudience.body.status === 'refused', 'redeemer refused outside its audiences');
+  check(firstUse.status === 200 && secondUse.body.status === 'invalid_ticket', 'ticket single use');
   log('5 ticket', {
     issued: issued.status,
     expiresIn: ticket.expires_in,
+    audienceNotTheCallers: otherAudience.body,
     firstUse: { status: firstUse.status, body: firstUse.body },
     secondUse: { status: secondUse.status, body: secondUse.body },
   });

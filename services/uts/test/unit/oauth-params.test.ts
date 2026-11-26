@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { identifyClient, isRegisteredRedirect } from '../../src/oauth/clients';
+import { clientServedIn, identifyClient, isRegisteredRedirect } from '../../src/oauth/clients';
 import {
   audiencesOfResources,
   paramsOf,
@@ -113,6 +113,16 @@ describe('clients', () => {
     expect(allowed('com.kilocode.kiloapp:/oauth/other')).toBe(false);
     expect(allowed('kiloapp:/oauth/callback')).toBe(false);
     expect(allowed('http://127.0.0.1:4100/callback')).toBe(false);
+  });
+
+  it('serve the mobile app, which needs device attestation, in development only', () => {
+    const mobile = identifyClient('kilo-mobile');
+    const cli = identifyClient('kilo-cli');
+    if (mobile.kind !== 'first_party' || cli.kind !== 'first_party') throw new Error('first-party');
+    expect(clientServedIn(mobile.client, 'development')).toBe(true);
+    expect(clientServedIn(mobile.client, 'staging')).toBe(false);
+    expect(clientServedIn(mobile.client, 'production')).toBe(false);
+    expect(clientServedIn(cli.client, 'production')).toBe(true);
   });
 });
 

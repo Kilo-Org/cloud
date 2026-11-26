@@ -1,3 +1,4 @@
+import type { UtsEnvironment } from '@kilocode/uts-contracts';
 import { matchesPrivateUseRedirect } from '../signin/native/redirect';
 import { oauthError } from './errors';
 import type { Params } from './params';
@@ -25,6 +26,12 @@ export type FirstPartyClient = {
   redirect: RedirectRule;
   /** Whether the client may sign in with the RFC 8628 device grant (design 5.5). */
   deviceGrant: boolean;
+  /**
+   * `required`: design 5.5 asks the client for device attestation (App Attest, Play Integrity),
+   * which UTS does not verify yet, so the authorization endpoint serves the client in development
+   * only and refuses it in staging and production (`clientServedIn`). `none`: no attestation.
+   */
+  attestation: 'required' | 'none';
 };
 
 /**
@@ -41,6 +48,7 @@ const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
       clientClass: 'desktop',
       redirect: { kind: 'loopback', path: '/callback' },
       deviceGrant: true,
+      attestation: 'none',
     },
   ],
   [
@@ -51,9 +59,19 @@ const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
       clientClass: 'mobile',
       redirect: { kind: 'private_use_scheme', uri: 'com.kilocode.kiloapp:/oauth/callback' },
       deviceGrant: false,
+      attestation: 'required',
     },
   ],
 ]);
+
+/**
+ * Whether the authorization endpoint serves `client` in `environment`. A client that needs device
+ * attestation is served only in development until UTS verifies attestation, so no staging or
+ * production grant exists for it; every later step (refresh, tickets) needs such a grant.
+ */
+export function clientServedIn(client: FirstPartyClient, environment: UtsEnvironment): boolean {
+  return client.attestation === 'none' || environment === 'development';
+}
 
 /** The shape `uts.third_party_clients` enforces: an HTTPS URL with a path and no query. */
 const THIRD_PARTY_CLIENT_ID = /^https:\/\/[^/?#]+\/[^?#]+$/;

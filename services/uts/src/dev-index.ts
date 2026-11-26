@@ -5,6 +5,7 @@
 export { UtsKeySetDO } from './dos/UtsKeySetDO';
 export { UtsSignerDO } from './dos/UtsSignerDO';
 export { SignerKeys } from './signer-keys';
+export { TicketRedeemer } from './tickets/redeemer';
 
 import { handleDevRequest } from './dev';
 import type { Env } from './env';

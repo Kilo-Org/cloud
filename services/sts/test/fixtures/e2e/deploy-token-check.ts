@@ -3,13 +3,16 @@
 //   ../../node_modules/.bin/tsx test/fixtures/e2e/deploy-token-check.ts
 //   wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/wrangler.sts.jsonc
 // The script serves a fake GitHub issuer, a fake Infisical (JWT Auth login and the `/ci/minting`
-// read) and a fake Cloudflare account token API that records every request, on port 8830; the test
-// build of STS sends its requests for all three there. It checks that a production-shaped deploy
-// job gets a 1-hour token with the policy's permission groups, that another workflow, a
-// pull_request job and a job of another GitHub environment are refused, that only the owner job's
-// run can revoke a token, that the reaper deletes a token past its expiry, and that no audit row
-// carries a token value or the minting credential. It waits about six minutes for a 5-minute token
-// to expire. Every key, id and credential is synthetic. Exits 1 on the first failure.
+// read) and a fake Cloudflare API (account tokens and the Worker script list) that records every
+// request, on port 8830; the test build of STS sends its requests for all three there. It checks
+// that a production-shaped deploy job gets a 1-hour token with the policy's permission groups, that
+// another workflow, a pull_request job and a job of another GitHub environment are refused, that
+// only the owner job's run can revoke a token, that the reaper deletes a token past its expiry,
+// that a creation whose answer was lost is audited and its token swept, that the sweep audits a
+// Worker changed while tokens were live that no token intended, and that no audit row carries a
+// token value or the minting credential. It waits about eight minutes for a 5-minute token to
+// expire and the sweep to follow. Every key, id and credential is synthetic. Exits 1 on the first
+// failure.
 import {
   CloudflareDeployTokenResultSchema,
   type CloudflareDeployTokenResult,
@@ -45,7 +48,18 @@ type CloudflareCall = {
 };
 const cloudflareCalls: CloudflareCall[] = [];
 const tokens = new Map<string, { name: string; expiresOn: string; value: string }>();
+/** The account's Worker scripts, as `GET .../workers/scripts` lists them. */
+const scripts: { id: string; modified_on: string }[] = [];
+/** Cloudflare's names of the policies' permission groups (test/fixtures/e2e/sts.ts). */
+const GROUP_NAMES: Record<string, string> = {
+  e2e0000000000000000000000000a001: 'Workers Scripts Write',
+  e2e0000000000000000000000000a002: 'Containers Write',
+  e2e0000000000000000000000000a003: 'Workers Routes Write',
+};
 let serial = 0;
+/** The next creation makes its token but answers 502, as a lost answer would. */
+let loseNextCreate = false;
+let lost: { id: string; name: string } | null = null;
 
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -114,6 +128,11 @@ const server = createServer((request, response) => {
         resources: Record<string, string>;
       }[];
       tokens.set(id, { name: String(body.name), expiresOn: String(body.expires_on), value });
+      if (loseNextCreate) {
+        loseNextCreate = false;
+        lost = { id, name: String(body.name) };
+        return json({ success: false, errors: [{ code: 10000, message: 'Bad gateway' }] }, 502);
+      }
       return json({
         success: true,
         errors: [],
@@ -130,7 +149,7 @@ const server = createServer((request, response) => {
             effect: 'allow',
             permission_groups: policy.permission_groups.map(group => ({
               id: group.id,
-              name: 'Synthetic Deploy Group',
+              name: GROUP_NAMES[group.id],
             })),
             resources: policy.resources,
           })),
@@ -153,6 +172,9 @@ const server = createServer((request, response) => {
           expires_on: token.expiresOn,
         })),
       });
+    }
+    if (request.method === 'GET' && path === `/accounts/${ACCOUNT}/workers/scripts`) {
+      return json({ success: true, errors: [], messages: [], result: scripts });
     }
     json({ success: false }, 404);
   })();
@@ -331,7 +353,15 @@ check(
   'no refused request reached Cloudflare'
 );
 
-// 3. Only the owner job's run revokes a token.
+// 3. A creation whose answer is lost is audited; then only the owner job's run revokes a token.
+loseNextCreate = true;
+const lostAnswer = await exchange(SHORT_CLAIMS);
+check(
+  lostAnswer.status === 503 && lostAnswer.result.status === 'unavailable' && lost !== null,
+  'a creation whose answer was lost answers unavailable, and Cloudflare holds its token',
+  lostAnswer.result
+);
+const lostToken: { id: string; name: string } = lost ?? { id: '', name: '' };
 const short = await exchange(SHORT_CLAIMS);
 check(
   short.result.status === 'ok' && short.result.ttlSeconds === 300,
@@ -339,6 +369,14 @@ check(
   short.result.status
 );
 if (short.result.status !== 'ok') process.exit(1);
+// Changed while both tokens are live: each job's own Worker, and one neither job deploys.
+const changedAt = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+scripts.push(
+  { id: 'e2e-worker', modified_on: changedAt },
+  { id: 'e2e-other-worker', modified_on: changedAt },
+  { id: 'e2e-rogue-worker', modified_on: changedAt },
+  { id: 'e2e-untouched-worker', modified_on: '2020-01-01T00:00:00Z' }
+);
 check(
   (await revoke(token.tokenId, SHORT_CLAIMS)) === 404,
   "another workload cannot revoke the deploy job's token (404)"
@@ -367,7 +405,22 @@ console.log('waiting for the 5-minute token to expire and be reaped');
 for (let attempt = 0; attempt < 90 && tokens.has(shortId); attempt += 1) await sleep(5_000);
 check(!tokens.has(shortId), 'the reaper deleted the expired token');
 
-// 5. The audit rows reach the queue, with no token value and no minting credential.
+// 5. The sweep brought forward by the lost answer deletes that token once it expired, and its
+// script check runs over both closed windows.
+console.log('waiting for the sweep (about 7 minutes after the lost creation)');
+for (let attempt = 0; attempt < 48 && tokens.has(lostToken.id); attempt += 1) await sleep(5_000);
+check(!tokens.has(lostToken.id), 'the sweep deleted the token whose creation answer was lost');
+check(
+  cloudflareCalls.some(
+    call =>
+      call.method === 'GET' &&
+      call.path === `/accounts/${ACCOUNT}/workers/scripts` &&
+      call.authorization === `Bearer ${MINTING_CREDENTIAL}`
+  ),
+  'the sweep listed the Worker scripts with the minting credential'
+);
+
+// 6. The audit rows reach the queue, with no token value and no minting credential.
 type SeenEvent = { stream: string; type: string; attributes: Record<string, unknown> };
 let events: SeenEvent[] = [];
 const denied = (reason: string) =>
@@ -380,7 +433,9 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
     denied('identity_rejected') &&
     denied('not_owner') &&
     denied('other_run') &&
-    events.some(event => event.type === 'ai.kilo.sts.deploy_token.reaped') &&
+    events.filter(event => event.type === 'ai.kilo.sts.deploy_token.reaped').length >= 2 &&
+    events.some(event => event.type === 'ai.kilo.sts.deploy_token.mint_failed') &&
+    events.some(event => event.type === 'ai.kilo.sts.deploy_token.unexpected_script') &&
     events.filter(event => event.type === 'ai.kilo.sts.deploy_token.minted').length >= 2 &&
     events.some(event => event.type === 'ai.kilo.sts.deploy_token.revoked')
   ) {
@@ -419,6 +474,37 @@ check(
       event.attributes.result === 'deleted'
   ),
   'deploy_token.reaped records the expired token'
+);
+check(
+  deployEvents.some(
+    event =>
+      event.type === 'ai.kilo.sts.deploy_token.mint_failed' &&
+      event.attributes.outcome === 'unknown' &&
+      event.attributes.workload === 'ci-e2e-deploy-short' &&
+      event.attributes.tokenName === lostToken.name
+  ),
+  'deploy_token.mint_failed (unknown) names the token whose creation answer was lost',
+  lostToken.name
+);
+check(
+  deployEvents.some(
+    event =>
+      event.type === 'ai.kilo.sts.deploy_token.reaped' &&
+      event.attributes.source === 'sweep' &&
+      event.attributes.tokenId === lostToken.id
+  ),
+  'deploy_token.reaped (source sweep) records the lost token'
+);
+const unexpected = deployEvents.filter(
+  event => event.type === 'ai.kilo.sts.deploy_token.unexpected_script'
+);
+check(
+  unexpected.length === 1 &&
+    unexpected[0].attributes.script === 'e2e-rogue-worker' &&
+    JSON.stringify([...(unexpected[0].attributes.tokenIds as string[])].sort()) ===
+      JSON.stringify([token.tokenId, shortId].sort()),
+  'deploy_token.unexpected_script names the one Worker no live token intended, and both tokens',
+  unexpected.map(event => event.attributes)
 );
 check(
   denied('identity_rejected') && denied('not_owner') && denied('other_run'),

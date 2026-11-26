@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createTestHarness, unstable_readConfig } from 'wrangler';
 import { expect, it, vi } from 'vitest';
+import { stsStandIn } from './sts-stand-in.test-fixture';
 import { usage } from './usage.test-fixture';
 
 it('consumes a copy published to the staging hedge queue once, and its EU duplicate as duplicate', async () => {
@@ -66,6 +67,7 @@ it('consumes a copy published to the staging hedge queue once, and its EU duplic
             queues: { producers: [{ binding: 'USAGE_INGEST_QUEUE', queue: hedgeQueue }] },
           },
         },
+        stsStandIn('staging'),
       ],
     });
     harness = server;

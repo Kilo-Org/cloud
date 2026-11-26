@@ -3,6 +3,7 @@ import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -15,6 +16,7 @@ import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } fro
 import { openAiChatGptConnectorGone } from './connector';
 import {
   getOpenAiChatGptStoredConnection,
+  openAiChatGptOwnerKey,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
   type OpenAiChatGptStoredConnection,
@@ -239,7 +241,21 @@ async function readServableStoredConnection(
   owner: OpenAiChatGptOwner,
   onSharedConnectorGone?: (organizationId: string, connectorId: string) => void
 ): Promise<OpenAiChatGptStoredConnection | null> {
-  const stored = await getOpenAiChatGptStoredConnection(owner);
+  let stored: OpenAiChatGptStoredConnection | null;
+  try {
+    stored = await getOpenAiChatGptStoredConnection(owner);
+  } catch (error) {
+    // Only a payload the KMS service could not open keeps the existing route, like a
+    // transient refresh failure. A database failure still fails the request, as it did
+    // before envelopes existed, rather than quietly changing who pays.
+    if (!(error instanceof CredentialKmsError)) throw error;
+    console.error(
+      '[openai-chatgpt] stored connection unreadable: %s (%s)',
+      error.causeName,
+      openAiChatGptOwnerKey(owner)
+    );
+    return null;
+  }
   if (!isUsableStoredConnection(stored)) return null;
 
   if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
@@ -459,7 +475,8 @@ export function buildOpenAiChatGptProvider(
   apiKey: string,
   accessToken: string,
   upstreamModel: string,
-  owner?: OpenAiChatGptOwner
+  owner?: OpenAiChatGptOwner,
+  credentialKeyId?: string
 ): Provider | null {
   if (apiKey.trim().length === 0) return null;
 
@@ -467,6 +484,7 @@ export function buildOpenAiChatGptProvider(
     type: OPENAI_CHATGPT_PROVIDER_ID,
     inferenceProviderId: OPENAI_CHATGPT_PROVIDER_ID,
     ...(owner ? { chatGptOwner: owner } : {}),
+    ...(credentialKeyId ? { chatGptCredentialKeyId: credentialKeyId } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -600,7 +618,13 @@ export async function checkOpenAiChatGptByok(
 
     // The key is present, so this never returns null; the guard stays because the
     // builder's type admits it, and it keeps the ordinary route if that changes.
-    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, upstreamModel, owner);
+    const provider = buildOpenAiChatGptProvider(
+      apiKey,
+      outcome.accessToken,
+      upstreamModel,
+      owner,
+      outcome.credentialKeyId
+    );
     if (!provider) return null;
 
     return {

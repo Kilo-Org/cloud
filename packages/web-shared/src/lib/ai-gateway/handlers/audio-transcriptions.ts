@@ -24,14 +24,8 @@ import {
   type UsageEndpoint,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/usage-endpoint-pipeline';
 
-/** Prompt info attributed from a multipart upload: file name and size. */
-function extractMultipartPromptInfo(file: File, language: string | null): PromptInfo {
-  const languagePart = language ? ` language=${language.slice(0, 32)}` : '';
-  return {
-    system_prompt_prefix: '',
-    system_prompt_length: 0,
-    user_prompt_prefix: `audio/${file.name} size=${file.size}${languagePart}`.slice(0, 100),
-  };
+function extractMultipartPromptInfo(): PromptInfo {
+  return { system_prompt_length: 0, system_prompt_kind: null };
 }
 
 function extractMultipartLanguage(formData: FormData): string | null {
@@ -112,7 +106,7 @@ async function parseTranscriptionRequest(
       body: parsedRequest,
       model: parsedRequest.model,
       requestProvider: undefined,
-      promptInfo: extractMultipartPromptInfo(parsedRequest.file, parsedRequest.language),
+      promptInfo: extractMultipartPromptInfo(),
     };
   }
 
@@ -132,7 +126,7 @@ async function parseTranscriptionRequest(
     body: parsedRequest,
     model: parsedRequest.body.model.trim(),
     requestProvider: requestPrivacy.data,
-    promptInfo: extractTranscriptionPromptInfo(parsedRequest.body),
+    promptInfo: extractTranscriptionPromptInfo(),
   };
 }
 

@@ -2,7 +2,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { User } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
@@ -30,7 +31,7 @@ import { bindAppShellSession } from '@/lib/app-shell/session';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { Owner } from '@/lib/integrations/core/types';
 
-type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
+type AuthenticatedOAuthUser = User;
 
 const GitLabOAuthConnectPostBodySchema = z.object({
   organizationId: z.string().max(128).optional(),
@@ -327,7 +328,8 @@ async function resolveGitLabOAuthOwner(
   // The stored credential is the organization's shared GitLab authorisation, so
   // binding it is a billing-scoped action whether or not a connection already
   // exists. Asking for the same role set on every start keeps the decision
-  // independent of the current row state.
-  await ensureOrganizationAccess({ user }, organizationId, ORGANIZATION_BILLING_ROLES);
+  // independent of the current row state. Binding a credential is
+  // membership-only: a staff or support grant never stands in.
+  await ensureMemberOrganizationAccess(user, organizationId, ORGANIZATION_BILLING_ROLES);
   return { type: 'org', id: organizationId };
 }

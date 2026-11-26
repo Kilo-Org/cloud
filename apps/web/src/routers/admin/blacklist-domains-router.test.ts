@@ -28,7 +28,7 @@ import { blacklisted_domains, blacklisted_domains_settings, kilocode_users } fro
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { count, eq, inArray, sql } from 'drizzle-orm';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats } from '@/lib/abuse/blacklist-domain-stats';
 import { isDomainOnBlacklist } from './blacklist-domains-router';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
@@ -408,7 +408,7 @@ describe('admin.blacklistDomains.stats', () => {
       email_domain: 'example.com',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const stats = await caller.admin.blacklistDomains.stats();
 
     expect(stats).toEqual({ domains: [], totalDomains: 0, totalBlockedUsers: 0 });
@@ -421,7 +421,7 @@ describe('admin.blacklistDomains.stats', () => {
     await insertTestUser({ google_user_email: 'c@spam.org' });
     await insertTestUser({ google_user_email: 'd@notmailinator.com' });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const stats = await caller.admin.blacklistDomains.stats();
 
     expect(stats).toEqual({
@@ -462,7 +462,7 @@ describe('admin.blacklistDomains.suspicious', () => {
       blocked_reason: 'abuse',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
 
     const byDomain = Object.fromEntries(domains.map(d => [d.domain, d]));
@@ -504,7 +504,7 @@ describe('admin.blacklistDomains.suspicious', () => {
       blocked_reason: 'abuse',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
 
     const ordered = domains.map(d => d.domain);
@@ -548,7 +548,7 @@ describe('admin.blacklistDomains.suspicious', () => {
       });
     }
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
 
     const names = domains.map(d => d.domain);
@@ -570,7 +570,7 @@ describe('admin.blacklistDomains.suspicious', () => {
       blocked_reason: 'abuse',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious({
       hideLegitimateProviders: false,
     });
@@ -584,7 +584,7 @@ describe('admin.blacklistDomains.suspicious', () => {
       email_domain: null,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
 
     expect(domains).toHaveLength(0);
@@ -597,7 +597,7 @@ describe('admin.blacklistDomains.suspicious', () => {
       blocked_reason: 'abuse',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
 
     const example = domains.find(d => d.domain === 'example.com');
@@ -624,7 +624,7 @@ describe('admin.blacklistDomains.suspicious', () => {
       blocked_reason: 'abuse',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
 
     expect(Object.fromEntries(domains.map(d => [d.domain, d.isBlacklisted]))).toEqual({
@@ -641,7 +641,7 @@ describe('admin.blacklistDomains.set', () => {
     await insertBlacklistedDomains(['previous.example']);
     const raw = storeSettings(previousSettings);
     const user = await insertTestUser({ is_admin: false });
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
 
     await expect(caller.admin.blacklistDomains.get()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(
@@ -666,7 +666,7 @@ describe('admin.blacklistDomains.set', () => {
       api_token_pepper: 'safe-pepper',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const result = await caller.admin.blacklistDomains.set({
       domains: ['mailinator.com'],
@@ -706,7 +706,7 @@ describe('admin.blacklistDomains.set', () => {
 
   it('returns stored signup TLDs as bare labels, including a legacy trailing dot', async () => {
     await insertSettings({ ...previousSettings, blocked_signup_tlds: ['.ASIA.'] });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const loaded = await caller.admin.blacklistDomains.get();
 
@@ -714,7 +714,7 @@ describe('admin.blacklistDomains.set', () => {
   });
 
   it('writes domains, settings and editor metadata to Postgres, not Redis', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const result = await caller.admin.blacklistDomains.set({
       domains: ['mailinator.com', 'spam.org'],
@@ -732,7 +732,7 @@ describe('admin.blacklistDomains.set', () => {
   });
 
   it('stores normalized settings and editor metadata on repeated saves, including an empty list', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const initial = await caller.admin.blacklistDomains.get();
     expect(await tableSettings()).toEqual([]);
 
@@ -748,7 +748,7 @@ describe('admin.blacklistDomains.set', () => {
       google_user_email: 'second-admin@admin.example.com',
       is_admin: true,
     });
-    const secondCaller = await createCallerForUser(secondAdmin.id);
+    const secondCaller = await createSessionCallerForUser(secondAdmin.id);
     const loaded = await secondCaller.admin.blacklistDomains.get();
     const second = await secondCaller.admin.blacklistDomains.set({
       domains: ['example.com'],
@@ -780,7 +780,7 @@ describe('admin.blacklistDomains.set', () => {
       updated_by: admin.id,
       updated_by_email: admin.google_user_email,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const deletionReady = Promise.withResolvers<number>();
     const releaseDeletion = Promise.withResolvers<void>();
@@ -840,7 +840,7 @@ describe('admin.blacklistDomains.set', () => {
 
   it('reports an actor lock timeout before saving and allows a retry after the lock clears', async () => {
     const previousRaw = storeSettings(previousSettings);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const lockReady = Promise.withResolvers<number>();
     const releaseLock = Promise.withResolvers<void>();
@@ -886,7 +886,7 @@ describe('admin.blacklistDomains.set', () => {
 
   it('holds the actor lock until a winning save commits, then deletion scrubs its editor', async () => {
     storeSettings(previousSettings);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const blocker = await blockSettingsWrite();
     const save = caller.admin.blacklistDomains.set({
@@ -928,7 +928,7 @@ describe('admin.blacklistDomains.set', () => {
   }, 30000);
 
   it('rejects a previously authorized editor whose deletion is in progress', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const legacyRaw = JSON.stringify(previousSettings);
     storeLegacyBlob(legacyRaw);
@@ -967,7 +967,7 @@ describe('admin.blacklistDomains.set', () => {
       if (!evalImpl) throw new Error('Missing Redis eval implementation');
       return evalImpl(...args);
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const saved = await caller.admin.blacklistDomains.set({
       domains: ['mailinator.com'],
@@ -1004,7 +1004,7 @@ describe('admin.blacklistDomains.set', () => {
       if (!evalImpl) throw new Error('Missing Redis eval implementation');
       return evalImpl(...args);
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     await caller.admin.blacklistDomains.set({ domains: [], expected_version: version });
 
@@ -1014,7 +1014,7 @@ describe('admin.blacklistDomains.set', () => {
   });
 
   it('repeats cleanup on later saves, including a newly persistent settings key', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const initial = await caller.admin.blacklistDomains.get();
     await caller.admin.blacklistDomains.set({ domains: [], expected_version: initial.version });
     storeSettings(previousSettings);
@@ -1033,7 +1033,7 @@ describe('admin.blacklistDomains.set', () => {
     const deleteError = new Error('redis delete failed');
     const raw = storeSettings(previousSettings);
     mockedRedisEval.mockRejectedValue(deleteError);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
 
     const result = await caller.admin.blacklistDomains.set({
@@ -1058,7 +1058,7 @@ describe('admin.blacklistDomains.set', () => {
   });
 
   it('applies the saved list to access checks immediately', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(isEmailBlacklisted('user@mailinator.com')).resolves.toBe(false);
 
     const { version } = await caller.admin.blacklistDomains.get();
@@ -1077,7 +1077,7 @@ describe('admin.blacklistDomains.set', () => {
       email_domain: 'mailinator.com',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const result = await caller.admin.blacklistDomains.set({
       domains: [' MAILINATOR.COM ', 'Spam.ORG', 'spam.org', '   '],
@@ -1102,7 +1102,7 @@ describe('admin.blacklistDomains.set', () => {
     async ({ domains: remainingDomains }) => {
       await insertSettings();
       await insertBlacklistedDomains(['mailinator.com', 'removed.example']);
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const { version } = await caller.admin.blacklistDomains.get();
 
       const result = await caller.admin.blacklistDomains.set({
@@ -1127,7 +1127,7 @@ describe('admin.blacklistDomains.set', () => {
       });
       return { processed: 0, remaining: false };
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
 
     const result = await caller.admin.blacklistDomains.set({
@@ -1142,7 +1142,7 @@ describe('admin.blacklistDomains.set', () => {
   it('keeps the saved list when the automatic block fails', async () => {
     mockedBackfill.mockRejectedValue(new Error('database unavailable'));
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const result = await caller.admin.blacklistDomains.set({
       domains: ['mailinator.com'],
@@ -1159,7 +1159,7 @@ describe('admin.blacklistDomains.set', () => {
     const previousRaw = storeSettings(previousSettings);
     storeLegacyBlob(previousRaw);
     await insertBlacklistedDomains(['first.example', 'second.example']);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const loaded = await caller.admin.blacklistDomains.get();
     await insertBlacklistedDomains(['third.example']);
 
@@ -1183,7 +1183,7 @@ describe('admin.blacklistDomains.set', () => {
   it('rejects a stale version after the settings changed without changing anything', async () => {
     await insertSettings();
     await insertBlacklistedDomains(['first.example']);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const loaded = await caller.admin.blacklistDomains.get();
     await db
       .update(blacklisted_domains_settings)
@@ -1212,7 +1212,7 @@ describe('admin.blacklistDomains.set', () => {
     await insertSettings();
     storeLegacyBlob(previousRaw);
     await insertBlacklistedDomains(['previous.example']);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     await db.execute(sql`
       CREATE FUNCTION public.fail_blacklist_settings_mirror() RETURNS trigger AS $$
@@ -1267,7 +1267,7 @@ describe('admin.blacklistDomains.set', () => {
       google_user_email: 'target@batch1000.example',
       email_domain: 'batch1000.example',
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const input = { domains, expected_version: version };
     await db.execute(sql`
@@ -1328,7 +1328,7 @@ describe('admin.blacklistDomains.set', () => {
   it('serializes saves before reading the current list and rejects the stale concurrent version', async () => {
     await insertSettings({ ...previousSettings, blocked_signup_tlds: ['shop'] });
     mockedBackfill.mockResolvedValue({ processed: 0, remaining: false });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version: expectedVersion } = await caller.admin.blacklistDomains.get();
     const blocker = await blockSettingsWrite();
     const first = caller.admin.blacklistDomains.set({
@@ -1385,7 +1385,7 @@ describe('admin.blacklistDomains.set', () => {
       email_domain: 'example.asia',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const result = await caller.admin.blacklistDomains.set({
       domains: [],
@@ -1406,7 +1406,7 @@ describe('admin.blacklistDomains.set', () => {
   });
 
   it('keeps signup TLDs from the prior save when the field is omitted', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const initial = await caller.admin.blacklistDomains.get();
     await caller.admin.blacklistDomains.set({
       domains: ['mailinator.com'],
@@ -1427,7 +1427,7 @@ describe('admin.blacklistDomains.set', () => {
   });
 
   it('stores the effective TLD fallback when no list is stored yet', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { version } = await caller.admin.blacklistDomains.get();
     const result = await caller.admin.blacklistDomains.set({
       domains: ['mailinator.com'],
@@ -1443,7 +1443,7 @@ describe('admin.blacklistDomains.set', () => {
 
 describe('admin.blacklistDomains.get', () => {
   it('shows defaults and the effective TLD list when nothing is stored yet', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const config = await caller.admin.blacklistDomains.get();
 
     expect(config).toEqual({
@@ -1461,7 +1461,7 @@ describe('admin.blacklistDomains.get', () => {
     await insertSettings();
     await insertBlacklistedDomains(['spam.org', 'mailinator.com']);
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const config = await caller.admin.blacklistDomains.get();
 
     expect(config).toEqual({
@@ -1474,7 +1474,7 @@ describe('admin.blacklistDomains.get', () => {
   it('keeps the version stable until the table or the settings change', async () => {
     await insertSettings();
     await insertBlacklistedDomains(['mailinator.com']);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const first = await caller.admin.blacklistDomains.get();
     const unchanged = await caller.admin.blacklistDomains.get();
@@ -1495,7 +1495,7 @@ describe('admin.blacklistDomains.get', () => {
   it('uses Postgres settings and versioning even when Redis differs or changes', async () => {
     storeSettings(previousSettings);
     await insertSettings({ ...previousSettings, blocked_signup_tlds: [] });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const original = await caller.admin.blacklistDomains.get();
     storeSettings({ ...previousSettings, blocked_signup_tlds: ['top'] });
     const afterRedisEdit = await caller.admin.blacklistDomains.get();
@@ -1518,7 +1518,7 @@ describe('admin.blacklistDomains.get', () => {
     const legacyRaw = JSON.stringify({ ...previousSettings, domains: ['legacy-only.example'] });
     redisValues.set(LEGACY_BLACKLIST_DOMAINS_REDIS_KEY, legacyRaw);
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const config = await caller.admin.blacklistDomains.get();
 
     expect(config).toEqual({
@@ -1549,7 +1549,7 @@ describe('admin.blacklistDomains.get', () => {
 
   it('waits for an in-flight save and returns its committed list and settings', async () => {
     mockedBackfill.mockResolvedValue({ processed: 0, remaining: false });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const initial = await caller.admin.blacklistDomains.get();
     const blocker = await blockSettingsWrite();
     const save = caller.admin.blacklistDomains.set({
@@ -1584,7 +1584,7 @@ describe('admin.blacklistDomains.get', () => {
   it.each(['', 'not-json'])('ignores malformed Redis settings %j on get and save', async raw => {
     redisValues.set(BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY, raw);
     await insertBlacklistedDomains(['previous.example']);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const config = await caller.admin.blacklistDomains.get();
     const result = await caller.admin.blacklistDomains.set({

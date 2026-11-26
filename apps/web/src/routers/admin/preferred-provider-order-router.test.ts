@@ -3,7 +3,7 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config, type User } from '@kilocode/db/schema';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 
 let admin: User;
 let nonAdmin: User;
@@ -29,7 +29,7 @@ beforeEach(async () => {
 
 describe('adminPreferredProviderOrderRouter', () => {
   it('rejects a non-admin caller', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
     await expect(caller.admin.preferredProviderOrder.get()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
@@ -39,7 +39,7 @@ describe('adminPreferredProviderOrderRouter', () => {
   });
 
   it('returns no stored config when unset', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(caller.admin.preferredProviderOrder.get()).resolves.toEqual({ config: null });
   });
 
@@ -49,7 +49,7 @@ describe('adminPreferredProviderOrderRouter', () => {
       config: { vercel_routing_opt_out_models: [] },
       preferred_models: preferredModels,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.preferredProviderOrder.set({ config });
     expect((await caller.admin.preferredProviderOrder.get()).config).toEqual(config);
@@ -69,14 +69,14 @@ describe('adminPreferredProviderOrderRouter', () => {
   });
 
   it('keeps the rule order', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const reversed: PreferredProviderOrderConfig = { rules: [...config.rules].reverse() };
     await caller.admin.preferredProviderOrder.set({ config: reversed });
     expect((await caller.admin.preferredProviderOrder.get()).config).toEqual(reversed);
   });
 
   it('creates the singleton row when none exists', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.preferredProviderOrder.set({ config });
 
     const rows = await db.select().from(ai_gateway_config);
@@ -96,7 +96,7 @@ describe('adminPreferredProviderOrderRouter', () => {
   });
 
   it('rejects an invalid config without writing', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.preferredProviderOrder.set({
         config: { rules: [{ includes: ['gpt'], excludes: ['gpt'], providers: ['openai'] }] },

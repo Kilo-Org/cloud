@@ -1,7 +1,5 @@
 import 'server-only';
 
-import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
-
 import { createPublicKey, randomUUID } from 'node:crypto';
 import {
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
@@ -186,14 +184,14 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bitbucket-oauth-owner:${input.owner.type}:${input.owner.id}`}, 0))`
     );
 
-    // The authorizer row is read inside the organization guard below; its
-    // identity also attributes the durable organization audit entry.
+    // Storing an organization credential is membership-only: a staff or support
+    // grant never stands in (SUPPORT_NEVER_KEYS). The locked authorizer row also
+    // attributes the durable organization audit entry.
     let organizationAuthorizer: { email: string | null; name: string | null } | null = null;
 
     if (input.owner.type === 'org') {
       const [authorizer] = await tx
         .select({
-          isAdmin: kilocode_users.is_admin,
           email: kilocode_users.google_user_email,
           name: kilocode_users.google_user_name,
         })
@@ -212,26 +210,24 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
         );
       }
 
-      if (!authorizer.isAdmin || isSupportAccessEnabled()) {
-        const [membership] = await tx
-          .select({ id: organization_memberships.id })
-          .from(organization_memberships)
-          .where(
-            and(
-              eq(organization_memberships.organization_id, input.owner.id),
-              eq(organization_memberships.kilo_user_id, input.authorizedByUserId),
-              inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
-            )
+      const [membership] = await tx
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, input.owner.id),
+            eq(organization_memberships.kilo_user_id, input.authorizedByUserId),
+            inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
           )
-          .for('update');
-        if (!membership) {
-          throw new BitbucketIntegrationAuthorizationError(
-            'Bitbucket integration authorizer is no longer authorized'
-          );
-        }
+        )
+        .for('update');
+      if (!membership) {
+        throw new BitbucketIntegrationAuthorizationError(
+          'Bitbucket integration authorizer is no longer authorized'
+        );
       }
 
-      organizationAuthorizer = { email: authorizer.email, name: authorizer.name };
+      organizationAuthorizer = authorizer;
     }
 
     const [currentIntegration] = await tx

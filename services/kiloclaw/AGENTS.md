@@ -346,9 +346,9 @@ The Dockerfile has two cache bust mechanisms:
 
 ### Files COPYed into the image
 
-These files are COPYed by the Dockerfile and hashed by CI (`deploy-kiloclaw.yml`) to
+These files are COPYed by the Dockerfile and hashed by `scripts/image-content-hash.sh` to
 produce the content-hash image tag. If you add or remove a COPY in the Dockerfile,
-update the `find` command in the workflow's "Compute source content hash" step to match.
+update that script and the path check in `push-dev-kiloclaw.yml` to match.
 
 | Path | Purpose |
 |---|---|

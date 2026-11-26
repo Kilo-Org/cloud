@@ -19,6 +19,13 @@ jest.mock('next/navigation', () => ({ redirect: jest.fn() }));
 jest.mock('./SupportAccessRequestDialog', () => ({
   SupportAccessRequestDialog: () => null,
 }));
+jest.mock('@/lib/admin/require-admin-page', () => {
+  const ReactActual = jest.requireActual('react') as typeof React;
+  return {
+    AdminStepUpGate: ({ requirement }: { requirement: { reason: string } }) =>
+      ReactActual.createElement('div', { 'data-step-up': requirement.reason }),
+  };
+});
 jest.mock('./OrganizationTrialWrapper', () => {
   const ReactActual = jest.requireActual('react') as typeof React;
   return {
@@ -153,12 +160,12 @@ describe('OrganizationByPageLayout', () => {
     expect(html).not.toContain('data-role="owner"');
   });
 
-  it('retains legacy staff owner elevation when support access is disabled', async () => {
+  it('forwards a guarded legacy staff owner grant from the authorization result', async () => {
     mockSupportEnabled.mockReturnValue(false);
     mockAuth.mockResolvedValue({
       success: true,
       data: {
-        user: { role: 'member', is_admin: true },
+        user: { role: 'owner', is_admin: true },
         organization,
         access: { kind: 'legacy_admin', role: 'owner' },
       },
@@ -174,6 +181,73 @@ describe('OrganizationByPageLayout', () => {
     expect(html).toContain('owner:true');
     expect(html).not.toContain('Support read access');
   });
+
+  it('keeps a staff member at their real role without a staff grant', async () => {
+    mockSupportEnabled.mockReturnValue(false);
+    mockAuth.mockResolvedValue({
+      success: true,
+      data: {
+        user: { role: 'member', is_admin: true },
+        organization,
+        access: { kind: 'member', role: 'member' },
+      },
+    } as Awaited<ReturnType<typeof getAuthorizedOrgContext>>);
+    const render = jest.fn(({ role, isGlobalAdmin }: PageRenderProps) =>
+      React.createElement('div', null, `${role}:${isGlobalAdmin}`)
+    );
+
+    const html = renderToStaticMarkup(await OrganizationByPageLayout({ params, render }));
+
+    expect(render).toHaveBeenCalledWith({ role: 'member', organization, isGlobalAdmin: true });
+    expect(html).toContain('data-role="member"');
+    expect(html).not.toContain('data-role="owner"');
+  });
+
+  it('renders the step-up ceremony instead of redirecting when a staff proof is needed', async () => {
+    mockSupportEnabled.mockReturnValue(false);
+    const stepUp = { reason: 'step_up_required' };
+    mockAuth.mockResolvedValue({
+      success: false,
+      nextResponse: { status: 403 },
+      stepUp,
+    } as unknown as Awaited<ReturnType<typeof getAuthorizedOrgContext>>);
+    const render = jest.fn(() => React.createElement('div', null, 'organization content'));
+
+    const html = renderToStaticMarkup(await OrganizationByPageLayout({ params, render }));
+
+    expect(mockRedirectFn).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+    expect(html).toContain('data-step-up="step_up_required"');
+    expect(html).not.toContain('organization content');
+  });
+
+  it.each([
+    ['outside-allowlist', 'limited to the corporate network'],
+    ['not-configured', 'not configured'],
+  ] as const)(
+    'renders the admin network refusal for %s instead of redirecting',
+    async (reason, text) => {
+      mockSupportEnabled.mockReturnValue(true);
+      mockSupportAuth.mockResolvedValue({
+        success: false,
+        nextResponse: { status: 403 },
+        adminNetworkDenial: reason,
+      } as unknown as Awaited<ReturnType<typeof getAuthorizedOrgContextOrSupport>>);
+      const render = jest.fn(() => React.createElement('div', null, 'organization content'));
+
+      const html = renderToStaticMarkup(
+        await OrganizationByPageLayout({ params, render, supportRead: true })
+      );
+
+      expect(mockRedirectFn).not.toHaveBeenCalled();
+      expect(mockOrganizationName).not.toHaveBeenCalled();
+      expect(render).not.toHaveBeenCalled();
+      expect(html).toContain('Access Denied');
+      expect(html).toContain(text);
+      expect(html).not.toContain('Request access');
+      expect(html).not.toContain('organization content');
+    }
+  );
 
   describe('support access denial', () => {
     type AuthResult = Awaited<ReturnType<typeof getAuthorizedOrgContext>>;

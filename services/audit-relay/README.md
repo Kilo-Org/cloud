@@ -174,6 +174,38 @@ A batch lost at its final delivery stalls its stream: every later batch gap-retr
 To recover, re-send the stored object's bytes to the main queue as a `bytes` message; the
 StreamDO archives the missing batch and dedupes the rest.
 
+## STS token events
+
+STS's service-token events travel this path like every other event (design 8.3); the relay
+treats them as opaque rows. Shapes are built in `services/sts/src/audit/events.ts`;
+`test/token-events.test.ts` here decodes, archives and ingests them, and STS's
+`test/worker/token-audit-events.test.ts` proves the builders pass the producer-side check
+(`assertRelayable`: the event schema, flat attributes only, and the single-message size) at their
+largest (8 audiences, 63-character names, 127-character scopes). No event carries a token.
+
+| Type | Stream | OCSF class / activity | Outcome | Attributes |
+|---|---|---|---|---|
+| `ai.kilo.sts.token.issued` | `sts:<env>:tokens:<shard>` | API Activity 6003 / Create 1 | `success`, actor `workload` | `workload`, `environment`, `identity` (`worker-binding`, `vercel`, `github`, `fly`), `kid`, `issuedAt`, `expiresAt`, `lifetimeSeconds`, `attestationCapped`, `tokenCount`, and the parallel lists `jtis`, `audiences`, `scopes` (one row per mint call) |
+| `ai.kilo.sts.token.denied` | `sts:<env>:denials` | API Activity 6003 / Create 1 | `denied`, `outcomeDetail` = reason; actor `workload` (binding) or `service` (HTTP) | `environment`, `channel`, `reason`, `workload` (the actor), `audience` and `scope` (absent for a whole-call refusal), `count` and `windowStart` (identical denials merged per minute), `overflow`, `claims` (stable identity claims as `name=value`) |
+| `ai.kilo.sts.token_key.rotated` | `sts:<env>:tokens:<shard>` | API Activity 6003 / Update 3, Delete 4 for `removed` | `success`, `outcomeDetail` = change; actor `system` | `environment`, `change` (`created`, `published`, `activated`, `removed`), `kid`, plus `activatesAt`, `retiredKid` or `lastTokenExpiresAt` |
+| `ai.kilo.sts.token_key.revoked` | `sts:<env>:tokens:<shard>` | API Activity 6003 / Delete 4 | `success`, `outcomeDetail` `emergency removal`; actor `system` | `environment`, `kid`, `state`, `cause` (`listed`, `same_ring`), `replacementKid` |
+
+Mints and denials for one workload in Axiom (`kilo-audit`; nested fields are flattened with dots):
+
+```kusto
+['kilo-audit']
+| where type in ('ai.kilo.sts.token.issued', 'ai.kilo.sts.token.denied')
+| where ['data.attributes.workload'] == 'web'
+| project _time, source, type, outcome = ['data.outcome'], reason = ['data.attributes.reason'],
+    audiences = ['data.attributes.audiences'], audience = ['data.attributes.audience'],
+    scopes = ['data.attributes.scopes'], count = ['data.attributes.count']
+| order by _time desc
+```
+
+Who minted tokens for one audience: `| where type == 'ai.kilo.sts.token.issued' | mv-expand
+audience = ['data.attributes.audiences'] | where audience == 'usage-ingest' | summarize mints =
+count() by bin(_time, 5m), workload = tostring(['data.attributes.workload'])`.
+
 ## Checkpoints and verification
 
 - Hourly (`0 * * * *`): the registry's heads are serialised as

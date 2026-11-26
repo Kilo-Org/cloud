@@ -417,7 +417,11 @@ beforeEach(() => {
   verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: {} });
   createRuntimeAuthorizationMock.mockResolvedValue({
     authorization: { id: 'destination-authorization', state: 'active' },
-    token: 'destination-delegated-token',
+    tokens: {
+      'kilo-api': 'destination-delegated-token',
+      'kilo-gateway': 'destination-gateway-token',
+      'session-ingest': 'destination-ingest-token',
+    },
   });
   sealRuntimeAuthorizationMock.mockResolvedValue('destination-seal');
   createSessionForCloudAgentMock.mockResolvedValue({
@@ -1200,6 +1204,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
         token: controlToken,
         resourceKind: 'cloud-agent-next',
         resourceId: DESTINATION_WORKSPACE_ID,
+        audienceMode: 'combined',
       })
     );
     expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
@@ -1208,6 +1213,11 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
           auth: {
             kiloSessionId: DESTINATION_KILO_SESSION_ID,
             kilocodeToken: 'destination-delegated-token',
+            runtimeTokens: {
+              'kilo-api': 'destination-delegated-token',
+              'kilo-gateway': 'destination-gateway-token',
+              'session-ingest': 'destination-ingest-token',
+            },
           },
         }),
         runtimeAuthorizationSeal: 'destination-seal',

@@ -7,8 +7,8 @@
     "dev": "wrangler dev --env local",
     "test": "vitest run && vitest run --config vitest.node.config.ts",
     "test:workers": "vitest run",
-    "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/sts/src services/sts/test"
+    "typecheck": "tsgo --noEmit && tsgo --noEmit -p proof/vercel-exchange/tsconfig.json",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/sts/src services/sts/test services/sts/proof"
   },
   "dependencies": {
     "@kilocode/sts-contracts": "workspace:*",

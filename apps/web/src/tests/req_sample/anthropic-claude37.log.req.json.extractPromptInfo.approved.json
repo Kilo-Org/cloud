@@ -1,5 +1,4 @@
 {
-  "system_prompt_prefix": "You are Kilo Code, a knowledgeable technical assistant focused on answering questions and providing ",
   "system_prompt_length": 190,
-  "user_prompt_prefix": "[read_file for 'package.json'] Result:\n<file><path>package.json</path>\n<content lines=\"1-88\">\n 1 | {"
+  "system_prompt_kind": "kilo"
 }

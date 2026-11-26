@@ -14,7 +14,7 @@ import {
   GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
   GitHubListingBudgetExceededError,
 } from '@/lib/integrations/platforms/github/listing-budget';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/integrations/github/connection-state');
@@ -70,7 +70,7 @@ const mockedDiscover = jest.mocked(discoverAuthorizedGitHubInstallations);
 const mockedVerify = jest.mocked(verifyGitHubInstallationAuthorization);
 const mockedRecordDiscovery = jest.mocked(recordGitHubConnectionDiscovery);
 const mockedComplete = jest.mocked(completeGitHubConnectionAttempt);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -79,7 +79,7 @@ beforeEach(() => {
     authFailedResponse: null,
   } as never);
   mockedExchange.mockResolvedValue({ id: '12', login: 'owner', accessToken: 'token' });
-  mockedEnsureOrganizationAccess.mockResolvedValue('admin');
+  mockedEnsureMemberOrganizationAccess.mockResolvedValue('admin');
 });
 
 test('records only server-authorized discovery candidates', async () => {
@@ -124,7 +124,7 @@ test('rechecks GitHub and Kilo authority before completing confirmation', async 
   const response = await GET(
     new NextRequest(`http://localhost/callback?state=state&code=code`) as never
   );
-  expect(mockedEnsureOrganizationAccess).toHaveBeenCalledTimes(2);
+  expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledTimes(2);
   expect(response.headers.get('location')).toContain('github_connection=success');
 });
 
@@ -135,7 +135,7 @@ test('fails closed when destination administration was revoked', async () => {
     verifierRef: 'ref',
     codeVerifier: 'verifier',
   });
-  mockedEnsureOrganizationAccess.mockRejectedValue(new Error('revoked'));
+  mockedEnsureMemberOrganizationAccess.mockRejectedValue(new Error('revoked'));
   const { GET } = await import('./route');
   const response = await GET(
     new NextRequest(`http://localhost/callback?state=state&code=code`) as never

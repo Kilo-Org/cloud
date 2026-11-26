@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   verifyUserOwnsSessionByCloudAgentId,
@@ -10,12 +10,6 @@ import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
-import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
-import {
-  addAdminAuditMetadata,
-  adminActionContextFromHeaders,
-  runElevatedOrganizationWrite,
-} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 const streamTicketSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
@@ -57,7 +51,7 @@ function handleTRPCError(error: unknown): NextResponse {
  */
 export async function POST(request: Request) {
   try {
-    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
 
     if (authFailedResponse) {
       return authFailedResponse;
@@ -86,58 +80,42 @@ export async function POST(request: Request) {
 
     const { cloudAgentSessionId, organizationId } = validation.data;
 
-    if (!organizationId) {
-      const sessionOwnership = await verifyUserOwnsSessionByCloudAgentId(
-        db,
-        user.id,
-        cloudAgentSessionId
-      );
-      if (!sessionOwnership) {
-        return NextResponse.json({ error: 'Session not found or access denied' }, { status: 403 });
-      }
-      return NextResponse.json(
-        signStreamTicket({
-          userId: user.id,
-          kiloSessionId: sessionOwnership.kiloSessionId,
-          cloudAgentSessionId,
-        })
-      );
+    // A stream ticket is a credential, so it is on the support never-list: only
+    // a real (direct or inherited) membership grants organization scope here,
+    // so no Kilo admin bypass exists to audit.
+    const sessionAccess = organizationId
+      ? {
+          verify: async () => {
+            await ensureMemberOrganizationAccess(user, organizationId);
+            return verifyOrgOwnsSessionByCloudAgentId(
+              db,
+              organizationId,
+              user.id,
+              cloudAgentSessionId
+            );
+          },
+          refusal: 'Organization does not own this session',
+          ticketFields: { organizationId },
+        }
+      : {
+          verify: () => verifyUserOwnsSessionByCloudAgentId(db, user.id, cloudAgentSessionId),
+          refusal: 'Session not found or access denied',
+          ticketFields: {},
+        };
+
+    const sessionOwnership = await sessionAccess.verify();
+
+    if (!sessionOwnership) {
+      return NextResponse.json({ error: sessionAccess.refusal }, { status: 403 });
     }
 
-    await ensureOrganizationAccess({ user, tokenSource }, organizationId);
-    return await runElevatedOrganizationWrite(
-      adminActionContextFromHeaders(user, request.headers),
-      {
-        organizationId,
-        requiredRoles: ORGANIZATION_ROLES,
-        action: 'organization.cloud_agent_session.stream_ticket',
-        message: 'Signed a cloud agent stream ticket',
-      },
-      async () => {
-        const sessionOwnership = await verifyOrgOwnsSessionByCloudAgentId(
-          db,
-          organizationId,
-          user.id,
-          cloudAgentSessionId
-        );
-        if (!sessionOwnership) {
-          return NextResponse.json(
-            { error: 'Organization does not own this session' },
-            { status: 403 }
-          );
-        }
-        // Only a session the organization owns is named: the requested id is
-        // caller-supplied text until this check matched it to a stored session.
-        addAdminAuditMetadata({ kiloSessionId: sessionOwnership.kiloSessionId });
-        return NextResponse.json(
-          signStreamTicket({
-            userId: user.id,
-            kiloSessionId: sessionOwnership.kiloSessionId,
-            cloudAgentSessionId,
-            organizationId,
-          })
-        );
-      }
+    return NextResponse.json(
+      signStreamTicket({
+        userId: user.id,
+        kiloSessionId: sessionOwnership.kiloSessionId,
+        cloudAgentSessionId,
+        ...sessionAccess.ticketFields,
+      })
     );
   } catch (error) {
     return handleTRPCError(error);

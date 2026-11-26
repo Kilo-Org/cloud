@@ -1,15 +1,23 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException, setTags } from '@sentry/nextjs';
+import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import {
+  organizationRestAccessContext,
+  StaffRequestRefusal,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { streamChunks, type ChunkMetadata } from '@/lib/managed-index-chunking';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
 import type { ChunkWithMetadata } from '@/lib/code-indexing/types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { code_indexing_manifest } from '@kilocode/db/schema';
-import { getCodeIndexOrganizationId } from '@/routers/code-indexing/code-indexing-router';
+import {
+  getCodeIndexOrganizationId,
+  isCodeIndexingEntitlementDenial,
+} from '@/routers/code-indexing/code-indexing-router';
 import { trackCodeIndexingUpsert } from '@/lib/code-indexing/posthog-tracking';
 import { createFlexibleAIAttributionTracker } from '@/lib/ai-attribution-service';
 import {
@@ -65,9 +73,16 @@ export async function PUT(
     return codeIndexingGoneResponse();
   }
 
-  try {
-    const ctx = await createTRPCContext();
+  const auth = await getUserFromAuth({ adminOnly: false });
+  if (auth.authFailedResponse) {
+    return auth.authFailedResponse;
+  }
+  const ctx = organizationRestAccessContext(auth, {
+    headers: request.headers,
+    method: request.method,
+  });
 
+  try {
     let formData: FormData | undefined;
     try {
       formData = await request.formData();
@@ -104,9 +119,11 @@ export async function PUT(
 
     const { file, projectId, filePath, fileHash, gitBranch, isBaseBranch } = validationResult.data;
 
-    const organizationId = await getCodeIndexOrganizationId(ctx, {
-      organizationId: validationResult.data.organizationId,
-    });
+    const organizationId = await getCodeIndexOrganizationId(
+      ctx,
+      { organizationId: validationResult.data.organizationId },
+      { actionClass: 'platform_write' }
+    );
 
     const storage = getIndexStorage();
 
@@ -262,6 +279,16 @@ export async function PUT(
       throw error;
     }
   } catch (error) {
+    // A refused staff admission keeps the adapter's status and step-up detail;
+    // it happens before any index write.
+    if (error instanceof TRPCError && error.cause instanceof StaffRequestRefusal) {
+      return error.cause.response;
+    }
+    // The documented refusal for an account or organization the index is not
+    // enabled for, also before any index write. It is not an internal error.
+    if (isCodeIndexingEntitlementDenial(error)) {
+      return NextResponse.json({ error: error.message, message: error.message }, { status: 403 });
+    }
     // Outer catch for early failures (auth, form parsing, validation)
     // These don't need PostHog tracking as they're pre-processing failures
     console.log('error', error);

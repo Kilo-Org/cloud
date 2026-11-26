@@ -40,6 +40,7 @@ import { fetchSessionMetadata } from './metadata.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import { runtimeAuthorizationLifetime } from './runtime-authorization-lifetime.js';
+import { runtimeTokenAudienceMode } from './runtime-authorization-persistence.js';
 import { renewWorkspaceAuthorityForUserSend } from './workspace-authority-renewal.js';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
@@ -201,6 +202,7 @@ async function preflightChatRuntimeAuthorization(
     resourceId: metadata.identity.sessionId,
     environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
     ...runtimeAuthorizationLifetime(ctx.env),
+    audienceMode: runtimeTokenAudienceMode(ctx.env),
     onAdmissionRejected: reason =>
       logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
@@ -220,7 +222,8 @@ async function preflightChatRuntimeAuthorization(
         ownerId: ctx.userId,
         expectedOldId,
         runtimeAuthorizationSeal,
-        runtimeToken: created.token,
+        runtimeToken: created.tokens['kilo-api'],
+        runtimeTokens: created.tokens,
       }),
     'recoverExpiredRuntimeAuthorization'
   );

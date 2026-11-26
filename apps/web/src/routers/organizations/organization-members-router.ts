@@ -24,14 +24,25 @@ import {
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   ensureOrganizationAccess,
+  observeMembershipRole,
   OrganizationIdInputSchema,
   organizationAdminMutationProcedure,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
+  requireLiveOrganization,
+  requireOrganizationStaffAuthority,
+  resolveOrganizationAccess,
+  type OrganizationAccessContext,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
+import {
+  organizationTarget,
+  recordKiloAdminElevation,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
@@ -105,19 +116,27 @@ const OWNER_AUTHORITY_MESSAGE = 'Only an organization owner can manage owners';
  * halves are required: allowing only one would let an admin strip every owner
  * while being unable to appoint a replacement, leaving the org with no owner.
  *
- * Kilo staff bypass this because `ensureOrganizationAccess` resolves them to
- * `owner`.
+ * Kilo staff whose own membership is below owner get owner authority only
+ * where the legacy staff policy grants it (support access off), through the
+ * staff admission for this organization. With support access on, a grant
+ * never stands in over a membership, so they are refused like any admin.
  */
-function assertOwnerAuthority(
-  actorRole: OrganizationRole,
+async function requireOwnerAuthority(
+  ctx: OrganizationAccessContext,
+  organizationId: string,
   target: { currentRole?: OrganizationRole | null; nextRole?: OrganizationRole | null }
-): void {
-  if (actorRole === 'owner') {
+): Promise<void> {
+  const actorRole = await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
+  if (actorRole === 'owner') return;
+  if (target.currentRole !== 'owner' && target.nextRole !== 'owner') return;
+  if (
+    ctx.user.is_admin &&
+    !isSupportAccessEnabled() &&
+    (await ensureOrganizationAccess(ctx, organizationId, ['owner'])) === 'owner'
+  ) {
     return;
   }
-  if (target.currentRole === 'owner' || target.nextRole === 'owner') {
-    throw new TRPCError({ code: 'FORBIDDEN', message: OWNER_AUTHORITY_MESSAGE });
-  }
+  throw new TRPCError({ code: 'FORBIDDEN', message: OWNER_AUTHORITY_MESSAGE });
 }
 
 async function getDirectOrganizationRole(
@@ -136,6 +155,73 @@ async function getDirectOrganizationRole(
     .limit(1);
 
   return membership?.role ?? null;
+}
+
+/**
+ * The shared owner-or-billing-manager write guard: the role, then an active
+ * subscription or trial.
+ */
+async function requireBillingWriteAccess(
+  ctx: OrganizationAccessContext,
+  organizationId: string
+): Promise<void> {
+  await resolveOrganizationAccess(ctx, organizationId, { roles: ORGANIZATION_BILLING_ROLES });
+  await requireActiveSubscriptionOrTrial(organizationId);
+}
+
+type ChildMembershipTargets = { parentMemberEmail: string; childIds: string[] };
+
+/**
+ * What a child-membership update acts on: the target's parent membership and
+ * the parent's live direct children, sorted. Refuses a target that is not a
+ * human member of the parent, and a selection naming any other organization.
+ */
+async function readChildMembershipTargets(
+  organizationId: string,
+  memberId: string,
+  childOrganizationIds: readonly string[]
+): Promise<ChildMembershipTargets> {
+  const [parentMember] = await db
+    .select({
+      email: kilocode_users.google_user_email,
+      isBot: kilocode_users.is_bot,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, memberId)
+      )
+    )
+    .limit(1);
+
+  if (!parentMember || parentMember.isBot) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'User is not a member of the parent organization',
+    });
+  }
+
+  const childOrganizations = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, organizationId),
+        isNull(organizations.deleted_at)
+      )
+    );
+  const childIds = new Set(childOrganizations.map(child => child.id));
+
+  if (childOrganizationIds.some(childOrganizationId => !childIds.has(childOrganizationId))) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Selected organizations must be direct child organizations',
+    });
+  }
+
+  return { parentMemberEmail: parentMember.email, childIds: [...childIds].sort() };
 }
 
 /**
@@ -263,7 +349,15 @@ export const organizationsMembersRouter = createTRPCRouter({
           message: 'User is not a member of this organization',
         });
       }
-      // Changing an owner or granting owner needs owner authority.
+
+      // Only an owner may grant the owner role or change an existing owner's
+      // role; admins match owners everywhere else. Checked before the audited
+      // write, so a caller refused here is never recorded as an admin bypass.
+      await requireOwnerAuthority(ctx, organizationId, {
+        currentRole: targetMember.role,
+        nextRole: role,
+      });
+
       return runElevatedOrganizationWrite(
         ctx,
         {
@@ -277,15 +371,6 @@ export const organizationsMembersRouter = createTRPCRouter({
           metadata: { memberKiloUserId: memberId, previousRole: targetMember.role, role },
         },
         async () => {
-          // Only an owner may grant the owner role or change an existing owner's
-          // role; admins match owners everywhere else.
-          const actorRole = await ensureOrganizationAccess(
-            ctx,
-            organizationId,
-            ORGANIZATION_MANAGE_ROLES
-          );
-          assertOwnerAuthority(actorRole, { currentRole: targetMember.role, nextRole: role });
-
           const updatedUser = await findUserById(memberId);
           const updatedUserEmail = updatedUser?.google_user_email || 'unknown';
 
@@ -327,23 +412,74 @@ export const organizationsMembersRouter = createTRPCRouter({
         }
       );
     }),
-  setChildMemberships: organizationBillingMutationProcedure
+  // Not on the billing builder: for staff without a billing role its guard
+  // would spend the operation proof before this resolver validates the request.
+  setChildMemberships: baseProcedure
     .input(SetChildMembershipsSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
       const { organizationId, memberId } = input;
       const childOrganizationIds = Array.from(new Set(input.childOrganizationIds));
 
-      const directRole =
-        user.is_admin && !isSupportAccessEnabled()
-          ? 'owner'
-          : await getDirectOrganizationRole(organizationId, user.id);
-      if (!ORGANIZATION_BILLING_ROLES.some(role => role === directRole)) {
+      // Everyone but legacy staff passes the shared billing guard before the
+      // direct-role read; legacy staff are first judged by their direct role.
+      const legacyStaff = user.is_admin && !isSupportAccessEnabled();
+      if (!legacyStaff) await requireBillingWriteAccess(ctx, organizationId);
+      const directRole = await getDirectOrganizationRole(organizationId, user.id);
+      const needsStaffGrant = !ORGANIZATION_BILLING_ROLES.some(role => role === directRole);
+      if (needsStaffGrant && !legacyStaff) {
+        // A caller the billing guard admits through an inherited role still
+        // lacks the direct role this needs.
         throw new TRPCError({
           code: 'UNAUTHORIZED',
           message: 'You do not have the required organizational role to access this feature',
         });
       }
+      if (legacyStaff && !needsStaffGrant) await requireBillingWriteAccess(ctx, organizationId);
+
+      const validated: { targets: ChildMembershipTargets | null } = { targets: null };
+      if (needsStaffGrant) {
+        // Legacy staff: the role, session and network checks run first, then
+        // these, and the operation proof is spent only once they pass. The
+        // audited write below starts only after this admission.
+        const staff = await requireOrganizationStaffAuthority(
+          ctx,
+          organizationId,
+          'support_write',
+          async () => {
+            await requireLiveOrganization(organizationId);
+            await requireActiveSubscriptionOrTrial(organizationId);
+            validated.targets = await readChildMembershipTargets(
+              organizationId,
+              memberId,
+              childOrganizationIds
+            );
+          }
+        );
+        const { membershipRole } = await observeMembershipRole(() =>
+          loadEffectiveMembershipRows(staff.user.id, organizationId)
+        );
+        await recordKiloAdminElevation(
+          { ...ctx, user: staff.user },
+          {
+            reason: 'organization_access',
+            target: organizationTarget(organizationId),
+            membershipRole,
+            wouldPassWithoutAdmin: false,
+          }
+        );
+      } else {
+        validated.targets = await readChildMembershipTargets(
+          organizationId,
+          memberId,
+          childOrganizationIds
+        );
+      }
+      if (!validated.targets) {
+        throw new Error('Child membership targets were not validated');
+      }
+      const { parentMemberEmail, childIds } = validated.targets;
+      const selectedChildOrganizationIds = new Set(childOrganizationIds);
 
       return runElevatedOrganizationWrite(
         ctx,
@@ -357,56 +493,6 @@ export const organizationsMembersRouter = createTRPCRouter({
           metadata: { memberKiloUserId: memberId },
         },
         async () => {
-          const [parentMember] = await db
-            .select({
-              email: kilocode_users.google_user_email,
-              isBot: kilocode_users.is_bot,
-            })
-            .from(organization_memberships)
-            .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-            .where(
-              and(
-                eq(organization_memberships.organization_id, organizationId),
-                eq(organization_memberships.kilo_user_id, memberId)
-              )
-            )
-            .limit(1);
-
-          if (!parentMember || parentMember.isBot) {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'User is not a member of the parent organization',
-            });
-          }
-
-          const childOrganizations = await db
-            .select({
-              id: organizations.id,
-            })
-            .from(organizations)
-            .where(
-              and(
-                eq(organizations.parent_organization_id, organizationId),
-                isNull(organizations.deleted_at)
-              )
-            );
-          const childOrganizationsById = new Map(
-            childOrganizations.map(child => [child.id, child])
-          );
-
-          if (
-            childOrganizationIds.some(
-              childOrganizationId => !childOrganizationsById.has(childOrganizationId)
-            )
-          ) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Selected organizations must be direct child organizations',
-            });
-          }
-
-          const childIds = childOrganizations.map(child => child.id).sort();
-          const selectedChildOrganizationIds = new Set(childOrganizationIds);
           const { added, removed } = await db.transaction(async tx => {
             // The audit rows name the parent organization, so read its display name
             // once here rather than repeating the parent id for every child.
@@ -461,10 +547,10 @@ export const organizationsMembersRouter = createTRPCRouter({
                   actor_name: user.google_user_name,
                   details: {
                     id: 'member.parentAdded',
-                    email: parentMember.email,
+                    email: parentMemberEmail,
                     parent: parentOrganizationName,
                   },
-                  message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
+                  message: `Added parent organization member ${parentMemberEmail} as a member from parent organization ${organizationId}`,
                   organization_id: childOrganizationId,
                   tx,
                 });
@@ -506,10 +592,10 @@ export const organizationsMembersRouter = createTRPCRouter({
                 actor_name: user.google_user_name,
                 details: {
                   id: 'member.parentRemoved',
-                  email: parentMember.email,
+                  email: parentMemberEmail,
                   parent: parentOrganizationName,
                 },
-                message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
+                message: `Removed parent organization member ${parentMemberEmail} from child organization via parent organization ${organizationId}`,
                 organization_id: childOrganizationId,
                 tx,
               });
@@ -541,8 +627,9 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, memberId } = input;
 
-      // Prevent users from removing themselves (unless they are kilo admin users)
-      if (user.id === memberId && (!user.is_admin || isSupportAccessEnabled())) {
+      // Only staff may remove themselves, and only with a verified grant.
+      const isSelfRemoval = user.id === memberId;
+      if (isSelfRemoval && (!user.is_admin || isSupportAccessEnabled())) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You cannot remove yourself from the organization',
@@ -565,14 +652,12 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
+      // Spend the staff proof only once the target is known to be removable.
+      if (isSelfRemoval) await requireOrganizationStaffAuthority(ctx, organizationId);
+
       // Only an owner may act on an existing owner's membership; admins match
       // owners everywhere else.
-      const actorRole = await ensureOrganizationAccess(
-        ctx,
-        organizationId,
-        ORGANIZATION_MANAGE_ROLES
-      );
-      assertOwnerAuthority(actorRole, { currentRole: targetMember.role });
+      await requireOwnerAuthority(ctx, organizationId, { currentRole: targetMember.role });
 
       return runElevatedOrganizationWrite(
         ctx,
@@ -629,12 +714,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       // require organization-management authority, and only an owner may invite
       // another owner.
       if (role !== 'member') {
-        const actorRole = await ensureOrganizationAccess(
-          ctx,
-          organizationId,
-          ORGANIZATION_MANAGE_ROLES
-        );
-        assertOwnerAuthority(actorRole, { nextRole: role });
+        await requireOwnerAuthority(ctx, organizationId, { nextRole: role });
       }
 
       // The invitee's address stays out of the audit log; inviting oneself
@@ -798,12 +878,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       // Owners can revoke any invitation; admins cannot revoke an owner invite,
       // which is a pending grant of owner authority.
-      const actorRole = await ensureOrganizationAccess(
-        ctx,
-        organizationId,
-        ORGANIZATION_MANAGE_ROLES
-      );
-      assertOwnerAuthority(actorRole, { currentRole: invitation.role });
+      await requireOwnerAuthority(ctx, organizationId, { currentRole: invitation.role });
 
       // Expire the invitation by setting expires_at to NOW, atomically with the audit.
       await db.transaction(async tx => {
@@ -884,12 +959,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       // Owners can resend any invitation; admins cannot resend an owner invite,
       // which is a pending grant of owner authority.
-      const actorRole = await ensureOrganizationAccess(
-        ctx,
-        organizationId,
-        ORGANIZATION_MANAGE_ROLES
-      );
-      assertOwnerAuthority(actorRole, { currentRole: invitation.role });
+      await requireOwnerAuthority(ctx, organizationId, { currentRole: invitation.role });
 
       // Reset the existing outbox row rather than inserting a second one. The
       // reset fences on the invitation still being valid, so a concurrent

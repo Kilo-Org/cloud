@@ -7,7 +7,8 @@ import {
   getGitHubAppName,
   getGitHubAppTypeForOrganization,
 } from '@/lib/integrations/platforms/github/app-selector';
-import { resolveAuthorizedOwner } from '@/lib/integrations/resolve-owner';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { Owner } from '@/lib/integrations/core/types';
 import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
 import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { createInstallState } from '@/lib/integrations/github/install-state';
@@ -17,17 +18,19 @@ import { createInstallState } from '@/lib/integrations/github/install-state';
  *
  * One implementation serves both entry points: the web tRPC mutation and the
  * app shell's own start route, which must set the shell flow cookie on the same
- * response that starts the install.
+ * response that starts the install. An organization install binds a credential,
+ * so it is membership-only and the install state never carries staff authority.
  */
 export async function beginGitHubAppInstall(
   ctx: Pick<TRPCContext, 'user'>,
   input: { organizationId?: string; returnTo: string | null }
 ): Promise<{ token: string; appType: GitHubAppType }> {
-  const owner = await resolveAuthorizedOwner(
-    ctx,
-    input.organizationId,
-    input.organizationId ? ORGANIZATION_MANAGE_ROLES : undefined
-  );
+  if (input.organizationId) {
+    await ensureMemberOrganizationAccess(ctx.user, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+  }
+  const owner: Owner = input.organizationId
+    ? { type: 'org', id: input.organizationId }
+    : { type: 'user', id: ctx.user.id };
 
   if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
     // The single-installation slot belongs to the organization's live

@@ -1,5 +1,4 @@
 {
-  "system_prompt_prefix": "You are Kilo Code, a knowledgeable technical assistant focused on answering questions and providing ",
   "system_prompt_length": 190,
-  "user_prompt_prefix": "<task>\ntsconfig.json:1-34\n```\n{\n  \"compilerOptions\": {\n    \"target\": \"es2017\",\n    \"module\": \"es2022"
+  "system_prompt_kind": "kilo"
 }

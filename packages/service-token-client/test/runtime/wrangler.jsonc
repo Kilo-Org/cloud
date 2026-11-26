@@ -1,0 +1,14 @@
+// Test-only Worker that runtime.test.ts starts in local workerd; never deployed. Its STS binding
+// points at its own SecretsBroker entrypoint, so every mint is a real RPC call.
+{
+  "name": "service-token-client-runtime-test",
+  "main": "worker.ts",
+  "compatibility_date": "2026-02-01",
+  "services": [
+    {
+      "binding": "STS",
+      "service": "service-token-client-runtime-test",
+      "entrypoint": "SecretsBroker",
+    },
+  ],
+}

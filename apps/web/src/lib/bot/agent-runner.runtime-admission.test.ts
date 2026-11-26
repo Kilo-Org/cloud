@@ -191,7 +191,7 @@ beforeEach(() => {
               : null,
         },
       });
-      expect(jwt.verify(runtime.token, NEXTAUTH_SECRET)).toMatchObject({
+      expect(jwt.verify(runtime.tokens['kilo-api'], NEXTAUTH_SECRET)).toMatchObject({
         runtimeAuthorization: { resourceKind: 'cloud-agent-next', resourceId: 'workspace_test' },
       });
       return { cloudAgentSessionId: 'workspace_test', kiloSessionId: 'ses_test' };

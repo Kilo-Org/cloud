@@ -1,0 +1,59 @@
+// Test-only build of STS for the local end-to-end check in README "Tests"; never deployed (it sits
+// under test/fixtures/, and the deploy job only finds files named wrangler.jsonc). Started together
+// with wrangler.probe.jsonc in one `wrangler dev` session; the probe serves both on port 8827, so
+// STS_ISSUER names that port. Every value is local and synthetic, and the names stay outside the
+// `sts-*` and `kilo-audit-*` names test/repo/worker-configs.ts reserves for deployments.
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "secrets-broker-e2e-sts",
+  "main": "sts.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "traces": { "enabled": false } },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+    {
+      "type": "Text",
+      "globs": ["**/*.yaml"],
+      "fallthrough": true,
+    },
+  ],
+  "vars": {
+    "STS_ENVIRONMENT": "development",
+    "STS_ISSUER": "http://localhost:8827",
+    "MANAGER_BASE_URL": "https://manager.sts-test.invalid",
+    "MANAGER_PROJECT_ID": "test-project-id",
+    "MANAGER_PROJECT_SLUG": "e2e-project",
+    "MANAGER_ENVIRONMENT_SLUG": "development",
+    "MANAGER_IDENTITY_ID": "test-identity-id",
+    "DO_JURISDICTION": "none",
+    "TOKEN_SIGNING_KIDS_REVOKED": "",
+    "LEASE_CI_MIGRATION_TARGET": "db.e2e-primary.invalid:5432/postgres",
+    "CF_DEPLOY_ACCOUNT_ID": "e2e0000000000000000000000000acc1",
+  },
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "secrets-broker-e2e-audit" }],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+      { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+      { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+      { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+      { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+      { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
+      { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["LeaseDO"] },
+    { "tag": "v5", "new_sqlite_classes": ["DeployTokenDO"] },
+  ],
+}

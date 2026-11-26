@@ -10,15 +10,8 @@ import {
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
-import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
-import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
-import {
-  addAdminAuditMetadata,
-  adminActionContextFromHeaders,
-  runElevatedOrganizationWrite,
-} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 // Large workspaces can take a while to archive; raise the function timeout so
 // the streamed download isn't killed mid-flight (mirrors the api-request-log
@@ -38,19 +31,6 @@ function jsonError(message: string, status: number, code?: string): Response {
   });
 }
 
-function instanceAccessErrorResponse(err: unknown): Response {
-  if (err instanceof TRPCError) {
-    if (err.code === 'FORBIDDEN' || err.code === 'UNAUTHORIZED') {
-      return jsonError(err.message, 403);
-    }
-    if (err.code === 'NOT_FOUND') {
-      return jsonError(err.message, 404);
-    }
-  }
-  console.error('[openclaw-export] failed to resolve instance access:', err);
-  return jsonError('Failed to resolve KiloClaw instance', 500);
-}
-
 /**
  * POST /api/claw/openclaw-export
  *
@@ -62,7 +42,7 @@ function instanceAccessErrorResponse(err: unknown): Response {
 export async function POST(request: NextRequest): Promise<Response> {
   await connection();
 
-  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({
+  const { user, authFailedResponse } = await getUserFromAuth({
     adminOnly: false,
   });
   if (authFailedResponse) {
@@ -90,35 +70,14 @@ export async function POST(request: NextRequest): Promise<Response> {
       'openclaw_export_encryption_unsupported'
     );
   }
-  const exportRequest = { format, password };
-  if (!organizationId) return exportWorkspace(user, exportRequest, undefined);
 
-  try {
-    await ensureOrganizationAccess({ user, tokenSource } as TRPCContext, organizationId);
-  } catch (err) {
-    return instanceAccessErrorResponse(err);
-  }
-  return runElevatedOrganizationWrite(
-    adminActionContextFromHeaders(user, request.headers),
-    {
-      organizationId,
-      requiredRoles: ORGANIZATION_ROLES,
-      action: 'organization.kiloclaw_workspace.export',
-      message: 'Exported the KiloClaw workspace',
-      metadata: { format, encrypted: password !== undefined },
-    },
-    () => exportWorkspace(user, exportRequest, organizationId)
-  );
-}
-
-async function exportWorkspace(
-  user: { id: string },
-  { format, password }: Pick<z.infer<typeof BodySchema>, 'format' | 'password'>,
-  organizationId: string | undefined
-): Promise<Response> {
   let instance: Awaited<ReturnType<typeof getActiveInstance>>;
   try {
     if (organizationId) {
+      // A workspace export is on the support never-list: only a real (direct or
+      // inherited) membership grants organization scope here, so no Kilo admin
+      // bypass exists to audit.
+      await ensureMemberOrganizationAccess(user, organizationId);
       await requireActiveSubscriptionOrTrial(organizationId);
       instance = await getActiveOrgInstance(user.id, organizationId);
     } else {
@@ -126,13 +85,21 @@ async function exportWorkspace(
       instance = await getActiveInstance(user.id);
     }
   } catch (err) {
-    return instanceAccessErrorResponse(err);
+    if (err instanceof TRPCError) {
+      if (err.code === 'FORBIDDEN' || err.code === 'UNAUTHORIZED') {
+        return jsonError(err.message, 403);
+      }
+      if (err.code === 'NOT_FOUND') {
+        return jsonError(err.message, 404);
+      }
+    }
+    console.error('[openclaw-export] failed to resolve instance access:', err);
+    return jsonError('Failed to resolve KiloClaw instance', 500);
   }
 
   if (!instance) {
     return jsonError('No active KiloClaw instance found', 404, 'instance_not_found');
   }
-  addAdminAuditMetadata({ instanceId: instance.id });
 
   const client = new KiloClawInternalClient();
   let workerResponse: Response;

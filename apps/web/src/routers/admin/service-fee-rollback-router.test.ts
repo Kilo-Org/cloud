@@ -11,7 +11,7 @@ import type { AdminActionAuditAction } from '@kilocode/db/schema-types';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 
 async function insertAdmin(isSuperAdmin: boolean) {
   return insertTestUser({
@@ -59,7 +59,7 @@ describe('admin.serviceFeeRollback', () => {
     const admin = await insertAdmin(false);
     const customer = await insertTestUser();
     await seedChargedFee(customer.id, 'ch_view_only');
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const overview = await caller.admin.serviceFeeRollback.overview();
     expect(overview.remaining).toEqual({ count: 1, amountMinor: 250 });
@@ -94,7 +94,7 @@ describe('admin.serviceFeeRollback', () => {
       amount: 250,
       status: 'succeeded',
     } as unknown as Stripe.Response<Stripe.Refund>);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const results = await caller.admin.serviceFeeRollback.executeBatch({ limit: 5 });
 
@@ -138,7 +138,7 @@ describe('admin.serviceFeeRollback', () => {
       url: '/v1/refunds',
     } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Refund>>);
     jest.spyOn(stripeClient.refunds, 'create').mockRejectedValue(new Error('socket hang up'));
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const results = await caller.admin.serviceFeeRollback.executeBatch({ limit: 5 });
 
@@ -178,7 +178,7 @@ describe('admin.serviceFeeRollback', () => {
       has_more: false,
       url: '/v1/refunds',
     } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Refund>>);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const results = await caller.admin.serviceFeeRollback.reconcileStale();
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
 export const TranscriptionInputAudioSchema = z.object({
   data: z.string().min(1),
@@ -23,12 +24,6 @@ export function buildUpstreamBody(body: TranscriptionRequest): Record<string, un
   return body;
 }
 
-export function extractTranscriptionPromptInfo(body: TranscriptionRequest) {
-  const format = body.input_audio.format.slice(0, 100);
-  const language = body.language ? ` language=${body.language.slice(0, 32)}` : '';
-  return {
-    system_prompt_prefix: '',
-    system_prompt_length: 0,
-    user_prompt_prefix: `audio/${format}${language}`.slice(0, 100),
-  };
+export function extractTranscriptionPromptInfo(): PromptInfo {
+  return { system_prompt_length: 0, system_prompt_kind: null };
 }

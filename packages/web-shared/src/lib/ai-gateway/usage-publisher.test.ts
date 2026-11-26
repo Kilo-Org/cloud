@@ -85,6 +85,7 @@ const payload: LlmUsageQueueMessage = {
     is_free: null,
     abuse_delay: null,
     abuse_downgraded_from: null,
+    system_prompt_kind: null,
   },
   prior_microdollar_usage: 0,
   posthog_distinct_id: null,

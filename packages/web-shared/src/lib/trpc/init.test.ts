@@ -7,6 +7,7 @@ import {
   baseProcedure,
   createCallerFactory,
   createTRPCRouter,
+  requireStaffAuthority,
   type TRPCContext,
 } from './init';
 import {
@@ -15,8 +16,9 @@ import {
   UNSCOPED_TARGET,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { staffRefusalKind } from '@kilocode/web-shared/lib/admin/admin-guard';
 import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
-import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const testRouter = createTRPCRouter({
   ping: adminProcedure.query(() => 'ok'),
@@ -55,7 +57,11 @@ afterEach(() => {
 describe('adminProcedure admin_access telemetry', () => {
   test('emits a trpc session event for a web-console admin', async () => {
     const caller = createCaller(
-      ctxFor({ user: defineTestUser({ is_admin: true, is_super_admin: true }), ip: '9.9.9.9' })
+      ctxFor({
+        user: await insertTestUser({ is_admin: true, is_super_admin: true }),
+        credential: 'session',
+        ip: '9.9.9.9',
+      })
     );
 
     await expect(caller.ping()).resolves.toBe('ok');
@@ -74,7 +80,7 @@ describe('adminProcedure admin_access telemetry', () => {
     });
   });
 
-  test('emits authVia token when the caller authenticated via a bearer token', async () => {
+  test('refuses a bearer admin and reports the token and its denial', async () => {
     const caller = createCaller(
       ctxFor({
         user: defineTestUser({ is_admin: true, is_super_admin: false }),
@@ -83,7 +89,10 @@ describe('adminProcedure admin_access telemetry', () => {
       })
     );
 
-    await caller.ping();
+    await expect(caller.ping()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    });
 
     expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
     expect(events[0]).toMatchObject({
@@ -98,9 +107,41 @@ describe('adminProcedure admin_access telemetry', () => {
     expect(events[1]).toMatchObject({
       kind: 'privileged_access',
       credential: 'delegated_workload',
-      outcome: 'succeeded',
+      outcome: 'denied',
       actionClass: 'platform_read',
     });
+  });
+
+  test('refuses a context that never established a browser session', async () => {
+    // The app-shell context and other hand-built contexts carry no credential.
+    const caller = createCaller(ctxFor({ user: await insertTestUser({ is_admin: true }) }));
+
+    await expect(caller.ping()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    });
+  });
+
+  test('uses the primary row: a revoked admin is refused although the context says admin', async () => {
+    const revoked = await insertTestUser({ is_admin: false });
+    const caller = createCaller(
+      ctxFor({ user: { ...revoked, is_admin: true }, credential: 'session' })
+    );
+
+    const error = await caller.ping().catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ message: 'Admin access required' });
+    expect(staffRefusalKind(error)).toBe('not_staff');
+  });
+
+  test('refuses a browser session whose pepper the primary row no longer holds', async () => {
+    const admin = await insertTestUser({ is_admin: true, web_session_pepper: 'current-pepper' });
+    const caller = createCaller(
+      ctxFor({ user: admin, credential: 'session', webSessionPepper: 'revoked-pepper' })
+    );
+
+    const error = await caller.ping().catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ message: 'Reauthentication required' });
+    expect(staffRefusalKind(error)).toBe('reauth');
   });
 
   // Regression: a `{ user }`-shaped context that omits the derived `credential`
@@ -129,7 +170,7 @@ describe('adminProcedure admin_access telemetry', () => {
       })
     );
 
-    await caller.models.list();
+    await expect(caller.models.list()).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
     expect(events[0]).toMatchObject({
       kind: 'admin_guard',
@@ -138,23 +179,18 @@ describe('adminProcedure admin_access telemetry', () => {
     });
   });
 
-  test('emits denied, not succeeded, when a chained guard refuses the request', async () => {
+  test('emits only the guard event when a chained guard refuses a session request', async () => {
     const caller = createCaller(
       ctxFor({
-        user: defineTestUser({ is_admin: true, is_super_admin: false }),
-        authViaToken: true,
+        user: await insertTestUser({ is_admin: true, is_super_admin: false }),
+        credential: 'session',
       })
     );
 
-    await expect(caller.chainedDenial()).rejects.toThrow();
+    await expect(caller.chainedDenial()).rejects.toThrow('Specialized guard denied');
 
-    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
-    expect(events[1]).toMatchObject({
-      kind: 'privileged_access',
-      credential: 'human_bearer',
-      outcome: 'denied',
-      wouldBlock: true,
-    });
+    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
+    expect(events[0]).toMatchObject({ kind: 'admin_guard', credential: 'session' });
   });
 
   test('emits a denied privileged_access event for a non-admin bearer caller', async () => {
@@ -205,12 +241,14 @@ describe('adminProcedure admin network allowlist', () => {
     resetAdminNetworkConfigForTest();
   });
 
-  function adminCallerFrom(headersList: Headers) {
-    return createCaller(ctxFor({ user: defineTestUser({ is_admin: true }), headersList }));
+  async function adminCallerFrom(headersList: Headers) {
+    return createCaller(
+      ctxFor({ user: await insertTestUser({ is_admin: true }), credential: 'session', headersList })
+    );
   }
 
   test('refuses an admin outside the allowlist on Vercel with FORBIDDEN', async () => {
-    const caller = adminCallerFrom(
+    const caller = await adminCallerFrom(
       new Headers({ 'x-vercel-forwarded-for': '198.51.100.1', 'x-forwarded-for': '203.0.113.7' })
     );
 
@@ -222,7 +260,7 @@ describe('adminProcedure admin network allowlist', () => {
   });
 
   test('lets an admin inside the allowlist through', async () => {
-    const caller = adminCallerFrom(new Headers({ 'x-vercel-forwarded-for': '203.0.113.7' }));
+    const caller = await adminCallerFrom(new Headers({ 'x-vercel-forwarded-for': '203.0.113.7' }));
 
     await expect(caller.ping()).resolves.toBe('ok');
   });
@@ -297,6 +335,177 @@ describe('baseProcedure audit context', () => {
       reason: 'cli_session_cross_org_query',
       target: '*',
     });
+  });
+});
+
+describe('requireStaffAuthority', () => {
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+  const orgTarget = { kind: 'organization', id: 'org-1' } as const;
+  const staffRouter = createTRPCRouter({
+    twice: baseProcedure.query(async ({ ctx }) => {
+      const first = await requireStaffAuthority(ctx, {
+        actionClass: 'support_read',
+        target: orgTarget,
+      });
+      const second = await requireStaffAuthority(ctx, {
+        actionClass: 'support_read',
+        target: orgTarget,
+      });
+      return { same: first === second, user: first.user.id };
+    }),
+    claimSet: baseProcedure.query(({ ctx }) => ctx.stepUpClaims !== undefined),
+    checked: baseProcedure.input(z.object({ allow: z.boolean() })).query(async ({ ctx, input }) => {
+      const checkedRows: string[] = [];
+      const authorize = async (currentUser: { id: string }) => {
+        checkedRows.push(currentUser.id);
+        if (!input.allow) throw new TRPCError({ code: 'NOT_FOUND', message: 'No support grant' });
+      };
+      const first = await requireStaffAuthority(ctx, {
+        actionClass: 'support_write',
+        target: orgTarget,
+        authorize,
+      });
+      const second = await requireStaffAuthority(ctx, {
+        actionClass: 'support_write',
+        target: orgTarget,
+        authorize,
+      });
+      return { checkedRows, same: first === second };
+    }),
+    insideAdmin: adminProcedure.query(async ({ ctx }) => {
+      const covered = await requireStaffAuthority(ctx, {
+        actionClass: 'platform_read',
+        target: { kind: 'none', id: null },
+      });
+      const bound = await requireStaffAuthority(ctx, {
+        actionClass: 'support_write',
+        target: orgTarget,
+      });
+      return { covered: covered === ctx.adminAdmission, bound: bound === ctx.adminAdmission };
+    }),
+  });
+  const createStaffCaller = createCallerFactory(staffRouter);
+
+  beforeEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+  });
+
+  afterEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+  });
+
+  test('admits an admin browser session once per procedure call and action', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = createStaffCaller(ctxFor({ user: admin, credential: 'session' }));
+
+    await expect(caller.twice()).resolves.toEqual({ same: true, user: admin.id });
+  });
+
+  test('gives each procedure call its own claim set, and none to an ordinary caller', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+
+    await expect(
+      createStaffCaller(ctxFor({ user: admin, credential: 'session' })).claimSet()
+    ).resolves.toBe(true);
+    await expect(
+      createStaffCaller(ctxFor({ user: defineTestUser({ is_admin: false }) })).claimSet()
+    ).resolves.toBe(false);
+  });
+
+  test('reuses the adminProcedure admission only for the action and target it covers', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = createStaffCaller(ctxFor({ user: admin, credential: 'session' }));
+
+    await expect(caller.insideAdmin()).resolves.toEqual({ covered: true, bound: false });
+  });
+
+  test('refuses a bearer caller and a context without a credential', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+
+    for (const ctx of [
+      ctxFor({ user: admin, credential: 'human_bearer', authViaToken: true }),
+      ctxFor({ user: admin }),
+    ]) {
+      await expect(createStaffCaller(ctx).twice()).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+      });
+    }
+  });
+
+  test('runs the caller check on every call, also when the admission is reused', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = createStaffCaller(ctxFor({ user: admin, credential: 'session' }));
+
+    await expect(caller.checked({ allow: true })).resolves.toEqual({
+      checkedRows: [admin.id, admin.id],
+      same: true,
+    });
+  });
+
+  test('runs the caller check before the proof, so a refused check never reaches it', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await insertTestUser({ is_admin: true });
+    // No web session id: a proof check would refuse with SESSION_UNBOUND.
+    const caller = createStaffCaller(ctxFor({ user: admin, credential: 'session' }));
+
+    await expect(caller.checked({ allow: false })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'No support grant',
+    });
+    await expect(caller.checked({ allow: true })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'SESSION_UNBOUND' }),
+    });
+  });
+
+  test('refuses, instead of asking for a second proof, an operation a measured decision does not cover', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const upstream = {
+      user: admin,
+      stepUp: {
+        status: 'fresh' as const,
+        method: 'webauthn_uv' as const,
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      decision: {
+        actionClass: 'support_write' as const,
+        target: { kind: 'organization' as const, id: 'org-1' },
+      },
+    };
+    const ctx = {
+      user: admin,
+      credential: 'session' as const,
+      trpcPath: 'organizations.sso.updateSsoDomain',
+      trpcType: 'mutation',
+      adminAdmission: upstream,
+    };
+
+    await expect(
+      requireStaffAuthority(ctx, { actionClass: 'support_write', target: orgTarget })
+    ).resolves.toBe(upstream);
+    for (const params of [
+      {
+        actionClass: 'support_write' as const,
+        target: { kind: 'organization' as const, id: 'org-2' },
+      },
+      { actionClass: 'support_read' as const, target: orgTarget },
+      { actionClass: 'support_write' as const, target: orgTarget, route: 'organizations.other' },
+    ]) {
+      await expect(requireStaffAuthority(ctx, params)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'This request was verified for a different operation',
+      });
+    }
+  });
+
+  test('refuses a non-admin before any read', async () => {
+    const caller = createStaffCaller(
+      ctxFor({ user: defineTestUser({ is_admin: false }), credential: 'session' })
+    );
+
+    await expect(caller.twice()).rejects.toMatchObject({ message: 'Admin access required' });
   });
 });
 

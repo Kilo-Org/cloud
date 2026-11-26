@@ -61,6 +61,12 @@ import { isInteractiveSessionOrigin } from '../../shared/control-plane-permissio
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
 import { runtimeAuthorizationLifetime } from '../../session/runtime-authorization-lifetime.js';
+import {
+  issuedRuntimeTokenAuth,
+  issuedRuntimeTokens,
+  runtimeTokenAudienceMode,
+  type DelegatedRuntimeTokens,
+} from '../../session/runtime-authorization-persistence.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -619,7 +625,7 @@ function resultFromProgress(progress: OperationProgress, replayed = false): Work
   return replayed ? { ...result, replayed: true } : result;
 }
 
-type WorktreeRuntimeAuthorization = { token: string; seal: string } | undefined;
+type WorktreeRuntimeAuthorization = (DelegatedRuntimeTokens & { seal: string }) | undefined;
 
 /**
  * Establish whether the current caller presented modern control authority.
@@ -671,12 +677,13 @@ async function createDestinationRuntimeAuthorization(
       resourceId: progress.cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
       ...runtimeAuthorizationLifetime(ctx.env),
+      audienceMode: runtimeTokenAudienceMode(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(progress.cloudAgentSessionId, 'admission', reason),
       ...(organizationId ? { organizationId } : {}),
     });
     return {
-      token: created.token,
+      ...issuedRuntimeTokens(created.tokens),
       seal: await sealRuntimeAuthorization(created.authorization, secret),
     };
   } catch {
@@ -747,10 +754,12 @@ function buildRegistrationInput(
     allowSubagentSessions:
       allowsSubagentSessionsForWorktree(source) && runtimeAuthorization !== undefined,
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
+    // A sibling never inherits its source's runtime tokens.
     auth: {
-      ...source.metadata.auth,
       kiloSessionId: progress.kiloSessionId,
-      kilocodeToken: runtimeAuthorization?.token ?? ctx.authToken,
+      ...(runtimeAuthorization
+        ? issuedRuntimeTokenAuth(runtimeAuthorization)
+        : { kilocodeToken: ctx.authToken }),
     },
     agent,
     repository,
@@ -2009,7 +2018,7 @@ export async function createWorkspaceCallbackSession(input: {
   messageId: string;
   prompt: string;
   title: string;
-  runtimeAuthorization: { token: string; seal: string };
+  runtimeAuthorization: DelegatedRuntimeTokens & { seal: string };
 }): Promise<WorktreeResult> {
   const db = getPgDb(input.env);
   const ctx: TRPCContext = {

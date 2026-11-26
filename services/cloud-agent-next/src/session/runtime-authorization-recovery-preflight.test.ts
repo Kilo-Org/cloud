@@ -8,10 +8,19 @@ import { RuntimeAuthorizationRevokedError } from '@kilocode/worker-utils/runtime
 const getRuntimeAuthorizationStatus = vi.fn();
 const recoverExpiredRuntimeAuthorization = vi.fn();
 
+const runtimeTokens = {
+  'kilo-api': 'api-runtime-token',
+  'kilo-gateway': 'gateway-runtime-token',
+  'session-ingest': 'ingest-runtime-token',
+};
 const createRuntimeAuthorizationMock = vi.hoisted(() =>
   vi.fn(async () => ({
     authorization: { id: 'authorization-1' },
-    token: 'runtime-token',
+    tokens: {
+      'kilo-api': 'api-runtime-token',
+      'kilo-gateway': 'gateway-runtime-token',
+      'session-ingest': 'ingest-runtime-token',
+    },
   }))
 );
 
@@ -141,11 +150,15 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
       id: 'authorization-1',
     });
     await preflightRuntimeAuthorizationRecovery('workspace_a', ctx);
+    expect(createRuntimeAuthorizationMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ audienceMode: 'combined' })
+    );
     expect(recoverExpiredRuntimeAuthorization).toHaveBeenCalledWith({
       ownerId: 'usr_1',
       expectedOldId: 'authorization-1',
       runtimeAuthorizationSeal: 'runtime-seal',
-      runtimeToken: 'runtime-token',
+      runtimeToken: 'api-runtime-token',
+      runtimeTokens,
     });
   });
 

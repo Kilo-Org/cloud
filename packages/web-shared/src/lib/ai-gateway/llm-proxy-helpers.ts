@@ -79,10 +79,6 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import type { AutoDecisionRejection } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
 
-// FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
-// This allows FIM requests to be tracked consistently with chat requests
-const fimSuffixFakeSysPrompMarkers = { begin: '[FIM_SUFFIX:', end: ']' } as const;
-
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 // Kilo clients show a sign-up prompt for this code and do not retry the request.
 const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
@@ -1074,17 +1070,10 @@ function untrustedProjectId(header: string | null): string | null {
   return projectId;
 }
 
-const wrapFimSuffixIntoSystemPrompt = (() => {
-  const { begin, end } = fimSuffixFakeSysPrompMarkers;
-  const wrapperLen = begin.length + end.length;
-  return (suffix: string) => begin + suffix.slice(0, 100 - wrapperLen) + end;
-})();
-
 export function extractFimPromptInfo(body: { prompt: string; suffix?: string | null }): PromptInfo {
   return {
-    system_prompt_prefix: wrapFimSuffixIntoSystemPrompt(body.suffix || ''), // suffix = context
     system_prompt_length: (body.suffix || '').length + body.prompt.length,
-    user_prompt_prefix: body.prompt.slice(0, 100), // prompt = user input
+    system_prompt_kind: null,
   };
 }
 
@@ -1628,20 +1617,8 @@ function priceTranscriptionUsage(
   Object.assign(stats, cost);
 }
 
-export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo {
-  const inputStr =
-    body.input == null
-      ? ''
-      : typeof body.input === 'string'
-        ? body.input
-        : Array.isArray(body.input) && typeof body.input[0] === 'string'
-          ? body.input[0]
-          : JSON.stringify(body.input).slice(0, 100);
-  return {
-    system_prompt_prefix: '',
-    system_prompt_length: 0,
-    user_prompt_prefix: inputStr.slice(0, 100),
-  };
+export function extractEmbeddingPromptInfo(): PromptInfo {
+  return { system_prompt_length: 0, system_prompt_kind: null };
 }
 
 /**

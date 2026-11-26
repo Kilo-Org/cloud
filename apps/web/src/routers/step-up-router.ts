@@ -1,25 +1,17 @@
 import 'server-only';
-import { TRPCError } from '@trpc/server';
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 
-function assertBrowserSession(ctx: { credential?: string }): void {
-  if (ctx.credential !== 'session') {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Browser session required' });
-  }
-}
-
 export const stepUpRouter = createTRPCRouter({
   /**
-   * Status for the verification dialog. Exempt from the admin step-up guard so
-   * it can report enrollment and freshness while the session is not verified;
-   * it still requires an admin browser session.
+   * Status for the verification dialog. The one admin procedure that needs no
+   * proof, so it can report enrollment and freshness while the session is not
+   * verified. `adminProcedure` still admits only a current admin on an allowed
+   * network with a current browser session.
    */
   getStatus: adminProcedure.query(async ({ ctx }) => {
-    assertBrowserSession(ctx);
-
     if (!isAdminStepUpEnabled()) {
       return {
         enrolled: false,

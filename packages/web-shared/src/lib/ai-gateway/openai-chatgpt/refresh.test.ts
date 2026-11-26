@@ -19,12 +19,19 @@ jest.mock('@kilocode/web-shared/lib/auth/openai/config', () => ({
 }));
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { encryptApiKey, decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import type { EncryptedData, OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
+import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
-  BYOK_ENCRYPTION_KEY,
-  OPENAI_CLIENT_ID,
-  OPENAI_CLIENT_SECRET,
-} from '@kilocode/web-shared/lib/config.server';
+  fetchWithFakeByokKms,
+  TEST_BYOK_DATA_KEY,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
+import {
+  sealedOpenAiChatGptConnectionColumns,
+  staticKeyOpenAiChatGptConnection,
+} from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import {
   OPENAI_TOKEN_ENDPOINT,
   OPENAI_RESOURCE,
@@ -37,7 +44,7 @@ import {
   resolveOpenAiChatGptAccessToken,
   type OpenAiChatGptAccessTokenOutcome,
 } from './refresh';
-import type { OpenAiChatGptOwner } from './store';
+import { decryptOpenAiChatGptConnection, type OpenAiChatGptOwner } from './store';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 
 type MockDb = {
@@ -46,7 +53,14 @@ type MockDb = {
   update: jest.Mock;
 };
 
-type StoredRow = { encrypted_connection: ReturnType<typeof encryptApiKey>; is_enabled: boolean };
+type StoredRow = {
+  kilo_user_id: string;
+  organization_id: string | null;
+  is_shared_services: boolean;
+  encrypted_connection: EncryptedData;
+  encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope | null;
+  is_enabled: boolean;
+};
 
 const TEST_USER_ID = 'user-1';
 const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: TEST_USER_ID, organizationId: null };
@@ -76,8 +90,22 @@ function buildConnection(
 
 function encryptedRow(connection: OpenAiChatGptConnection): StoredRow {
   return {
-    encrypted_connection: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
+    kilo_user_id: TEST_USER_ID,
+    organization_id: null,
+    is_shared_services: false,
+    ...sealedOpenAiChatGptConnectionColumns(connection),
     is_enabled: true,
+  };
+}
+
+/** A row whose envelope holds `sealed` next to a real static-key ciphertext of `staticCopy`. */
+function rowWithStaticKeyCopy(
+  sealed: OpenAiChatGptConnection,
+  staticCopy: OpenAiChatGptConnection
+): StoredRow {
+  return {
+    ...encryptedRow(sealed),
+    encrypted_connection: staticKeyOpenAiChatGptConnection(staticCopy),
   };
 }
 
@@ -90,10 +118,12 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
   } as unknown as Response;
 }
 
+/** The payload a write stored in its envelope, after checking the obsolete column holds the placeholder. */
 function decodeStored(setCall: Record<string, unknown>): OpenAiChatGptConnection {
-  const encrypted = setCall.encrypted_connection as ReturnType<typeof encryptApiKey>;
+  expect(setCall.encrypted_connection).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+  const envelope = setCall.encrypted_connection_envelope as OpenAiChatGptConnectionEnvelope;
   return OpenAiChatGptConnectionSchema.parse(
-    JSON.parse(decryptApiKey(encrypted, BYOK_ENCRYPTION_KEY))
+    JSON.parse(decryptApiKey(envelope.encrypted_data, TEST_BYOK_DATA_KEY))
   );
 }
 
@@ -123,16 +153,21 @@ function captureRetryDelays(): { values: number[]; restore: () => void } {
 describe('resolveOpenAiChatGptAccessToken', () => {
   const mockDb = db as unknown as MockDb;
   const fetchMock = jest.fn();
-  const originalFetch = global.fetch;
+  const kms = useFakeByokKms();
 
   let storedRow: StoredRow | null = null;
+  // Set to make the replica read in the fast path differ from the locked read of `storedRow`.
+  let replicaOverride: StoredRow | null | undefined;
   const txUpdateSetCalls: Array<Record<string, unknown>> = [];
   const markUpdateSetCalls: Array<Record<string, unknown>> = [];
 
   const selectChain = () => ({
     from: jest.fn(() => ({
       where: jest.fn(() => ({
-        limit: jest.fn(() => Promise.resolve(storedRow ? [storedRow] : [])),
+        limit: jest.fn(() => {
+          const row = replicaOverride === undefined ? storedRow : replicaOverride;
+          return Promise.resolve(row ? [row] : []);
+        }),
       })),
     })),
   });
@@ -149,10 +184,14 @@ describe('resolveOpenAiChatGptAccessToken', () => {
 
   beforeEach(() => {
     storedRow = null;
+    replicaOverride = undefined;
     txUpdateSetCalls.length = 0;
     markUpdateSetCalls.length = 0;
     fetchMock.mockReset();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchWithFakeByokKms(
+      OPENAI_TOKEN_ENDPOINT,
+      fetchMock as unknown as typeof fetch
+    );
 
     mockDb.select.mockReset();
     mockDb.select.mockImplementation(selectChain);
@@ -179,16 +218,13 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     );
   });
 
-  afterAll(() => {
-    global.fetch = originalFetch;
-  });
-
   it('returns a fresh access token without any network call', async () => {
     storedRow = encryptedRow(buildConnection({ expires_at: nowSeconds() + 3600 }));
 
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'stored-access-token',
+      credentialKeyId: storedRow.encrypted_connection_envelope?.key_id,
     });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mockDb.transaction).not.toHaveBeenCalled();
@@ -205,6 +241,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'stored-access-token',
+      credentialKeyId: expect.any(String),
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -218,6 +255,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -273,6 +311,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -318,6 +357,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -335,6 +375,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'access_token',
         accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
       });
     } finally {
       delays.restore();
@@ -433,6 +474,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'sibling-access-token',
+      credentialKeyId: expect.any(String),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -554,10 +596,12 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(first).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
     await expect(second).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -568,16 +612,18 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
     );
     const timeouts = jest.spyOn(AbortSignal, 'timeout');
-    const budgets = () => timeouts.mock.calls.map(([ms]) => ms);
 
     try {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'access_token',
         accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
       });
-      expect(budgets()).toEqual([OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS]);
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(init.signal).toBeInstanceOf(AbortSignal);
+      // The KMS client also creates timeout signals, so find the one the token request carries.
+      const budgetIndex = timeouts.mock.results.findIndex(result => result.value === init.signal);
+      expect(timeouts.mock.calls[budgetIndex]?.[0]).toBe(OPENAI_CHATGPT_REFRESH_REQUEST_TIMEOUT_MS);
     } finally {
       timeouts.mockRestore();
     }
@@ -605,15 +651,15 @@ describe('resolveOpenAiChatGptAccessToken', () => {
 
     // The endpoint accepts the connection and never answers, so the only thing
     // that can end a request is its own budget aborting it.
-    const controllers: AbortController[] = [];
+    const controllers = new Map<AbortSignal | null | undefined, AbortController>();
     const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
       const controller = new AbortController();
-      controllers.push(controller);
+      controllers.set(controller.signal, controller);
       return controller.signal;
     });
-    fetchMock.mockImplementation(() => {
+    fetchMock.mockImplementation((_url: string, init: RequestInit) => {
       events.push('fetch');
-      controllers[controllers.length - 1].abort();
+      controllers.get(init.signal)?.abort();
       return Promise.reject(new DOMException('The request was aborted.', 'TimeoutError'));
     });
 
@@ -629,7 +675,10 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(outcome).toEqual({ kind: 'failed' });
     // Every attempt was issued with its own budget, and the stall consumed all
     // of them before the outcome failed.
-    expect(controllers).toHaveLength(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS);
+    const signals = fetchMock.mock.calls.map(([, init]) => (init as RequestInit).signal);
+    expect(signals).toHaveLength(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS);
+    expect(new Set(signals).size).toBe(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS);
+    expect(signals.every(signal => signal?.aborted)).toBe(true);
     // The row lock and the pool connection go back before the next attempt, so a
     // stalled endpoint cannot hold either across the retries.
     expect(events).toEqual([
@@ -643,7 +692,10 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       'fetch',
       'lock:release',
     ]);
-    expect(delays.values).toHaveLength(OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS - 1);
+    // The KMS data key cache's Redis client also schedules timers; only the backoff delays are positive.
+    expect(delays.values.filter(delay => delay > 0)).toHaveLength(
+      OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS - 1
+    );
     // A budget that runs out is transient: the stored credential stays as it is.
     expect(txUpdateSetCalls).toHaveLength(0);
     expect(markUpdateSetCalls).toHaveLength(0);
@@ -685,18 +737,260 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     storedRow = encryptedRow(buildConnection({ access_token: 'sensitive-access-token' }));
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400));
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    let logged: string;
 
     try {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'terminal',
       });
+      logged = JSON.stringify(errorSpy.mock.calls);
     } finally {
       errorSpy.mockRestore();
     }
 
-    const logged = JSON.stringify(errorSpy.mock.calls);
     expect(logged).not.toContain(OPENAI_CLIENT_SECRET);
     expect(logged).not.toContain('sensitive-access-token');
     expect(logged).not.toContain('stored-refresh-token');
+  });
+
+  describe('with KMS envelopes', () => {
+    const connectionOf = (row: StoredRow) => decryptOpenAiChatGptConnection(row);
+
+    /** Resolves a refresh that must fail and returns everything it logged to `console.error`. */
+    async function resolveFailedAndCaptureLogs(): Promise<string> {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+          kind: 'failed',
+        });
+        return JSON.stringify(errorSpy.mock.calls);
+      } finally {
+        errorSpy.mockRestore();
+      }
+    }
+
+    it('stores a rotated token set in the envelope and reads the new refresh token from the envelope', async () => {
+      storedRow = encryptedRow(buildConnection());
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 3600,
+        })
+      );
+
+      await resolveOpenAiChatGptAccessToken(USER_OWNER);
+
+      const [written] = txUpdateSetCalls;
+      expect(decodeStored(written).refresh_token).toBe('new-refresh-token');
+      expect(JSON.stringify(written)).not.toContain('new-refresh-token');
+      const envelope = written.encrypted_connection_envelope as OpenAiChatGptConnectionEnvelope;
+      expect(envelope.key_id).toEqual(expect.any(String));
+      kms.requests.length = 0;
+      await expect(
+        connectionOf({ ...(storedRow as StoredRow), ...written } as StoredRow)
+      ).resolves.toMatchObject({
+        access_token: 'new-access-token',
+        refresh_token: 'new-refresh-token',
+      });
+      expect(kms.requests).toEqual([
+        {
+          path: '/decrypt',
+          body: expect.objectContaining({
+            key_id: envelope.key_id,
+            owner_type: 'user',
+            owner_id: TEST_USER_ID,
+            provider_id: 'openai-chatgpt-oauth:personal',
+          }),
+        },
+      ]);
+    });
+
+    it('creates one data key for the refresh actor before the row lock, whatever the attempts', async () => {
+      storedRow = encryptedRow(buildConnection());
+      const events: string[] = [];
+      mockDb.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => {
+        events.push(`lock:acquire after ${kms.requests.map(request => request.path).join(',')}`);
+        return callback({
+          select: jest.fn(txSelectChain),
+          update: jest.fn(() => ({
+            set: jest.fn((values: Record<string, unknown>) => {
+              txUpdateSetCalls.push(values);
+              return { where: jest.fn(() => Promise.resolve(undefined)) };
+            }),
+          })),
+        });
+      });
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse({ error: 'refresh_token_conflict' }, 409))
+        .mockResolvedValueOnce(
+          jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
+        );
+      const delays = captureRetryDelays();
+
+      try {
+        await resolveOpenAiChatGptAccessToken(USER_OWNER);
+      } finally {
+        delays.restore();
+      }
+
+      const dataKeyRequests = kms.requests.filter(request => request.path === '/data-key');
+      expect(dataKeyRequests).toHaveLength(1);
+      expect(dataKeyRequests[0].body).toMatchObject({
+        owner_type: 'user',
+        owner_id: TEST_USER_ID,
+        provider_id: 'openai-chatgpt-oauth:personal',
+        actor_user_id: 'system:openai-chatgpt-refresh',
+      });
+      expect(events[0]).toContain('/data-key');
+      expect(
+        (txUpdateSetCalls[0].encrypted_connection_envelope as OpenAiChatGptConnectionEnvelope)
+          .key_id
+      ).toBe(dataKeyRequests[0].body.key_id);
+    });
+
+    it('writes the terminal error state into the envelope', async () => {
+      storedRow = encryptedRow(buildConnection());
+      fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400));
+
+      await resolveOpenAiChatGptAccessToken(USER_OWNER);
+
+      const [written] = txUpdateSetCalls;
+      expect(decodeStored(written)).toMatchObject({
+        status: 'error',
+        access_token: '',
+        error_message: OPENAI_CHATGPT_RECONNECT_MESSAGE,
+      });
+      expect(JSON.stringify(written)).not.toContain('stored-refresh-token');
+      expect(written.is_enabled).toBe(false);
+    });
+
+    it('refreshes with the envelope refresh token, never the one in the obsolete static-key column', async () => {
+      storedRow = rowWithStaticKeyCopy(
+        buildConnection({ access_token: 'envelope-access', refresh_token: 'envelope-refresh' }),
+        buildConnection({ access_token: 'static-access', refresh_token: 'static-refresh' })
+      );
+      fetchMock.mockResolvedValue(
+        jsonResponse({ access_token: 'new-access-token', expires_in: 60 })
+      );
+
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(new URLSearchParams(init.body as string).get('refresh_token')).toBe(
+        'envelope-refresh'
+      );
+      expect(decodeStored(txUpdateSetCalls[0]).refresh_token).toBe('envelope-refresh');
+    });
+
+    it('serves the access token of the envelope, not the static-key copy', async () => {
+      storedRow = rowWithStaticKeyCopy(
+        buildConnection({ access_token: 'envelope-access', expires_at: nowSeconds() + 3600 }),
+        buildConnection({ access_token: 'static-access', expires_at: nowSeconds() + 3600 })
+      );
+
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'envelope-access',
+        credentialKeyId: expect.any(String),
+      });
+    });
+
+    it('reports no connection for a row without an envelope, even if the static-key column holds a connection', async () => {
+      storedRow = {
+        ...rowWithStaticKeyCopy(
+          buildConnection({ expires_at: nowSeconds() + 3600 }),
+          buildConnection({ access_token: 'static-access', expires_at: nowSeconds() + 3600 })
+        ),
+        encrypted_connection_envelope: null,
+      };
+
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+        kind: 'no_connection',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+    });
+
+    it('fails without calling OpenAI or writing when the KMS service cannot create a data key', async () => {
+      storedRow = encryptedRow(buildConnection());
+      kms.fail('/data-key');
+      const logged = await resolveFailedAndCaptureLogs();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+      expect(markUpdateSetCalls).toHaveLength(0);
+      expect(logged).toContain('kms_unavailable');
+      expect(logged).not.toContain('stored-refresh-token');
+    });
+
+    it('fails without calling OpenAI when the KMS service issues a data key that cannot encrypt', async () => {
+      storedRow = encryptedRow(buildConnection());
+      // Non-empty, so the KMS client accepts it, but not a 32-byte AES key.
+      kms.issueDataKey(Buffer.alloc(8, 1).toString('base64'));
+      const logged = await resolveFailedAndCaptureLogs();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+      expect(markUpdateSetCalls).toHaveLength(0);
+      expect(logged).toContain('kms_unavailable');
+    });
+
+    it('fails without calling OpenAI when the data key is first needed inside the lock and the KMS service refuses it', async () => {
+      storedRow = encryptedRow(buildConnection());
+      // The replica has not shown the row yet, so no data key was created before the lock.
+      replicaOverride = null;
+      kms.fail('/data-key');
+      const logged = await resolveFailedAndCaptureLogs();
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+      expect(logged).toContain('kms_unavailable');
+    });
+
+    it('creates the data key inside the lock when only the primary shows the row', async () => {
+      storedRow = encryptedRow(buildConnection());
+      replicaOverride = null;
+      fetchMock.mockResolvedValue(
+        jsonResponse({ access_token: 'new-access-token', expires_in: 60 })
+      );
+
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
+      });
+
+      expect(kms.requests.filter(request => request.path === '/data-key')).toHaveLength(1);
+      expect(decodeStored(txUpdateSetCalls[0]).access_token).toBe('new-access-token');
+    });
+
+    it('fails without calling OpenAI or writing when the KMS service refuses to decrypt the stored payload', async () => {
+      storedRow = encryptedRow(buildConnection());
+      kms.fail('/decrypt');
+      const logged = await resolveFailedAndCaptureLogs();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+      expect(markUpdateSetCalls).toHaveLength(0);
+      expect(logged).not.toContain('stored-refresh-token');
+    });
+
+    it('fails without calling OpenAI when only the locked read needs the KMS service to decrypt and it refuses', async () => {
+      storedRow = encryptedRow(buildConnection());
+      replicaOverride = null;
+      kms.fail('/decrypt');
+      await resolveFailedAndCaptureLogs();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(txUpdateSetCalls).toHaveLength(0);
+    });
   });
 });

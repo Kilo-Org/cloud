@@ -233,6 +233,8 @@ const mockOrderRepositoriesByUsage =
   >();
 const mockEnsureOrganizationAccess =
   jest.fn<typeof OrganizationUtilsModule.ensureOrganizationAccess>();
+const mockEnsureMemberOrganizationAccess =
+  jest.fn<typeof OrganizationUtilsModule.ensureMemberOrganizationAccess>();
 const mockRequireActiveSubscription = jest.fn<() => void>();
 
 const mockCreateControlTokenForRequest = jest.fn<
@@ -348,6 +350,13 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
       mockRequireActiveSubscription();
       return next();
     }),
+    organizationMemberOnlyMutationProcedure: trpcInit.baseProcedure
+      .input(zod.object({ organizationId: zod.uuid() }))
+      .use(async ({ ctx, input, next }) => {
+        await mockEnsureMemberOrganizationAccess(ctx.user, input.organizationId);
+        mockRequireActiveSubscription();
+        return next();
+      }),
   };
 });
 
@@ -2864,10 +2873,11 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockEnsureMemberOrganizationAccess.mockResolvedValue('member');
     mockCreateWorktreeChat.mockResolvedValue(result);
   });
 
-  it('requires current membership and forwards the exact organization and authenticated owner', async () => {
+  it('requires a real membership and forwards the exact organization and authenticated owner', async () => {
     const user = { id: 'organization-owner', is_admin: false } as User;
     const headersList = new Headers({ 'x-kilo-client': 'web' });
     const caller = createCaller({ user, headersList });
@@ -2880,10 +2890,9 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
       })
     ).resolves.toEqual(result);
 
-    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ user }),
-      ORGANIZATION_ID
-    );
+    expect(mockEnsureMemberOrganizationAccess).toHaveBeenCalledWith(user, ORGANIZATION_ID);
+    expect(mockEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockRequireActiveSubscription).toHaveBeenCalledTimes(1);
     expect(mockCreateWorktreeChat).toHaveBeenCalledWith({
       user,
       headersList,
@@ -2893,6 +2902,26 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
     });
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
     expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+  });
+
+  it('refuses a platform admin without a membership before creating the chat', async () => {
+    mockEnsureMemberOrganizationAccess.mockRejectedValueOnce(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      })
+    );
+    const caller = createCaller({ user: { id: 'staff', is_admin: true } as User });
+
+    await expect(
+      caller.createWorktreeChat({
+        organizationId: ORGANIZATION_ID,
+        sourceKiloSessionId,
+        operationKey: uuid,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockCreateWorktreeChat).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -2917,12 +2946,12 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
   );
 
   it('rejects a revoked organization member before resolving the source session', async () => {
-    mockEnsureOrganizationAccess.mockImplementation(() => {
-      throw new TRPCError({
+    mockEnsureMemberOrganizationAccess.mockRejectedValueOnce(
+      new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have access to this organization',
-      });
-    });
+      })
+    );
     const caller = createCaller({ user: { id: 'revoked-member', is_admin: false } as User });
 
     await expect(
@@ -2933,7 +2962,14 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
       })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
+    expect(mockEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'revoked-member' }),
+      ORGANIZATION_ID
+    );
+    expect(mockEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
     expect(mockCreateWorktreeChat).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
   it('rejects untrusted provenance and organization identifiers before invoking the operation', async () => {

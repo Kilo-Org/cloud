@@ -1,5 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -127,14 +127,14 @@ afterAll(async () => {
 
 describe('admin.kiloclawVersions.listVersions', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(caller.admin.kiloclawVersions.listVersions({})).rejects.toThrow(
       'Admin access required'
     );
   });
 
   it('returns catalog entries with pagination', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.listVersions({});
 
     expect(result.items.length).toBeGreaterThanOrEqual(2);
@@ -144,7 +144,7 @@ describe('admin.kiloclawVersions.listVersions', () => {
   });
 
   it('filters by status', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.listVersions({ status: 'disabled' });
 
     for (const item of result.items) {
@@ -153,7 +153,7 @@ describe('admin.kiloclawVersions.listVersions', () => {
   });
 
   it('sorts by image_tag asc', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.listVersions({
       sortBy: 'image_tag',
       sortDir: 'asc',
@@ -169,7 +169,7 @@ describe('admin.kiloclawVersions.listVersions', () => {
   });
 
   it('sorts by image_tag desc', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.listVersions({
       sortBy: 'image_tag',
       sortDir: 'desc',
@@ -184,7 +184,7 @@ describe('admin.kiloclawVersions.listVersions', () => {
   });
 
   it('sorts by openclaw_version asc (numeric, not lex)', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.listVersions({
       sortBy: 'openclaw_version',
       sortDir: 'asc',
@@ -204,7 +204,7 @@ describe('admin.kiloclawVersions.listVersions', () => {
   });
 
   it('rejects an unknown sort column via zod', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawVersions.listVersions({
         // @ts-expect-error - invalid sort column for this test
@@ -216,7 +216,7 @@ describe('admin.kiloclawVersions.listVersions', () => {
 
 describe('admin.kiloclawVersions.updateVersionStatus', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(
       caller.admin.kiloclawVersions.updateVersionStatus({
         imageTag: catalogEntry.image_tag,
@@ -226,7 +226,7 @@ describe('admin.kiloclawVersions.updateVersionStatus', () => {
   });
 
   it('updates status and records updated_by', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.updateVersionStatus({
       imageTag: catalogEntry.image_tag,
       status: 'disabled',
@@ -237,7 +237,7 @@ describe('admin.kiloclawVersions.updateVersionStatus', () => {
   });
 
   it('throws NOT_FOUND for non-existent image tag', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawVersions.updateVersionStatus({
         imageTag: 'nonexistent-tag',
@@ -271,7 +271,7 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
   });
 
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(
       caller.admin.kiloclawVersions.bulkDisableVersions({
         imageTags: [catalogEntry.image_tag],
@@ -280,7 +280,7 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
   });
 
   it('disables a batch of available, non-:latest rows', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.bulkDisableVersions({
       imageTags: [catalogEntry.image_tag, catalogEntry2.image_tag],
     });
@@ -318,7 +318,7 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
       .set({ is_latest: true })
       .where(eq(kiloclaw_image_catalog.image_tag, catalogEntry.image_tag));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.bulkDisableVersions({
       imageTags: [catalogEntry.image_tag, catalogEntry2.image_tag],
     });
@@ -342,7 +342,7 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
       .set({ status: 'disabled' })
       .where(eq(kiloclaw_image_catalog.image_tag, catalogEntry.image_tag));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.bulkDisableVersions({
       imageTags: [catalogEntry.image_tag, catalogEntry2.image_tag],
     });
@@ -352,7 +352,7 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
   });
 
   it('reports unknown tags in notFound and disables the rest', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.bulkDisableVersions({
       imageTags: ['does-not-exist', catalogEntry.image_tag],
     });
@@ -362,14 +362,14 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
   });
 
   it('rejects an empty array', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     await expect(
       caller.admin.kiloclawVersions.bulkDisableVersions({ imageTags: [] })
     ).rejects.toThrow();
   });
 
   it('rejects an oversized array (>50)', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const tooMany = Array.from({ length: 51 }, (_, i) => `tag-${i}`);
     await expect(
       caller.admin.kiloclawVersions.bulkDisableVersions({ imageTags: tooMany })
@@ -382,7 +382,7 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
       .set({ is_latest: true })
       .where(eq(kiloclaw_image_catalog.image_tag, catalogEntry.image_tag));
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.bulkDisableVersions({
       imageTags: [catalogEntry.image_tag, catalogEntry2.image_tag, 'missing-tag'],
     });
@@ -424,7 +424,7 @@ describe('admin.kiloclawVersions.bulkDisableVersions', () => {
     }));
 
     try {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawVersions.bulkDisableVersions({
         imageTags: [catalogEntry.image_tag, catalogEntry2.image_tag],
       });
@@ -447,7 +447,7 @@ describe('admin.kiloclawVersions pin operations', () => {
 
   describe('setPin', () => {
     it('throws FORBIDDEN for non-admin users', async () => {
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createSessionCallerForUser(regularUser.id);
       await expect(
         caller.admin.kiloclawVersions.setPin({
           userId: targetUser.id,
@@ -457,7 +457,7 @@ describe('admin.kiloclawVersions pin operations', () => {
     });
 
     it('creates a pin for a user', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
         imageTag: catalogEntry.image_tag,
@@ -471,7 +471,7 @@ describe('admin.kiloclawVersions pin operations', () => {
     });
 
     it('upserts pin when user already has one', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
@@ -494,7 +494,7 @@ describe('admin.kiloclawVersions pin operations', () => {
     });
 
     it('rejects pin to non-existent image tag (FK constraint)', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawVersions.setPin({
           userId: targetUser.id,
@@ -504,7 +504,7 @@ describe('admin.kiloclawVersions pin operations', () => {
     });
 
     it('reports worker_sync ok alongside the DB row', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
         imageTag: catalogEntry.image_tag,
@@ -521,7 +521,7 @@ describe('admin.kiloclawVersions pin operations', () => {
 
   describe('getUserPin', () => {
     it('returns null when user has no pin', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawVersions.getUserPin({
         userId: targetUser.id,
       });
@@ -529,7 +529,7 @@ describe('admin.kiloclawVersions pin operations', () => {
     });
 
     it('returns pin with catalog metadata', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
@@ -550,7 +550,7 @@ describe('admin.kiloclawVersions pin operations', () => {
 
   describe('listPins', () => {
     it('returns pins with joined user and catalog data', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
@@ -573,7 +573,7 @@ describe('admin.kiloclawVersions pin operations', () => {
 
   describe('removePin', () => {
     it('removes an existing pin', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
@@ -590,7 +590,7 @@ describe('admin.kiloclawVersions pin operations', () => {
     });
 
     it('is idempotent when no pin exists — still pushes clear to DO so failed syncs are retryable', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawVersions.removePin({
         instanceId: targetInstanceId,
       });
@@ -600,7 +600,7 @@ describe('admin.kiloclawVersions pin operations', () => {
     });
 
     it('reports deleted=true and worker_sync ok on successful clear', async () => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
         imageTag: catalogEntry.image_tag,
@@ -619,14 +619,14 @@ describe('admin.kiloclawVersions pin operations', () => {
 
 describe('admin.kiloclawVersions.searchUsers', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
     await expect(caller.admin.kiloclawVersions.searchUsers({ query: 'target' })).rejects.toThrow(
       'Admin access required'
     );
   });
 
   it('finds users by email', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.searchUsers({
       query: 'target-kiloclaw',
     });
@@ -636,7 +636,7 @@ describe('admin.kiloclawVersions.searchUsers', () => {
   });
 
   it('finds users by exact id', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.searchUsers({
       query: targetUser.id,
     });
@@ -647,7 +647,7 @@ describe('admin.kiloclawVersions.searchUsers', () => {
 
 describe('admin.kiloclawVersions instance-based search', () => {
   it('finds instances by exact id', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.searchUsers({
       query: targetInstanceId,
     });

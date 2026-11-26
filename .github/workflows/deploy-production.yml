@@ -202,10 +202,6 @@ jobs:
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 
-  # The KiloClaw image and worker deploy (deploy-kiloclaw.yml) is not part of
-  # the scheduled pipeline. It runs manually via workflow_dispatch from the
-  # Actions tab.
-
   record-deployment:
     needs:
       [

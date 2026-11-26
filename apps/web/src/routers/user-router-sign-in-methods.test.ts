@@ -75,6 +75,10 @@ import {
   setAdminActionSinkForTest,
   type AdminActionEvent,
 } from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import {
+  setAdminAccessSinkForTest,
+  type AdminAccessEvent,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { authAuditEmailHash } from '@/lib/auth/auth-audit';
 
 const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
@@ -551,6 +555,70 @@ describe('user.linkAuthProvider', () => {
     await expect(
       caller.user.linkAuthProvider({ provider: 'openai', code, challengeId })
     ).resolves.toEqual({ success: true });
+  });
+
+  it('authorizes an organization ChatGPT link by real membership, never the platform-admin flag', async () => {
+    const owner = await insertUser();
+    const organization = await createTestOrganization('ChatGPT link org', owner.id, 0);
+
+    // Each scope uses its own platform admin, so neither attempt meets the
+    // resend cooldown of the other's code.
+    for (const chatGptScope of [undefined, 'shared_services'] as const) {
+      const admin = await insertUser({ is_admin: true });
+      await setSessionCookie(admin, { webSessionId: `web-session-staff-link-${randomUUID()}` });
+      const staffCaller = await createSessionCallerForUser(admin.id);
+      const { code, challengeId } = await requestCode(staffCaller, 'link', 'openai');
+      mockCreateLinkingSession.mockClear();
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+      try {
+        await expect(
+          staffCaller.user.linkAuthProvider({
+            provider: 'openai',
+            code,
+            challengeId,
+            organizationId: organization.id,
+            chatGptScope,
+          })
+        ).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have access to this organization',
+        });
+      } finally {
+        setAdminAccessSinkForTest(null);
+      }
+      // The refusal starts no linking session, records no staff access and
+      // leaves the code unspent.
+      expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+      await expect(
+        staffCaller.user.linkAuthProvider({ provider: 'openai', code, challengeId })
+      ).resolves.toEqual({ success: true });
+      expect(mockCreateLinkingSession).toHaveBeenCalledWith(
+        expect.objectContaining({ existingUserId: admin.id, organizationId: undefined })
+      );
+    }
+
+    await setSessionCookie(owner, { webSessionId: 'web-session-owner-link' });
+    const ownerCaller = await createSessionCallerForUser(owner.id);
+    const { code, challengeId } = await requestCode(ownerCaller, 'link', 'openai');
+    mockCreateLinkingSession.mockClear();
+    await expect(
+      ownerCaller.user.linkAuthProvider({
+        provider: 'openai',
+        code,
+        challengeId,
+        organizationId: organization.id,
+        chatGptScope: 'shared_services',
+      })
+    ).resolves.toEqual({ success: true });
+    expect(mockCreateLinkingSession).toHaveBeenCalledWith({
+      existingUserId: owner.id,
+      webSessionId: 'web-session-owner-link',
+      targetProvider: 'openai',
+      organizationId: organization.id,
+      chatGptScope: 'shared_services',
+    });
   });
 });
 

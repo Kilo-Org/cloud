@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { setTimeout } from 'node:timers/promises';
 import { createTestHarness } from 'wrangler';
 import { expect, it, vi } from 'vitest';
+import { stsStandIn } from './sts-stand-in.test-fixture';
 import { usage } from './usage.test-fixture';
 
 it.each([undefined, 'staging'])(
@@ -61,6 +62,7 @@ it.each([undefined, 'staging'])(
               USAGE_WRITER_PROTECTION_BYPASS: 'local-bypass',
             },
           },
+          stsStandIn(env),
         ],
       });
       harness = server;

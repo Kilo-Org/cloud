@@ -58,6 +58,9 @@
     // Deployment environment shared with the token minters' `env` claim
     // (`process.env.NODE_ENV` on the web app): admission refused on mismatch.
     "ENVIRONMENT": "production",
+    // Runtime token audiences: `per-destination` mints one token per service;
+    // `combined` keeps the earlier multi-audience token as the rollout fallback.
+    "RUNTIME_TOKEN_AUDIENCE_MODE": "combined",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "GITHUB_APP_SLUG": "kiloconnect",
     "GITHUB_APP_BOT_USER_ID": "240665456",
@@ -382,6 +385,7 @@
       ],
       "vars": {
         "ENVIRONMENT": "development",
+        "RUNTIME_TOKEN_AUDIENCE_MODE": "per-destination",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
         "GITHUB_APP_SLUG": "kiloconnect-development",

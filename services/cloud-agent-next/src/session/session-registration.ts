@@ -117,9 +117,17 @@ import {
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
+import { modelValidationAudience } from '../model-validation-audience.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import { runtimeAuthorizationLifetime } from './runtime-authorization-lifetime.js';
+import {
+  issuedRuntimeToken,
+  issuedRuntimeTokenAuth,
+  issuedRuntimeTokens,
+  runtimeTokenAudienceMode,
+  type DelegatedRuntimeTokens,
+} from './runtime-authorization-persistence.js';
 import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import {
   createCloudAgentSessionReport,
@@ -294,7 +302,7 @@ type NewSessionAllocation = SessionRegistrationResult & {
   generatedBranch: string;
   credentialContainment: CredentialContainment;
   rollbackCliSession: () => Promise<void>;
-  runtimeAuthorization?: { token: string; seal: string };
+  runtimeAuthorization?: DelegatedRuntimeTokens & { seal: string };
   builtinAgents?: RuntimeBuiltinAgents;
 };
 
@@ -944,7 +952,10 @@ async function issueSessionRuntimeAuthorization(
     await assertKiloModelAvailable({
       env: ctx.env,
       submittedModel: input.agent.model,
-      originalToken: runtimeAuthorization.token,
+      originalToken: issuedRuntimeToken(
+        runtimeAuthorization,
+        modelValidationAudience(ctx.env, orgId)
+      ),
       originalOrganizationId: orgId,
       createdOnPlatform: input.options?.createdOnPlatform,
       procedure: 'scoped_child_session_create',
@@ -965,6 +976,7 @@ async function issueSessionRuntimeAuthorization(
       resourceId: cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
       ...runtimeAuthorizationLifetime(ctx.env),
+      audienceMode: runtimeTokenAudienceMode(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
       ...(orgId ? { organizationId: orgId } : {}),
@@ -977,7 +989,7 @@ async function issueSessionRuntimeAuthorization(
       throw error;
     });
     runtimeAuthorization = {
-      token: created.token,
+      ...issuedRuntimeTokens(created.tokens),
       seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
     };
     // Only a model the caller's organization catalogue makes available may serve a
@@ -989,7 +1001,10 @@ async function issueSessionRuntimeAuthorization(
       await assertKiloModelAvailable({
         env: ctx.env,
         submittedModel: input.agent.model,
-        originalToken: runtimeAuthorization.token,
+        originalToken: issuedRuntimeToken(
+          runtimeAuthorization,
+          modelValidationAudience(ctx.env, orgId)
+        ),
         originalOrganizationId: orgId,
         createdOnPlatform: input.options?.createdOnPlatform,
         procedure: 'runtime_authorized_session_create',
@@ -1024,7 +1039,12 @@ async function filterUnavailableBuiltinAgentModels(
         validation = assertKiloModelAvailable({
           env: ctx.env,
           submittedModel: model,
-          originalToken: runtimeAuthorization?.token ?? ctx.authToken,
+          originalToken: runtimeAuthorization
+            ? issuedRuntimeToken(
+                runtimeAuthorization,
+                modelValidationAudience(ctx.env, organizationId)
+              )
+            : ctx.authToken,
           originalOrganizationId: organizationId,
           createdOnPlatform: input.options?.createdOnPlatform,
           procedure: 'builtin_agent_model_validation',
@@ -1598,7 +1618,9 @@ function buildSessionRegistrationCommand(
     },
     auth: {
       kiloSessionId: allocation.kiloSessionId,
-      kilocodeToken: allocation.runtimeAuthorization?.token ?? ctx.authToken,
+      ...(allocation.runtimeAuthorization
+        ? issuedRuntimeTokenAuth(allocation.runtimeAuthorization)
+        : { kilocodeToken: ctx.authToken }),
     },
     ...(allocation.runtimeAuthorization
       ? { runtimeAuthorizationSeal: allocation.runtimeAuthorization.seal }

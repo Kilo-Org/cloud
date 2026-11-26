@@ -25,26 +25,63 @@ identity:
   appId: '2222'
 secrets: [APP_SECRET]
 `,
-  'github-deploy.yaml': `
-workload: github-deploy
+  // Two policies on one repository, routed by GitHub environment and workflow file, plus the
+  // workflow_run policy; `smoke-test.yml` is a reusable workflow `publish.yml` calls.
+  'ci-release.yaml': `
+workload: ci-release
 environments: [production]
 identity:
   kind: github-oidc
+  repository: acme/repo
   repositoryId: '123'
   repositoryOwnerId: '456'
-  environments: [production]
-  refs: [refs/heads/main]
+  environment: release
+  jobWorkflowRefs:
+    - acme/repo/.github/workflows/publish.yml@refs/heads/main
+    - acme/repo/.github/workflows/smoke-test.yml@refs/heads/main
+  events: [workflow_dispatch]
 secrets: [APP_SECRET]
 `,
-  'github-review.yaml': `
-workload: github-review
+  'ci-automation.yaml': `
+workload: ci-automation
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: acme/repo
+  repositoryId: '123'
+  repositoryOwnerId: '456'
+  environment: automation
+  jobWorkflowRefs: [acme/repo/.github/workflows/beta.yml@refs/heads/main]
+  events: [push, schedule, workflow_dispatch]
+secrets: [APP_SECRET]
+`,
+  'ci-commit.yaml': `
+workload: ci-commit
 environments: [staging]
 identity:
   kind: github-oidc
+  repository: acme/repo
+  repositoryId: '123'
+  repositoryOwnerId: '456'
+  environment: automation
+  jobWorkflowRefs: [acme/repo/.github/workflows/baselines.yml@refs/heads/main]
+  events: [workflow_run]
+secrets: [APP_SECRET]
+`,
+  // Two refs, each with its own workflow file: an entry admits a run on its own ref only.
+  'ci-review.yaml': `
+workload: ci-review
+environments: [staging]
+identity:
+  kind: github-oidc
+  repository: acme/other
   repositoryId: '789'
   repositoryOwnerId: '456'
-  refs: [refs/heads/main]
-  allowedEvents: [workflow_run]
+  refs: [refs/heads/main, refs/heads/release]
+  jobWorkflowRefs:
+    - acme/other/.github/workflows/review.yml@refs/heads/main
+    - acme/other/.github/workflows/smoke.yml@refs/heads/release
+  events: [push]
 secrets: [APP_SECRET]
 `,
 });
@@ -86,23 +123,55 @@ const FLY_CLAIMS = {
   machine_id: 'machine-1',
 };
 
+const RELEASE_WORKFLOW = 'acme/repo/.github/workflows/publish.yml@refs/heads/main';
+
+/** A `publish.yml` job in the `release` environment, with GitHub's immutable-format subject. */
 const GITHUB_CLAIMS = {
+  sub: 'repo:acme@456/repo@123:environment:release',
   repository_id: '123',
   repository_owner_id: '456',
   repository: 'acme/repo',
-  environment: 'production',
+  repository_owner: 'acme',
+  environment: 'release',
   ref: 'refs/heads/main',
-  event_name: 'push',
+  event_name: 'workflow_dispatch',
+  job_workflow_ref: RELEASE_WORKFLOW,
+  workflow_ref: RELEASE_WORKFLOW,
+  run_id: '9001',
+};
+
+const AUTOMATION_CLAIMS = {
+  ...GITHUB_CLAIMS,
+  sub: 'repo:acme@456/repo@123:environment:automation',
+  environment: 'automation',
 };
 
 describe('Fly machine identity', () => {
-  it('accepts a machine token bound to the policy org and app ids', async () => {
+  it('accepts a machine token bound to the policy org and app ids, with its exp and iat', async () => {
     const { verify, provider } = await fixture('production');
-    expect(await verify(await signToken(provider(FLY_ISSUER), FLY_CLAIMS))).toEqual({
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS, {
+      issuedAt,
+      expiresAt: issuedAt + 900,
+    });
+    expect(await verify(token)).toEqual({
       status: 'verified',
       workload: 'fly-app',
       provider: 'fly',
+      attestationExp: issuedAt + 900,
+      attestationIat: issuedAt,
+      run: null,
     });
+  });
+
+  it('refuses a token issued more than the clock skew in the future', async () => {
+    const { verify, provider } = await fixture('production');
+    const issuedAt = Math.floor(Date.now() / 1000) + 120;
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS, {
+      issuedAt,
+      expiresAt: issuedAt + 900,
+    });
+    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
   });
 
   it('refuses an app with the policy name but another app id', async () => {
@@ -127,57 +196,238 @@ describe('Fly machine identity', () => {
 });
 
 describe('GitHub Actions identity', () => {
-  it('accepts a token bound to the repository ids, the environment and the ref', async () => {
+  it('accepts a job of a listed workflow in the bound environment, with its exp and iat', async () => {
     const { verify, provider } = await fixture('production');
-    expect(await verify(await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS))).toEqual({
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await signToken(provider(GITHUB_ISSUER), GITHUB_CLAIMS, {
+      issuedAt,
+      expiresAt: issuedAt + 300,
+    });
+    expect(await verify(token)).toEqual({
       status: 'verified',
-      workload: 'github-deploy',
+      workload: 'ci-release',
       provider: 'github',
+      attestationExp: issuedAt + 300,
+      attestationIat: issuedAt,
+      run: { jobWorkflowRef: RELEASE_WORKFLOW, runId: '9001' },
+    });
+  });
+
+  it('carries run_attempt for the delivery row and keeps per-run claims off a refusal', async () => {
+    const { verify, provider } = await fixture('production');
+    const accepted = await signToken(provider(GITHUB_ISSUER), {
+      ...GITHUB_CLAIMS,
+      run_attempt: '2',
+    });
+    expect(await verify(accepted)).toMatchObject({
+      run: { jobWorkflowRef: RELEASE_WORKFLOW, runId: '9001', runAttempt: '2' },
+    });
+    const refused = await verify(
+      await signToken(provider(GITHUB_ISSUER), {
+        ...GITHUB_CLAIMS,
+        run_attempt: '2',
+        event_name: 'push',
+      })
+    );
+    expect(refused).toMatchObject({ status: 'denied' });
+    expect(JSON.stringify(refused)).not.toMatch(/run_id|run_attempt|9001/);
+  });
+
+  it('accepts a job of a called reusable workflow by its own entry', async () => {
+    const { verify, provider } = await fixture('production');
+    const token = await signToken(provider(GITHUB_ISSUER), {
+      ...GITHUB_CLAIMS,
+      job_workflow_ref: 'acme/repo/.github/workflows/smoke-test.yml@refs/heads/main',
+    });
+    expect(await verify(token)).toMatchObject({ status: 'verified', workload: 'ci-release' });
+  });
+
+  it('routes two policies on one repository by environment and workflow file', async () => {
+    const production = await fixture('production');
+    const beta = await signToken(production.provider(GITHUB_ISSUER), {
+      ...AUTOMATION_CLAIMS,
+      event_name: 'schedule',
+      job_workflow_ref: 'acme/repo/.github/workflows/beta.yml@refs/heads/main',
+    });
+    expect(await production.verify(beta)).toMatchObject({
+      status: 'verified',
+      workload: 'ci-automation',
+    });
+    const staging = await fixture('staging');
+    const commit = await signToken(staging.provider(GITHUB_ISSUER), {
+      ...AUTOMATION_CLAIMS,
+      event_name: 'workflow_run',
+      job_workflow_ref: 'acme/repo/.github/workflows/baselines.yml@refs/heads/main',
+    });
+    expect(await staging.verify(commit)).toMatchObject({
+      status: 'verified',
+      workload: 'ci-commit',
+    });
+  });
+
+  it.each([
+    ['an unlisted workflow file', 'acme/repo/.github/workflows/other.yml@refs/heads/main'],
+    ['a listed workflow file on another ref', `${RELEASE_WORKFLOW.split('@')[0]}@refs/heads/x`],
+    ["another environment's workflow file", 'acme/repo/.github/workflows/beta.yml@refs/heads/main'],
+  ])('refuses a job of %s and names the repository', async (_case, workflow) => {
+    const { verify, provider } = await fixture('production');
+    const token = await signToken(provider(GITHUB_ISSUER), {
+      ...GITHUB_CLAIMS,
+      job_workflow_ref: workflow,
+    });
+    expect(await verify(token)).toMatchObject({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: { actor: 'github:123', claims: { job_workflow_ref: workflow } },
     });
   });
 
   it('refuses a token without the bound GitHub environment', async () => {
     const { verify, provider } = await fixture('production');
-    const withoutEnvironment: Record<string, string> = { ...GITHUB_CLAIMS };
+    const withoutEnvironment: Record<string, string> = {
+      ...GITHUB_CLAIMS,
+      sub: 'repo:acme@456/repo@123:ref:refs/heads/main',
+    };
     delete withoutEnvironment.environment;
     const token = await signToken(provider(GITHUB_ISSUER), withoutEnvironment);
     expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'identity_rejected' });
   });
 
-  it('keeps refs as an extra filter next to the environment', async () => {
+  it.each([
+    [
+      'the name-only subject of a repository without immutable subjects',
+      'repo:acme/repo:environment:release',
+      'name-only:environment',
+    ],
+    ['the ref form', 'repo:acme@456/repo@123:ref:refs/heads/main', 'immutable:ref'],
+    ['another owner id', 'repo:acme@999/repo@123:environment:release', 'immutable:environment'],
+    [
+      'another environment',
+      'repo:acme@456/repo@123:environment:automation',
+      'immutable:environment',
+    ],
+    ['a wildcard', 'repo:acme@456/repo@123:environment:*', 'immutable:environment'],
+    ['a customized template', 'repo:acme/repo:run_id:9001:actor:someone', 'custom'],
+  ])('refuses a subject that is not the exact one: %s', async (_case, sub, format) => {
+    const { verify, provider } = await fixture('production');
+    const token = await signToken(provider(GITHUB_ISSUER), { ...GITHUB_CLAIMS, sub });
+    const outcome = await verify(token);
+    expect(outcome).toMatchObject({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: { actor: 'ci-release', claims: { sub_format: format } },
+    });
+    // Only the format: a customized subject can carry per-run claims.
+    expect(JSON.stringify(outcome)).not.toContain(sub);
+    expect(JSON.stringify(outcome)).not.toContain('9001');
+  });
+
+  it('refuses a ref the policy does not list', async () => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(GITHUB_ISSUER), {
       ...GITHUB_CLAIMS,
       ref: 'refs/heads/feature',
     });
-    expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'identity_rejected' });
+    expect(await verify(token)).toMatchObject({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: { actor: 'ci-release' },
+    });
   });
 
-  it.each(['pull_request_target', 'workflow_run', 'issue_comment'])(
-    'refuses a %s token the policy does not allow',
-    async event => {
-      const { verify, provider } = await fixture('production');
-      const token = await signToken(provider(GITHUB_ISSUER), {
-        ...GITHUB_CLAIMS,
-        event_name: event,
-      });
-      expect(await verify(token)).toMatchObject({ status: 'denied', reason: 'identity_rejected' });
-    }
-  );
+  it.each([
+    'pull_request_target',
+    'pull_request',
+    'issues',
+    'issue_comment',
+    'workflow_run',
+    'push',
+  ])('refuses a %s token that the policy events do not list', async event => {
+    const { verify, provider } = await fixture('production');
+    const token = await signToken(provider(GITHUB_ISSUER), { ...GITHUB_CLAIMS, event_name: event });
+    expect(await verify(token)).toMatchObject({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: { actor: 'ci-release', claims: { event_name: event } },
+    });
+  });
 
-  it('accepts a privileged event the policy names explicitly', async () => {
+  it('accepts workflow_run only for the policy that lists it', async () => {
+    const { verify, provider } = await fixture('production');
+    const baselines = 'acme/repo/.github/workflows/baselines.yml@refs/heads/main';
+    const push = await signToken(provider(GITHUB_ISSUER), {
+      ...AUTOMATION_CLAIMS,
+      event_name: 'push',
+      job_workflow_ref: baselines,
+    });
+    expect(await verify(push)).toMatchObject({
+      reason: 'identity_rejected',
+      subject: { actor: 'ci-commit' },
+    });
+    const beta = await signToken(provider(GITHUB_ISSUER), {
+      ...AUTOMATION_CLAIMS,
+      event_name: 'workflow_run',
+      job_workflow_ref: 'acme/repo/.github/workflows/beta.yml@refs/heads/main',
+    });
+    expect(await verify(beta)).toMatchObject({
+      reason: 'identity_rejected',
+      subject: { actor: 'ci-automation' },
+    });
+  });
+
+  it('binds the ref form of the subject for a policy without an environment', async () => {
     const { verify, provider } = await fixture('staging');
-    const token = await signToken(provider(GITHUB_ISSUER), {
+    const review = {
+      sub: 'repo:acme@456/other@789:ref:refs/heads/main',
       repository_id: '789',
       repository_owner_id: '456',
       ref: 'refs/heads/main',
-      event_name: 'workflow_run',
-    });
-    expect(await verify(token)).toEqual({
+      event_name: 'push',
+      job_workflow_ref: 'acme/other/.github/workflows/review.yml@refs/heads/main',
+    };
+    expect(await verify(await signToken(provider(GITHUB_ISSUER), review))).toMatchObject({
       status: 'verified',
-      workload: 'github-review',
-      provider: 'github',
+      workload: 'ci-review',
     });
+    const withEnvironment = await signToken(provider(GITHUB_ISSUER), {
+      ...review,
+      sub: 'repo:acme@456/other@789:environment:staging',
+      environment: 'staging',
+    });
+    expect(await verify(withEnvironment)).toMatchObject({
+      status: 'denied',
+      reason: 'identity_rejected',
+    });
+  });
+
+  it('admits a workflow entry only on its own ref, even when a reusable workflow is called', async () => {
+    const { verify, provider } = await fixture('staging');
+    const run = (ref: string, jobWorkflowRef: string) =>
+      signToken(provider(GITHUB_ISSUER), {
+        sub: `repo:acme@456/other@789:ref:${ref}`,
+        repository_id: '789',
+        repository_owner_id: '456',
+        ref,
+        event_name: 'push',
+        job_workflow_ref: jobWorkflowRef,
+      });
+    const review = 'acme/other/.github/workflows/review.yml@refs/heads/main';
+    const smoke = 'acme/other/.github/workflows/smoke.yml@refs/heads/release';
+    expect(await verify(await run('refs/heads/release', smoke))).toMatchObject({
+      status: 'verified',
+      workload: 'ci-review',
+    });
+    // A run on one listed ref that calls the workflow pinned to the other listed ref.
+    for (const [ref, workflow] of [
+      ['refs/heads/release', review],
+      ['refs/heads/main', smoke],
+    ]) {
+      expect(await verify(await run(ref, workflow))).toMatchObject({
+        status: 'denied',
+        reason: 'identity_rejected',
+        subject: { actor: 'ci-review', claims: { ref, job_workflow_ref: workflow } },
+      });
+    }
   });
 
   it('refuses a token from another repository', async () => {
@@ -216,9 +466,11 @@ describe('denial subjects', () => {
           repository_id: '999',
           repository_owner_id: '456',
           repository: 'acme/repo',
-          environment: 'production',
+          environment: 'release',
           ref: 'refs/heads/main',
-          event_name: 'push',
+          event_name: 'workflow_dispatch',
+          job_workflow_ref: RELEASE_WORKFLOW,
+          sub_format: 'immutable:environment',
         },
       },
     });
@@ -238,7 +490,7 @@ describe('denial subjects', () => {
     });
     expect(await verify(github)).toMatchObject({
       reason: 'identity_rejected',
-      subject: { actor: 'github-deploy' },
+      subject: { actor: 'ci-release' },
     });
   });
 
@@ -270,6 +522,21 @@ describe('token rejection', () => {
   it('refuses a malformed token', async () => {
     const { verify } = await fixture('production');
     expect(await verify('not-a-jwt')).toEqual({ status: 'denied', reason: 'identity_rejected' });
+  });
+
+  it.each([
+    ['Fly', FLY_ISSUER, FLY_CLAIMS],
+    ['GitHub', GITHUB_ISSUER, GITHUB_CLAIMS],
+  ])('refuses a %s token without iat or without exp', async (_name, issuer, claims) => {
+    const { verify, provider } = await fixture('production');
+    for (const times of [
+      { issuedAt: null },
+      { expiresAt: null },
+      { issuedAt: null, expiresAt: null },
+    ]) {
+      const token = await signToken(provider(issuer), claims, times);
+      expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+    }
   });
 });
 

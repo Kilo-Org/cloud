@@ -1,0 +1,26 @@
+// Test-only probe Worker for the local end-to-end check in README "Tests"; never deployed. STS binds
+// the test build's broker entrypoint with props.caller, as a consumer binds SecretsBroker; STS_HTTP
+// reaches the build's HTTP routes. It consumes the audit queue the build produces to.
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "secrets-broker-e2e-probe",
+  "main": "probe.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "traces": { "enabled": false } },
+  "dev": { "port": 8827, "local_protocol": "http", "ip": "127.0.0.1" },
+  "services": [
+    {
+      "binding": "STS",
+      "service": "secrets-broker-e2e-sts",
+      "entrypoint": "E2eSecretsBroker",
+      "props": { "caller": "secrets-broker-e2e-probe" },
+    },
+    { "binding": "STS_HTTP", "service": "secrets-broker-e2e-sts" },
+  ],
+  "queues": {
+    "consumers": [
+      { "queue": "secrets-broker-e2e-audit", "max_batch_size": 100, "max_batch_timeout": 1 },
+    ],
+  },
+}

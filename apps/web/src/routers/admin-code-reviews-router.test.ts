@@ -1,5 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cloud_agent_code_review_attempts,
@@ -165,7 +165,7 @@ describe('adminCodeReviewsRouter', () => {
   it('computes overview wait metrics only from valid started reviews', async () => {
     await insertWaitMetricRows();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.codeReviews.getOverviewStats(filterInput());
 
     expect(result.waitStartedCount).toBe(3);
@@ -187,7 +187,7 @@ describe('adminCodeReviewsRouter', () => {
         reviewValues({ owner: personalOwner, status: 'pending', createdAt: timestamp(780) }),
       ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const result = await caller.admin.codeReviews.getOverviewStats(
       filterInput({ startDate: timestamp(720), endDate: timestamp(780) })
     );
@@ -196,7 +196,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('rejects empty telemetry date intervals', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.codeReviews.getOverviewStats(
@@ -206,7 +206,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('rejects telemetry date intervals longer than 90 days', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const longInterval = filterInput({
       startDate: '2035-01-01T00:00:00.000Z',
       endDate: '2035-04-02T00:00:00.000Z',
@@ -261,7 +261,7 @@ describe('adminCodeReviewsRouter', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const finalOutcome = await caller.admin.codeReviews.getOverviewStats(filterInput());
     const allAttempts = await caller.admin.codeReviews.getOverviewStats(
       filterInput({ retryAccountingMode: 'all_attempts' })
@@ -313,7 +313,7 @@ describe('adminCodeReviewsRouter', () => {
       },
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const finalErrors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
     const attemptErrors = await caller.admin.codeReviews.getErrorAnalysis(
       filterInput({ retryAccountingMode: 'all_attempts' })
@@ -380,7 +380,7 @@ describe('adminCodeReviewsRouter', () => {
       }),
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
 
     expect(errors.categories).toEqual(
@@ -421,7 +421,7 @@ describe('adminCodeReviewsRouter', () => {
       started_at: timestamp(802),
       completed_at: timestamp(803),
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     for (const retryAccountingMode of ['final_outcome', 'all_attempts'] as const) {
       const errors = await caller.admin.codeReviews.getErrorAnalysis(
         filterInput({ retryAccountingMode })
@@ -460,7 +460,7 @@ describe('adminCodeReviewsRouter', () => {
       }),
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const categoryNames = (
       await caller.admin.codeReviews.getErrorAnalysis(filterInput())
     ).categories.map(category => category.category);
@@ -488,7 +488,7 @@ describe('adminCodeReviewsRouter', () => {
       }),
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
 
     expect(errors.categories).toEqual(
@@ -511,7 +511,7 @@ describe('adminCodeReviewsRouter', () => {
       }),
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
 
     expect(errors.categories).toEqual(
@@ -546,7 +546,7 @@ describe('adminCodeReviewsRouter', () => {
       reviewValues({ owner, status: 'completed', createdAt: timestamp(730) }),
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const overview = await caller.admin.codeReviews.getOverviewStats(filterInput());
     const daily = await caller.admin.codeReviews.getDailyStats(filterInput());
     const cancellations = await caller.admin.codeReviews.getCancellationAnalysis(filterInput());
@@ -602,7 +602,7 @@ describe('adminCodeReviewsRouter', () => {
       completed_at: timestamp(763),
     });
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const finalErrors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
     const attemptErrors = await caller.admin.codeReviews.getErrorAnalysis(
       filterInput({ retryAccountingMode: 'all_attempts' })
@@ -677,7 +677,7 @@ describe('adminCodeReviewsRouter', () => {
     ]);
 
     const input = filterInput({ retryAccountingMode: 'all_attempts' });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const overview = await caller.admin.codeReviews.getOverviewStats(input);
     const daily = await caller.admin.codeReviews.getDailyStats(input);
     const cancellations = await caller.admin.codeReviews.getCancellationAnalysis(input);
@@ -710,7 +710,7 @@ describe('adminCodeReviewsRouter', () => {
   it('returns ownership wait breakdown and daily trend series', async () => {
     await insertWaitMetricRows();
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const segmentation = await caller.admin.codeReviews.getUserSegmentation(filterInput());
     const trend = await caller.admin.codeReviews.getWaitTimeStats(filterInput());
 
@@ -795,7 +795,7 @@ describe('adminCodeReviewsRouter', () => {
       }),
     ]);
 
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const globalQueue = await caller.admin.codeReviews.getQueueHealthStats(
       filterInput({ retryAccountingMode: 'all_attempts' })
     );
@@ -841,7 +841,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('returns zero-valued live queue health when no waiting work exists', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     await expect(caller.admin.codeReviews.getQueueHealthStats(filterInput())).resolves.toEqual({
       pendingReviewCount: 0,
@@ -854,7 +854,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('requires admin access for live queue health stats', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.codeReviews.getQueueHealthStats(filterInput())).rejects.toThrow(
       'Admin access required'
@@ -862,7 +862,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('requires admin access for wait time stats', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.codeReviews.getWaitTimeStats(filterInput())).rejects.toThrow(
       'Admin access required'
@@ -870,7 +870,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('searches organizations by text without requiring a UUID query', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.admin.codeReviews.searchOrganizations({
       query: 'Admin Code Review Wait',
@@ -880,7 +880,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('searches organizations by exact UUID', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.admin.codeReviews.searchOrganizations({
       query: testOrganizationId,
@@ -890,7 +890,7 @@ describe('adminCodeReviewsRouter', () => {
   });
 
   it('returns no organizations for whitespace-only search', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
 
     const result = await caller.admin.codeReviews.searchOrganizations({ query: '   ' });
 

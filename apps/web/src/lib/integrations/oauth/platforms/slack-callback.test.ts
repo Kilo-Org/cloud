@@ -1,6 +1,6 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 
-const mockEnsureOrganizationAccess = jest.fn();
+const mockEnsureMemberOrganizationAccess = jest.fn();
 const mockConsumeProviderOAuthAttempt = jest.fn();
 const mockUpsertSlackInstallation = jest.fn();
 const mockExchangeSlackOAuthCode = jest.fn();
@@ -12,7 +12,8 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: (...args: unknown[]) => mockEnsureOrganizationAccess(...args),
+  ensureMemberOrganizationAccess: (...args: unknown[]) =>
+    mockEnsureMemberOrganizationAccess(...args),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
@@ -113,14 +114,14 @@ describe('handleSlackOAuthCallback organization authority', () => {
       user: { id: USER_ID, is_admin: false },
       authFailedResponse: null,
     } as never);
-    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockEnsureMemberOrganizationAccess.mockResolvedValue('owner');
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
     mockUpsertSlackInstallation.mockResolvedValue({ id: 'integration-1' });
     mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });
   });
 
   it('refuses an organization completion by a plain member', async () => {
-    mockEnsureOrganizationAccess.mockRejectedValue(permissionDeniedError);
+    mockEnsureMemberOrganizationAccess.mockRejectedValue(permissionDeniedError);
 
     const { response } = await callCallback(`org_${ORGANIZATION_ID}`);
 
@@ -128,8 +129,8 @@ describe('handleSlackOAuthCallback organization authority', () => {
     expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
       'permission_required'
     );
-    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
-      { user: expect.objectContaining({ id: USER_ID }) },
+    expect(mockEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_MANAGE_ROLES
     );
@@ -139,7 +140,7 @@ describe('handleSlackOAuthCallback organization authority', () => {
   });
 
   it('refuses a member completion that carries no install purpose', async () => {
-    mockEnsureOrganizationAccess.mockRejectedValue(permissionDeniedError);
+    mockEnsureMemberOrganizationAccess.mockRejectedValue(permissionDeniedError);
 
     const { response, state } = await callCallback(`org_${ORGANIZATION_ID}`, null);
 
@@ -154,7 +155,7 @@ describe('handleSlackOAuthCallback organization authority', () => {
   });
 
   it('completes an organization installation', async () => {
-    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockEnsureMemberOrganizationAccess.mockResolvedValue('owner');
 
     const { response } = await callCallback(`org_${ORGANIZATION_ID}`);
 
@@ -170,7 +171,7 @@ describe('handleSlackOAuthCallback organization authority', () => {
     expect(new URL(response.headers.get('location') ?? '').searchParams.get('success')).toBe(
       'installed'
     );
-    expect(mockEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
   });
 });
 
@@ -181,7 +182,7 @@ describe('handleSlackOAuthCallback diagnostics', () => {
       user: { id: USER_ID, is_admin: false },
       authFailedResponse: null,
     } as never);
-    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockEnsureMemberOrganizationAccess.mockResolvedValue('owner');
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
     mockUpsertSlackInstallation.mockResolvedValue({ id: 'integration-1' });
     mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });

@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll, beforeEach, afterAll, afterEach } from '@jest/globals';
+import { sealedInventoryColumns } from '@/tests/helpers/coding-plan-inventory.helper';
 import { randomBytes } from 'crypto';
 // Catalog-mode code reads the catalog snapshot through a process-wide cache. Stubbing those reads
 // keeps the cache unfilled for the listSupportedModels test, which stores its own metadata.
@@ -27,7 +28,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getOpenRouterTranscriptionModels: jest.fn(async () => ({ data: [] })),
 }));
 
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -64,8 +65,7 @@ import {
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
-import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { byokOwner, getByokKeyStates } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
   isFakeByokKmsRequest,
@@ -2376,14 +2376,13 @@ describe('BYOK Router', () => {
     });
 
     async function createInstalledMiniMaxKey() {
-      const encrypted = encryptApiKey('installed-minimax-key', BYOK_ENCRYPTION_KEY);
       const [inventory] = await db
         .insert(coding_plan_key_inventory)
         .values({
           plan_id: 'minimax-token-plan-plus',
           provider_id: 'minimax',
           upstream_plan_id: 'minimax-installed-plan',
-          encrypted_api_key: encrypted,
+          ...sealedInventoryColumns('installed-minimax-key'),
           credential_fingerprint: crypto.randomUUID(),
           status: 'assigned',
           assigned_to_user_id: ownerUser.id,
@@ -2420,14 +2419,13 @@ describe('BYOK Router', () => {
     }
 
     async function createInstalledBytePlusKey() {
-      const encrypted = encryptApiKey('installed-byteplus-key', BYOK_ENCRYPTION_KEY);
       const [inventory] = await db
         .insert(coding_plan_key_inventory)
         .values({
           plan_id: 'byteplus-coding-plan-team-lite',
           provider_id: 'byteplus-coding',
           upstream_plan_id: 'byteplus-installed-plan',
-          encrypted_api_key: encrypted,
+          ...sealedInventoryColumns('installed-byteplus-key'),
           credential_fingerprint: crypto.randomUUID(),
           status: 'assigned',
           assigned_to_user_id: ownerUser.id,
@@ -2623,6 +2621,64 @@ describe('BYOK Router', () => {
       // Verify key still exists
       const keys = await callerB.byok.list({ organizationId: organizationB.id });
       expect(keys).toHaveLength(1);
+    });
+  });
+
+  // Storing, replacing and removing an organization key need a real owner or
+  // billing-manager membership. A platform admin on a browser session, with
+  // support access off, still reads the keys through the guarded staff path.
+  describe('organization key writes by a platform admin without a membership', () => {
+    const previousSupport = process.env.SUPPORT_ACCESS_ENABLED;
+    let staffUser: User;
+
+    beforeAll(async () => {
+      delete process.env.SUPPORT_ACCESS_ENABLED;
+      staffUser = await insertTestUser({ is_admin: true });
+    });
+
+    afterAll(() => {
+      if (previousSupport === undefined) delete process.env.SUPPORT_ACCESS_ENABLED;
+      else process.env.SUPPORT_ACCESS_ENABLED = previousSupport;
+    });
+
+    test('refuses create, update and delete and keeps the owner key and flow', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const staffCaller = await createSessionCallerForUser(staffUser.id);
+      const organizationId = organizationA.id;
+      const ownerKey = await ownerCaller.byok.create({
+        organizationId,
+        provider_id: 'anthropic',
+        api_key: 'owner-key',
+      });
+
+      // The guarded staff path admits this caller for a read.
+      const listed = await staffCaller.byok.list({ organizationId });
+      expect(listed.map(key => key.id)).toEqual([ownerKey.id]);
+
+      const nonMember = {
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      };
+      await expect(
+        staffCaller.byok.create({ organizationId, provider_id: 'openai', api_key: 'staff-key' })
+      ).rejects.toMatchObject(nonMember);
+      await expect(
+        staffCaller.byok.update({ organizationId, id: ownerKey.id, api_key: 'staff-key' })
+      ).rejects.toMatchObject(nonMember);
+      await expect(
+        staffCaller.byok.delete({ organizationId, id: ownerKey.id })
+      ).rejects.toMatchObject(nonMember);
+
+      const rows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationId));
+      expect(rows.map(row => row.id)).toEqual([ownerKey.id]);
+      expect(decryptStoredKey(rows[0])).toBe('owner-key');
+
+      await expect(ownerCaller.byok.delete({ organizationId, id: ownerKey.id })).resolves.toEqual({
+        success: true,
+      });
     });
   });
 });

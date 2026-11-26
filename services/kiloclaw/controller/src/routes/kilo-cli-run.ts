@@ -199,7 +199,7 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
         cleanupRun(run, code, code === 0 ? 'completed' : 'failed');
       });
 
-      console.log(`[kilo-cli-run] Started: pid=${child.pid}, prompt="${prompt.slice(0, 100)}..."`);
+      console.log(`[kilo-cli-run] Started: pid=${child.pid}`);
 
       return c.json({
         ok: true,

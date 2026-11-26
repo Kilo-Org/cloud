@@ -1,21 +1,20 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
-import { kilocode_users, type User } from '@kilocode/db/schema';
-import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { User } from '@kilocode/db/schema';
 import {
   createAdminAssurance,
-  deriveCredentialKind,
   describePrivilegedAction,
-  type AdminStepUpDecision,
   type PrivilegedActionClass,
   type PrivilegedActor,
   type PrivilegedTarget,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { runStepUpGuard, stepUpDecisionCovers } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
-import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
+import { differentOperationError } from '@kilocode/web-shared/lib/admin/admin-guard';
+import {
+  requireStaffAuthority,
+  type StaffAuthorityContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import {
   userCanExportApiRequestLogs,
   userCanViewSessions,
@@ -30,21 +29,7 @@ export type PrivilegedPermission =
   | 'session_viewer'
   | 'api_request_log_exporter';
 
-type GuardContext = {
-  user: User;
-  credential?: ReturnType<typeof deriveCredentialKind>;
-  webSessionId?: string;
-  webSessionPepper?: string | null;
-  authViaToken?: boolean;
-  tokenSource?: string | null;
-  internalApiUse?: boolean;
-  headersList?: Headers;
-  ip?: string | null;
-  trpcPath?: string;
-  trpcType?: string;
-  adminStepUpState?: PrivilegedActor['assurance']['stepUp'];
-  adminStepUpDecision?: AdminStepUpDecision;
-};
+type GuardContext = StaffAuthorityContext & { tokenSource?: string | null };
 
 const permissionRules: Record<
   PrivilegedPermission,
@@ -69,34 +54,23 @@ const permissionRules: Record<
   },
 };
 
-async function loadPrimaryActor(userId: string): Promise<User | undefined> {
-  return db.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.id, userId),
-  });
-}
-
 /**
- * Asserts one independent permission against the primary user row. The message
- * is the same one the pre-PR2 guard used, so existing callers see no change.
+ * Asserts one independent permission against the current primary row, which
+ * the staff admission read for this request.
  */
-export async function assertPrivilegedPermission(
-  permission: PrivilegedPermission,
-  ctx: Pick<GuardContext, 'user'>
-): Promise<User> {
-  const currentUser = await loadPrimaryActor(ctx.user.id);
+export function assertPrivilegedPermission(permission: PrivilegedPermission, currentUser: User) {
   const rule = permissionRules[permission];
-  if (!currentUser || isBlockedAccount(currentUser) || !rule.allowed(currentUser)) {
+  if (!rule.allowed(currentUser)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: rule.message });
   }
-  return currentUser;
 }
 
 /**
- * PR1's privileged actor, now with step-up assurance. Always re-reads the
- * permission on the primary. When step-up is enabled it denies a missing or
- * stale proof. When the caller is chained on adminProcedure, the decision from
- * the admin middleware is reused only when it covers this action class and
- * target instead of evaluating twice.
+ * A specialized permission on top of the staff admission. Chained on
+ * `adminProcedure`, it reuses that admission: the primary row it read and,
+ * when it measured a request proof, its step-up decision, which must cover this
+ * action class and target. Outside `adminProcedure` it runs the admission
+ * itself. Either way the request needs one primary read.
  */
 export async function requirePrivilegedActor(
   params: {
@@ -107,42 +81,29 @@ export async function requirePrivilegedActor(
   },
   ctx: GuardContext
 ): Promise<PrivilegedActor> {
-  const currentUser = await assertPrivilegedPermission(params.permission, ctx);
-  const credential =
-    ctx.credential ??
-    deriveCredentialKind({
-      authViaToken: ctx.authViaToken ?? false,
-      tokenSource: ctx.tokenSource ?? null,
-      internalApiUse: ctx.internalApiUse,
-    });
-
-  // `isWebSessionCurrent` normalizes an absent pepper to null, so a session
-  // credential is always compared against the primary row.
-  if (credential === 'session' && !isWebSessionCurrent(ctx.webSessionPepper, currentUser)) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'Reauthentication required' });
-  }
-
   const target = params.target ?? { kind: 'none', id: null };
-  let stepUp: PrivilegedActor['assurance']['stepUp'];
-  if (ctx.adminStepUpState) {
-    // Reuse the middleware's measurement when it measured nothing (switch off)
-    // or when it covers this action class and target. A request whose measured
-    // decision does not cover it is refused here, because a request is
-    // evaluated once.
+  const upstream = ctx.adminAdmission;
+  const admission =
+    upstream ?? (await requireStaffAuthority(ctx, { actionClass: params.actionClass, target }));
+  const currentUser = admission.user;
+  assertPrivilegedPermission(params.permission, currentUser);
+
+  let stepUp = admission.stepUp;
+  if (upstream && upstream.decision) {
+    // A request is evaluated once. A measured decision that does not cover
+    // this action and target refuses it; the switch being off measured nothing.
     if (
-      ctx.adminStepUpState.status !== 'absent' &&
-      !stepUpDecisionCovers(ctx.adminStepUpDecision, params.actionClass, target)
+      upstream.stepUp.status !== 'absent' &&
+      !stepUpDecisionCovers(upstream.decision, params.actionClass, target)
     ) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'This request was verified for a different operation',
-      });
+      throw differentOperationError();
     }
-    stepUp = ctx.adminStepUpState;
-  } else {
+  } else if (upstream) {
+    // The upstream admission deferred or skipped the proof, so this guard
+    // measures it for its own action and target.
     stepUp = await runStepUpGuard({
       userId: currentUser.id,
-      credential,
+      credential: 'session',
       webSessionId: ctx.webSessionId,
       actionClass: params.actionClass,
       target,
@@ -165,7 +126,7 @@ export async function requirePrivilegedActor(
       },
       stepUp,
     }),
-    credential,
+    credential: 'session',
     tokenSource: ctx.tokenSource ?? null,
     action: describePrivilegedAction(params.actionClass, target, params.inventoryId ?? null),
   };

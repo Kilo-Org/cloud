@@ -229,9 +229,23 @@ export async function readSignerObjects(
  */
 let isolateShard: number | null = null;
 
-function keySetShardOfIsolate(): number {
+/**
+ * One read through this isolate's shard. A read still makes exactly one shard call. When that
+ * call fails, the isolate moves to the next shard for its later reads, so a failing shard does not
+ * keep failing the same isolates. Only the first failure on a shard moves it: a concurrent read
+ * that failed on the same shard, or one that finishes after the isolate moved, changes nothing.
+ */
+export async function readThroughIsolateShard(
+  read: (shard: number) => Promise<SignerKeysRead>
+): Promise<SignerKeysRead> {
   isolateShard ??= (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % KEY_SET_SHARD_COUNT;
-  return isolateShard;
+  const shard = isolateShard;
+  try {
+    return await read(shard);
+  } catch (error) {
+    if (isolateShard === shard) isolateShard = (shard + 1) % KEY_SET_SHARD_COUNT;
+    throw error;
+  }
 }
 
 /**
@@ -281,17 +295,14 @@ export async function signerKeysRead(
  * The named entrypoint the feed Worker binds with its deployed name as `props.caller`
  * (`UTS_SIGNER_KEYS_ENTRYPOINT`). A service binding delivers `props` to a named entrypoint, as
  * for the STS broker. Placement does not apply to a named entrypoint, so it runs where the feed
- * Worker runs, and asks its isolate's key-set shard in the EU; the default entrypoint's fetch
- * handler, which placement covers, serves no signer keys. `test/repo` keeps every other config
- * from binding the mint Worker.
+ * Worker runs, and asks its isolate's key-set shard in the EU (`readThroughIsolateShard`); the
+ * default entrypoint's fetch handler, which placement covers, serves no signer keys. `test/repo`
+ * keeps every other config from binding the mint Worker.
  */
 export class SignerKeys extends WorkerEntrypoint<Env> implements SignerKeysBinding {
   async signerKeys(): Promise<SignerKeysRead> {
-    return await signerKeysRead(
-      this.env,
-      readConfig(this.env),
-      this.ctx.props,
-      keySetShardOfIsolate()
+    return await readThroughIsolateShard(shard =>
+      signerKeysRead(this.env, readConfig(this.env), this.ctx.props, shard)
     );
   }
 }

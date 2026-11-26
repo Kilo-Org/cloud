@@ -10,6 +10,7 @@ import type { PublicKeysResult } from '../../src/dos/UtsSignerDO';
 import {
   combineSignerKeys,
   newSignerKeysCache,
+  readThroughIsolateShard,
   SIGNER_KEYS_COPY_MS,
   SIGNER_READ_DEADLINE_MS,
   signerKeysAnswer,
@@ -236,5 +237,54 @@ describe('signerKeysAnswer', () => {
     for (const { read } of shards) {
       expect(read.reads).toEqual([0, 2000, 4000, 6000, 8000].map(offset => T0 + offset));
     }
+  });
+});
+
+describe('readThroughIsolateShard', () => {
+  const refusedRead = { status: 'refused' } as const;
+
+  it('keeps a shard while it answers, and moves to the next shard after a failed call', async () => {
+    const asked: number[] = [];
+    const ok = async (shard: number) => {
+      asked.push(shard);
+      return refusedRead;
+    };
+    await readThroughIsolateShard(ok);
+    await readThroughIsolateShard(ok);
+    const [first] = asked;
+    if (first === undefined) throw new Error('no shard asked');
+    expect(asked).toEqual([first, first]);
+    await expect(
+      readThroughIsolateShard(async shard => {
+        asked.push(shard);
+        throw new Error('Durable Object overloaded');
+      })
+    ).rejects.toThrow('overloaded');
+    await readThroughIsolateShard(ok);
+    const next = (first + 1) % KEY_SET_SHARD_COUNT;
+    expect(asked).toEqual([first, first, first, next]);
+  });
+
+  it('moves once when concurrent reads fail on the same shard', async () => {
+    const asked: number[] = [];
+    const { promise: release, resolve } = Promise.withResolvers<void>();
+    const failing = async (shard: number) => {
+      asked.push(shard);
+      await release;
+      throw new Error('Durable Object reset');
+    };
+    const reads = Array.from({ length: 4 }, () => readThroughIsolateShard(failing));
+    resolve();
+    const settled = await Promise.allSettled(reads);
+    expect(settled.every(outcome => outcome.status === 'rejected')).toBe(true);
+    const [failed] = asked;
+    if (failed === undefined) throw new Error('no shard asked');
+    expect(new Set(asked)).toEqual(new Set([failed]));
+    let after: number | null = null;
+    await readThroughIsolateShard(async shard => {
+      after = shard;
+      return refusedRead;
+    });
+    expect(after).toBe((failed + 1) % KEY_SET_SHARD_COUNT);
   });
 });

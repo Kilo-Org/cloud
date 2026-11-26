@@ -214,7 +214,10 @@ async function keySet(env: Env, config: StsConfig): Promise<Response> {
  * here as well as in the signer, so an emergency removal never waits on the object, and a change
  * of that list rebuilds the copy. The answer is `no-store`: a key-set removal is the only recall
  * of an STS token (design Q50), so no HTTP cache may hold the set, nor serve it stale while STS
- * answers 503; only the verifier's own 5-minute copy counts.
+ * answers 503; only the verifier's own 5-minute copy counts. A scheduled removal (a retired key
+ * leaving the ring) can therefore reach verifiers up to 10 minutes later: up to 5 minutes in this
+ * isolate copy, then up to 5 in the verifier's. An emergency removal is filtered from every
+ * answer, so it reaches them within the verifier's 5 minutes.
  */
 async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
   const cached = tokenJwksCache;

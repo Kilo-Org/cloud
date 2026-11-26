@@ -29,11 +29,11 @@ import {
 import * as schema from '../db/token-signer-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import {
-  KeyRingSchema,
   advanceKeyRing,
   keyRingDueAt,
   keepLatestSignedExp,
   publishedKeys,
+  readStoredKeyRing,
   recordSignedExp,
   type GeneratedKey,
   type KeyRing,
@@ -140,7 +140,12 @@ export class TokenSignerDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(drizzle(ctx.storage, { schema }), migrations);
       const stored: unknown = await ctx.storage.get(KEY_RING_NAME);
-      if (stored !== undefined) this.#ring = KeyRingSchema.parse(stored);
+      if (stored !== undefined) {
+        const { ring, cleaned } = readStoredKeyRing(stored);
+        this.#ring = ring;
+        // Stored with a retired key's private key by an earlier build: remove it from storage now.
+        if (cleaned) await ctx.storage.put(KEY_RING_NAME, ring);
+      }
       await this.#advance(Date.now());
     });
   }

@@ -194,6 +194,44 @@ describe('token signer', () => {
     });
   });
 
+  it('loads a ring stored with a retired private key, drops that key at load and signs with the current key', async () => {
+    const [{ kid: currentKid }] = (await signer().getJwks()).keys;
+    const retiredKid = 'r'.repeat(43);
+    const after = await runInDurableObject(signer(), async (_instance, state) => {
+      const stored = await state.storage.get<KeyRing>('token-key-ring');
+      if (stored === undefined) throw new Error('expected a stored ring');
+      const now = Date.now();
+      // As an earlier build stored it: the retired key kept its PKCS#8.
+      await state.storage.put('token-key-ring', {
+        keys: [
+          ...stored.keys,
+          {
+            kid: retiredKid,
+            pkcs8: 'legacy-private-key',
+            x: 'x'.repeat(43),
+            state: 'retired',
+            createdAt: now - 60_000,
+            activatesAt: now - 60_000,
+            retiredAt: now - 1_000,
+            maxExp: Math.floor(now / 1000) + 300,
+          },
+        ],
+      });
+      const restarted = new TokenSignerDO(state, env);
+      const jwks = await restarted.getJwks();
+      const loaded = (await state.storage.get<KeyRing>('token-key-ring'))?.keys;
+      const minted = await restarted.mint(signRequest());
+      return { jwks, loaded, minted };
+    });
+    expect(after.jwks.keys.map(key => key.kid)).toEqual([currentKid, retiredKid]);
+    expect(after.loaded?.map(key => [key.kid, key.pkcs8 === null])).toEqual([
+      [currentKid, false],
+      [retiredKid, true],
+    ]);
+    if (after.minted.status !== 'signed') throw new Error(`got ${after.minted.status}`);
+    expect(decodeProtectedHeader(after.minted.tokens[0].token).kid).toBe(currentKid);
+  });
+
   it('drops a revoked current key from the key set, promotes a fresh one and audits the removal', async () => {
     const [revoked] = (await signer().getJwks()).keys;
     // A deploy that lists the kid restarts the object with the new var; this instance has it.

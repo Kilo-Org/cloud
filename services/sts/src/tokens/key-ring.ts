@@ -16,31 +16,51 @@ import {
  */
 export type TokenKeyState = 'next' | 'current' | 'retired';
 
-const TokenKeySchema = z
-  .strictObject({
-    kid: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    /**
-     * The Ed25519 private key, PKCS#8, base64url; null once retired, since a retired key never
-     * signs again. Never leaves the token signer object.
-     */
-    pkcs8: z.string().min(1).nullable(),
-    /** The public key, base64url (JWK `x`). */
-    x: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    state: z.enum(['next', 'current', 'retired']),
-    createdAt: z.number().int().nonnegative(),
-    /** When a next key becomes current; when a current or retired key did. */
-    activatesAt: z.number().int().nonnegative(),
-    retiredAt: z.number().int().nonnegative().nullable(),
-    /** Latest `exp` (seconds) of a token this key signed, rounded up to a whole minute; 0 for none. */
-    maxExp: z.number().int().nonnegative(),
-  })
-  .refine(key => (key.pkcs8 === null) === (key.state === 'retired'), {
-    message: 'a retired key, and only a retired key, has no private key',
-  });
+const TokenKeyFieldsSchema = z.strictObject({
+  kid: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  /**
+   * The Ed25519 private key, PKCS#8, base64url; null once retired, since a retired key never
+   * signs again. Never leaves the token signer object.
+   */
+  pkcs8: z.string().min(1).nullable(),
+  /** The public key, base64url (JWK `x`). */
+  x: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  state: z.enum(['next', 'current', 'retired']),
+  createdAt: z.number().int().nonnegative(),
+  /** When a next key becomes current; when a current or retired key did. */
+  activatesAt: z.number().int().nonnegative(),
+  retiredAt: z.number().int().nonnegative().nullable(),
+  /** Latest `exp` (seconds) of a token this key signed, rounded up to a whole minute; 0 for none. */
+  maxExp: z.number().int().nonnegative(),
+});
+
+const TokenKeySchema = TokenKeyFieldsSchema.refine(
+  key => (key.pkcs8 === null) === (key.state === 'retired'),
+  { message: 'a retired key, and only a retired key, has no private key' }
+);
 export type TokenKey = z.infer<typeof TokenKeySchema>;
 
-export const KeyRingSchema = z.strictObject({ keys: z.array(TokenKeySchema).max(16) });
+const KeyRingSchema = z.strictObject({ keys: z.array(TokenKeySchema).max(16) });
 export type KeyRing = z.infer<typeof KeyRingSchema>;
+
+/** A stored ring, which an earlier build may have written with a retired key's private key. */
+const StoredKeyRingSchema = z.strictObject({ keys: z.array(TokenKeyFieldsSchema).max(16) });
+
+/**
+ * Reads the stored ring. A retired key that still holds its private key (stored before retired
+ * keys dropped it) loses it here; `cleaned` says the ring must be written back.
+ */
+export function readStoredKeyRing(stored: unknown): { ring: KeyRing; cleaned: boolean } {
+  const { keys } = StoredKeyRingSchema.parse(stored);
+  let cleaned = false;
+  for (const key of keys) {
+    if (key.state === 'retired' && key.pkcs8 !== null) {
+      key.pkcs8 = null;
+      cleaned = true;
+    }
+  }
+  return { ring: KeyRingSchema.parse({ keys }), cleaned };
+}
 
 export type GeneratedKey = { kid: string; pkcs8: string; x: string };
 

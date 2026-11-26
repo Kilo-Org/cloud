@@ -135,7 +135,10 @@ that finds no fresh copy, or a copy built under another list, calls the four sha
 parallel (each bounded at 5 s and retried like the manager key set), and stores the plain result
 only when all four answered; otherwise it answers 503 with `Retry-After: 30`. Requests that find the
 copy stale at the same moment each load it, because no promise is shared across requests: a few
-extra shard calls per isolate per 5 minutes, accepted.
+extra shard calls per isolate per 5 minutes, accepted. So a scheduled removal (a retired key
+leaving its ring) reaches verifiers up to 10 minutes later: up to 5 minutes in an isolate copy,
+then up to 5 in the verifier's. An emergency removal is filtered from every answer, so it reaches
+them within 5 minutes (see the runbook below for the rollout of the list itself).
 
 ### Cost per request
 

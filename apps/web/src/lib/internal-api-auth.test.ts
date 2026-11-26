@@ -77,6 +77,14 @@ describe('authorizeInternalApiRequest', () => {
     expect(readSts).toHaveBeenCalledWith('INTERNAL_API_SECRET');
   });
 
+  it('refuses a request without a credential before any STS read', async () => {
+    process.env.SECRETS_SOURCE = 'sts';
+    readSts.mockRejectedValue(new Error('STS denied the bundle request for this workload'));
+    expect(await statusOf({})).toBe(401);
+    expect(await statusOf({ 'x-internal-api-key': '' })).toBe(401);
+    expect(readSts).not.toHaveBeenCalled();
+  });
+
   it('fails the request instead of accepting the environment value when STS denies', async () => {
     process.env.SECRETS_SOURCE = 'sts';
     readSts.mockRejectedValue(new Error('STS denied the bundle request for this workload'));

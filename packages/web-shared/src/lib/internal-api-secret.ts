@@ -1,5 +1,4 @@
 import 'server-only';
-import { timingSafeEqual } from '@kilocode/encryption';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 /** Reads the internal API secret for one request and returns it as stored, empty included. */
@@ -27,16 +26,4 @@ export function installInternalApiSecretRead(read: InternalApiSecretRead): void 
 export async function readInternalApiSecret(): Promise<string> {
   const read = globalThis.__kilocodeInternalApiSecretRead;
   return read === undefined ? INTERNAL_API_SECRET : read();
-}
-
-/**
- * Whether a caller presented the internal API secret. A request with no credential is refused
- * without a read; an empty configured secret matches nothing.
- */
-export async function matchesInternalApiSecret(
-  presented: string | null | undefined
-): Promise<boolean> {
-  if (!presented) return false;
-  const expected = await readInternalApiSecret();
-  return Boolean(expected) && timingSafeEqual(presented, expected);
 }

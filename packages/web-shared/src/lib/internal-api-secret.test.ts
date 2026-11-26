@@ -1,8 +1,4 @@
-import {
-  installInternalApiSecretRead,
-  matchesInternalApiSecret,
-  readInternalApiSecret,
-} from './internal-api-secret';
+import { installInternalApiSecretRead, readInternalApiSecret } from './internal-api-secret';
 
 let mockEnvSecret = 'env-only-secret';
 
@@ -57,43 +53,5 @@ describe('readInternalApiSecret with the installed web read', () => {
     const error = new Error('STS denied the bundle request for this workload');
     installedRead.mockRejectedValue(error);
     await expect(readInternalApiSecret()).rejects.toBe(error);
-  });
-});
-
-describe('matchesInternalApiSecret', () => {
-  it('accepts only the configured value when nothing is installed', async () => {
-    await expect(matchesInternalApiSecret('env-only-secret')).resolves.toBe(true);
-    await expect(matchesInternalApiSecret(DELIVERED)).resolves.toBe(false);
-    await expect(matchesInternalApiSecret('env-only-secret-x')).resolves.toBe(false);
-  });
-
-  it('accepts only the installed value when a read is installed', async () => {
-    installInternalApiSecretRead(installedRead);
-    await expect(matchesInternalApiSecret(DELIVERED)).resolves.toBe(true);
-    await expect(matchesInternalApiSecret('env-only-secret')).resolves.toBe(false);
-  });
-
-  it.each([null, undefined, ''])(
-    'refuses an absent credential (%j) without a read',
-    async presented => {
-      installInternalApiSecretRead(installedRead);
-      await expect(matchesInternalApiSecret(presented)).resolves.toBe(false);
-      expect(installedRead).not.toHaveBeenCalled();
-    }
-  );
-
-  it('matches nothing when the value is empty', async () => {
-    mockEnvSecret = '';
-    await expect(matchesInternalApiSecret('anything')).resolves.toBe(false);
-    installInternalApiSecretRead(installedRead);
-    installedRead.mockResolvedValue('');
-    await expect(matchesInternalApiSecret('anything')).resolves.toBe(false);
-  });
-
-  it('rejects instead of matching the configured value when the installed read fails', async () => {
-    installInternalApiSecretRead(installedRead);
-    const error = new Error('STS denied the bundle request for this workload');
-    installedRead.mockRejectedValue(error);
-    await expect(matchesInternalApiSecret('env-only-secret')).rejects.toBe(error);
   });
 });

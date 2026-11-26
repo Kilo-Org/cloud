@@ -1,3 +1,4 @@
+import { timingSafeEqual } from '@kilocode/encryption';
 import { and, eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -5,14 +6,16 @@ import { z } from 'zod';
 
 import { byoc_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { matchesInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 import { decodeVercelConnection } from '@/lib/byoc/vercel-connection';
 
 const responseHeaders = { 'Cache-Control': 'no-store' };
 
-function isAuthorized(request: NextRequest): Promise<boolean> {
-  return matchesInternalApiSecret(request.headers.get('x-internal-api-key'));
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  const presented = request.headers.get('x-internal-api-key');
+  const expected = presented ? await readInternalApiSecret() : '';
+  return Boolean(expected && presented && timingSafeEqual(presented, expected));
 }
 
 export async function GET(

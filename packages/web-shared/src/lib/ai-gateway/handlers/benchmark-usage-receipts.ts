@@ -8,8 +8,9 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { inArray } from 'drizzle-orm';
 import { microdollar_usage } from '@kilocode/db/schema';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { matchesInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 /**
  * The authenticated read that turns a deferred usage id into an actual charge.
@@ -89,7 +90,8 @@ export async function handleBenchmarkUsageReceipts(request: Request): Promise<Re
 async function authorize(request: Request): Promise<Response | null> {
   const presented =
     request.headers.get('x-internal-api-key') ?? request.headers.get('x-internal-secret');
-  if (!(await matchesInternalApiSecret(presented))) {
+  const expected = presented ? await readInternalApiSecret() : '';
+  if (!expected || !presented || !timingSafeEqual(presented, expected)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return null;

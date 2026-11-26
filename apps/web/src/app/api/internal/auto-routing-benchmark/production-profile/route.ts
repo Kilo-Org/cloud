@@ -21,7 +21,8 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { auto_model, microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { matchesInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { eq, sql, and } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
@@ -34,7 +35,8 @@ const WINDOW_HOURS = 6;
 
 export async function GET(req: NextRequest) {
   const token = extractBearerToken(req.headers.get('authorization'));
-  if (!(await matchesInternalApiSecret(token))) {
+  const expected = token ? await readInternalApiSecret() : '';
+  if (!expected || !token || !timingSafeEqual(token, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

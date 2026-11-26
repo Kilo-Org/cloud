@@ -32,6 +32,26 @@ const FAKE_STRIPE_RESTRICTED_KEY = ['rk', '_live_', 'x'.repeat(24)].join('');
 const FAKE_STRIPE_WEBHOOK_SECRET = ['whs', 'ec_', 'x'.repeat(24)].join('');
 const FAKE_GITLAB_TOKEN = ['gl', 'pat-', 'x'.repeat(20)].join('');
 const FAKE_GOOGLE_TOKEN = ['ya', '29.', 'FAKE'.repeat(6)].join('');
+const FAKE_GOOGLE_API_KEY = ['AI', 'za', 'fake'.repeat(8), '1_-'].join('');
+const FAKE_GOOGLE_AUTH_KEY = ['A', 'Q.', 'fake0123'.repeat(5)].join('');
+const FAKE_NPM_TOKEN = ['np', 'm_', 'fake0123'.repeat(4), 'AbC4'].join('');
+const FAKE_SENTRY_USER_TOKEN = ['sntry', 'u_', 'abcd0123'.repeat(8)].join('');
+const FAKE_SENTRY_ORG_TOKEN_PREFIX = [
+  'sntry',
+  's_',
+  Buffer.from(
+    JSON.stringify({
+      iat: 123,
+      url: 'https://example.com',
+      region_url: 'https://example.com',
+      org: 'example',
+    })
+  ).toString('base64'),
+  '_',
+].join('');
+const FAKE_SENTRY_ORG_TOKEN = `${FAKE_SENTRY_ORG_TOKEN_PREFIX}${Buffer.alloc(32, 0xfb)
+  .toString('base64')
+  .replace(/=+$/, '')}`;
 const SLACK_WEBHOOK_HOST = ['https://hooks', 'slack.com'].join('.');
 const DISCORD_WEBHOOK_PATH = ['/api', 'webhooks'].join('/');
 const PRIVATE_KEY_HEADER = ['-----BEGIN', 'PRIVATE KEY-----'].join(' ');
@@ -66,6 +86,16 @@ describe('redactSecretValues', () => {
     ['a Slack bot token', FAKE_SLACK_BOT_TOKEN, '[Filtered]'],
     ['a Slack user token', FAKE_SLACK_USER_TOKEN, '[Filtered]'],
     ['a Slack app token', FAKE_SLACK_APP_TOKEN, '[Filtered]'],
+    ['a Google API key', `failed for ${FAKE_GOOGLE_API_KEY}`, 'failed for [Filtered]'],
+    ['a Google authorization key', FAKE_GOOGLE_AUTH_KEY, '[Filtered]'],
+    ['an npm access token', FAKE_NPM_TOKEN, '[Filtered]'],
+    ['a Sentry user token', FAKE_SENTRY_USER_TOKEN, '[Filtered]'],
+    ['a Sentry organization token', `(${FAKE_SENTRY_ORG_TOKEN})`, '([Filtered])'],
+    [
+      'a Sentry organization token with a slash segment',
+      `${FAKE_SENTRY_ORG_TOKEN_PREFIX}/s/${'A'.repeat(40)}`,
+      '[Filtered]',
+    ],
   ])('replaces %s', (_name, input, expected) => {
     expect(redactSecretValues(input)).toBe(expected);
   });
@@ -94,6 +124,11 @@ describe('redactSecretValues', () => {
     'Basic plan users get 5 requests',
     'ghp_short',
     'xoxb-short',
+    'AIza-short',
+    'AQ.short',
+    'npm_install_job',
+    'sntryu_placeholder',
+    'sntrys_version_name',
     'statement timeout after 30000ms on relation "kilocode_users"',
     'https://app.kilo.sh/organizations/0f8fad5b-d9cb-469f-a165-70867728950e/usage?tab=models',
     'fra1::iad1::abcde-1732451234567-0123456789ab',
@@ -108,6 +143,7 @@ describe('redactSecretValues', () => {
     ['a JWT start with one long segment', `eyJa.${'a'.repeat(200_000)}`],
     ['a bearer prefix with long whitespace', `Bearer${' '.repeat(200_000)}`],
     ['repeated key prefixes', 'sk-x '.repeat(40_000)],
+    ['a Sentry token prefix with no delimiter', `sntrys_eyJ${'a'.repeat(200_000)}`],
   ])('redacts 200 KB of %s in linear time', (_name, input) => {
     const started = performance.now();
     redactSecretValues(input, input.length);

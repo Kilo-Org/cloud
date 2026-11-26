@@ -119,9 +119,10 @@ data.
 - **List:** UTF-8 JSON (`RevocationListWireSchema`): `{ revoked_before: { <sub>: <seconds> },
   revoked_sids: [], revoked_kids: [], revoked_pat_ids: [], blocked_accounts: [] }`. Unknown fields
   are ignored.
-- The library rejects a head older than the one it holds, a head over 30 s old, and a head more
-  than 5 s in the future (the design 5.6 clock skew); a head up to 5 s ahead ages from its fetch
-  time. It fetches the list only when `list_hash` changes.
+- The library rejects a head older than the one it holds, a head signed in the same second as the
+  held one over another list (two feed objects sign heads, and `iat` has one-second resolution),
+  a head over 30 s old, and a head more than 5 s in the future (the design 5.6 clock skew); a head
+  up to 5 s ahead ages from its fetch time. It fetches the list only when `list_hash` changes.
 
 ## PAT format
 
@@ -176,7 +177,7 @@ Fail-closed and caching rules:
 | JWKS: unknown `kid` refreshes at most once per 5 min per set, also when the requests are cancelled | `jwks.ts` | unknown kid |
 | Feed: background refresh 10 s after the last fetch, wait once the head is over 30 s old; 1 s fetch timeout | `revocation.ts` | `revocation.test.ts` request-driven revalidation |
 | Feed: the library verifies each head under a feed key and each new list against its hash | `revocation.ts` `verifyFeedHead`, `parseRevocationList` | heads and lists that do not count |
-| Feed: a head over 30 s old, more than 5 s in the future, or older than the held one counts as failed | `revocation.ts` | heads and lists that do not count; heads from the future |
+| Feed: a head over 30 s old, more than 5 s in the future, older than the held one, or of the held head's second over another list counts as failed | `revocation.ts` | heads and lists that do not count; heads from the future |
 | Feed: retry wait 5 s, doubling per failure up to 30 s while the copy still serves short tokens | `revocation.ts` | head-age limits while the feed is down |
 | Feed: tokens up to 10 min accept a 10-min head; longer credentials refuse past 60 s, even cached | `maxHeadAgeForLifetime` | head-age limits while the feed is down |
 | Cold start: one bootstrap call fills the UTS key set and the feed; `warm` starts it beside the STS key set | `bootstrap.ts`, `warm` | `bootstrap.test.ts` |

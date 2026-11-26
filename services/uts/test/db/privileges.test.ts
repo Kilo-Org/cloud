@@ -51,11 +51,13 @@ const FUNCTION_WRITTEN_TABLES = [
 ];
 
 /**
- * Tables the app login cannot even read: only the sign-in functions reach the flows, and only the
- * subject operation, import and app-event functions (migration 0014) reach the rest.
+ * Tables the app login cannot even read: only the sign-in functions reach the flows and the
+ * per-network wrong email code counts (migration 0018), and only the subject operation, import
+ * and app-event functions (migration 0014) reach the rest.
  */
 const FUNCTION_ONLY_TABLES = [
   'sign_in_flows',
+  'network_email_code_failures',
   'subject_operations',
   'subject_tombstones',
   'app_account_events',

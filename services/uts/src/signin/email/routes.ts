@@ -33,7 +33,9 @@ import { anonymousWriteRetryAfter } from '../limits';
  *   statement, then hands the message to the mail port, and shows the code entry.
  * * `POST /signin/email/code` checks the newest code sent to the address. The fifth wrong entry
  *   exhausts the code; the email's link still works, so wrong entries by someone else cannot lock
- *   the address's owner out (design 5.3).
+ *   the address's owner out (design 5.3). A client network (IPv4 /24, IPv6 /48) may enter 30
+ *   wrong codes an hour over all addresses (`network_limited` past that), so one network cannot
+ *   guess across many addresses.
  * * `GET /signin/email/link` only shows a confirmation page: a mail scanner that opens the link
  *   changes nothing. Its button posts the token to `POST /signin/email/link`.
  *
@@ -273,6 +275,7 @@ export async function handleEmailRequest(
       return codeEntryPage(email, result.entriesLeft > 0, message, 400);
     }
     if (result.outcome === 'codes_stopped') return refusalPage('codes_stopped', null);
+    if (result.outcome === 'network_limited') return refusalPage('network_limited', null);
     return refusalPage(result.outcome, result.returnTo);
   }
 

@@ -183,7 +183,10 @@ export type SignInRefusal =
   | 'no_sso_connection'
   | 'invalid_link'
   | 'code_locked'
-  | 'codes_stopped';
+  | 'codes_stopped'
+  | 'network_limited'
+  | 'check_failed'
+  | 'recipient_not_allowed';
 
 const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   invalid_state: {
@@ -235,6 +238,19 @@ const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   codes_stopped: {
     status: 429,
     message: 'Too many wrong codes for this address. Use the link in the email.',
+  },
+  network_limited: {
+    status: 429,
+    message:
+      'Too many wrong codes from your network. Use the link in the email, or try again in an hour.',
+  },
+  check_failed: {
+    status: 400,
+    message: 'The check that you are a person did not pass. Go back and try again.',
+  },
+  recipient_not_allowed: {
+    status: 403,
+    message: 'This test environment sends sign-in email only to test addresses.',
   },
 };
 

@@ -400,6 +400,12 @@ export const NetworkUserCodeFailureRowSchema = z.strictObject({
   window_started_at: timestamp,
 });
 
+export const NetworkEmailCodeFailureRowSchema = z.strictObject({
+  client_network: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
+});
+
 export const PersonalAccessTokenRowSchema = z.strictObject({
   id: uuid,
   account_id: z.string(),
@@ -623,6 +629,7 @@ export const IDENTITY_STORE_TABLES = {
   sign_in_flows: SignInFlowRowSchema,
   account_user_code_failures: AccountUserCodeFailureRowSchema,
   network_user_code_failures: NetworkUserCodeFailureRowSchema,
+  network_email_code_failures: NetworkEmailCodeFailureRowSchema,
   personal_access_tokens: PersonalAccessTokenRowSchema,
   org_bot_keys: OrgBotKeyRowSchema,
   ci_trust_policies: CiTrustPolicyRowSchema,

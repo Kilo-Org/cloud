@@ -11,7 +11,7 @@ import type { UtsConfig } from '../env';
 import { classifyFailure } from '../oauth/errors';
 import { base64url, isRandomCredential, randomCredential, sha256 } from '../token/credentials';
 import type { SignInMailer } from './email/mailer';
-import { anonymousWriteRefusal } from './limits';
+import { anonymousWriteRetryAfter } from './limits';
 import { requestNetwork } from './network';
 import { type SignInChoices, continuePage, messagePage, unavailablePage } from './pages';
 import type { SignInConfig } from './providers/config';
@@ -268,6 +268,18 @@ export function refusalPage(refusal: SignInRefusal, returnTo: string | null): Re
   return messagePage('Sign in to Kilo', message, status, returnTo);
 }
 
+/** Too many anonymous sign-in starts from one network: 429 with `Retry-After`, and a way back. */
+export function rateLimitedPage(retryAfter: number, returnTo: string | null): Response {
+  const response = messagePage(
+    'Sign in to Kilo',
+    'Too many sign-in attempts from your network. Wait a minute and try again.',
+    429,
+    returnTo
+  );
+  response.headers.set('Retry-After', String(retryAfter));
+  return response;
+}
+
 /** A provider or mail service failed: 502 with `Retry-After` when a retry can succeed. */
 export function upstreamFailurePage(retryable: boolean, returnTo: string | null): Response {
   const response = messagePage(
@@ -352,11 +364,11 @@ export async function beginFlow(
     return messagePage('Sign in to Kilo', 'Unknown sign-in request.', 400, params.returnTo);
   } else {
     // A sign-in start stores a flow row before anyone is signed in.
-    const limited = anonymousWriteRefusal(
+    const retryAfter = anonymousWriteRetryAfter(
       requestNetwork(request).clientIp,
       provider === 'workos' ? 'sso_sign_in_start' : 'provider_sign_in_start'
     );
-    if (limited !== null) return limited;
+    if (retryAfter !== null) return rateLimitedPage(retryAfter, params.returnTo);
   }
   const flow = await newFlow();
   let started;

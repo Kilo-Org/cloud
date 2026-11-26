@@ -15,6 +15,7 @@ import {
   refusalPage,
   returnPathOf,
   signedInRedirect,
+  rateLimitedPage,
   upstreamFailurePage,
 } from '../flows';
 import { escapeHtml, messagePage, page, unavailablePage } from '../pages';
@@ -22,7 +23,7 @@ import { logMisconfigured } from '../providers/config';
 import { normalizeEmail } from '../providers/exchange';
 import { requestNetwork } from '../network';
 import { isSameOriginPost } from '../requests';
-import { anonymousWriteRefusal } from '../limits';
+import { anonymousWriteRetryAfter } from '../limits';
 
 /**
  * Email sign-in (design 5.1, 5.3): one email carries a link and, unless codes are stopped for the
@@ -192,8 +193,8 @@ export async function handleEmailRequest(
       return messagePage('Sign in to Kilo', 'Enter a valid email address.', 400, returnTo);
     }
     // The start stores an email row and sends mail before anyone is signed in.
-    const limited = anonymousWriteRefusal(network.clientIp, 'email_sign_in_start');
-    if (limited !== null) return limited;
+    const retryAfter = anonymousWriteRetryAfter(network.clientIp, 'email_sign_in_start');
+    if (retryAfter !== null) return rateLimitedPage(retryAfter, returnTo);
     const linkToken = randomCredential();
     const linkHash = await sha256(linkToken);
     const binder = randomCredential();

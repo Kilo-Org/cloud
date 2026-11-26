@@ -92,7 +92,7 @@ export type SignInInput = PasskeyUse & {
 
 export type SignInResult =
   | { outcome: 'signed_in'; session: BrowserSession }
-  | { outcome: 'challenge_used' | 'counter_conflict' | 'account_inactive' };
+  | { outcome: 'challenge_used' | 'counter_conflict' | 'account_inactive' | 'sso_required' };
 
 export type StepUpInput = PasskeyUse & {
   environment: UtsEnvironment;
@@ -293,7 +293,9 @@ const SignInRowSchema = z.discriminatedUnion('outcome', [
     session_account: z.string(),
     signed_in_at: z.date(),
   }),
-  z.object({ outcome: z.enum(['challenge_used', 'counter_conflict', 'account_inactive']) }),
+  z.object({
+    outcome: z.enum(['challenge_used', 'counter_conflict', 'account_inactive', 'sso_required']),
+  }),
 ]);
 
 const StepUpRowSchema = z.discriminatedUnion('outcome', [

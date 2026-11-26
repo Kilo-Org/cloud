@@ -879,18 +879,28 @@ async function run(admin: pg.Client) {
       '/signin/email/start',
       formPost({ email: keep(`flood-${randomBytes(3).toString('hex')}@example.com`) })
     );
+    const emailPage = await emailStart.text();
+    // SSO starts have their own allowance, so an office behind this address still reaches SSO.
+    const ssoStart = await browse(
+      '/signin/sso/start',
+      formPost({ email: keep(`office-${randomBytes(3).toString('hex')}@${SSO_DOMAIN}`) })
+    );
     pinnedAddress = null;
     const other = await browse('/signin/oauth/google/start');
     check(
       statuses.slice(0, 10).every(status => status === 302 || status === 303) &&
         statuses[10] === 429 &&
         emailStart.status === 429 &&
+        emailStart.headers.get('Retry-After') !== null &&
+        emailPage.includes('Too many sign-in attempts') &&
+        ssoStart.status === 200 &&
         other.status !== 429,
-      `anonymous start limit ${statuses.join()} email ${emailStart.status} other ${other.status}`
+      `anonymous start limit ${statuses.join()} email ${emailStart.status} sso ${ssoStart.status} other ${other.status}`
     );
     log('4b anonymous start limit', {
       sameAddress: statuses,
-      emailStartSameAddress: emailStart.status,
+      emailStartSameAddress: `${emailStart.status} (page, Retry-After ${emailStart.headers.get('Retry-After')})`,
+      ssoStartSameAddress: ssoStart.status,
       otherAddress: other.status,
     });
     jar.clear();

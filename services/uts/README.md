@@ -226,7 +226,8 @@ an account it chose.
 The endpoints are fixed in `src/signin/providers/specs.ts`, checked against each provider's
 OpenID Connect discovery document or API reference; nothing is discovered per request. An ID
 token is verified against the provider's key set (signature, `iss`, `aud`, `exp`, `iat` and the
-flow's `nonce`); `jose` keeps each key set per isolate and refetches it on an unknown `kid`.
+flow's `nonce`); `jose` keeps each key set per isolate for 10 minutes (`cacheMaxAge`) and
+refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`).
 
 | Provider | Protocol | PKCE | Client authentication | Scopes | Proof of the address |
 |---|---|---|---|---|---|
@@ -239,12 +240,13 @@ flow's `nonce`); `jose` keeps each key set per isolate and refetches it on an un
 | GitLab | OpenID Connect | S256 | `client_secret_post` | `openid email` | `email_verified` |
 | Discord | OAuth 2; `/users/@me` | S256 | `client_secret_post` | `identify email` | `verified` |
 | LinkedIn | OpenID Connect | none offered | `client_secret_post` | `openid profile email` | `email_verified` |
-| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | API key | none | never: SSO never links by email |
+| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
 
 ### Accounts and linking (design 5.2)
 
 - A known method signs in to its account. A blocked account, or an account whose address is in a
-  verified domain of an org that requires SSO (for any method but SSO), is refused.
+  verified domain of an org that requires SSO (for any method but SSO, passkeys included: 0009
+  redefines `uts.complete_passkey_sign_in()`), is refused.
 - A new method links to an existing account only when the provider proves the address and exactly
   one account holds it as its primary email, or inside a browser session of the account with an
   open tier A `method_add` pass of that session, which the link consumes and the method's row
@@ -286,13 +288,17 @@ development entry records each message (`GET /__dev/mail?to=`).
 
 Open items before deploy:
 
+- The provider, SSO and email sign-in starts are anonymous sign-in writes (`src/signin/limits.ts`):
+  per isolate, 10 a minute per IPv4 address or IPv6 /48, shared with passkey challenges and device
+  authorizations, and SSO starts 60 a minute in their own window, because an org's staff often
+  share one egress address. A refused start answers the sign-in page's message page with 429 and
+  `Retry-After`.
 - Before a mail sender is wired: past the code cap every sign-in email still carries the link, so
-  an address can be sent many emails. Wiring a sender needs first a per-network cap on
-  unauthenticated `POST /signin/email/start` requests and a Turnstile check on the email start form
-  (its secret is production configuration). A total cap per address is not used, because anyone
-  could then spend the owner's emails and lock the owner out.
-- The provider and SSO starts are unauthenticated too, and each stores a flow row: the same
-  per-network cap covers `GET /signin/oauth/<provider>/start` and `POST /signin/sso/start`.
+  an address can be sent many emails. Wiring a sender needs first a Turnstile check on the email
+  start form (its secret is production configuration) and a per-network counter of wrong email
+  code entries (the per-address counter alone lets one network guess across many addresses). A
+  total cap per address is not used, because anyone could then spend the owner's emails and lock
+  the owner out.
 - The UTS cron (slice 3.9) must call `uts.maintain_provider_sign_in_rows()` beside
   `uts.maintain_sign_in_rows()` before any environment offers these methods; without it flow and
   email rows grow without bound.

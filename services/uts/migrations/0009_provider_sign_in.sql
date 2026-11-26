@@ -1120,6 +1120,92 @@ BEGIN
 END
 $$;
 
+-- `uts.complete_passkey_sign_in()` (migration 0008) with the SSO rule of design 5.2: an account
+-- whose address is in a verified domain of an org that requires SSO signs in through SSO only, so
+-- a passkey sign-in is refused (`sso_required`, a denied row at most once per account per minute),
+-- as every other method is in `uts.sign_in_with_method()`. The challenge stays consumed and the
+-- counter moved, as for a blocked account. Everything else is as in 0008; the grant stays.
+CREATE OR REPLACE FUNCTION uts.complete_passkey_sign_in(
+  p_environment text,
+  p_challenge_hash bytea,
+  p_passkey_id uuid,
+  p_previous_count bigint,
+  p_new_count bigint,
+  p_backed_up boolean,
+  p_session_token_hash bytea,
+  p_user_agent text,
+  p_client_ip inet,
+  p_asn integer,
+  p_country text,
+  p_city text
+) RETURNS TABLE (outcome text, session_id uuid, session_account text, signed_in_at timestamptz)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  owner_account text;
+  account_state uts.account_status;
+  account_email text;
+BEGIN
+  UPDATE uts.webauthn_challenges AS challenge SET status = 'consumed', consumed_at = now()
+  WHERE challenge.challenge_hash = p_challenge_hash
+    AND challenge.ceremony = 'sign_in'
+    AND challenge.status = 'issued'
+    AND challenge.expires_at > now();
+  IF NOT FOUND THEN
+    outcome := 'challenge_used';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  owner_account := uts.use_passkey(p_passkey_id, NULL, p_previous_count, p_new_count, p_backed_up);
+  IF owner_account IS NULL THEN
+    outcome := 'counter_conflict';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  SELECT account.status, account.primary_email INTO account_state, account_email
+  FROM uts.accounts AS account WHERE account.id = owner_account;
+  IF account_state IS DISTINCT FROM 'active' THEN
+    outcome := 'account_inactive';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  IF uts.sso_required_for(account_email) THEN
+    PERFORM uts.audit_account_refusal(
+      p_environment, owner_account, 'ai.kilo.uts.sign_in.denied', 3002, 1,
+      jsonb_build_object('method', 'passkey', 'passkeyId', p_passkey_id), 'sso_required'
+    );
+    outcome := 'sso_required';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  INSERT INTO uts.browser_sessions (
+    account_id, token_hash, auth_time, amr, idle_expires_at, expires_at, user_agent, client_ip,
+    asn, country, city
+  ) VALUES (
+    owner_account, p_session_token_hash, now(), '{passkey}', now() + interval '14 days',
+    now() + interval '30 days', p_user_agent, p_client_ip, p_asn, p_country, p_city
+  ) RETURNING id INTO session_id;
+  PERFORM uts.write_audit_event(
+    p_environment, 'ai.kilo.uts.session.created', 3002, 1, 'success', NULL, owner_account,
+    jsonb_build_object(
+      'method', 'passkey',
+      'sessionKind', 'browser',
+      'sessionId', session_id,
+      'passkeyId', p_passkey_id,
+      'country', p_country,
+      'asn', p_asn
+    )
+  );
+  outcome := 'signed_in';
+  session_account := owner_account;
+  signed_in_at := now();
+  RETURN NEXT;
+END
+$$;
+
 -- Deletes sign-in flows and sign-in emails 1 hour past their 10-minute lifetime, and address
 -- limits whose windows and stop have all ended, at most 5,000 of each kind per call, as
 -- `uts.maintain_sign_in_rows()` does.

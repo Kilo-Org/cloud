@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { anonymousWriteRefusal } from '../../src/signin/limits';
+import { anonymousWriteRefusal, anonymousWriteRetryAfter } from '../../src/signin/limits';
 import { anonymousWriter } from '../../src/signin/network';
 
 /**
@@ -110,5 +110,19 @@ describe('anonymous sign-in write limit', () => {
       expect(anonymousWriteRefusal(address, 'device_authorization', start + 1)).toBeNull();
     }
     expect(anonymousWriteRefusal('198.51.6.1', 'device_authorization', start + 2)).toBeNull();
+  });
+
+  it('gives SSO starts their own 60 a minute, apart from the shared 10', () => {
+    const start = 3_000_000;
+    const office = '198.51.9.9';
+    for (let write = 0; write < 60; write++) {
+      expect(anonymousWriteRetryAfter(office, 'sso_sign_in_start', start + write)).toBeNull();
+    }
+    expect(anonymousWriteRetryAfter(office, 'sso_sign_in_start', start + 30_000)).toBe(30);
+    // The SSO starts left the shared window untouched: 10 more writes of other kinds pass.
+    for (let write = 0; write < 10; write++) {
+      expect(anonymousWriteRetryAfter(office, 'provider_sign_in_start', start + write)).toBeNull();
+    }
+    expect(anonymousWriteRetryAfter(office, 'email_sign_in_start', start + 100)).toBe(60);
   });
 });

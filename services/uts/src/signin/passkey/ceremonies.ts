@@ -110,7 +110,8 @@ type Refusal =
   | 'already_registered'
   | 'limit_reached'
   | 'no_passkey'
-  | 'account_inactive';
+  | 'account_inactive'
+  | 'sso_required';
 
 const REFUSAL_STATUS: Record<Refusal, number> = {
   no_session: 401,
@@ -123,6 +124,8 @@ const REFUSAL_STATUS: Record<Refusal, number> = {
   limit_reached: 409,
   no_passkey: 409,
   account_inactive: 403,
+  // The account's address is in a domain whose org requires SSO (design 5.2).
+  sso_required: 403,
 };
 
 function refused(reason: Refusal): Response {

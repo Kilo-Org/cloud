@@ -300,6 +300,49 @@ describe('passkey sign-in', () => {
     expect(await auditTypes(accountId)).toEqual([]);
   });
 
+  it('refuses an account whose address is in a domain that requires SSO (migration 0009)', async () => {
+    const accountId = await insertAccount(owner);
+    const orgId = randomUUID();
+    const domain = `${randomBytes(4).toString('hex')}.example.org`;
+    await owner.query(
+      `INSERT INTO uts.sso_connections (org_id, workos_connection_id) VALUES ($1, $2)`,
+      [orgId, `conn_${randomBytes(6).toString('hex')}`]
+    );
+    await owner.query(
+      `INSERT INTO uts.sso_domains (org_id, domain, status, dns_challenge_hash, verified_at)
+       VALUES ($1, $2, 'verified', $3, now())`,
+      [orgId, domain, randomBytes(32)]
+    );
+    await owner.query(
+      `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, 'required', 1)`,
+      [orgId]
+    );
+    await owner.query('UPDATE uts.accounts SET primary_email = $2 WHERE id = $1', [
+      accountId,
+      `member@${domain}`,
+    ]);
+    const passkey = await storedPasskey(accountId, 7);
+    const sessionTokenHash = sha256(token());
+    const { hash } = await challenge('sign_in');
+    expect(
+      await signIn.completeSignIn({
+        environment,
+        challengeHash: hash,
+        passkeyId: passkey.id,
+        previousCount: 7n,
+        newCount: 8n,
+        backedUp: false,
+        sessionTokenHash,
+        network,
+      })
+    ).toEqual({ outcome: 'sso_required' });
+    const sessions = await owner.query('SELECT 1 FROM uts.browser_sessions WHERE token_hash = $1', [
+      sessionTokenHash,
+    ]);
+    expect(sessions.rows).toEqual([]);
+    expect(await auditTypes(accountId)).toEqual(['ai.kilo.uts.sign_in.denied']);
+  });
+
   it('knows no passkey of another relying party, and writes one refusal row per minute', async () => {
     const accountId = await insertAccount(owner);
     const passkey = await storedPasskey(accountId);

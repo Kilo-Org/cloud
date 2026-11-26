@@ -25,6 +25,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     const token = isProduction ? key : 'fake-token';
 
     posthog.init(token, {
+      session_recording: { maskAllInputs: true },
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
       disable_web_experiments: false,

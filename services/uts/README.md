@@ -204,6 +204,31 @@ backfill adds an entry no publish carried, that the feed serves from feed object
 that the head stays under 20 seconds old, and that every head verifies under a feed key of the key
 set, over HTTPS and over the `FeedReader` binding.
 
+Two runs bring up their own Workers and a fresh identity-store database, so neither needs a
+`wrangler dev` server running: `scripts/keyset-e2e.ts` and `scripts/relay-e2e.ts`. Both take
+`UTS_E2E_ADMIN_URL`, the admin login of `scripts/local-db.sh up`, on a loopback host and without
+query parameters, and `UTS_E2E_PORT`, the first of the run's ports (9300 and 9310 by default). Each
+drops and recreates its own database (`uts_keyset_e2e`, `uts_relay_e2e`), applies the migrations,
+and gives `uts_app_a`, `uts_pat_a` and `uts_reader_a` a random password for the run. Roles are
+cluster-wide, so run them one at a time. Each prints a `PASS` line per check, a final pass line and
+the path of its log directory, and exits nonzero when a check fails.
+
+`scripts/keyset-e2e.ts` starts the mint and feed Workers under `wrangler dev`, in one persisted
+state directory, and runs the key-set proof: 36 keys with `Age` and `Kilo-Key-Set-Oldest-Age`
+under 17 seconds and cache windows that end with the 24-hour hold, no private key part, RFC 8414
+metadata, a token signed through `/__dev/sign` that verifies with jose while a tampered one does
+not, a restart that keeps the same kids without bootstrapping a signer, an intruder Worker whose
+binding carries another caller that gets no keys, the held set while the mint Worker is down,
+signer 03's rotated keys standing beside signer 07's held ones from a restarted shard, and a cold
+start of both Workers over a shard that stored signer 07's keys.
+
+`scripts/relay-e2e.ts` runs the mint Worker and the audit relay consumer in one `wrangler dev`
+over two configs (`--env local`) with the local queue and the consumer's R2 archive, and runs the
+outbox proof: a transaction held open for 7 seconds holds every shard's watermark, 600 rows
+inserted while the app login cannot move a watermark move nothing, 6,000 rows follow once it can,
+terminated relay sessions resend rather than skip, every shard relays, and the archive holds every
+row once, contiguous, in transaction order. A cron run after the drain logs no lag alert.
+
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
 only `wrangler.dev.jsonc` runs, and the claim set must name the development issuer. That config

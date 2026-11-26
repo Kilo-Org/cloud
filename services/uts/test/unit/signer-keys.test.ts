@@ -243,48 +243,66 @@ describe('signerKeysAnswer', () => {
 describe('readThroughIsolateShard', () => {
   const refusedRead = { status: 'refused' } as const;
 
-  it('keeps a shard while it answers, and moves to the next shard after a failed call', async () => {
-    const asked: number[] = [];
-    const ok = async (shard: number) => {
-      asked.push(shard);
+  /** The shard this isolate asks now, through one read that answers. */
+  async function currentShard(): Promise<number> {
+    let asked: number | null = null;
+    await readThroughIsolateShard(async shard => {
+      asked = shard;
       return refusedRead;
-    };
-    await readThroughIsolateShard(ok);
-    await readThroughIsolateShard(ok);
-    const [first] = asked;
-    if (first === undefined) throw new Error('no shard asked');
-    expect(asked).toEqual([first, first]);
-    await expect(
-      readThroughIsolateShard(async shard => {
-        asked.push(shard);
+    });
+    if (asked === null) throw new Error('no shard asked');
+    return asked;
+  }
+
+  const failOnce = () =>
+    expect(
+      readThroughIsolateShard(async () => {
         throw new Error('Durable Object overloaded');
       })
     ).rejects.toThrow('overloaded');
-    await readThroughIsolateShard(ok);
-    const next = (first + 1) % KEY_SET_SHARD_COUNT;
-    expect(asked).toEqual([first, first, first, next]);
+
+  it('keeps a shard while it answers, and moves to another shard after a failed call', async () => {
+    const first = await currentShard();
+    expect(await currentShard()).toBe(first);
+    await failOnce();
+    const next = await currentShard();
+    expect(next).not.toBe(first);
+    expect(next).toBeGreaterThanOrEqual(0);
+    expect(next).toBeLessThan(KEY_SET_SHARD_COUNT);
+  });
+
+  it('spreads the isolates of a failing shard evenly over the 7 others', async () => {
+    const offsets = Array.from({ length: KEY_SET_SHARD_COUNT }, () => 0);
+    for (let failure = 0; failure < 7000; failure += 1) {
+      const before = await currentShard();
+      await failOnce();
+      const offset = ((await currentShard()) - before + KEY_SET_SHARD_COUNT) % KEY_SET_SHARD_COUNT;
+      offsets[offset] = (offsets[offset] ?? 0) + 1;
+    }
+    expect(offsets[0]).toBe(0);
+    for (const count of offsets.slice(1)) {
+      expect(count).toBeGreaterThan(850);
+      expect(count).toBeLessThan(1150);
+    }
   });
 
   it('moves once when concurrent reads fail on the same shard', async () => {
-    const asked: number[] = [];
+    const failed = await currentShard();
+    const draws = vi.spyOn(crypto, 'getRandomValues');
     const { promise: release, resolve } = Promise.withResolvers<void>();
-    const failing = async (shard: number) => {
-      asked.push(shard);
-      await release;
-      throw new Error('Durable Object reset');
-    };
-    const reads = Array.from({ length: 4 }, () => readThroughIsolateShard(failing));
+    const asked: number[] = [];
+    const reads = Array.from({ length: 4 }, () =>
+      readThroughIsolateShard(async shard => {
+        asked.push(shard);
+        await release;
+        throw new Error('Durable Object reset');
+      })
+    );
     resolve();
     const settled = await Promise.allSettled(reads);
     expect(settled.every(outcome => outcome.status === 'rejected')).toBe(true);
-    const [failed] = asked;
-    if (failed === undefined) throw new Error('no shard asked');
-    expect(new Set(asked)).toEqual(new Set([failed]));
-    let after: number | null = null;
-    await readThroughIsolateShard(async shard => {
-      after = shard;
-      return refusedRead;
-    });
-    expect(after).toBe((failed + 1) % KEY_SET_SHARD_COUNT);
+    expect(asked).toEqual([failed, failed, failed, failed]);
+    expect(draws).toHaveBeenCalledTimes(1);
+    expect(await currentShard()).not.toBe(failed);
   });
 });

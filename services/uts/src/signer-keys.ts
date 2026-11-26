@@ -229,21 +229,30 @@ export async function readSignerObjects(
  */
 let isolateShard: number | null = null;
 
+function randomUint32(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+}
+
 /**
  * One read through this isolate's shard. A read still makes exactly one shard call. When that
- * call fails, the isolate moves to the next shard for its later reads, so a failing shard does not
- * keep failing the same isolates. Only the first failure on a shard moves it: a concurrent read
- * that failed on the same shard, or one that finishes after the isolate moved, changes nothing.
+ * call fails, the isolate moves to a shard drawn at random from the 7 others for its later reads,
+ * so a failing shard does not keep failing the same isolates and its isolates spread over the
+ * rest. 2^32 is not a multiple of 7, so the draw favours some shards by less than one part in 600
+ * million. Only the first failure on a shard moves the isolate: a concurrent read that failed on
+ * the same shard, or one that finishes after the isolate moved, changes nothing.
  */
 export async function readThroughIsolateShard(
   read: (shard: number) => Promise<SignerKeysRead>
 ): Promise<SignerKeysRead> {
-  isolateShard ??= (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % KEY_SET_SHARD_COUNT;
+  isolateShard ??= randomUint32() % KEY_SET_SHARD_COUNT;
   const shard = isolateShard;
   try {
     return await read(shard);
   } catch (error) {
-    if (isolateShard === shard) isolateShard = (shard + 1) % KEY_SET_SHARD_COUNT;
+    if (isolateShard === shard) {
+      isolateShard =
+        (shard + 1 + (randomUint32() % (KEY_SET_SHARD_COUNT - 1))) % KEY_SET_SHARD_COUNT;
+    }
     throw error;
   }
 }

@@ -71,7 +71,22 @@ const PARTITION_RUNWAY = `SELECT count(*)::integer AS days
     'audit_events_' || to_char((now() AT TIME ZONE 'UTC')::date + ahead, 'YYYYMMDD')
   )) IS NOT NULL`;
 
-const MAINTAIN_OAUTH_ROWS = 'SELECT kind, deleted FROM uts.maintain_oauth_rows()';
+/**
+ * The row-maintenance functions the minute cron calls, each of which deletes at most a batch of
+ * each kind per call and returns one `(kind, deleted)` row per kind.
+ */
+const ROW_MAINTENANCE = {
+  oauth_rows: 'SELECT kind, deleted FROM uts.maintain_oauth_rows()',
+  sign_in_rows: 'SELECT kind, deleted FROM uts.maintain_sign_in_rows()',
+  provider_sign_in_rows: 'SELECT kind, deleted FROM uts.maintain_provider_sign_in_rows()',
+} as const;
+
+export type RowMaintenance = keyof typeof ROW_MAINTENANCE;
+
+/** Ends every UTS session whose transaction passed 30 seconds; one row per ended session. */
+const END_LONG_TRANSACTIONS = `SELECT pid, login,
+    extract(epoch FROM now() - transaction_started_at)::double precision AS age_seconds
+  FROM uts.end_long_transactions()`;
 
 const ShardAgeSchema = z.strictObject({
   shard: z.number().int().min(0).max(7),
@@ -141,6 +156,22 @@ export async function partitionRunwayDays(store: IdentityStore): Promise<number>
   return rows[0]?.days ?? 0;
 }
 
-export async function maintainOAuthRows(store: IdentityStore): Promise<OAuthStep[]> {
-  return await store.rows({ text: MAINTAIN_OAUTH_ROWS, values: [] }, OAuthStepSchema);
+/** One call of a row-maintenance function. */
+export async function maintainRows(
+  store: IdentityStore,
+  which: RowMaintenance
+): Promise<OAuthStep[]> {
+  return await store.rows({ text: ROW_MAINTENANCE[which], values: [] }, OAuthStepSchema);
+}
+
+const EndedSessionSchema = z.strictObject({
+  pid: z.number().int(),
+  login: z.string(),
+  age_seconds: z.number(),
+});
+export type EndedSession = z.output<typeof EndedSessionSchema>;
+
+/** Ends UTS sessions whose transaction passed 30 seconds (`uts.end_long_transactions`). */
+export async function endLongTransactions(store: IdentityStore): Promise<EndedSession[]> {
+  return await store.rows({ text: END_LONG_TRANSACTIONS, values: [] }, EndedSessionSchema);
 }

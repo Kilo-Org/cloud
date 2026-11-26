@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { oauthRows, runMaintenance } from '../../src/audit/maintenance';
+import { rowMaintenance, runMaintenance } from '../../src/audit/maintenance';
 import { type IdentityStore, withIdentityStore } from '../../src/db/client';
 import { TestDatabase, auditEvent } from './harness';
 
@@ -151,11 +151,15 @@ describe('cron maintenance alerts', () => {
        FROM generate_series(1, 6000) AS n`
     );
 
-    const behind = await logLines(() => withStore(store => oauthRows(store, 1)));
+    const behind = await logLines(() =>
+      withStore(store => rowMaintenance(store, 'oauth_rows', 1))
+    );
     expect(behind).toEqual([{ event: 'uts.oauth_rows.behind', kinds: ['dpop_proofs'] }]);
 
     // 1,000 remain, under one batch: the call catches up and logs nothing.
-    const caughtUp = await logLines(() => withStore(store => oauthRows(store, 1)));
+    const caughtUp = await logLines(() =>
+      withStore(store => rowMaintenance(store, 'oauth_rows', 1))
+    );
     expect(caughtUp).toEqual([]);
   });
 });

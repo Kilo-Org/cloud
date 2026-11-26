@@ -629,10 +629,11 @@ due notice and the retries, then runs one retention step (`uts.maintain_notice_r
 rows of each kind): known devices and networks unseen for 90 days, and finished notices with
 their attempts 400 days after they were written.
 
-The deployed Worker calls `sweepNotices` from the minute cron of the audit outbox relay, which
-joins this code when the branches are integrated. Until that wiring lands, the sign-in notice and
-every retry stay `pending` in a deployed environment (they show in-app only), and only the
-credential notice port sends at once, once it is wired with real transports.
+The minute cron (`src/scheduled.ts`) runs one `sweepNotices` pass after its maintenance steps.
+No deployed environment has a push or email provider wired yet, so the deployed cron passes no
+transports: each out-of-band channel settles as `not_configured`, every notice shows in-app, and
+the retention step runs. The account API's credential notice port stays null in the deployed entry
+until a real transport exists.
 
 | Channel | Provider | Adapter |
 |---|---|---|
@@ -969,12 +970,13 @@ The watermark drives the inner query, so the row comparison is the index conditi
 partition's (`shard`, `txid`, `id`) index and the read never touches a relayed row. A join that
 filters on the watermark instead walks every relayed row of the shard on each read.
 
-The minute cron (`src/scheduled.ts`) arms the 8 relay objects and, on one connection, runs
-partition maintenance, the partition alerts, OAuth row maintenance and the lag check
-(`src/audit/maintenance.ts`). Each step logs its own failure and the next step still runs, so a
-partition call that gives up still leaves the kept-partition alerts and the runway check to run.
-It does nothing while `IDENTITY_STORE` is unbound. Its error log lines are the alert signals for
-an Axiom monitor:
+The minute cron (`src/scheduled.ts`) arms the 8 relay objects and, on one connection, ends UTS
+transactions over 30 seconds (`uts.end_long_transactions()`), runs partition maintenance, the
+partition alerts, OAuth, sign-in and provider sign-in row maintenance and the lag check
+(`src/audit/maintenance.ts`), then one notice sweep. Each step logs its own failure and the next
+step still runs, so a partition call that gives up still leaves the kept-partition alerts and the
+runway check to run. It does nothing while `IDENTITY_STORE` is unbound. Its error log lines are
+the alert signals for an Axiom monitor:
 
 | Log event | Meaning |
 |---|---|
@@ -983,7 +985,8 @@ an Axiom monitor:
 | `uts.audit_relay.not_started` | The cron could not arm a shard's relay object |
 | `uts.audit_partitions.kept_unrelayed` | A partition past the 7-day tier still holds an unrelayed row |
 | `uts.audit_partitions.runway_short` | Fewer than today's and the next 7 days' partitions exist |
-| `uts.oauth_rows.behind` | A kind still deleted a full batch on the run's last maintenance call |
+| `uts.oauth_rows.behind`, `uts.sign_in_rows.behind`, `uts.provider_sign_in_rows.behind` | A kind still deleted a full batch on the run's last maintenance call |
+| `uts.maintenance.transaction_ended` | The cron ended a UTS session whose transaction passed 30 seconds (`login`, `ageSeconds`) |
 | `uts.maintenance.failed` | A cron step failed (`step`, `sqlState`, `constraint`, `table`) |
 
 `uts.maintain_audit_partitions()` runs one step per call: it creates the first missing partition of

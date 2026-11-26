@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   identityStoreOutbox,
   maintainAuditPartitions,
-  maintainOAuthRows,
+  maintainRows,
   partitionRunwayDays,
   unrelayedAges,
 } from '../../src/audit/outbox';
@@ -206,7 +206,7 @@ describe('audit outbox relay against the identity store', () => {
       const steps = await maintainAuditPartitions(store);
       expect(steps.filter(step => step.action !== 'kept_unrelayed')).toEqual([]);
       expect(await partitionRunwayDays(store)).toBe(8);
-      const kinds = await maintainOAuthRows(store);
+      const kinds = await maintainRows(store, 'oauth_rows');
       expect(kinds.map(row => row.kind).sort()).toEqual([
         'authorization_codes',
         'dpop_proofs',

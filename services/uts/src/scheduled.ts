@@ -4,6 +4,16 @@ import { withIdentityStore } from './db/client';
 import { getAuditRelayStub } from './dos/stubs';
 import { readConfig, type Env, type UtsConfig } from './env';
 import { identityStoreBinding } from './grants/binding';
+import { sweepNotices } from './notices/dispatch';
+import { noticesAccess } from './notices/store';
+import type { NoticeTransports } from './notices/transports';
+
+/**
+ * No deployed environment has a push or email provider wired yet (README, "Security notices"), so
+ * the sweep settles each out-of-band channel as `not_configured`; the in-app row shows every
+ * notice, and the sweep's retention step still runs.
+ */
+const DEPLOYED_NOTICE_TRANSPORTS: NoticeTransports = { push: null, email: null };
 
 /** Arms each shard's relay object; logs `uts.audit_relay.not_started` for one that failed or refused. */
 export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
@@ -25,9 +35,11 @@ export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
 }
 
 /**
- * The minute cron: keeps the 8 shard relays running, maintains audit partitions and OAuth rows,
- * and raises the relay-lag alert (`src/audit/maintenance.ts`). Nothing runs until the environment
- * binds its identity store. Every statement is its own transaction on one connection.
+ * The minute cron: keeps the 8 shard relays running; on one connection ends long transactions,
+ * maintains audit partitions, OAuth rows and sign-in rows, and raises the relay-lag alert
+ * (`src/audit/maintenance.ts`); then runs one notice sweep, whose claim and finish statements
+ * open their own connections (`src/notices/dispatch.ts`). Nothing runs until the environment binds
+ * its identity store. Every statement is its own transaction, and each step logs its own failure.
  */
 export async function scheduled(
   _controller: ScheduledController,
@@ -41,4 +53,11 @@ export async function scheduled(
   await step('connect', () =>
     withIdentityStore(binding.connectionString, context, store => runMaintenance(store))
   );
+  await step('notices', async () => {
+    await sweepNotices({
+      notices: noticesAccess(binding.connectionString, context),
+      transports: DEPLOYED_NOTICE_TRANSPORTS,
+      now: () => new Date(),
+    });
+  });
 }

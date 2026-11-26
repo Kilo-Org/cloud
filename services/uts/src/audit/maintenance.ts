@@ -1,7 +1,9 @@
 import { type IdentityStore, IdentityStoreError } from '../db/client';
 import {
+  type RowMaintenance,
+  endLongTransactions,
   maintainAuditPartitions,
-  maintainOAuthRows,
+  maintainRows,
   partitionRunwayDays,
   unrelayedAges,
 } from './outbox';
@@ -15,14 +17,18 @@ import {
 export const UNRELAYED_ALERT_SECONDS = 60;
 /** Today's partition and the next 7 days' exist after every successful maintenance pass. */
 export const PARTITION_RUNWAY_DAYS = 8;
-/** `uts.maintain_oauth_rows()` deletes at most this many rows of each kind per call. */
-export const OAUTH_MAINTENANCE_BATCH = 5_000;
+/**
+ * `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()` and
+ * `uts.maintain_provider_sign_in_rows()` each delete at most this many rows of each kind per call.
+ */
+export const ROW_MAINTENANCE_BATCH = 5_000;
 /**
  * Calls per cron run. Partition maintenance takes one step per call and has at most 8 creates and
- * a truncate plus a drop per old day to do; OAuth maintenance repeats while a kind hits its batch.
+ * a truncate plus a drop per old day to do; each row maintenance repeats while a kind hits its
+ * batch.
  */
 export const MAX_PARTITION_STEPS = 32;
-export const MAX_OAUTH_CALLS = 20;
+export const MAX_ROW_MAINTENANCE_CALLS = 20;
 
 /** `IdentityStoreError` keeps no row value, so every field here is safe to log. */
 export function errorFields(error: unknown): Record<string, string | undefined> {
@@ -83,20 +89,40 @@ async function partitionAlerts(store: IdentityStore, kept: ReadonlySet<string>):
 }
 
 /**
- * Deletes dead OAuth rows until every kind is under one batch, or alerts that it fell behind
- * after `maxCalls` calls.
+ * Deletes dead rows through `which` until every kind is under one batch, or alerts
+ * (`uts.<which>.behind`) that it fell behind after `maxCalls` calls.
  */
-export async function oauthRows(store: IdentityStore, maxCalls = MAX_OAUTH_CALLS): Promise<void> {
+export async function rowMaintenance(
+  store: IdentityStore,
+  which: RowMaintenance,
+  maxCalls = MAX_ROW_MAINTENANCE_CALLS
+): Promise<void> {
   for (let call = 0; call < maxCalls; call += 1) {
-    const full = (await maintainOAuthRows(store)).filter(
-      row => row.deleted >= OAUTH_MAINTENANCE_BATCH
+    const full = (await maintainRows(store, which)).filter(
+      row => row.deleted >= ROW_MAINTENANCE_BATCH
     );
     if (full.length === 0) return;
     if (call === maxCalls - 1) {
       console.error(
-        JSON.stringify({ event: 'uts.oauth_rows.behind', kinds: full.map(row => row.kind) })
+        JSON.stringify({ event: `uts.${which}.behind`, kinds: full.map(row => row.kind) })
       );
     }
+  }
+}
+
+/**
+ * Ends every UTS session whose transaction passed 30 seconds, which a session can reach only by
+ * lifting its own limits (README, "Schemas and roles"), and alerts on each one it ended.
+ */
+async function longTransactions(store: IdentityStore): Promise<void> {
+  for (const ended of await endLongTransactions(store)) {
+    console.error(
+      JSON.stringify({
+        event: 'uts.maintenance.transaction_ended',
+        login: ended.login,
+        ageSeconds: Math.round(ended.age_seconds),
+      })
+    );
   }
 }
 
@@ -116,12 +142,16 @@ async function relayLag(store: IdentityStore): Promise<void> {
 
 /**
  * One cron run's identity-store work on one connection. A partition maintenance call that throws
- * still leaves the kept-partition alerts and the runway check to run.
+ * still leaves the kept-partition alerts and the runway check to run. Long transactions end first,
+ * so the relay horizon and the partition checks do not wait behind them.
  */
 export async function runMaintenance(store: IdentityStore): Promise<void> {
   const kept = new Set<string>();
+  await step('long_transactions', () => longTransactions(store));
   await step('audit_partitions', () => auditPartitions(store, kept));
   await step('partition_alerts', () => partitionAlerts(store, kept));
-  await step('oauth_rows', () => oauthRows(store));
+  await step('oauth_rows', () => rowMaintenance(store, 'oauth_rows'));
+  await step('sign_in_rows', () => rowMaintenance(store, 'sign_in_rows'));
+  await step('provider_sign_in_rows', () => rowMaintenance(store, 'provider_sign_in_rows'));
   await step('relay_lag', () => relayLag(store));
 }

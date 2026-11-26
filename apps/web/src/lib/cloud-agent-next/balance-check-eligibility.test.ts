@@ -229,6 +229,18 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(mockOpenAiChatGptConnectorGone).not.toHaveBeenCalled();
   });
 
+  it('does not count a ChatGPT connection the KMS service cannot open', async () => {
+    mockGetOpenAiChatGptStoredConnection.mockRejectedValue(new Error('BYOK KMS /decrypt failed'));
+
+    const result = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: fakeDb,
+      user: fakeUser,
+      modelId: 'openai/gpt-5',
+    });
+
+    expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
+  });
+
   it("counts the organization's shared-services ChatGPT connection for service runs", async () => {
     mockGetOpenAiChatGptStoredConnection.mockImplementation(async (owner: { scope?: string }) =>
       owner.scope === 'shared_services' ? CONNECTED_CHATGPT : null

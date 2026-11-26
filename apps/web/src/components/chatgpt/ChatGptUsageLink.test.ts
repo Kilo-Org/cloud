@@ -14,7 +14,10 @@ const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
  * Renders the server component for a live or an absent connection and returns
  * the markup, or an empty string when the component renders nothing.
  */
-async function renderChatGptUsageLink(hasConnection: boolean): Promise<string> {
+async function renderChatGptUsageLink(
+  hasConnection: boolean,
+  readFailure?: Error
+): Promise<string> {
   jest.resetModules();
   const [store, link, server] = await Promise.all([
     import('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store'),
@@ -23,9 +26,13 @@ async function renderChatGptUsageLink(hasConnection: boolean): Promise<string> {
   ]);
 
   const readConnection = jest.mocked(store.getOpenAiChatGptConnection);
-  readConnection.mockResolvedValue(
-    hasConnection ? ({ status: 'connected' } as Awaited<ReturnType<typeof readConnection>>) : null
-  );
+  if (readFailure) {
+    readConnection.mockRejectedValue(readFailure);
+  } else {
+    readConnection.mockResolvedValue(
+      hasConnection ? ({ status: 'connected' } as Awaited<ReturnType<typeof readConnection>>) : null
+    );
+  }
 
   const element = await link.ChatGptUsageLink({ kiloUserId: 'user-1' });
   return element === null ? '' : server.renderToStaticMarkup(element);
@@ -42,5 +49,9 @@ describe('ChatGptUsageLink', () => {
 
   it('renders nothing when the account is not connected', async () => {
     expect(await renderChatGptUsageLink(false)).toBe('');
+  });
+
+  it('renders nothing instead of failing the page when the KMS service cannot open the payload', async () => {
+    expect(await renderChatGptUsageLink(true, new Error('BYOK KMS /decrypt failed'))).toBe('');
   });
 });

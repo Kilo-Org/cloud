@@ -54,6 +54,8 @@ const MAX_COST_MICRODOLLARS = 50_000_000;
 const ULTRA_COST_MICRODOLLARS = 120_000_000;
 const BYTEPLUS_PRO_COST_MICRODOLLARS = 100_000_000;
 
+const ADMIN_USER_ID = 'admin-user-id';
+
 const validatedInventoryUpload = {
   validateCredential: async ({
     providerId,
@@ -76,7 +78,13 @@ async function seedInventoryKey(
   planId: CodingPlanId = PLAN_ID,
   providerId = PROVIDER_ID
 ) {
-  await uploadKeysToInventory(providerId, planId, [inventoryEntry(key)], validatedInventoryUpload);
+  await uploadKeysToInventory(
+    providerId,
+    planId,
+    [inventoryEntry(key)],
+    ADMIN_USER_ID,
+    validatedInventoryUpload
+  );
 }
 
 async function createUserWithBalance(microdollars: number) {
@@ -312,6 +320,8 @@ describe('coding plans', () => {
   it('stores the managed key as a KMS envelope', async () => {
     const user = await createUserWithBalance(COST_MICRODOLLARS);
     await seedInventoryKey('kms-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+    const [inventoryRow] = await db.select().from(coding_plan_key_inventory);
+    kms.requests.length = 0;
 
     const result = await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'kms-activation');
     const [subscription] = await db
@@ -330,6 +340,7 @@ describe('coding plans', () => {
     expect(
       decryptApiKey(managedKey.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)
     ).toBe('kms-key');
+    // The claimed inventory row is opened through KMS, then the installed key is sealed.
     expect(kms.requests).toEqual([
       {
         path: '/data-key',
@@ -341,21 +352,34 @@ describe('coding plans', () => {
           provider_id: BYTEPLUS_PROVIDER_ID,
         },
       },
+      {
+        path: '/decrypt',
+        body: expect.objectContaining({
+          key_id: inventoryRow.id,
+          owner_type: 'organization',
+          provider_id: 'coding-plan-inventory',
+        }),
+      },
     ]);
   });
 
-  it('requests the KMS data key without holding the user row lock', async () => {
+  it('makes every KMS request without holding the user row lock', async () => {
     const user = await createUserWithBalance(COST_MICRODOLLARS);
     await seedInventoryKey('lock-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
-    let userRowLockedDuringKms: boolean | undefined;
-    global.fetch = jest.fn(async () => {
+    const userRowLockedDuringKms: boolean[] = [];
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       try {
         await db.execute(sql`
           SELECT id FROM kilocode_users WHERE id = ${user.id} FOR UPDATE NOWAIT
         `);
-        userRowLockedDuringKms = false;
+        userRowLockedDuringKms.push(false);
       } catch {
-        userRowLockedDuringKms = true;
+        userRowLockedDuringKms.push(true);
+      }
+      // The inventory credential is opened before the transaction, from the candidate row
+      // the claim then prefers.
+      if (!String(input).endsWith('/data-key')) {
+        return Response.json({ data_key: TEST_BYOK_DATA_KEY });
       }
       return Response.json({
         data_key: randomBytes(32).toString('base64'),
@@ -367,15 +391,16 @@ describe('coding plans', () => {
 
     await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'lock-activation');
 
-    expect(userRowLockedDuringKms).toBe(false);
+    expect(userRowLockedDuringKms.length).toBeGreaterThanOrEqual(2);
+    expect(userRowLockedDuringKms.every(locked => !locked)).toBe(true);
   });
 
   it('fails the purchase before charging or claiming credentials when KMS is unavailable', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS);
+    await seedInventoryKey('kms-down-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
     global.fetch = jest.fn(
       async () => new Response('{}', { status: 503 })
     ) as unknown as typeof fetch;
-    const user = await createUserWithBalance(COST_MICRODOLLARS);
-    await seedInventoryKey('kms-down-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
 
     await expect(
       subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'kms-down-activation')
@@ -708,9 +733,15 @@ describe('coding plans', () => {
   it('stores upstream plan IDs separately from validated inventory credentials', async () => {
     const validateCredential = jest.fn(async () => true);
 
-    await uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['test-api-key::minimax-upstream-plan-123'], {
-      validateCredential,
-    });
+    await uploadKeysToInventory(
+      PROVIDER_ID,
+      PLAN_ID,
+      ['test-api-key::minimax-upstream-plan-123'],
+      ADMIN_USER_ID,
+      {
+        validateCredential,
+      }
+    );
     const [inventory] = await db.select().from(coding_plan_key_inventory);
 
     expect(validateCredential).toHaveBeenCalledWith({
@@ -727,11 +758,13 @@ describe('coding plans', () => {
     const validateCredential = jest.fn(async () => false);
 
     await expect(
-      uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['missing-plan-id'], { validateCredential })
+      uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['missing-plan-id'], ADMIN_USER_ID, {
+        validateCredential,
+      })
     ).rejects.toThrow('<api key>::<upstream plan id>');
     expect(validateCredential).not.toHaveBeenCalled();
     await expect(
-      uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['invalid-key::minimax-plan-id'], {
+      uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['invalid-key::minimax-plan-id'], ADMIN_USER_ID, {
         validateCredential,
       })
     ).rejects.toThrow('failed validation');
@@ -749,6 +782,7 @@ describe('coding plans', () => {
       PROVIDER_ID,
       PLAN_ID,
       [inventoryEntry('duplicate-key', 'minimax-plan-one')],
+      ADMIN_USER_ID,
       validatedInventoryUpload
     );
     await expect(
@@ -756,6 +790,7 @@ describe('coding plans', () => {
         PROVIDER_ID,
         PLAN_ID,
         [inventoryEntry('duplicate-key', 'minimax-plan-two')],
+        ADMIN_USER_ID,
         validatedInventoryUpload
       )
     ).rejects.toThrow('already present');
@@ -771,6 +806,7 @@ describe('coding plans', () => {
       BYTEPLUS_PROVIDER_ID,
       BYTEPLUS_PLAN_ID,
       [inventoryEntry('revoke-success-key', 'byteplus-revoke-plan')],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-revoke-success' }),
       }
@@ -789,6 +825,7 @@ describe('coding plans', () => {
     expect(credential.status).toBe('revocation_pending');
     expect(credential.upstream_plan_id).toBe('byteplus-revoke-plan');
     expect(credential.encrypted_api_key).toBeNull();
+    expect(credential.encrypted_api_key_envelope).toBeNull();
 
     await markCredentialManuallyRevoked(subscription.key_inventory_id!);
     [credential] = await db
@@ -799,6 +836,7 @@ describe('coding plans', () => {
     expect(credential.status).toBe('revoked');
     expect(credential.upstream_plan_id).toBe('byteplus-revoke-plan');
     expect(credential.encrypted_api_key).toBeNull();
+    expect(credential.encrypted_api_key_envelope).toBeNull();
     expect(credential.revocation_attempt_count).toBe(1);
   });
 
@@ -812,6 +850,7 @@ describe('coding plans', () => {
       BYTEPLUS_PROVIDER_ID,
       BYTEPLUS_PLAN_ID,
       [inventoryEntry('replace-original-key', 'byteplus-replace-plan')],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-replace-plan' }),
       }
@@ -823,9 +862,14 @@ describe('coding plans', () => {
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
     await terminateCodingPlanImmediately(activation.subscriptionId);
 
-    await replaceManualCredentialRevocation(subscription.key_inventory_id!, ' replace-new-key ', {
-      validateCredential,
-    });
+    await replaceManualCredentialRevocation(
+      subscription.key_inventory_id!,
+      ' replace-new-key ',
+      ADMIN_USER_ID,
+      {
+        validateCredential,
+      }
+    );
     const [credential] = await db
       .select()
       .from(coding_plan_key_inventory)
@@ -854,6 +898,7 @@ describe('coding plans', () => {
       BYTEPLUS_PROVIDER_ID,
       BYTEPLUS_PLAN_ID,
       [inventoryEntry('byteplus-original-key', 'byteplus-original-user')],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-original' }),
       }
@@ -862,6 +907,7 @@ describe('coding plans', () => {
       BYTEPLUS_PROVIDER_ID,
       BYTEPLUS_PRO_PLAN_ID,
       [inventoryEntry('byteplus-existing-key', 'byteplus-existing-user')],
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-already-used' }),
       }
@@ -880,6 +926,7 @@ describe('coding plans', () => {
     const replacement = replaceManualCredentialRevocation(
       subscription.key_inventory_id!,
       'byteplus-replacement-key',
+      ADMIN_USER_ID,
       {
         validateCredential: async () => ({
           valid: true,
@@ -906,9 +953,14 @@ describe('coding plans', () => {
     await terminateCodingPlanImmediately(activation.subscriptionId);
 
     await expect(
-      replaceManualCredentialRevocation(subscription.key_inventory_id!, 'replace-invalid-key', {
-        validateCredential: async () => false,
-      })
+      replaceManualCredentialRevocation(
+        subscription.key_inventory_id!,
+        'replace-invalid-key',
+        ADMIN_USER_ID,
+        {
+          validateCredential: async () => false,
+        }
+      )
     ).rejects.toThrow('failed validation');
     const [credential] = await db
       .select()
@@ -916,6 +968,7 @@ describe('coding plans', () => {
       .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
     expect(credential.status).toBe('revocation_pending');
     expect(credential.encrypted_api_key).toBeNull();
+    expect(credential.encrypted_api_key_envelope).toBeNull();
   });
 
   it('rejects unchanged and duplicate replacement credentials before validating upstream', async () => {
@@ -928,6 +981,7 @@ describe('coding plans', () => {
         inventoryEntry('replace-unchanged-original-key', 'byteplus-replace-unchanged-plan'),
         inventoryEntry('replace-duplicate-existing-key', 'byteplus-replace-duplicate-plan'),
       ],
+      ADMIN_USER_ID,
       {
         validateCredential: async ({ upstreamPlanId }: { upstreamPlanId: string }) => ({
           valid: true,
@@ -956,14 +1010,24 @@ describe('coding plans', () => {
         : 'replace-unchanged-original-key';
 
     await expect(
-      replaceManualCredentialRevocation(subscription.key_inventory_id!, unchangedApiKey, {
-        validateCredential,
-      })
+      replaceManualCredentialRevocation(
+        subscription.key_inventory_id!,
+        unchangedApiKey,
+        ADMIN_USER_ID,
+        {
+          validateCredential,
+        }
+      )
     ).rejects.toThrow('must be different');
     await expect(
-      replaceManualCredentialRevocation(subscription.key_inventory_id!, duplicateApiKey, {
-        validateCredential,
-      })
+      replaceManualCredentialRevocation(
+        subscription.key_inventory_id!,
+        duplicateApiKey,
+        ADMIN_USER_ID,
+        {
+          validateCredential,
+        }
+      )
     ).rejects.toThrow('already present');
 
     const [credential] = await db
@@ -997,6 +1061,7 @@ describe('coding plans', () => {
     expect(credential.status).toBe('revocation_failed');
     expect(credential.upstream_plan_id).toEqual(expect.any(String));
     expect(credential.encrypted_api_key).toBeNull();
+    expect(credential.encrypted_api_key_envelope).toBeNull();
     expect(credential.revocation_attempt_count).toBe(1);
     expect(credential.last_revocation_error).toContain('api_key=[redacted]');
 

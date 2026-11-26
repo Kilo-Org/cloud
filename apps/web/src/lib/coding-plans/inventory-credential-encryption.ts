@@ -78,7 +78,9 @@ export async function openCodingPlanInventoryCredential(row: {
   encrypted_api_key: EncryptedData | null;
   encrypted_api_key_envelope: CodingPlanInventoryCredentialEnvelope | null;
 }): Promise<string | null> {
-  return await openDualWrittenCredential(row.encrypted_api_key, row.encrypted_api_key_envelope, () =>
-    codingPlanInventoryKmsContext(row.id)
+  return await openDualWrittenCredential(
+    row.encrypted_api_key,
+    row.encrypted_api_key_envelope,
+    () => codingPlanInventoryKmsContext(row.id)
   );
 }

@@ -100,6 +100,7 @@ import {
   OPENAI_TOKEN_SHARING_SCOPE,
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { authAuditEmailHash } from '@/lib/auth/auth-audit';
@@ -347,6 +348,7 @@ describe('sessionAuthOptions', () => {
 
 describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
   const jwtCallback = authOptions.callbacks?.jwt;
+  const kms = useFakeByokKms();
 
   async function seedOpenAiUser(sub: string) {
     const email = `openai-${crypto.randomUUID()}@example.com`;
@@ -499,6 +501,49 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });
+  });
+
+  test('seals the delegated connection for the signing-in user and stores both forms', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    const [row] = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(
+        and(
+          eq(openai_chatgpt_connections.kilo_user_id, user.id),
+          isNull(openai_chatgpt_connections.organization_id)
+        )
+      );
+    for (const stored of [row?.encrypted_connection, row?.encrypted_connection_envelope]) {
+      expect(JSON.stringify(stored)).not.toContain('signin-access-token');
+      expect(JSON.stringify(stored)).not.toContain('signin-refresh-token');
+    }
+    expect(kms.requests.find(request => request.path === '/data-key')?.body).toMatchObject({
+      owner_type: 'user',
+      owner_id: user.id,
+      provider_id: 'openai-chatgpt-oauth:personal',
+      actor_user_id: user.id,
+      key_id: row?.encrypted_connection_envelope?.key_id,
+    });
+  });
+
+  test('does not fail the sign-in when the KMS service cannot create a data key', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    kms.fail('/data-key');
+
+    const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    expect(token.kiloUserId).toBe(user.id);
+    const rows = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, user.id));
+    expect(rows).toHaveLength(0);
   });
 
   test('does not fail the sign-in when storing the connection fails', async () => {

@@ -8,23 +8,18 @@ export type StepUpCeremonyDeps = {
   requestOptions: () => Promise<StepUpOptions>;
   startAuthentication: (options: PublicKeyCredentialRequestOptionsJSON) => Promise<unknown>;
   submitAssertion: (challengeId: string, response: unknown) => Promise<boolean>;
-  enroll: () => Promise<void>;
 };
 
 export type StepUpCeremonyResult = { ok: true } | { ok: false; code?: string };
 
 /**
  * One step-up attempt: mint options, run the browser's passkey sheet, submit the
- * assertion. When the account has no passkey the ceremony enrolls one first and
- * mints options again exactly once. Cancelling the sheet is a terminal result,
- * not a retry.
+ * assertion. An account with no passkey answers `NOT_ENROLLED`; the caller
+ * enrolls one, which needs a code from the person's email. Cancelling the sheet
+ * is a terminal result, not a retry.
  */
 export async function runStepUpCeremony(deps: StepUpCeremonyDeps): Promise<StepUpCeremonyResult> {
-  let options = await deps.requestOptions();
-  if (!options.ok && options.code === 'NOT_ENROLLED') {
-    await deps.enroll();
-    options = await deps.requestOptions();
-  }
+  const options = await deps.requestOptions();
   if (!options.ok) return { ok: false, code: options.code };
 
   let assertion: unknown;

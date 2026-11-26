@@ -1,0 +1,13 @@
+workload: o11y
+environments:
+  - development
+  - staging
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - O11Y_KILO_GATEWAY_CLIENT_SECRET
+  - O11Y_CF_AE_API_TOKEN
+  - O11Y_SLACK_WEBHOOK_PAGE
+  - O11Y_SLACK_WEBHOOK_TICKET
+  - O11Y_CF_CONTAINERS_API_TOKEN

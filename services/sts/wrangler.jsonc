@@ -1,0 +1,133 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Top level is production; `wrangler dev --env local` uses the local block below.
+  "name": "sts",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "port": 8825,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+    {
+      "type": "Text",
+      "globs": ["**/*.yaml"],
+      "fallthrough": true,
+    },
+  ],
+  // Traces stay off: a Durable Object SQL span records each statement's bound values. Every env
+  // block inherits this.
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
+  },
+  "logpush": true,
+  // Starts the refresher after a deploy without waiting for a read (README).
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "routes": [
+    {
+      "pattern": "sts.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "STS_ENVIRONMENT": "production",
+    "STS_ISSUER": "https://sts.kiloapps.io",
+    "MANAGER_BASE_URL": "https://eu.infisical.com",
+    // Merge gate and post-merge steps: README.md#merge-gate-the-merge-to-main-is-the-first-production-deploy.
+    "MANAGER_PROJECT_ID": "8cf601df-1c5a-4c8f-9e21-7e9af6728b06",
+    "MANAGER_ENVIRONMENT_SLUG": "production",
+    "MANAGER_IDENTITY_ID": "c531ad9b-eec9-4f93-b173-e14d3d94f6ef",
+    // Durable Objects hold secret material, so production and staging pin them to the EU.
+    "DO_JURISDICTION": "eu",
+  },
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+      { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+      { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+      { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["BundleDO", "RefresherDO", "SignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["DenialDO"] },
+  ],
+  "env": {
+    "staging": {
+      "name": "sts-staging",
+      "triggers": { "crons": ["*/5 * * * *"] },
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "sts-staging.kiloapps.io",
+          "zone_name": "kiloapps.io",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "STS_ENVIRONMENT": "staging",
+        "STS_ISSUER": "https://sts-staging.kiloapps.io",
+        "MANAGER_BASE_URL": "https://eu.infisical.com",
+        "MANAGER_PROJECT_ID": "8cf601df-1c5a-4c8f-9e21-7e9af6728b06",
+        "MANAGER_ENVIRONMENT_SLUG": "staging",
+        "MANAGER_IDENTITY_ID": "5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4",
+        "DO_JURISDICTION": "eu",
+      },
+      "queues": {
+        "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+          { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+          { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+          { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+        ],
+      },
+    },
+    // Local development only; no deploy workflow targets this name.
+    "local": {
+      "name": "sts-local",
+      "triggers": { "crons": [] },
+      "workers_dev": false,
+      "routes": [],
+      "vars": {
+        "STS_ENVIRONMENT": "development",
+        "STS_ISSUER": "http://localhost:8825",
+        "MANAGER_BASE_URL": "https://eu.infisical.com",
+        "MANAGER_PROJECT_ID": "8cf601df-1c5a-4c8f-9e21-7e9af6728b06",
+        "MANAGER_ENVIRONMENT_SLUG": "development",
+        "MANAGER_IDENTITY_ID": "8c46d33c-6f3b-465b-b99a-ebfb734e2c8c",
+        // workerd enforces no data residency, so local development keeps objects unscoped.
+        "DO_JURISDICTION": "none",
+      },
+      "queues": {
+        "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "STS_BUNDLE_DO", "class_name": "BundleDO" },
+          { "name": "STS_REFRESHER_DO", "class_name": "RefresherDO" },
+          { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
+          { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
+        ],
+      },
+    },
+  },
+}

@@ -1,0 +1,149 @@
+import type { AuditBatch, AuditEvent } from '@kilocode/sts-contracts';
+import { runInDurableObject } from 'cloudflare:test';
+import { env as bindings } from 'cloudflare:workers';
+import { z } from 'zod';
+import type { HotStoreGap, StreamDO } from '../src/dos/StreamDO';
+import type { PassResult, VerifierDO, VerifyPassKind } from '../src/dos/VerifierDO';
+import type { Env } from '../src/env';
+import { archiveObjectKey, readArchivedObject, type ArchivedBatch } from '../src/relay/archive';
+
+export const env = bindings as unknown as Env;
+
+export const STREAM = 'sts:production:bundle:o11y';
+
+/** A stream name no other test shares, so Durable Object state never leaks between tests. */
+export function uniqueStream(label: string): string {
+  return `${STREAM}-${label}-${crypto.randomUUID()}`;
+}
+
+export function auditEvent(seq: number): AuditEvent {
+  return {
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: 'kilo:sts:production',
+    type: 'ai.kilo.sts.bundle.delivered',
+    time: new Date(Date.UTC(2026, 10, 25, 10, 0, seq % 60)).toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: 6003,
+      activityId: 2,
+      outcome: 'success',
+      actor: { kind: 'workload', id: 'sts' },
+      attributes: { seq },
+    },
+  };
+}
+
+export function auditBatch(fromSeq: number, toSeq: number, stream = STREAM): AuditBatch {
+  return {
+    schemaVersion: 1,
+    stream,
+    fromSeq,
+    toSeq,
+    events: Array.from({ length: toSeq - fromSeq + 1 }, (_, index) => auditEvent(fromSeq + index)),
+  };
+}
+
+export type CapturedRequest = { url: string; body: string | null };
+
+/** A `fetch` replacement that records each request and answers through `respond`. */
+export function recordingFetch(
+  respond: (request: CapturedRequest) => Response | Promise<Response>
+): { impl: typeof fetch; requests: CapturedRequest[] } {
+  const requests: CapturedRequest[] = [];
+  const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = input instanceof Request ? input.url : String(input);
+    const body = typeof init?.body === 'string' ? init.body : null;
+    const request = { url, body };
+    requests.push(request);
+    return respond(request);
+  };
+  return { impl, requests };
+}
+
+export function axiomOk(): Response {
+  return new Response('{}', { status: 200 });
+}
+
+export function requestBodyOf(request: CapturedRequest | undefined): unknown[] {
+  if (!request?.body) return [];
+  return JSON.parse(request.body) as unknown[];
+}
+
+/** The archived object for `stream` at `toSeq`; fails the test when it is absent or corrupt. */
+export async function readArchived(stream: string, toSeq: number): Promise<ArchivedBatch> {
+  const read = await readArchivedObject(env.AUDIT_ARCHIVE, archiveObjectKey(stream, toSeq));
+  if (read.kind !== 'ok') throw new Error(`archive object ${stream}@${toSeq} is ${read.kind}`);
+  return read.object;
+}
+
+/** Every key under `prefix`, following R2's cursor until the listing is complete. */
+export async function listObjectKeys(prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await env.AUDIT_ARCHIVE.list({ prefix, cursor, limit: 1000 });
+    for (const object of page.objects) keys.push(object.key);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return keys;
+}
+
+/** The paging webhook the test config's local secrets name. */
+export const SLACK_WEBHOOK = 'https://hooks.slack.test/audit-relay';
+
+const PageSchema = z.object({ text: z.string() });
+const IngestSchema = z.array(z.object({ id: z.string() }));
+
+/** The text of every page posted, in order. */
+export function pageTexts(requests: CapturedRequest[]): string[] {
+  return requests
+    .filter(request => request.url === SLACK_WEBHOOK)
+    .map(request => PageSchema.parse(JSON.parse(request.body ?? '{}')).text);
+}
+
+export function axiomRequests(requests: CapturedRequest[]): CapturedRequest[] {
+  return requests.filter(request => request.url.startsWith('https://api.axiom.co/'));
+}
+
+/** The event ids one Axiom ingest request carried. */
+export function eventIds(request: CapturedRequest): string[] {
+  return IngestSchema.parse(JSON.parse(request.body ?? '[]')).map(event => event.id);
+}
+
+/** A stream's owed hot-copy rows, then its parked ones, each oldest first, read from storage. */
+export async function hotRows(
+  stub: DurableObjectStub<StreamDO>,
+  limit = 1000
+): Promise<HotStoreGap[]> {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const [owed, parked] = await Promise.all([
+      state.storage.list<HotStoreGap>({ prefix: 'hot_copy:', limit }),
+      state.storage.list<HotStoreGap>({ prefix: 'hot_copy_parked:', limit }),
+    ]);
+    return [...owed.values(), ...parked.values()];
+  });
+}
+
+export type VerifierState = {
+  running: VerifyPassKind[];
+  lastVerifiedCheckpoint: string | null;
+  daily: PassResult | null;
+  full: PassResult | null;
+};
+
+/** The verifier's running passes, anchor and last results, read from its storage. */
+export async function verifierStatus(stub: DurableObjectStub<VerifierDO>): Promise<VerifierState> {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const storage = state.storage;
+    const running: VerifyPassKind[] = [];
+    if (await storage.get('pass:daily')) running.push('daily');
+    if (await storage.get('pass:full')) running.push('full');
+    return {
+      running,
+      lastVerifiedCheckpoint: (await storage.get<string>('verified_checkpoint')) ?? null,
+      daily: (await storage.get<PassResult>('last:daily')) ?? null,
+      full: (await storage.get<PassResult>('last:full')) ?? null,
+    };
+  });
+}

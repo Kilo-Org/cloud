@@ -1,0 +1,3 @@
+# Copy to `.dev.vars`. `wrangler dev --env local` reads this file; deployed Workers get the
+# same two names from STS (Infisical project kilo, folder /workloads/audit-relay).
+AUDIT_RELAY_LOCAL_SECRETS={"AUDIT_RELAY_AXIOM_TOKEN":"replace-with-a-local-axiom-token","AUDIT_RELAY_SLACK_WEBHOOK_PAGE":"https://hooks.slack.com/services/replace/me"}

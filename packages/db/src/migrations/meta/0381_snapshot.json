@@ -1,5 +1,5 @@
 {
-  "id": "75de24e3-6b2d-45d3-9340-9dddf7ca1c6f",
+  "id": "c30af322-5bfd-4918-9ad0-431b9ad84057",
   "prevId": "baf44efc-df30-45d8-8a3f-ba7e4371a2eb",
   "version": "7",
   "dialect": "postgresql",
@@ -25049,7 +25049,7 @@
         },
         "check_magic_link_tokens_purpose": {
           "name": "check_magic_link_tokens_purpose",
-          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change')"
+          "value": "\"magic_link_tokens\".\"purpose\" IN ('magic_link', 'sign_in_code', 'data_export_download', 'sign_in_method_change', 'passkey_enrollment')"
         }
       },
       "isRLSEnabled": false
@@ -43879,77 +43879,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.user_sign_in_contexts": {
-      "name": "user_sign_in_contexts",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "key_hash": {
-          "name": "key_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "first_seen_at": {
-          "name": "first_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_seen_at": {
-          "name": "last_seen_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "user_sign_in_contexts_user_id_kilocode_users_id_fk": {
-          "name": "user_sign_in_contexts_user_id_kilocode_users_id_fk",
-          "tableFrom": "user_sign_in_contexts",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "user_sign_in_contexts_user_id_kind_key_hash_pk": {
-          "name": "user_sign_in_contexts_user_id_kind_key_hash_pk",
-          "columns": [
-            "user_id",
-            "kind",
-            "key_hash"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "user_sign_in_contexts_kind_check": {
-          "name": "user_sign_in_contexts_kind_check",
-          "value": "\"user_sign_in_contexts\".\"kind\" IN ('device', 'network', 'notice')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.user_terms_acceptances": {

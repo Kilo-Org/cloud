@@ -5,6 +5,7 @@
 import type { AlertSeverity } from './slo-config';
 import type { HealthInstances } from './container-capacity';
 import type { ContainerAllocations } from './container-allocations';
+import { readO11ySecret } from '../secrets';
 
 type NotifyEnv = {
   O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;
@@ -328,13 +329,10 @@ export function buildSlackMessage(alert: AlertPayload): object {
 // ── Notification delivery ───────────────────────────────────────────────────
 
 export async function sendAlertNotification(alert: AlertPayload, env: NotifyEnv): Promise<void> {
-  const webhookSecret =
-    alert.severity === 'page' ? env.O11Y_SLACK_WEBHOOK_PAGE : env.O11Y_SLACK_WEBHOOK_TICKET;
-
-  const webhookUrl = await webhookSecret.get();
-  if (!webhookUrl) {
-    throw new Error(`No Slack webhook configured for severity: ${alert.severity}`);
-  }
+  const webhookUrl = await readO11ySecret(
+    env,
+    alert.severity === 'page' ? 'O11Y_SLACK_WEBHOOK_PAGE' : 'O11Y_SLACK_WEBHOOK_TICKET'
+  );
 
   const body = buildSlackMessage(alert);
 

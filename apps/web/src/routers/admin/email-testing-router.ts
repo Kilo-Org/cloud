@@ -15,6 +15,7 @@ import {
   buildCreditsTopUpReceiptSection,
   buildCreditsTopUpServiceFeeSection,
   RawHtml,
+  renderNonAutolinkedText,
   renderTemplate,
   type TemplateName,
 } from '@kilocode/web-shared/lib/email';
@@ -153,6 +154,13 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         change_action: 'add',
         provider_name: 'GitHub',
         expires_in: '10 minutes',
+      };
+    case 'passkeyEnrollmentCode':
+      return {
+        code: '482913',
+        email: 'user@example.com',
+        expires_in: '10 minutes',
+        connected_accounts_url: renderNonAutolinkedText(`${NEXTAUTH_URL}/connected-accounts`),
       };
     case 'balanceAlert':
       return { minimum_balance: '10', organization_url };

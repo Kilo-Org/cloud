@@ -39,6 +39,7 @@ export const subjects = {
   signInResetBySupport: 'Kilo: Kilo support reset how you sign in',
   newSignIn: 'Kilo: New sign-in to your account',
   signInMethodChangeCode: 'Kilo: Your code to change a sign-in method',
+  passkeyEnrollmentCode: 'Your Kilo code to add a passkey',
   balanceAlert: 'Kilo: Low Balance Alert',
   spendAlert: 'Kilo: Spend alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
@@ -703,6 +704,22 @@ export async function sendSignInMethodChangeCodeEmail(
       change_action: props.change === 'link' ? 'add' : 'remove',
       provider_name: props.providerName,
       expires_in: `${props.expiresInMinutes} minutes`,
+    },
+  });
+}
+
+export async function sendPasskeyEnrollmentCodeEmail(
+  email: string,
+  props: { code: string; expiresInMinutes: number }
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'passkeyEnrollmentCode',
+    templateVars: {
+      code: props.code,
+      email,
+      expires_in: `${props.expiresInMinutes} minutes`,
+      connected_accounts_url: renderNonAutolinkedText(`${NEXTAUTH_URL}/connected-accounts`),
     },
   });
 }

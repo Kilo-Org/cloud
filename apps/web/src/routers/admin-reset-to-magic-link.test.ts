@@ -56,6 +56,24 @@ import {
 } from '@/lib/auth/passkey';
 import { getPostgresErrorCode } from '@/lib/db-errors';
 import { createCallerForUser } from '@/routers/test-utils';
+import {
+  createPasskeyEnrollmentCode,
+  type PasskeyEnrollmentEmailCode,
+} from '@/lib/auth/passkey-enrollment-email-code';
+
+async function enrollmentCode(user: {
+  id: string;
+  google_user_email: string;
+}): Promise<PasskeyEnrollmentEmailCode> {
+  const binding = {
+    userId: user.id,
+    email: user.google_user_email,
+    webSessionId: 'holder-web-session',
+  };
+  const created = await createPasskeyEnrollmentCode(binding);
+  if (created.status !== 'created') throw new Error(`no enrollment code: ${created.status}`);
+  return { binding, emailCodeId: created.emailCodeId, code: created.code };
+}
 
 const mockDispatchPush = jest.mocked(dispatchAccountSecurityPush);
 const mockSendResetEmail = jest.mocked(sendSignInResetBySupportEmail);
@@ -530,7 +548,8 @@ describe('admin.users.resetToMagicLinkLogin', () => {
         user.id,
         challengeId,
         attestation,
-        'holder-session-pepper'
+        'holder-session-pepper',
+        await enrollmentCode(user)
       );
       void registration.catch(() => undefined);
       const ceremonyPid = await waitFor(
@@ -582,7 +601,8 @@ describe('admin.users.resetToMagicLinkLogin', () => {
       user.id,
       challengeId,
       buildRegistrationResponse(createTestAuthenticator(), { challenge: options.challenge }),
-      'holder-session-pepper'
+      'holder-session-pepper',
+      await enrollmentCode(user)
     ).then(
       () => null,
       (error: unknown) => error

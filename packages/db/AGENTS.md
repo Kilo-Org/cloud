@@ -86,6 +86,14 @@ To recover a deploy that is already failing on a concurrent-index migration:
 - Then make the unrecorded migration retry-safe as above. Editing it is safe
   because drizzle only compares the newest recorded migration timestamp.
 
+While migrations are failing, do not redeploy or promote a deployment from the
+Vercel UI. `deploy-production.yml` promotes only after its migration job
+succeeds, so a failed run leaves a staged but unpromoted deployment whose code
+expects the unapplied schema. Promoting or redeploying it from Vercel skips that
+check and breaks production. The `Redeploy Web to Production` workflow
+(`redeploy-web.yml`) does not run migrations either. Fix the migration and rerun
+`Deploy to Production` instead.
+
 Prefer `timestamp({ withTimezone: true })` over timestamps without time zone.
 Review generated migrations for data loss. Prefer additive or staged schema
 changes over destructive operations; when generated DDL is unsafe, revise the

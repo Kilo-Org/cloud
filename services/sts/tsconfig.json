@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node", "@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "drizzle.bundle/migrations.d.ts",
+    "drizzle.refresher/migrations.d.ts",
+    "drizzle.signer/migrations.d.ts",
+    "drizzle.denial/migrations.d.ts",
+    "drizzle.bundle.config.ts",
+    "drizzle.refresher.config.ts",
+    "drizzle.signer.config.ts",
+    "drizzle.denial.config.ts",
+    "vitest.config.ts",
+    "vitest.node.config.ts"
+  ],
+  "exclude": ["node_modules"]
+}

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import {
   buildAuthenticationResponse,
@@ -12,6 +12,7 @@ import {
 import {
   kilocode_users,
   device_sessions,
+  magic_link_tokens,
   passkey_challenges,
   passkey_credentials,
   passkey_management_authorizations,
@@ -20,6 +21,12 @@ import {
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+
+import {
+  createPasskeyEnrollmentCode,
+  PasskeyEnrollmentCodeRefusedError,
+  type PasskeyEnrollmentEmailCode,
+} from './passkey-enrollment-email-code';
 
 import {
   bindPasskeyManagementChallenge,
@@ -69,6 +76,31 @@ async function expectRefusal(promise: Promise<unknown>, code: string): Promise<v
   );
   expect(error).toBeInstanceOf(PasskeyVerificationError);
   expect((error as PasskeyVerificationError).code).toBe(code);
+}
+
+const ENROLLMENT_EMAILS: Record<string, string> = {
+  [userId]: userEmail,
+  [otherUserId]: 'passkey-test-other@example.com',
+};
+
+/** A fresh enrollment email code for the user's test browser session. */
+async function enrollmentCode(kiloUserId: string = userId): Promise<PasskeyEnrollmentEmailCode> {
+  const binding = {
+    userId: kiloUserId,
+    email: ENROLLMENT_EMAILS[kiloUserId],
+    webSessionId: 'passkey-test-web-session',
+  };
+  await db
+    .delete(magic_link_tokens)
+    .where(
+      and(
+        eq(magic_link_tokens.email, binding.email),
+        eq(magic_link_tokens.purpose, 'passkey_enrollment')
+      )
+    );
+  const created = await createPasskeyEnrollmentCode(binding);
+  if (created.status !== 'created') throw new Error(`no enrollment code: ${created.status}`);
+  return { binding, emailCodeId: created.emailCodeId, code: created.code };
 }
 
 async function insertCredential(
@@ -170,7 +202,8 @@ describe('passkey', () => {
         userId,
         first.challengeId,
         buildRegistrationResponse(authenticator, { challenge: first.options.challenge }),
-        SESSION_PEPPER
+        SESSION_PEPPER,
+        await enrollmentCode()
       );
 
       const second = await createRegistrationOptions(userId, userEmail);
@@ -189,7 +222,8 @@ describe('passkey', () => {
         userId,
         challengeId,
         buildRegistrationResponse(authenticator, { challenge: options.challenge }),
-        SESSION_PEPPER
+        SESSION_PEPPER,
+        await enrollmentCode()
       );
 
       expect(credential.kilo_user_id).toBe(userId);
@@ -210,7 +244,8 @@ describe('passkey', () => {
           userId,
           challengeId,
           buildRegistrationResponse(authenticator, { challenge: 'not-the-stored-challenge' }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         ),
         'WRONG_CHALLENGE'
       );
@@ -224,13 +259,81 @@ describe('passkey', () => {
       });
 
       await expect(
-        verifyRegistration(userId, challengeId, response, SESSION_PEPPER)
+        verifyRegistration(userId, challengeId, response, SESSION_PEPPER, await enrollmentCode())
       ).resolves.toBeDefined();
 
       await expectRefusal(
-        verifyRegistration(userId, challengeId, response, SESSION_PEPPER),
+        verifyRegistration(userId, challengeId, response, SESSION_PEPPER, await enrollmentCode()),
         'CHALLENGE_ALREADY_USED'
       );
+    });
+
+    it('refuses a second passkey with a code that already added one', async () => {
+      const emailCode = await enrollmentCode();
+      const first = await createRegistrationOptions(userId, userEmail);
+      await verifyRegistration(
+        userId,
+        first.challengeId,
+        buildRegistrationResponse(createTestAuthenticator(), {
+          challenge: first.options.challenge,
+        }),
+        SESSION_PEPPER,
+        emailCode
+      );
+
+      const second = await createRegistrationOptions(userId, userEmail);
+      const refusal: unknown = await verifyRegistration(
+        userId,
+        second.challengeId,
+        buildRegistrationResponse(createTestAuthenticator(), {
+          challenge: second.options.challenge,
+        }),
+        SESSION_PEPPER,
+        emailCode
+      ).then(
+        () => null,
+        (error: unknown) => error
+      );
+
+      expect(refusal).toBeInstanceOf(PasskeyEnrollmentCodeRefusedError);
+      expect((refusal as PasskeyEnrollmentCodeRefusedError).refusal).toEqual({ status: 'expired' });
+      expect(await listPasskeysForUser(userId)).toHaveLength(1);
+    });
+
+    it('leaves the code unused when the insert transaction rolls back', async () => {
+      const emailCode = await enrollmentCode();
+      const taken = createTestAuthenticator();
+      await insertCredential(taken, { kiloUserId: otherUserId });
+      const refused = await createRegistrationOptions(userId, userEmail);
+      await expectRefusal(
+        verifyRegistration(
+          userId,
+          refused.challengeId,
+          buildRegistrationResponse(taken, { challenge: refused.options.challenge }),
+          SESSION_PEPPER,
+          emailCode
+        ),
+        'VERIFICATION_FAILED'
+      );
+
+      const [row] = await db
+        .select({ consumed_at: magic_link_tokens.consumed_at })
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.challenge_id, emailCode.emailCodeId));
+      expect(row?.consumed_at).toBeNull();
+
+      const retry = await createRegistrationOptions(userId, userEmail);
+      await expect(
+        verifyRegistration(
+          userId,
+          retry.challengeId,
+          buildRegistrationResponse(createTestAuthenticator(), {
+            challenge: retry.options.challenge,
+          }),
+          SESSION_PEPPER,
+          emailCode
+        )
+      ).resolves.toMatchObject({ kilo_user_id: userId });
     });
 
     it('refuses an expired challenge', async () => {
@@ -250,7 +353,8 @@ describe('passkey', () => {
           userId,
           challengeId,
           buildRegistrationResponse(authenticator, { challenge }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         ),
         'CHALLENGE_EXPIRED'
       );
@@ -264,7 +368,8 @@ describe('passkey', () => {
           userId,
           randomUUID(),
           buildRegistrationResponse(authenticator, { challenge: 'anything' }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         ),
         'CHALLENGE_EXPIRED'
       );
@@ -282,7 +387,8 @@ describe('passkey', () => {
             challenge: options.challenge,
             origin: 'https://evil.example',
           }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         ),
         'VERIFICATION_FAILED'
       );
@@ -300,7 +406,8 @@ describe('passkey', () => {
             challenge: options.challenge,
             rpIdHash: createHash('sha256').update('api.kilo.ai').digest(),
           }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         ),
         'VERIFICATION_FAILED'
       );
@@ -315,7 +422,8 @@ describe('passkey', () => {
           userId,
           challengeId,
           buildRegistrationResponse(authenticator, { challenge: options.challenge }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         ),
         'VERIFICATION_FAILED'
       );
@@ -331,7 +439,8 @@ describe('passkey', () => {
           otherUserId,
           challengeId,
           buildRegistrationResponse(authenticator, { challenge: options.challenge }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode(otherUserId)
         ),
         'VERIFICATION_FAILED'
       );
@@ -533,7 +642,8 @@ describe('passkey', () => {
         userId,
         challengeId,
         buildRegistrationResponse(authenticator, { challenge: options.challenge, origin }),
-        SESSION_PEPPER
+        SESSION_PEPPER,
+        await enrollmentCode()
       );
 
       expect(credential.credential_id).toBe(authenticator.credentialId);
@@ -569,7 +679,8 @@ describe('passkey', () => {
             challenge: options.challenge,
             origin: 'android:apk-key-hash:not-a-registered-certificate',
           }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         ),
         'VERIFICATION_FAILED'
       );
@@ -588,7 +699,8 @@ describe('passkey', () => {
               challenge: options.challenge,
               origin: ANDROID_DEBUG_ORIGIN,
             }),
-            SESSION_PEPPER
+            SESSION_PEPPER,
+            await enrollmentCode()
           ),
           'VERIFICATION_FAILED'
         );
@@ -607,7 +719,8 @@ describe('passkey', () => {
             challenge: options.challenge,
             origin: ANDROID_UPLOAD_ORIGIN,
           }),
-          SESSION_PEPPER
+          SESSION_PEPPER,
+          await enrollmentCode()
         );
 
         expect(credential.credential_id).toBe(authenticator.credentialId);

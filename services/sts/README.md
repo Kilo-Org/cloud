@@ -1507,13 +1507,16 @@ first; the production deploy policy (step 5) follows the staging proof.
    each). The script list (200) and the zone's route list (200) work. Its calls carry `Ratelimit:
    "default";r=1199;t=1` and `Ratelimit-Policy: "default";q=1200;w=300`; whether a deploy's calls
    lower it is pending the staging proof. Also pending the staging proof: a minted token's own
-   token creation answering 403, an unrevoked minted token gone about an hour later, and the
-   sweep's `include_expired=true` list. GitHub environments: the only staging `cloudflare-deploy`
-   policy is the throwaway proof policy (`ci-sts-deploy-proof-staging`); its environment
-   `sts-proof-staging` in `iscekic/sts-deploy-token-proof` carries the same rules as
-   `sts-proof-production` (deployment branch `main` only, no required reviewers, in a repository
-   whose only writer is Igor), and both policies are removed right after the production proof.
-   `ci-deploy-bouncer` will bind production only.
+   token creation answering 403, an unrevoked minted token gone about an hour later, the sweep's
+   `include_expired=true` list, and the monitor live test (step 7: the first scheduled watch run
+   reports no unexpected deployment; a deployment of `sts-staging` made with a minted staging token
+   outside any deploy job is posted; the health workflow's first run is green). GitHub
+   environments: the only staging `cloudflare-deploy` policy is the throwaway proof policy
+   (`ci-sts-deploy-proof-staging`); its environment `sts-proof-staging` in
+   `iscekic/sts-deploy-token-proof` carries the same rules as `sts-proof-production` (deployment
+   branch `main` only, no required reviewers, in a repository whose only writer is Igor), and both
+   policies are removed right after the production proof. `ci-deploy-bouncer` will bind production
+   only.
 7. **Monitor of the STS Worker, outside STS.** The window check runs inside STS, so it cannot
    report a change to the STS Worker of its own environment.
    `.github/workflows/sts-deployment-watch.yml` runs every 15 minutes on `main`

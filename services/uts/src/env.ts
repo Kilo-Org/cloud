@@ -7,6 +7,7 @@ import {
 import { z } from 'zod';
 import type { UtsKeySetDO } from './dos/UtsKeySetDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
+import type { UtsFeedDO } from './feed/UtsFeedDO';
 
 /**
  * Production and staging keep every UTS Durable Object in the `eu` jurisdiction (design 5.7).
@@ -33,6 +34,11 @@ export type Env = {
   DO_JURISDICTION: string;
   UTS_SIGNER_DO: DurableObjectNamespace<UtsSignerDO>;
   UTS_KEY_SET_DO: DurableObjectNamespace<UtsKeySetDO>;
+  /**
+   * The two revocation-feed objects. Only this Worker binds them, so only it writes entries; the
+   * feed Worker reads heads and lists through the `FeedReads` entrypoint (src/feed/reads.ts).
+   */
+  UTS_FEED_DO: DurableObjectNamespace<UtsFeedDO>;
   /**
    * The identity store's primary Hyperdrive config, bound once the environment's identity store is
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.

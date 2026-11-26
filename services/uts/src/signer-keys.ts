@@ -1,6 +1,8 @@
 import {
+  UTS_FEED_COUNT,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
+  type FeedKeysEntry,
   type SignerKeysAnswer,
   type SignerKeysBinding,
   type SignerKeysEntry,
@@ -9,23 +11,24 @@ import {
 } from '@kilocode/uts-contracts';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withDORetry } from '@kilocode/worker-utils';
-import { z } from 'zod';
+import { callerOf } from './callers';
 import type { KeySetShardResult } from './dos/UtsKeySetDO';
 import type { PublicKeysResult } from './dos/UtsSignerDO';
-import { getKeySetShardStub, getSignerStub, KEY_SET_SHARD_COUNT } from './dos/stubs';
+import { getFeedStub, getKeySetShardStub, getSignerStub, KEY_SET_SHARD_COUNT } from './dos/stubs';
 import { FEED_DEPLOYMENTS, readConfig, type Env, type UtsConfig } from './env';
+import type { FeedPublicKeysResult } from './feed/UtsFeedDO';
 
 /**
  * A key-set shard answers from its copy of the last combined answer for this long after that read
- * started. Each of the 8 shards therefore reads the 16 signer objects at most once per 2 seconds,
- * whatever the number of feed isolates (design 3).
+ * started. Each of the 8 shards therefore reads the 16 signer objects and the 2 feed objects at
+ * most once per 2 seconds, whatever the number of feed isolates (design 3).
  */
 export const SIGNER_KEYS_COPY_MS = 2 * 1000;
 
 /**
- * Every signer call of one read, retries included, ends by this deadline, so a read settles
- * within it even when an object hangs. It is shorter than the shard call deadline, so the feed
- * Worker still receives the answer built from the held keys.
+ * Every signer and feed object call of one read, retries included, ends by this deadline, so a
+ * read settles within it even when an object hangs. It is shorter than the shard call deadline,
+ * so the feed Worker still receives the answer built from the held keys.
  */
 export const SIGNER_READ_DEADLINE_MS = 5 * 1000;
 
@@ -41,9 +44,19 @@ const WAIT_STEP_MS = 20;
 
 export type HeldSignerKeys = { keys: UtsPublicJwk[]; readAt: number };
 
-export type SignerAnswers = ReadonlyArray<PromiseSettledResult<PublicKeysResult>>;
+/** Each key object's last good keys, which stand in for its failed calls for 24 hours. */
+export type HeldKeys = {
+  signers: ReadonlyArray<HeldSignerKeys | null>;
+  feeds: ReadonlyArray<HeldSignerKeys | null>;
+};
 
-/** Reads the 16 signer objects; `startedAt` is the read's start, which its deadline counts from. */
+/** The settled calls of one read: the 16 signer objects and the 2 feed objects, in order. */
+export type SignerAnswers = {
+  signers: ReadonlyArray<PromiseSettledResult<PublicKeysResult>>;
+  feeds: ReadonlyArray<PromiseSettledResult<FeedPublicKeysResult>>;
+};
+
+/** Reads the key objects; `startedAt` is the read's start, which its deadline counts from. */
 export type ReadSigners = (startedAt: number) => Promise<SignerAnswers>;
 
 /**
@@ -51,69 +64,71 @@ export type ReadSigners = (startedAt: number) => Promise<SignerAnswers>;
  * started (design 7); it polls `read` instead.
  */
 export type SignerKeysCache = {
-  /** Each signer's last good keys, which stand in for its failed calls for 24 hours. */
-  held: ReadonlyArray<HeldSignerKeys | null>;
+  held: HeldKeys;
   copy: { answer: SignerKeysAnswer; readAt: number } | null;
   read: { status: 'idle' } | { status: 'reading'; startedAt: number };
 };
 
+const noneHeld = (count: number) => Array.from({ length: count }, () => null);
+
 export function newSignerKeysCache(): SignerKeysCache {
   return {
-    held: Array.from({ length: UTS_SIGNER_COUNT }, () => null),
+    held: { signers: noneHeld(UTS_SIGNER_COUNT), feeds: noneHeld(UTS_FEED_COUNT) },
     copy: null,
     read: { status: 'idle' },
   };
 }
 
-const CallerPropsSchema = z.strictObject({ caller: z.string().min(1) });
+/** One key object's entry before it is named as a signer or a feed object. */
+type ObjectEntry =
+  | { status: 'ok'; keys: UtsPublicJwk[]; readAt: number }
+  | { status: 'misconfigured' | 'unavailable' };
 
-/** The caller a service binding's `props` name; null when the binding carries no valid props. */
-function callerOf(props: unknown): string | null {
-  const parsed = CallerPropsSchema.safeParse(props);
-  return parsed.success ? parsed.data.caller : null;
-}
+type ObjectAnswer = PromiseSettledResult<
+  { status: 'ok'; keys: UtsPublicJwk[] } | { status: 'misconfigured'; reason: string }
+>;
 
-/** The entry of a signer without an answer: its held keys while under 24 hours old. */
+/** The entry of an object without an answer: its held keys while under 24 hours old. */
 function heldEntry(
-  signer: number,
   held: HeldSignerKeys | null,
   now: number,
   failure: 'misconfigured' | 'unavailable'
-): SignerKeysEntry {
+): ObjectEntry {
   return held !== null && now - held.readAt < UTS_SIGNER_KEYS_HOLD_MS
-    ? { signer, status: 'ok', keys: held.keys, readAt: held.readAt }
-    : { signer, status: failure };
+    ? { status: 'ok', keys: held.keys, readAt: held.readAt }
+    : { status: failure };
 }
 
 /**
- * Combines the 16 answers of the read that started at `readAt`, in signer order, with the keys
- * held from earlier reads. A signer that answered gives its keys at `readAt`, and they become its
- * held keys unless newer ones are held already. A signer whose call failed after its retries, or
- * whose object refused to load, gives its held keys while they are under 24 hours old, and its
+ * Combines one kind's answers of the read that started at `readAt`, in object order, with the
+ * keys held from earlier reads. An object that answered gives its keys at `readAt`, and they
+ * become its held keys unless newer ones are held already. An object whose call failed after its
+ * retries, or that refused to load, gives its held keys while they are under 24 hours old, and its
  * failure otherwise. Each failure is logged; a refused object stays refused until a deploy fixes
  * it, so it is `misconfigured`, not `unavailable`.
  */
-export function combineSignerKeys(
-  answers: SignerAnswers,
+function combineObjects(
+  kind: 'signer' | 'feed',
+  answers: readonly ObjectAnswer[],
   held: ReadonlyArray<HeldSignerKeys | null>,
   readAt: number,
   now: number
-): { answer: SignerKeysAnswer; held: Array<HeldSignerKeys | null> } {
+): { entries: ObjectEntry[]; held: Array<HeldSignerKeys | null> } {
   const nextHeld: Array<HeldSignerKeys | null> = [];
-  const signers: SignerKeysEntry[] = [];
-  for (const [signer, answer] of answers.entries()) {
-    const previous = held[signer] ?? null;
+  const entries: ObjectEntry[] = [];
+  for (const [index, answer] of answers.entries()) {
+    const previous = held[index] ?? null;
     let failure: { status: 'misconfigured' | 'unavailable'; event: string; error: string };
     if (answer.status === 'rejected') {
       failure = {
         status: 'unavailable',
-        event: 'uts.signer_keys.signer_failed',
+        event: `uts.signer_keys.${kind}_failed`,
         error: String(answer.reason),
       };
     } else if (answer.value.status === 'misconfigured') {
       failure = {
         status: 'misconfigured',
-        event: 'uts.signer_keys.signer_misconfigured',
+        event: `uts.signer_keys.${kind}_misconfigured`,
         error: answer.value.reason,
       };
     } else {
@@ -122,22 +137,42 @@ export function combineSignerKeys(
           ? previous
           : { keys: answer.value.keys, readAt };
       nextHeld.push(best);
-      signers.push({ signer, status: 'ok', keys: best.keys, readAt: best.readAt });
+      entries.push({ status: 'ok', keys: best.keys, readAt: best.readAt });
       continue;
     }
-    const entry = heldEntry(signer, previous, now, failure.status);
+    const entry = heldEntry(previous, now, failure.status);
     console.error(
       JSON.stringify({
         event: failure.event,
-        signer,
+        [kind]: index,
         error: failure.error,
         heldReadAt: entry.status === 'ok' ? entry.readAt : null,
       })
     );
     nextHeld.push(previous);
-    signers.push(entry);
+    entries.push(entry);
   }
-  return { answer: { signers }, held: nextHeld };
+  return { entries, held: nextHeld };
+}
+
+const asSignerEntries = (entries: readonly ObjectEntry[]): SignerKeysEntry[] =>
+  entries.map((entry, signer) => ({ signer, ...entry }));
+const asFeedEntries = (entries: readonly ObjectEntry[]): FeedKeysEntry[] =>
+  entries.map((entry, feed) => ({ feed, ...entry }));
+
+/** Combines the answers of the read that started at `readAt` with the held keys of each object. */
+export function combineSignerKeys(
+  answers: SignerAnswers,
+  held: HeldKeys,
+  readAt: number,
+  now: number
+): { answer: SignerKeysAnswer; held: HeldKeys } {
+  const signers = combineObjects('signer', answers.signers, held.signers, readAt, now);
+  const feeds = combineObjects('feed', answers.feeds, held.feeds, readAt, now);
+  return {
+    answer: { signers: asSignerEntries(signers.entries), feeds: asFeedEntries(feeds.entries) },
+    held: { signers: signers.held, feeds: feeds.held },
+  };
 }
 
 /**
@@ -151,8 +186,11 @@ async function waitForRead(cache: SignerKeysCache, startedAt: number): Promise<S
   }
   if (cache.copy !== null && cache.copy.readAt >= startedAt) return cache.copy.answer;
   const now = Date.now();
+  const fromHeld = (held: ReadonlyArray<HeldSignerKeys | null>) =>
+    held.map(entry => heldEntry(entry, now, 'unavailable'));
   return {
-    signers: cache.held.map((held, signer) => heldEntry(signer, held, now, 'unavailable')),
+    signers: asSignerEntries(fromHeld(cache.held.signers)),
+    feeds: asFeedEntries(fromHeld(cache.held.feeds)),
   };
 }
 
@@ -187,10 +225,26 @@ export async function signerKeysAnswer(
 }
 
 /**
- * Every signer's published keys, read from the 16 signer objects in parallel. Each result is
- * copied out and its RPC disposer run: workerd gives every object an RPC call returns a disposer,
- * and the call stays open until it runs. The keys are plain data, so the copy stays readable.
- * https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
+ * Copies a key object's RPC result out and runs its disposer: workerd gives every object an RPC
+ * call returns a disposer, and the call stays open until it runs. The keys are plain data, so the
+ * copy stays readable. https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
+ */
+async function plainResult<Result extends object>(
+  call: () => Promise<Result & Partial<Disposable>>
+): Promise<Result> {
+  // Partial: only a workerd RPC result carries a disposer.
+  const result = await call();
+  try {
+    // The disposer is non-enumerable, so the spread leaves it behind.
+    return { ...result };
+  } finally {
+    result[Symbol.dispose]?.();
+  }
+}
+
+/**
+ * Every signer's and both feed objects' published keys, read in parallel, each call with the
+ * shared Durable Object retry under the read's deadline.
  */
 export async function readSignerObjects(
   env: Env,
@@ -201,25 +255,29 @@ export async function readSignerObjects(
     ...DEFAULT_DO_RETRY_CONFIG,
     scope: { deadlineAt: startedAt + SIGNER_READ_DEADLINE_MS },
   };
-  return await Promise.allSettled(
-    Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) =>
-      withDORetry(
-        () => getSignerStub(env, config, signer),
-        async (stub): Promise<PublicKeysResult> => {
-          // Partial: only a workerd RPC result carries a disposer.
-          const result: PublicKeysResult & Partial<Disposable> = await stub.publicKeys();
-          try {
-            // The disposer is non-enumerable, so the spread leaves it behind.
-            return { ...result };
-          } finally {
-            result[Symbol.dispose]?.();
-          }
-        },
-        'uts.signer.publicKeys',
-        retry
+  const [signers, feeds] = await Promise.all([
+    Promise.allSettled(
+      Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) =>
+        withDORetry(
+          () => getSignerStub(env, config, signer),
+          stub => plainResult<PublicKeysResult>(() => stub.publicKeys()),
+          'uts.signer.publicKeys',
+          retry
+        )
       )
-    )
-  );
+    ),
+    Promise.allSettled(
+      Array.from({ length: UTS_FEED_COUNT }, (_, feed) =>
+        withDORetry(
+          () => getFeedStub(env, config, feed),
+          stub => plainResult<FeedPublicKeysResult>(() => stub.publicKeys()),
+          'uts.feed.publicKeys',
+          retry
+        )
+      )
+    ),
+  ]);
+  return { signers, feeds };
 }
 
 /**
@@ -259,12 +317,11 @@ export async function readThroughIsolateShard(
 
 /**
  * One signer-keys read for the binding whose props are `props`, answered by key-set shard
- * `shard`. It answers only the feed Worker of the mint Worker's own environment: a service binding
- * carries `props.caller`, and only a deploy in the account can set props, so the check is
- * deploy-level trust, as for the STS broker (design 6.4). Any other caller, or a binding without
- * props, gets `refused` without a shard call. A shard that refused to load gives `misconfigured`.
- * A shard call that fails until its deadline throws, and the feed Worker counts the read as
- * failed. The answer is plain data, so it stays readable after the caller disposes the RPC result.
+ * `shard`. It answers only the feed Worker of the mint Worker's own environment (`callerOf`). Any
+ * other caller, or a binding without props, gets `refused` without a shard call. A shard that
+ * refused to load gives `misconfigured`. A shard call that fails until its deadline throws, and
+ * the feed Worker counts the read as failed. The answer is plain data, so it stays readable after
+ * the caller disposes the RPC result.
  */
 export async function signerKeysRead(
   env: Env,
@@ -279,15 +336,7 @@ export async function signerKeysRead(
   }
   const result = await withDORetry(
     () => getKeySetShardStub(env, config, shard),
-    async (stub): Promise<KeySetShardResult> => {
-      // Partial: only a workerd RPC result carries a disposer.
-      const answered: KeySetShardResult & Partial<Disposable> = await stub.signerKeys();
-      try {
-        return { ...answered };
-      } finally {
-        answered[Symbol.dispose]?.();
-      }
-    },
+    stub => plainResult<KeySetShardResult>(() => stub.signerKeys()),
     'uts.key_set_shard.signerKeys',
     { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt: Date.now() + KEY_SET_SHARD_DEADLINE_MS } }
   );

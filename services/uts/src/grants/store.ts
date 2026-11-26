@@ -2,6 +2,7 @@ import type { UtsEnvironment } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { IdentityStore } from '../db/client';
 import { CLIENT_KINDS } from '../db/enums';
+import { type FeedEntry, StatementFeedEntriesSchema } from '../revocation/entries';
 
 /**
  * The OAuth grant statements (migration `0004_oauth_grants.sql`). Each call is one SQL statement:
@@ -95,19 +96,27 @@ export type Minted = {
 
 type SelectionFailure = 'invalid_grant' | 'invalid_scope' | 'invalid_target';
 
-/** `dpop_replay`: the proof's `jti` was recorded under the grant before. */
+/**
+ * `dpop_replay`: the proof's `jti` was recorded under the grant before. A failed exchange carries
+ * the feed entries its statement wrote: a second use of a code revokes the grant the code created.
+ */
 export type ExchangeResult =
   | ({ outcome: 'issued'; refreshExpiresAt: Date } & Minted)
-  | { outcome: SelectionFailure | 'dpop_replay' };
+  | { outcome: SelectionFailure | 'dpop_replay'; feedEntries: FeedEntry[] };
 export type FirstPartyRefreshResult =
   | ({ outcome: 'issued' } & Minted)
   | { outcome: SelectionFailure | 'dpop_mismatch' | 'dpop_replay' };
+/** A failed third-party refresh carries the feed entries of a family that reuse revoked. */
 export type ThirdPartyRefreshResult =
   | ({ outcome: 'issued'; familyId: string; refreshExpiresAt: Date } & Minted)
-  | { outcome: SelectionFailure | 'reuse_detected' };
+  | { outcome: SelectionFailure | 'reuse_detected'; feedEntries: FeedEntry[] };
 
 export type RevokeInput = { environment: UtsEnvironment; tokenHash: Uint8Array; clientId: string };
-export type RevokeResult = 'revoked' | 'already_revoked' | 'unknown' | 'client_mismatch';
+/** The outcome and the feed entries the statement wrote, which the caller publishes. */
+export type RevokeResult = {
+  outcome: 'revoked' | 'already_revoked' | 'unknown' | 'client_mismatch';
+  feedEntries: FeedEntry[];
+};
 
 export type IntrospectInput = {
   tokenHash: Uint8Array;
@@ -167,13 +176,26 @@ function minted(row: z.output<z.ZodObject<typeof MintedColumns>>): Minted {
 const failure = <const Outcomes extends readonly [string, ...string[]]>(outcomes: Outcomes) =>
   z.object({ outcome: z.enum(outcomes) });
 
+/** A failure row of a statement that can revoke: it carries the entries the statement wrote. */
+const revokingFailure = <const Outcomes extends readonly [string, ...string[]]>(
+  outcomes: Outcomes
+) => z.object({ outcome: z.enum(outcomes), feed_entries: StatementFeedEntriesSchema });
+
+/**
+ * The select list of a grant function that can revoke: its row, and for any outcome but `issued`
+ * the feed entries the statement wrote (`uts.feed_entries_of_statement()`, migration 0006). The
+ * CASE leaves the issued path, the hot one, without the extra probe.
+ */
+const WITH_FEED_ENTRIES = `result.*, CASE WHEN result.outcome = 'issued' THEN '[]'::jsonb
+  ELSE uts.feed_entries_of_statement() END AS feed_entries`;
+
 const IssueCodeRowSchema = z.object({
   outcome: z.enum(['issued', 'access_denied', 'consent_required']),
 });
 
 const ExchangeRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('issued'), ...MintedColumns, refresh_expires_at: z.date() }),
-  failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_replay']),
+  revokingFailure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_replay']),
 ]);
 
 const FirstPartyRefreshRowSchema = z.discriminatedUnion('outcome', [
@@ -188,11 +210,12 @@ const ThirdPartyRefreshRowSchema = z.discriminatedUnion('outcome', [
     family_id: z.uuid(),
     refresh_expires_at: z.date(),
   }),
-  failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'reuse_detected']),
+  revokingFailure(['invalid_grant', 'invalid_scope', 'invalid_target', 'reuse_detected']),
 ]);
 
 const RevokeRowSchema = z.object({
   outcome: z.enum(['revoked', 'already_revoked', 'unknown', 'client_mismatch']),
+  feed_entries: StatementFeedEntriesSchema,
 });
 
 const IntrospectRowSchema = z.discriminatedUnion('outcome', [
@@ -269,7 +292,7 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
       const firstParty = input.binding.kind === 'first_party' ? input.binding : null;
       const device = firstParty?.device ?? null;
       const row = await one(
-        'SELECT * FROM uts.exchange_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)',
+        `SELECT ${WITH_FEED_ENTRIES} FROM uts.exchange_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) AS result`,
         [
           input.environment,
           input.codeHash,
@@ -292,7 +315,7 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         ],
         ExchangeRowSchema
       );
-      if (row.outcome !== 'issued') return { outcome: row.outcome };
+      if (row.outcome !== 'issued') return { outcome: row.outcome, feedEntries: row.feed_entries };
       return { outcome: 'issued', refreshExpiresAt: row.refresh_expires_at, ...minted(row) };
     },
 
@@ -317,7 +340,7 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
 
     async refreshThirdParty(input) {
       const row = await one(
-        'SELECT * FROM uts.refresh_third_party($1, $2, $3, $4, $5, $6)',
+        `SELECT ${WITH_FEED_ENTRIES} FROM uts.refresh_third_party($1, $2, $3, $4, $5, $6) AS result`,
         [
           input.environment,
           input.tokenHash,
@@ -328,7 +351,7 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         ],
         ThirdPartyRefreshRowSchema
       );
-      if (row.outcome !== 'issued') return { outcome: row.outcome };
+      if (row.outcome !== 'issued') return { outcome: row.outcome, feedEntries: row.feed_entries };
       return {
         outcome: 'issued',
         familyId: row.family_id,
@@ -339,11 +362,11 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
 
     async revoke(input) {
       const row = await one(
-        'SELECT * FROM uts.revoke_refresh_token($1, $2, $3)',
+        `SELECT ${WITH_FEED_ENTRIES} FROM uts.revoke_refresh_token($1, $2, $3) AS result`,
         [input.environment, input.tokenHash, input.clientId],
         RevokeRowSchema
       );
-      return row.outcome;
+      return { outcome: row.outcome, feedEntries: row.feed_entries };
     },
 
     async introspect(input) {

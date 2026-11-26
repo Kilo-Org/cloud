@@ -11,6 +11,7 @@ import {
   randomCredential,
   sha256,
 } from '../token/credentials';
+import type { FeedPublish } from '../revocation/publish';
 import { type SignerAccess, accessTokenClaims, tokenResponseBody } from '../token/mint';
 import { type FirstPartyClient, requestClient } from './clients';
 import { failureResponse, oauthError, temporarilyUnavailable } from './errors';
@@ -31,6 +32,10 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * third-party client authorizes again, because a second use of its code revokes the family), and
  * a third-party refresh within the 60-second grace of its rotated token gets the family's next
  * token.
+ *
+ * A refused exchange or third-party refresh whose statement revoked a grant (a second use of a
+ * code, a reused rotated token) publishes the statement's feed entries before it answers; a failed
+ * publish changes nothing in the answer, and the backfill adds the entries (design 5.6).
  */
 
 /** The RFC 8628 device grant, which the device sign-in slice provides. */
@@ -40,6 +45,7 @@ export type TokenDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
   sign: SignerAccess;
+  publish: FeedPublish;
   deviceCodeGrant: DeviceCodeGrant | null;
 };
 
@@ -210,7 +216,10 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
       ...selection,
     })
   );
-  if (result.outcome !== 'issued') return grantError(result.outcome);
+  if (result.outcome !== 'issued') {
+    await deps.publish(result.feedEntries);
+    return grantError(result.outcome);
+  }
   return await completeMint(deps, clientId, grantId, result, {
     token: refreshToken,
     expiresAt: result.refreshExpiresAt,
@@ -257,7 +266,10 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
       ...selection,
     })
   );
-  if (result.outcome !== 'issued') return grantError(result.outcome);
+  if (result.outcome !== 'issued') {
+    await deps.publish(result.feedEntries);
+    return grantError(result.outcome);
+  }
   return await completeMint(deps, identity.clientId, result.familyId, result, {
     token: rotated,
     expiresAt: result.refreshExpiresAt,

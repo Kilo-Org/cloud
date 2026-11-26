@@ -1,5 +1,7 @@
 import {
+  feedKid,
   tokenKid,
+  UTS_FEED_COUNT,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
   type UtsPublicJwk,
@@ -7,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
 import type { PublicKeysResult } from '../../src/dos/UtsSignerDO';
+import type { FeedPublicKeysResult } from '../../src/feed/UtsFeedDO';
 import {
   combineSignerKeys,
   newSignerKeysCache,
@@ -14,7 +17,7 @@ import {
   SIGNER_KEYS_COPY_MS,
   SIGNER_READ_DEADLINE_MS,
   signerKeysAnswer,
-  type HeldSignerKeys,
+  type HeldKeys,
   type ReadSigners,
   type SignerAnswers,
   type SignerKeysCache,
@@ -44,16 +47,41 @@ const refused: PromiseSettledResult<PublicKeysResult> = {
   status: 'fulfilled',
   value: { status: 'misconfigured', reason: 'signer object was not created by its signer name' },
 };
-const noneHeld = (): Array<HeldSignerKeys | null> =>
-  Array.from({ length: UTS_SIGNER_COUNT }, () => null);
 
-/** A signer reader that answers `answers` and counts its reads. */
-function reader(answers: () => Promise<SignerAnswers>): ReadSigners & { reads: number[] } {
+function feedKeysOf(feed: number, generation = 0): UtsPublicJwk[] {
+  const x = `${String(generation).padStart(3, '0')}${'F'.repeat(40)}`;
+  return [{ kty: 'OKP', crv: 'Ed25519', x, kid: feedKid(feed, x), alg: 'EdDSA', use: 'sig' }];
+}
+
+const allFeeds = (generation = 0): Array<PromiseSettledResult<FeedPublicKeysResult>> =>
+  Array.from({ length: UTS_FEED_COUNT }, (_, feed) => ({
+    status: 'fulfilled',
+    value: { status: 'ok', feed, keys: feedKeysOf(feed, generation) },
+  }));
+
+const noneHeld = (): HeldKeys => ({
+  signers: Array.from({ length: UTS_SIGNER_COUNT }, () => null),
+  feeds: Array.from({ length: UTS_FEED_COUNT }, () => null),
+});
+
+/** `combineSignerKeys` over these signer answers, with every feed object answering. */
+const combine = (
+  signers: SignerAnswers['signers'],
+  held: HeldKeys,
+  readAt: number,
+  now: number,
+  feeds: SignerAnswers['feeds'] = allFeeds()
+) => combineSignerKeys({ signers, feeds }, held, readAt, now);
+
+/** A key-object reader that answers `signers`, every feed object beside them, and counts reads. */
+function reader(
+  signers: () => Promise<SignerAnswers['signers']>
+): ReadSigners & { reads: number[] } {
   const reads: number[] = [];
   return Object.assign(
     async (startedAt: number) => {
       reads.push(startedAt);
-      return await answers();
+      return { signers: await signers(), feeds: allFeeds() };
     },
     { reads }
   );
@@ -82,21 +110,25 @@ afterEach(() => {
 
 describe('combineSignerKeys', () => {
   it('gives every signer that answered its keys at the read time, and holds them', () => {
-    const { answer: combined, held } = combineSignerKeys(all(), noneHeld(), T0, T0);
+    const { answer: combined, held } = combine(all(), noneHeld(), T0, T0);
     expect(combined.signers.map(entry => entry.signer)).toEqual(
       Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => signer)
     );
     expect(combined.signers[3]).toEqual({ signer: 3, status: 'ok', keys: keysOf(3), readAt: T0 });
-    expect(held[3]).toEqual({ keys: keysOf(3), readAt: T0 });
+    expect(held.signers[3]).toEqual({ keys: keysOf(3), readAt: T0 });
+    expect(combined.feeds).toEqual(
+      [0, 1].map(feed => ({ feed, status: 'ok', keys: feedKeysOf(feed), readAt: T0 }))
+    );
+    expect(held.feeds[1]).toEqual({ keys: feedKeysOf(1), readAt: T0 });
   });
 
   it("stands in a failed or refused signer's held keys, with the time they were read", () => {
-    const { held } = combineSignerKeys(all(), noneHeld(), T0, T0);
+    const { held } = combine(all(), noneHeld(), T0, T0);
     const answers = all(1);
     answers[4] = failed;
     answers[9] = refused;
     const later = T0 + 60_000;
-    const { answer: combined, held: after } = combineSignerKeys(answers, held, later, later);
+    const { answer: combined, held: after } = combine(answers, held, later, later);
     expect(combined.signers[4]).toEqual({ signer: 4, status: 'ok', keys: keysOf(4), readAt: T0 });
     expect(combined.signers[9]).toEqual({ signer: 9, status: 'ok', keys: keysOf(9), readAt: T0 });
     expect(combined.signers[0]).toEqual({
@@ -105,35 +137,61 @@ describe('combineSignerKeys', () => {
       keys: keysOf(0, 1),
       readAt: later,
     });
-    expect(after[4]).toEqual({ keys: keysOf(4), readAt: T0 });
+    expect(after.signers[4]).toEqual({ keys: keysOf(4), readAt: T0 });
     expect(errors).toHaveBeenCalledWith(
       expect.stringContaining('"event":"uts.signer_keys.signer_failed","signer":4')
     );
   });
 
   it('answers the failure of a signer with no keys under 24 hours old', () => {
-    const { held } = combineSignerKeys(all(), noneHeld(), T0, T0);
+    const { held } = combine(all(), noneHeld(), T0, T0);
     const answers = all();
     answers[4] = failed;
     answers[9] = refused;
     const late = T0 + UTS_SIGNER_KEYS_HOLD_MS;
-    const { answer: combined } = combineSignerKeys(answers, held, late, late);
+    const { answer: combined } = combine(answers, held, late, late);
     expect(combined.signers[4]).toEqual({ signer: 4, status: 'unavailable' });
     expect(combined.signers[9]).toEqual({ signer: 9, status: 'misconfigured' });
-    const { answer: cold } = combineSignerKeys(answers, noneHeld(), T0, T0);
+    const { answer: cold } = combine(answers, noneHeld(), T0, T0);
     expect(cold.signers[4]).toEqual({ signer: 4, status: 'unavailable' });
   });
 
   it('keeps newer held keys over the answer of a read that started earlier', () => {
-    const { held } = combineSignerKeys(all(1), noneHeld(), T0 + 10, T0 + 10);
-    const { answer: combined, held: after } = combineSignerKeys(all(0), held, T0, T0 + 20);
+    const { held } = combine(all(1), noneHeld(), T0 + 10, T0 + 10);
+    const { answer: combined, held: after } = combine(all(0), held, T0, T0 + 20);
     expect(combined.signers[2]).toEqual({
       signer: 2,
       status: 'ok',
       keys: keysOf(2, 1),
       readAt: T0 + 10,
     });
-    expect(after[2]).toEqual({ keys: keysOf(2, 1), readAt: T0 + 10 });
+    expect(after.signers[2]).toEqual({ keys: keysOf(2, 1), readAt: T0 + 10 });
+  });
+
+  it("stands in a failed or refused feed object's held keys, and its failure once none are held", () => {
+    const { held } = combine(all(), noneHeld(), T0, T0);
+    const feeds = allFeeds(1);
+    feeds[0] = { status: 'rejected', reason: new Error('Durable Object overloaded') };
+    feeds[1] = {
+      status: 'fulfilled',
+      value: { status: 'misconfigured', reason: 'feed object was not created by its feed name' },
+    };
+    const later = T0 + 60_000;
+    const { answer: combined, held: after } = combine(all(1), held, later, later, feeds);
+    expect(combined.feeds).toEqual([
+      { feed: 0, status: 'ok', keys: feedKeysOf(0), readAt: T0 },
+      { feed: 1, status: 'ok', keys: feedKeysOf(1), readAt: T0 },
+    ]);
+    expect(after.feeds[0]).toEqual({ keys: feedKeysOf(0), readAt: T0 });
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"uts.signer_keys.feed_failed","feed":0')
+    );
+    const late = T0 + UTS_SIGNER_KEYS_HOLD_MS;
+    const { answer: expired } = combine(all(), held, late, late, feeds);
+    expect(expired.feeds).toEqual([
+      { feed: 0, status: 'unavailable' },
+      { feed: 1, status: 'misconfigured' },
+    ]);
   });
 });
 
@@ -175,7 +233,7 @@ describe('signerKeysAnswer', () => {
   it('answers a waiting request from the held keys when the read it waits for misses its deadline', async () => {
     let hang = false;
     const read = reader(async () =>
-      hang ? await new Promise<SignerAnswers>(() => undefined) : all()
+      hang ? await new Promise<SignerAnswers['signers']>(() => undefined) : all()
     );
     await answerAt(T0, read);
     hang = true;

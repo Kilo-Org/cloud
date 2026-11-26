@@ -74,6 +74,8 @@ export const REVOCATION_KINDS = [
   'bot_key',
   'sandbox_grant',
   'kid',
+  // Added by 0006_revocation_feed.sql; `ALTER TYPE ... ADD VALUE` appends it.
+  'blocked_account',
 ] as const;
 export const GATE_TIERS = ['a', 'b'] as const;
 export const GATED_ACTIONS = [

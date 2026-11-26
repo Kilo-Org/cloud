@@ -40,11 +40,14 @@
     "bindings": [
       { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
       { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+      // The two revocation-feed objects; only this Worker binds them (src/feed/UtsFeedDO.ts).
+      { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
   ],
   // No identity-store Hyperdrive binding yet: the OAuth endpoints and their metadata stay off
   // until the environment's identity store is provisioned (src/grants/binding.ts).
@@ -68,6 +71,7 @@
         "bindings": [
           { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+          { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
         ],
       },
     },
@@ -87,6 +91,7 @@
         "bindings": [
           { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+          { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
         ],
       },
       // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo:

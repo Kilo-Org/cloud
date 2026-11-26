@@ -1,0 +1,222 @@
+import type { FeedPublicKeys, FeedReadsHead, FeedReadsList } from '@kilocode/uts-contracts';
+import { DurableObject } from 'cloudflare:workers';
+import { withIdentityStore } from '../db/client';
+import { dataCenter } from '../dos/data-center';
+import { feedOfObjectId } from '../dos/stubs';
+import { readConfig, type Env, type UtsConfig } from '../env';
+import { identityStoreBinding } from '../grants/binding';
+import { generateFeedKey, importSigningKey } from '../keys/ed25519';
+import {
+  advance,
+  bootstrapState,
+  publishedKeys,
+  SignerStateSchema,
+  type SignerState,
+} from '../keys/lifecycle';
+import { FeedEntriesSchema, type FeedEntry } from '../revocation/entries';
+import { readFeedEntries } from '../revocation/store';
+import { FeedLedger } from './ledger';
+
+/**
+ * KV storage key of the feed key state. Its shape is the signer state's (`SignerStateSchema`),
+ * with the feed index in `signer`: feed keys follow the same 30-day rotation with a published next
+ * key (design 5.6, 5.7).
+ */
+const KEY_STATE = 'feed-key-state';
+
+/** The alarm period: backfill, expiry and key rotation run every 5 seconds (design 5.6). */
+export const FEED_ALARM_INTERVAL_MS = 5 * 1000;
+
+export type FeedPublicKeysResult =
+  | ({ status: 'ok' } & FeedPublicKeys)
+  | { status: 'misconfigured'; reason: string };
+
+/** `invalid_entries`: not a list of feed entries, a caller bug that no retry fixes. */
+export type FeedPublishResult =
+  | { status: 'stored' }
+  | { status: 'refused'; reason: 'invalid_entries' }
+  | { status: 'misconfigured'; reason: string };
+
+type Loaded = { feed: number; state: SignerState; signingKey: CryptoKey };
+
+/** Loading runs once per start, before any call; a refused object never creates keys. */
+type Phase =
+  | { status: 'loading' }
+  | { status: 'refused'; reason: string }
+  | ({ status: 'ready' } & Loaded);
+
+type Settled = Exclude<Phase, { status: 'loading' }>;
+
+/**
+ * One of the two revocation-feed objects (design 5.6), named `<environment>:feed:<0|1>`, in the
+ * `eu` jurisdiction, feed 0 with the western-Europe hint and feed 1 with the eastern-Europe hint.
+ *
+ * - It holds every live feed entry in memory (`FeedLedger`) and keeps no entry in storage: the
+ *   identity store is the record, and after a restart the object reads every live entry before it
+ *   signs a head.
+ * - Its own Ed25519 feed key, generated inside it and kept in its KV storage, signs its heads;
+ *   both objects' public keys reach the UTS key set through the key-set shards.
+ * - `publish` takes the entries of one revoking statement from the mint Worker, the only Worker
+ *   that binds this namespace. Every 5 seconds the alarm reads the revocations of the last 20
+ *   minutes from the identity store and adds any entry it lacks, drops expired entries, and
+ *   rotates the feed key when due.
+ * - `head` signs a new head when the list changed or the held head is 5 seconds old, and only
+ *   while the last good backfill started under 60 seconds ago.
+ *
+ * Workers RPC exposes every public method, so the only public members are the RPC methods
+ * `publicKeys`, `head`, `list` and `publish` and the platform's `alarm`.
+ */
+export class UtsFeedDO extends DurableObject<Env> {
+  readonly #config: UtsConfig;
+  #phase: Phase = { status: 'loading' };
+  readonly #ledger = new FeedLedger();
+  #unboundLogged = false;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.#config = readConfig(env);
+    // A load that throws (a storage failure) resets the object, and the next call loads again; the
+    // catch only keeps that rejection from surfacing as unhandled.
+    ctx
+      .blockConcurrencyWhile(() => this.#load())
+      .catch((error: unknown) => {
+        console.error(JSON.stringify({ event: 'uts.feed.load_failed', error: String(error) }));
+      });
+  }
+
+  async publicKeys(): Promise<FeedPublicKeysResult> {
+    const phase = this.#settled();
+    if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
+    return { status: 'ok', feed: phase.feed, keys: publishedKeys(phase.state) };
+  }
+
+  async head(): Promise<FeedReadsHead> {
+    const phase = this.#settled();
+    if (phase.status === 'refused') return { status: 'misconfigured' };
+    const now = Date.now();
+    if (!this.#ledger.vouches(now)) return { status: 'unavailable' };
+    const head = await this.#ledger.head(
+      { kid: phase.state.current.kid, signingKey: phase.signingKey },
+      now
+    );
+    return { status: 'ok', head: head.compact, listHash: head.listHash, issuedAt: head.issuedAt };
+  }
+
+  async list(listHash: unknown): Promise<FeedReadsList> {
+    if (this.#settled().status === 'refused') return { status: 'misconfigured' };
+    const list = this.#ledger.list(listHash);
+    return list === null ? { status: 'not_found' } : { status: 'ok', list: list.text };
+  }
+
+  /** Adds the entries one revoking statement wrote; `stored` confirms the object holds them. */
+  async publish(entries: unknown): Promise<FeedPublishResult> {
+    const phase = this.#settled();
+    if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
+    const parsed = FeedEntriesSchema.safeParse(entries);
+    if (!parsed.success) return { status: 'refused', reason: 'invalid_entries' };
+    this.#ledger.take(parsed.data, Date.now());
+    return { status: 'stored' };
+  }
+
+  override async alarm(): Promise<void> {
+    const phase = this.#settled();
+    if (phase.status === 'refused') return;
+    const now = Date.now();
+    // Set first, so a failure below still leaves the next run in place.
+    await this.ctx.storage.setAlarm(now + FEED_ALARM_INTERVAL_MS);
+    await this.#rotateKeys(phase, now);
+    await this.#backfill(now);
+    this.#ledger.expire(Date.now());
+  }
+
+  #settled(): Settled {
+    if (this.#phase.status === 'loading') throw new Error('feed state is not loaded');
+    return this.#phase;
+  }
+
+  async #backfill(now: number): Promise<void> {
+    const binding = identityStoreBinding(this.env);
+    if (binding.kind === 'unprovisioned') {
+      if (!this.#unboundLogged) {
+        this.#unboundLogged = true;
+        console.warn(JSON.stringify({ event: 'uts.feed.identity_store_unbound' }));
+      }
+      return;
+    }
+    const read = this.#ledger.startBackfill(now);
+    if (read === null) return;
+    let entries: FeedEntry[] | null = null;
+    try {
+      const result = await withIdentityStore(binding.connectionString, this.ctx, store =>
+        readFeedEntries(store, read)
+      );
+      if (result.status === 'too_many') {
+        console.error(JSON.stringify({ event: 'uts.feed.too_many_entries', limit: result.limit }));
+      } else {
+        entries = result.entries;
+      }
+    } catch (error) {
+      // An `IdentityStoreError` names the SQLSTATE or system code only, never a row value.
+      console.error(
+        JSON.stringify({ event: 'uts.feed.backfill_failed', read: read.kind, error: String(error) })
+      );
+    } finally {
+      this.#ledger.endBackfill(now, entries, Date.now());
+    }
+  }
+
+  async #rotateKeys(loaded: Loaded, now: number): Promise<void> {
+    const { state, events } = await advance(loaded.state, now, () => generateFeedKey(loaded.feed));
+    if (state === loaded.state) return;
+    await this.#commit(loaded.feed, state);
+    for (const event of events) {
+      console.log(JSON.stringify({ event: 'uts.feed.key_event', ...event }));
+    }
+  }
+
+  async #load(): Promise<void> {
+    const id = feedOfObjectId(this.#config, this.ctx.id);
+    if (id.status === 'refused') {
+      console.error(JSON.stringify({ event: 'uts.feed.refused', reason: id.reason }));
+      this.#phase = id;
+      return;
+    }
+    const now = Date.now();
+    const stored: unknown = await this.ctx.storage.get(KEY_STATE);
+    if (stored === undefined) {
+      const state = await bootstrapState(id.index, now, () => generateFeedKey(id.index));
+      await this.#commit(id.index, state);
+      // Where the object landed, which never changes (design 5.7 proof run).
+      console.log(
+        JSON.stringify({
+          event: 'uts.feed.bootstrapped',
+          feed: id.index,
+          jurisdiction: this.#config.jurisdiction,
+          colo: this.#config.jurisdiction === 'none' ? null : await dataCenter(),
+          kids: publishedKeys(state).map(key => key.kid),
+        })
+      );
+    } else {
+      const state = SignerStateSchema.parse(stored);
+      this.#phase = {
+        status: 'ready',
+        feed: id.index,
+        state,
+        signingKey: await importSigningKey(state.current.privateJwk),
+      };
+    }
+    // The first run starts at once, so a restarted object backfills before its first head.
+    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(now);
+  }
+
+  /** Persist first, cache second: memory never holds a key state storage does not. */
+  async #commit(feed: number, state: SignerState): Promise<void> {
+    const previous = this.#phase;
+    const signingKey =
+      previous.status === 'ready' && previous.state.current.kid === state.current.kid
+        ? previous.signingKey
+        : await importSigningKey(state.current.privateJwk);
+    await this.ctx.storage.put(KEY_STATE, state);
+    this.#phase = { status: 'ready', feed, state, signingKey };
+  }
+}

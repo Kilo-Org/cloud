@@ -38,6 +38,8 @@ import {
   formRequest,
   minted,
   oauthDeps,
+  grantEntry,
+  recordingPublisher,
   storeFailure,
 } from './oauth-support';
 import { config, env } from './test-env';
@@ -165,9 +167,11 @@ describe('token endpoint: authorization_code', () => {
     expect(grants.calls).toEqual([]);
   });
 
-  it('maps each refused exchange to its OAuth error', async () => {
+  it('maps each refused exchange to its OAuth error and publishes what its statement revoked', async () => {
     for (const outcome of ['invalid_grant', 'invalid_scope', 'invalid_target'] as const) {
-      const grants = fakeGrants({ exchangeCode: async () => ({ outcome }) });
+      const revoked = outcome === 'invalid_grant' ? [grantEntry()] : [];
+      const grants = fakeGrants({ exchangeCode: async () => ({ outcome, feedEntries: revoked }) });
+      const feed = recordingPublisher();
       const response = await call(
         formRequest('/token', {
           grant_type: 'authorization_code',
@@ -176,10 +180,11 @@ describe('token endpoint: authorization_code', () => {
           client_id: THIRD_PARTY,
           code_verifier: VERIFIER,
         }),
-        oauthDeps(grants.access)
+        oauthDeps(grants.access, { publish: feed.publish })
       );
       expect(response.status).toBe(400);
       expect(await errorOf(response)).toBe(outcome);
+      expect(feed.batches).toEqual([revoked]);
     }
   });
 
@@ -305,16 +310,24 @@ describe('token endpoint: refresh_token', () => {
     );
     expect(await errorOf(mismatched)).toBe('invalid_grant');
 
-    const reuse = fakeGrants({ refreshThirdParty: async () => ({ outcome: 'reuse_detected' }) });
-    const reused = await call(
-      formRequest('/token', {
-        grant_type: 'refresh_token',
-        refresh_token: randomCredential(),
-        client_id: THIRD_PARTY,
-      }),
-      oauthDeps(reuse.access)
-    );
-    expect(await errorOf(reused)).toBe('invalid_grant');
+    const family = grantEntry();
+    const reuse = fakeGrants({
+      refreshThirdParty: async () => ({ outcome: 'reuse_detected', feedEntries: [family] }),
+    });
+    for (const outcome of ['published', 'unpublished'] as const) {
+      const feed = recordingPublisher(outcome);
+      const reused = await call(
+        formRequest('/token', {
+          grant_type: 'refresh_token',
+          refresh_token: randomCredential(),
+          client_id: THIRD_PARTY,
+        }),
+        oauthDeps(reuse.access, { publish: feed.publish })
+      );
+      // A failed publish changes nothing in the answer; the backfill adds the entry.
+      expect(await errorOf(reused)).toBe('invalid_grant');
+      expect(feed.batches).toEqual([[family]]);
+    }
 
     const none = fakeGrants();
     const malformed = await call(
@@ -715,17 +728,22 @@ describe('authorization endpoint', () => {
 });
 
 describe('revocation endpoint', () => {
-  it('revokes a refresh token and answers 200 for unknown and malformed tokens', async () => {
-    const grants = fakeGrants({ revoke: async () => 'revoked' });
+  it('revokes a refresh token, publishes its feed entry, and answers 200 for unknown and malformed tokens', async () => {
+    const entry = grantEntry();
+    const grants = fakeGrants({
+      revoke: async () => ({ outcome: 'revoked', feedEntries: [entry] }),
+    });
+    const feed = recordingPublisher();
     const token = createFirstPartyRefreshToken(crypto.randomUUID());
     const revoked = await call(
       formRequest('/revoke', { token, client_id: 'kilo-cli' }),
-      oauthDeps(grants.access)
+      oauthDeps(grants.access, { publish: feed.publish })
     );
     expect(revoked.status).toBe(200);
     expect(grants.calls).toHaveLength(1);
+    expect(feed.batches).toEqual([[entry]]);
 
-    const unknown = fakeGrants({ revoke: async () => 'unknown' });
+    const unknown = fakeGrants({ revoke: async () => ({ outcome: 'unknown', feedEntries: [] }) });
     expect(
       (
         await call(
@@ -766,7 +784,7 @@ describe('revocation endpoint', () => {
 
   it('answers a token of another client like an unknown token', async () => {
     const answer = async (outcome: 'client_mismatch' | 'unknown') => {
-      const grants = fakeGrants({ revoke: async () => outcome });
+      const grants = fakeGrants({ revoke: async () => ({ outcome, feedEntries: [] }) });
       const response = await call(
         formRequest('/revoke', { token: randomCredential(), client_id: THIRD_PARTY }),
         oauthDeps(grants.access)
@@ -776,6 +794,21 @@ describe('revocation endpoint', () => {
     };
     expect(await answer('client_mismatch')).toEqual(await answer('unknown'));
     expect(await answer('client_mismatch')).toEqual({ status: 200, body: '' });
+  });
+
+  it('answers 503 when neither feed object took the entry, and the revocation stands', async () => {
+    const grants = fakeGrants({
+      revoke: async () => ({ outcome: 'revoked', feedEntries: [grantEntry()] }),
+    });
+    const feed = recordingPublisher('unpublished');
+    const response = await call(
+      formRequest('/revoke', { token: randomCredential(), client_id: THIRD_PARTY }),
+      oauthDeps(grants.access, { publish: feed.publish })
+    );
+    expect(response.status).toBe(503);
+    expect(await errorOf(response)).toBe('temporarily_unavailable');
+    expect(grants.calls).toHaveLength(1);
+    expect(feed.batches).toHaveLength(1);
   });
 
   it('answers 503 and 500 for store failures', async () => {

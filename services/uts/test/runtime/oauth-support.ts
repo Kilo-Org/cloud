@@ -3,6 +3,8 @@ import { type JWK, SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair }
 import { IdentityStoreError } from '../../src/db/client';
 import type { GrantStore, GrantsAccess, Minted } from '../../src/grants/store';
 import type { OAuthDeps } from '../../src/oauth/routes';
+import type { FeedEntry } from '../../src/revocation/entries';
+import type { FeedPublish, PublishOutcome } from '../../src/revocation/publish';
 import { signerAccess } from '../../src/token/mint';
 import { config, env } from './test-env';
 
@@ -106,12 +108,32 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   };
 }
 
+/**
+ * A feed publisher that records every batch and answers `outcome`, so a test sees what an
+ * endpoint published after its statement.
+ */
+export function recordingPublisher(outcome: PublishOutcome = 'published') {
+  const batches: FeedEntry[][] = [];
+  const publish: FeedPublish = async entries => {
+    batches.push([...entries]);
+    return outcome;
+  };
+  return { publish, batches };
+}
+
+/** A feed entry as a revoking statement returns it. */
+export function grantEntry(id: string = crypto.randomUUID()): FeedEntry {
+  const now = Date.now();
+  return { kind: 'grant', id, revokedBefore: null, revokedAt: now, expiresAt: now + 1_200_000 };
+}
+
 /** Endpoint dependencies with the real signer objects of the test pool. */
 export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
   return {
     config,
     grants,
     sign: signerAccess(env, config),
+    publish: recordingPublisher().publish,
     handoff: null,
     deviceCodeGrant: null,
     ...overrides,

@@ -137,6 +137,39 @@ describe('provider routes', () => {
     expect(calls).toEqual([]);
   });
 
+  it('refuses a LinkedIn callback without the binder cookie of its state', async () => {
+    // LinkedIn has neither PKCE nor an ID-token nonce (src/signin/providers/specs.ts): the binder
+    // cookie of the flow's state is what ties its callback to the browser that started it.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { methods: base, calls } = methodsWith({});
+    const methods: SignInMethods = {
+      ...base,
+      settings: readSignInConfig(
+        {
+          SIGNIN_LINKEDIN_CLIENT_ID: 'linkedin-client',
+          SIGNIN_LINKEDIN_CLIENT_SECRET: 'linkedin-synthetic',
+          SIGNIN_EMAIL_HASH_KEY: HASH_KEY,
+        },
+        config
+      ),
+    };
+    const path = '/signin/oauth/linkedin/callback';
+    const state = 'S'.repeat(43);
+    const otherFlow = flowCookieName(await sha256('T'.repeat(43)));
+    for (const cookie of [null, `${otherFlow}=${'B'.repeat(43)}`]) {
+      const response = await handleProviderRequest(
+        new Request(`${ISSUER}${path}?code=c&state=${state}`, {
+          headers: cookie === null ? {} : { Cookie: cookie },
+        }),
+        path,
+        methods
+      );
+      expect(response?.status).toBe(400);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
   it('starts a link only with a session cookie and a gate pass id', async () => {
     const { methods, calls } = methodsWith({});
     const response = await handleProviderRequest(

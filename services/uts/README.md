@@ -586,20 +586,29 @@ The endpoints are fixed in `src/signin/providers/specs.ts`, checked against each
 OpenID Connect discovery document or API reference; nothing is discovered per request. An ID
 token is verified against the provider's key set (signature, `iss`, `aud`, `exp`, `iat` and the
 flow's `nonce`); `jose` keeps each key set per isolate for 10 minutes (`cacheMaxAge`) and
-refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`).
+refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`). UTS sends the
+nonce to every OpenID Connect provider. Each spec's `idTokenNonce` says whether the ID token must
+carry it: `required` refuses a token without it; `if_present` (LinkedIn only, whose ID token has
+no `nonce`) accepts a token without it, and both refuse a token with another nonce. Without PKCE
+or a nonce, the state and the flow's binder cookie still stop a forged callback. They do not stop
+a stolen LinkedIn code injected into the thief's own flow: LinkedIn accepts a code for 30 minutes
+(its authorization code lifetime), so that is the replay window of a code that leaks. The mint
+Worker's logs keep no query string (`observability.redact_query_string`, held by the repo check),
+so a callback's code never reaches the invocation logs, and the callback page sends
+`Referrer-Policy: same-origin`.
 
-| Provider | Protocol | PKCE | Client authentication | Scopes | Proof of the address |
-|---|---|---|---|---|---|
-| Google | OpenID Connect | S256 | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
-| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | `client_secret_basic` | `openid profile email` | `email_verified` |
-| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
-| Anaconda | OpenID Connect | S256 | `client_secret_post` | `openid profile email` | `email_verified` |
-| Apple | OpenID Connect, `response_mode=form_post` | none offered | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
-| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
-| GitLab | OpenID Connect | S256 | `client_secret_post` | `openid email` | `email_verified` |
-| Discord | OAuth 2; `/users/@me` | S256 | `client_secret_post` | `identify email` | `verified` |
-| LinkedIn | OpenID Connect | none offered | `client_secret_post` | `openid profile email` | `email_verified` |
-| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
+| Provider | Protocol | PKCE | ID-token `nonce` | Client authentication | Scopes | Proof of the address |
+|---|---|---|---|---|---|---|
+| Google | OpenID Connect | S256 | required | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
+| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | required | `client_secret_basic` | `openid profile email` | `email_verified` |
+| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | required | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
+| Anaconda | OpenID Connect | S256 | required | `client_secret_post` | `openid profile email` | `email_verified` |
+| Apple | OpenID Connect, `response_mode=form_post` | none offered | required | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
+| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | no ID token | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
+| GitLab | OpenID Connect | S256 | required | `client_secret_post` | `openid email` | `email_verified` |
+| Discord | OAuth 2; `/users/@me` | S256 | no ID token | `client_secret_post` | `identify email` | `verified` |
+| LinkedIn | OpenID Connect | none offered | if present | `client_secret_post` | `openid profile email` | `email_verified` |
+| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | no ID token | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
 
 ### Accounts and linking (design 5.2)
 
@@ -792,8 +801,8 @@ and the security view before and after `/revoke`.
 
 ## Subject operations and identity import
 
-Design 5.2 and 5.6, migration 0014. The web app keeps owning some account authority until its
-cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
+Design 5.2 and 5.6, migrations 0014 to 0016. The web app keeps owning some account authority
+until its cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
 enqueues each write in the same transaction as the app's own write, and its outbox sends it to UTS.
 Each call is one statement with its audit row (actor: the calling workload; the app's own actor
 string in `requestedBy`). It answers 200 only once a vouching feed object took the entries the
@@ -872,11 +881,21 @@ another organization, or on an inactive connection).
 **Authority sync.** `email` moves the primary email forward by version (the audit row names no
 address); `membership` adds, changes or (with `role: null`) removes a membership through
 `uts.remove_org_member`, ordered by the subject's version; `sso-organization` writes the SSO policy,
-the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
-by the organization's own version; a connection active in another organization never moves
-(`409 retry_later connection_conflict`, `Retry-After: 30`, nothing written, also when another
-organization's sync takes it during this one). The authority check behind the legacy bridge and
-`sso_app_organization` is `uts.sso_app_organization` through `src/subjects/authority.ts`: verified
+the WorkOS organization whose `externalId` is the app organization, its connections and its
+verified domains (`verified_domains`: lower case, each once, at most 100), ordered by the
+organization's own version. The domain set replaces the organization's: a domain left out is
+deleted, so `POST /signin/sso/start` answers that SSO is not set up for it; the audit row counts the
+domains and names none (migration 0015). Domains follow `SsoDomainSchema` in the contract and in
+the table check (migration 0016), and the sync inserts connections and domains in sorted order, so
+two organizations' syncs never deadlock. A connection active in another organization never moves
+(`409 retry_later connection_conflict`), nor does a domain verified by another organization
+(`409 retry_later domain_conflict`); both carry `Retry-After: 30`, write nothing, and apply also
+when another organization's sync takes the connection or domain during this one. A sync older than
+the version already applied is `already_applied` without these checks, so a late older sync never
+waits on a connection or domain that moved on. UTS holds no DNS challenge for a synced domain (the
+app verified it through WorkOS), so `dns_challenge_hash` is required only while a domain is
+pending. The authority check behind the legacy bridge and `sso_app_organization` is
+`uts.sso_app_organization` through `src/subjects/authority.ts`: verified
 only when the connection is active, belongs to that WorkOS organization, maps to the app
 organization, and the active account holds an active membership there.
 

@@ -29,6 +29,7 @@ import {
   AccountImportRequestSchema,
   AppUserCreatedEventSchema,
   reasonAllowed,
+  SsoDomainSchema,
   SsoOrganizationSyncRequestSchema,
   SubjectOperationRequestSchema,
   UTS_CREATED_ACCOUNT_ID,
@@ -645,7 +646,7 @@ describe('subject operation contracts', () => {
     ).toBe(false);
   });
 
-  it('refuse an SSO organization sync that names a connection twice', () => {
+  it('refuse an SSO organization sync that names a connection or a domain twice, or a bad domain', () => {
     const sync = {
       operation_id: '00000000-0000-4000-8000-000000000003',
       actor: 'system:scim',
@@ -653,15 +654,63 @@ describe('subject operation contracts', () => {
       app_organization_id: '00000000-0000-4000-8000-000000000004',
       workos_organization_id: 'org_1',
       workos_connection_ids: ['conn_1', 'conn_2'],
+      verified_domains: ['example.com', 'eu.example-corp.co.uk'],
       enforcement: 'required',
     };
     expect(SsoOrganizationSyncRequestSchema.safeParse(sync).success).toBe(true);
+    expect(
+      SsoOrganizationSyncRequestSchema.safeParse({ ...sync, verified_domains: [] }).success
+    ).toBe(true);
     expect(
       SsoOrganizationSyncRequestSchema.safeParse({
         ...sync,
         workos_connection_ids: ['conn_1', 'conn_1'],
       }).success
     ).toBe(false);
+    const { verified_domains: _domains, ...withoutDomains } = sync;
+    expect(SsoOrganizationSyncRequestSchema.safeParse(withoutDomains).success).toBe(false);
+    for (const verified_domains of [
+      ['example.com', 'example.com'],
+      ['Example.com'],
+      ['localhost'],
+      ['example.com.'],
+      [`${'a'.repeat(64)}.example.com`],
+      [`${'a.'.repeat(126)}com`],
+      Array.from({ length: 101 }, (_, index) => `d${index}.example.com`),
+    ]) {
+      expect(
+        SsoOrganizationSyncRequestSchema.safeParse({ ...sync, verified_domains }).success
+      ).toBe(false);
+    }
+  });
+
+  it('accept punycode domains and refuse a label that starts or ends with a hyphen', () => {
+    for (const domain of [
+      'example.xn--p1ai',
+      'xn--80ak6aa92e.com',
+      'a-b.example.com',
+      'a.bc',
+      `${'a'.repeat(63)}.example.com`,
+      `example.xn--${'a'.repeat(59)}`,
+      '0.example.org',
+    ]) {
+      expect(SsoDomainSchema.safeParse(domain).success, domain).toBe(true);
+    }
+    for (const domain of [
+      '-a.example.com',
+      'a-.example.com',
+      'example.-com',
+      'example.com-',
+      'example.xn--',
+      'example.xn--p1ai-',
+      `example.xn--${'a'.repeat(60)}`,
+      'example.c0m',
+      'example.b',
+      'a..example.com',
+      '.example.com',
+    ]) {
+      expect(SsoDomainSchema.safeParse(domain).success, domain).toBe(false);
+    }
   });
 
   it('describe the user-created event the app consumes', () => {

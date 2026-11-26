@@ -542,8 +542,9 @@ async function main() {
     outcomeOf(recovery.at(-1)) === 'applied' && (await cli.refresh()) !== 200
   );
 
-  // Authority sync: SSO organization and membership.
+  // Authority sync: SSO organization (with its verified domain) and membership.
   const org = randomUUID();
+  const ssoDomain = `e2e-${randomBytes(4).toString('hex')}.example.org`;
   const sso = await internal(
     '/internal/authority/sso-organization',
     {
@@ -553,9 +554,14 @@ async function main() {
       app_organization_id: org,
       workos_organization_id: 'org_e2e',
       workos_connection_ids: ['conn_e2e'],
+      verified_domains: [ssoDomain],
       enforcement: 'optional',
     },
     'uts:authority.sync'
+  );
+  const ssoDomains = await admin.query<{ domain: string; status: string }>(
+    'SELECT domain, status::text FROM uts.sso_domains WHERE org_id = $1',
+    [org]
   );
   const member = await internal(
     '/internal/authority/membership',
@@ -581,13 +587,17 @@ async function main() {
     'uts:authority.sync'
   );
   log(
-    'authority sync: SSO setup, membership, a stale email',
+    'authority sync: SSO setup with its domain, membership, a stale email',
     {
       sso: sso.body,
+      ssoDomains: ssoDomains.rows,
       membership: member.body,
       email: email.body,
     },
     outcomeOf(sso) === 'applied' &&
+      ssoDomains.rows.length === 1 &&
+      ssoDomains.rows[0]?.domain === ssoDomain &&
+      ssoDomains.rows[0]?.status === 'verified' &&
       outcomeOf(member) === 'applied' &&
       outcomeOf(email) === 'already_applied'
   );

@@ -50,6 +50,13 @@ export type OidcSpec = {
   responseMode: 'query' | 'form_post';
   clientAuth: ClientAuthMethod;
   idTokenAlgorithms: readonly ('RS256' | 'ES256')[];
+  /**
+   * The ID token's `nonce`. UTS sends the flow's nonce to every provider. `required`: a token
+   * without it is refused. `if_present`: a token without it passes (the provider never echoes it;
+   * the state and the flow's binder cookie still tie the callback to the browser), and a token
+   * with another nonce is refused.
+   */
+  idTokenNonce: 'required' | 'if_present';
   emailProof: 'google' | 'email_verified';
   /** Sent on the authorization request and the code exchange (OpenAI's API resource). */
   resource: string | null;
@@ -85,6 +92,7 @@ export const PROVIDER_SPECS: Readonly<Record<UtsOAuthProvider, ProviderSpec>> = 
     pkce: true,
     clientAuth: 'client_secret_post',
     idTokenAlgorithms: ['RS256'],
+    idTokenNonce: 'required',
     emailProof: 'google',
   }),
   openai: oidc({
@@ -98,6 +106,7 @@ export const PROVIDER_SPECS: Readonly<Record<UtsOAuthProvider, ProviderSpec>> = 
     pkce: true,
     clientAuth: 'client_secret_basic',
     idTokenAlgorithms: ['RS256'],
+    idTokenNonce: 'required',
     emailProof: 'email_verified',
     // The app's registration grants its tokens for this resource; the code exchange must repeat it.
     resource: 'https://api.openai.com/v1',
@@ -113,6 +122,7 @@ export const PROVIDER_SPECS: Readonly<Record<UtsOAuthProvider, ProviderSpec>> = 
     pkce: true,
     clientAuth: 'private_key_jwt_json',
     idTokenAlgorithms: ['ES256'],
+    idTokenNonce: 'required',
     emailProof: 'email_verified',
   }),
   anaconda: oidc({
@@ -126,6 +136,7 @@ export const PROVIDER_SPECS: Readonly<Record<UtsOAuthProvider, ProviderSpec>> = 
     pkce: true,
     clientAuth: 'client_secret_post',
     idTokenAlgorithms: ['RS256'],
+    idTokenNonce: 'required',
     emailProof: 'email_verified',
   }),
   apple: oidc({
@@ -142,6 +153,7 @@ export const PROVIDER_SPECS: Readonly<Record<UtsOAuthProvider, ProviderSpec>> = 
     responseMode: 'form_post',
     clientAuth: 'apple_client_secret',
     idTokenAlgorithms: ['RS256'],
+    idTokenNonce: 'required',
     emailProof: 'email_verified',
   }),
   github: {
@@ -164,6 +176,7 @@ export const PROVIDER_SPECS: Readonly<Record<UtsOAuthProvider, ProviderSpec>> = 
     pkce: true,
     clientAuth: 'client_secret_post',
     idTokenAlgorithms: ['RS256'],
+    idTokenNonce: 'required',
     emailProof: 'email_verified',
   }),
   discord: {
@@ -187,6 +200,8 @@ export const PROVIDER_SPECS: Readonly<Record<UtsOAuthProvider, ProviderSpec>> = 
     pkce: false,
     clientAuth: 'client_secret_post',
     idTokenAlgorithms: ['RS256'],
+    // LinkedIn's ID token carries no `nonce` (its documented claims are iss, sub, aud, iat, exp).
+    idTokenNonce: 'if_present',
     emailProof: 'email_verified',
   }),
 };

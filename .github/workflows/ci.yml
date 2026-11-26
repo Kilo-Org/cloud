@@ -701,12 +701,16 @@ jobs:
       - name: Test release workflow wiring
         run: node --test scripts/kilo-app-release-workflow.test.mjs
 
-  # The bundled plugins' contract checks: each plugin's copy of the shared wire
-  # schemas must match the package it is synced from, and every exact runtime pin
-  # must match the version the image installs. Both read product files rather
-  # than the workflows, so a path filter that gates them would have to name those
-  # product paths. This job therefore runs on every run, installs nothing, and
-  # the required `test` job needs it, so a drift still blocks the merge.
+  # The product-source contract checks: each bundled plugin's copy of the shared
+  # wire schemas must match the package it is synced from, every exact runtime
+  # pin must match the version the image installs, and every credential check in
+  # workspace source must belong to a phase 4 surface of design section 9.6 or
+  # carry an exact exception (scripts/verifier-inventory.test.mjs). All of them
+  # read product files rather than the workflows, so a path filter that gates
+  # them would have to name those product paths. This job therefore runs on
+  # every run, installs nothing (the inventory suite imports only Node
+  # built-ins), and the required `test` job needs it, so a drift still blocks
+  # the merge.
   plugin-contract:
     needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -724,6 +728,9 @@ jobs:
 
       - name: Plugin openclaw peer-dep pin check
         run: bash scripts/check-plugin-openclaw-pin.sh
+
+      - name: Phase 4 verifier inventory
+        run: node --test scripts/verifier-inventory.test.mjs
 
   # One producer for the tRPC declarations. Both matrices used to run the
   # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss

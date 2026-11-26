@@ -1,0 +1,322 @@
+import { z } from 'zod';
+
+/**
+ * The UTS revocation feed (design 5.6, 7): a signed head and the list it covers, served by the
+ * feed Worker over a service binding (`FeedReader`) and, for Vercel and Fly, over HTTPS. The
+ * shapes match `@kilocode/verify` (phase 2), which verifies them; this module holds the shapes UTS
+ * publishes and the transports that implement the library's ports.
+ */
+
+/** JWS `typ` of a signed feed head. */
+export const FEED_HEAD_TYPE = 'kilo-feed-head+jwt';
+
+const Base64Url32Schema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+
+/** The base64url SHA-256 of the list bytes, which names the list. */
+export const FeedListHashSchema = Base64Url32Schema;
+
+/**
+ * The payload UTS signs: when the feed object signed it, as a JWT NumericDate in seconds, and the
+ * base64url SHA-256 of the list bytes it covers.
+ */
+export const FeedHeadPayloadSchema = z.strictObject({
+  iat: z.number().int().nonnegative(),
+  list_hash: FeedListHashSchema,
+});
+export type FeedHeadPayload = z.infer<typeof FeedHeadPayloadSchema>;
+
+/**
+ * The list as UTS serves it: UTF-8 JSON. Times are JWT NumericDates in seconds; a token issued at
+ * or before its subject's `revoked_before` is revoked. Every array is sorted and every key of
+ * `revoked_before` in ascending order, so equal contents give equal bytes and the same hash.
+ */
+export const RevocationListWireSchema = z.strictObject({
+  revoked_before: z.record(z.string().min(1), z.number().int().nonnegative()),
+  /** Revoked grant, third-party family, device session and sandbox grant ids (`sid`). */
+  revoked_sids: z.array(z.string().min(1)),
+  /** Signing key ids removed in an emergency rotation. */
+  revoked_kids: z.array(z.string().min(1)),
+  /** Revoked PAT and org bot key ids. */
+  revoked_pat_ids: z.array(z.string().min(1)),
+  blocked_accounts: z.array(z.string().min(1)),
+});
+export type RevocationListWire = z.infer<typeof RevocationListWireSchema>;
+
+/** Paths on the feed Worker's origin (`UTS_ENDPOINTS[env].feedOrigin`). */
+export const UTS_FEED_HEAD_PATH = '/revocation/head';
+/** Followed by the list hash. */
+export const UTS_FEED_LIST_PATH_PREFIX = '/revocation/list/';
+export const UTS_BOOTSTRAP_PATH = '/revocation/bootstrap';
+
+/**
+ * The HTTPS bootstrap body: the UTS key set as served at `jwks_uri`, the current head, and the
+ * list bytes that head covers as base64url (JSON cannot carry raw bytes, and the hash covers the
+ * exact bytes).
+ */
+export const UtsBootstrapWireSchema = z.strictObject({
+  jwks: z.record(z.string(), z.unknown()),
+  head: z.string().min(1),
+  list: z.string().regex(/^[A-Za-z0-9_-]*$/),
+});
+export type UtsBootstrapWire = z.infer<typeof UtsBootstrapWireSchema>;
+
+/**
+ * The feed Worker's named entrypoint for Worker verifiers. A verifier binds it with its own
+ * deployed name as `props.caller` (a repository check); the feed Worker refuses a binding without
+ * one.
+ */
+export const UTS_FEED_READER_ENTRYPOINT = 'FeedReader';
+
+/**
+ * The mint Worker's named entrypoint through which the feed Worker reads the two feed objects.
+ * Only the mint Worker binds the feed objects, so only it writes to them (design 5.7).
+ */
+export const UTS_FEED_READS_ENTRYPOINT = 'FeedReads';
+
+const Bytes = z.instanceof(Uint8Array);
+
+const Refused = z.strictObject({ status: z.literal('refused') });
+const Unavailable = z.strictObject({
+  status: z.literal('unavailable'),
+  retryAfterSeconds: z.number().int().positive(),
+});
+
+/**
+ * What one feed object answers through `FeedReads`: its current head with the list hash it
+ * covers and its signing time (NumericDate seconds); `unavailable` while the object holds no
+ * fresh backfill (it never signs a list it cannot vouch for) or its call failed; `misconfigured`
+ * when the object refused to load under its name or jurisdiction; `refused` when the binding's
+ * `props.caller` is not the feed Worker of the mint Worker's own environment.
+ */
+export const FeedReadsHeadSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('ok'),
+    head: z.string().min(1),
+    listHash: FeedListHashSchema,
+    issuedAt: z.number().int().nonnegative(),
+  }),
+  z.strictObject({ status: z.literal('unavailable') }),
+  z.strictObject({ status: z.literal('misconfigured') }),
+  Refused,
+]);
+export type FeedReadsHead = z.infer<typeof FeedReadsHeadSchema>;
+
+/** The list text of one of the object's recent lists, by hash, or `not_found`. */
+export const FeedReadsListSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('ok'), list: z.string().min(1) }),
+  z.strictObject({ status: z.literal('not_found') }),
+  z.strictObject({ status: z.literal('unavailable') }),
+  z.strictObject({ status: z.literal('misconfigured') }),
+  Refused,
+]);
+export type FeedReadsList = z.infer<typeof FeedReadsListSchema>;
+
+/** The `FeedReads` entrypoint as the feed Worker's binding exposes it; results are validated. */
+export type FeedReadsBinding = {
+  head(feed: number): Promise<unknown>;
+  list(feed: number, listHash: string): Promise<unknown>;
+};
+
+export const FeedReaderHeadSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('ok'), head: z.string().min(1) }),
+  Unavailable,
+  Refused,
+]);
+export const FeedReaderListSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('ok'), list: Bytes }),
+  z.strictObject({ status: z.literal('not_found') }),
+  Unavailable,
+  Refused,
+]);
+export const FeedReaderBootstrapSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('ok'),
+    jwks: z.record(z.string(), z.unknown()),
+    head: z.string().min(1),
+    list: Bytes,
+  }),
+  Unavailable,
+  Refused,
+]);
+export type FeedReaderHead = z.infer<typeof FeedReaderHeadSchema>;
+export type FeedReaderList = z.infer<typeof FeedReaderListSchema>;
+export type FeedReaderBootstrap = z.infer<typeof FeedReaderBootstrapSchema>;
+
+/** The `FeedReader` entrypoint as a verifier's binding exposes it; results are validated. */
+export type FeedReaderBinding = {
+  head(): Promise<unknown>;
+  list(listHash: string): Promise<unknown>;
+  bootstrap(): Promise<unknown>;
+};
+
+/**
+ * `@kilocode/verify`'s `RevocationFeedSource`, declared here with the same shape so UTS can
+ * implement it without depending on the library. Any rejection is a failed fetch.
+ */
+export type RevocationFeedSourcePort = {
+  head(signal: AbortSignal): Promise<string>;
+  list(listHash: string, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>>;
+};
+
+/** `@kilocode/verify`'s `UtsBootstrapAnswer` and `UtsBootstrapSource`, with the same shapes. */
+export type UtsBootstrapAnswerPort = {
+  jwks: unknown;
+  head: string;
+  list: Uint8Array<ArrayBuffer>;
+};
+export type UtsBootstrapSourcePort = (signal: AbortSignal) => Promise<UtsBootstrapAnswerPort>;
+
+export type UtsFeedSources = {
+  feed: RevocationFeedSourcePort;
+  bootstrap: UtsBootstrapSourcePort;
+};
+
+/**
+ * Runs the RPC disposer of `result`, which workerd gives every object an RPC call returns. A
+ * result that is not an object carries none.
+ */
+function disposeResult(result: unknown): void {
+  if (typeof result !== 'object' || result === null || !(Symbol.dispose in result)) return;
+  const dispose = result[Symbol.dispose];
+  if (typeof dispose === 'function') dispose.call(result);
+}
+
+/**
+ * The validated result of one RPC call, or a rejection when `signal` aborts first. The result is
+ * copied by the parse and then disposed; one that lands after the abort is only disposed.
+ */
+async function rpcCall<Schema extends z.ZodType>(
+  call: () => Promise<unknown>,
+  schema: Schema,
+  signal: AbortSignal
+): Promise<z.output<Schema>> {
+  signal.throwIfAborted();
+  const pending = Promise.try(call);
+  const aborted = Promise.withResolvers<never>();
+  const onAbort = () => aborted.reject(signal.reason);
+  signal.addEventListener('abort', onAbort, { once: true });
+  try {
+    const result = await Promise.race([pending, aborted.promise]);
+    try {
+      return schema.parse(result);
+    } finally {
+      disposeResult(result);
+    }
+  } catch (error) {
+    void pending.then(disposeResult, () => undefined);
+    throw error;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
+function copyBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(bytes);
+}
+
+/** The feed and bootstrap ports over a `FeedReader` service binding, for Worker verifiers. */
+export function feedReaderSources(binding: FeedReaderBinding): UtsFeedSources {
+  return {
+    feed: {
+      async head(signal) {
+        const read = await rpcCall(() => binding.head(), FeedReaderHeadSchema, signal);
+        if (read.status !== 'ok') throw new Error(`feed head ${read.status}`);
+        return read.head;
+      },
+      async list(listHash, signal) {
+        const read = await rpcCall(() => binding.list(listHash), FeedReaderListSchema, signal);
+        if (read.status !== 'ok') throw new Error(`feed list ${read.status}`);
+        return copyBytes(read.list);
+      },
+    },
+    async bootstrap(signal) {
+      const read = await rpcCall(() => binding.bootstrap(), FeedReaderBootstrapSchema, signal);
+      if (read.status !== 'ok') throw new Error(`bootstrap ${read.status}`);
+      return { jwks: read.jwks, head: read.head, list: copyBytes(read.list) };
+    },
+  };
+}
+
+/** The subset of `fetch` the HTTPS sources use. */
+export type FeedFetch = (
+  url: string,
+  init: { signal: AbortSignal; headers: Record<string, string> }
+) => Promise<Response>;
+
+async function okResponse(
+  fetcher: FeedFetch,
+  url: string,
+  accept: string,
+  signal: AbortSignal
+): Promise<Response> {
+  const response = await fetcher(url, { signal, headers: { accept } });
+  if (response.status !== 200) {
+    await response.body?.cancel();
+    throw new Error(`feed answered HTTP ${response.status}`);
+  }
+  return response;
+}
+
+/**
+ * The feed and bootstrap ports over HTTPS on the feed Worker's origin, for Vercel and Fly
+ * verifiers. A non-200 answer or a body of the wrong shape is a failed fetch.
+ */
+export function httpsFeedSources(
+  feedOrigin: string,
+  fetcher: FeedFetch = (url, init) => fetch(url, init)
+): UtsFeedSources {
+  const origin = feedOrigin.replace(/\/+$/, '');
+  return {
+    feed: {
+      async head(signal) {
+        const response = await okResponse(
+          fetcher,
+          `${origin}${UTS_FEED_HEAD_PATH}`,
+          'application/jwt',
+          signal
+        );
+        return z
+          .string()
+          .min(1)
+          .parse(await response.text());
+      },
+      async list(listHash, signal) {
+        const hash = FeedListHashSchema.parse(listHash);
+        const response = await okResponse(
+          fetcher,
+          `${origin}${UTS_FEED_LIST_PATH_PREFIX}${hash}`,
+          'application/json',
+          signal
+        );
+        return new Uint8Array(await response.arrayBuffer());
+      },
+    },
+    async bootstrap(signal) {
+      const response = await okResponse(
+        fetcher,
+        `${origin}${UTS_BOOTSTRAP_PATH}`,
+        'application/json',
+        signal
+      );
+      const body = UtsBootstrapWireSchema.parse(await response.json());
+      return { jwks: body.jwks, head: body.head, list: decodeBase64Url(body.list) };
+    },
+  };
+}
+
+/** Base64url without padding (RFC 4648 section 5), as the bootstrap body and list hashes use. */
+export function encodeBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+export function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(value.replaceAll('-', '+').replaceAll('_', '/'));
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+/** The list hash of `bytes`: the base64url SHA-256 the head carries as `list_hash`. */
+export async function feedListHash(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  return encodeBase64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
+}

@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import {
+  feedOfFeedKid,
   signerOfTokenKid,
+  UTS_FEED_COUNT,
   UTS_SIGNER_COUNT,
+  UtsFeedIndexSchema,
   UtsPublicJwkSchema,
   UtsSignerIndexSchema,
   type UtsPublicJwk,
@@ -20,12 +23,15 @@ export const UTS_SIGNER_KEYS_ENTRYPOINT = 'SignerKeys';
  * How long a signer's last good keys stand in for its failed reads, at the mint Worker and at the
  * feed Worker alike. Both count from the signer read, as the key set's oldest-age header
  * (`UTS_JWKS_OLDEST_AGE_HEADER`) does, so a verifier that counts that header drops those keys 24
- * hours after that read too (design 5.7, 7).
+ * hours after that read too (design 5.7, 7). Feed objects' keys follow the same rule.
  */
 export const UTS_SIGNER_KEYS_HOLD_MS = 24 * 60 * 60 * 1000;
 
 /** The public keys one signer object publishes: its current key, its next key, retired keys. */
 export type SignerPublicKeys = { signer: number; keys: UtsPublicJwk[] };
+
+/** The public keys one feed object publishes for its signed heads, in the same order. */
+export type FeedPublicKeys = { feed: number; keys: UtsPublicJwk[] };
 
 /**
  * One signer in the signer-keys answer:
@@ -52,22 +58,55 @@ export const SignerKeysEntrySchema = z.discriminatedUnion('status', [
 ]);
 export type SignerKeysEntry = z.infer<typeof SignerKeysEntrySchema>;
 
-function uniqueKids(entries: readonly SignerKeysEntry[]): boolean {
-  const kids = entries.flatMap(entry => (entry.status === 'ok' ? entry.keys : [])).map(k => k.kid);
-  return new Set(kids).size === kids.length;
+/** One feed object in the signer-keys answer, with the same three states as a signer. */
+export const FeedKeysEntrySchema = z.discriminatedUnion('status', [
+  z
+    .strictObject({
+      feed: UtsFeedIndexSchema,
+      status: z.literal('ok'),
+      keys: z.array(UtsPublicJwkSchema).min(1),
+      readAt: z.number().int().positive(),
+    })
+    .refine(
+      entry => entry.keys.every(key => feedOfFeedKid(key.kid) === entry.feed),
+      'every kid must be a feed kid of this feed object'
+    ),
+  z.strictObject({ feed: UtsFeedIndexSchema, status: z.literal('misconfigured') }),
+  z.strictObject({ feed: UtsFeedIndexSchema, status: z.literal('unavailable') }),
+]);
+export type FeedKeysEntry = z.infer<typeof FeedKeysEntrySchema>;
+
+type KeyEntry = SignerKeysEntry | FeedKeysEntry;
+
+function kidsOf(entries: readonly KeyEntry[]): string[] {
+  return entries.flatMap(entry => (entry.status === 'ok' ? entry.keys : [])).map(key => key.kid);
 }
 
-/** The signer-keys answer: every signer exactly once, and no `kid` twice. */
-export const SignerKeysAnswerSchema = z.strictObject({
-  signers: z
-    .array(SignerKeysEntrySchema)
-    .length(UTS_SIGNER_COUNT)
-    .refine(
-      signers => new Set(signers.map(entry => entry.signer)).size === UTS_SIGNER_COUNT,
-      'every signer exactly once'
-    )
-    .refine(uniqueKids, 'duplicate kid'),
-});
+/**
+ * The signer-keys answer: every signer and every feed object exactly once, and no `kid` twice.
+ * The feed Worker publishes both kinds in the UTS key set (design 5.6, 5.7).
+ */
+export const SignerKeysAnswerSchema = z
+  .strictObject({
+    signers: z
+      .array(SignerKeysEntrySchema)
+      .length(UTS_SIGNER_COUNT)
+      .refine(
+        signers => new Set(signers.map(entry => entry.signer)).size === UTS_SIGNER_COUNT,
+        'every signer exactly once'
+      ),
+    feeds: z
+      .array(FeedKeysEntrySchema)
+      .length(UTS_FEED_COUNT)
+      .refine(
+        feeds => new Set(feeds.map(entry => entry.feed)).size === UTS_FEED_COUNT,
+        'every feed object exactly once'
+      ),
+  })
+  .refine(answer => {
+    const kids = [...kidsOf(answer.signers), ...kidsOf(answer.feeds)];
+    return new Set(kids).size === kids.length;
+  }, 'duplicate kid');
 export type SignerKeysAnswer = z.infer<typeof SignerKeysAnswerSchema>;
 
 /**

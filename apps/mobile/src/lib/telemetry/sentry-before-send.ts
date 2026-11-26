@@ -42,6 +42,16 @@ function withoutNativeUrlParts(breadcrumb: Record<string, unknown>) {
   return { ...breadcrumb, data: Object.fromEntries(kept) };
 }
 
+// A breadcrumb whose scrub throws is dropped rather than sent unscrubbed.
+function scrubOneBreadcrumb(breadcrumb: Record<string, unknown>) {
+  try {
+    const scrubbed = scrubBreadcrumb(withoutNativeUrlParts(breadcrumb));
+    return scrubbed === null ? [] : [scrubbed];
+  } catch {
+    return [];
+  }
+}
+
 // The SDK merges the native SDK's breadcrumbs into the event before beforeSend,
 // and they never pass beforeBreadcrumb. A list this module cannot read is
 // dropped rather than sent unscrubbed.
@@ -52,11 +62,7 @@ function scrubMergedBreadcrumbs(event: unknown): void {
     return;
   }
   const breadcrumbs = breadcrumbsSchema.safeParse(fields.breadcrumbs);
-  fields.breadcrumbs = breadcrumbs.success
-    ? breadcrumbs.data.flatMap(
-        breadcrumb => scrubBreadcrumb(withoutNativeUrlParts(breadcrumb)) ?? []
-      )
-    : [];
+  fields.breadcrumbs = breadcrumbs.success ? breadcrumbs.data.flatMap(scrubOneBreadcrumb) : [];
 }
 
 /** The part of Sentry's capture hint this gate reads. */
@@ -66,7 +72,8 @@ export type BeforeSendHint = { originalException?: unknown };
  * Returns `null` to drop the event (a harness fault, a locked-device skip, or
  * a malformed App Attest diagnostic). An App Attest event is projected to its
  * allowlisted fields before it leaves; everything else is scrubbed. Never
- * throws: a malformed hint keeps the event rather than dropping a real crash.
+ * throws: a malformed hint keeps the event rather than dropping a real crash,
+ * and a scrub that throws drops the event rather than sending it unscrubbed.
  */
 export function beforeSendScrubbedEvent<T>(event: T, hint?: BeforeSendHint): T | null {
   try {
@@ -77,9 +84,13 @@ export function beforeSendScrubbedEvent<T>(event: T, hint?: BeforeSendHint): T |
   } catch {
     // Fall through to scrubbing; a gate failure must not drop a real crash.
   }
-  if (isAppAttestFailureEvent(event)) {
-    return projectAppAttestFailureEvent(event);
+  try {
+    if (isAppAttestFailureEvent(event)) {
+      return projectAppAttestFailureEvent(event);
+    }
+    scrubMergedBreadcrumbs(event);
+    return scrubEvent(event);
+  } catch {
+    return null;
   }
-  scrubMergedBreadcrumbs(event);
-  return scrubEvent(event);
 }

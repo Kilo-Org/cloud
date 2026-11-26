@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateOrganizationApiToken } from '@/lib/auth/kilo-token-signing';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   canIssueLegacyOrganizationToken,

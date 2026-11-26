@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { securityFindingPayloadShape, securityLifecyclePayloadShape } from './notification-events';
 import { nonEmptyStringSchema } from './non-empty-string';
-import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
+import {
+  accountSecurityEventSchema,
+  cloudAgentSessionRaiseShape,
+  pushDataSchema,
+} from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
 
 // The pre-localized copy a producer may attach to a push.
@@ -456,11 +460,76 @@ export type InternalDispatchAgentBriefingRequest = z.infer<
   typeof internalDispatchAgentBriefingRequestSchema
 >;
 
+/**
+ * Bound on the short request labels an account-security notice shows: a
+ * browser and operating system ("Chrome on macOS") or a city and country.
+ */
+const ACCOUNT_SECURITY_LABEL_MAX_LENGTH = 120;
+
+const accountSecurityLabelSchema = nonEmptyStringSchema
+  .max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH)
+  .nullable();
+
+/** Double quote marks, straight and curly, and guillemets and corner brackets. */
+const QUOTE_MARKS = /["“”„‟«»「」『』]/g;
+
+/**
+ * A name with every double quote mark replaced by an apostrophe. The copy
+ * that repeats a name a device chose for itself quotes it, and a quote mark
+ * inside the name could close that quote early and add words that read as
+ * Kilo's own.
+ */
+export function replaceQuoteMarks(name: string): string {
+  return name.replace(QUOTE_MARKS, "'");
+}
+
+/**
+ * Who took the action an account-security notice reports. The owner's own
+ * request carries the device and approximate location, each null when the
+ * request did not say. A device sign-in whose requesting device named itself
+ * carries that name alone, which the push repeats quoted and attributed to
+ * the device, with no quote mark inside it. An action by Kilo support carries
+ * nothing about the staff member's request.
+ */
+export const accountSecurityOriginSchema = z.discriminatedUnion('actor', [
+  z.object({
+    actor: z.literal('owner'),
+    device: accountSecurityLabelSchema,
+    location: accountSecurityLabelSchema,
+  }),
+  z.object({
+    actor: z.literal('self_named_device'),
+    name: nonEmptyStringSchema
+      .max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH)
+      .refine(name => replaceQuoteMarks(name) === name, 'name contains a quote mark'),
+  }),
+  z.object({ actor: z.literal('support') }),
+]);
+export type AccountSecurityOrigin = z.infer<typeof accountSecurityOriginSchema>;
+
+/**
+ * Account-security notice for one account owner. `idempotencyKey` is derived
+ * by the producer from the event (a credential id, a request id, a session and
+ * a time bucket), so a repeated dispatch of one event collapses to one push.
+ * The push names the origin only in full previews.
+ */
+export const internalDispatchAccountSecurityRequestSchema = z.object({
+  kind: z.literal('account_security'),
+  recipientUserId: nonEmptyStringSchema,
+  event: accountSecurityEventSchema,
+  idempotencyKey: nonEmptyStringSchema.max(200),
+  origin: accountSecurityOriginSchema,
+});
+export type InternalDispatchAccountSecurityRequest = z.infer<
+  typeof internalDispatchAccountSecurityRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
   internalDispatchAgentBriefingRequestSchema,
+  internalDispatchAccountSecurityRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

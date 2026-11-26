@@ -8,7 +8,8 @@
       "securityFinding": "Penemuan keselamatan memerlukan perhatian",
       "securityUpdate": "Semakan keselamatan ada kemas kini",
       "agentBriefing": "Laporan aktiviti agen anda sudah sedia",
-      "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
+      "activeAgentsGlanceable": "Ejen aktif ada kemas kini",
+      "accountSecurity": "Terdapat aktiviti keselamatan pada akaun anda"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Pelanggaran SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Kunci laluan ditambah pada akaun anda"
+      },
+      "passkeyRemoved": {
+        "title": "Kunci laluan dialih keluar daripada akaun anda"
+      },
+      "signInMethodLinked": {
+        "title": "Kaedah log masuk ditambah pada akaun anda"
+      },
+      "signInMethodUnlinked": {
+        "title": "Kaedah log masuk dialih keluar daripada akaun anda"
+      },
+      "deviceSignInApproved": {
+        "title": "Log masuk peranti diluluskan"
+      },
+      "apiKeyReset": {
+        "title": "Token API ditetapkan semula"
+      },
+      "browserSessionsRevoked": {
+        "title": "Dilog keluar daripada semua pelayar"
+      },
+      "deviceSessionRevoked": {
+        "title": "Peranti dilog keluar daripada akaun anda"
+      },
+      "signInResetBySupport": {
+        "title": "Log masuk ditetapkan semula oleh sokongan Kilo"
+      },
+      "newSignIn": {
+        "title": "Log masuk baharu ke akaun anda"
+      },
+      "body": {
+        "deviceAndLocation": "Daripada {{device}} berhampiran {{location}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
+        "device": "Daripada {{device}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
+        "location": "Berhampiran {{location}}. Bukan anda? Semak keselamatan akaun anda sekarang.",
+        "unknown": "Bukan anda? Semak keselamatan akaun anda sekarang.",
+        "selfNamedDevice": "Daripada peranti yang menamakan dirinya \"{{name}}\". Bukan anda? Semak keselamatan akaun anda sekarang.",
+        "support": "Dilakukan oleh sokongan Kilo. Jika anda tidak memintanya, hubungi sokongan."
+      }
     }
   },
   "sessionReady": {

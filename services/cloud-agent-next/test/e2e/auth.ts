@@ -5,7 +5,7 @@
  * - Ensures a test user row exists in Postgres (direct insert via
  *   `@kilocode/db`; no reliance on the Next.js fake-login HTTP flow).
  * - Mints Kilo user JWTs for tRPC and short-lived `stream_ticket` JWTs for
- *   the `/stream` WebSocket — same shapes as `packages/web-shared/src/lib/tokens.ts`
+ *   the `/stream` WebSocket — same shapes as `apps/web/src/lib/auth/kilo-token-signing.ts`
  *   and `apps/web/src/lib/cloud-agent/stream-ticket.ts`.
  *
  * Dev-only — never run against a production DB.

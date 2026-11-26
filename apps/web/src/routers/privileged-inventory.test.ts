@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
 import { rootRouter } from './root-router';
+import { appShellProceduresRouter } from './app-shell-procedures-router';
 import {
   ADMIN_AREA_POLICIES,
   ADMIN_STEP_UP_SELF_GUARDED_ROUTES,
@@ -15,6 +16,11 @@ import {
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import {
+  ADMIN_ONLY_TRPC_NAMESPACES,
+  ADMIN_ONLY_TRPC_PROCEDURES,
+  isAdminEdgePath,
+} from '@kilocode/web-shared/lib/admin/admin-network-policy';
 import {
   SUPPORT_NEVER_KEYS,
   SUPPORT_READ_ALLOWLIST,
@@ -282,6 +288,72 @@ describe('privileged inventory covers discovered tRPC procedures', () => {
       .sort();
 
     expect(covered).toMatchSnapshot('guarded-trpc-procedures');
+  });
+
+  test('every procedure the admin edge rule matches carries the admin guard', () => {
+    const unguarded = discoveredProcedures
+      .filter(procedure => isAdminEdgePath(`/api/trpc/${procedure.path}`))
+      .filter(procedure => !procedure.tiers.includes('admin'))
+      .map(procedure => procedure.path);
+
+    expect(unguarded).toEqual([]);
+  });
+
+  test('every admin procedure is refused at the edge off-network, except reviewed ones', () => {
+    // An admin procedure the edge does not match still meets the in-app
+    // network check; listing one here only gives up the edge layer for it.
+    const edgeExclusions: Record<string, string> = {
+      'stepUp.getStatus':
+        'StepUpProvider mounts app-wide and, for a signed-in admin with step-up enabled, polls it ' +
+        "on every page beside the page's own procedures, so an edge match would refuse whole " +
+        'batches on normal pages',
+    };
+    const adminPaths = new Set(
+      discoveredProcedures
+        .filter(procedure => procedure.tiers.includes('admin'))
+        .map(procedure => procedure.path)
+    );
+
+    const uncovered = [...adminPaths].filter(
+      path => !(path in edgeExclusions) && !isAdminEdgePath(`/api/trpc/${path}`)
+    );
+    const staleExclusions = Object.keys(edgeExclusions).filter(
+      path => !adminPaths.has(path) || isAdminEdgePath(`/api/trpc/${path}`)
+    );
+
+    expect(uncovered).toEqual([]);
+    expect(staleExclusions).toEqual([]);
+  });
+
+  test('the app-shell router mounts only reviewed admin procedures', () => {
+    // `/app-shell/api/trpc` is outside the admin edge rule, which must not
+    // match it: the shell batches org owners' calls, so an edge match would
+    // refuse whole batches for non-admins. Admin procedures mounted there rely
+    // on the in-app network check alone.
+    const appShellAdminExceptions: Record<string, string> = {
+      'organizations.sso.generateAdminPortalLink':
+        'the app-shell mount is outside the edge rule; adminGuardFn still refuses ' +
+        'off-network admins in the app',
+    };
+    const appShellProcedures = appShellProceduresRouter._def.procedures as Record<
+      string,
+      ProcedureDef
+    >;
+    const appShellAdminPaths = Object.entries(appShellProcedures)
+      .filter(([, def]) => privilegedGuardTiers(def?._def?.middlewares ?? []).includes('admin'))
+      .map(([procedurePath]) => procedurePath);
+
+    expect(appShellAdminPaths.sort()).toEqual(Object.keys(appShellAdminExceptions).sort());
+  });
+
+  test('every admin edge namespace and exact name still names mounted procedures', () => {
+    const unusedNamespaces = ADMIN_ONLY_TRPC_NAMESPACES.filter(
+      namespace => !discoveredProcedures.some(procedure => procedure.path.startsWith(namespace))
+    );
+    const unmountedProcedures = ADMIN_ONLY_TRPC_PROCEDURES.filter(name => !(name in procedures));
+
+    expect(unusedNamespaces).toEqual([]);
+    expect(unmountedProcedures).toEqual([]);
   });
 
   test('known non-admin elevation procedures are classified', () => {

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+import { replaceQuoteMarks } from '@kilocode/notifications/schemas';
 import type { Organization } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -29,6 +30,14 @@ export const subjects = {
   accountLinkCode: 'Kilo: Confirm adding a sign-in method',
   newSignInMethod: 'Kilo: A new sign-in method was added to your account',
   signInMethodRemoved: 'Kilo: A sign-in method was removed from your account',
+  passkeyAdded: 'Kilo: A passkey was added to your account',
+  passkeyRemoved: 'Kilo: A passkey was removed from your account',
+  deviceSignInApproved: 'Kilo: A device sign-in was approved for your account',
+  apiKeyReset: 'Kilo: Your API token was reset',
+  browserSessionsRevoked: 'Kilo: You were signed out of all browsers',
+  deviceSessionRevoked: 'Kilo: A device was signed out of your account',
+  signInResetBySupport: 'Kilo: Kilo support reset how you sign in',
+  newSignIn: 'Kilo: New sign-in to your account',
   signInMethodChangeCode: 'Kilo: Your code to change a sign-in method',
   passkeyEnrollmentCode: 'Your Kilo code to add a passkey',
   balanceAlert: 'Kilo: Low Balance Alert',
@@ -207,12 +216,16 @@ type SendParams = {
   templateName: TemplateName;
   templateVars: TemplateVars;
   subjectOverride?: string;
+  /** Runs the address verifier without its diagnostics, which log the address and attach it to Sentry. */
+  suppressVerifierDiagnostics?: true;
 };
 
 export async function send(params: SendParams): Promise<SendResult> {
   const verificationRecipient = getEmailVerificationRecipient(params.to);
   if (verificationRecipient) {
-    const isSafeToSend = await verifyEmail(verificationRecipient);
+    const isSafeToSend = await verifyEmail(verificationRecipient, {
+      suppressDiagnostics: params.suppressVerifierDiagnostics === true,
+    });
     if (!isSafeToSend) {
       return { sent: false, reason: 'neverbounce_rejected' };
     }
@@ -364,54 +377,141 @@ export async function sendAccountLinkCodeEmail(
   });
 }
 
-/** Where and when a sign-in method change came from, for the notice email. */
-export type SignInMethodChangeRequestDetails = {
-  changedAt: Date;
-  ip: string | null;
-  /** An approximate location from the request's geolocation headers. */
-  location: string | null;
-  /** The browser and operating system from the user agent. */
-  device: string | null;
-};
+/**
+ * Who acted and when, as a security notice reports it. The owner's own request
+ * names its address, approximate location and browser; an action Kilo support
+ * took names support and the time only, never the staff member's request.
+ */
+export type SecurityNoticeRequest =
+  | {
+      actor: 'owner';
+      occurredAt: Date;
+      ip: string | null;
+      /** An approximate location from the request's geolocation headers. */
+      location: string | null;
+      /** The browser and operating system from the user agent. */
+      device: string | null;
+    }
+  | { actor: 'support'; occurredAt: Date };
 
-function signInMethodChangeDetails(details: SignInMethodChangeRequestDetails): RawHtml {
-  const time = `${details.changedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-  const lines = [
-    `Time: ${time}`,
-    `IP address: ${details.ip ?? 'Unknown'}`,
-    `Approximate location: ${details.location ?? 'Unknown'}`,
-    `Browser: ${details.device ?? 'Unknown'}`,
-  ];
+function securityNoticeDetails(request: SecurityNoticeRequest): RawHtml {
+  const time = `Time: ${request.occurredAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  const lines =
+    request.actor === 'support'
+      ? [time, 'Done by: Kilo support']
+      : [
+          time,
+          `IP address: ${request.ip ?? 'Unknown'}`,
+          `Approximate location: ${request.location ?? 'Unknown'}`,
+          `Browser: ${request.device ?? 'Unknown'}`,
+        ];
   return new RawHtml(lines.map(escapeHtml).join('<br />'));
 }
 
-function connectedAccountsLink(): RawHtml {
-  const connectedAccountsUrl = `${NEXTAUTH_URL}/connected-accounts`;
+function appPageLink(pagePath: '/connected-accounts' | '/profile'): RawHtml {
+  const url = `${NEXTAUTH_URL}${pagePath}`;
   return new RawHtml(
-    `<a class="kc-strong" href="${escapeHtml(connectedAccountsUrl)}" style="color: #1a1a1a">${escapeHtml(
-      connectedAccountsUrl
-    )}</a>`
+    `<a class="kc-strong" href="${escapeHtml(url)}" style="color: #1a1a1a">${escapeHtml(url)}</a>`
   );
+}
+
+/**
+ * The variables every security notice shares: who acted and when, and
+ * navigational links to the pages its "If this was not you" steps name.
+ * Neither link changes anything when opened.
+ */
+function securityNoticeVars(email: string, request: SecurityNoticeRequest): TemplateVars {
+  return {
+    email,
+    change_details: securityNoticeDetails(request),
+    connected_accounts_link: appPageLink('/connected-accounts'),
+    profile_link: appPageLink('/profile'),
+  };
+}
+
+/**
+ * The sentences of a notice that either the owner or Kilo support can cause:
+ * "if this was you" fits only the owner's own action.
+ */
+function actorNoticeVars(request: SecurityNoticeRequest): TemplateVars {
+  return request.actor === 'support'
+    ? { actor_note: 'Kilo support made this change.', not_you_lead: 'If you did not ask for this:' }
+    : { actor_note: 'If this was you, no action is needed.', not_you_lead: 'If this was not you:' };
+}
+
+/**
+ * Sends an account-security notice. Its recipient address never reaches a log
+ * or Sentry from here: the verifier runs without diagnostics, and the caller
+ * reports only the returned reason when the notice is not sent.
+ */
+function sendSecurityNotice(
+  params: Pick<SendParams, 'to' | 'templateName' | 'templateVars'>
+): Promise<SendResult> {
+  return send({ ...params, suppressVerifierDiagnostics: true });
+}
+
+/**
+ * How a new sign-in method came onto the account. `added`: the owner linked a
+ * method they can remove themselves. `sso_settled`: an enterprise SSO sign-in
+ * settled onto the account; it replaced the account's other sign-in methods
+ * (`replacedMethodNames`, display names, possibly none) and signed out every
+ * browser, and only Kilo support can remove it.
+ */
+export type NewSignInMethodChange =
+  | { kind: 'added' }
+  | { kind: 'sso_settled'; replacedMethodNames: readonly string[] };
+
+/**
+ * The first paragraph's additions and the "If this was not you" step of a
+ * new sign-in method notice. An SSO settlement names the methods it replaced,
+ * reports the browser sign-out on its own, and points to support, because the
+ * owner cannot remove the SSO method themselves.
+ */
+function newSignInMethodChangeVars(change: NewSignInMethodChange): TemplateVars {
+  const profileLink = appPageLink('/profile').html;
+  const supportEmail = escapeHtml(SUPPORT_EMAIL);
+  const resetStep = `reset your API token at ${profileLink}, which signs out every browser, the app, and the CLI`;
+  switch (change.kind) {
+    case 'added':
+      return {
+        replaced_note: '',
+        sign_out_note: '',
+        not_you_steps: new RawHtml(
+          `remove this sign-in method at ${appPageLink('/connected-accounts').html}, ${resetStep}, and contact ${supportEmail}.`
+        ),
+      };
+    case 'sso_settled':
+      return {
+        replaced_note:
+          change.replacedMethodNames.length === 0
+            ? ''
+            : ` It replaced: ${change.replacedMethodNames.join(', ')}.`,
+        sign_out_note: ' Every browser was signed out.',
+        not_you_steps: new RawHtml(
+          `contact ${supportEmail} to remove this sign-in method, which you cannot remove yourself, and ${resetStep}.`
+        ),
+      };
+  }
 }
 
 export async function sendNewSignInMethodEmail(
   email: string,
   providerName: string,
   linkedIdentity: { email: string; displayName?: string | null },
-  details: SignInMethodChangeRequestDetails
+  change: NewSignInMethodChange,
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
   const displayName = linkedIdentity.displayName?.trim();
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'newSignInMethod',
     templateVars: {
-      email,
+      ...securityNoticeVars(email, request),
+      ...newSignInMethodChangeVars(change),
       provider_name: providerName,
       linked_identity: displayName
         ? `${displayName} (${linkedIdentity.email})`
         : linkedIdentity.email,
-      change_details: signInMethodChangeDetails(details),
-      connected_accounts_link: connectedAccountsLink(),
     },
   });
 }
@@ -419,16 +519,201 @@ export async function sendNewSignInMethodEmail(
 export async function sendSignInMethodRemovedEmail(
   email: string,
   providerName: string,
-  details: SignInMethodChangeRequestDetails
+  request: SecurityNoticeRequest
 ): Promise<SendResult> {
-  return send({
+  return sendSecurityNotice({
     to: email,
     templateName: 'signInMethodRemoved',
+    templateVars: { ...securityNoticeVars(email, request), provider_name: providerName },
+  });
+}
+
+/** A passkey's own name in parentheses after "A passkey", or nothing when it was never named. */
+function passkeyNameNote(passkeyName: string | null): RawHtml {
+  const name = passkeyName?.trim();
+  return new RawHtml(name ? ` (${renderNonAutolinkedText(name).html})` : '');
+}
+
+export async function sendPasskeyAddedEmail(
+  email: string,
+  passkeyName: string | null,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'passkeyAdded',
     templateVars: {
-      email,
-      provider_name: providerName,
-      change_details: signInMethodChangeDetails(details),
-      connected_accounts_link: connectedAccountsLink(),
+      ...securityNoticeVars(email, request),
+      passkey_name_note: passkeyNameNote(passkeyName),
+    },
+  });
+}
+
+export async function sendPasskeyRemovedEmail(
+  email: string,
+  passkeyName: string | null,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'passkeyRemoved',
+    templateVars: {
+      ...securityNoticeVars(email, request),
+      passkey_name_note: passkeyNameNote(passkeyName),
+    },
+  });
+}
+
+/**
+ * How a device sign-in names the device that asked. A name the requesting
+ * device chose for itself is its own words, not Kilo's, so it is always shown
+ * quoted and attributed; a recognised client kind or a parsed browser label
+ * is Kilo's own description.
+ */
+export type DeviceSignInRequester =
+  | { kind: 'self_named'; name: string }
+  | { kind: 'recognised'; label: string }
+  | { kind: 'unidentified' };
+
+/** The longest self-chosen device name a notice repeats, in characters. */
+const SELF_NAMED_CLIENT_MAX_LENGTH = 40;
+
+/**
+ * A name the requesting device chose for itself, cut to a short length and
+ * with every double quote mark replaced, so the quotes a notice puts around
+ * it cannot be closed early by the name itself.
+ */
+export function selfNamedClientName(name: string): string {
+  const characters = Array.from(replaceQuoteMarks(name.trim()));
+  return characters.length > SELF_NAMED_CLIENT_MAX_LENGTH
+    ? `${characters.slice(0, SELF_NAMED_CLIENT_MAX_LENGTH).join('').trimEnd()}…`
+    : characters.join('');
+}
+
+/** A self-chosen device name, quoted so it never reads as Kilo's own words. */
+function quotedClientName(name: string): string {
+  return `"${selfNamedClientName(name)}"`;
+}
+
+function requesterSentenceLabel(requester: DeviceSignInRequester): string {
+  switch (requester.kind) {
+    case 'self_named':
+      return `a device that named itself ${quotedClientName(requester.name)}`;
+    case 'recognised':
+      return requester.label;
+    case 'unidentified':
+      return 'an unidentified device';
+  }
+}
+
+function requesterLineLabel(requester: DeviceSignInRequester): string {
+  switch (requester.kind) {
+    case 'self_named':
+      return `named itself ${quotedClientName(requester.name)}`;
+    case 'recognised':
+      return requester.label;
+    case 'unidentified':
+      return 'Unidentified';
+  }
+}
+
+/**
+ * `requester` is the device that asked to sign in, read from its stored
+ * request; `request` is where the approval was given, which can be a
+ * different place.
+ */
+export async function sendDeviceSignInApprovedEmail(
+  email: string,
+  requester: { client: DeviceSignInRequester; ip: string | null },
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'deviceSignInApproved',
+    templateVars: {
+      ...securityNoticeVars(email, request),
+      client_label: renderNonAutolinkedText(requesterSentenceLabel(requester.client)),
+      requesting_device: renderNonAutolinkedText(requesterLineLabel(requester.client)),
+      request_ip: requester.ip ?? 'Unknown',
+    },
+  });
+}
+
+/**
+ * What an API token reset did. The owner's own reset also signs out every
+ * browser and device; a reset by Kilo support stops only the API tokens.
+ */
+function apiKeyResetEffect(request: SecurityNoticeRequest): string {
+  return request.actor === 'support'
+    ? 'Every earlier API token stopped working. Browsers and signed-in devices stay signed in.'
+    : 'Every earlier token stopped working, and every browser, the app, and the CLI were signed out.';
+}
+
+export async function sendApiKeyResetEmail(
+  email: string,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'apiKeyReset',
+    templateVars: {
+      ...securityNoticeVars(email, request),
+      ...actorNoticeVars(request),
+      reset_effect: apiKeyResetEffect(request),
+    },
+  });
+}
+
+export async function sendBrowserSessionsRevokedEmail(
+  email: string,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'browserSessionsRevoked',
+    templateVars: { ...securityNoticeVars(email, request), ...actorNoticeVars(request) },
+  });
+}
+
+/** `revokedDevice` is Kilo's description of the signed-out device, or null when it has none. */
+export async function sendDeviceSessionRevokedEmail(
+  email: string,
+  revokedDevice: string | null,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'deviceSessionRevoked',
+    templateVars: {
+      ...securityNoticeVars(email, request),
+      revoked_device: renderNonAutolinkedText(revokedDevice ?? 'Unidentified'),
+    },
+  });
+}
+
+export async function sendSignInResetBySupportEmail(
+  email: string,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'signInResetBySupport',
+    templateVars: securityNoticeVars(email, request),
+  });
+}
+
+/** `methodName` is the sign-in method's display name, or null when it is not one this build names. */
+export async function sendNewSignInEmail(
+  email: string,
+  methodName: string | null,
+  request: SecurityNoticeRequest
+): Promise<SendResult> {
+  return sendSecurityNotice({
+    to: email,
+    templateName: 'newSignIn',
+    templateVars: {
+      ...securityNoticeVars(email, request),
+      method_name: methodName ?? 'a sign-in method',
     },
   });
 }

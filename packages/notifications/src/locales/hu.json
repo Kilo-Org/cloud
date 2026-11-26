@@ -8,7 +8,8 @@
       "securityFinding": "Egy biztonsági találat figyelmet igényel",
       "securityUpdate": "Egy biztonsági ellenőrzés frissítést kapott",
       "agentBriefing": "A jelentésed az ügynök tevékenységéről elkészült",
-      "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
+      "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak",
+      "accountSecurity": "Biztonsági tevékenység történt a fiókodban"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA megsértése"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Hozzáférési kulcs hozzáadva a fiókodhoz"
+      },
+      "passkeyRemoved": {
+        "title": "Hozzáférési kulcs eltávolítva a fiókodból"
+      },
+      "signInMethodLinked": {
+        "title": "Bejelentkezési mód hozzáadva a fiókodhoz"
+      },
+      "signInMethodUnlinked": {
+        "title": "Bejelentkezési mód eltávolítva a fiókodból"
+      },
+      "deviceSignInApproved": {
+        "title": "Eszközbejelentkezés jóváhagyva"
+      },
+      "apiKeyReset": {
+        "title": "API-token visszaállítva"
+      },
+      "browserSessionsRevoked": {
+        "title": "Kijelentkeztél az összes böngészőből"
+      },
+      "deviceSessionRevoked": {
+        "title": "Egy eszköz kijelentkezett a fiókodból"
+      },
+      "signInResetBySupport": {
+        "title": "A Kilo ügyfélszolgálata visszaállította a bejelentkezést"
+      },
+      "newSignIn": {
+        "title": "Új bejelentkezés a fiókodba"
+      },
+      "body": {
+        "deviceAndLocation": "Innen: {{device}}, {{location}} közelében. Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
+        "device": "Innen: {{device}}. Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
+        "location": "{{location}} közelében. Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
+        "unknown": "Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
+        "selfNamedDevice": "Egy eszközről, amely „{{name}}” néven nevezte meg magát. Nem te voltál? Ellenőrizd most a fiókod biztonságát.",
+        "support": "A Kilo ügyfélszolgálata végezte el. Ha nem te kérted, lépj kapcsolatba az ügyfélszolgálattal."
+      }
     }
   },
   "sessionReady": {

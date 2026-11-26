@@ -8,7 +8,8 @@
       "securityFinding": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು",
       "securityUpdate": "ಭದ್ರತಾ ಪರಿಶೀಲನೆಗೆ ನವೀಕರಣವಿದೆ",
       "agentBriefing": "ನಿಮ್ಮ ಏಜೆಂಟ್ ವರದಿ ಸಿದ್ಧವಾಗಿದೆ",
-      "activeAgentsGlanceable": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳಿಗೆ ನವೀಕರಣವಿದೆ"
+      "activeAgentsGlanceable": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳಿಗೆ ನವೀಕರಣವಿದೆ",
+      "accountSecurity": "ನಿಮ್ಮ ಖಾತೆಯಲ್ಲಿ ಭದ್ರತಾ ಚಟುವಟಿಕೆ ನಡೆದಿದೆ"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA ಉಲ್ಲಂಘನೆ"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "ನಿಮ್ಮ ಖಾತೆಗೆ ಪಾಸ್‌ಕೀ ಸೇರಿಸಲಾಗಿದೆ"
+      },
+      "passkeyRemoved": {
+        "title": "ನಿಮ್ಮ ಖಾತೆಯಿಂದ ಪಾಸ್‌ಕೀ ತೆಗೆದುಹಾಕಲಾಗಿದೆ"
+      },
+      "signInMethodLinked": {
+        "title": "ನಿಮ್ಮ ಖಾತೆಗೆ ಸೈನ್-ಇನ್ ವಿಧಾನ ಸೇರಿಸಲಾಗಿದೆ"
+      },
+      "signInMethodUnlinked": {
+        "title": "ನಿಮ್ಮ ಖಾತೆಯಿಂದ ಸೈನ್-ಇನ್ ವಿಧಾನ ತೆಗೆದುಹಾಕಲಾಗಿದೆ"
+      },
+      "deviceSignInApproved": {
+        "title": "ಸಾಧನದ ಸೈನ್-ಇನ್ ಅನುಮೋದಿಸಲಾಗಿದೆ"
+      },
+      "apiKeyReset": {
+        "title": "API ಟೋಕನ್ ಮರುಹೊಂದಿಸಲಾಗಿದೆ"
+      },
+      "browserSessionsRevoked": {
+        "title": "ಎಲ್ಲಾ ಬ್ರೌಸರ್‌ಗಳಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಲಾಗಿದೆ"
+      },
+      "deviceSessionRevoked": {
+        "title": "ನಿಮ್ಮ ಖಾತೆಯಿಂದ ಒಂದು ಸಾಧನವನ್ನು ಸೈನ್ ಔಟ್ ಮಾಡಲಾಗಿದೆ"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo ಬೆಂಬಲ ತಂಡ ಸೈನ್-ಇನ್ ಮರುಹೊಂದಿಸಿದೆ"
+      },
+      "newSignIn": {
+        "title": "ನಿಮ್ಮ ಖಾತೆಗೆ ಹೊಸ ಸೈನ್-ಇನ್"
+      },
+      "body": {
+        "deviceAndLocation": "{{location}} ಬಳಿಯ {{device}} ನಿಂದ. ಇದು ನೀವಲ್ಲವೇ? ಈಗಲೇ ನಿಮ್ಮ ಖಾತೆಯ ಭದ್ರತೆಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "device": "{{device}} ನಿಂದ. ಇದು ನೀವಲ್ಲವೇ? ಈಗಲೇ ನಿಮ್ಮ ಖಾತೆಯ ಭದ್ರತೆಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "location": "{{location}} ಬಳಿಯಿಂದ. ಇದು ನೀವಲ್ಲವೇ? ಈಗಲೇ ನಿಮ್ಮ ಖಾತೆಯ ಭದ್ರತೆಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "unknown": "ಇದು ನೀವಲ್ಲವೇ? ಈಗಲೇ ನಿಮ್ಮ ಖಾತೆಯ ಭದ್ರತೆಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "selfNamedDevice": "ತನ್ನನ್ನು \"{{name}}\" ಎಂದು ಹೆಸರಿಸಿಕೊಂಡ ಸಾಧನದಿಂದ. ಇದು ನೀವಲ್ಲವೇ? ಈಗಲೇ ನಿಮ್ಮ ಖಾತೆಯ ಭದ್ರತೆಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "support": "Kilo ಬೆಂಬಲ ತಂಡ ಇದನ್ನು ಮಾಡಿದೆ. ನೀವು ಇದನ್ನು ಕೇಳದಿದ್ದರೆ, ಬೆಂಬಲವನ್ನು ಸಂಪರ್ಕಿಸಿ."
+      }
     }
   },
   "sessionReady": {

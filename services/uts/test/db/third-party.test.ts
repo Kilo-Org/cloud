@@ -35,7 +35,7 @@ beforeAll(async () => {
 });
 afterAll(() => db.drop());
 
-const environment = 'development';
+const environment = 'development' as const;
 const SCOPE = 'kilo-mcp:catalog.read';
 const DELEGATED = 'kilo-api:mcp.read';
 const sha256 = (value: string) => createHash('sha256').update(value).digest();
@@ -208,9 +208,10 @@ describe('client metadata cache', () => {
     await thirdParty.extendClient(clientId, 900);
     expect(await thirdParty.readClient(clientId)).toMatchObject({ fresh: true });
 
-    await owner.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [
-      clientId,
-    ]);
+    await owner.query(
+      `UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`,
+      [clientId]
+    );
     expect(
       await thirdParty.saveClient({
         clientId,
@@ -300,14 +301,23 @@ describe('consent', () => {
     const accountId = await insertAccount(owner);
     const clientId = await client();
     const session = await browserSession(accountId, 20);
-    const input = { environment, sessionTokenHash: session, clientId, orgId: null, scopes: [SCOPE] };
+    const input = {
+      environment,
+      sessionTokenHash: session,
+      clientId,
+      orgId: null,
+      scopes: [SCOPE],
+    };
     expect(await thirdParty.grantConsent(input)).toEqual({ outcome: 'gate_required' });
     expect(await thirdParty.grantConsent(input)).toEqual({ outcome: 'gate_required' });
     const rows = await auditRows(accountId);
     expect(rows.map(row => row.type)).toEqual(['ai.kilo.uts.gate.refused']);
     expect(
-      (await owner.query('SELECT 1 FROM uts.third_party_consents WHERE account_id = $1', [accountId]))
-        .rowCount
+      (
+        await owner.query('SELECT 1 FROM uts.third_party_consents WHERE account_id = $1', [
+          accountId,
+        ])
+      ).rowCount
     ).toBe(0);
   });
 
@@ -320,7 +330,10 @@ describe('consent', () => {
       outcome: 'no_session',
     });
     expect(
-      await thirdParty.grantConsent({ ...base, clientId: `https://client.example.com/${randomUUID()}` })
+      await thirdParty.grantConsent({
+        ...base,
+        clientId: `https://client.example.com/${randomUUID()}`,
+      })
     ).toEqual({ outcome: 'unknown_client' });
     expect(await thirdParty.grantConsent({ ...base, orgId: randomUUID() })).toEqual({
       outcome: 'org_denied',
@@ -437,9 +450,10 @@ describe('the broker exchange statement', () => {
     // No subject-wide entry: other grants of the account keep working.
     expect(
       (
-        await owner.query(`SELECT 1 FROM uts.revocations WHERE kind = 'subject' AND subject_id = $1`, [
-          accountId,
-        ])
+        await owner.query(
+          `SELECT 1 FROM uts.revocations WHERE kind = 'subject' AND subject_id = $1`,
+          [accountId]
+        )
       ).rowCount
     ).toBe(0);
     expect(
@@ -471,9 +485,10 @@ describe('the broker exchange statement', () => {
 
   it('refuses a blocked client at once', async () => {
     const { accountId, clientId, familyId } = await consentedFamily();
-    await owner.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [
-      clientId,
-    ]);
+    await owner.query(
+      `UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`,
+      [clientId]
+    );
     expect(
       await grants.exchangeDelegated(exchangeInput({ accountId, clientId, grantId: familyId }))
     ).toEqual({ outcome: 'invalid_grant' });

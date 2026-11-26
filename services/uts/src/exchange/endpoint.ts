@@ -228,7 +228,11 @@ export async function handleTokenExchange(
   const client = identifyClient(claims.client_id);
   if (
     client.kind === 'unknown' ||
-    clientScopeRefusal([claims.scope], { kind: client.kind, clientId: claims.client_id }, deps.scopes) !== null
+    clientScopeRefusal(
+      [claims.scope],
+      { kind: client.kind, clientId: claims.client_id },
+      deps.scopes
+    ) !== null
   ) {
     return oauthError('invalid_grant', 400, 'the subject token is invalid, expired or revoked');
   }

@@ -418,11 +418,16 @@ export type AppListing = {
  * The apps page (design 5.9): every third-party app that holds a consent of the signed-in account,
  * each with a Withdraw button. Withdrawing posts the consent id to the same path from this origin.
  */
-export function appsPage(apps: readonly AppListing[], message: string | null, status = 200): Response {
+export function appsPage(
+  apps: readonly AppListing[],
+  message: string | null,
+  status = 200
+): Response {
   const notice = message === null ? '' : `<p role="status">${escapeHtml(message)}</p>\n`;
   const items = apps
     .map(app => {
-      const org = app.orgId === null ? '' : ` for organization <code>${escapeHtml(app.orgId)}</code>`;
+      const org =
+        app.orgId === null ? '' : ` for organization <code>${escapeHtml(app.orgId)}</code>`;
       const lines = app.lines.map(line => `<li>${escapeHtml(line)}</li>`).join('');
       return `<li>
 <p><strong>${escapeHtml(app.clientName)}</strong>${org}, allowed ${escapeHtml(app.grantedAt.toISOString())}</p>

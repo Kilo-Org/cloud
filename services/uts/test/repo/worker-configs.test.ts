@@ -171,6 +171,27 @@ describe('the FeedReader entrypoint', () => {
     props: { caller },
   });
 
+  it('lets Kilo MCP read the feed as kilo-mcp, and its dev deployment only as kilo-mcp-dev', () => {
+    const kiloMcp = (devCaller: string) =>
+      consumer(
+        {
+          name: 'kilo-mcp',
+          services: [readerBinding('uts-feed', 'kilo-mcp')],
+          env: {
+            dev: {
+              name: 'kilo-mcp-dev',
+              services: [readerBinding('uts-feed', devCaller)],
+            },
+          },
+        },
+        'services/kilo-mcp/wrangler.jsonc'
+      );
+    expect(workerConfigProblems([kiloMcp('kilo-mcp-dev')])).toEqual([]);
+    expect(workerConfigProblems([kiloMcp('kilo-mcp')])).toEqual([
+      expect.stringContaining('sets props.caller "kilo-mcp"'),
+    ]);
+  });
+
   it('lets another config bind the feed Worker at FeedReader under its own name', () => {
     expect(
       workerConfigProblems([consumer({ services: [readerBinding('uts-feed', 'consumer')] })])

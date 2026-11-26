@@ -150,7 +150,9 @@ export function consentStep(deps: ConsentDeps, methods: SignInMethods): ConsentS
         return view('gate');
       case 'no_session': {
         const { pathname, search } = new URL(request.url);
-        return interaction(signInPage(signInChoices(methods, returnPathOf(`${pathname}${search}`))));
+        return interaction(
+          signInPage(signInChoices(methods, returnPathOf(`${pathname}${search}`)))
+        );
       }
       case 'unknown_client':
       case 'org_denied':

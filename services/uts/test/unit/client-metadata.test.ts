@@ -171,7 +171,11 @@ describe('metadata fetch', () => {
       new Response('{', { headers: { 'Content-Type': 'application/json' } }),
       'body is not JSON',
     ],
-    ['another client id', json(document({ client_id: `${CLIENT_ID}x` })), 'document names another client id'],
+    [
+      'another client id',
+      json(document({ client_id: `${CLIENT_ID}x` })),
+      'document names another client id',
+    ],
     ['no redirect URI', json(document({ redirect_uris: [] })), 'document does not validate'],
     [
       'a refused redirect URI',
@@ -183,7 +187,11 @@ describe('metadata fetch', () => {
       json(document({ token_endpoint_auth_method: 'client_secret_basic' })),
       'document does not validate',
     ],
-    ['a client secret', json(document({ client_secret: 'synthetic' })), 'document does not validate'],
+    [
+      'a client secret',
+      json(document({ client_secret: 'synthetic' })),
+      'document does not validate',
+    ],
     [
       'a name with control characters',
       json(document({ client_name: 'Example\u0000client' })),

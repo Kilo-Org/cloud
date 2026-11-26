@@ -785,9 +785,10 @@ describe('migration 0010 baseline', () => {
     try {
       const admin = await empty.connect();
       const migrations = await loadMigrations();
+      // Every migration before 0010, then all: a later migration may not sort before an applied one.
       await applyMigrations(
         admin,
-        migrations.filter(migration => migration.name !== '0010_notices.sql')
+        migrations.filter(migration => migration.name < '0010_notices.sql')
       );
       await admin.query('SET ROLE uts_owner');
       const accountId = await insertAccount(admin);

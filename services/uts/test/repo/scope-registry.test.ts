@@ -380,7 +380,7 @@ describe('the UTS scope registry', () => {
     }
   });
 
-  it('lets each first-party client mint exactly the scopes that list it, and third parties none yet', () => {
+  it('lets each client mint through a grant exactly the scopes that list it, and no exchange scope', () => {
     for (const [scope, entry] of Object.entries(UTS_SCOPE_REGISTRY)) {
       for (const client of UTS_FIRST_PARTY_CLIENTS) {
         const refused = clientScopeRefusal(
@@ -388,7 +388,11 @@ describe('the UTS scope registry', () => {
           { kind: 'first_party', clientId: client.clientId },
           utsScopeEntry
         );
-        expect(refused).toBe(entry.allowedClients.includes(client.clientId) ? null : scope);
+        expect(refused).toBe(
+          entry.allowedClients.includes(client.clientId) && entry.issuance === 'grant'
+            ? null
+            : scope
+        );
       }
       expect(
         clientScopeRefusal(
@@ -396,7 +400,7 @@ describe('the UTS scope registry', () => {
           { kind: 'third_party', clientId: 'https://client.example.com/metadata.json' },
           utsScopeEntry
         )
-      ).toBe(entry.thirdPartySafe ? null : scope);
+      ).toBe(entry.thirdPartySafe && entry.issuance === 'grant' ? null : scope);
     }
     expect(
       clientScopeRefusal(
@@ -530,7 +534,7 @@ describe('the registry check', () => {
     [
       'a third-party flag without third_party',
       'gateway:models.read',
-      { thirdPartySafe: true },
+      { thirdPartySafe: true, consentText: 'Read your models' },
       'disagree',
     ],
     [
@@ -547,6 +551,7 @@ describe('the registry check', () => {
         allowedClients: ['third_party'],
         thirdPartySafe: true,
         patEligible: false,
+        consentText: 'Read development data',
       },
       'third-party-safe but',
     ],
@@ -612,6 +617,7 @@ describe('the registry check', () => {
         patEligible: false,
         allowedClients: ['third_party'],
         thirdPartySafe: true,
+        consentText: 'Read your tools',
       },
       'limited to listed roles but',
     ],
@@ -675,7 +681,12 @@ describe('the registry check', () => {
       delegable: true,
       issuance: 'token_exchange',
     } as const;
-    const source = { ...base, audience: 'kilo-mcp', patEligible: false, delegatesTo: ['kilo-api:mcp.read'] };
+    const source = {
+      ...base,
+      audience: 'kilo-mcp',
+      patEligible: false,
+      delegatesTo: ['kilo-api:mcp.read'],
+    };
     expect(
       scopeRegistryProblems({ 'kilo-mcp:catalog.read': source, 'kilo-api:mcp.read': exchange })
     ).toEqual([]);

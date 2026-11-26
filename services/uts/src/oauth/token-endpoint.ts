@@ -346,7 +346,10 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
         return oauthError('unsupported_grant_type', 400);
       case UTS_GRANT_TYPES.tokenExchange:
         if (deps.exchange === null) return oauthError('unsupported_grant_type', 400);
-        return await handleTokenExchange(request, form.params, { ...deps, exchange: deps.exchange });
+        return await handleTokenExchange(request, form.params, {
+          ...deps,
+          exchange: deps.exchange,
+        });
       default:
         return oauthError('unsupported_grant_type', 400);
     }

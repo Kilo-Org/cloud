@@ -27,13 +27,7 @@ import { newExchangeWindows } from '../../src/exchange/limits';
 import type { DelegatedExchangeInput } from '../../src/grants/store';
 import { handleOAuthRequest } from '../../src/oauth/routes';
 import type { SignerAccess } from '../../src/token/mint';
-import {
-  errorOf,
-  fakeGrants,
-  formRequest,
-  oauthDeps,
-  storeFailure,
-} from './oauth-support';
+import { errorOf, fakeGrants, formRequest, oauthDeps, storeFailure } from './oauth-support';
 import { keySet } from './support';
 import { config } from './test-env';
 
@@ -55,7 +49,11 @@ const subjectKey = await (async () => {
   const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
   const jwk = await exportJWK(publicKey);
   const kid = `uts-token-05-${await calculateJwkThumbprint(jwk, 'sha256')}`;
-  return { privateKey, kid, key: UtsPublicJwkSchema.parse({ ...jwk, kid, alg: 'EdDSA', use: 'sig' }) };
+  return {
+    privateKey,
+    kid,
+    key: UtsPublicJwkSchema.parse({ ...jwk, kid, alg: 'EdDSA', use: 'sig' }),
+  };
 })();
 
 const subjectKeys: AccessTokenKeys = async kid =>
@@ -245,7 +243,12 @@ describe('the broker exchange', () => {
       401,
       'invalid_client',
     ],
-    ['an STS key set that does not answer', { status: 'unavailable' }, 503, 'temporarily_unavailable'],
+    [
+      'an STS key set that does not answer',
+      { status: 'unavailable' },
+      503,
+      'temporarily_unavailable',
+    ],
   ])('refuses %s before any statement', async (_name, check, status, error) => {
     const grants = issuedStore();
     const callers: StsCallerVerifier = async () => check ?? caller;
@@ -262,13 +265,29 @@ describe('the broker exchange', () => {
   });
 
   it.each<[string, Record<string, string>, string]>([
-    ['another subject token type', { subject_token_type: 'urn:ietf:params:oauth:token-type:jwt' }, 'invalid_request'],
-    ['another requested type', { requested_token_type: 'urn:ietf:params:oauth:token-type:jwt' }, 'invalid_request'],
-    ['an actor token', { actor_token: 'x', actor_token_type: UTS_ACCESS_TOKEN_TYPE_URN }, 'invalid_request'],
+    [
+      'another subject token type',
+      { subject_token_type: 'urn:ietf:params:oauth:token-type:jwt' },
+      'invalid_request',
+    ],
+    [
+      'another requested type',
+      { requested_token_type: 'urn:ietf:params:oauth:token-type:jwt' },
+      'invalid_request',
+    ],
+    [
+      'an actor token',
+      { actor_token: 'x', actor_token_type: UTS_ACCESS_TOKEN_TYPE_URN },
+      'invalid_request',
+    ],
     ['an audience parameter', { audience: 'kilo-api' }, 'invalid_request'],
     ['a scope only a grant mints', { scope: 'kilo-api:profile.read' }, 'invalid_scope'],
     ['an unregistered scope', { scope: 'kilo-api:admin.write' }, 'invalid_scope'],
-    ['the subject scope itself', { scope: KILO_MCP_CATALOG_READ_SCOPE, resource: 'http://localhost:8815/mcp' }, 'invalid_scope'],
+    [
+      'the subject scope itself',
+      { scope: KILO_MCP_CATALOG_READ_SCOPE, resource: 'http://localhost:8815/mcp' },
+      'invalid_scope',
+    ],
     ['the urn resource', { resource: 'urn:kilo:service:kilo-api' }, 'invalid_target'],
     ['a resource with a path', { resource: `${API_ORIGIN}/api` }, 'invalid_target'],
     ['the production resource', { resource: 'https://app.kilo.ai' }, 'invalid_target'],
@@ -281,19 +300,44 @@ describe('the broker exchange', () => {
   });
 
   it.each<[string, () => Promise<string>, string]>([
-    ['a token under an unknown kid', async () => {
-      const { privateKey } = await generateKeyPair('EdDSA');
-      return await new SignJWT({ sub: ACCOUNT })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'at+jwt', kid: 'uts-token-01-' + 'A'.repeat(43) })
-        .sign(privateKey);
-    }, 'invalid_grant'],
-    ['a token of another audience', () => subjectToken({ aud: 'kilo-api', scope: 'kilo-api:profile.read', client_id: 'kilo-cli' }), 'invalid_scope'],
-    ['a delegated subject token', () => subjectToken({ act: { sub: 'kilo-mcp' } }), 'invalid_grant'],
+    [
+      'a token under an unknown kid',
+      async () => {
+        const { privateKey } = await generateKeyPair('EdDSA');
+        return await new SignJWT({ sub: ACCOUNT })
+          .setProtectedHeader({
+            alg: 'EdDSA',
+            typ: 'at+jwt',
+            kid: 'uts-token-01-' + 'A'.repeat(43),
+          })
+          .sign(privateKey);
+      },
+      'invalid_grant',
+    ],
+    [
+      'a token of another audience',
+      () =>
+        subjectToken({ aud: 'kilo-api', scope: 'kilo-api:profile.read', client_id: 'kilo-cli' }),
+      'invalid_scope',
+    ],
+    [
+      'a delegated subject token',
+      () => subjectToken({ act: { sub: 'kilo-mcp' } }),
+      'invalid_grant',
+    ],
     ['a token without sid', () => subjectToken({ sid: undefined }), 'invalid_grant'],
-    ['a token of another issuer', () => subjectToken({ iss: 'https://uts.kiloapps.io' }), 'invalid_grant'],
+    [
+      'a token of another issuer',
+      () => subjectToken({ iss: 'https://uts.kiloapps.io' }),
+      'invalid_grant',
+    ],
     ['a token of another environment', () => subjectToken({ env: 'production' }), 'invalid_grant'],
     ['a token of an unknown client', () => subjectToken({ client_id: 'kilo-tv' }), 'invalid_grant'],
-    ['a token of a client the scope does not allow', () => subjectToken({ client_id: 'kilo-web' }), 'invalid_grant'],
+    [
+      'a token of a client the scope does not allow',
+      () => subjectToken({ client_id: 'kilo-web' }),
+      'invalid_grant',
+    ],
   ])('refuses %s before the store', async (_name, token, error) => {
     const grants = issuedStore();
     const response = await call(await exchangeRequest(await token()), grants);

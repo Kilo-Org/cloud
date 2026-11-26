@@ -1,4 +1,7 @@
-import { KILO_MCP_CATALOG_CONSENT_TEXT, KILO_MCP_CATALOG_READ_SCOPE } from '@kilocode/uts-contracts';
+import {
+  KILO_MCP_CATALOG_CONSENT_TEXT,
+  KILO_MCP_CATALOG_READ_SCOPE,
+} from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
 import type { PendingAuthorization } from '../../src/oauth/authorize';
 import type { FeedEntry } from '../../src/revocation/entries';
@@ -10,11 +13,7 @@ import {
 } from '../../src/third-party/clients';
 import { consentStep, handleAppsPage } from '../../src/third-party/consent';
 import type { MetadataFetcher } from '../../src/third-party/metadata';
-import type {
-  CachedClient,
-  ThirdPartyAccess,
-  ThirdPartyStore,
-} from '../../src/third-party/store';
+import type { CachedClient, ThirdPartyAccess, ThirdPartyStore } from '../../src/third-party/store';
 import { recordingPublisher, storeFailure, testScopes } from './oauth-support';
 import { ORIGIN } from './signin-support';
 import { config, noSignInMethods } from './test-env';
@@ -37,27 +36,30 @@ const session: BrowserSession = {
 
 type Call = { method: keyof ThirdPartyStore; input: unknown };
 
+/** One store method that answers with `run` and records each call; a missing one fails. */
+function recorded<Input extends unknown[], Output>(
+  method: keyof ThirdPartyStore,
+  calls: Call[],
+  run: ((...input: Input) => Promise<Output>) | undefined
+): (...input: Input) => Promise<Output> {
+  return async (...input) => {
+    calls.push({ method, input: input.length === 1 ? input[0] : input });
+    if (run === undefined) throw new Error(`unexpected ${method} call`);
+    return await run(...input);
+  };
+}
+
 /** A third-party store that answers with `implementation` and records every call. */
 function fakeStore(implementation: Partial<ThirdPartyStore> = {}) {
   const calls: Call[] = [];
-  const recorded =
-    <Method extends keyof ThirdPartyStore>(method: Method) =>
-    async (...input: Parameters<ThirdPartyStore[Method]>) => {
-      calls.push({ method, input: input.length === 1 ? input[0] : input });
-      const run = implementation[method] as
-        | ((...args: Parameters<ThirdPartyStore[Method]>) => ReturnType<ThirdPartyStore[Method]>)
-        | undefined;
-      if (run === undefined) throw new Error(`unexpected ${method} call`);
-      return await run(...input);
-    };
   const store: ThirdPartyStore = {
-    readClient: recorded('readClient'),
-    saveClient: recorded('saveClient'),
-    extendClient: recorded('extendClient'),
-    findConsent: recorded('findConsent'),
-    grantConsent: recorded('grantConsent'),
-    listConsents: recorded('listConsents'),
-    withdrawConsent: recorded('withdrawConsent'),
+    readClient: recorded('readClient', calls, implementation.readClient),
+    saveClient: recorded('saveClient', calls, implementation.saveClient),
+    extendClient: recorded('extendClient', calls, implementation.extendClient),
+    findConsent: recorded('findConsent', calls, implementation.findConsent),
+    grantConsent: recorded('grantConsent', calls, implementation.grantConsent),
+    listConsents: recorded('listConsents', calls, implementation.listConsents),
+    withdrawConsent: recorded('withdrawConsent', calls, implementation.withdrawConsent),
   };
   const access: ThirdPartyAccess = work => work(store);
   return { access, calls };
@@ -154,9 +156,9 @@ describe('the third-party client resolver', () => {
       saveClient: async () => ({ status: 'blocked' }),
     });
     expect(
-      await thirdPartyClients(resolverDeps(store.access, async () => Response.json(metadataDocument)))(
-        CLIENT_ID
-      )
+      await thirdPartyClients(
+        resolverDeps(store.access, async () => Response.json(metadataDocument))
+      )(CLIENT_ID)
     ).toEqual({ kind: 'refused', reason: 'blocked' });
   });
 
@@ -284,9 +286,7 @@ describe('the consent screen', () => {
     expect(html).toContain('Example &lt;app&gt;');
     expect(html).not.toContain('Example <app>');
     expect(html).toContain(CLIENT_ID);
-    expect(html).toContain(
-      KILO_MCP_CATALOG_CONSENT_TEXT.replace("'", '&#39;')
-    );
+    expect(html).toContain(KILO_MCP_CATALOG_CONSENT_TEXT.replace("'", '&#39;'));
     expect(html).toContain(`name="consent" value="${KILO_MCP_CATALOG_READ_SCOPE}" required`);
     expect(result.response.headers.get('Content-Security-Policy')).toContain(
       "form-action 'self' https://client.example.com;"
@@ -338,7 +338,10 @@ describe('the consent screen', () => {
   it('refuses a POST from another origin before any statement', async () => {
     const store = fakeStore();
     const result = await step(store.access)(
-      consentPost({ decision: 'allow', consent: KILO_MCP_CATALOG_READ_SCOPE }, 'https://evil.example'),
+      consentPost(
+        { decision: 'allow', consent: KILO_MCP_CATALOG_READ_SCOPE },
+        'https://evil.example'
+      ),
       pending,
       session
     );
@@ -452,7 +455,11 @@ describe('the apps page', () => {
     const entries = [entry(), entry()];
     const publisher = recordingPublisher();
     const store = fakeStore({
-      withdrawConsent: async () => ({ outcome: 'withdrawn', endedFamilies: 2, feedEntries: entries }),
+      withdrawConsent: async () => ({
+        outcome: 'withdrawn',
+        endedFamilies: 2,
+        feedEntries: entries,
+      }),
       listConsents: async () => [],
     });
     const page = await handleAppsPage(withdrawPost(CONSENT_ID), deps(store.access, publisher));
@@ -464,7 +471,11 @@ describe('the apps page', () => {
 
   it('says so when no vouching feed object took the entries, and the withdrawal stands', async () => {
     const store = fakeStore({
-      withdrawConsent: async () => ({ outcome: 'withdrawn', endedFamilies: 1, feedEntries: [entry()] }),
+      withdrawConsent: async () => ({
+        outcome: 'withdrawn',
+        endedFamilies: 1,
+        feedEntries: [entry()],
+      }),
       listConsents: async () => [],
     });
     const page = await handleAppsPage(
@@ -477,7 +488,10 @@ describe('the apps page', () => {
 
   it('refuses a withdrawal from another origin or with a malformed id, before any statement', async () => {
     const store = fakeStore();
-    expect((await handleAppsPage(withdrawPost(CONSENT_ID, 'https://evil.example'), deps(store.access))).status).toBe(403);
+    expect(
+      (await handleAppsPage(withdrawPost(CONSENT_ID, 'https://evil.example'), deps(store.access)))
+        .status
+    ).toBe(403);
     expect((await handleAppsPage(withdrawPost('not-a-uuid'), deps(store.access))).status).toBe(400);
     expect(store.calls).toEqual([]);
   });

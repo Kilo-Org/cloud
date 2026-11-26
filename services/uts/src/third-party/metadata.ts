@@ -34,7 +34,8 @@ const MAX_ETAG_LENGTH = 256;
 const PRIVATE_NAME_SUFFIXES = ['.localhost', '.local', '.internal', '.home.arpa'];
 const IPV4_LITERAL = /^\d{1,3}(\.\d{1,3}){3}$/;
 /** A DNS name of at least two labels, each 1 to 63 letters, digits or hyphens, no edge hyphen. */
-const DOMAIN_NAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const DOMAIN_NAME =
+  /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
 /**
  * Why `clientId` cannot be a Client ID Metadata Document URL that UTS fetches, or null when it
@@ -182,8 +183,11 @@ async function boundedText(response: Response, maxBytes: number): Promise<string
   const chunks: Uint8Array[] = [];
   let size = 0;
   for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    // The platform types a body chunk as `any`; a fetch body yields bytes, checked here.
+    const read: ReadableStreamReadResult<unknown> = await reader.read();
+    if (read.done) break;
+    const { value } = read;
+    if (!(value instanceof Uint8Array)) throw new TypeError('a body chunk is not bytes');
     size += value.byteLength;
     if (size > maxBytes) {
       await reader.cancel();

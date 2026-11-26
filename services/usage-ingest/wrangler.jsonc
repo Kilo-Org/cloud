@@ -10,12 +10,12 @@
   "preview_urls": false,
   // env.staging inherits this block. Traces stay off: a config that binds STS may not record
   // traces (services/sts README, "Policy"), since a trace records outbound URLs. Workers Logs
-  // stay on, and Logpush sends them to Axiom for the STS canary's scheduled_job.completed events.
+  // stay on. No Logpush: it would ship every billing publish and consume invocation to Axiom; the
+  // STS canary's Axiom signal is the web route's log line (README, "STS canary").
   "observability": {
     "enabled": true,
     "traces": { "enabled": false },
   },
-  "logpush": true,
   // The STS canary (services/usage-ingest README, "STS canary"); env.staging sets its own copy.
   "triggers": { "crons": ["*/5 * * * *"] },
   "services": [

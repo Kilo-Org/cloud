@@ -375,22 +375,20 @@ each outcome/path/region; keep them separate from the slow-biased phase series.
 
 Worker logs are available in Cloudflare through `observability.enabled`. This
 service's configuration does not opt in to Workers Logpush or configure an
-OpenTelemetry export destination; external export can be configured separately.
+OpenTelemetry export destination: Logpush would ship every publish and consume
+invocation of this billing hot path to Axiom (about 14 million publish invocations
+a day at the Nov 12 rate below), so the STS canary's Axiom signal comes from the
+web side instead ([STS canary](#sts-canary)).
 Each selected persistence attempt adds one completion line; IDs remain log
 fields, not metric labels. Logs can be dropped, and are not durable accounting:
 reconcile against persisted usage rows when exact completeness matters.
 
-Both environments also persist [Workers traces](https://developers.cloudflare.com/workers/observability/traces/)
-for a 5% head sample of invocations (`observability.traces`, inherited by
-`env.staging`). Trace sampling is independent of Workers Logs, which keep their unsampled default.
-Sampled traces show the fetch and queue handler spans, `queue_send`, and the
-outbound writer `fetch` with timing and status. In the dashboard, filter by
-`$metadata.service` (`usage-ingest` or `usage-ingest-staging`) rather than
-`service.name`. Trace IDs are not propagated to the Vercel writer, spans do not
-show time a message waits in the queue before the consumer handler starts, and a
-5% sample cannot count rare events; use the logs above for those. No custom spans
-are added. See the [span attributes](https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/)
-and [known limitations](https://developers.cloudflare.com/workers/observability/traces/known-limitations/).
+[Workers traces](https://developers.cloudflare.com/workers/observability/traces/)
+are off in both environments (`observability.traces`, inherited by `env.staging`).
+The Worker used to persist a 5% head sample; the repo rule for Workers that bind
+STS (`services/sts/test/repo/worker-configs.test.ts`: a trace records outbound
+URLs) keeps them off since the STS canary binding was added, so there are no
+fetch, queue or `queue_send` spans and writer timing comes only from the logs above.
 
 ## Queue policy
 
@@ -788,7 +786,11 @@ One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
    (expect 204), presents the `web` token it received (expect 403 `insufficient_scope`), the same
    claims signed by a key STS never held (expect 401) and, when the instance holds one, an earlier
    token past `exp` plus 60 s (expect 401, else `skipped`), and answers a report
-   (`StsCanaryReportSchema` in `@kilocode/sts-contracts`).
+   (`StsCanaryReportSchema` in `@kilocode/sts-contracts`; each `detail` at most 200 characters).
+   Every call that carries a token or the bypass secret uses `redirect: 'manual'`: a 3xx fails
+   the check (web side) or the run (`StsCanaryWebRefused` here), and is never followed.
+   usage-ingest waits 80 s for the answer: the route's slowest run is a 5 s key-set fetch, a
+   30 s mint attempt and four 10 s calls here, 75 s, and its `maxDuration` is 90 s.
 4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
    `succeeded` only when every check passed, with `mint_result`, `web_status`, and
    `<check>_result`/`_status`/`_detail` for `outbound`, `negative_wrong_audience`,
@@ -810,16 +812,25 @@ the run id), never the token. The route works whether or not the flag is on.
 | `STS_URL` | `https://sts.kiloapps.io` | `https://sts-staging.kiloapps.io` |
 | `WEB_STS_CANARY_URL` | `https://app.kilo.ai/api/internal/sts-canary` | `https://staging-app.kilo.ai/api/internal/sts-canary` |
 
-Binding STS changes two settings of this Worker. `observability.traces` is off in every block,
-because the repo check in `services/sts/test/repo/worker-configs.test.ts` refuses traces for any
-config that binds STS (a trace records outbound URLs); this ends the 5 % trace sampling the
-Worker had, and Workers Logs stay on. `logpush` is on, so the canary's lines reach Axiom.
+Binding STS turns `observability.traces` off in every block (see [Observability](#observability));
+Workers Logs stay on and carry the `scheduled_job.completed` and `sts_canary_verify_*` lines.
+There is no Logpush: it is a setting of the whole Worker and would send every billing publish
+and consume invocation to Axiom.
 
-Page on the canary with an Axiom threshold monitor over the account Logpush dataset
-`cloudflare-logpush` (`ScriptName` `usage-ingest` or `usage-ingest-staging`, `EventType`
-`scheduled`; the canary line is in `Logs[].Message`): no `succeeded` event for
-`usage_ingest.sts_canary` in 15 minutes, or any `failed` event in 15 minutes, per environment,
-notifying the existing alert route.
+The Axiom signal is the web route's line instead. Every run the route answers logs one JSON line
+(`event` `sts_canary`, `step` `report`, `outcome` `succeeded` or `failed`, `run`, `caller`,
+`inbound`, `outbound` and `negatives` with each check's `result`, `status` and `detail`; never a
+token), and one with `step` `inbound` when it refuses the caller. The Vercel log drain carries
+them to the Axiom dataset `vercel` (`vercel.projectName` `kilocode-app`, `request.path`
+`/api/internal/sts-canary`, `request.host` `app.kilo.ai` or `staging-app.kilo.ai`; the line is
+in `message`). Page with two Axiom threshold monitors per environment, notifying the existing
+alert route:
+
+- no line with `outcome` `succeeded` in 15 minutes;
+- any line with `outcome` `failed`, or with `step` `inbound`, in 15 minutes.
+
+A run whose call never reaches the web route (usage-ingest down, usage-ingest's own mint denied
+or failed, a network failure, a redirect) writes no web line, so it shows as a missing success.
 
 ### Cost
 
@@ -833,10 +844,10 @@ so with a run every 300 s each side mints once per run, warm or cold. Per run an
 | STS mint calls | 2: one RPC over the binding (usage-ingest), one `POST /v1/token` (web); each one signer Durable Object request | 576 |
 | STS audit rows | 2 `token.issued` (a denial adds one `token.denied`) | 576 |
 | Audit queue messages | at most 2; the signer relays up to 500 events per message, so usually they share one with other rows | at most 576 |
-| STS key-set fetches | one per verifier isolate with no copy younger than 5 minutes: usually 2 (usage-ingest, the web instance). The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | about 576 |
-| Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's) | at most 288; in practice one per base-token renewal or new deployment |
+| STS key-set fetches | one per verifier isolate per 5 minutes: each usage-ingest isolate that serves a verify-route call and each web instance that serves the route fetches once when its copy is older than 5 minutes. The 3 or 4 verify calls and the scheduled run can land on different isolates, so a run can cost several. The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | at most (usage-ingest isolates + web instances) x 288 |
+| Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt | at most 288; in practice one per base-token renewal or new deployment |
 | Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 or 2 writes on a miss | at most about 1,700 operations |
-| Log lines | 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`, 1 web `sts_canary` | about 1,700 |
+| Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
 
 Both environments together double each daily figure.
 

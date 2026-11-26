@@ -1,7 +1,20 @@
-import type { MintRequest, MintResult, StsCanaryReport } from '@kilocode/sts-contracts';
-import type { MintBinding } from '@kilocode/service-token-client';
+import {
+  STS_CANARY_ROUTE_MAX_DURATION_SECONDS,
+  STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
+  STS_CANARY_VERIFY_CALLS_MAX,
+  type MintRequest,
+  type MintResult,
+  type StsCanaryReport,
+} from '@kilocode/sts-contracts';
+import { HTTP_ATTEMPT_TIMEOUT_MS, type MintBinding } from '@kilocode/service-token-client';
+import { JWKS_FETCH_TIMEOUT_MS } from '@kilocode/verify';
 import { afterEach, beforeAll, describe, expect, it, vi, type MockInstance } from 'vitest';
-import { handleStsCanaryVerify, runStsCanary, type StsCanaryEnv } from './sts-canary';
+import {
+  handleStsCanaryVerify,
+  runStsCanary,
+  WEB_CALL_TIMEOUT_MS,
+  type StsCanaryEnv,
+} from './sts-canary';
 import { serviceClaims, signToken, testSigner, type TestSigner } from './sts-canary.test-fixture';
 
 const STS_URL = 'https://sts.kiloapps.io';
@@ -262,5 +275,43 @@ describe('scheduled STS canary', () => {
         mint_detail: 'scope_not_allowed',
       }),
     ]);
+  });
+
+  it('never follows a redirect from the web route: the call is manual and a 3xx fails the run', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const calls = stubFetch((_url, init) =>
+      init?.redirect === 'manual'
+        ? new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/' } })
+        : Response.json(PASSING_REPORT)
+    );
+    await runStsCanary(
+      CONTROLLER,
+      {
+        STS: binding(issue),
+        STS_CANARY_ENABLED: 'true',
+        STS_URL,
+        WEB_STS_CANARY_URL: WEB_URL,
+        USAGE_WRITER_PROTECTION_BYPASS: 'bypass-value',
+      },
+      context()
+    );
+    expect(calls.map(call => call.url)).toEqual([WEB_URL]);
+    expect(events(info, error)).toEqual([
+      expect.objectContaining({
+        outcome: 'failed',
+        exception_name: 'StsCanaryWebRefused',
+        web_status: 307,
+      }),
+    ]);
+  });
+
+  it('waits for the web route longer than its slowest run and less than its maxDuration', () => {
+    const slowestRunMs =
+      JWKS_FETCH_TIMEOUT_MS +
+      HTTP_ATTEMPT_TIMEOUT_MS +
+      STS_CANARY_VERIFY_CALLS_MAX * STS_CANARY_VERIFY_CALL_TIMEOUT_MS;
+    expect(WEB_CALL_TIMEOUT_MS).toBeGreaterThan(slowestRunMs);
+    expect(WEB_CALL_TIMEOUT_MS).toBeLessThan(STS_CANARY_ROUTE_MAX_DURATION_SECONDS * 1000);
   });
 });

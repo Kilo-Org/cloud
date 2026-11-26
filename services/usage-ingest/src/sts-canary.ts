@@ -1,10 +1,13 @@
 import {
   createWorkerServiceTokens,
+  HTTP_ATTEMPT_TIMEOUT_MS,
   ServiceTokenError,
   type MintBinding,
   type ServiceTokens,
 } from '@kilocode/service-token-client';
 import {
+  STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
+  STS_CANARY_VERIFY_CALLS_MAX,
   STS_CANARY_RUN_HEADER,
   STS_ISSUERS,
   StsCanaryReportSchema,
@@ -15,7 +18,13 @@ import {
   type StsCanaryCheck,
   type StsCanaryReport,
 } from '@kilocode/sts-contracts';
-import { createVerifier, failureResponse, httpJwksSource, type Verifier } from '@kilocode/verify';
+import {
+  createVerifier,
+  failureResponse,
+  httpJwksSource,
+  JWKS_FETCH_TIMEOUT_MS,
+  type Verifier,
+} from '@kilocode/verify';
 import {
   buildScheduledJobFailureEvent,
   buildScheduledJobSuccessEvent,
@@ -41,8 +50,18 @@ export type StsCanaryEnv = {
 };
 
 export const STS_CANARY_JOB_NAME = 'usage_ingest.sts_canary';
-/** The web route mints and makes four calls to this Worker; a cold Vercel wave adds up to 20 s. */
-const WEB_CALL_TIMEOUT_MS = 45_000;
+/**
+ * The web route's slowest run: a cold key-set fetch to verify this Worker's token
+ * (`JWKS_FETCH_TIMEOUT_MS`, 5 s), one mint attempt (`HTTP_ATTEMPT_TIMEOUT_MS`, 30 s), then four
+ * calls to this Worker (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each): 5 + 30 + 4 x 10 = 75 s.
+ * This Worker waits 5 s past that, 80 s, under the route's 90 s `maxDuration`
+ * (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`), so even the slowest run lands its report here.
+ */
+export const WEB_CALL_TIMEOUT_MS =
+  JWKS_FETCH_TIMEOUT_MS +
+  HTTP_ATTEMPT_TIMEOUT_MS +
+  STS_CANARY_VERIFY_CALLS_MAX * STS_CANARY_VERIFY_CALL_TIMEOUT_MS +
+  5_000;
 
 /** One client per isolate, keyed by the binding, so every run after the first reuses its token. */
 let tokens: { binding: MintBinding; client: ServiceTokens } | null = null;
@@ -180,9 +199,12 @@ async function runChecks(
   if (env.USAGE_WRITER_PROTECTION_BYPASS) {
     headers['x-vercel-protection-bypass'] = env.USAGE_WRITER_PROTECTION_BYPASS;
   }
+  // The request carries the token and, in staging, the bypass secret: a redirect is never
+  // followed, it fails the run.
   const response = await fetch(env.WEB_STS_CANARY_URL, {
     method: 'POST',
     headers,
+    redirect: 'manual',
     signal: AbortSignal.timeout(WEB_CALL_TIMEOUT_MS),
   });
   metadata.web_status = response.status;

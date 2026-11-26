@@ -120,6 +120,26 @@ describe('scheduleNewSignInCheck', () => {
     transaction.mockRestore();
   });
 
+  test('a check skipped at its lock limit sends nothing and reports nothing', async () => {
+    const user = await insertTestUser();
+    const transaction = jest
+      .spyOn(db, 'transaction')
+      .mockRejectedValueOnce(
+        new Error('failed query', { cause: Object.assign(new Error('lock'), { code: '55P03' }) })
+      );
+
+    await scheduleNewSignInCheck({
+      user,
+      method: 'email',
+      device: { kind: 'browser_cookie', secret: 'laptop' },
+      headers: requestHeaders('203.0.113.45', 'DE'),
+    });
+
+    expect(mockScheduleSecurityNotice).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    transaction.mockRestore();
+  });
+
   test('a sign-in of an account that is gone sends nothing and reports nothing', async () => {
     const user = { id: `missing-${crypto.randomUUID()}`, google_user_email: 'a@example.com' };
 

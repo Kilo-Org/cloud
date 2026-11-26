@@ -456,6 +456,44 @@ describe('recordSignInContext', () => {
     await expect(check).resolves.toEqual({ kind: 'account_inactive' });
     expect(await rows(user.id)).toEqual([]);
   });
+
+  test('a check waits at most 2 seconds for a locked user row, then skips and writes nothing', async () => {
+    const user = await insertTestUser();
+    await signIn(user.id, 'laptop', 'DE 203.0.0.0/16', start);
+    const snapshot = async () => (await rows(user.id)).sort((a, b) => a.kind.localeCompare(b.kind));
+    const before = await snapshot();
+
+    const locked = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      await tx
+        .select({ id: kilocode_users.id })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id))
+        .for('update');
+      locked.resolve();
+      await release.promise;
+    });
+    await locked.promise;
+
+    // A new device on a new network: without the lock it would own a notice.
+    const startedAt = performance.now();
+    const decision = await signIn(user.id, 'stranger', 'US 192.0.0.0/16', at(HOUR)).finally(() =>
+      release.resolve()
+    );
+    const waitedMs = performance.now() - startedAt;
+    await holder;
+
+    expect(decision).toEqual({ kind: 'lock_busy' });
+    expect(waitedMs).toBeGreaterThanOrEqual(1_900);
+    expect(waitedMs).toBeLessThan(4_000);
+    expect(await snapshot()).toEqual(before);
+
+    // Nothing was claimed or recorded: the same sign-in, uncontended, notifies.
+    await expect(signIn(user.id, 'stranger', 'US 192.0.0.0/16', at(HOUR))).resolves.toEqual({
+      kind: 'new_device_new_network',
+    });
+  });
 });
 
 describe('pruneSignInContexts', () => {

@@ -12,7 +12,8 @@ import { scheduleSecurityNotice, securityNoticeRequestFromHeaders } from '@/lib/
  * database work runs after the response, so it adds nothing to the sign-in's
  * latency. A failure never reaches the sign-in. It is reported as a fixed
  * error: a database error's message carries the query parameters (the user
- * id and the digests).
+ * id and the digests). A check skipped at its lock limit (`lock_busy`) is no
+ * failure and is not reported.
  */
 export async function scheduleNewSignInCheck(params: {
   user: { id: string; google_user_email: string };

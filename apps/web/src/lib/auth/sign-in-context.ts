@@ -7,6 +7,7 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { callerAddressOrNull } from '@/lib/auth/caller-address';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 
 /**
  * Sign-in context detection: has this user signed in from this device, or
@@ -68,7 +69,13 @@ export type SignInContextDecision =
   /** Both are new, but a new-sign-in notice already went out within the interval. */
   | { kind: 'notice_capped' }
   /** Both are new: this sign-in owns the notice. */
-  | { kind: 'new_device_new_network' };
+  | { kind: 'new_device_new_network' }
+  /**
+   * The user row stayed locked past the wait limit (another sign-in of the
+   * user, or an account change), or the statement ran past its limit: the
+   * check is skipped, nothing is recorded or decided.
+   */
+  | { kind: 'lock_busy' };
 
 function deviceKeyMaterial(device: SignInDevice): string | null {
   switch (device.kind) {
@@ -196,6 +203,12 @@ const decisionRowSchema = z.object({
 });
 
 /**
+ * The SQLSTATEs of a check stopped by its own limits: lock not available
+ * (55P03, `lock_timeout`) and query canceled (57014, `statement_timeout`).
+ */
+const CHECK_LIMIT_SQLSTATES: Record<string, true> = { '55P03': true, '57014': true };
+
+/**
  * Records one sign-in's device and network for the user and decides whether
  * it is a new device on a new network, in one short transaction:
  *
@@ -203,7 +216,10 @@ const decisionRowSchema = z.object({
  *    (`anonymizeCloudUserData`), and stops when the account is deleted,
  *    blocked, or gone. Sign-ins of one user therefore run one at a time, and
  *    a check never writes after a deletion or holds a context row that a
- *    deletion waits for.
+ *    deletion waits for. The check waits at most 2 seconds for the lock, and
+ *    any statement runs at most 5 seconds; past either limit the transaction
+ *    rolls back and the check is skipped (`lock_busy`), so a contended check
+ *    never holds a pool connection until the server's own timeout.
  * 2. One statement, which takes its snapshot after the lock, so it sees every
  *    earlier sign-in of the user:
  *    - reads whether the user has the history marker under the current key
@@ -239,87 +255,96 @@ export async function recordSignInContext(params: {
   const retentionCutoff = new Date(now.getTime() - SIGN_IN_CONTEXT_RETENTION_MS).toISOString();
   const noticeCutoff = new Date(now.getTime() - NEW_SIGN_IN_NOTICE_INTERVAL_MS).toISOString();
 
-  return db.transaction(async (tx): Promise<SignInContextDecision> => {
-    const [account] = await tx
-      .select({ blocked_reason: kilocode_users.blocked_reason })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, userId))
-      .for('no key update');
-    // A soft-deleted account keeps its row with a soft-delete blocked reason.
-    if (!account || account.blocked_reason !== null) return { kind: 'account_inactive' };
+  try {
+    return await db.transaction(async (tx): Promise<SignInContextDecision> => {
+      await tx.execute(sql`SET LOCAL lock_timeout = '2s'`);
+      await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
+      const [account] = await tx
+        .select({ blocked_reason: kilocode_users.blocked_reason })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, userId))
+        .for('no key update');
+      // A soft-deleted account keeps its row with a soft-delete blocked reason.
+      if (!account || account.blocked_reason !== null) return { kind: 'account_inactive' };
 
-    const { rows } = await tx.execute(sql`
-      WITH recent AS (
+      const { rows } = await tx.execute(sql`
+        WITH recent AS (
+          SELECT
+            coalesce(bool_or(kind = 'history'), false) AS has_history,
+            coalesce(bool_or(
+              kind = 'device'
+              AND key_hash = ${deviceKeyHash}::text
+              AND last_seen_at > ${retentionCutoff}::timestamptz
+            ), false) AS device_known,
+            coalesce(bool_or(
+              kind = 'network'
+              AND key_hash = ${networkKeyHash}::text
+              AND last_seen_at > ${retentionCutoff}::timestamptz
+            ), false) AS network_known
+          FROM user_sign_in_contexts
+          WHERE user_id = ${userId}
+            AND key_id = ${key.id}
+            AND kind IN ('history', 'device', 'network')
+        ),
+        candidate AS (
+          SELECT (
+            ${networkKeyHash}::text IS NOT NULL
+            AND has_history
+            AND NOT device_known
+            AND NOT network_known
+          ) AS is_candidate
+          FROM recent
+        ),
+        notice AS (
+          INSERT INTO user_sign_in_contexts (user_id, kind, key_hash, key_id, first_seen_at, last_seen_at)
+          SELECT ${userId}, 'notice', 'new_sign_in', ${key.id}, ${nowIso}::timestamptz, ${nowIso}::timestamptz
+          FROM candidate
+          WHERE is_candidate
+          ON CONFLICT (user_id, kind, key_hash) DO UPDATE
+            SET last_seen_at = excluded.last_seen_at, key_id = excluded.key_id
+            WHERE user_sign_in_contexts.last_seen_at <= ${noticeCutoff}::timestamptz
+          RETURNING 1
+        ),
+        seen AS (
+          INSERT INTO user_sign_in_contexts (user_id, kind, key_hash, key_id, first_seen_at, last_seen_at)
+          SELECT ${userId}, v.kind, v.key_hash, ${key.id}, ${nowIso}::timestamptz, ${nowIso}::timestamptz
+          FROM (VALUES ('device', ${deviceKeyHash}::text), ('network', ${networkKeyHash}::text))
+            AS v(kind, key_hash)
+          WHERE v.key_hash IS NOT NULL
+            AND (NOT (SELECT is_candidate FROM candidate) OR EXISTS (SELECT 1 FROM notice))
+          ON CONFLICT (user_id, kind, key_hash) DO UPDATE
+            SET last_seen_at = greatest(user_sign_in_contexts.last_seen_at, excluded.last_seen_at),
+              key_id = excluded.key_id
+        ),
+        history AS (
+          INSERT INTO user_sign_in_contexts (user_id, kind, key_hash, key_id, first_seen_at, last_seen_at)
+          SELECT ${userId}, 'history', ${key.id}, ${key.id}, ${nowIso}::timestamptz, ${nowIso}::timestamptz
+          FROM recent
+          WHERE NOT has_history
+            AND (${deviceKeyHash}::text IS NOT NULL OR ${networkKeyHash}::text IS NOT NULL)
+          ON CONFLICT (user_id, kind, key_hash) DO NOTHING
+        )
         SELECT
-          coalesce(bool_or(kind = 'history'), false) AS has_history,
-          coalesce(bool_or(
-            kind = 'device'
-            AND key_hash = ${deviceKeyHash}::text
-            AND last_seen_at > ${retentionCutoff}::timestamptz
-          ), false) AS device_known,
-          coalesce(bool_or(
-            kind = 'network'
-            AND key_hash = ${networkKeyHash}::text
-            AND last_seen_at > ${retentionCutoff}::timestamptz
-          ), false) AS network_known
-        FROM user_sign_in_contexts
-        WHERE user_id = ${userId}
-          AND key_id = ${key.id}
-          AND kind IN ('history', 'device', 'network')
-      ),
-      candidate AS (
-        SELECT (
-          ${networkKeyHash}::text IS NOT NULL
-          AND has_history
-          AND NOT device_known
-          AND NOT network_known
-        ) AS is_candidate
+          recent.has_history,
+          recent.device_known,
+          recent.network_known,
+          EXISTS (SELECT 1 FROM notice) AS notified
         FROM recent
-      ),
-      notice AS (
-        INSERT INTO user_sign_in_contexts (user_id, kind, key_hash, key_id, first_seen_at, last_seen_at)
-        SELECT ${userId}, 'notice', 'new_sign_in', ${key.id}, ${nowIso}::timestamptz, ${nowIso}::timestamptz
-        FROM candidate
-        WHERE is_candidate
-        ON CONFLICT (user_id, kind, key_hash) DO UPDATE
-          SET last_seen_at = excluded.last_seen_at, key_id = excluded.key_id
-          WHERE user_sign_in_contexts.last_seen_at <= ${noticeCutoff}::timestamptz
-        RETURNING 1
-      ),
-      seen AS (
-        INSERT INTO user_sign_in_contexts (user_id, kind, key_hash, key_id, first_seen_at, last_seen_at)
-        SELECT ${userId}, v.kind, v.key_hash, ${key.id}, ${nowIso}::timestamptz, ${nowIso}::timestamptz
-        FROM (VALUES ('device', ${deviceKeyHash}::text), ('network', ${networkKeyHash}::text))
-          AS v(kind, key_hash)
-        WHERE v.key_hash IS NOT NULL
-          AND (NOT (SELECT is_candidate FROM candidate) OR EXISTS (SELECT 1 FROM notice))
-        ON CONFLICT (user_id, kind, key_hash) DO UPDATE
-          SET last_seen_at = greatest(user_sign_in_contexts.last_seen_at, excluded.last_seen_at),
-            key_id = excluded.key_id
-      ),
-      history AS (
-        INSERT INTO user_sign_in_contexts (user_id, kind, key_hash, key_id, first_seen_at, last_seen_at)
-        SELECT ${userId}, 'history', ${key.id}, ${key.id}, ${nowIso}::timestamptz, ${nowIso}::timestamptz
-        FROM recent
-        WHERE NOT has_history
-          AND (${deviceKeyHash}::text IS NOT NULL OR ${networkKeyHash}::text IS NOT NULL)
-        ON CONFLICT (user_id, kind, key_hash) DO NOTHING
-      )
-      SELECT
-        recent.has_history,
-        recent.device_known,
-        recent.network_known,
-        EXISTS (SELECT 1 FROM notice) AS notified
-      FROM recent
-    `);
+      `);
 
-    const row = decisionRowSchema.parse(rows[0]);
-    if (networkKeyHash === null) return { kind: 'no_network' };
-    if (!row.has_history) return { kind: 'bootstrap' };
-    if (row.device_known || row.network_known) return { kind: 'known' };
-    if (!row.notified) return { kind: 'notice_capped' };
-    return { kind: 'new_device_new_network' };
-  });
+      const row = decisionRowSchema.parse(rows[0]);
+      if (networkKeyHash === null) return { kind: 'no_network' };
+      if (!row.has_history) return { kind: 'bootstrap' };
+      if (row.device_known || row.network_known) return { kind: 'known' };
+      if (!row.notified) return { kind: 'notice_capped' };
+      return { kind: 'new_device_new_network' };
+    });
+  } catch (error) {
+    // The transaction has rolled back: the skipped check wrote nothing.
+    const code = getPostgresErrorCode(error);
+    if (code !== null && Object.hasOwn(CHECK_LIMIT_SQLSTATES, code)) return { kind: 'lock_busy' };
+    throw error;
+  }
 }
 
 /** Rows one prune statement deletes at most. */

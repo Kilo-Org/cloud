@@ -80,7 +80,7 @@ scopes: ['o11y:alerts.read']
     expectGrantThrow(`dynamic: [ci_migration_role]\n`, 'does not match the policy schema');
   });
 
-  it('checks shipped policies against the shipped registry, which lists no scope yet', () => {
+  it('checks shipped policies against the shipped registry, which lists only the pilot scopes', () => {
     expect(() =>
       loadPolicies({
         'app-one.yaml': withGrants(`audiences: [gateway]\nscopes: ['gateway:models.read']\n`),

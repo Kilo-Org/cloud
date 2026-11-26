@@ -21,7 +21,7 @@ part of this Worker.
   failed bundle object call answers the same way, over RPC and HTTP. Each isolate caches a
   provider's discovery and key set once a request has fetched them; requests share only that
   result, never a pending fetch, so a cold isolate makes one discovery fetch per issuer for each
-  request that arrives before the first lands (none today: no policy uses a provider identity).
+  request that arrives before the first lands (today only `web`, a Vercel caller, uses one).
 - STS waits at most 20 seconds for the bundle object (a fill attempt takes at most 16), then answers
   `unavailable` with `Retry-After: 30`: a caller cannot cancel an RPC, and a Durable Object waiting
   on one stays in memory until it completes. A fill still running at the deadline finishes inside
@@ -299,7 +299,7 @@ Identity kinds:
 
 Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
-`STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`, empty until the first audience registers) and
+`STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`; today only the canary scopes `web:sts.canary` and `usage-ingest:sts.canary`) and
 belong to a listed audience, every audience needs at least one scope, and no audience may be the
 workload itself. `dynamic` (database leases, CI deploy tokens) fixes the shape for later; its list
 of allowed values is empty, so any entry fails the load.
@@ -391,16 +391,20 @@ measured). So overlapping deployments, and if it is team-wide every project of t
 share it. It refuses to exchange an exchanged token (401, proof runs 2 and 3). A
 client therefore never exchanges once per instance: it shares the exchanged token through the
 Vercel Runtime Cache (decision D10, design 4.4 and Q49), with the algorithm in
-`proof/vercel-exchange/lib/shared-token.ts`: key SHA-256 of the base token's `owner_id`,
+`packages/service-token-client/src/vercel/shared-token.ts` (`vercelIdentity` in the client's
+`/vercel` subpath; the proof harness re-exports it): key SHA-256 of the base token's `owner_id`,
 `project_id`, `environment`, `custom_environment_id` and `deployment_id` and the audience (Vercel
 renews the base token during a deployment's life, even mid-wave, so the token itself is not in the
 key); memory, then the cache, a cached token used until its own `exp` minus 60 seconds whatever
 base token the reader holds; on a miss a random wait and a re-read, then a claim marker so one
 request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
-exchanging again. The cache key is not secret: code that can write the same Runtime Cache
-partition (other deployments of the project in the same scope; a custom environment may share the
-preview partition) can stall a deployment's exchanges, never change which token it presents (the
-reader checks the claims, STS checks the signature); production has its own partition. There is no
+exchanging again. A cached token STS refuses is dropped and exchanged once more; when STS refuses
+the fresh one too, a refusal marker stops every instance of the deployment from exchanging for
+that audience for 60 seconds (the client's denied recheck). The cache key is not secret: code that
+can write the same Runtime Cache partition (other deployments of the project in the same scope; a
+custom environment may share the preview partition) can stall a deployment's exchanges, never
+change which token it presents (the reader checks the claims, STS checks the signature);
+production has its own partition. There is no
 early refresh: the exchanged token keeps the base token's `exp`, so
 exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
 the request at once. When the cache is down (the claim marker does not read back), each request
@@ -446,7 +450,7 @@ A token from a listed Vercel environment that this STS deployment may not serve 
 `project_id`, `environment`, `custom_environment_id` and `user_id` only (actor
 `vercel:<owner_id>/<project_id>` or the policy's workload), never a name or the token. The verified
 outcome carries the token's `exp` and `iat` (`attestationExp`, `attestationIat`, seconds). The mint
-in the next PR of this stack (`/v1/token`) caps what it issues at `attestationExp`; for a Vercel
+(`/v1/token`) caps what it issues at `attestationExp`; for a Vercel
 token `attestationIat` is the exchange time, not the base token's issue time, so it says nothing
 about how old the deployment's token is.
 
@@ -742,7 +746,7 @@ promise of another request; that a bound caller cannot reach the mint authority 
 the token signer keeps its key across a restart of the runtime with persisted storage. `typecheck`
 and `lint` are the usual package scripts.
 
-**Local end-to-end check of service tokens.** The shipped scope registry lists no scope yet, so a
+**Local end-to-end check of service tokens.** The shipped scope registry lists only the canary scopes, so a
 test build of STS in `test/fixtures/e2e/` (STS's own routes, broker and objects, checked against a
 test registry and a probe policy) runs next to a probe Worker that binds its broker with
 `props.caller` and consumes its audit queue:

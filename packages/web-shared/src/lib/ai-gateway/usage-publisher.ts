@@ -154,7 +154,7 @@ const EXA_USAGE_INGEST_PATH = '/exa-usage';
  * is its sibling on the same Worker. Any other shape cannot be mapped safely, so it counts as no
  * publisher at all.
  */
-function usageIngestSiblingUrl(
+export function usageIngestSiblingUrl(
   usageIngestUrl: string | undefined,
   siblingPath: string
 ): string | undefined {

@@ -7,9 +7,9 @@ import {
   type SharedCache,
   type SharedTokenResult,
   type SharedTokenSettings,
-} from '../../proof/vercel-exchange/lib/shared-token';
+} from '../src/vercel/shared-token';
 
-// The D10 algorithm the proof-run harness (and later the Vercel client) uses, against stand-ins for
+// The D10 algorithm `vercelIdentity` and the proof-run harness use, against stand-ins for
 // the Runtime Cache and the exchange. Proof run 2 measures the real ones; this checks the logic.
 
 const AUDIENCE = 'https://sts.test';
@@ -54,6 +54,10 @@ function fakeCache(latencyMs = 5): SharedCache {
     async set(key, value, { ttl }) {
       await sleep(latencyMs);
       entries.set(key, { value: structuredClone(value), expiresAt: Date.now() + ttl * 1000 });
+    },
+    async delete(key) {
+      await sleep(latencyMs);
+      entries.delete(key);
     },
   };
 }
@@ -169,10 +173,11 @@ describe('shared exchanged token (D10)', () => {
     const keys = new Set<string>();
     const recording: SharedCache = {
       get: async key => {
-        if (!key.endsWith(':claim')) keys.add(key);
+        if (!/:(claim|refused)$/.test(key)) keys.add(key);
         return await cache.get(key);
       },
       set: async (key, value, options) => await cache.set(key, value, options),
+      delete: async key => await cache.delete(key),
     };
     const results = await coldWave(2_500, recording, exchange, {}, index =>
       index % 2 === 0 ? BASE_TOKEN : renewed
@@ -201,6 +206,7 @@ describe('shared exchanged token (D10)', () => {
     const cache: SharedCache = {
       get: async key => shared.get(key) ?? null,
       set: async (key, value) => void shared.set(key, value),
+      delete: async key => void shared.delete(key),
     };
     await new SharedExchangedToken(cache).get(BASE_TOKEN, AUDIENCE, exchange);
     const other = baseToken({ deployment_id: 'dpl_D2' });
@@ -257,7 +263,11 @@ describe('shared exchanged token (D10)', () => {
 
   it('exchanges once per instance when the cache keeps nothing', async () => {
     const { calls, exchange } = fakeExchange({ budget: 100 });
-    const nothing: SharedCache = { get: async () => null, set: async () => {} };
+    const nothing: SharedCache = {
+      get: async () => null,
+      set: async () => {},
+      delete: async () => {},
+    };
     const results = await coldWave(10, nothing, exchange, { jitterMs: 1 });
     expect(results.every(result => result.status === 'ok')).toBe(true);
     expect(calls.attempts).toBe(10);
@@ -265,7 +275,11 @@ describe('shared exchanged token (D10)', () => {
 
   it('fails at once on a 429 when the cache keeps nothing, instead of polling to the deadline', async () => {
     const { calls, exchange } = fakeExchange({ budget: 0 });
-    const nothing: SharedCache = { get: async () => null, set: async () => {} };
+    const nothing: SharedCache = {
+      get: async () => null,
+      set: async () => {},
+      delete: async () => {},
+    };
     const [result] = await coldWave(1, nothing, exchange, { jitterMs: 1, deadlineMs: 5_000 });
     expect(result).toMatchObject({
       status: 'failed',

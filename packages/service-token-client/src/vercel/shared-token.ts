@@ -37,6 +37,9 @@
  *    refused token writes no refusal marker. That costs one exchange per instance per base-token
  *    renewal, for custom environments only. Encrypting its entries (AES-GCM under a key only that
  *    environment holds, the cache key as associated data) is the way to share them again later.
+ *    Staging shares the project's ~100 exchanges/min budget with production, so custom-environment
+ *    use must stay well below 100 exchanging instances per minute, or the encrypted shared
+ *    entries must come first, before any staging hot path adopts this client.
  * 3. Instance memory, then the shared cache: a hit is used. On a miss, a base token with under
  *    60 seconds left fails the request at once: no exchange, no waiting.
  * 4. Otherwise wait a random 0..`jitterMs` and read again, so a cold wave spreads out.

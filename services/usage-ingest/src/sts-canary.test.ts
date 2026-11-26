@@ -134,6 +134,26 @@ describe('POST /sts-canary/verify', () => {
       expect(unconfigured.status).toBe(503);
     }
   });
+
+  it('answers 503 when STS_ENVIRONMENT disagrees with the environment of STS_URL', async () => {
+    stubFetch();
+    const token = await signToken(signer, ingestClaims({ env: 'staging' }));
+    for (const env of [
+      // A listed issuer under another environment, even with a token of that environment.
+      { STS_URL, STS_ENVIRONMENT: 'staging' },
+      { STS_URL: 'https://sts-staging.kiloapps.io', STS_ENVIRONMENT: 'production' },
+      { STS_URL, STS_ENVIRONMENT: 'development' },
+      // An unlisted issuer: only a loopback one, and only for development.
+      { STS_URL: 'http://127.0.0.1:8825', STS_ENVIRONMENT: 'production' },
+      { STS_URL: 'https://sts.example.test', STS_ENVIRONMENT: 'development' },
+    ]) {
+      const refused = await handleStsCanaryVerify(
+        new Request(VERIFY_URL, { method: 'POST', headers: { authorization: `Bearer ${token}` } }),
+        env
+      );
+      expect(refused.status).toBe(503);
+    }
+  });
 });
 
 const PASSING_REPORT: StsCanaryReport = {

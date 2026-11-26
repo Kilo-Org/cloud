@@ -9,6 +9,7 @@ import {
   STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
   STS_CANARY_VERIFY_CALLS_MAX,
   STS_CANARY_RUN_HEADER,
+  STS_ENVIRONMENTS,
   STS_ISSUERS,
   StsEnvironmentSchema,
   StsCanaryReportSchema,
@@ -46,7 +47,10 @@ export type StsCanaryEnv = {
   STS_CANARY_ENABLED?: string;
   /** The STS issuer: the `iss` the verify route accepts and the base of its key-set URL. */
   STS_URL?: string;
-  /** The STS environment, `production` or `staging`: the one `env` claim the verify route accepts. */
+  /**
+   * The STS environment, `production` or `staging`: the one `env` claim the verify route accepts.
+   * It must be the environment `STS_ISSUERS` names `STS_URL` under.
+   */
   STS_ENVIRONMENT?: string;
   WEB_STS_CANARY_URL?: string;
   /** Staging only: the web app's staging deployment sits behind Vercel deployment protection. */
@@ -103,9 +107,35 @@ function runIdOf(request: Request): string | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+function environmentOf(stsUrl: string | undefined): StsEnvironment | undefined {
+  return STS_ENVIRONMENTS.find(name => STS_ISSUERS[name] === stsUrl);
+}
+
+/**
+ * The environment the verify route accepts: `STS_ENVIRONMENT` when `STS_ISSUERS` names `STS_URL`
+ * under that same environment. An issuer outside `STS_ISSUERS` is accepted only on loopback and
+ * only for `development` (the runtime test's stand-in). `null`: the route is not configured.
+ */
+function verifyEnvironment(
+  env: StsCanaryEnv
+): { stsUrl: string; environment: StsEnvironment } | null {
+  const environment = StsEnvironmentSchema.safeParse(env.STS_ENVIRONMENT);
+  if (!env.STS_URL || !environment.success) return null;
+  const listed = environmentOf(env.STS_URL);
+  if (listed !== undefined) {
+    return listed === environment.data ? { stsUrl: env.STS_URL, environment: listed } : null;
+  }
+  if (environment.data !== 'development' || !URL.canParse(env.STS_URL)) return null;
+  const { hostname } = new URL(env.STS_URL);
+  return hostname === '127.0.0.1' || hostname === 'localhost'
+    ? { stsUrl: env.STS_URL, environment: environment.data }
+    : null;
+}
+
 /**
  * `POST /sts-canary/verify`: 204 for a valid `usage-ingest:sts.canary` STS token, otherwise the
- * design section 7 refusal. Logs each outcome without the token.
+ * design section 7 refusal. Logs each outcome without the token. Answers 503 while `STS_URL` and
+ * `STS_ENVIRONMENT` are missing or disagree (`verifyEnvironment`).
  */
 export async function handleStsCanaryVerify(
   request: Request,
@@ -115,10 +145,10 @@ export async function handleStsCanaryVerify(
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
   }
-  const environment = StsEnvironmentSchema.safeParse(env.STS_ENVIRONMENT);
-  if (!env.STS_URL || !environment.success) {
+  const configured = verifyEnvironment(env);
+  if (configured === null) {
     return Response.json(
-      { error: 'STS_URL and STS_ENVIRONMENT are not configured' },
+      { error: 'STS_URL and STS_ENVIRONMENT are not configured or do not agree' },
       { status: 503 }
     );
   }
@@ -127,8 +157,8 @@ export async function handleStsCanaryVerify(
     else ctx.waitUntil(promise);
   };
   const result = await verifierFor(
-    env.STS_URL,
-    environment.data,
+    configured.stsUrl,
+    configured.environment,
     new URL(request.url).origin
   ).verify(request, { issuer: 'sts', scope: USAGE_INGEST_CANARY_TOKEN.scope }, { waitUntil });
   const run = runIdOf(request);
@@ -177,10 +207,6 @@ function reportMetadata(report: StsCanaryReport): ScheduledJobMetadata {
     ...checkMetadata('negative_forged', report.negatives.forged),
     ...checkMetadata('negative_expired', report.negatives.expired),
   };
-}
-
-function environmentOf(stsUrl: string | undefined): string | undefined {
-  return Object.entries(STS_ISSUERS).find(([, issuer]) => issuer === stsUrl)?.[0];
 }
 
 /** Mints, calls the web route, and reads its report; throws a named error at the first failure. */

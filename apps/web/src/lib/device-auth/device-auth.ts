@@ -388,8 +388,17 @@ export function isDeviceAuthRequestExpired(
   return request.status === 'expired' || isExpiredAt(request.expires_at, now);
 }
 
+/** The approved request as its approval notice describes the requester. */
+export type ApprovedDeviceAuthRequest = {
+  id: string;
+  requestingClientName: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+};
+
 /**
- * Approve a device authorization request by its displayed user code.
+ * Approve a device authorization request by its displayed user code. Returns
+ * the request only to the call whose conditional update approved it.
  */
 export async function approveDeviceAuthRequest(
   userCode: string,
@@ -400,7 +409,7 @@ export async function approveDeviceAuthRequest(
     /** Required to add a pending link to an existing account. */
     pendingLinkProof?: DeviceAuthPendingLinkProof;
   } = {}
-): Promise<void> {
+): Promise<ApprovedDeviceAuthRequest> {
   const now = new Date().toISOString();
   const code = normalizeDeviceAuthUserCode(userCode);
   const existing = await getDeviceAuthRequest(code);
@@ -447,10 +456,15 @@ export async function approveDeviceAuthRequest(
         requestIsLiveAt(now)
       )
     )
-    .returning({ id: device_auth_requests.id });
+    .returning({
+      id: device_auth_requests.id,
+      requestingClientName: device_auth_requests.requesting_client_name,
+      userAgent: device_auth_requests.user_agent,
+      ipAddress: device_auth_requests.ip_address,
+    });
 
   if (approved) {
-    return;
+    return approved;
   }
 
   const request = await getDeviceAuthRequest(code);

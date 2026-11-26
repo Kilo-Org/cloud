@@ -8,7 +8,8 @@
       "securityFinding": "Drošības atradumam nepieciešama uzmanība",
       "securityUpdate": "Drošības pārbaudei ir atjauninājums",
       "agentBriefing": "Tava aģenta atskaite ir gatava",
-      "activeAgentsGlanceable": "Aktīvajiem aģentiem ir atjauninājums"
+      "activeAgentsGlanceable": "Aktīvajiem aģentiem ir atjauninājums",
+      "accountSecurity": "Jūsu kontā notika ar drošību saistītas darbības"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA pārkāpums"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Jūsu kontam pievienota piekļuves atslēga"
+      },
+      "passkeyRemoved": {
+        "title": "No jūsu konta noņemta piekļuves atslēga"
+      },
+      "signInMethodLinked": {
+        "title": "Jūsu kontam pievienota pierakstīšanās metode"
+      },
+      "signInMethodUnlinked": {
+        "title": "No jūsu konta noņemta pierakstīšanās metode"
+      },
+      "deviceSignInApproved": {
+        "title": "Pierakstīšanās no ierīces apstiprināta"
+      },
+      "apiKeyReset": {
+        "title": "API marķieris atiestatīts"
+      },
+      "browserSessionsRevoked": {
+        "title": "Izrakstīts no visām pārlūkprogrammām"
+      },
+      "deviceSessionRevoked": {
+        "title": "Ierīce izrakstīta no jūsu konta"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo atbalsts atiestatīja pierakstīšanos"
+      },
+      "newSignIn": {
+        "title": "Jauna pierakstīšanās jūsu kontā"
+      },
+      "body": {
+        "deviceAndLocation": "No {{device}} netālu no {{location}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
+        "device": "No {{device}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
+        "location": "Netālu no {{location}}. Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
+        "unknown": "Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
+        "selfNamedDevice": "No ierīces, kas sevi nosauca par \"{{name}}\". Tas nebijāt jūs? Tagad pārskatiet sava konta drošību.",
+        "support": "To izdarīja Kilo atbalsts. Ja jūs to nepieprasījāt, sazinieties ar atbalstu."
+      }
     }
   },
   "sessionReady": {

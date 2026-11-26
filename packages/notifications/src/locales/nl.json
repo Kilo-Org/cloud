@@ -8,7 +8,8 @@
       "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig",
       "securityUpdate": "Een beveiligingscontrole heeft een update",
       "agentBriefing": "Je agentbriefing is klaar",
-      "activeAgentsGlanceable": "Actieve agents hebben een update"
+      "activeAgentsGlanceable": "Actieve agents hebben een update",
+      "accountSecurity": "Er was beveiligingsactiviteit op je account"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-overschrijding"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Toegangssleutel toegevoegd aan je account"
+      },
+      "passkeyRemoved": {
+        "title": "Toegangssleutel verwijderd uit je account"
+      },
+      "signInMethodLinked": {
+        "title": "Aanmeldmethode toegevoegd aan je account"
+      },
+      "signInMethodUnlinked": {
+        "title": "Aanmeldmethode verwijderd uit je account"
+      },
+      "deviceSignInApproved": {
+        "title": "Aanmelding vanaf apparaat goedgekeurd"
+      },
+      "apiKeyReset": {
+        "title": "API-token opnieuw ingesteld"
+      },
+      "browserSessionsRevoked": {
+        "title": "Afgemeld bij alle browsers"
+      },
+      "deviceSessionRevoked": {
+        "title": "Apparaat afgemeld bij je account"
+      },
+      "signInResetBySupport": {
+        "title": "Aanmelding opnieuw ingesteld door Kilo-support"
+      },
+      "newSignIn": {
+        "title": "Nieuwe aanmelding bij je account"
+      },
+      "body": {
+        "deviceAndLocation": "Vanaf {{device}} in de buurt van {{location}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
+        "device": "Vanaf {{device}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
+        "location": "In de buurt van {{location}}. Was jij dit niet? Controleer nu de beveiliging van je account.",
+        "unknown": "Was jij dit niet? Controleer nu de beveiliging van je account.",
+        "selfNamedDevice": "Vanaf een apparaat dat zichzelf \"{{name}}\" noemde. Was jij dit niet? Controleer nu de beveiliging van je account.",
+        "support": "Gedaan door Kilo-support. Heb je hier niet om gevraagd, neem dan contact op met support."
+      }
     }
   },
   "sessionReady": {

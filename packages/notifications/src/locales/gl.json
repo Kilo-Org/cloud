@@ -8,7 +8,8 @@
       "securityFinding": "Un achado de seguridade precisa atención",
       "securityUpdate": "Unha comprobación de seguridade ten unha actualización",
       "agentBriefing": "O teu informe do axente está listo",
-      "activeAgentsGlanceable": "Os axentes activos teñen unha actualización"
+      "activeAgentsGlanceable": "Os axentes activos teñen unha actualización",
+      "accountSecurity": "Houbo actividade de seguranza na túa conta"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Incumprimento de SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Engadiuse unha chave de acceso á túa conta"
+      },
+      "passkeyRemoved": {
+        "title": "Eliminouse unha chave de acceso da túa conta"
+      },
+      "signInMethodLinked": {
+        "title": "Engadiuse un método de inicio de sesión á túa conta"
+      },
+      "signInMethodUnlinked": {
+        "title": "Eliminouse un método de inicio de sesión da túa conta"
+      },
+      "deviceSignInApproved": {
+        "title": "Aprobouse o inicio de sesión dun dispositivo"
+      },
+      "apiKeyReset": {
+        "title": "Restableceuse o token da API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Pechouse a sesión en todos os navegadores"
+      },
+      "deviceSessionRevoked": {
+        "title": "Pechouse a sesión dun dispositivo na túa conta"
+      },
+      "signInResetBySupport": {
+        "title": "O soporte de Kilo restableceu o inicio de sesión"
+      },
+      "newSignIn": {
+        "title": "Novo inicio de sesión na túa conta"
+      },
+      "body": {
+        "deviceAndLocation": "Desde {{device}} preto de {{location}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
+        "device": "Desde {{device}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
+        "location": "Preto de {{location}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
+        "unknown": "Non fuches ti? Revisa agora a seguranza da túa conta.",
+        "selfNamedDevice": "Desde un dispositivo que se chamou a si mesmo «{{name}}». Non fuches ti? Revisa agora a seguranza da túa conta.",
+        "support": "Fíxoo o soporte de Kilo. Se non o pediches, contacta co soporte."
+      }
     }
   },
   "sessionReady": {

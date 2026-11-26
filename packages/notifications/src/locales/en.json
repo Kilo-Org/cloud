@@ -8,7 +8,8 @@
       "securityFinding": "A security finding needs attention",
       "securityUpdate": "A security check has an update",
       "agentBriefing": "Your agent brief is ready",
-      "activeAgentsGlanceable": "Active agents have an update"
+      "activeAgentsGlanceable": "Active agents have an update",
+      "accountSecurity": "There was security activity on your account"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA breach"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Passkey added to your account"
+      },
+      "passkeyRemoved": {
+        "title": "Passkey removed from your account"
+      },
+      "signInMethodLinked": {
+        "title": "Sign-in method added to your account"
+      },
+      "signInMethodUnlinked": {
+        "title": "Sign-in method removed from your account"
+      },
+      "deviceSignInApproved": {
+        "title": "Device sign-in approved"
+      },
+      "apiKeyReset": {
+        "title": "API token reset"
+      },
+      "browserSessionsRevoked": {
+        "title": "Signed out of all browsers"
+      },
+      "deviceSessionRevoked": {
+        "title": "Device signed out of your account"
+      },
+      "signInResetBySupport": {
+        "title": "Sign-in reset by Kilo support"
+      },
+      "newSignIn": {
+        "title": "New sign-in to your account"
+      },
+      "body": {
+        "deviceAndLocation": "From {{device}} near {{location}}. Not you? Review your account security now.",
+        "device": "From {{device}}. Not you? Review your account security now.",
+        "location": "Near {{location}}. Not you? Review your account security now.",
+        "unknown": "Not you? Review your account security now.",
+        "selfNamedDevice": "From a device that named itself \"{{name}}\". Not you? Review your account security now.",
+        "support": "Done by Kilo support. If you did not ask for this, contact support."
+      }
     }
   },
   "sessionReady": {

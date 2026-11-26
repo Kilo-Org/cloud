@@ -12,6 +12,9 @@ jest.mock('./components/AppSidebar', () => ({ AppSidebar: () => null }));
 jest.mock('@/components/ui/sonner', () => ({ Toaster: () => null }));
 jest.mock('@/app/admin/components/BuildInfo', () => ({ BuildInfo: () => null }));
 jest.mock('@/components/AppShellSkipLink', () => ({ AppShellSkipLink: () => null }));
+jest.mock('@/app/admin/components/AdminAccessDenied', () => ({
+  AdminAccessDenied: ({ message }: { message: string }) => `ACCESS_DENIED:${message}`,
+}));
 jest.mock('@/components/admin/step-up/StepUpProvider', () => ({
   StepUpProvider: ({ children }: { children: unknown }) => children,
 }));
@@ -122,6 +125,21 @@ describe('AdminLayout step-up gate', () => {
     const html = await render(React.createElement('div', null, 'PAGE_CONTENT'));
 
     expect(html).toContain('INTERSTITIAL:STEP_UP_UNAVAILABLE');
+    expect(html).not.toContain('PAGE_CONTENT');
+  });
+});
+
+describe('AdminLayout admin network refusal', () => {
+  it('shows the WARP message, not the non-admin page, to an off-network admin', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: null,
+      adminNetworkDenial: 'outside-allowlist',
+    } as never);
+
+    const html = await render(React.createElement('div', null, 'PAGE_CONTENT'));
+
+    expect(html).toContain('ACCESS_DENIED:');
+    expect(html).toContain('Cloudflare WARP');
     expect(html).not.toContain('PAGE_CONTENT');
   });
 });

@@ -97,6 +97,18 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
   ['audit-relay-test', 'audit-relay-test'],
 ]);
 
+/**
+ * Workloads with a worker-binding policy whose Worker config lives in another repository, which
+ * this check cannot read; that repository's review covers the config's STS binding. No config here
+ * may deploy under one of these names: it would replace that Worker and, with `props.caller` set to
+ * its own top-level name, read that workload's bundle.
+ */
+export const EXTERNAL_WORKLOADS: ReadonlyMap<string, string> = new Map([
+  // watch/wrangler.jsonc there is to bind `sts` from its top-level (production) block once
+  // bouncer's step 2 lands.
+  ['bouncer-watch', 'Kilo-Org/bouncer'],
+]);
+
 const STS_ENTRYPOINT = 'SecretsBroker';
 
 // Prefix matches, wider than the deployment lists on purpose: a binding to a name that only looks
@@ -807,6 +819,14 @@ function routeProblems(block: Block, owner: string | undefined): string[] {
   return problems;
 }
 
+/** A preview binds no STS, so only the deployed blocks count. */
+function bindsStsAnywhere(blocks: readonly Block[]): boolean {
+  return blocks.some(
+    block =>
+      !block.preview && (block.bindings.services ?? []).some(binding => isStsName(binding.service))
+  );
+}
+
 /**
  * Problems with how the repository's Worker configs reach STS and the audit relay. The only way in
  * is a `SecretsBroker` service binding whose `props.caller` names the binding Worker. STS trusts
@@ -837,11 +857,7 @@ export function workerConfigProblems(
   for (const worker of configs) {
     const caller = worker.config.name;
     const blocks = blocksOf(worker);
-    const bindsSts = blocks.some(
-      block =>
-        !block.preview &&
-        (block.bindings.services ?? []).some(binding => isStsName(binding.service))
-    );
+    const bindsSts = bindsStsAnywhere(blocks);
     for (const block of blocks) {
       for (const key of block.unknownKeys) {
         problems.push(
@@ -855,6 +871,12 @@ export function workerConfigProblems(
       if (owner !== undefined && caller !== owner) {
         problems.push(
           `${block.where} deploys as ${block.deployedName}, which only the ${owner} config deploys`
+        );
+      }
+      const external = EXTERNAL_WORKLOADS.get(block.deployedName ?? '');
+      if (external !== undefined) {
+        problems.push(
+          `${block.where} deploys as ${block.deployedName}, whose config lives in ${external}`
         );
       }
       problems.push(...routeProblems(block, caller));
@@ -924,6 +946,41 @@ export function internalWorkerProblems(configs: readonly WorkerConfig[]): string
     if (deployed !== expectedRelay) {
       problems.push(
         `${worker.path} deploys ${deployed}; AUDIT_RELAY_DEPLOYMENTS lists ${expectedRelay}`
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * Problems with the worker-binding policies: each one's workload is a config here that binds STS
+ * under that top-level name, or is listed in EXTERNAL_WORKLOADS, so a policy whose Worker lives in
+ * another repository is always one the deploy-name rule above protects. Every listed external
+ * workload has a worker-binding policy.
+ */
+export function workerBindingPolicyProblems(
+  configs: readonly WorkerConfig[],
+  policies: readonly Policy[]
+): string[] {
+  const problems: string[] = [];
+  const workloads = policies
+    .filter(policy => policy.identity.kind === 'worker-binding')
+    .map(policy => policy.workload);
+  for (const workload of workloads) {
+    if (EXTERNAL_WORKLOADS.has(workload)) continue;
+    const bindsHere = configs.some(
+      worker => worker.config.name === workload && bindsStsAnywhere(blocksOf(worker))
+    );
+    if (!bindsHere) {
+      problems.push(
+        `policy ${workload} has no config here that binds STS as ${workload}; list it in EXTERNAL_WORKLOADS if another repository holds its config`
+      );
+    }
+  }
+  for (const [workload, repository] of EXTERNAL_WORKLOADS) {
+    if (!workloads.includes(workload)) {
+      problems.push(
+        `EXTERNAL_WORKLOADS lists ${workload} (${repository}), which has no worker-binding policy`
       );
     }
   }

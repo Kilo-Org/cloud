@@ -50,6 +50,16 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
   const organization_claw_url = `${NEXTAUTH_URL}/organizations/${orgId}/claw`;
   const integrations_url = `${NEXTAUTH_URL}/organizations/${orgId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${orgId}/code-reviews`;
+  const securityNoticeFixtureVars = {
+    email: 'user@example.com',
+    change_details: new RawHtml(
+      'Time: 2026-01-01 12:00 UTC<br />IP address: 203.0.113.7<br />Approximate location: San Francisco, US<br />Browser: Chrome on macOS'
+    ),
+    connected_accounts_link: new RawHtml(
+      `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
+    ),
+    profile_link: new RawHtml(`<a href="${NEXTAUTH_URL}/profile">${NEXTAUTH_URL}/profile</a>`),
+  };
 
   switch (template) {
     case 'autoRoutingPoolNotice':
@@ -94,27 +104,50 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
       };
     case 'newSignInMethod':
       return {
-        email: 'user@example.com',
+        ...securityNoticeFixtureVars,
         provider_name: 'GitHub',
         linked_identity: 'octocat (user@example.com)',
-        change_details: new RawHtml(
-          'Time: 2026-01-01 12:00 UTC<br />IP address: 203.0.113.7<br />Approximate location: San Francisco, US<br />Browser: Chrome on macOS'
-        ),
-        connected_accounts_link: new RawHtml(
-          `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
+        replaced_note: '',
+        sign_out_note: '',
+        not_you_steps: new RawHtml(
+          `remove this sign-in method at <a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>, reset your API token at <a href="${NEXTAUTH_URL}/profile">${NEXTAUTH_URL}/profile</a>, which signs out every browser, the app, and the CLI, and contact ${SUPPORT_EMAIL}.`
         ),
       };
     case 'signInMethodRemoved':
+      return { ...securityNoticeFixtureVars, provider_name: 'GitHub' };
+    case 'passkeyAdded':
+    case 'passkeyRemoved':
+      return { ...securityNoticeFixtureVars, passkey_name_note: ' (MacBook Pro)' };
+    case 'deviceSignInApproved':
       return {
-        email: 'user@example.com',
-        provider_name: 'GitHub',
-        change_details: new RawHtml(
-          'Time: 2026-01-01 12:00 UTC<br />IP address: 203.0.113.7<br />Approximate location: San Francisco, US<br />Browser: Chrome on macOS'
-        ),
-        connected_accounts_link: new RawHtml(
-          `<a href="${NEXTAUTH_URL}/connected-accounts">${NEXTAUTH_URL}/connected-accounts</a>`
-        ),
+        ...securityNoticeFixtureVars,
+        client_label: 'Kilo CLI',
+        requesting_device: 'Kilo CLI',
+        request_ip: '198.51.100.24',
       };
+    case 'apiKeyReset':
+      return {
+        ...securityNoticeFixtureVars,
+        reset_effect:
+          'Every earlier token stopped working, and every browser, the app, and the CLI were signed out.',
+        actor_note: 'If this was you, no action is needed.',
+        not_you_lead: 'If this was not you:',
+      };
+    case 'browserSessionsRevoked':
+      return {
+        ...securityNoticeFixtureVars,
+        actor_note: 'If this was you, no action is needed.',
+        not_you_lead: 'If this was not you:',
+      };
+    case 'deviceSessionRevoked':
+      return { ...securityNoticeFixtureVars, revoked_device: 'Kilo CLI' };
+    case 'signInResetBySupport':
+      return {
+        ...securityNoticeFixtureVars,
+        change_details: new RawHtml('Time: 2026-01-01 12:00 UTC<br />Done by: Kilo support'),
+      };
+    case 'newSignIn':
+      return { ...securityNoticeFixtureVars, method_name: 'Google' };
     case 'signInMethodChangeCode':
       return {
         code: '482913',

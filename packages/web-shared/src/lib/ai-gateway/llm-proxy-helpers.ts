@@ -1227,12 +1227,6 @@ const fimResponseSchema = z.object({
   error: upstreamStreamErrorSchema.nullish(),
 });
 
-function computeInceptionFimMicrodollarCost(
-  usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>
-): number {
-  return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
-}
-
 function computeFimMicrodollarCost(
   usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>,
   provider: ProviderType
@@ -1240,8 +1234,6 @@ function computeFimMicrodollarCost(
   switch (provider) {
     case 'mistral':
       return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
-    case 'inception':
-      return computeInceptionFimMicrodollarCost(usage);
     default:
       console.error('Unknown provider for FIM cost calculation', provider);
       return 0;
@@ -1407,156 +1399,6 @@ export function countAndStoreFimUsage(
             usageContext.provider
           )
         : 0;
-    usageStats.market_cost = usageStats.cost_mUsd;
-
-    if (usageContext.is_free || usageContext.user_byok) {
-      usageStats.cost_mUsd = 0;
-      usageStats.cacheDiscount_mUsd = 0;
-    }
-
-    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-  });
-  after(usagePromise);
-  return { statsPromise: usageStatsPromise, usagePromise };
-}
-
-// ============================================================================
-// Edit-Specific Code
-// ============================================================================
-
-type EditMessage = { role: string; content: string };
-
-export function extractEditPromptInfo(body: { messages: EditMessage[] }): PromptInfo {
-  const lastUser = [...body.messages].reverse().find(m => m.role === 'user');
-  const content = lastUser?.content ?? '';
-  return {
-    system_prompt_prefix: '', // /v1/edit/completions bakes its system prompt in server-side
-    system_prompt_length: 0,
-    user_prompt_prefix: content.slice(0, 100),
-  };
-}
-
-const editUsageSchema = fimUsageSchema.extend({ cached_input_tokens: z.number().optional() });
-
-const editResponseSchema = z.object({
-  id: z.string().nullish(),
-  model: z.string().nullish(),
-  usage: editUsageSchema.nullish(),
-  choices: z
-    .array(z.object({ message: z.object({ content: z.string().nullish() }).nullish() }))
-    .nullish(),
-  error: upstreamStreamErrorSchema.nullish(),
-});
-
-type EditUsage = z.infer<typeof editUsageSchema>;
-
-function getEditCacheHitTokens(usage: EditUsage): number {
-  return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
-}
-
-function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderType): number {
-  switch (provider) {
-    case 'inception': {
-      // Inception Mercury Edit 2 published rates (per 1M tokens):
-      //   $0.25 input  →  0.25 mUSD/token
-      //   $0.025 cached input  →  0.025 mUSD/token
-      //   $0.75 output  →  0.75 mUSD/token
-      // Sources:
-      //   https://www.inceptionlabs.ai/models
-      //   https://www.inceptionlabs.ai/blog/introducing-mercury-edit-2
-      // Mercury 2 (chat) shares the same per-token rates.
-      const cacheHitTokens = getEditCacheHitTokens(usage);
-      const uncachedInputTokens = usage.prompt_tokens - cacheHitTokens;
-      return Math.round(
-        uncachedInputTokens * 0.25 + cacheHitTokens * 0.025 + usage.completion_tokens * 0.75
-      );
-    }
-    default:
-      console.error('Unknown provider for edit cost calculation', provider);
-      return 0;
-  }
-}
-
-export function parseEditUsageFromResponse(
-  response: string,
-  provider: ProviderType,
-  statusCode: number
-): MicrodollarUsageStats {
-  const json = editResponseSchema.parse(parseUsageResponse(response, statusCode));
-  const stats = extractEditUsage(json, provider, statusCode);
-  priceEditUsage(stats, json.usage, provider);
-  return stats;
-}
-
-function extractEditUsage(
-  json: z.infer<typeof editResponseSchema>,
-  provider: ProviderType,
-  statusCode: number
-): MicrodollarUsageStats {
-  if (!json.model && !json.error && !json.usage && statusCode < 400) {
-    throw new Error('Unexpected edit response');
-  }
-  const usage = json.usage;
-  const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
-  return {
-    messageId: json.id ?? null,
-    model: json.model ?? null,
-    responseContent: json.choices?.[0]?.message?.content || '',
-    hasError: !json.model || json.error != null || statusCode >= 400,
-    inference_provider: provider,
-    inputTokens: usage?.prompt_tokens ?? 0,
-    outputTokens: usage?.completion_tokens ?? 0,
-    cacheHitTokens,
-    cacheWriteTokens: 0,
-    cost_mUsd: 0,
-    is_byok: null,
-    upstream_id: null,
-    finish_reason: null,
-    latency: null,
-    moderation_latency: null,
-    generation_time: null,
-    streamed: null,
-    cancelled: null,
-    status_code: statusCode,
-  };
-}
-
-function priceEditUsage(
-  stats: MicrodollarUsageStats,
-  usage: EditUsage | null | undefined,
-  provider: ProviderType
-) {
-  stats.cost_mUsd = usage ? computeEditMicrodollarCost(usage, provider) : 0;
-  stats.cacheDiscount_mUsd =
-    usage && provider === 'inception'
-      ? Math.round(getEditCacheHitTokens(usage) * (0.25 - 0.025))
-      : undefined;
-}
-
-export function countAndStoreEditUsage(
-  clonedResponse: Response,
-  usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
-) {
-  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
-
-  const statusCode = clonedResponse.status;
-  let usage: EditUsage | null | undefined;
-  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
-    if (!clonedResponse.body) return null;
-    const { text, timing } = await readResponseText(
-      clonedResponse.body,
-      usageContext.requestStartedAt
-    );
-    const json = editResponseSchema.parse(parseUsageResponse(text, statusCode));
-    const stats = extractEditUsage(json, usageContext.provider, statusCode);
-    usage = json.usage;
-    return { ...stats, ...timing };
-  });
-
-  const usagePromise = usageStatsPromise.then(usageStats => {
-    requestSpan?.end();
-    priceEditUsage(usageStats, usage, usageContext.provider);
     usageStats.market_cost = usageStats.cost_mUsd;
 
     if (usageContext.is_free || usageContext.user_byok) {

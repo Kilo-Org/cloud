@@ -1,14 +1,14 @@
 # UTS feed Worker
 
-The UTS Worker that serves the key set, and later the revocation feed and the bootstrap endpoint
-(`services/uts/README.md`). It runs without placement, so a reader far from Frankfurt is served
-near itself.
+The UTS Worker that serves the key set, the revocation feed and the bootstrap endpoint
+(`services/uts/README.md`, "Revocation feed"). It runs without placement, so a reader far from
+Frankfurt is served near itself.
 
 ## Key set
 
 `GET /.well-known/jwks.json` serves the UTS JWKS: the current and next key of all 16 signer objects
-(32 keys), plus, for 1 hour and 10 minutes after each rotation, the key that retired (48 keys right
-after the 16 signers rotate together).
+(32 token keys) and of the 2 feed objects (4 feed keys), plus, for 1 hour and 10 minutes after each
+rotation, the key that retired (54 keys right after every object rotates together).
 
 - `Cache-Control: max-age=300, stale-if-error=86400` (design 5.7), unchanged on every response,
   with two ages in whole seconds beside it:
@@ -54,11 +54,42 @@ after the 16 signers rotate together).
   - with no signer's keys held, a failed call answers `503 temporarily_unavailable` with
     `Retry-After: 10`; a refused caller, misconfigured signer objects or an invalid signer-keys
     answer give `500 server_error`.
-- Token keys carry `kid`s that start `uts-token-`. The feed keys join the same `keys` array with a
-  prefix of their own, so a verifier selects token keys by `UtsTokenKidSchema` and never accepts a
-  feed key for a token.
+- Token keys carry `kid`s that start `uts-token-`, feed keys `uts-feed-<0|1>-`, in the same `keys`
+  array. A verifier selects token keys by `UTS_TOKEN_KID_PREFIX` and feed keys by
+  `UTS_FEED_KID_PREFIX`, and never accepts a feed key for a token. Each feed object's keys follow
+  the signer rules above: held separately, served up to 24 hours after their last good read.
+
+## Revocation feed
+
+The feed objects live in the mint Worker, which alone binds them and so alone writes entries. This
+Worker reads them through the mint Worker's `FeedReads` entrypoint (`UTS_FEED_READS`, bound with
+this Worker's deployed name as `props.caller`) and serves (`src/revocation.ts`):
+
+- **Head** (a compact JWS, `typ: kilo-feed-head+jwt`, payload `{iat, list_hash}`): feed object 0
+  gets 1 second to answer, then feed object 1 is read. An object that failed, answered
+  `unavailable`, or answered a head over 10 seconds old is skipped for 30 seconds, unless both
+  failed. The head stays in each data center's cache for 5 seconds; a cached head past 10 seconds
+  is not served. Both failing answers `unavailable`; both refusing to load answers `misconfigured`.
+- **List** by its hash: from the data center's cache (10 minutes) when its bytes still hash to the
+  name, otherwise from the objects; bytes that do not match the hash are refused and the other
+  object is read. `not_found` only when every object holds no such list.
+- **Bootstrap**: the key set, the head and the list it covers in one answer, whole or not at all.
+
+Transports (`@kilocode/uts-contracts`, the shapes of `@kilocode/verify`'s ports):
+
+- Workers bind the named entrypoint `FeedReader` (`head()`, `list(hash)`, `bootstrap()`) with their
+  own deployed name as `props.caller`; `services/uts/test/repo` fails any other caller value. A
+  binding without a caller is refused; a failed read answers `unavailable` with
+  `retryAfterSeconds: 5`. `feedReaderSources(binding)` adapts it to the verifier's ports.
+- HTTPS (`httpsFeedSources(origin)`): `GET /revocation/head` (`application/jwt`),
+  `GET /revocation/list/<hash>`, `GET /revocation/bootstrap` (`{jwks, head, list}`, the list as
+  base64url of its exact bytes); 503 with `Retry-After: 5` when no object answers, 500 on a
+  deploy error. These paths are served in development only: the feed names accounts and grants,
+  and staging and production answer them 404 until this Worker verifies the caller's STS audience
+  token (design 5.6). Opening them is an open budget item (design 3, "Revocation feed").
 
 ## Local development
 
 `pnpm dev` runs `wrangler dev --env local` on port 8801; run the mint Worker (`services/uts`) on port
-8800 beside it.
+8800 beside it. `test/fixtures/e2e` holds a verifier Worker for the local end-to-end run of the feed
+(`services/uts/scripts/feed-e2e.ts`); nothing deploys it.

@@ -5,8 +5,8 @@ Cloudflare Workers:
 
 | Worker | Package | Hostname (production / staging) | Placement | Serves |
 |---|---|---|---|---|
-| Mint Worker `uts` | `services/uts` | `uts.kiloapps.io` / `uts-staging.kiloapps.io` | `aws:eu-central-1` | Issuer metadata; later sign-in, token and account endpoints. Binds the signer objects |
-| Feed Worker `uts-feed` | `services/uts-feed` | `uts-feed.kiloapps.io` / `uts-feed-staging.kiloapps.io` | none | The UTS key set; later the revocation feed and the bootstrap endpoint |
+| Mint Worker `uts` | `services/uts` | `uts.kiloapps.io` / `uts-staging.kiloapps.io` | `aws:eu-central-1` | Issuer metadata; later sign-in, token and account endpoints. Binds the signer, key-set shard and feed objects |
+| Feed Worker `uts-feed` | `services/uts-feed` | `uts-feed.kiloapps.io` / `uts-feed-staging.kiloapps.io` | none | The UTS key set, the revocation feed and the bootstrap endpoint |
 
 The issuer, key set URL and local ports of each environment live in
 `@kilocode/uts-contracts` (`UTS_ENDPOINTS`); verifiers read them from there.
@@ -74,9 +74,10 @@ Each object:
   long between the two removals, and before the second one check that the public key set
   (`/.well-known/jwks.json` on the feed Worker) lists the signer's new next `kid`; removing at once
   leaves that signer's new tokens unverifiable for up to that time. The result is
-  the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The revocation feed
-  writes it once that feed exists. No route calls `removeKid` yet: it stays unreachable until the
-  revocation-feed slice adds the operator route, which audits and alerts on each removal;
+  the revocation-feed entry: verifiers reject the `kid` until `revokeUntil`. The feed carries such
+  an entry as kind `kid` in `uts.revocations` ("Revocation feed" below). No route calls
+  `removeKid` yet: it stays unreachable until the operator route exists, which writes that entry,
+  audits and alerts on each removal;
 - logs each rotation and removal as `uts.signer.key_event` (`SignerKeyEvent`, public `kid`s only),
   the event the UTS audit pipeline will carry (design 8.3).
 
@@ -117,9 +118,43 @@ serves no signer keys: a request to the old `/internal/signer-keys` path gets `4
 any unknown path. Placement does not apply to a named entrypoint, so the entrypoint runs where the
 feed Worker runs and makes one call to its shard in the EU per read.
 `test/repo/worker-configs.test.ts` fails any Worker config outside the two UTS Workers that names a
-UTS Durable Object class or binds the mint Worker, any feed binding at an entrypoint other than
-`SignerKeys` or whose caller is not the feed block's own name, and any drift in the UTS configs
-(names, `eu` jurisdiction, placement, traces).
+UTS Durable Object class or binds the mint Worker, any feed binding of the mint Worker at an
+entrypoint other than `SignerKeys` or `FeedReads` (each once per block) or whose caller is not the
+feed block's own name, any `FeedReader` binding whose caller is not its own block's deployed name,
+and any drift in the UTS configs (names, `eu` jurisdiction, placement, traces).
+
+### Revocation feed
+
+Design 5.6. Every revoking statement (`/revoke`, a second use of a code, a reused third-party
+token) writes its `uts.revocations` rows and returns them in the same statement
+(`uts.feed_entries_of_statement()`, migration 0006; one index probe, skipped on the issued path).
+After the commit the Worker writes them to both feed objects in parallel
+(`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2 seconds.
+`/revoke` answers 503 when neither confirms (the revocation stands, the backfill adds it); the
+reuse paths answer as before. A failed publish logs kinds and counts, never ids.
+
+The two feed objects (`src/feed/UtsFeedDO.ts`) are named `<environment>:feed:<0|1>`, in the `eu`
+jurisdiction, feed 0 with the `weur` hint and feed 1 with `eeur`; only this Worker binds them, so
+only it writes entries. Each one:
+
+- keeps its entries in memory only (`src/feed/ledger.ts`); the identity store is the record;
+- every 5 seconds (alarm) reads, as the app login, the entries revoked in the last 20 minutes,
+  or every live entry after a restart or a gap over 15 minutes (`src/revocation/store.ts`), drops
+  expired entries, and rotates its feed key;
+- signs a head (`typ: kilo-feed-head+jwt`, `{iat, list_hash}`) with its own Ed25519 key, kept in
+  its KV storage with the signer's 30-day rotation and published next key (`uts-feed-<n>-<thumbprint>`),
+  only while its last good backfill started under 60 seconds ago, and over more than 50,000 live
+  entries never; a head is signed again once 5 seconds old or when the list changed;
+- serves its current list and the 4 before it by hash.
+
+The list is canonical JSON: subject → `revoked_before` (whole seconds, rounded down); grant, third-party
+family, session and sandbox grant → `revoked_sids`; PAT and bot key → `revoked_pat_ids`; `kid` →
+`revoked_kids`; `blocked_account` → `blocked_accounts`. A PAT entry stays 15 minutes; a grant or
+family entry 20 minutes. The feed objects' public keys reach the key set through the key-set
+shards, beside the signers'. The feed Worker reads heads and lists through the `FeedReads`
+entrypoint, which answers only the feed Worker's `props.caller` and gives each object call 800 ms.
+Without an `IDENTITY_STORE` binding (staging and production today) no backfill runs, so the objects
+sign no head and the feed answers `unavailable`.
 
 ## Local development
 
@@ -128,6 +163,15 @@ cd services/uts && pnpm exec wrangler dev --env local --persist-to ../../.wrangl
 cd services/uts-feed && pnpm exec wrangler dev --env local --persist-to ../../.wrangler-uts
 curl -s http://localhost:8801/.well-known/jwks.json
 ```
+
+The local revocation-feed run (`scripts/feed-e2e.ts`) needs the mint Worker with `IDENTITY_STORE`
+(below), the feed Worker and the verifier Worker of `services/uts-feed/test/fixtures/e2e` running
+together, with `UTS_E2E_BASE_URL`, `UTS_E2E_FEED_URL`, `UTS_E2E_READER_URL` and
+`UTS_E2E_ADMIN_URL` set. It checks that a revoke reaches the feed within 11 seconds, that the
+backfill adds an entry no publish carried, that the feed serves from feed object 1 while
+`POST /__dev/feed/stop` (development only, `src/dev-feed.ts`) stops feed object 0 for 90 seconds,
+that the head stays under 11 seconds old, and that every head verifies under a feed key of the key
+set, over HTTPS and over the `FeedReader` binding.
 
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
@@ -197,8 +241,10 @@ failed signing no token carries those ids, and the retry's row (`token.issued`, 
   removal by direct call, the RPC surface, the SignerKeys entrypoint over real service bindings
   (its caller check) and the key-set shards (their names, their 2-second copy with one read in
   flight, at most one signer read per shard per 2 seconds under many concurrent isolates, and the
-  held keys of a failed signer), metadata, DPoP proofs, the signer's batch signing, and every OAuth
-  endpoint against a recording grant store.
+  held keys of a failed signer), metadata, DPoP proofs, the signer's batch signing, every OAuth
+  endpoint against a recording grant store and feed publisher, the feed objects (keys kept across
+  restarts, no head without a good backfill, refused names), the publisher and the `FeedReads`
+  caller check; unit tests cover feed entries, list serialization and the feed ledger.
 - `pnpm test:repo`: the repository config check (`test/repo`), with no database.
 - `pnpm test` runs both; neither needs Postgres. `pnpm test:postgres` runs the identity store
   tests (`test/db`, see "Local database and tests"), the OAuth grant functions and the DPoP `jti`
@@ -262,7 +308,7 @@ Expect `200`, `cache-control: max-age=300, stale-if-error=86400`, `32`, and meta
    Expect `remote-FRA` (or `local-FRA` for a request that entered in Frankfurt). The signer-keys
    read is outside this check: it runs on the `SignerKeys` named entrypoint, which placement does
    not cover, so it runs where the feed Worker runs. The key-set request above proves it answers
-   the feed Worker (`32` keys).
+   the feed Worker (`36` keys: 32 token keys and 4 feed keys).
 
 4. **The mint path's p95 under placement is a staging gate (design 3, 5.2).** No environment binds
    the identity store yet, so this branch measures the mint statement and `POST /token` only
@@ -278,7 +324,9 @@ Both Workers deploy through `.github/workflows/deploy-workers.yml`, which discov
 change, as on the first deploy of an environment, detection takes them out of the parallel matrix:
 the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` deploys
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
-order). A change to only one of them deploys in the matrix.
+order). A change to only one of them deploys in the matrix. The signer-keys answer carries the feed
+objects' keys, which an older feed Worker refuses as an invalid answer and so keeps serving its held
+keys until it is deployed too.
 
 ## Identity store
 

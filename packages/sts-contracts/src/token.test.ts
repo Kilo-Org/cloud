@@ -150,9 +150,14 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('starts empty, so every scope is denied', () => {
-    expect(STS_SCOPE_REGISTRY).toEqual({});
+  it('lists only the pilot scopes, so every other scope is denied', () => {
+    expect(STS_SCOPE_REGISTRY).toEqual({
+      web: { scopes: ['web:sts.canary'] },
+      'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
+    });
+    expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
     expect(isRegisteredStsScope('gateway', 'gateway:models.read')).toBe(false);
+    expect(isRegisteredStsScope('web', 'usage-ingest:sts.canary')).toBe(false);
   });
 
   it('lists each shipped scope under its own audience', () => {

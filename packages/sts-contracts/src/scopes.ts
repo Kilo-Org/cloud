@@ -6,8 +6,14 @@ import { AudienceSchema, ScopeSchema, scopeAudience } from './token';
  */
 export type StsScopeRegistry = Readonly<Record<string, { readonly scopes: readonly string[] }>>;
 
-/** Empty: no audience accepts an STS token until a scope is added here. */
-export const STS_SCOPE_REGISTRY: StsScopeRegistry = {};
+/**
+ * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
+ * usage-ingest back, each with a token of the other's canary scope.
+ */
+export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
+  web: { scopes: ['web:sts.canary'] },
+  'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
+};
 
 /** Whether `scope` is registered under `audience`. Inherited object keys never match. */
 export function isRegisteredStsScope(

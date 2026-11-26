@@ -133,16 +133,6 @@ export function sealOpenAiChatGptConnection(
 }
 
 /**
- * The payload columns of a connection whose stored credential is removed: the row reads as
- * holding no connection. Used when a refusal cannot be sealed because the KMS service did
- * not create a data key, so the refused tokens are dropped rather than kept.
- */
-export const CLEARED_OPENAI_CHATGPT_CONNECTION_PAYLOAD = {
-  encrypted_connection: OBSOLETE_STATIC_KEY_PLACEHOLDER,
-  encrypted_connection_envelope: null,
-} as const;
-
-/**
  * Decrypts and parses a stored payload. A row without an envelope or a payload that does
  * not parse returns null, so a corrupt row never takes down a sign-in or a request. A KMS
  * failure throws a `CredentialKmsError`: the row exists, and reading it as absent would tell

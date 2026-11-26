@@ -475,7 +475,8 @@ export function buildOpenAiChatGptProvider(
   apiKey: string,
   accessToken: string,
   upstreamModel: string,
-  owner?: OpenAiChatGptOwner
+  owner?: OpenAiChatGptOwner,
+  credentialKeyId?: string
 ): Provider | null {
   if (apiKey.trim().length === 0) return null;
 
@@ -483,6 +484,7 @@ export function buildOpenAiChatGptProvider(
     type: OPENAI_CHATGPT_PROVIDER_ID,
     inferenceProviderId: OPENAI_CHATGPT_PROVIDER_ID,
     ...(owner ? { chatGptOwner: owner } : {}),
+    ...(credentialKeyId ? { chatGptCredentialKeyId: credentialKeyId } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -616,7 +618,13 @@ export async function checkOpenAiChatGptByok(
 
     // The key is present, so this never returns null; the guard stays because the
     // builder's type admits it, and it keeps the ordinary route if that changes.
-    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, upstreamModel, owner);
+    const provider = buildOpenAiChatGptProvider(
+      apiKey,
+      outcome.accessToken,
+      upstreamModel,
+      owner,
+      outcome.credentialKeyId
+    );
     if (!provider) return null;
 
     return {

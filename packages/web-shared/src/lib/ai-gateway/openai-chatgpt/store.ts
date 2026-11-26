@@ -6,7 +6,6 @@ import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import {
-  CLEARED_OPENAI_CHATGPT_CONNECTION_PAYLOAD,
   createOpenAiChatGptSealingKey,
   OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR,
   openAiChatGptKmsOwnerFor,
@@ -368,17 +367,16 @@ export async function writeOpenAiChatGptConnection(
  * Inserts or replaces the owner's connection. The upsert targets the owner's
  * unique index, so reconnecting never leaves a second row behind. The row is
  * always left enabled and connected with any previous error state cleared.
- * `createdBy` is the acting person and is recorded on organization rows.
+ * `createdBy` is the acting person and is recorded on organization rows. Returns the key id
+ * of the stored credential, which a refusal of it names.
  */
 export async function saveOpenAiChatGptConnection(
   owner: OpenAiChatGptOwner,
   connection: OpenAiChatGptConnection,
   createdBy: string
-): Promise<void> {
-  const columns = connectionWriteColumns(
-    connection,
-    await createOpenAiChatGptConnectionSealingKey(owner, createdBy)
-  );
+): Promise<{ credentialKeyId: string }> {
+  const sealingKey = await createOpenAiChatGptConnectionSealingKey(owner, createdBy);
+  const columns = connectionWriteColumns(connection, sealingKey);
   const shape = openAiChatGptOwnerShape(owner);
   // The shared-services row records the connecting person in `created_by`; its
   // reads never match on `kilo_user_id`.
@@ -409,6 +407,7 @@ export async function saveOpenAiChatGptConnection(
         ...NO_USAGE_LIMIT,
       },
     });
+  return { credentialKeyId: sealingKey.keyId };
 }
 
 export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
@@ -618,39 +617,78 @@ export async function markOpenAiChatGptConnectionErrored(
     .where(openAiChatGptOwnerWhere(owner));
 }
 
+/** A refusal by OpenAI of the account behind one stored credential. */
+export type OpenAiChatGptRefusal = {
+  /** The access token of the refused request. */
+  accessToken: string;
+  /**
+   * The key id of the stored credential that sent `accessToken`, from token resolution or
+   * the save. Null when the caller does not know it; the refusal is then matched by
+   * decrypting the row, which needs the KMS service.
+   */
+  credentialKeyId: string | null;
+  message: string;
+};
+
 /**
- * Records OpenAI's refusal of the connected account. Only the connection whose
- * access token served the refused request is marked: a reconnect that landed
- * while the request was in flight can hold a different, eligible account, and
- * must not be erased by a stale refusal. A missing row is a no-op.
+ * Records OpenAI's refusal of the connected account. Only the credential that served the
+ * refused request is marked: a reconnect or token refresh since then sealed a new one, which
+ * can hold a different, eligible account and must not be erased by a stale refusal. A
+ * missing row is a no-op.
+ *
+ * OpenAI says the refused account fails every later request, so the refusal must take
+ * effect even while the KMS service is unavailable. When the payload cannot be decrypted or
+ * a data key cannot be created, a row still holding the refused credential is deleted: it
+ * then reads as disconnected instead of showing the refusal reason, and holds no tokens.
  */
 export async function markOpenAiChatGptNotEligible(
   owner: OpenAiChatGptOwner,
-  refusedAccessToken: string,
-  message: string
+  refusal: OpenAiChatGptRefusal
 ): Promise<void> {
   const sealingKey = await createOpenAiChatGptConnectionSealingKey(
     owner,
     OPENAI_CHATGPT_ELIGIBILITY_KMS_ACTOR
   ).catch((error: unknown) => {
     console.error(
-      '[openai-chatgpt] no data key for the refusal; dropping the refused credential: %s (%s)',
+      '[openai-chatgpt] no data key for the refusal; deleting the refused credential: %s (%s)',
       error instanceof Error ? error.name : 'UnknownError',
       openAiChatGptOwnerKey(owner)
     );
     return null;
   });
-  await withConnectionHoldingToken(owner, refusedAccessToken, async (tx, connection) => {
-    if (sealingKey) {
-      await markOpenAiChatGptConnectionErrored(tx, owner, connection, message, sealingKey);
+
+  await db.transaction(async tx => {
+    const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
+    if (!row) return;
+    const storedKeyId = row.encrypted_connection_envelope?.key_id ?? null;
+    if (refusal.credentialKeyId !== null && storedKeyId !== refusal.credentialKeyId) return;
+
+    const deleteRefusedCredential = () =>
+      tx.delete(openai_chatgpt_connections).where(openAiChatGptOwnerWhere(owner));
+
+    let connection: OpenAiChatGptConnection | null;
+    try {
+      connection = await decryptOpenAiChatGptConnection(row);
+    } catch (error) {
+      if (!(error instanceof CredentialKmsError)) throw error;
+      // Without a key id the stored credential cannot be matched without decrypting it.
+      const matched = refusal.credentialKeyId !== null;
+      console.error(
+        matched
+          ? '[openai-chatgpt] refusal: stored connection unreadable; deleting the refused credential: %s (%s)'
+          : '[openai-chatgpt] refusal not applied: stored connection unreadable: %s (%s)',
+        error.causeName,
+        openAiChatGptOwnerKey(owner)
+      );
+      if (matched) await deleteRefusedCredential();
       return;
     }
-    // A refusal that cannot be sealed must still stop the account serving requests, so the
-    // refused tokens are removed and the row disabled. The row then reads as disconnected
-    // rather than showing the refusal reason.
-    await tx
-      .update(openai_chatgpt_connections)
-      .set({ ...CLEARED_OPENAI_CHATGPT_CONNECTION_PAYLOAD, is_enabled: false })
-      .where(openAiChatGptOwnerWhere(owner));
+    if (!connection || connection.access_token !== refusal.accessToken) return;
+
+    if (!sealingKey) {
+      await deleteRefusedCredential();
+      return;
+    }
+    await markOpenAiChatGptConnectionErrored(tx, owner, connection, refusal.message, sealingKey);
   });
 }

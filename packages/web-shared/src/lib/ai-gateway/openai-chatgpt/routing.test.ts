@@ -80,6 +80,7 @@ import { resetReportWindowsForTest } from '@kilocode/web-shared/lib/ai-gateway/r
 
 const PARTNER_KEY = 'partner-project-key';
 const DELEGATED_TOKEN = 'delegated-access-token';
+const DELEGATED_CREDENTIAL_KEY_ID = 'delegated-credential-key-id';
 const REQUESTED_MODEL = 'openai/gpt-5-nano';
 const USER_ID = 'user-1';
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
@@ -177,10 +178,11 @@ beforeEach(() => {
   process.env.OPENAI_CHATGPT_API_KEY = PARTNER_KEY;
   jest.mocked(getOpenAiChatGptStoredConnection).mockReset().mockResolvedValue(storedConnection());
   jest.mocked(openAiChatGptConnectorGone).mockReset().mockResolvedValue(false);
-  jest
-    .mocked(resolveOpenAiChatGptAccessToken)
-    .mockReset()
-    .mockResolvedValue({ kind: 'access_token', accessToken: DELEGATED_TOKEN });
+  jest.mocked(resolveOpenAiChatGptAccessToken).mockReset().mockResolvedValue({
+    kind: 'access_token',
+    accessToken: DELEGATED_TOKEN,
+    credentialKeyId: DELEGATED_CREDENTIAL_KEY_ID,
+  });
   jest.mocked(isOpenAiModelServed).mockReset().mockResolvedValue(true);
 });
 
@@ -796,6 +798,14 @@ describe('checkOpenAiChatGptByok', () => {
     ]);
     // api.openai.com rejects the gateway-only routing object.
     expect(outgoingBody).not.toHaveProperty('provider');
+  });
+
+  it('carries the resolved credential key id on the provider, for a refusal to name', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput());
+
+    expect(result?.kind === 'provider' && result.provider.chatGptCredentialKeyId).toBe(
+      DELEGATED_CREDENTIAL_KEY_ID
+    );
   });
 
   it('resolves the organization credential for an organization request', async () => {

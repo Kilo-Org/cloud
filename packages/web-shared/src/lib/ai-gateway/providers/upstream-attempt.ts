@@ -188,7 +188,12 @@ export async function sendUpstreamAttempt({
     // belongs to; a reconnect during the request replaces it.
     const accessToken = extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER];
     await syncChatGptUsageLimit(result.response, owner, accessToken);
-    await recordChatGptNotEligible(result.response, owner, accessToken);
+    await recordChatGptNotEligible(
+      result.response,
+      owner,
+      accessToken,
+      providerContext.provider.chatGptCredentialKeyId
+    );
   }
   if (providerContext.provider.type === CLAUDE_BILLING_PROVIDER_ID) {
     await recordClaudeBillingRefusalResponse(result.response, providerContext.provider);
@@ -319,13 +324,18 @@ async function syncChatGptUsageLimit(
 async function recordChatGptNotEligible(
   response: Response,
   owner: OpenAiChatGptOwner | undefined,
-  accessToken: string | undefined
+  accessToken: string | undefined,
+  credentialKeyId: string | undefined
 ): Promise<void> {
   if (!owner || !accessToken || response.status !== 403) return;
 
   try {
     if (!isChatGptUserNotEligible(response.status, await response.clone().json())) return;
-    await markOpenAiChatGptNotEligible(owner, accessToken, OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE);
+    await markOpenAiChatGptNotEligible(owner, {
+      accessToken,
+      credentialKeyId: credentialKeyId ?? null,
+      message: OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
+    });
   } catch {
     // Best-effort: the caller still receives the upstream response.
   }

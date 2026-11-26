@@ -105,30 +105,9 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
     owner = { kiloUserId: user.id, organizationId: null };
   });
 
-  it('disables the refused connection and keeps the reason for the card', async () => {
-    await saveOpenAiChatGptConnection(owner, connection('refused'), owner.kiloUserId as string);
-
-    await markOpenAiChatGptNotEligible(owner, 'refused', 'not eligible');
-
-    const stored = await getOpenAiChatGptStoredConnection(owner);
-    expect(stored?.isEnabled).toBe(false);
-    expect(stored?.connection).toMatchObject({
-      status: 'error',
-      error_message: 'not eligible',
-      access_token: '',
-    });
-    expect(stored?.connection.refresh_token).toBeUndefined();
-  });
-
-  it('leaves a connection made after the refused request untouched', async () => {
-    await saveOpenAiChatGptConnection(owner, connection('reconnected'), owner.kiloUserId as string);
-
-    await markOpenAiChatGptNotEligible(owner, 'refused', 'not eligible');
-
-    const stored = await getOpenAiChatGptStoredConnection(owner);
-    expect(stored?.isEnabled).toBe(true);
-    expect(stored?.connection).toMatchObject({ status: 'connected', access_token: 'reconnected' });
-  });
+  function refusal(accessToken: string, credentialKeyId: string | null) {
+    return { accessToken, credentialKeyId, message: 'not eligible' };
+  }
 
   async function readPayloadColumns() {
     const [row] = await db
@@ -144,22 +123,72 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
           isNull(openai_chatgpt_connections.organization_id)
         )
       );
-    return row;
+    return row ?? null;
   }
 
-  it('writes the refusal as an envelope without tokens, the placeholder in the obsolete column and the system actor recorded', async () => {
+  it('disables the refused connection and keeps the reason for the card', async () => {
+    const { credentialKeyId } = await saveOpenAiChatGptConnection(
+      owner,
+      connection('refused'),
+      owner.kiloUserId as string
+    );
+
+    await markOpenAiChatGptNotEligible(owner, refusal('refused', credentialKeyId));
+
+    const stored = await getOpenAiChatGptStoredConnection(owner);
+    expect(stored?.isEnabled).toBe(false);
+    expect(stored?.connection).toMatchObject({
+      status: 'error',
+      error_message: 'not eligible',
+      access_token: '',
+    });
+    expect(stored?.connection.refresh_token).toBeUndefined();
+  });
+
+  it('matches by decrypting the row when the caller does not know the credential key id', async () => {
     await saveOpenAiChatGptConnection(
+      owner,
+      connection('refused-no-id'),
+      owner.kiloUserId as string
+    );
+
+    await markOpenAiChatGptNotEligible(owner, refusal('refused-no-id', null));
+
+    await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toMatchObject({
+      isEnabled: false,
+      connection: { status: 'error' },
+    });
+  });
+
+  it('leaves a connection made after the refused request untouched', async () => {
+    const refused = await saveOpenAiChatGptConnection(
+      owner,
+      connection('refused'),
+      owner.kiloUserId as string
+    );
+    await saveOpenAiChatGptConnection(owner, connection('reconnected'), owner.kiloUserId as string);
+
+    await markOpenAiChatGptNotEligible(owner, refusal('refused', refused.credentialKeyId));
+    await markOpenAiChatGptNotEligible(owner, refusal('refused', null));
+
+    const stored = await getOpenAiChatGptStoredConnection(owner);
+    expect(stored?.isEnabled).toBe(true);
+    expect(stored?.connection).toMatchObject({ status: 'connected', access_token: 'reconnected' });
+  });
+
+  it('writes the refusal as an envelope without tokens, the placeholder in the obsolete column and the system actor recorded', async () => {
+    const { credentialKeyId } = await saveOpenAiChatGptConnection(
       owner,
       connection('refused-both'),
       owner.kiloUserId as string
     );
     kms.requests.length = 0;
 
-    await markOpenAiChatGptNotEligible(owner, 'refused-both', 'not eligible');
+    await markOpenAiChatGptNotEligible(owner, refusal('refused-both', credentialKeyId));
 
     const row = await readPayloadColumns();
-    expect(row.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
-    expect(row.envelope).not.toBeNull();
+    expect(row?.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
+    expect(row?.envelope).not.toBeNull();
     const serialized = JSON.stringify(row);
     expect(serialized).not.toContain('refused-both');
     expect(serialized).not.toContain('refresh-refused-both');
@@ -168,7 +197,7 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
       owner_id: owner.kiloUserId,
       provider_id: 'openai-chatgpt-oauth:personal',
       actor_user_id: 'system:openai-chatgpt-eligibility',
-      key_id: row.envelope?.key_id,
+      key_id: row?.envelope?.key_id,
     });
     await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toMatchObject({
       isEnabled: false,
@@ -177,52 +206,28 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
   });
 
   describe('when the KMS service cannot create a data key', () => {
-    it('disables the row and removes the credential, so it reads as no connection', async () => {
-      await saveOpenAiChatGptConnection(owner, connection('kms-down'), owner.kiloUserId as string);
+    it('deletes the refused credential, so it reads as no connection', async () => {
+      const { credentialKeyId } = await saveOpenAiChatGptConnection(
+        owner,
+        connection('kms-down'),
+        owner.kiloUserId as string
+      );
       kms.fail('/data-key');
 
       await expect(
-        markOpenAiChatGptNotEligible(owner, 'kms-down', 'not eligible')
+        markOpenAiChatGptNotEligible(owner, refusal('kms-down', credentialKeyId))
       ).resolves.toBeUndefined();
 
-      const after = await readPayloadColumns();
-      expect(after.envelope).toBeNull();
-      expect(after.isEnabled).toBe(false);
-      expect(after.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
-      expect(JSON.stringify(after)).not.toContain('kms-down');
-      await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toBeNull();
+      await expect(readPayloadColumns()).resolves.toBeNull();
       await expect(getOpenAiChatGptConnection(owner)).resolves.toBeNull();
     });
 
-    it('leaves the row untouched, and logs, when the KMS service cannot open the stored envelope either', async () => {
-      await saveOpenAiChatGptConnection(
+    it('leaves a connection made after the refused request untouched', async () => {
+      const refused = await saveOpenAiChatGptConnection(
         owner,
-        connection('kms-fully-down'),
+        connection('refused'),
         owner.kiloUserId as string
       );
-      const before = await readPayloadColumns();
-      kms.fail('/data-key');
-      kms.fail('/decrypt');
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-      try {
-        await expect(
-          markOpenAiChatGptNotEligible(owner, 'kms-fully-down', 'not eligible')
-        ).resolves.toBeUndefined();
-
-        expect(consoleError).toHaveBeenCalledWith(
-          expect.stringContaining('report not applied'),
-          expect.any(String),
-          expect.any(String)
-        );
-        expect(JSON.stringify(consoleError.mock.calls)).not.toContain('kms-fully-down');
-      } finally {
-        consoleError.mockRestore();
-      }
-      await expect(readPayloadColumns()).resolves.toEqual(before);
-    });
-
-    it('leaves a connection made after the refused request untouched', async () => {
       await saveOpenAiChatGptConnection(
         owner,
         connection('reconnected-kms-down'),
@@ -231,11 +236,74 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
       const before = await readPayloadColumns();
       kms.fail('/data-key');
 
-      await markOpenAiChatGptNotEligible(owner, 'refused', 'not eligible');
+      await markOpenAiChatGptNotEligible(owner, refusal('refused', refused.credentialKeyId));
 
       await expect(readPayloadColumns()).resolves.toEqual(before);
-      const stored = await getOpenAiChatGptStoredConnection(owner);
-      expect(stored?.isEnabled).toBe(true);
+    });
+  });
+
+  describe('when the KMS service cannot open the stored envelope', () => {
+    it('deletes the credential the refusal names, without decrypting it', async () => {
+      const { credentialKeyId } = await saveOpenAiChatGptConnection(
+        owner,
+        connection('kms-fully-down'),
+        owner.kiloUserId as string
+      );
+      kms.fail('/decrypt');
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await markOpenAiChatGptNotEligible(owner, refusal('kms-fully-down', credentialKeyId));
+
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringContaining('deleting the refused credential'),
+          expect.any(String),
+          expect.any(String)
+        );
+        expect(JSON.stringify(consoleError.mock.calls)).not.toContain('kms-fully-down');
+      } finally {
+        consoleError.mockRestore();
+      }
+      await expect(readPayloadColumns()).resolves.toBeNull();
+    });
+
+    it('leaves a credential sealed since the refused request untouched', async () => {
+      const refused = await saveOpenAiChatGptConnection(
+        owner,
+        connection('refused'),
+        owner.kiloUserId as string
+      );
+      await saveOpenAiChatGptConnection(
+        owner,
+        connection('reconnected'),
+        owner.kiloUserId as string
+      );
+      const before = await readPayloadColumns();
+      kms.fail('/decrypt');
+
+      await markOpenAiChatGptNotEligible(owner, refusal('refused', refused.credentialKeyId));
+
+      await expect(readPayloadColumns()).resolves.toEqual(before);
+    });
+
+    it('skips and logs a refusal without a credential key id, which cannot be matched', async () => {
+      await saveOpenAiChatGptConnection(owner, connection('unmatched'), owner.kiloUserId as string);
+      const before = await readPayloadColumns();
+      kms.fail('/decrypt');
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await markOpenAiChatGptNotEligible(owner, refusal('unmatched', null));
+
+        expect(consoleError).toHaveBeenCalledWith(
+          expect.stringContaining('refusal not applied'),
+          expect.any(String),
+          expect.any(String)
+        );
+      } finally {
+        consoleError.mockRestore();
+      }
+      await expect(readPayloadColumns()).resolves.toEqual(before);
     });
   });
 });

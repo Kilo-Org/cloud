@@ -198,12 +198,15 @@ describe('refresh with KMS envelopes against a real database', () => {
     );
     const before = await readRow();
 
-    await expect(resolveOpenAiChatGptAccessToken(owner)).resolves.toEqual({
-      kind: 'access_token',
-      accessToken: 'rotated-access-token',
-    });
+    const outcome = await resolveOpenAiChatGptAccessToken(owner);
 
     const after = await readRow();
+    // The outcome names the credential it just stored, so a refusal of it can be matched.
+    expect(outcome).toEqual({
+      kind: 'access_token',
+      accessToken: 'rotated-access-token',
+      credentialKeyId: after.envelope?.key_id,
+    });
     expect(after.envelope?.key_id).not.toBe(before.envelope?.key_id);
     expect(after.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(JSON.stringify(after.envelope)).not.toContain('rotated');
@@ -238,6 +241,7 @@ describe('refresh with KMS envelopes against a real database', () => {
     await expect(resolveOpenAiChatGptAccessToken(owner)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);

@@ -427,6 +427,7 @@ describe('upstream model catalog validation', () => {
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;
+  let credentialKeyId: string;
   const kms = useFakeByokKms();
 
   beforeEach(async () => {
@@ -434,7 +435,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       google_user_email: `upstream-attempt-${randomUUID()}@example.com`,
     });
     owner = { kiloUserId: user.id, organizationId: null };
-    await saveOpenAiChatGptConnection(
+    ({ credentialKeyId } = await saveOpenAiChatGptConnection(
       owner,
       {
         access_token: ACCESS_TOKEN,
@@ -447,7 +448,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
         status: 'connected',
       },
       user.id
-    );
+    ));
     // The real transform puts the delegated token in this header.
     jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
       extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
@@ -460,7 +461,11 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       dataRegion: null,
       upstreamDurationBudgetMs,
       providerContext: {
-        provider: { type: 'openai-chatgpt', chatGptOwner: owner },
+        provider: {
+          type: 'openai-chatgpt',
+          chatGptOwner: owner,
+          chatGptCredentialKeyId: credentialKeyId,
+        },
         userByok: null,
       } as never,
       requestedModel: 'openai/gpt-6.1-sol',
@@ -508,17 +513,35 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     );
 
     expect(result.type === 'success' && result.response.status).toBe(403);
-    // The refusal cannot be sealed, so the credential is removed and the row disabled: it reads
-    // as no connection.
-    const [row] = await db
-      .select({
-        isEnabled: openai_chatgpt_connections.is_enabled,
-        envelope: openai_chatgpt_connections.encrypted_connection_envelope,
-      })
+    // The refusal cannot be sealed, so the refused credential is deleted: it reads as no
+    // connection.
+    const rows = await db
+      .select({ id: openai_chatgpt_connections.id })
       .from(openai_chatgpt_connections)
       .where(eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string));
-    expect(row).toEqual({ isEnabled: false, envelope: null });
+    expect(rows).toEqual([]);
     await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toBeNull();
+  });
+
+  it('deletes the refused credential by its key id when the KMS service cannot open it', async () => {
+    kms.fail('/decrypt');
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await send(
+      jsonResponse(403, {
+        error: {
+          message: 'The ChatGPT user is not eligible for subscription sharing.',
+          code: 'subscription_sharing_user_not_eligible',
+        },
+      })
+    ).finally(() => consoleError.mockRestore());
+
+    expect(result.type === 'success' && result.response.status).toBe(403);
+    const rows = await db
+      .select({ id: openai_chatgpt_connections.id })
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string));
+    expect(rows).toEqual([]);
   });
 
   it('keeps the connection on another 403', async () => {

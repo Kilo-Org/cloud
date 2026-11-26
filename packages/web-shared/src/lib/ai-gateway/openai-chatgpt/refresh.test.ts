@@ -224,6 +224,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'stored-access-token',
+      credentialKeyId: storedRow.encrypted_connection_envelope?.key_id,
     });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mockDb.transaction).not.toHaveBeenCalled();
@@ -240,6 +241,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'stored-access-token',
+      credentialKeyId: expect.any(String),
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -253,6 +255,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -308,6 +311,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -353,6 +357,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -370,6 +375,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'access_token',
         accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
       });
     } finally {
       delays.restore();
@@ -468,6 +474,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'sibling-access-token',
+      credentialKeyId: expect.any(String),
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -589,10 +596,12 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await expect(first).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
     await expect(second).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
+      credentialKeyId: expect.any(String),
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -608,6 +617,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'access_token',
         accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
       });
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(init.signal).toBeInstanceOf(AbortSignal);
@@ -867,6 +877,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'access_token',
         accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
       });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -886,6 +897,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'access_token',
         accessToken: 'envelope-access',
+        credentialKeyId: expect.any(String),
       });
     });
 
@@ -953,6 +965,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'access_token',
         accessToken: 'new-access-token',
+        credentialKeyId: expect.any(String),
       });
 
       expect(kms.requests.filter(request => request.path === '/data-key')).toHaveLength(1);

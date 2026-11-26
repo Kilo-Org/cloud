@@ -815,9 +815,11 @@ because the repo check in `services/sts/test/repo/worker-configs.test.ts` refuse
 config that binds STS (a trace records outbound URLs); this ends the 5 % trace sampling the
 Worker had, and Workers Logs stay on. `logpush` is on, so the canary's lines reach Axiom.
 
-Page on the canary with an Axiom threshold monitor over the Worker's Logpush dataset (field names
-depend on the Logpush job): no `succeeded` event for `usage_ingest.sts_canary` in 15 minutes, or
-any `failed` event in 15 minutes, per environment, notifying the existing alert route.
+Page on the canary with an Axiom threshold monitor over the account Logpush dataset
+`cloudflare-logpush` (`ScriptName` `usage-ingest` or `usage-ingest-staging`, `EventType`
+`scheduled`; the canary line is in `Logs[].Message`): no `succeeded` event for
+`usage_ingest.sts_canary` in 15 minutes, or any `failed` event in 15 minutes, per environment,
+notifying the existing alert route.
 
 ### Cost
 

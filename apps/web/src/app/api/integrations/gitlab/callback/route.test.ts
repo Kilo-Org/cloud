@@ -11,7 +11,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
   instanceUrlChanged: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({
   resetCodeReviewConfigForOwner: jest.fn(),

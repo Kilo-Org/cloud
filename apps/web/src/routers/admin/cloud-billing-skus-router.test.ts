@@ -4,7 +4,7 @@ import type {
   ContainerUsageAnalyticsInput,
   ContainerUsageAnalyticsResult,
 } from '@/lib/cloudflare/container-usage-analytics';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
@@ -134,7 +134,7 @@ describe('admin.cloudBillingSkus.list', () => {
       created_by_user_id: admin.id,
     });
 
-    const adminCaller = await createCallerForUser(admin.id);
+    const adminCaller = await createSessionCallerForUser(admin.id);
     await expect(adminCaller.admin.cloudBillingSkus.list()).resolves.toEqual([
       expect.objectContaining({
         id: 'cloud-agent-standard',
@@ -142,7 +142,7 @@ describe('admin.cloudBillingSkus.list', () => {
       }),
     ]);
 
-    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    const nonAdminCaller = await createSessionCallerForUser(nonAdmin.id);
     await expect(nonAdminCaller.admin.cloudBillingSkus.list()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
@@ -193,7 +193,7 @@ describe('admin.cloudBillingSkus usage records', () => {
       .update(container_usage_interval)
       .set({ status: 'closed', close_reason: 'unconfirmed', stopped_at: oldAt })
       .where(eq(container_usage_interval.id, 'recent-old'));
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.cloudBillingSkus.searchUsageIntervals({
       search: { kind: 'recent' },
       limit: 10,
@@ -256,14 +256,14 @@ describe('admin.cloudBillingSkus usage records', () => {
 
   it('requires admin access and searches exact interval IDs', async () => {
     await insertUsageInterval({ id: 'interval-exact' });
-    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    const nonAdminCaller = await createSessionCallerForUser(nonAdmin.id);
     await expect(
       nonAdminCaller.admin.cloudBillingSkus.searchUsageIntervals({
         search: { kind: 'interval', id: 'interval-exact' },
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.cloudBillingSkus.searchUsageIntervals({
       search: { kind: 'interval', id: 'interval-exact' },
     });
@@ -349,7 +349,7 @@ describe('admin.cloudBillingSkus usage records', () => {
         received_at: '2026-07-22T10:01:00.000Z',
       },
     ]);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const first = await caller.admin.cloudBillingSkus.searchUsageIntervals({
       search: {
         kind: 'subject',
@@ -445,7 +445,7 @@ describe('admin.cloudBillingSkus usage records', () => {
       received_at: '2026-07-23T10:00:00.000Z',
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const summary = await caller.admin.cloudBillingSkus.getUsageSummary({
       subjectType: 'user',
       subjectId: 'summary-subject',
@@ -466,7 +466,7 @@ describe('admin.cloudBillingSkus usage records', () => {
       ],
     });
 
-    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    const nonAdminCaller = await createSessionCallerForUser(nonAdmin.id);
     await expect(
       nonAdminCaller.admin.cloudBillingSkus.getUsageSummary({
         subjectType: 'user',
@@ -478,7 +478,7 @@ describe('admin.cloudBillingSkus usage records', () => {
   });
 
   it('rejects invalid and oversized usage summary windows', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.cloudBillingSkus.getUsageSummary({
         subjectType: 'user',
@@ -862,7 +862,7 @@ describe('admin.cloudBillingSkus usage records', () => {
   });
 
   it('does not call Cloudflare for empty meter usage and rejects non-admin reconciliation', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.admin.cloudBillingSkus.reconcileUsageWithCloudflare({
       subjectType: 'user',
       subjectId: 'no-usage-subject',
@@ -879,7 +879,7 @@ describe('admin.cloudBillingSkus usage records', () => {
     });
     expect(mockQueryContainerUsageAnalytics).not.toHaveBeenCalled();
 
-    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    const nonAdminCaller = await createSessionCallerForUser(nonAdmin.id);
     await expect(
       nonAdminCaller.admin.cloudBillingSkus.reconcileUsageWithCloudflare({
         subjectType: 'user',
@@ -1071,7 +1071,7 @@ describe('admin.cloudBillingSkus usage records', () => {
         received_at: '2026-07-22T10:01:00.000Z',
       },
     ]);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const first = await caller.admin.cloudBillingSkus.listUsageSegments({
       intervalId: 'interval-segments',
       limit: 1,
@@ -1104,7 +1104,7 @@ describe('admin.cloudBillingSkus usage records', () => {
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Stored usage metadata is invalid',
     });
-    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    const nonAdminCaller = await createSessionCallerForUser(nonAdmin.id);
     await expect(
       nonAdminCaller.admin.cloudBillingSkus.listUsageSegments({
         intervalId: 'interval-segments',
@@ -1134,7 +1134,7 @@ describe('admin.cloudBillingSkus usage records', () => {
       received_at: recent,
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const health = await caller.admin.cloudBillingSkus.usageHealth();
     expect(health).toMatchObject({
       intervalsReported: 1,
@@ -1156,7 +1156,7 @@ describe('admin.cloudBillingSkus usage records', () => {
       limit: 10,
     });
     expect(unconfirmed.items.map(item => item.id)).toEqual(['health-closed']);
-    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    const nonAdminCaller = await createSessionCallerForUser(nonAdmin.id);
     await expect(nonAdminCaller.admin.cloudBillingSkus.usageHealth()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
@@ -1224,7 +1224,7 @@ describe('admin.cloudBillingSkus charge ledger', () => {
         created_at: createdAt,
       },
     ]);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const start = new Date(Date.now() - 60_000).toISOString();
     const end = new Date(Date.now() + 60_000).toISOString();
     const first = await caller.admin.cloudBillingSkus.searchUsageCharges({ start, end, limit: 1 });
@@ -1319,7 +1319,7 @@ describe('admin.cloudBillingSkus charge ledger', () => {
 
 describe('admin.cloudBillingSkus.create', () => {
   it('requires admin access', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.cloudBillingSkus.create(validInput('restricted-sku'))
@@ -1330,7 +1330,7 @@ describe('admin.cloudBillingSkus.create', () => {
   });
 
   it('persists the exact rate and authenticated creator', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.cloudBillingSkus.create(validInput('exact-rate-sku'));
 
@@ -1347,7 +1347,7 @@ describe('admin.cloudBillingSkus.create', () => {
   });
 
   it('returns a canonical rate after PostgreSQL scale padding', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const created = await caller.admin.cloudBillingSkus.create({
       ...validInput('canonical-rate-sku'),
@@ -1365,7 +1365,7 @@ describe('admin.cloudBillingSkus.create', () => {
   });
 
   it('returns CONFLICT for a duplicate SKU ID', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.cloudBillingSkus.create(validInput('duplicate-sku'));
 
     await expect(
@@ -1383,7 +1383,7 @@ describe('admin.cloudBillingSkus.disable', () => {
       ...validInput('protected-sku'),
       created_by_user_id: admin.id,
     });
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.cloudBillingSkus.disable({ id: 'protected-sku' })
@@ -1397,7 +1397,7 @@ describe('admin.cloudBillingSkus.disable', () => {
   });
 
   it('only moves a SKU to disabled and remains disabled on repeated calls', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.cloudBillingSkus.create(validInput('one-way-sku'));
 
     const disabled = await caller.admin.cloudBillingSkus.disable({ id: 'one-way-sku' });

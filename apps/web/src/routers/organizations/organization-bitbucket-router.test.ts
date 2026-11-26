@@ -14,14 +14,18 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq } from 'drizzle-orm';
+import { eq, isNotNull } from 'drizzle-orm';
 import type {
   BitbucketWorkspaceAccessTokenMutationResult,
   ConnectBitbucketWorkspaceAccessTokenInput,
   DisconnectBitbucketWorkspaceAccessTokenInput,
   RotateBitbucketWorkspaceAccessTokenInput,
 } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-credentials';
-import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
+import type * as WorkspaceAccessTokenCredentialsModule from '@/lib/integrations/platforms/bitbucket/workspace-access-token-credentials';
+import type {
+  createCallerForUser as CreateCallerForUser,
+  createSessionCallerForUser as CreateSessionCallerForUser,
+} from '@/routers/test-utils';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { BitbucketRepositoryListResult } from '@/lib/integrations/platforms/bitbucket/token-service-client';
@@ -85,8 +89,22 @@ jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-credent
   connectBitbucketWorkspaceAccessToken: mockConnect,
   disconnectBitbucketWorkspaceAccessToken: mockDisconnect,
   rotateBitbucketWorkspaceAccessToken: mockRotate,
-  BitbucketWorkspaceAccessTokenCredentialError: class extends Error {},
+  // The real class, so the router maps refusals from the real disconnect service.
+  BitbucketWorkspaceAccessTokenCredentialError: jest.requireActual<
+    typeof WorkspaceAccessTokenCredentialsModule
+  >('@/lib/integrations/platforms/bitbucket/workspace-access-token-credentials')
+    .BitbucketWorkspaceAccessTokenCredentialError,
 }));
+
+// The real credential service, whose locked authorization decides whether the
+// router's pre-disconnect cleanup runs.
+function realDisconnect(input: DisconnectBitbucketWorkspaceAccessTokenInput) {
+  return jest
+    .requireActual<typeof WorkspaceAccessTokenCredentialsModule>(
+      '@/lib/integrations/platforms/bitbucket/workspace-access-token-credentials'
+    )
+    .disconnectBitbucketWorkspaceAccessToken(input);
+}
 
 const mockCancelReview = jest.fn<(reviewId: string, reason: string, attemptId?: string) => void>();
 
@@ -97,6 +115,7 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 }));
 
 let createCallerForUser: typeof CreateCallerForUser;
+let createSessionCallerForUser: typeof CreateSessionCallerForUser;
 
 const WORKSPACE_UUID = '11111111-1111-4111-8111-111111111111';
 const REPOSITORY_UUID = '22222222-2222-4222-8222-222222222222';
@@ -235,6 +254,63 @@ async function insertActiveOAuthIntegration(organizationId: string, actorUserId:
   return integration;
 }
 
+async function insertRunningCodeReview(
+  organizationId: string,
+  ownerUserId: string,
+  integrationId: string
+) {
+  await db.insert(agent_configs).values({
+    owned_by_organization_id: organizationId,
+    agent_type: 'code_review',
+    platform: 'bitbucket',
+    config: {
+      review_style: 'balanced',
+      focus_areas: [],
+      model_slug: 'test-model',
+      repository_selection_mode: 'selected',
+      selected_repository_ids: [REPOSITORY_UUID],
+    },
+    is_enabled: true,
+    created_by: ownerUserId,
+  });
+  const reviewId = await createCodeReview({
+    owner: { type: 'org', id: organizationId, userId: ownerUserId },
+    platform: 'bitbucket',
+    platformIntegrationId: integrationId,
+    repoFullName: 'acme/api',
+    prNumber: 42,
+    prUrl: 'https://bitbucket.org/acme/api/pull-requests/42',
+    prTitle: 'Disconnect cleanup',
+    prAuthor: 'Ada Reviewer',
+    baseRef: 'main',
+    headRef: 'feature/disconnect-cleanup',
+    headSha: 'a'.repeat(40),
+  });
+  await updateCodeReviewStatus(reviewId, 'running', {
+    sessionId: 'agent-bitbucket-disconnect',
+    cliSessionId: 'ses_bitbucket_disconnect',
+  });
+  const attempt = await createCodeReviewAttempt({
+    codeReviewId: reviewId,
+    status: 'running',
+    sessionId: 'agent-bitbucket-disconnect',
+    cliSessionId: 'ses_bitbucket_disconnect',
+  });
+  return { reviewId, attemptId: attempt.id };
+}
+
+async function codeReviewerState(organizationId: string, reviewId: string) {
+  const [config] = await db
+    .select({ isEnabled: agent_configs.is_enabled })
+    .from(agent_configs)
+    .where(eq(agent_configs.owned_by_organization_id, organizationId));
+  const [review] = await db
+    .select({ status: cloud_agent_code_reviews.status })
+    .from(cloud_agent_code_reviews)
+    .where(eq(cloud_agent_code_reviews.id, reviewId));
+  return { isEnabled: config?.isEnabled, status: review?.status };
+}
+
 describe('organization Bitbucket router', () => {
   let owner: User;
   let billingManager: User;
@@ -242,7 +318,7 @@ describe('organization Bitbucket router', () => {
   let organization: Organization;
 
   beforeAll(async () => {
-    ({ createCallerForUser } = await import('@/routers/test-utils'));
+    ({ createCallerForUser, createSessionCallerForUser } = await import('@/routers/test-utils'));
     owner = await insertTestUser();
     billingManager = await insertTestUser();
     member = await insertTestUser();
@@ -268,6 +344,10 @@ describe('organization Bitbucket router', () => {
   });
 
   afterAll(async () => {
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: null })
+      .where(isNotNull(organizations.parent_organization_id));
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -450,55 +530,22 @@ describe('organization Bitbucket router', () => {
 
   it('disables Bitbucket Code Reviewer before disconnecting a Workspace Access Token', async () => {
     const integration = await insertStaticIntegration(organization.id, owner.id);
-    await db.insert(agent_configs).values({
-      owned_by_organization_id: organization.id,
-      agent_type: 'code_review',
-      platform: 'bitbucket',
-      config: {
-        review_style: 'balanced',
-        focus_areas: [],
-        model_slug: 'test-model',
-        repository_selection_mode: 'selected',
-        selected_repository_ids: [REPOSITORY_UUID],
-      },
-      is_enabled: true,
-      created_by: owner.id,
-    });
-    const reviewId = await createCodeReview({
-      owner: { type: 'org', id: organization.id, userId: owner.id },
-      platform: 'bitbucket',
-      platformIntegrationId: integration.id,
-      repoFullName: 'acme/api',
-      prNumber: 42,
-      prUrl: 'https://bitbucket.org/acme/api/pull-requests/42',
-      prTitle: 'Disconnect cleanup',
-      prAuthor: 'Ada Reviewer',
-      baseRef: 'main',
-      headRef: 'feature/disconnect-cleanup',
-      headSha: 'a'.repeat(40),
-    });
-    await updateCodeReviewStatus(reviewId, 'running', {
-      sessionId: 'agent-bitbucket-disconnect',
-      cliSessionId: 'ses_bitbucket_disconnect',
-    });
-    const attempt = await createCodeReviewAttempt({
-      codeReviewId: reviewId,
-      status: 'running',
-      sessionId: 'agent-bitbucket-disconnect',
-      cliSessionId: 'ses_bitbucket_disconnect',
-    });
-    mockDisconnect.mockImplementationOnce(async () => {
-      const [config] = await db
-        .select({ isEnabled: agent_configs.is_enabled })
-        .from(agent_configs)
-        .where(eq(agent_configs.owned_by_organization_id, organization.id));
-      const [review] = await db
-        .select({ status: cloud_agent_code_reviews.status })
-        .from(cloud_agent_code_reviews)
-        .where(eq(cloud_agent_code_reviews.id, reviewId));
-
-      expect(config?.isEnabled).toBe(false);
-      expect(review?.status).toBe('cancelled');
+    const { reviewId, attemptId } = await insertRunningCodeReview(
+      organization.id,
+      owner.id,
+      integration.id
+    );
+    mockDisconnect.mockImplementationOnce(async input => {
+      // The credential service runs cleanup only once it confirms authority.
+      await expect(codeReviewerState(organization.id, reviewId)).resolves.toEqual({
+        isEnabled: true,
+        status: 'running',
+      });
+      await input.beforeDisconnect?.();
+      await expect(codeReviewerState(organization.id, reviewId)).resolves.toEqual({
+        isEnabled: false,
+        status: 'cancelled',
+      });
       return { integrationId: integration.id };
     });
     const caller = await createCallerForUser(owner.id);
@@ -513,7 +560,7 @@ describe('organization Bitbucket router', () => {
     expect(mockCancelReview).toHaveBeenCalledWith(
       reviewId,
       'Bitbucket Code Reviewer disabled',
-      attempt.id
+      attemptId
     );
     expect(mockDeleteBitbucketWorkspaceWebhooksFromTokenService).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -530,7 +577,104 @@ describe('organization Bitbucket router', () => {
       organizationId: organization.id,
       actorUserId: owner.id,
       integrationId: integration.id,
+      authority: 'member',
+      beforeDisconnect: expect.any(Function),
     });
+  });
+
+  it('refuses an inherited billing role before any Code Reviewer cleanup', async () => {
+    const parentOwner = await insertTestUser();
+    const inheritedManager = await insertTestUser();
+    const inheritedStaff = await insertTestUser({ is_admin: true });
+    const parent = await createTestOrganization('Bitbucket Parent Organization', parentOwner.id, 0);
+    await db.insert(organization_memberships).values([
+      { organization_id: parent.id, kilo_user_id: inheritedManager.id, role: 'billing_manager' },
+      { organization_id: parent.id, kilo_user_id: inheritedStaff.id, role: 'billing_manager' },
+    ]);
+    const child = await createTestOrganization('Bitbucket Child Organization', owner.id, 0);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    const integration = await insertStaticIntegration(child.id, owner.id);
+    const { reviewId } = await insertRunningCodeReview(child.id, owner.id, integration.id);
+    mockDisconnect.mockImplementationOnce(realDisconnect).mockImplementationOnce(realDisconnect);
+
+    // Both pass the procedure boundary as members through the parent role; the
+    // staff caller holds a role, so no staff admission stands in for it.
+    for (const caller of [
+      await createCallerForUser(inheritedManager.id),
+      await createSessionCallerForUser(inheritedStaff.id),
+    ]) {
+      await expect(
+        caller.organizations.bitbucket.disconnect({
+          organizationId: child.id,
+          integrationId: integration.id,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    }
+
+    expect(mockDisconnect.mock.calls.map(([input]) => input.authority)).toEqual([
+      'member',
+      'member',
+    ]);
+    await expect(codeReviewerState(child.id, reviewId)).resolves.toEqual({
+      isEnabled: true,
+      status: 'running',
+    });
+    expect(mockCancelReview).not.toHaveBeenCalled();
+    expect(mockDeleteBitbucketWorkspaceWebhooksFromTokenService).not.toHaveBeenCalled();
+    await expect(
+      db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id))
+    ).resolves.toEqual([{ id: integration.id }]);
+  });
+
+  it('lets a guarded staff caller disconnect after Code Reviewer cleanup', async () => {
+    const staff = await insertTestUser({ is_admin: true });
+    const integration = await insertStaticIntegration(organization.id, owner.id);
+    const { reviewId, attemptId } = await insertRunningCodeReview(
+      organization.id,
+      owner.id,
+      integration.id
+    );
+    mockDisconnect.mockImplementationOnce(realDisconnect);
+    const previousSupport = process.env.SUPPORT_ACCESS_ENABLED;
+    delete process.env.SUPPORT_ACCESS_ENABLED;
+    try {
+      const caller = await createSessionCallerForUser(staff.id);
+      await expect(
+        caller.organizations.bitbucket.disconnect({
+          organizationId: organization.id,
+          integrationId: integration.id,
+        })
+      ).resolves.toEqual({ integrationId: integration.id });
+    } finally {
+      if (previousSupport === undefined) delete process.env.SUPPORT_ACCESS_ENABLED;
+      else process.env.SUPPORT_ACCESS_ENABLED = previousSupport;
+    }
+
+    expect(mockDisconnect).toHaveBeenCalledWith(
+      expect.objectContaining({ actorUserId: staff.id, authority: 'staff' })
+    );
+    await expect(codeReviewerState(organization.id, reviewId)).resolves.toEqual({
+      isEnabled: false,
+      status: 'cancelled',
+    });
+    expect(mockCancelReview).toHaveBeenCalledWith(
+      reviewId,
+      'Bitbucket Code Reviewer disabled',
+      attemptId
+    );
+    expect(mockDeleteBitbucketWorkspaceWebhooksFromTokenService).toHaveBeenCalledTimes(1);
+    await expect(
+      db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id))
+    ).resolves.toEqual([]);
   });
 
   it('rejects every integration mutation for an ordinary member', async () => {
@@ -573,6 +717,35 @@ describe('organization Bitbucket router', () => {
     expect(mockConnect).not.toHaveBeenCalled();
     expect(mockRotate).not.toHaveBeenCalled();
     expect(mockDisconnect).not.toHaveBeenCalled();
+  });
+
+  it('refuses Workspace Access Token issue to a platform admin without a membership', async () => {
+    const integration = await insertStaticIntegration(organization.id, owner.id);
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.organizations.bitbucket.connect({
+        organizationId: organization.id,
+        accessToken: 'ATCT-admin-secret',
+      })
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    });
+    await expect(
+      caller.organizations.bitbucket.replaceToken({
+        organizationId: organization.id,
+        integrationId: integration.id,
+        accessToken: 'ATCT-admin-secret',
+      })
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    });
+
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(mockRotate).not.toHaveBeenCalled();
   });
 
   it('returns sanitized authorization loss when a manager is demoted during refresh', async () => {

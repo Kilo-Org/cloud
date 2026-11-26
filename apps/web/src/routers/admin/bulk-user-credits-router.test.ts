@@ -1,5 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { admin_action_audit_logs, credit_transactions } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
@@ -8,7 +8,7 @@ describe('bulk user credits router', () => {
   it('allows ordinary admins to match users but not grant credits', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const recipient = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.bulkUserCredits.matchUsers({ emails: [recipient.google_user_email] })
@@ -35,7 +35,7 @@ describe('bulk user credits router', () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipients = await Promise.all([insertTestUser(), insertTestUser()]);
     const missingEmail = `missing-${crypto.randomUUID()}@example.com`;
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const results = await caller.admin.bulkUserCredits.grantBulkCredits({
       emails: [...recipients.map(user => user.google_user_email), missingEmail],
@@ -77,7 +77,7 @@ describe('bulk user credits router', () => {
   it('records one admin audit row per requested user, failures included', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipients = await Promise.all([insertTestUser(), insertTestUser()]);
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.bulkUserCredits.grantBulkCredits({
       emails: [
@@ -123,7 +123,7 @@ describe('bulk user credits router', () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const blocked = await insertTestUser({ blocked_reason: 'abuse' });
     const missingEmail = `missing-${crypto.randomUUID()}@example.com`;
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const results = await caller.admin.bulkUserCredits.grantBulkCredits({
       emails: [blocked.google_user_email, missingEmail],
@@ -162,7 +162,7 @@ describe('bulk user credits router', () => {
   it('distinguishes an invalid expiration date from a past one', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipient = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     async function refusalMessage(expirationDate: string): Promise<string> {
       let message = '';

@@ -3,7 +3,10 @@ import Stripe from 'stripe';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -309,6 +312,56 @@ describe('fetchTopUpTransactionForStripeSession', () => {
 
     await expect(fetchTopUpTransactionForStripeSession('cs_test_1')).resolves.toEqual({
       status: 'unavailable',
+    });
+  });
+
+  it('returns nothing for an organization purchase to staff without a membership', async () => {
+    const owner = await insertTestUser();
+    const staff = await insertTestUser({ is_admin: true });
+    const organization = await createTestOrganization('Top-up org', owner.id, 0);
+    await insertLedgerRow({
+      kiloUserId: owner.id,
+      organizationId: organization.id,
+      stripePaymentId: 'pi_test_org_staff_outsider',
+    });
+    mockedGetUserFromAuth.mockResolvedValue({ user: staff, authFailedResponse: null });
+    stripeMock.checkout.sessions.retrieve.mockResolvedValue(
+      makeSession({
+        metadata: { kiloUserId: owner.id, organizationId: organization.id },
+        paymentIntentId: 'pi_test_org_staff_outsider',
+      })
+    );
+
+    await expect(fetchTopUpTransactionForStripeSession('cs_test_1')).resolves.toEqual({
+      status: 'unavailable',
+    });
+  });
+
+  it('resolves an organization purchase for staff who hold a real billing role', async () => {
+    const owner = await insertTestUser();
+    const staff = await insertTestUser({ is_admin: true });
+    const organization = await createTestOrganization('Top-up org', owner.id, 0);
+    await addUserToOrganization(organization.id, staff.id, 'billing_manager');
+    const transactionId = await insertLedgerRow({
+      kiloUserId: owner.id,
+      organizationId: organization.id,
+      stripePaymentId: 'pi_test_org_staff_member',
+    });
+    mockedGetUserFromAuth.mockResolvedValue({ user: staff, authFailedResponse: null });
+    stripeMock.checkout.sessions.retrieve.mockResolvedValue(
+      makeSession({
+        metadata: { kiloUserId: owner.id, organizationId: organization.id },
+        paymentIntentId: 'pi_test_org_staff_member',
+      })
+    );
+
+    await expect(fetchTopUpTransactionForStripeSession('cs_test_1')).resolves.toEqual({
+      status: 'found',
+      transaction: {
+        id: transactionId,
+        organizationId: organization.id,
+        amountMicrodollars: 20_000_000,
+      },
     });
   });
 });

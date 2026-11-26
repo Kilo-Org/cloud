@@ -1,4 +1,7 @@
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { AdminStepUpGate } from '@/lib/admin/require-admin-page';
+import { AdminAccessDenied } from '@/app/admin/components/AdminAccessDenied';
+import { adminNetworkRefusalFor } from '@kilocode/web-shared/lib/admin/admin-network';
 import { signInUrlWithCallbackPath } from '@kilocode/web-shared/lib/user/server';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
@@ -17,9 +20,16 @@ export default async function WelcomeLayout({
     surface: 'server-component',
   });
   if (!result.success) {
-    const href =
-      result.nextResponse.status === 401 ? await signInUrlWithCallbackPath() : '/profile';
-    redirect(href);
+    if (result.nextResponse.status === 401) redirect(await signInUrlWithCallbackPath());
+    // A staff grant that needs a fresh proof renders the ceremony, not a redirect.
+    if (result.stepUp) return <AdminStepUpGate requirement={result.stepUp} />;
+    // Staff off the admin network get the admin refusal, not a generic redirect.
+    if (result.adminNetworkDenial) {
+      return (
+        <AdminAccessDenied message={adminNetworkRefusalFor(result.adminNetworkDenial).message} />
+      );
+    }
+    redirect('/profile');
   }
   const { user } = result.data;
   return (

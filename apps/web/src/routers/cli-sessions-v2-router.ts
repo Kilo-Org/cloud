@@ -67,12 +67,7 @@ import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { encodePercentEncodedSegments } from '@kilocode/app-shared/percent-encoded-segments';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
-import {
-  recordKiloAdminElevation,
-  UNSCOPED_TARGET,
-} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   fetchPullRequestByNumber,
   toGitHubRateLimitError,
@@ -786,19 +781,10 @@ async function addOrganizationCondition(
   organizationId: string | null | undefined
 ): Promise<void> {
   if (organizationId === undefined) {
-    if (ctx.user.is_admin && !isSupportAccessEnabled()) {
-      // No membership predicate is added at all, so the query spans every
-      // organization's sessions. This is the broadest read in the file and it
-      // never touches `adminProcedure`, so it must be recorded here.
-      await recordKiloAdminElevation(ctx, {
-        reason: 'cli_session_cross_org_query',
-        target: UNSCOPED_TARGET,
-      });
-    } else {
-      whereConditions.push(
-        activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id)
-      );
-    }
+    // Staff included: a session in an organization the caller does not belong
+    // to is listed only through an explicit `organizationId`, which the
+    // organization access check admits.
+    whereConditions.push(activeOrganizationAccessSql(cli_sessions_v2.organization_id, ctx.user.id));
     return;
   }
 

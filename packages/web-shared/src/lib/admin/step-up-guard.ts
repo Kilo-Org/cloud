@@ -128,27 +128,38 @@ export function stepUpDecisionCovers(
   return decision.target.id === target.id;
 }
 
-function deny(params: {
+type StepUpRefusalParams = {
   code: StepUpErrorCode;
   actionClass: PrivilegedActionClass;
   /** The operation a retry must name, when the refusal can name one. */
   operation: StepUpOperation | null;
-  message: string;
-}): never {
+};
+
+/**
+ * The cause of a step-up refusal: what the tRPC formatter exposes as
+ * `data.stepUp` and what a REST refusal returns as its `stepUp` body.
+ */
+export function stepUpRequirement(params: StepUpRefusalParams): StepUpRequiredError {
   const policy = stepUpPolicyFor(params.actionClass);
+  return new StepUpRequiredError({
+    code: params.code,
+    actionClass: params.actionClass,
+    purpose: policy.purpose,
+    maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
+    binding:
+      params.operation && isOperationStepUpClass(params.actionClass)
+        ? refusalBinding(params.actionClass, params.operation)
+        : null,
+  });
+}
+
+export const BROWSER_SESSION_REQUIRED_MESSAGE = 'MFA requires a browser session';
+
+function deny(params: StepUpRefusalParams & { message: string }): never {
   throw new TRPCError({
     code: 'FORBIDDEN',
     message: params.message,
-    cause: new StepUpRequiredError({
-      code: params.code,
-      actionClass: params.actionClass,
-      purpose: policy.purpose,
-      maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
-      binding:
-        params.operation && isOperationStepUpClass(params.actionClass)
-          ? refusalBinding(params.actionClass, params.operation)
-          : null,
-    }),
+    cause: stepUpRequirement(params),
   });
 }
 
@@ -190,7 +201,7 @@ export async function runStepUpGuard(params: RunStepUpGuardParams): Promise<Admi
       code: 'BEARER_NOT_ALLOWED',
       actionClass: params.actionClass,
       operation: null,
-      message: 'MFA requires a browser session',
+      message: BROWSER_SESSION_REQUIRED_MESSAGE,
     });
   }
 

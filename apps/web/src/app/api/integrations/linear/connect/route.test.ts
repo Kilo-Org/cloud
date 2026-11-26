@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getLinearOAuthUrl } from '@/lib/integrations/linear-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
@@ -15,7 +15,7 @@ jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   beginProviderOAuthAttempt: jest.fn(async () => undefined),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware', () => ({
   requireActiveSubscriptionOrTrial: jest.fn(),
@@ -26,7 +26,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetLinearOAuthUrl = jest.mocked(getLinearOAuthUrl);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedRequireActiveSubscriptionOrTrial = jest.mocked(requireActiveSubscriptionOrTrial);
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 
@@ -47,7 +47,7 @@ describe('GET /api/integrations/linear/connect', () => {
       authFailedResponse: null,
     } as never);
     mockedGetLinearOAuthUrl.mockReturnValue('https://linear.app/oauth/authorize?state=signed');
-    mockedEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockedEnsureMemberOrganizationAccess.mockResolvedValue('owner');
     mockedRequireActiveSubscriptionOrTrial.mockResolvedValue({
       isReadOnly: false,
       daysRemaining: 30,
@@ -94,8 +94,8 @@ describe('GET /api/integrations/linear/connect', () => {
       makeRequest('/api/integrations/linear/connect?organizationId=org-linear-123')
     );
 
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      { user: expect.objectContaining({ id: USER_ID }) },
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       'org-linear-123',
       ORGANIZATION_BILLING_ROLES
     );
@@ -110,7 +110,7 @@ describe('GET /api/integrations/linear/connect', () => {
   });
 
   test('redirects org authorization failures without creating an OAuth URL', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(new Error('unauthorized'));
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(new Error('unauthorized'));
 
     const response = await callLinearConnect(
       makeRequest('/api/integrations/linear/connect?organizationId=org-linear-123')

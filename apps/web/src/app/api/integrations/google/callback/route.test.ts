@@ -12,9 +12,9 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
-const mockedEnsureOrganizationAccess = jest.fn();
+const mockedEnsureMemberOrganizationAccess = jest.fn();
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: mockedEnsureOrganizationAccess,
+  ensureMemberOrganizationAccess: mockedEnsureMemberOrganizationAccess,
 }));
 const mockedRequireKiloClawAccess = jest.fn();
 jest.mock('@/lib/kiloclaw/access-gate', () => ({
@@ -254,7 +254,7 @@ describe('GET /api/integrations/google/callback', () => {
       response,
       `/organizations/${ORG_ID}/claw/settings?success=google_connected`
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith({ id: USER_ID }, ORG_ID);
     expect(mockedRequireOrganizationKiloClawComputeEntitlement).toHaveBeenCalledWith(ORG_ID);
     expect(mockedRequireKiloClawAccess).not.toHaveBeenCalled();
   });
@@ -285,7 +285,7 @@ describe('GET /api/integrations/google/callback', () => {
       response,
       `/organizations/${ORG_ID}/claw/settings?success=google_connected`
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith({ id: USER_ID }, ORG_ID);
   });
 
   test('redirects personal OAuth provider errors to personal claw settings', async () => {

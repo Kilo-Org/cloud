@@ -8,6 +8,7 @@ import * as z from 'zod';
 import {
   organizationMemberProcedure,
   organizationBillingMutationProcedure,
+  organizationBillingMemberMutationProcedure,
   organizationMemberMutationProcedure,
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
@@ -15,11 +16,7 @@ import {
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import {
-  inputFieldTarget,
-  runElevatedOrganizationWrite,
-} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,
@@ -1372,160 +1369,142 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    * Scope is per-org: only this integration's metadata is touched. See
    * P1-D-32.
    */
-  rotateGitLabWebhookSecret: organizationBillingMutationProcedure
+  rotateGitLabWebhookSecret: organizationBillingMemberMutationProcedure
     .input(OrganizationIdInputSchema)
-    .mutation(({ input, ctx }) =>
-      // The rotated secret is returned to the caller, so an elevated admin
-      // rotation is recorded durably, failures included. The secret itself is
-      // never logged.
-      runElevatedOrganizationWrite(
-        ctx,
-        {
-          organizationId: input.organizationId,
-          requiredRoles: ORGANIZATION_BILLING_ROLES,
-          action: 'organization.gitlab_webhook_secret.rotate',
-          message: 'Rotated GitLab webhook secret (new secret returned to the caller)',
-        },
-        async () => {
-          const organizationId = input.organizationId;
-          const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
+    .mutation(async ({ input, ctx }) => {
+      const organizationId = input.organizationId;
+      const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
 
-          if (!integration) {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'GitLab integration not found for this organization',
-            });
-          }
+      if (!integration) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'GitLab integration not found for this organization',
+        });
+      }
 
-          const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
-          const configuredWebhooks =
-            (existingMetadata.configured_webhooks as
-              | Record<string, ConfiguredWebhook>
-              | undefined) ?? {};
-          const instanceUrl =
-            (existingMetadata.gitlab_instance_url as string | undefined) || 'https://gitlab.com';
+      const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+      const configuredWebhooks =
+        (existingMetadata.configured_webhooks as Record<string, ConfiguredWebhook> | undefined) ??
+        {};
+      const instanceUrl =
+        (existingMetadata.gitlab_instance_url as string | undefined) || 'https://gitlab.com';
 
-          // Persist a brand-new secret. We generate it here (rather than via
-          // gitlab-service.regenerateWebhookSecret) so the re-sync and the
-          // metadata write happen against a single secret in a single
-          // operation. Never log the secret or the full metadata.
-          const newSecret = randomBytes(32).toString('hex');
+      // Persist a brand-new secret. We generate it here (rather than via
+      // gitlab-service.regenerateWebhookSecret) so the re-sync and the
+      // metadata write happen against a single secret in a single
+      // operation. Never log the secret or the full metadata.
+      const newSecret = randomBytes(32).toString('hex');
 
-          // If no Kilo-managed webhooks are configured, skip the network
-          // round-trip entirely and just persist + return the new secret.
-          if (Object.keys(configuredWebhooks).length === 0) {
-            await mutateGitLabMetadata(integration.id, {
-              set: { webhook_secret: newSecret },
-            });
-            await createAuditLog({
-              organization_id: organizationId,
-              action: 'organization.settings.change',
-              actor_id: ctx.user.id,
-              actor_email: ctx.user.google_user_email,
-              actor_name: ctx.user.google_user_name,
-              details: { id: 'reviewAgent.secretRotated', updated: 0, errors: 0 },
-              message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
-            });
-            return {
-              webhookSecret: newSecret,
-              webhookSync: {
-                created: 0,
-                updated: 0,
-                deleted: 0,
-                errors: [] as Array<{ projectId: number; error: string; operation: string }>,
-              },
-              configuredWebhookCount: 0,
-            };
-          }
+      // If no Kilo-managed webhooks are configured, skip the network
+      // round-trip entirely and just persist + return the new secret.
+      if (Object.keys(configuredWebhooks).length === 0) {
+        await mutateGitLabMetadata(integration.id, {
+          set: { webhook_secret: newSecret },
+        });
+        await createAuditLog({
+          organization_id: organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          details: { id: 'reviewAgent.secretRotated', updated: 0, errors: 0 },
+          message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
+        });
+        return {
+          webhookSecret: newSecret,
+          webhookSync: {
+            created: 0,
+            updated: 0,
+            deleted: 0,
+            errors: [] as Array<{ projectId: number; error: string; operation: string }>,
+          },
+          configuredWebhookCount: 0,
+        };
+      }
 
-          let webhookSyncResult: {
-            created: number;
-            updated: number;
-            deleted: number;
-            errors: Array<{ projectId: number; error: string; operation: string }>;
-          } = { created: 0, updated: 0, deleted: 0, errors: [] };
-          let updatedWebhooks: Record<string, ConfiguredWebhook> = configuredWebhooks;
+      let webhookSyncResult: {
+        created: number;
+        updated: number;
+        deleted: number;
+        errors: Array<{ projectId: number; error: string; operation: string }>;
+      } = { created: 0, updated: 0, deleted: 0, errors: [] };
+      let updatedWebhooks: Record<string, ConfiguredWebhook> = configuredWebhooks;
 
-          try {
-            const accessToken = await getValidGitLabToken(integration, {
-              userId: ctx.user.id,
-              organizationId,
-            });
-            const configuredRepoIds = Object.keys(configuredWebhooks)
-              .map(id => Number.parseInt(id, 10))
-              .filter(id => Number.isFinite(id));
+      try {
+        const accessToken = await getValidGitLabToken(integration, {
+          userId: ctx.user.id,
+          organizationId,
+        });
+        const configuredRepoIds = Object.keys(configuredWebhooks)
+          .map(id => Number.parseInt(id, 10))
+          .filter(id => Number.isFinite(id));
 
-            // Pass `previous = []` so the sync helper treats every currently
-            // configured repo as newly added and UPDATES its existing Kilo
-            // webhook in place with the new secret — nothing is deleted.
-            const syncOutcome = await syncWebhooksForRepositories(
-              accessToken,
-              newSecret,
-              configuredRepoIds,
-              [],
-              configuredWebhooks,
-              instanceUrl
-            );
-            updatedWebhooks = syncOutcome.updatedWebhooks;
-            webhookSyncResult = {
-              created: syncOutcome.result.created.length,
-              updated: syncOutcome.result.updated.length,
-              deleted: syncOutcome.result.deleted.length,
-              errors: syncOutcome.result.errors,
-            };
-            logExceptInTest(
-              '[rotateGitLabWebhookSecret] Webhook re-sync completed for organization',
-              {
-                created: webhookSyncResult.created,
-                updated: webhookSyncResult.updated,
-                deleted: webhookSyncResult.deleted,
-                errorCount: webhookSyncResult.errors.length,
-              }
-            );
-          } catch (webhookError) {
-            // Re-sync failure MUST NOT lose the new secret: persist it
-            // anyway so the operator can recover via manual reconfiguration.
-            logExceptInTest('[rotateGitLabWebhookSecret] Webhook re-sync failed for organization', {
-              error: webhookError instanceof Error ? webhookError.message : String(webhookError),
-            });
-            webhookSyncResult = {
-              created: 0,
-              updated: 0,
-              deleted: 0,
-              errors: [
-                {
-                  projectId: 0,
-                  error: webhookError instanceof Error ? webhookError.message : 'Unknown error',
-                  operation: 'sync' as const,
-                },
-              ],
-            };
-          }
-
-          await mutateGitLabMetadata(integration.id, {
-            set: { webhook_secret: newSecret, configured_webhooks: updatedWebhooks },
-          });
-
-          await createAuditLog({
-            organization_id: organizationId,
-            action: 'organization.settings.change',
-            actor_id: ctx.user.id,
-            actor_email: ctx.user.google_user_email,
-            actor_name: ctx.user.google_user_name,
-            details: {
-              id: 'reviewAgent.secretRotated',
-              updated: webhookSyncResult.updated,
-              errors: webhookSyncResult.errors.length,
+        // Pass `previous = []` so the sync helper treats every currently
+        // configured repo as newly added and UPDATES its existing Kilo
+        // webhook in place with the new secret — nothing is deleted.
+        const syncOutcome = await syncWebhooksForRepositories(
+          accessToken,
+          newSecret,
+          configuredRepoIds,
+          [],
+          configuredWebhooks,
+          instanceUrl
+        );
+        updatedWebhooks = syncOutcome.updatedWebhooks;
+        webhookSyncResult = {
+          created: syncOutcome.result.created.length,
+          updated: syncOutcome.result.updated.length,
+          deleted: syncOutcome.result.deleted.length,
+          errors: syncOutcome.result.errors,
+        };
+        logExceptInTest('[rotateGitLabWebhookSecret] Webhook re-sync completed for organization', {
+          created: webhookSyncResult.created,
+          updated: webhookSyncResult.updated,
+          deleted: webhookSyncResult.deleted,
+          errorCount: webhookSyncResult.errors.length,
+        });
+      } catch (webhookError) {
+        // Re-sync failure MUST NOT lose the new secret: persist it
+        // anyway so the operator can recover via manual reconfiguration.
+        logExceptInTest('[rotateGitLabWebhookSecret] Webhook re-sync failed for organization', {
+          error: webhookError instanceof Error ? webhookError.message : String(webhookError),
+        });
+        webhookSyncResult = {
+          created: 0,
+          updated: 0,
+          deleted: 0,
+          errors: [
+            {
+              projectId: 0,
+              error: webhookError instanceof Error ? webhookError.message : 'Unknown error',
+              operation: 'sync' as const,
             },
-            message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
-          });
+          ],
+        };
+      }
 
-          return {
-            webhookSecret: newSecret,
-            webhookSync: webhookSyncResult,
-            configuredWebhookCount: Object.keys(updatedWebhooks).length,
-          };
-        }
-      )
-    ),
+      await mutateGitLabMetadata(integration.id, {
+        set: { webhook_secret: newSecret, configured_webhooks: updatedWebhooks },
+      });
+
+      await createAuditLog({
+        organization_id: organizationId,
+        action: 'organization.settings.change',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        details: {
+          id: 'reviewAgent.secretRotated',
+          updated: webhookSyncResult.updated,
+          errors: webhookSyncResult.errors.length,
+        },
+        message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
+      });
+
+      return {
+        webhookSecret: newSecret,
+        webhookSync: webhookSyncResult,
+        configuredWebhookCount: Object.keys(updatedWebhooks).length,
+      };
+    }),
 });

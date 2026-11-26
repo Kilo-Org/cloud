@@ -1,6 +1,6 @@
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import {
   kiloclaw_admin_audit_logs,
@@ -53,7 +53,7 @@ async function insertSubscription(input: SubscriptionInput = {}) {
 
 async function superadminCaller() {
   const admin = await insertTestUser({ is_admin: true, is_super_admin: true });
-  return { admin, caller: await createCallerForUser(admin.id) };
+  return { admin, caller: await createSessionCallerForUser(admin.id) };
 }
 
 describe('admin credit renewal controls', () => {
@@ -233,13 +233,13 @@ describe('admin credit renewal controls', () => {
 
   it('requires superadmin access', async () => {
     const user = await insertTestUser({ is_admin: false });
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
     await expect(caller.admin.kiloclawCreditRenewals.preview()).rejects.toThrow(
       'Admin access required'
     );
 
     const platformAdmin = await insertTestUser({ is_admin: true, is_super_admin: false });
-    const platformCaller = await createCallerForUser(platformAdmin.id);
+    const platformCaller = await createSessionCallerForUser(platformAdmin.id);
     await expect(platformCaller.admin.kiloclawCreditRenewals.preview()).rejects.toThrow(
       'Superadmin access required'
     );

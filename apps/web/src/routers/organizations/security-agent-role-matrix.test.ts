@@ -227,6 +227,38 @@ describe('gitlabRouter.connectWithPAT role gate', () => {
       expect(mockedConnectWithPAT).toHaveBeenCalledTimes(1);
     }
   });
+
+  it('refuses a platform admin without a membership before storing the credential', async () => {
+    const staff = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(staff.id);
+
+    await expect(
+      caller.gitlab.connectWithPAT({
+        token: 'glpat-test-token',
+        instanceUrl: 'https://gitlab.com',
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have access to this organization',
+    });
+    expect(mockedConnectWithPAT).not.toHaveBeenCalled();
+  });
+
+  it('keeps a personal connection without an organization unchanged', async () => {
+    await expect(
+      callers.non_member.gitlab.connectWithPAT({
+        token: 'glpat-test-token',
+        instanceUrl: 'https://gitlab.com',
+      })
+    ).resolves.toMatchObject({ success: true });
+    expect(mockedConnectWithPAT).toHaveBeenCalledWith(
+      { type: 'user', id: users.non_member.id },
+      'glpat-test-token',
+      'https://gitlab.com',
+      users.non_member.id
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

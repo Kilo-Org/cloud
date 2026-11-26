@@ -2,21 +2,21 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { NextRequest } from 'next/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getDoltHubOAuthUrl } from '@/lib/integrations/dolthub-service';
 import { handlePlatformOAuthConnect } from '@/lib/integrations/oauth/routes';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/dolthub-service', () => ({
   getDoltHubOAuthUrl: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedGetDoltHubOAuthUrl = jest.mocked(getDoltHubOAuthUrl);
 
 const USER_ID = 'e0c2bd2a-4d1e-4c33-9a2f-6f0f2f3a5b11';
@@ -41,7 +41,7 @@ describe('DoltHub OAuth connect route owner authorization', () => {
       user: { id: USER_ID },
       authFailedResponse: null,
     } as never);
-    mockedEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockedEnsureMemberOrganizationAccess.mockResolvedValue('owner');
     mockedGetDoltHubOAuthUrl.mockReturnValue(AUTHORIZE_URL);
   });
 
@@ -51,8 +51,8 @@ describe('DoltHub OAuth connect route owner authorization', () => {
       'dolthub'
     );
 
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ user: expect.objectContaining({ id: USER_ID }) }),
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_BILLING_ROLES
     );
@@ -60,7 +60,7 @@ describe('DoltHub OAuth connect route owner authorization', () => {
   });
 
   test('a rejected organization role redirects back to the integration page with the reason', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValueOnce(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValueOnce(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have the required organizational role to access this feature',
@@ -80,7 +80,7 @@ describe('DoltHub OAuth connect route owner authorization', () => {
   test('a personal connect never consults organization roles', async () => {
     const response = await handlePlatformOAuthConnect(connectRequest(), 'dolthub');
 
-    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
     expect(response.headers.get('location')).toContain(AUTHORIZE_URL);
   });
 });

@@ -34,7 +34,11 @@ export async function createCallerForUser(
 /** Test-only caller that represents a browser session, not a bearer token. */
 export async function createSessionCallerForUser(
   userId: string,
-  opts?: { webSessionId?: string; webSessionPepper?: string | null }
+  opts?: {
+    webSessionId?: string;
+    webSessionPepper?: string | null;
+    headers?: Record<string, string>;
+  }
 ) {
   const user = await findUserById(userId);
   if (!user) {
@@ -46,7 +50,7 @@ export async function createSessionCallerForUser(
     authViaToken: false,
     webSessionId: opts?.webSessionId ?? 'test-web-session',
     webSessionPepper: opts?.webSessionPepper ?? user.web_session_pepper,
-    headersList: new Headers(),
+    headersList: new Headers(opts?.headers),
   });
 }
 

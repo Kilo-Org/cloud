@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
@@ -70,7 +70,7 @@ describe('sales demo admin list', () => {
       createSalesDemoOrganization({ targetUser: target, adminUser: admin, txn })
     );
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const result = await caller.organizations.admin.list({
       mode: 'paying',
       stripe_status: 'active',

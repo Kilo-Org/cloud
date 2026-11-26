@@ -1,5 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cloud_agent_session_runs,
@@ -171,8 +171,8 @@ describe('adminCloudAgentNextRouter', () => {
   });
 
   it('requires admin access and rejects invalid or overlong intervals', async () => {
-    const regularCaller = await createCallerForUser(regularUser.id);
-    const adminCaller = await createCallerForUser(adminUser.id);
+    const regularCaller = await createSessionCallerForUser(regularUser.id);
+    const adminCaller = await createSessionCallerForUser(adminUser.id);
     await expect(regularCaller.admin.cloudAgentNext.getHealthOverview(interval())).rejects.toThrow(
       'Admin access required'
     );
@@ -205,7 +205,7 @@ describe('adminCloudAgentNextRouter', () => {
   });
 
   it('summarizes health and ranks operational errors without interruptions', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.summary).toEqual({
@@ -287,7 +287,7 @@ describe('adminCloudAgentNextRouter', () => {
       failure_responsibility: 'provider',
       failure_reason: 'provider_unavailable',
     });
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const allHealth = await caller.admin.cloudAgentNext.getHealthOverview(interval());
     const providerHealth = await caller.admin.cloudAgentNext.getHealthOverview({
       ...interval(),
@@ -332,7 +332,7 @@ describe('adminCloudAgentNextRouter', () => {
       .update(cloud_agent_sessions)
       .set({ failure_responsibility: 'provider', failure_reason: 'provider_unavailable' })
       .where(eq(cloud_agent_sessions.cloud_agent_session_id, ids.setupFailed));
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
     const providerHealth = await caller.admin.cloudAgentNext.getHealthOverview({
       ...interval(),
@@ -372,7 +372,7 @@ describe('adminCloudAgentNextRouter', () => {
         message_id: `msg_admin_repeated_${index}`,
       }))
     );
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
     const sessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
       ...interval(),
@@ -428,7 +428,7 @@ describe('adminCloudAgentNextRouter', () => {
   });
 
   it('excludes runs whose session falls outside the 90-day retention window', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.summary.failedRuns).toBe(2);
@@ -467,7 +467,7 @@ describe('adminCloudAgentNextRouter', () => {
   ] as const)(
     'filters top errors by $responsibility without changing the global summary',
     async ({ responsibility, events, groups, diagnostics }) => {
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const allHealth = await caller.admin.cloudAgentNext.getHealthOverview(interval());
       const health = await caller.admin.cloudAgentNext.getHealthOverview({
         ...interval(),
@@ -515,7 +515,7 @@ describe('adminCloudAgentNextRouter', () => {
       { ...matchingRun, message_id: 'msg_admin_top_group_repeat_1' },
       { ...matchingRun, message_id: 'msg_admin_top_group_repeat_2' },
     ]);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
     const platformHealth = await caller.admin.cloudAgentNext.getHealthOverview({
       ...interval(),
@@ -532,7 +532,7 @@ describe('adminCloudAgentNextRouter', () => {
   });
 
   it('returns null rates when there are no assessed outcomes', async () => {
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview({
       startDate: '2035-01-12T00:00:00.000Z',
       endDate: '2035-01-13T00:00:00.000Z',
@@ -566,7 +566,7 @@ describe('adminCloudAgentNextRouter', () => {
       .update(cloud_agent_sessions)
       .set({ failure_at: END_DATE })
       .where(eq(cloud_agent_sessions.cloud_agent_session_id, ids.setupFailedLater));
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
     const sessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
       ...interval(),
@@ -624,7 +624,7 @@ describe('adminCloudAgentNextRouter', () => {
           error_expires_at: DIAGNOSTIC_EXPIRES_AT,
         },
       ]);
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const error = {
         source: 'run',
         stage,
@@ -687,7 +687,7 @@ describe('adminCloudAgentNextRouter', () => {
           terminal_at: at(9),
         },
       ]);
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const sessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
         ...interval(),
         ...matchingError,
@@ -756,7 +756,7 @@ describe('adminCloudAgentNextRouter', () => {
         terminal_at: END_DATE,
       },
     ]);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const sessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
       ...interval(),
       ...matchingError,
@@ -798,7 +798,7 @@ describe('adminCloudAgentNextRouter', () => {
         error_message_redacted: diagnostic,
         error_expires_at: expiresAt,
       });
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const sessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
         ...interval(),
         ...matchingError,
@@ -857,7 +857,7 @@ describe('adminCloudAgentNextRouter', () => {
         .update(cloud_agent_sessions)
         .set({ error_message_redacted: diagnostic, error_expires_at: expiresAt })
         .where(eq(cloud_agent_sessions.cloud_agent_session_id, ids.setupFailed));
-      const caller = await createCallerForUser(adminUser.id);
+      const caller = await createSessionCallerForUser(adminUser.id);
       const sessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
         ...interval(),
         source: 'setup',
@@ -933,7 +933,7 @@ describe('adminCloudAgentNextRouter', () => {
         failure_reason: 'rate_limited',
       },
     ]);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const setupSessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
       ...interval(),
       source: 'setup',
@@ -1042,7 +1042,7 @@ describe('adminCloudAgentNextRouter', () => {
         error_expires_at: DIAGNOSTIC_EXPIRES_AT,
       })
       .where(eq(cloud_agent_sessions.cloud_agent_session_id, ids.setupFailedLater));
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.topErrors).toContainEqual(
@@ -1076,7 +1076,7 @@ describe('adminCloudAgentNextRouter', () => {
         error_expires_at: DIAGNOSTIC_EXPIRES_AT,
       },
     ]);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.topErrors).toContainEqual(
@@ -1104,7 +1104,7 @@ describe('adminCloudAgentNextRouter', () => {
         error_expires_at: DIAGNOSTIC_EXPIRES_AT,
       },
     ]);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.topErrors).toContainEqual(
@@ -1130,7 +1130,7 @@ describe('adminCloudAgentNextRouter', () => {
         error_expires_at: DIAGNOSTIC_EXPIRES_AT,
       },
     ]);
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.topErrors).toContainEqual(
@@ -1152,7 +1152,7 @@ describe('adminCloudAgentNextRouter', () => {
           eq(cloud_agent_session_runs.message_id, 'msg_admin_failed_predispatch')
         )
       );
-    const caller = await createCallerForUser(adminUser.id);
+    const caller = await createSessionCallerForUser(adminUser.id);
     const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.topErrors).toContainEqual(

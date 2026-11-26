@@ -4,7 +4,7 @@ import { ai_gateway_config, custom_llm2, type User } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
 import { AUTO_FREE_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import {
   customLlmDefinition,
   publicCustomLlmDefinition,
@@ -79,7 +79,7 @@ describe('AutoFreeConfigSchema', () => {
 
 describe('adminAutoFreeConfigRouter', () => {
   it('rejects a non-admin caller', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
     await expect(caller.admin.autoFreeConfig.get()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(caller.admin.autoFreeConfig.set({ config })).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -87,7 +87,7 @@ describe('adminAutoFreeConfigRouter', () => {
   });
 
   it('returns no stored config and the openrouter/free fallback when unset', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(caller.admin.autoFreeConfig.get()).resolves.toEqual({
       config: null,
       fallback: {
@@ -98,7 +98,7 @@ describe('adminAutoFreeConfigRouter', () => {
 
   it('stores, updates, and clears the config without touching routing config', async () => {
     await db.insert(ai_gateway_config).values({ config: { vercel_routing_opt_out_models: [] } });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.admin.autoFreeConfig.set({ config });
     expect((await caller.admin.autoFreeConfig.get()).config).toEqual(config);
@@ -115,7 +115,7 @@ describe('adminAutoFreeConfigRouter', () => {
   });
 
   it('creates the singleton row when none exists', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await caller.admin.autoFreeConfig.set({ config });
 
     const rows = await db.select().from(ai_gateway_config);
@@ -135,7 +135,7 @@ describe('adminAutoFreeConfigRouter', () => {
   });
 
   it('rejects invalid config', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.autoFreeConfig.set({
         config: { models: [{ ...config.models[0], weight: 0 }] },
@@ -146,7 +146,7 @@ describe('adminAutoFreeConfigRouter', () => {
   it.each(['provider/paid-model', 'anthropic/claude-sonnet-4:free', 'kilo-auto/free'])(
     'rejects ineligible model %s',
     async model => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       await expect(
         caller.admin.autoFreeConfig.set({
           config: { models: [config.models[0], { model, weight: 1, reasoning: {} }] },
@@ -156,7 +156,7 @@ describe('adminAutoFreeConfigRouter', () => {
     }
   );
   it('accepts a public custom LLM saved moments ago and rejects a private one', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await getCustomLlmsById();
     await db.insert(custom_llm2).values([
       { public_id: 'acme/public-free', definition: publicCustomLlmDefinition(['acme']) },

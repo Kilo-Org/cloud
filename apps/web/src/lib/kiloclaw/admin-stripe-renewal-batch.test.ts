@@ -1,6 +1,6 @@
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscriptions, operation_ledgers } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
@@ -160,20 +160,20 @@ describe('admin Stripe renewal batch', () => {
 
   it('requires superadmin access and the literal confirmation', async () => {
     const user = await insertTestUser({ is_admin: false });
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
 
     await expect(caller.admin.kiloclawStripeRenewals.preview()).rejects.toThrow(
       'Admin access required'
     );
 
     const platformAdmin = await insertTestUser({ is_admin: true, is_super_admin: false });
-    const platformCaller = await createCallerForUser(platformAdmin.id);
+    const platformCaller = await createSessionCallerForUser(platformAdmin.id);
     await expect(platformCaller.admin.kiloclawStripeRenewals.preview()).rejects.toThrow(
       'Superadmin access required'
     );
 
     const admin = await insertTestUser({ is_admin: true, is_super_admin: true });
-    const adminCaller = await createCallerForUser(admin.id);
+    const adminCaller = await createSessionCallerForUser(admin.id);
     await subscription('sub_confirmation', 'stripe');
     const preview = await adminCaller.admin.kiloclawStripeRenewals.preview();
     await expect(
@@ -365,7 +365,7 @@ describe('admin Stripe renewal batch', () => {
 
   it('distinguishes expected input errors from private infrastructure failures', async () => {
     const admin = await insertTestUser({ is_admin: true, is_super_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(
       caller.admin.kiloclawStripeRenewals.start({
         previewId: crypto.randomUUID(),

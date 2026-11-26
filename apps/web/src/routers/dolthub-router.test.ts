@@ -23,13 +23,18 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
-import type { User } from '@kilocode/db/schema';
+import { describe, test, expect, beforeAll, afterAll, afterEach } from '@jest/globals';
+import type { Organization, User } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
+import {
+  organization_memberships,
+  organizations,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
 describe('dolthubRouter', () => {
@@ -178,6 +183,73 @@ describe('dolthubRouter', () => {
       expect(result).toBeNull();
     });
   });
+
+  // An organization DoltHub token is a credential: only a real billing
+  // membership reads it. A platform admin without one gets the ordinary
+  // non-member refusal whatever the support switch says.
+  describe.each(['false', 'true'])(
+    'getInstallationCredentials for an organization (support access %s)',
+    support => {
+      const previousSupport = process.env.SUPPORT_ACCESS_ENABLED;
+      let owner: User;
+      let member: User;
+      let staff: User;
+      let organization: Organization;
+
+      beforeAll(async () => {
+        process.env.SUPPORT_ACCESS_ENABLED = support;
+        owner = await insertTestUser();
+        member = await insertTestUser();
+        staff = await insertTestUser({ is_admin: true });
+        organization = await createTestOrganization(`DoltHub ${crypto.randomUUID()}`, owner.id, 0);
+        await db
+          .insert(organization_memberships)
+          .values({ organization_id: organization.id, kilo_user_id: member.id, role: 'member' });
+        await db.insert(platform_integrations).values({
+          owned_by_organization_id: organization.id,
+          platform: PLATFORM.DOLTHUB,
+          integration_type: 'oauth',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          scopes: ['api_read_write'],
+          metadata: { access_token: 'org-fixture-token' },
+          installed_at: new Date().toISOString(),
+        });
+      });
+
+      afterAll(async () => {
+        process.env.SUPPORT_ACCESS_ENABLED = previousSupport;
+        await db
+          .delete(platform_integrations)
+          .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+      });
+
+      test('refuses a platform admin without a membership', async () => {
+        const caller = await createCallerForUser(staff.id);
+        await expect(
+          caller.dolthub.getInstallationCredentials({ organizationId: organization.id })
+        ).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have access to this organization',
+        });
+      });
+
+      test('refuses an ordinary member', async () => {
+        const caller = await createCallerForUser(member.id);
+        await expect(
+          caller.dolthub.getInstallationCredentials({ organizationId: organization.id })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      });
+
+      test('returns the token to the owner', async () => {
+        const caller = await createCallerForUser(owner.id);
+        const result = await caller.dolthub.getInstallationCredentials({
+          organizationId: organization.id,
+        });
+        expect(result).toEqual({ token: 'org-fixture-token', dolthubUsername: null });
+      });
+    }
+  );
 
   describe('rememberUsername', () => {
     test('errors with PRECONDITION_FAILED when no integration exists', async () => {

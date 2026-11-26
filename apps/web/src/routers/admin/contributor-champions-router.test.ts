@@ -1,5 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   contributor_champion_contributors,
@@ -46,7 +46,7 @@ describe('contributor champions router', () => {
       login: 'gate-admin',
       email: 'gate-admin@example.com',
     });
-    const caller = await createCallerForUser(plainAdmin.id);
+    const caller = await createSessionCallerForUser(plainAdmin.id);
 
     await expect(
       caller.admin.contributorChampions.enroll({ contributorId, tier: 'ambassador' })
@@ -75,7 +75,7 @@ describe('contributor champions router', () => {
       login: 'router-window',
       email: 'router-window@example.com',
     });
-    const caller = await createCallerForUser(creditManager.id);
+    const caller = await createSessionCallerForUser(creditManager.id);
 
     const first = await caller.admin.contributorChampions.enroll({
       contributorId,

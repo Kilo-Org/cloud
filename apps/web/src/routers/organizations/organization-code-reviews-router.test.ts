@@ -22,7 +22,7 @@ jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-reposit
 // when `jest` is the global binding; importing it as a local binding disables
 // that hoist, so the mocks below would register AFTER `createCallerForUser`
 // pulls in the real gitlab-service. Using global `jest` keeps the mocks hoisted.
-import { afterAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -31,6 +31,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   organization_audit_logs,
+  organization_memberships,
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
@@ -1218,3 +1219,112 @@ describe('organization review agent router: repository_selection_mode', () => {
     expect(returned.selectedRepositoryIds).toEqual([303]);
   });
 });
+
+// rotateGitLabWebhookSecret returns a new webhook credential, so only a real
+// owner or billing_manager membership rotates it. A platform admin without one
+// gets the ordinary non-member refusal whatever the support switch says, and
+// the stored secret stays untouched.
+describe.each(['false', 'true'])(
+  'organization review agent router: rotateGitLabWebhookSecret (support access %s)',
+  support => {
+    const previousSupport = process.env.SUPPORT_ACCESS_ENABLED;
+    let fixture: { owner: { id: string }; organization: { id: string } };
+    let billingManagerId: string;
+    let memberId: string;
+    let staffId: string;
+
+    async function storedSecret() {
+      const [row] = await db
+        .select({ metadata: platform_integrations.metadata })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, fixture.organization.id));
+      return (row?.metadata as { webhook_secret?: string } | null)?.webhook_secret;
+    }
+
+    async function resetSecret() {
+      await db
+        .update(platform_integrations)
+        .set({ metadata: { webhook_secret: 'fixture-secret' } })
+        .where(eq(platform_integrations.owned_by_organization_id, fixture.organization.id));
+    }
+
+    beforeAll(async () => {
+      process.env.SUPPORT_ACCESS_ENABLED = support;
+      fixture = await createFixtureOrganization();
+      const [billingManager, member, staff] = await Promise.all([
+        insertTestUser(),
+        insertTestUser(),
+        insertTestUser({ is_admin: true }),
+      ]);
+      billingManagerId = billingManager.id;
+      memberId = member.id;
+      staffId = staff.id;
+      await db.insert(organization_memberships).values([
+        {
+          organization_id: fixture.organization.id,
+          kilo_user_id: billingManagerId,
+          role: 'billing_manager',
+        },
+        { organization_id: fixture.organization.id, kilo_user_id: memberId, role: 'member' },
+      ]);
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: fixture.organization.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        integration_status: 'active',
+        metadata: { webhook_secret: 'fixture-secret' },
+      });
+    });
+
+    afterAll(async () => {
+      process.env.SUPPORT_ACCESS_ENABLED = previousSupport;
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, fixture.organization.id));
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, fixture.organization.id));
+      await db.delete(organizations).where(eq(organizations.id, fixture.organization.id));
+    });
+
+    it('refuses a platform admin without a membership and keeps the stored secret', async () => {
+      await resetSecret();
+      const caller = await createCallerForUser(staffId);
+      await expect(
+        caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+          organizationId: fixture.organization.id,
+        })
+      ).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      });
+      expect(await storedSecret()).toBe('fixture-secret');
+    });
+
+    it('refuses an ordinary member', async () => {
+      await resetSecret();
+      const caller = await createCallerForUser(memberId);
+      await expect(
+        caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+          organizationId: fixture.organization.id,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      expect(await storedSecret()).toBe('fixture-secret');
+    });
+
+    it.each([
+      ['owner', () => fixture.owner.id],
+      ['billing_manager', () => billingManagerId],
+    ])('rotates for the %s', async (_role, userId) => {
+      await resetSecret();
+      const caller = await createCallerForUser(userId());
+      const result = await caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+        organizationId: fixture.organization.id,
+      });
+      const stored = await storedSecret();
+      // Compare without printing the generated secret.
+      expect(stored !== 'fixture-secret' && stored === result.webhookSecret).toBe(true);
+      expect(result.configuredWebhookCount).toBe(0);
+    });
+  }
+);

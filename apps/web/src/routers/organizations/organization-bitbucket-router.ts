@@ -28,6 +28,7 @@ import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/i
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
+  organizationBillingMemberProcedure,
   organizationBillingProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { platform_integrations } from '@kilocode/db/schema';
@@ -186,8 +187,9 @@ export const organizationBitbucketRouter = createTRPCRouter({
     return oauthStatus ?? { ...workspaceAccessTokenStatus, canManage };
   }),
 
-  connect: organizationBillingProcedure.input(ConnectInputSchema).mutation(({ ctx, input }) =>
-    runBitbucketWrite(ctx, input.organizationId, 'connect_workspace_access_token', {}, async () => {
+  connect: organizationBillingMemberProcedure
+    .input(ConnectInputSchema)
+    .mutation(async ({ ctx, input }) => {
       try {
         return await connectBitbucketWorkspaceAccessToken({
           organizationId: input.organizationId,
@@ -197,31 +199,22 @@ export const organizationBitbucketRouter = createTRPCRouter({
       } catch (error) {
         rethrowBitbucketMutationError(error);
       }
-    })
-  ),
+    }),
 
-  replaceToken: organizationBillingProcedure
+  replaceToken: organizationBillingMemberProcedure
     .input(ReplaceTokenInputSchema)
-    .mutation(({ ctx, input }) =>
-      runBitbucketWrite(
-        ctx,
-        input.organizationId,
-        'replace_workspace_access_token',
-        { integrationId: input.integrationId },
-        async () => {
-          try {
-            return await rotateBitbucketWorkspaceAccessToken({
-              organizationId: input.organizationId,
-              actorUserId: ctx.user.id,
-              integrationId: input.integrationId,
-              accessToken: input.accessToken,
-            });
-          } catch (error) {
-            rethrowBitbucketMutationError(error);
-          }
-        }
-      )
-    ),
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await rotateBitbucketWorkspaceAccessToken({
+          organizationId: input.organizationId,
+          actorUserId: ctx.user.id,
+          integrationId: input.integrationId,
+          accessToken: input.accessToken,
+        });
+      } catch (error) {
+        rethrowBitbucketMutationError(error);
+      }
+    }),
 
   selectWorkspace: organizationBillingProcedure
     .input(SelectWorkspaceInputSchema)
@@ -254,10 +247,12 @@ export const organizationBitbucketRouter = createTRPCRouter({
           });
         }
 
+        // The locked recheck follows how the procedure boundary admitted the caller.
         return await refreshBitbucketWorkspaceAccessTokenRepositories({
           organizationId: input.organizationId,
           kiloUserId: ctx.user.id,
           expectedIntegrationId: input.integrationId,
+          authority: ctx.organizationAccess.kind === 'member' ? 'member' : 'staff',
         });
       } catch (error) {
         rethrowBitbucketMutationError(error);
@@ -284,15 +279,19 @@ export const organizationBitbucketRouter = createTRPCRouter({
               return { integrationId: disconnected.integrationId };
             }
 
-            await cleanupBitbucketCodeReviewerForIntegration({
-              organizationId: input.organizationId,
-              integrationId: input.integrationId,
-              workspace: integration.workspace,
-            });
+            // The boundary admits inherited roles, which the credential service
+            // refuses, so cleanup waits for the service to confirm authority.
             return await disconnectBitbucketWorkspaceAccessToken({
               organizationId: input.organizationId,
               actorUserId: ctx.user.id,
               integrationId: input.integrationId,
+              authority: ctx.organizationAccess.kind === 'member' ? 'member' : 'staff',
+              beforeDisconnect: () =>
+                cleanupBitbucketCodeReviewerForIntegration({
+                  organizationId: input.organizationId,
+                  integrationId: input.integrationId,
+                  workspace: integration.workspace,
+                }),
             });
           } catch (error) {
             rethrowBitbucketMutationError(error);

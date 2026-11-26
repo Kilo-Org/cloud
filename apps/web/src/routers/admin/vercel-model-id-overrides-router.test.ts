@@ -6,7 +6,7 @@ import {
   VercelModelIdOverridesConfigSchema,
 } from '@kilocode/db/schema-types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 
 let admin: User;
 let nonAdmin: User;
@@ -41,14 +41,14 @@ describe('VercelModelIdOverridesConfigSchema', () => {
 
 describe('adminVercelModelIdOverridesRouter', () => {
   it('rejects a non-admin caller', async () => {
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
     await expect(caller.admin.vercelModelIdOverrides.list()).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
   });
 
   it('returns no overrides when none are stored', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(caller.admin.vercelModelIdOverrides.list()).resolves.toEqual({ items: [] });
   });
 
@@ -65,7 +65,7 @@ describe('adminVercelModelIdOverridesRouter', () => {
       },
     });
 
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     await expect(caller.admin.vercelModelIdOverrides.list()).resolves.toEqual({
       items: [
         {

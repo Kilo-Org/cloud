@@ -76,7 +76,7 @@ export type KiloAdminElevationReason =
   | 'organization_fetch'
   /** CLI session query ran with the org-membership filter removed entirely. */
   | 'cli_session_cross_org_query'
-  /** Code-index read/write redirected to another org or user via `overrideUser`. */
+  /** Code-index stats read redirected to another org or user via `overrideUser`. */
   | 'code_index_user_override'
   /** Security Agent audit report assembled with Kilo-admin visibility. */
   | 'security_agent_audit_report'
@@ -717,13 +717,12 @@ function actionClassForElevation(
     case 'organization_fetch':
     case 'cli_session_cross_org_query':
     case 'security_agent_audit_report':
+    case 'code_index_user_override':
       return 'support_read';
     case 'organization_access':
       return method === 'mutation' ? 'support_write' : 'support_read';
     case 'organization_access_rest':
       return method === 'GET' || method === 'HEAD' ? 'support_read' : 'support_write';
-    case 'code_index_user_override':
-      return 'support_write';
     case 'service_token_mint':
     case 'delegated_resource_token_mint':
     case 'worker_capability_mint':

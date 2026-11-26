@@ -42,3 +42,8 @@ export async function resetRefresherObject(stub: DurableObjectStub): Promise<voi
 export async function resetDenialObject(stub: DurableObjectStub): Promise<void> {
   await resetObject(stub, ['denial_window']);
 }
+
+/** The key ring goes too, so each test starts from a signer that has never generated a key. */
+export async function resetTokenSignerObject(stub: DurableObjectStub): Promise<void> {
+  await resetObject(stub, [], ['token-key-ring']);
+}

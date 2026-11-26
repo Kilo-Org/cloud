@@ -9,16 +9,24 @@ import { assertRelayable, relayAudit, type AuditRelayStore } from './relay';
 const PRUNE_BATCH_ROWS = 5_000;
 const PRUNE_MAX_BATCHES = 10;
 
+/** How long relayed rows stay, and how often the log prunes them. */
+export type AuditLogRetention = { retentionMs: number; pruneIntervalMs: number };
+
 /**
  * One Durable Object's audit stream: rows appended in the call that performs the action, relayed
- * to the audit queue in order, and deleted 7 days after the queue accepted them.
+ * to the audit queue in order, and deleted a retention period (7 days unless the owner sets
+ * another) after the queue accepted them.
  */
 export class AuditLog {
   private readonly db: DrizzleSqliteDODatabase;
 
   constructor(
     storage: DurableObjectStorage,
-    private readonly queue: Queue
+    private readonly queue: Queue,
+    private readonly retention: AuditLogRetention = {
+      retentionMs: AUDIT_RETENTION_MS,
+      pruneIntervalMs: PRUNE_INTERVAL_MS,
+    }
   ) {
     this.db = drizzle(storage);
   }
@@ -58,18 +66,19 @@ export class AuditLog {
   /** When the next prune is due; a log that never pruned is due now. */
   nextPruneAt(): number {
     const row = this.db.select().from(auditPrune).where(eq(auditPrune.id, 1)).get();
-    return row === undefined ? 0 : row.prunedAt + PRUNE_INTERVAL_MS;
+    return row === undefined ? 0 : row.prunedAt + this.retention.pruneIntervalMs;
   }
 
   /**
-   * Deletes relayed rows older than the retention, at most once per `PRUNE_INTERVAL_MS`. Each
+   * Deletes relayed rows older than the retention, at most once per prune interval. Each
    * statement touches one bounded primary-key range from the oldest row, and rows only age in
    * sequence order, so the walk stops at the first range that still holds a young row. A prune
    * that reaches its batch bound leaves the interval unrecorded and runs again on the next alarm.
+   * A row past the watermark (not yet relayed) is never deleted.
    */
   pruneIfDue(now: number): void {
     if (now < this.nextPruneAt()) return;
-    const cutoff = now - AUDIT_RETENTION_MS;
+    const cutoff = now - this.retention.retentionMs;
     const watermark = this.watermark();
     for (let batch = 0; batch < PRUNE_MAX_BATCHES; batch += 1) {
       const oldest = this.db

@@ -1,6 +1,125 @@
 import { describe, expect, it } from 'vitest';
+import { policyChangedEvent } from '../../src/audit/events';
 import { loadPolicies } from '../../src/policy/load';
 import { policyFor, policyIndex } from '../../src/policy';
+
+const REGISTRY = {
+  gateway: { scopes: ['gateway:models.read', 'gateway:usage.write'] },
+  o11y: { scopes: ['o11y:alerts.read'] },
+};
+
+function withGrants(grants: string): string {
+  return `${valid}${grants}`;
+}
+
+function expectGrantThrow(grants: string, fragment: string): void {
+  expect(() =>
+    loadPolicies({ 'app-one.yaml': withGrants(grants) }, { scopeRegistry: REGISTRY })
+  ).toThrow(fragment);
+}
+
+describe('policy token grants', () => {
+  it('defaults to no audience, no scope and no dynamic grant', () => {
+    const policy = loadPolicies({ 'app-one.yaml': valid }).get('production', 'app-one');
+    expect(policy).toMatchObject({ audiences: [], scopes: [], dynamic: [] });
+  });
+
+  it('accepts registered scopes under listed audiences', () => {
+    const index = loadPolicies(
+      {
+        'app-one.yaml': withGrants(
+          `audiences: [gateway, o11y]\nscopes: ['gateway:models.read', 'o11y:alerts.read']\n`
+        ),
+      },
+      { scopeRegistry: REGISTRY }
+    );
+    expect(index.get('production', 'app-one')).toMatchObject({
+      audiences: ['gateway', 'o11y'],
+      scopes: ['gateway:models.read', 'o11y:alerts.read'],
+    });
+  });
+
+  it('refuses a scope outside the registry, under an unlisted audience, or an audience without a scope', () => {
+    expectGrantThrow(
+      `audiences: [gateway]\nscopes: ['gateway:admin']\n`,
+      'scope gateway:admin is not in STS_SCOPE_REGISTRY'
+    );
+    expectGrantThrow(
+      `audiences: [o11y]\nscopes: ['o11y:alerts.read', 'gateway:models.read']\n`,
+      'which audiences does not list'
+    );
+    expectGrantThrow(
+      `audiences: [gateway, o11y]\nscopes: ['gateway:models.read']\n`,
+      'audience o11y has no scope'
+    );
+  });
+
+  it('refuses an audience equal to the workload, duplicates, and any dynamic grant', () => {
+    expect(() =>
+      loadPolicies(
+        {
+          'o11y.yaml': `
+workload: o11y
+environments: [production]
+identity:
+  kind: worker-binding
+secrets: []
+audiences: [o11y]
+scopes: ['o11y:alerts.read']
+`,
+        },
+        { scopeRegistry: REGISTRY }
+      )
+    ).toThrow('audience o11y is the workload itself');
+    expectGrantThrow(
+      `audiences: [gateway, gateway]\nscopes: ['gateway:models.read']\n`,
+      'audiences contains a duplicate'
+    );
+    expectGrantThrow(`dynamic: [ci_migration_role]\n`, 'does not match the policy schema');
+  });
+
+  it('checks shipped policies against the shipped registry, which lists no scope yet', () => {
+    expect(() =>
+      loadPolicies({
+        'app-one.yaml': withGrants(`audiences: [gateway]\nscopes: ['gateway:models.read']\n`),
+      })
+    ).toThrow('is not in STS_SCOPE_REGISTRY');
+  });
+
+  it('lists added and removed audience and scope grants in the policy.changed event', () => {
+    const before = loadPolicies(
+      {
+        'app-one.yaml': withGrants(`audiences: [gateway]\nscopes: ['gateway:models.read']\n`),
+      },
+      { scopeRegistry: REGISTRY }
+    );
+    const after = loadPolicies(
+      {
+        'app-one.yaml': withGrants(
+          `audiences: [o11y, gateway]\nscopes: ['gateway:usage.write', 'o11y:alerts.read']\n`
+        ),
+      },
+      { scopeRegistry: REGISTRY }
+    );
+    const event = policyChangedEvent({
+      environment: 'production',
+      policyHash: 'after',
+      previousPolicyHash: 'before',
+      previous: before.snapshot(),
+      current: after.snapshot(),
+    });
+    expect(event.data.attributes).toMatchObject({
+      addedAudiences: ['app-one:o11y'],
+      removedAudiences: [],
+      addedScopes: ['app-one:gateway:usage.write', 'app-one:o11y:alerts.read'],
+      removedScopes: ['app-one:gateway:models.read'],
+      audiencesTruncated: false,
+      scopesTruncated: false,
+      addedSecrets: [],
+      removedSecrets: [],
+    });
+  });
+});
 
 const valid = `
 workload: app-one

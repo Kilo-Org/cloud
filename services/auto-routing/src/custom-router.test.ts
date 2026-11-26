@@ -1513,6 +1513,20 @@ describe('public custom router decide', () => {
     expect(await errorCode(res)).toBe('unauthorized');
   });
 
+  it('rejects a token without a pepper claim for an account without a pepper', async () => {
+    dbRows.user = [{ ...spentBalanceUser(), api_token_pepper: null, microdollars_used: 0 }];
+    const { token } = await signKiloToken({
+      userId: USER_ID,
+      secret: NEXTAUTH_SECRET,
+      expiresInSeconds: 300,
+    });
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+      authorization: `Bearer ${token}`,
+    });
+    expect(res.status).toBe(401);
+    expect(await errorCode(res)).toBe('unauthorized');
+  });
+
   it('rejects an empty personal balance before classifying', async () => {
     dbRows.user = [
       {

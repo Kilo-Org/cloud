@@ -27,11 +27,12 @@
     "CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
     "CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS": "10000000",
   },
-  // Personal Cloud Agent payer enrollment is not part of the checked-in
-  // configuration. Set it as a secret before the release that needs it:
-  //   wrangler secret put CONTAINER_BILLING_CLOUD_AGENT_USER_IDS --name container-usage-meter
-  // Both Cloud Agent payer lists are validated together, so until the secret
-  // exists Cloud Agent payers stay in shadow mode. See RUNBOOK.md.
+  // CONTAINER_BILLING_CLOUD_AGENT_USER_IDS (personal Cloud Agent payers) is a
+  // Worker secret, not a checked-in var. Both Cloud Agent payer lists are
+  // validated together: a deploy without the secret leaves every Cloud Agent
+  // payer in shadow mode. Merging to main deploys this Worker, and `wrangler
+  // secret put` fails while a plain var of the same name exists, so moving
+  // another var to a secret follows the order in RUNBOOK.md.
   "triggers": {
     "crons": ["*/5 * * * *"],
   },

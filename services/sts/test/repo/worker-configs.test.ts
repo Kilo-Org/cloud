@@ -11,8 +11,11 @@ import {
   AUDIT_RELAY_DEPLOYMENTS,
   CLASSIFIED_KEYS,
   type WorkerConfig,
+  deployConfigEntries,
   internalWorkerProblems,
+  stsVarProblems,
   parseWorkerConfig,
+  trackedPaths,
   workerConfigPaths,
   workerConfigProblems,
 } from './worker-configs';
@@ -86,21 +89,34 @@ describe('repository Worker configs', () => {
   });
 
   it('keep every nested Worker config under test/fixtures, out of the production deploy', () => {
-    // deploy-workers.yml deploys every directory holding a wrangler.jsonc that this find lists.
+    // deploy-workers.yml deploys every directory holding a wrangler.jsonc that this find lists, and
+    // runs Wrangler there with no --config.
     const workflow = readFileSync(join(repoRoot, '.github/workflows/deploy-workers.yml'), 'utf8');
     const discovery = workflow
       .split('\n')
       .filter(line => line.includes('find services -name "wrangler.jsonc"'));
     expect(discovery).toHaveLength(1);
+    expect(discovery[0]).toContain('-not -path "*/node_modules/*"');
     expect(discovery[0]).toContain('-not -path "*/test/fixtures/*"');
 
+    const entries = deployConfigEntries(repoRoot);
+    const paths = entries.map(entry => entry.path);
+    // Wrangler takes a wrangler.json in the service directory or any parent before the service's
+    // own wrangler.jsonc, so one there, in services/ or at the root replaces the config checked here.
+    expect(paths.filter(path => /^(services\/([^/]+\/)?)?wrangler\.json$/.test(path))).toEqual([]);
+    // The find lists a directory named wrangler.jsonc as a Worker to deploy.
+    expect(entries.filter(entry => entry.directory).map(entry => entry.path)).toEqual([]);
+    // wrangler deploy follows a .wrangler/deploy/config.json there to the config it names, through
+    // a symlinked .wrangler or deploy directory too, so nothing under .wrangler there is tracked.
+    // A local build writes an ignored, untracked redirect, so this one reads tracked files only.
+    expect(
+      trackedPaths(repoRoot).filter(path => /^(services\/([^/]+\/)?)?\.wrangler(\/|$)/.test(path))
+    ).toEqual([]);
+
     // Only a service's own top-level config is a Worker to deploy; any other wrangler.jsonc under
-    // services/ must sit where that find skips it.
-    const nested = workerConfigPaths(repoRoot).filter(
-      path =>
-        path.startsWith('services/') &&
-        path.endsWith('/wrangler.jsonc') &&
-        !/^services\/[^/]+\/wrangler\.jsonc$/.test(path)
+    // services/, a broken symlink included, must sit where that find skips it.
+    const nested = paths.filter(
+      path => path.endsWith('/wrangler.jsonc') && !/^services\/[^/]+\/wrangler\.jsonc$/.test(path)
     );
     expect(nested).toContain('services/sts/test/fixtures/runtime/wrangler.jsonc');
     expect(nested.filter(path => !/^services\/[^/]+\/test\/fixtures\//.test(path))).toEqual([]);
@@ -112,6 +128,10 @@ describe('repository Worker configs', () => {
 
   it('agree with the deployment lists the check relies on', () => {
     expect(internalWorkerProblems(repoConfigs())).toEqual([]);
+  });
+
+  it('set every var STS reads in each STS deployment, with the issuer verifiers expect', () => {
+    expect(stsVarProblems(repoConfigs())).toEqual([]);
   });
 });
 
@@ -233,6 +253,55 @@ describe('worker config rules', () => {
           `${PATH} (top level): SIGNER binds Durable Object class SignerDO of ${script}; its Durable Objects are internal`
       )
     );
+  });
+
+  it("refuses a config outside services/sts that binds one of STS's own classes", () => {
+    const config = consumer({
+      durable_objects: {
+        bindings: [
+          { name: 'TOKENS', class_name: 'TokenSignerDO' },
+          { name: 'SIGNER', class_name: 'SignerDO' },
+        ],
+      },
+    });
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level): TOKENS binds Durable Object class TokenSignerDO, which only STS defines and binds`,
+    ]);
+    const own = parseWorkerConfig('services/sts/test/fixtures/x/wrangler.jsonc', {
+      name: 'secrets-broker-x-test',
+      ...NO_TRACES,
+      durable_objects: { bindings: [{ name: 'TOKENS', class_name: 'TokenSignerDO' }] },
+    });
+    expect(problemsOf(own)).toEqual([]);
+  });
+
+  it('refuses an STS block whose vars readConfig would refuse or whose issuer differs', () => {
+    const vars = {
+      STS_ENVIRONMENT: 'staging',
+      STS_ISSUER: 'https://sts-staging.kiloapps.io',
+      MANAGER_BASE_URL: 'https://eu.infisical.com',
+      MANAGER_PROJECT_ID: 'project',
+      MANAGER_ENVIRONMENT_SLUG: 'staging',
+      MANAGER_IDENTITY_ID: 'identity',
+      DO_JURISDICTION: 'eu',
+      TOKEN_SIGNING_KIDS_REVOKED: '',
+    };
+    const sts = (blockVars: Record<string, string>) =>
+      parseWorkerConfig('services/sts/wrangler.jsonc', { name: 'sts', vars: blockVars });
+    expect(stsVarProblems([sts(vars)])).toEqual([]);
+    expect(stsVarProblems([sts({ ...vars, TOKEN_SIGNING_KIDS_REVOKED: 'a'.repeat(43) })])).toEqual(
+      []
+    );
+    const { TOKEN_SIGNING_KIDS_REVOKED: _omitted, ...withoutKids } = vars;
+    expect(stsVarProblems([sts(withoutKids)])).toEqual([
+      expect.stringContaining('TOKEN_SIGNING_KIDS_REVOKED'),
+    ]);
+    expect(stsVarProblems([sts({ ...vars, TOKEN_SIGNING_KIDS_REVOKED: 'not-a-kid' })])).toEqual([
+      expect.stringContaining('vars do not pass EnvVarsSchema'),
+    ]);
+    expect(stsVarProblems([sts({ ...vars, STS_ISSUER: 'https://sts.kiloapps.io' })])).toEqual([
+      'services/sts/wrangler.jsonc (top level): STS_ISSUER is https://sts.kiloapps.io, expected https://sts-staging.kiloapps.io',
+    ]);
   });
 
   it('refuses an STS binding at any entrypoint other than SecretsBroker', () => {

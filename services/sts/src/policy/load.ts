@@ -1,4 +1,4 @@
-import type { StsEnvironment } from '@kilocode/sts-contracts';
+import type { StsEnvironment, StsScopeRegistry } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
 import { sha256Base64Url } from '../crypto/hash';
 import { PolicySchema, policyFileProblems, vercelEnvironmentKey, type Policy } from './schema';
@@ -8,6 +8,8 @@ export type PolicySnapshotEntry = {
   environments: string[];
   identity: string;
   secrets: string[];
+  audiences: string[];
+  scopes: string[];
 };
 
 export type PolicyIndex = {
@@ -53,7 +55,11 @@ function bindingKey(policy: Policy): string | null {
   }
 }
 
-export function loadPolicies(sources: Record<string, string>): PolicyIndex {
+/** `scopeRegistry` is the registry token grants are checked against; tests pass their own. */
+export function loadPolicies(
+  sources: Record<string, string>,
+  options: { scopeRegistry?: StsScopeRegistry } = {}
+): PolicyIndex {
   const policies: Policy[] = [];
   for (const [file, source] of Object.entries(sources)) {
     let document: unknown;
@@ -68,7 +74,7 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
       throw new Error(`${file} does not match the policy schema: ${parsed.error.message}`);
     }
     const policy = parsed.data;
-    const problems = policyFileProblems(policy);
+    const problems = policyFileProblems(policy, options.scopeRegistry);
     if (problems.length > 0) {
       throw new Error(`${file} is invalid: ${problems.join('; ')}`);
     }
@@ -100,6 +106,8 @@ export function loadPolicies(sources: Record<string, string>): PolicyIndex {
     environments: [...policy.environments].sort(),
     identity: canonicalIdentity(policy),
     secrets: [...policy.secrets].sort(),
+    audiences: [...policy.audiences].sort(),
+    scopes: [...policy.scopes].sort(),
   }));
   const byWorkload = new Map(policies.map(policy => [policy.workload, policy]));
 

@@ -1,8 +1,14 @@
 import {
+  AudienceSchema,
+  STS_SCOPE_REGISTRY,
+  ScopeSchema,
   SecretNameSchema,
   StsEnvironmentSchema,
   WorkloadNameSchema,
   type StsEnvironment,
+  isRegisteredStsScope,
+  scopeAudience,
+  type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
 
@@ -116,11 +122,22 @@ function hasDuplicates(values: readonly string[]): boolean {
   return new Set(values).size !== values.length;
 }
 
+/**
+ * Dynamic credentials a workload may request (database leases, CI deploy tokens). The enum is
+ * empty until those land (decisions Q5): the field fixes the policy shape, and any value fails.
+ */
+const DynamicGrantSchema = z.never();
+
 export const PolicySchema = z.strictObject({
   workload: WorkloadNameSchema,
   environments: z.array(StsEnvironmentSchema).min(1).max(3),
   identity: PolicyIdentitySchema,
   secrets: z.array(SecretNameSchema).max(256),
+  /** Services this workload may mint a token for; empty mints nothing (default deny). */
+  audiences: z.array(AudienceSchema.max(63)).max(64).default([]),
+  /** Scopes it may hold, each from `STS_SCOPE_REGISTRY` and under one of `audiences`. */
+  scopes: z.array(ScopeSchema.max(127)).max(256).default([]),
+  dynamic: z.array(DynamicGrantSchema).max(0).default([]),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;
@@ -131,15 +148,51 @@ export const PolicySnapshotEntrySchema = z.strictObject({
   environments: z.array(z.string()),
   identity: z.string(),
   secrets: z.array(z.string()),
+  // A snapshot stored before token grants existed has none.
+  audiences: z.array(z.string()).default([]),
+  scopes: z.array(z.string()).default([]),
 });
 
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
 
+/** Token grants: every scope registered and under a listed audience, every audience used. */
+function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
+  const problems: string[] = [];
+  if (hasDuplicates(policy.audiences)) problems.push('audiences contains a duplicate');
+  if (hasDuplicates(policy.scopes)) problems.push('scopes contains a duplicate');
+  for (const scope of policy.scopes) {
+    const audience = scopeAudience(scope);
+    if (!isRegisteredStsScope(audience, scope, registry)) {
+      problems.push(`scope ${scope} is not in STS_SCOPE_REGISTRY`);
+    }
+    if (!policy.audiences.includes(audience)) {
+      problems.push(
+        `scope ${scope} belongs to audience ${audience}, which audiences does not list`
+      );
+    }
+  }
+  for (const audience of policy.audiences) {
+    if (audience === policy.workload) {
+      problems.push(`audience ${audience} is the workload itself`);
+    }
+    if (!policy.scopes.some(scope => scopeAudience(scope) === audience)) {
+      problems.push(`audience ${audience} has no scope`);
+    }
+  }
+  return problems;
+}
+
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 
-/** Cross-field checks a single schema cannot express. Returns one message per problem. */
-export function policyFileProblems(policy: Policy): string[] {
-  const problems: string[] = [];
+/**
+ * Cross-field checks a single schema cannot express. Returns one message per problem. `registry`
+ * is the scope registry the grants are checked against; tests pass their own.
+ */
+export function policyFileProblems(
+  policy: Policy,
+  registry: StsScopeRegistry = STS_SCOPE_REGISTRY
+): string[] {
+  const problems: string[] = grantProblems(policy, registry);
   if (hasDuplicates(policy.environments)) problems.push('environments contains a duplicate');
   if (hasDuplicates(policy.secrets)) problems.push('secrets contains a duplicate');
   for (const name of policy.secrets) {

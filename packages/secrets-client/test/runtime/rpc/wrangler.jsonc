@@ -1,8 +1,9 @@
 // Test-only Worker that rpc-runtime.test.ts starts in local workerd; never deployed. Both
-// bindings point at its own entrypoints so each bundle read is a real RPC call.
+// bindings point at its own entrypoints so each bundle read is a real RPC call. It has its own
+// directory, so its local state does not share an SQLite file with the stand-in fixture's.
 {
   "name": "secrets-client-rpc-test",
-  "main": "rpc-worker.ts",
+  "main": "worker.ts",
   "compatibility_date": "2026-02-01",
   "services": [
     { "binding": "STS", "service": "secrets-client-rpc-test", "entrypoint": "SecretsBroker" },

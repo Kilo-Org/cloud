@@ -20,7 +20,7 @@ import { platform, resolveInstanceDoKey } from './platform';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { getActivePersonalInstance, getInstanceByIdIncludingDestroyed } from '../db';
 
-const currentUserId = '22222222-2222-4222-8222-222222222222';
+const currentUserId = '55555555-5555-4555-8555-555555555555';
 const legacyDoKey = 'oauth/google:100000000000000000005';
 const legacySandboxId = sandboxIdFromUserId(legacyDoKey);
 

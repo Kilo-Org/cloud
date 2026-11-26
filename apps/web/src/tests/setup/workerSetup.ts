@@ -18,7 +18,7 @@ import {
 } from '@/lib/usage-partitions';
 import { provisionWebhookEventPartitions } from '@/lib/integrations/db/webhook-event-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
 import { shutdownPosthog } from '@kilocode/web-shared/lib/posthog';
 
 // Use a file-system flag to ensure this setup runs only once per worker across all test files
@@ -37,6 +37,12 @@ const markSetupCompleted = (workerId: string) => {
 // production writers still fail unless they set the price version explicitly.
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
   LEGACY_KILOCLAW_PRICE_VERSION;
+
+// apps/ai-gateway inlines this at build time (its next.config.mjs `env`), and
+// its tests run in this suite, so they get the gateway's value.
+if (expect.getState().testPath?.startsWith(resolve(__dirname, '../../../../ai-gateway') + sep)) {
+  process.env.KILO_BROWSER_SESSIONS = 'disabled';
+}
 
 beforeAll(async () => {
   const workerId = getEnvVariable('JEST_WORKER_ID');

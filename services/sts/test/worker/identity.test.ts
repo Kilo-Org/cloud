@@ -112,6 +112,16 @@ describe('Fly machine identity', () => {
     });
   });
 
+  it('refuses a token issued more than the clock skew in the future', async () => {
+    const { verify, provider } = await fixture('production');
+    const issuedAt = Math.floor(Date.now() / 1000) + 120;
+    const token = await signToken(provider(FLY_ISSUER), FLY_CLAIMS, {
+      issuedAt,
+      expiresAt: issuedAt + 900,
+    });
+    expect(await verify(token)).toEqual({ status: 'denied', reason: 'identity_rejected' });
+  });
+
   it('refuses an app with the policy name but another app id', async () => {
     const { verify, provider } = await fixture('production');
     const token = await signToken(provider(FLY_ISSUER), { ...FLY_CLAIMS, app_id: '9999' });

@@ -16,7 +16,7 @@ let worker: LocalWorker;
 
 beforeEach(async () => {
   const started = await unstable_startWorker({
-    config: fileURLToPath(new URL('./runtime/rpc-wrangler.jsonc', import.meta.url)),
+    config: fileURLToPath(new URL('./runtime/rpc/wrangler.jsonc', import.meta.url)),
     dev: { server: { port: 0 }, inspector: false, watch: false, logLevel: 'error' },
   });
   await started.ready;

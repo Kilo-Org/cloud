@@ -18,7 +18,11 @@ export const RESTRICTED_DATA_COLLECTION: NodeOptions['dataCollection'] = {
     request: SENSITIVE_KEY_DENYLIST,
     response: SENSITIVE_KEY_DENYLIST,
   },
-  urlQueryParams: SENSITIVE_KEY_DENYLIST,
+  // Query keys stay visible, but the SDK filters every value: a value can hold a
+  // nested URL or a token (callbackPath, a tRPC input), and the SDK applies this
+  // policy to request URLs, the Next.js request path and outgoing request
+  // breadcrumbs before beforeSend runs.
+  urlQueryParams: { allow: [] },
   graphQL: { document: false, variables: false },
   genAI: { inputs: false, outputs: false },
   databaseQueryData: false,

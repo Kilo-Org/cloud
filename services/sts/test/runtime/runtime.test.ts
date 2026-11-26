@@ -147,7 +147,7 @@ it('verifies a workload token that arrives while a cancelled request was discove
   });
   // Discovery and the key set fetch take 500 ms each.
   expect(result.secondMs).toBeLessThan(PROMPT_MS + 500);
-  expect(JSON.parse(result.body)).toEqual({
+  expect(JSON.parse(result.body)).toMatchObject({
     status: 'verified',
     workload: 'fly-app',
     provider: 'fly',

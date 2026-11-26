@@ -205,14 +205,19 @@ describe('DeviceAuthClient requesting app', () => {
 });
 
 describe('DeviceAuthClient pending link', () => {
-  const renderWithPendingLink = () =>
+  const renderWithPendingLink = (needsEmailedCode = true) =>
     renderToStaticMarkup(
       React.createElement(DeviceAuthClient, {
         code: 'ABC-123',
         viewerToken: 'v',
         isAppMode: false,
         requestingClient: null,
-        pendingLink: { provider: 'github', email: 'octo@example.com', displayName: 'octocat' },
+        pendingLink: {
+          provider: 'github',
+          email: 'octo@example.com',
+          displayName: 'octocat',
+          needsEmailedCode,
+        },
         user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
       })
     );
@@ -231,6 +236,13 @@ describe('DeviceAuthClient pending link', () => {
     expect(html).not.toContain('checked=""');
     expect(authorizeButton(html)).toContain('disabled=""');
     expect(html).toContain('Choose whether to add the sign-in method above to authorize.');
+  });
+
+  test('says that adding a link to the existing account needs the emailed code', () => {
+    expect(renderWithPendingLink()).toContain(
+      'To add it, enter the code we email to test@example.com.'
+    );
+    expect(renderWithPendingLink(false)).not.toContain('enter the code we email');
   });
 });
 

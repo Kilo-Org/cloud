@@ -13,6 +13,11 @@ import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/ope
 import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
+import { SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES } from '@/lib/auth/sign-in-method-change-codes';
+import {
+  SignInMethodCodeDialog,
+  type SignInMethodChallenge,
+} from '@/components/profile/SignInMethodCodeDialog';
 
 /**
  * The BYOK entry for a delegated "Sign in with ChatGPT" connection. It is not a
@@ -64,13 +69,6 @@ const LOAD_ERROR_MESSAGE = "We couldn't load your ChatGPT connection. Try again.
 const DISCONNECT_ERROR_MESSAGE = "We couldn't disconnect ChatGPT. Try again.";
 
 /**
- * Client-side code for a linking session that never started the OAuth
- * round-trip. It is fed through `authErrorCode`, so the card renders the same
- * generic connect-failure copy and try-again action as a returned OAuth error.
- */
-const CONNECT_FAILED_CODE = 'connect_failed';
-
-/**
  * Shared by every state so the card keeps one padding and one reserved height:
  * switching between loading, disconnected, connected and error never moves the
  * key list below it. The minimum fits the tallest body at the narrowest
@@ -96,6 +94,13 @@ const CARD_ACTION_CLASS = 'w-fit';
 
 /** The declined/failed authorization copy, keyed by the returned error code. */
 function openAiChatGptAuthErrorMessage(code: string): string {
+  // A refused connect start (no browser session, or a missing or wrong emailed
+  // code) or callback (single sign-on required) names what the person can do
+  // about it.
+  const signInMethodChangeMessage = SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES[code];
+  if (signInMethodChangeMessage) {
+    return signInMethodChangeMessage;
+  }
   if (code === 'access_denied') {
     return 'ChatGPT was not connected. Try again.';
   }
@@ -386,7 +391,11 @@ export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
   );
 }
 
-function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: string }) {
+function OpenAiChatGptCardConnected({
+  organizationId,
+  codeChallenge,
+  onCodeChallengeChange,
+}: OpenAiChatGptCardProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -432,24 +441,34 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
   );
 
   const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
+  const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
 
   const handleConnect = () => {
     // A retry starts from a clean state so the failure copy never overlaps the
     // new attempt.
     setAuthErrorCode(null);
+    // The code step below asks for the emailed code before it starts the link.
+    setIsCodeDialogOpen(true);
+  };
+
+  const handleCodeVerified = async (code: string, challengeId: string) => {
     setIsConnecting(true);
-    void startOpenAiChatGptConnect(
-      () =>
-        linkMutation.mutateAsync(
-          organizationId ? { provider: 'openai', organizationId } : { provider: 'openai' }
-        ),
-      organizationId
-    ).catch(() => {
+    try {
+      await startOpenAiChatGptConnect(
+        () =>
+          linkMutation.mutateAsync(
+            organizationId
+              ? { provider: 'openai', organizationId, code, challengeId }
+              : { provider: 'openai', code, challengeId }
+          ),
+        organizationId
+      );
+    } catch (error) {
       // Only a failed attempt releases the busy state; a successful one
       // navigates away with the label still pending.
       setIsConnecting(false);
-      setAuthErrorCode(CONNECT_FAILED_CODE);
-    });
+      throw error;
+    }
   };
 
   const handleDisconnect = () => {
@@ -462,37 +481,59 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
   };
 
   return (
-    <OpenAiChatGptCardView
-      status={statusQuery.data}
-      authErrorCode={authErrorCode}
-      hasLoadError={statusQuery.isError}
-      hasDisconnectError={hasDisconnectError}
-      onConnect={handleConnect}
-      onDisconnect={handleDisconnect}
-      onRetry={handleRetryLoad}
-      isConnecting={isConnecting}
-      isDisconnecting={disconnectMutation.isPending}
-      isOrganization={Boolean(organizationId)}
-      isUsageLimitDismissed={
-        statusQuery.data?.usageLimit?.reachedAt === dismissedUsageLimitReachedAt
-      }
-      onDismissUsageLimit={() => {
-        setDismissedUsageLimitReachedAt(statusQuery.data?.usageLimit?.reachedAt ?? null);
-      }}
-    />
+    <>
+      <OpenAiChatGptCardView
+        status={statusQuery.data}
+        authErrorCode={authErrorCode}
+        hasLoadError={statusQuery.isError}
+        hasDisconnectError={hasDisconnectError}
+        onConnect={handleConnect}
+        onDisconnect={handleDisconnect}
+        onRetry={handleRetryLoad}
+        isConnecting={isConnecting}
+        isDisconnecting={disconnectMutation.isPending}
+        isOrganization={Boolean(organizationId)}
+        isUsageLimitDismissed={
+          statusQuery.data?.usageLimit?.reachedAt === dismissedUsageLimitReachedAt
+        }
+        onDismissUsageLimit={() => {
+          setDismissedUsageLimitReachedAt(statusQuery.data?.usageLimit?.reachedAt ?? null);
+        }}
+      />
+      <SignInMethodCodeDialog
+        open={isCodeDialogOpen}
+        change="link"
+        provider="openai"
+        challenge={codeChallenge}
+        onChallengeChange={onCodeChallengeChange}
+        onOpenChange={setIsCodeDialogOpen}
+        onError={error => setAuthErrorCode(error)}
+        onVerified={handleCodeVerified}
+      />
+    </>
   );
 }
 
-export function OpenAiChatGptCard({ organizationId }: { organizationId?: string }) {
+type OpenAiChatGptCardProps = {
+  organizationId?: string;
+  /**
+   * The page's last requested sign-in method code. The server keeps one live
+   * code per account, so every card on a page that asks for one shares it.
+   */
+  codeChallenge: SignInMethodChallenge | null;
+  onCodeChallengeChange: (challenge: SignInMethodChallenge | null) => void;
+};
+
+export function OpenAiChatGptCard(props: OpenAiChatGptCardProps) {
   // `useSearchParams` needs a Suspense boundary; the fallback is the card's own
   // loading state, so the reserved height covers it too.
   return (
     <Suspense
       fallback={
-        <OpenAiChatGptCardView status={undefined} isOrganization={Boolean(organizationId)} />
+        <OpenAiChatGptCardView status={undefined} isOrganization={Boolean(props.organizationId)} />
       }
     >
-      <OpenAiChatGptCardConnected organizationId={organizationId} />
+      <OpenAiChatGptCardConnected {...props} />
     </Suspense>
   );
 }

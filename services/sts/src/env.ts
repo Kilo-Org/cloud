@@ -4,12 +4,28 @@ import type { BundleDO } from './dos/BundleDO';
 import type { DenialDO } from './dos/DenialDO';
 import type { RefresherDO } from './dos/RefresherDO';
 import type { SignerDO } from './dos/SignerDO';
+import type { TokenSignerDO } from './dos/TokenSignerDO';
 
 function withoutTrailingSlash(value: string): string {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
-const EnvVarsSchema = z.object({
+/** An Ed25519 key's RFC 7638 thumbprint: SHA-256, base64url without padding. */
+const KidSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+
+/** A comma list of token-signing key ids pulled out of service; empty by default (README). */
+const RevokedKidsSchema = z
+  .string()
+  .transform(value =>
+    value
+      .split(',')
+      .map(kid => kid.trim())
+      .filter(kid => kid.length > 0)
+  )
+  .pipe(z.array(KidSchema));
+
+/** Every plain var STS reads; each deployed block of `wrangler.jsonc` sets all of them (repo check). */
+export const EnvVarsSchema = z.object({
   STS_ENVIRONMENT: StsEnvironmentSchema,
   STS_ISSUER: z.url().transform(withoutTrailingSlash),
   MANAGER_BASE_URL: z.url().transform(withoutTrailingSlash),
@@ -17,6 +33,7 @@ const EnvVarsSchema = z.object({
   MANAGER_ENVIRONMENT_SLUG: z.string().min(1),
   MANAGER_IDENTITY_ID: z.string().min(1),
   DO_JURISDICTION: z.enum(['eu', 'none']),
+  TOKEN_SIGNING_KIDS_REVOKED: RevokedKidsSchema,
 });
 
 /** The claims Infisical JWT Auth checks on the login JWT; every value is exact (design 4.2). */
@@ -39,6 +56,8 @@ export type StsConfig = {
   issuer: string;
   jurisdiction: 'eu' | 'none';
   manager: ManagerConfig;
+  /** Token-signing key ids never used again and dropped from the key set (emergency removal). */
+  revokedTokenKids: readonly string[];
 };
 
 export type Env = {
@@ -49,10 +68,12 @@ export type Env = {
   MANAGER_ENVIRONMENT_SLUG: string;
   MANAGER_IDENTITY_ID: string;
   DO_JURISDICTION: string;
+  TOKEN_SIGNING_KIDS_REVOKED: string;
   STS_BUNDLE_DO: DurableObjectNamespace<BundleDO>;
   STS_REFRESHER_DO: DurableObjectNamespace<RefresherDO>;
   STS_SIGNER_DO: DurableObjectNamespace<SignerDO>;
   STS_DENIAL_DO: DurableObjectNamespace<DenialDO>;
+  STS_TOKEN_SIGNER_DO: DurableObjectNamespace<TokenSignerDO>;
   AUDIT_QUEUE: Queue;
 };
 
@@ -78,5 +99,6 @@ export function readConfig(env: Env): StsConfig {
         subject: `sts:${vars.STS_ENVIRONMENT}:refresher`,
       },
     },
+    revokedTokenKids: vars.TOKEN_SIGNING_KIDS_REVOKED,
   };
 }

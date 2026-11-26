@@ -1,4 +1,10 @@
-import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
+import {
+  JWKS_PATH,
+  type BundleRequest,
+  type BundleResult,
+  type MintResult,
+} from '@kilocode/sts-contracts';
+import { decodeProtectedHeader } from 'jose';
 import { serveBundle, SecretsBroker } from '../../../src/broker';
 import { RefresherDO as StsRefresherDO } from '../../../src/dos/RefresherDO';
 import { SignerDO as StsSignerDO, type ManagerJwks } from '../../../src/dos/SignerDO';
@@ -8,18 +14,49 @@ import { handleRequest, MANAGER_WEBHOOK_PATH } from '../../../src/http';
 import { IdentityVerifier } from '../../../src/identity/verify';
 import { workloadPolicyHash } from '../../../src/policy';
 import { loadPolicies } from '../../../src/policy/load';
+import type { MintAuthority } from '../../../src/tokens/mint';
 import type { FillResult } from '../../../src/types';
 import { createProvider, providerFetch, signToken } from '../../worker/support';
 
-export { BundleDO, DenialDO } from '../../../src/index';
+export { BundleDO, DenialDO, TokenSignerDO } from '../../../src/index';
 
 /**
  * Test-only Worker for test/runtime; never deployed. `BROKER` binds its own `ProbeBroker`
- * entrypoint with `props.caller`, so a bundle read is a real RPC call into STS's broker code, and
- * `SELF` sends real requests to STS's own HTTP routes in this isolate. The Durable Object classes
- * run in this isolate too, so the counters below see their calls.
+ * entrypoint with `props.caller`, so a bundle read is a real RPC call into STS's broker code;
+ * `MINTER` binds `ProbeMinter` the same way for mint calls, and `SELF` sends real requests to STS's
+ * own HTTP routes in this isolate. The Durable Object classes run in this isolate too, so the
+ * counters below see their calls.
  */
-type ProbeEnv = Env & { BROKER: Service<ProbeBroker>; SELF: Fetcher };
+type ProbeEnv = Env & {
+  BROKER: Service<ProbeBroker>;
+  MINTER: Service<ProbeMinter>;
+  SELF: Fetcher;
+};
+
+/** The shipped scope registry is empty, so the minter checks against this one. */
+const RUNTIME_SCOPES = { 'runtime-target': { scopes: ['runtime-target:probe.read'] } };
+
+const RUNTIME_AUTHORITY: MintAuthority = {
+  scopes: RUNTIME_SCOPES,
+  policies: loadPolicies(
+    {
+      'sts-runtime-probe.yaml': `
+workload: sts-runtime-probe
+environments: [development]
+identity:
+  kind: worker-binding
+secrets: []
+audiences: [runtime-target]
+scopes: ['runtime-target:probe.read']
+`,
+    },
+    { scopeRegistry: RUNTIME_SCOPES }
+  ),
+};
+
+export class ProbeMinter extends SecretsBroker {
+  static override readonly mintAuthority = RUNTIME_AUTHORITY;
+}
 
 /** How long the signer, refresher and identity provider take to answer the calls STS caches. */
 const SLOW_CALL_MS = 500;
@@ -246,6 +283,52 @@ async function race(env: ProbeEnv, url: URL): Promise<Response> {
   });
 }
 
+/** The kid of the service-token key set STS serves, fetched as a real request. */
+async function servedKid(env: ProbeEnv): Promise<string | null> {
+  const response = await env.SELF.fetch(`${readConfig(env).issuer}${JWKS_PATH}`);
+  const jwks: { keys: Array<{ kid: string }> } = await response.json();
+  return jwks.keys[0]?.kid ?? null;
+}
+
+/**
+ * Two key-set requests and two mint calls at once, on a cold isolate and a cold token signer:
+ * each must be answered by work of its own, never by a promise another request created.
+ */
+async function coldTokens(env: ProbeEnv): Promise<Response> {
+  const issuer = readConfig(env).issuer;
+  const request = { tokens: [{ audience: 'runtime-target', scope: 'runtime-target:probe.read' }] };
+  const keySet = async () => {
+    const response = await env.SELF.fetch(`${issuer}${JWKS_PATH}`);
+    const jwks: { keys: Array<{ kid: string }> } = await response.json();
+    return { status: response.status, kids: jwks.keys.map(key => key.kid) };
+  };
+  const mint = async () => {
+    const result: MintResult = await env.MINTER.mintTokens(request);
+    if (result.status !== 'ok') return { status: result.status, kids: [] };
+    return {
+      status: result.status,
+      kids: result.tokens.map(token =>
+        token.status === 'issued' ? String(decodeProtectedHeader(token.token).kid) : token.reason
+      ),
+    };
+  };
+  return Response.json(await Promise.all([keySet(), keySet(), mint(), mint()]));
+}
+
+/** Calls the broker's former `mintAuthority()` method through the binding, as any caller could. */
+async function authorityOverRpc(env: ProbeEnv): Promise<Response> {
+  const binding = env.MINTER as unknown as { mintAuthority(): Promise<unknown> };
+  try {
+    await binding.mintAuthority();
+    return Response.json({ reachable: true, error: null });
+  } catch (error) {
+    return Response.json({
+      reachable: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export default {
   async fetch(request: Request, env: ProbeEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -268,6 +351,12 @@ export default {
         return new Response('settled');
       case '/fills':
         return new Response(String(fillsBuilt));
+      case '/token-kid':
+        return Response.json({ kid: await servedKid(env) });
+      case '/cold-tokens':
+        return await coldTokens(env);
+      case '/mint-authority':
+        return await authorityOverRpc(env);
       default:
         return new Response('not found', { status: 404 });
     }

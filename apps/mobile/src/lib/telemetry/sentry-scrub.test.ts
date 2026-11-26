@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { NETWORK_BODY_CONTEXT, scrubBreadcrumb, scrubEvent } from './sentry-scrub';
+import {
+  NETWORK_BODY_CONTEXT,
+  scrubBreadcrumb,
+  scrubEvent as scrubEventOrDrop,
+} from './sentry-scrub';
+import { scrubEvent } from './sentry-scrub.test-helpers';
 
 describe('scrubEvent', () => {
   it('strips query strings from request.url', () => {
@@ -254,8 +259,8 @@ describe('scrubEvent', () => {
 
   it('returns malformed event unchanged without throwing', () => {
     const event = null;
-    expect(() => scrubEvent(event)).not.toThrow();
-    expect(scrubEvent(event)).toBe(null);
+    expect(() => scrubEventOrDrop(event)).not.toThrow();
+    expect(scrubEventOrDrop(event)).toBe(null);
   });
 
   it('returns undefined unchanged without throwing', () => {

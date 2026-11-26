@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { scrubEvent } from './sentry-scrub';
+import { scrubEvent } from './sentry-scrub.test-helpers';
 
 /**
  * The scrubber keeps word-chain runs only at the app-set identifier paths: the

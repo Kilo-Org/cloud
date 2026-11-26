@@ -86,17 +86,22 @@ export type JwksSource = (
   signal: AbortSignal
 ) => Promise<{ body: unknown; age: number | null; oldestAge: number | null }>;
 
-/** The subset of `fetch` a key-set source uses; a Worker service binding's `fetch` fits it. */
+/**
+ * The subset of `fetch` a key-set source uses; a Worker service binding's `fetch` fits it. It must
+ * honour `redirect: 'manual'`: answer a redirect as the 3xx (or opaque-redirect) response itself.
+ */
 export type FetchLike = (
   url: string,
-  init: { signal: AbortSignal; headers: Record<string, string> }
+  init: { signal: AbortSignal; headers: Record<string, string>; redirect: 'manual' }
 ) => Promise<Response>;
 
 /**
  * The default source: `GET <issuer>/.well-known/jwks.json` over HTTPS (or through `fetcher`, such
- * as a service binding). A non-200 answer, a body that is not JSON, or an `Age` or
- * `Kilo-Key-Set-Oldest-Age` header that is not whole non-negative seconds is a failure. No HTTP
- * cache sits in between (design 5.7).
+ * as a service binding). It never follows a redirect, so the key set comes only from the issuer's
+ * origin: a 3xx, an opaque redirect, or a response that followed one anyway is a failure, like any
+ * other non-200 answer, a body that is not JSON, or an `Age` or `Kilo-Key-Set-Oldest-Age` header
+ * that is not whole non-negative seconds. Its detail names only the status. No HTTP cache sits in
+ * between (design 5.7).
  */
 export function httpJwksSource(
   issuer: string,
@@ -104,8 +109,12 @@ export function httpJwksSource(
 ): JwksSource {
   const url = `${issuer.replace(/\/+$/, '')}${JWKS_PATH}`;
   return async signal => {
-    const response = await fetcher(url, { signal, headers: { accept: 'application/json' } });
-    if (response.status !== 200) {
+    const response = await fetcher(url, {
+      signal,
+      headers: { accept: 'application/json' },
+      redirect: 'manual',
+    });
+    if (response.status !== 200 || response.redirected || response.type === 'opaqueredirect') {
       await response.body?.cancel();
       throw new Error(`key set answered HTTP ${response.status}`);
     }

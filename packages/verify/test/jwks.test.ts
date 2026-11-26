@@ -12,7 +12,8 @@ import {
   httpJwksSource,
   type VerifyResult,
 } from '../src/index';
-import { importKeySet } from '../src/jwks';
+import { newCallScope } from '../src/flight';
+import { createKeySetCache, importKeySet } from '../src/jwks';
 import {
   SCOPE,
   STS_ISSUER,
@@ -384,6 +385,53 @@ describe('the HTTPS key-set source', () => {
   ])('rejects %s', async (_name, answer) => {
     const source = httpJwksSource('https://sts.test', async () => answer());
     await expect(source(AbortSignal.timeout(1000))).rejects.toThrow();
+  });
+
+  /** A 302 to another origin, as a fetch that honours `redirect: 'manual'` answers it. */
+  const redirect = () =>
+    new Response(null, { status: 302, headers: { location: 'https://elsewhere.test/jwks.json' } });
+  /** A 200 whose read-only `redirected` or `type` is set, as a followed redirect answers. */
+  const followed = (property: 'redirected' | 'type', value: unknown) => () => {
+    const response = Response.json({ keys: [] });
+    Object.defineProperty(response, property, { value });
+    return response;
+  };
+  it.each([
+    ['a 302', redirect, 'HTTP 302'],
+    ['a response that followed a redirect anyway', followed('redirected', true), 'HTTP 200'],
+    ['an opaque redirect', followed('type', 'opaqueredirect'), 'HTTP 200'],
+  ])('refuses %s, naming only its status', async (_name, answer, detail) => {
+    const source = httpJwksSource('https://uts.test', async () => answer());
+    const refused = await source(AbortSignal.timeout(1000)).then(
+      () => null,
+      (error: unknown) => error
+    );
+    expect(refused).toBeInstanceOf(Error);
+    expect(String(refused)).toBe(`Error: key set answered ${detail}`);
+  });
+
+  it('never follows a redirect: the cache keeps the last good set', async () => {
+    const issuer = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID);
+    const elsewhere = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID);
+    const ages = { age: '0', [KEY_SET_OLDEST_AGE_HEADER]: '0' };
+    let moved = false;
+    const modes: string[] = [];
+    // Once moved, a manual request gets the 302 and a followed one the other origin's valid set.
+    const source = httpJwksSource(UTS_ISSUER, async (_url, init) => {
+      modes.push(init.redirect);
+      if (!moved) return Response.json({ keys: [issuer.jwk] }, { headers: ages });
+      if (init.redirect === 'manual') return redirect();
+      return Response.json({ keys: [elsewhere.jwk] }, { headers: ages });
+    });
+    const keySet = createKeySetCache(source, 'uts');
+    expect(await keySet.key(issuer.kid, newCallScope())).toMatchObject({ status: 'key' });
+    moved = true;
+    advance(JWKS_TTL_MS);
+    expect(await keySet.key(issuer.kid, newCallScope())).toMatchObject({ status: 'key' });
+    expect(await keySet.key(elsewhere.kid, newCallScope())).toMatchObject({
+      status: 'unavailable',
+    });
+    expect(modes).toEqual(['manual', 'manual']);
   });
 
   // Each row: the `Age` and `Kilo-Key-Set-Oldest-Age` headers sent (absent when undefined), and

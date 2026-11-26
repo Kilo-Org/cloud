@@ -28,31 +28,29 @@ export async function GET(request?: NextRequest) {
   return NextResponse.json(result.body, { status: result.status });
 }
 
+/** Requeue failed registry rows of the selected queue(s). */
 export const POST = auditedAdminRoute(
   { kind: 'declarative', action: 'auto_routing.benchmark_registry.requeue' },
-  requeueFailedRows
+  async (request: NextRequest) => {
+    const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(user);
+
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const parsed = RequeueBenchmarkRegistryRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid requeue request' }, { status: 400 });
+    }
+    const { scope, router } = parsed.data;
+    addAdminAuditMetadata({ scope, router });
+
+    const result = await requeueBenchmarkRegistry(scope, router);
+    return NextResponse.json(result.body, { status: result.status });
+  }
 );
-
-/** Requeue failed registry rows of the selected queue(s). */
-async function requeueFailedRows(request: NextRequest) {
-  const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
-  setAdminAuditActor(user);
-
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const parsed = RequeueBenchmarkRegistryRequestSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid requeue request' }, { status: 400 });
-  }
-  const { scope, router } = parsed.data;
-  addAdminAuditMetadata({ scope, router });
-
-  const result = await requeueBenchmarkRegistry(scope, router);
-  return NextResponse.json(result.body, { status: result.status });
-}

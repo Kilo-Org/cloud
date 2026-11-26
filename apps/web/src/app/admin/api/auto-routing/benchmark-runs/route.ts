@@ -40,28 +40,26 @@ export async function GET(request: NextRequest) {
 
 export const POST = auditedAdminRoute(
   { kind: 'declarative', action: 'auto_routing.benchmark_run.start' },
-  startRun
+  async (request: NextRequest) => {
+    const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
+    if (authFailedResponse) return authFailedResponse;
+    setAdminAuditActor(user);
+
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const parsed = StartBenchmarkRunRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid start benchmark run request' }, { status: 400 });
+    }
+    const { kind, force, queue, router } = parsed.data;
+    addAdminAuditMetadata({ kind, force, queue, router });
+
+    const result = await startBenchmarkRun(kind, force, queue, router);
+    return NextResponse.json(result.body, { status: result.status });
+  }
 );
-
-async function startRun(request: NextRequest) {
-  const { authFailedResponse, user } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
-  setAdminAuditActor(user);
-
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const parsed = StartBenchmarkRunRequestSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid start benchmark run request' }, { status: 400 });
-  }
-  const { kind, force, queue, router } = parsed.data;
-  addAdminAuditMetadata({ kind, force, queue, router });
-
-  const result = await startBenchmarkRun(kind, force, queue, router);
-  return NextResponse.json(result.body, { status: result.status });
-}

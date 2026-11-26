@@ -209,10 +209,11 @@ describe('audit outbox relay against the identity store', () => {
       const kinds = await maintainRows(store, 'oauth_rows');
       expect(kinds.map(row => row.kind).sort()).toEqual([
         'authorization_codes',
+        'blocked_client_families',
         'dpop_proofs',
         'revocations',
-        'rotated_refresh_tokens',
         'third_party_refresh_tokens',
+        'third_party_rotated_tokens',
       ]);
     });
   });

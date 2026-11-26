@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { IDENTITY_STORE_TABLES } from '../../src/db/rows';
 import { LOGIN_ROLES } from './connection';
 import {
@@ -78,6 +78,7 @@ beforeAll(async () => {
   db = await TestDatabase.create();
   todayPartition = `audit_events_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`;
 });
+afterEach(() => db.endConnections());
 afterAll(() => db.drop());
 
 describe('role attributes', () => {
@@ -601,32 +602,12 @@ describe('table privileges', () => {
     );
 
     // Gated tables (0003_access.sql): no INSERT, and UPDATE only on lifecycle columns. PATs and org
-    // bot keys lose even those in 0005, like gate passes: only the account functions write them.
+    // bot keys lose even those in 0005, like gate passes, and device codes in 0008: only the
+    // account and sign-in functions write them.
     const gatedUpdates: Record<string, string[]> = {
       ci_trust_policies: ['revoked_at', 'status', 'updated_at'],
       third_party_consents: ['revoked_at', 'status'],
-      device_codes: [
-        'account_id',
-        'consumed_at',
-        'denied_at',
-        'last_polled_at',
-        'poll_interval_seconds',
-        'status',
-      ],
     };
-    const deviceCodeInserts = [
-      'asn',
-      'city',
-      'client_id',
-      'client_ip',
-      'country',
-      'device_code_hash',
-      'expires_at',
-      'poll_interval_seconds',
-      'scopes',
-      'user_agent',
-      'user_code_hash',
-    ];
     const credentialTables = Object.keys(IDENTITY_STORE_TABLES).filter(
       table =>
         table !== 'audit_events' &&
@@ -654,7 +635,6 @@ describe('table privileges', () => {
         app(`uts.${table}`, 'SELECT'),
         ...columns.map(column => app(`uts.${table}(${column})`, 'UPDATE')),
       ]),
-      ...deviceCodeInserts.map(column => app(`uts.device_codes(${column})`, 'INSERT')),
       app('uts.audit_events', 'SELECT'),
       ...['account_id', 'event', 'event_id', 'event_type'].map(column =>
         app(`uts.audit_events(${column})`, 'INSERT')

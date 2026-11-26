@@ -5,6 +5,7 @@ import {
   TestDatabase,
   insertAccount,
   insertDeviceSession,
+  insertGatePass,
   randomHash,
   sqlStateOf,
 } from './harness';
@@ -140,9 +141,10 @@ describe('uts.write_gated_pat', () => {
     const otherSessionId = await sessionSignedIn(accountId, 30);
     const passkey = await owner.query<{ id: string }>(
       `INSERT INTO uts.passkey_credentials
-         (account_id, credential_id, public_key, backup_eligible, backed_up, rp_id, name)
-       VALUES ($1, $2, '\\x01', true, true, 'app.example.com', 'laptop') RETURNING id`,
-      [accountId, randomHash()]
+         (account_id, credential_id, public_key, backup_eligible, backed_up, rp_id, name,
+          user_handle, gate_pass_id)
+       VALUES ($1, $2, '\\x01', true, true, 'app.example.com', 'laptop', $3, $4) RETURNING id`,
+      [accountId, randomHash(), randomHash(), await insertGatePass(owner, accountId, 'passkey_add')]
     );
     await owner.query(
       `INSERT INTO uts.step_ups (account_id, device_session_id, purpose, passkey_credential_id, expires_at)

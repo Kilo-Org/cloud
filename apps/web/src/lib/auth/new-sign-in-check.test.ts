@@ -120,13 +120,14 @@ describe('scheduleNewSignInCheck', () => {
     transaction.mockRestore();
   });
 
-  test('a check skipped at its lock limit sends nothing and reports nothing', async () => {
+  test('a check skipped at its lock limit sends nothing and logs only its outcome', async () => {
     const user = await insertTestUser();
     const transaction = jest
       .spyOn(db, 'transaction')
       .mockRejectedValueOnce(
         new Error('failed query', { cause: Object.assign(new Error('lock'), { code: '55P03' }) })
       );
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
 
     await scheduleNewSignInCheck({
       user,
@@ -137,6 +138,17 @@ describe('scheduleNewSignInCheck', () => {
 
     expect(mockScheduleSecurityNotice).not.toHaveBeenCalled();
     expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(1);
+    const [line] = log.mock.calls[0] ?? [];
+    expect(typeof line).toBe('string');
+    expect(JSON.parse(String(line))).toEqual({
+      source: 'sign_in_context_check',
+      outcome: 'lock_busy',
+    });
+    for (const userData of [user.id, user.google_user_email, '203.0.113.45', 'laptop']) {
+      expect(String(line)).not.toContain(userData);
+    }
+    log.mockRestore();
     transaction.mockRestore();
   });
 

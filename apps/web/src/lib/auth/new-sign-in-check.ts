@@ -13,7 +13,8 @@ import { scheduleSecurityNotice, securityNoticeRequestFromHeaders } from '@/lib/
  * latency. A failure never reaches the sign-in. It is reported as a fixed
  * error: a database error's message carries the query parameters (the user
  * id and the digests). A check skipped at its lock limit (`lock_busy`) is no
- * failure and is not reported.
+ * failure and is not reported; it writes one log line that names only the
+ * outcome, so skips stay countable.
  */
 export async function scheduleNewSignInCheck(params: {
   user: { id: string; google_user_email: string };
@@ -33,6 +34,10 @@ export async function scheduleNewSignInCheck(params: {
         network,
         now: request.occurredAt,
       });
+      if (decision.kind === 'lock_busy') {
+        console.log(JSON.stringify({ source: 'sign_in_context_check', outcome: 'lock_busy' }));
+        return;
+      }
       if (decision.kind !== 'new_device_new_network') return;
       await scheduleSecurityNotice(user, { type: 'new_sign_in', method }, request);
     } catch {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { rootRouter } from './root-router';
@@ -193,6 +194,32 @@ function discoverServerComponents(): { file: string; route: string }[] {
           source.includes('getAuthorizedOrgContextOrSupport('))
       );
     });
+}
+
+const ELEVATED_WRITE_REACHABILITY_TOOL = path.join(
+  REPO_ROOT,
+  'tools/admin-audit/elevated-write-reachability.mjs'
+);
+
+/**
+ * For each route handler, the actions it can record through
+ * runElevatedOrganizationWrite, following its imports and its `import()`
+ * loads into other modules. The tool runs in its own Node process because its
+ * parser, oxc-parser, is an ES module this CommonJS suite cannot load.
+ */
+function elevatedWriteActionsReachableFrom(
+  handlers: readonly { file: string; method: string }[]
+): string[][] {
+  const output = execFileSync(
+    process.execPath,
+    [
+      ELEVATED_WRITE_REACHABILITY_TOOL,
+      ...handlers.flatMap(handler => [handler.file, handler.method]),
+    ],
+    { encoding: 'utf8' }
+  );
+  const reached: string[][] = JSON.parse(output);
+  return reached;
 }
 
 const procedures = rootRouter._def.procedures as Record<string, ProcedureDef>;
@@ -494,6 +521,29 @@ describe('organization admin bypass write sites are audited', () => {
 
     expect(problems).toEqual([]);
     expect(classified.size).toBe(organizationElevationWriteSites.length);
+  });
+
+  test('every recorded site reaches runElevatedOrganizationWrite with each action it lists', () => {
+    const routeFiles = new Map(
+      discoverRESTRoutes().map(discovered => [discovered.route, discovered.file])
+    );
+    // A route without a handler file is reported by the test above.
+    const recorded = organizationElevationWriteSites.flatMap(site => {
+      const file = routeFiles.get(site.route);
+      return site.audit.kind === 'recorded' && file !== undefined
+        ? [{ file, method: site.method, route: site.route, actions: site.audit.actions }]
+        : [];
+    });
+
+    const reached = elevatedWriteActionsReachableFrom(recorded);
+
+    const problems = recorded.flatMap((site, index) =>
+      site.actions
+        .filter(action => !reached[index]?.includes(action))
+        .map(action => `${site.route} ${site.method}: never records ${action}`)
+    );
+    expect(recorded.length).toBeGreaterThan(0);
+    expect(problems).toEqual([]);
   });
 });
 

@@ -453,6 +453,29 @@ describe('Sentry transport spy', () => {
     expect(SENTRY_NATIVE_OPTIONS.enableTombstone).toBe(true);
   });
 
+  it('keeps request URLs, screenshots and view trees out of native crash events', () => {
+    expect(SENTRY_NATIVE_OPTIONS).toMatchObject({
+      sendDefaultPii: false,
+      enableNetworkBreadcrumbs: false,
+      attachScreenshot: false,
+      attachViewHierarchy: false,
+    });
+  });
+
+  it.each([false, true])(
+    'keeps native request breadcrumbs and view trees off after JS init (consent %s)',
+    async optionalConsented => {
+      const { initSentry } = await loadSentryInit();
+
+      initSentry(optionalConsented);
+
+      expect(hoisted.sentryHolder.initOptions).toMatchObject({
+        enableNetworkBreadcrumbs: false,
+        attachViewHierarchy: false,
+      });
+    }
+  );
+
   it('registers no replay and disables screenshots when optional consent is false', async () => {
     const { initSentry } = await loadSentryInit();
 

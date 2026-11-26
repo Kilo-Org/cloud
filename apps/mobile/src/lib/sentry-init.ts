@@ -118,6 +118,10 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
     ...(Platform.OS === 'android' ? { enableNdk: androidApiLevel() < 31 } : {}),
     enableMetricKit: true,
     enableAppHangTracking: false,
+    // JS init restarts the native SDK with these options, so the native-only
+    // key of SENTRY_NATIVE_OPTIONS that keeps request URLs out of native crash
+    // events repeats here. View trees stay off through sentryOptionsForConsent.
+    enableNetworkBreadcrumbs: false,
 
     environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(optionalConsented),

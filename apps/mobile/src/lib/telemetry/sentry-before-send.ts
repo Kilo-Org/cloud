@@ -17,13 +17,47 @@
  * React Native Sentry SDK does not parse.
  */
 
+import * as z from 'zod';
+
 import { ProtectedDataUnavailableError } from '@/lib/protected-data';
 import {
   isAppAttestFailureEvent,
   projectAppAttestFailureEvent,
 } from '@/lib/telemetry/app-attest-events';
 import { isE2eInjectedFault } from '@/lib/telemetry/e2e-fault';
-import { scrubEvent } from '@/lib/telemetry/sentry-scrub';
+import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
+
+// Native request breadcrumbs keep the query and the fragment in their own data
+// fields, which the breadcrumb scrub does not read.
+const NATIVE_URL_PART_FIELDS = new Set(['http.query', 'http.fragment']);
+const fieldsSchema = z.record(z.string(), z.unknown());
+const breadcrumbsSchema = z.array(fieldsSchema);
+
+function withoutNativeUrlParts(breadcrumb: Record<string, unknown>) {
+  const data = fieldsSchema.safeParse(breadcrumb.data);
+  if (!data.success) {
+    return breadcrumb;
+  }
+  const kept = Object.entries(data.data).filter(([key]) => !NATIVE_URL_PART_FIELDS.has(key));
+  return { ...breadcrumb, data: Object.fromEntries(kept) };
+}
+
+// The SDK merges the native SDK's breadcrumbs into the event before beforeSend,
+// and they never pass beforeBreadcrumb. A list this module cannot read is
+// dropped rather than sent unscrubbed.
+function scrubMergedBreadcrumbs(event: unknown): void {
+  // SAFETY: The SDK supplies the event object. Only `breadcrumbs` is read and replaced.
+  const fields = event as Record<string, unknown>;
+  if (fields.breadcrumbs === undefined) {
+    return;
+  }
+  const breadcrumbs = breadcrumbsSchema.safeParse(fields.breadcrumbs);
+  fields.breadcrumbs = breadcrumbs.success
+    ? breadcrumbs.data.flatMap(
+        breadcrumb => scrubBreadcrumb(withoutNativeUrlParts(breadcrumb)) ?? []
+      )
+    : [];
+}
 
 /** The part of Sentry's capture hint this gate reads. */
 export type BeforeSendHint = { originalException?: unknown };
@@ -46,5 +80,6 @@ export function beforeSendScrubbedEvent<T>(event: T, hint?: BeforeSendHint): T |
   if (isAppAttestFailureEvent(event)) {
     return projectAppAttestFailureEvent(event);
   }
+  scrubMergedBreadcrumbs(event);
   return scrubEvent(event);
 }

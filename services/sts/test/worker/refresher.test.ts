@@ -477,6 +477,7 @@ describe('policy audit stream', () => {
     const event = JSON.parse(rows[0]);
     expect(event.type).toBe('ai.kilo.sts.policy.changed');
     expect([...event.data.attributes.addedWorkloads].sort()).toEqual([
+      'ai-gateway',
       'audit-relay',
       'bouncer-watch',
       'notifications',

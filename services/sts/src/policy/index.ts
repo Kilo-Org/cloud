@@ -1,3 +1,4 @@
+import aiGatewayPolicy from '../../policy/ai-gateway.yaml';
 import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
 import notificationsPolicy from '../../policy/notifications.yaml';
@@ -10,6 +11,7 @@ import { POLICY_FILES, type PolicyFile } from './registry';
 import type { Policy } from './schema';
 
 const sources: Record<PolicyFile, string> = {
+  'ai-gateway.yaml': aiGatewayPolicy,
   'audit-relay.yaml': auditRelayPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
   'notifications.yaml': notificationsPolicy,

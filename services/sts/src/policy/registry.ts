@@ -10,6 +10,7 @@ export const POLICY_FILES = [
   'notifications.yaml',
   'usage-ingest.yaml',
   'web.yaml',
+  'ai-gateway.yaml',
 ] as const;
 
 export type PolicyFile = (typeof POLICY_FILES)[number];

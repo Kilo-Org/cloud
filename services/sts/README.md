@@ -23,7 +23,8 @@ Worker.
   failed bundle object call answers the same way, over RPC and HTTP. Each isolate caches a
   provider's discovery and key set once a request has fetched them; requests share only that
   result, never a pending fetch, so a cold isolate makes one discovery fetch per issuer for each
-  request that arrives before the first lands (today only `web`, a Vercel caller, uses one).
+  request that arrives before the first lands (today the Vercel callers `web` and `ai-gateway`, which
+  share team `kilocode`'s issuer).
 - STS waits at most 20 seconds for the bundle object (a fill attempt takes at most 16), then answers
   `unavailable` with `Retry-After: 30`: a caller cannot cancel an RPC, and a Durable Object waiting
   on one stays in memory until it completes. A fill still running at the deadline finishes inside
@@ -429,6 +430,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | none yet, so STS refuses it |
+| `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (the policy lists only `development`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
 is reserved: its policy (`worker-binding`, `props.caller` `kilo-mcp`, development first) lands once
@@ -437,6 +439,11 @@ is reserved: its policy (`worker-binding`, `props.caller` `kilo-mcp`, developmen
 development STS: its `dev` block may only bind `sts-dev`, which STS does not deploy, so the binding
 goes in an `env.local` block named `kilo-mcp-local`, with `observability.traces.enabled: false` in
 every block.
+
+The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
+exists for the gateway's authenticated UTS HTTPS feed transport. It lists development only, so
+staging and production STS refuse the gateway as an unknown workload; its activation adds staging
+and production to both its `environments` lists and is reviewed like any policy change.
 
 Workloads with a policy, all over `worker-binding`:
 
@@ -590,6 +597,12 @@ deployed with `--target=staging`), so its policy lists
 `{ customEnvironmentId: env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b }` and STS staging serves exactly that
 environment. Anyone with deploy rights on the project can deploy to that custom environment, so
 staging values must not be production-grade. Team `kilocode` is `team_ItxRShuUkJaEd9GmXMEEgunb`.
+
+The AI gateway (`apps/ai-gateway`, workload `ai-gateway`) is the project `kilocode-ai-gateway`
+(`prj_cFtsRYRBCm4qa8D35LC2j183FohC`). Its policy lists only `preview`, so development STS serves its
+preview deployments and nothing else; its own custom environment `staging`
+(`env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV`) and `production` are not listed yet. Both projects share the
+team issuer `https://oidc.vercel.com/kilocode`; the project id alone tells them apart.
 
 A policy fails to load when a listed Vercel environment can read none of the policy's STS
 environments, or when one of its STS environments has no listed Vercel environment that may read it.

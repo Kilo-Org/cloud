@@ -57,7 +57,13 @@ import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { organizationActionTarget, recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+  organizationActionTarget,
+  recordAdminAction,
+  setAdminAuditTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { getAdminCreditTransactionsForOrganization } from '@kilocode/web-shared/lib/creditTransactions';
 import {
   assertOrganizationHierarchyChangeAllowed,
@@ -331,30 +337,35 @@ const SearchParentMembersInputSchema = z.object({
 });
 
 export const organizationAdminRouter = createTRPCRouter({
-  create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async ({ input, ctx }) => {
-    const parentOrganizationId = input.parentOrganizationId ?? null;
+  create: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.create'] } })
+    .input(OrganizationCreateInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const parentOrganizationId = input.parentOrganizationId ?? null;
 
-    let organization;
-    if (parentOrganizationId) {
-      organization = await createChildOrganization(input.name, parentOrganizationId);
-    } else {
-      organization = await createOrganization(input.name);
-      await getOrCreateStripeCustomerIdForOrganization(organization.id);
-    }
+      let organization;
+      if (parentOrganizationId) {
+        organization = await createChildOrganization(input.name, parentOrganizationId);
+      } else {
+        organization = await createOrganization(input.name);
+        await getOrCreateStripeCustomerIdForOrganization(organization.id);
+      }
 
-    await recordAdminAction(ctx, {
-      action: 'organization.create',
-      target: organizationActionTarget(organization.id),
-      message: parentOrganizationId ? 'Created child organization' : 'Created organization',
-      metadata: { name: input.name, parentOrganizationId },
-    });
+      await recordAdminAction(ctx, {
+        action: 'organization.create',
+        target: organizationActionTarget(organization.id),
+        message: parentOrganizationId ? 'Created child organization' : 'Created organization',
+        metadata: { name: input.name, parentOrganizationId },
+      });
 
-    return { organization };
-  }),
+      return { organization };
+    }),
 
   setParent: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.parent.set'] } })
     .input(SetParentOrganizationInputSchema)
     .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       let previous;
       try {
         previous = await db.transaction(async tx => {
@@ -429,8 +440,10 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   updateCreatedBy: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.created_by.set'] } })
     .input(UpdateCreatedByInputSchema)
     .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       const { organizationId, userId } = input;
 
       // Validate that the organization exists
@@ -478,8 +491,10 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   updateFreeTrialEndAt: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.free_trial_end.set'] } })
     .input(UpdateFreeTrialEndAtInputSchema)
     .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       const { organizationId, free_trial_end_at } = input;
 
       // Validate that the organization exists
@@ -509,8 +524,10 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   updateSuppressTrialMessaging: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.trial_messaging.set'] } })
     .input(UpdateSuppressTrialMessagingInputSchema)
     .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       const { organizationId, suppress_trial_messaging } = input;
 
       // Validate that the organization exists
@@ -548,8 +565,10 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   updateKiloEncrypt: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.kilo_encrypt.set'] } })
     .input(UpdateKiloEncryptInputSchema)
     .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       const { organizationId, kilo_encrypt } = input;
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
@@ -579,8 +598,15 @@ export const organizationAdminRouter = createTRPCRouter({
   // Members of a domain this organization requires SSO for may link another
   // sign-in method (for example ChatGPT) only while this is on.
   updateAllowNonSsoSignInMethods: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'handler',
+        actions: ['organization.sso.sign_in_methods_policy.set'],
+      },
+    })
     .input(UpdateAllowNonSsoSignInMethodsInputSchema)
     .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       const { organizationId, allow_non_sso_sign_in_methods } = input;
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
@@ -750,6 +776,13 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   clearKiloPassPaymentReview: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.kilo_pass.payment_review_clear',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
     .input(ClearKiloPassPaymentReviewInputSchema)
     .output(
       z.object({
@@ -775,6 +808,13 @@ export const organizationAdminRouter = createTRPCRouter({
     ),
 
   setServiceFeeExemption: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.service_fee_exemption.set',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
     .input(SetServiceFeeExemptionInputSchema)
     .output(
       z.object({
@@ -783,6 +823,7 @@ export const organizationAdminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      addAdminAuditMetadata({ isExempt: input.isExempt });
       try {
         return await setOrganizationServiceFeeExemption({
           store: createDefaultOrganizationServiceFeeExemptionStore(),
@@ -936,11 +977,19 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   grantCredit: creditManagerProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.credit.grant',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
     .input(GrantCreditInputSchema)
     .output(GrantCreditOutputSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, amount_usd, description } = input;
       const { user } = ctx;
+      addAdminAuditMetadata({ amountUsd: amount_usd, creditKind: input.creditKind });
 
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
@@ -1042,6 +1091,13 @@ export const organizationAdminRouter = createTRPCRouter({
     }),
 
   nullifyCredits: creditManagerProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.credit.nullify',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
     .input(NullifyCreditsInputSchema)
     .output(NullifyCreditsOutputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -1084,6 +1140,8 @@ export const organizationAdminRouter = createTRPCRouter({
           amountUsdNullified: retired / 1_000_000,
         };
       });
+
+      addAdminAuditMetadata({ amountUsdNullified: result.amountUsdNullified });
 
       return {
         message: `Successfully nullified $${result.amountUsdNullified.toFixed(2)} credits from organization ${result.orgName}`,
@@ -1176,168 +1234,184 @@ export const organizationAdminRouter = createTRPCRouter({
 
       return { users };
     }),
-  addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
-    const { organizationId, userId, role } = input;
+  addMember: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.member.admin_add',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
+    .input(AddMemberInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, userId, role } = input;
 
-    const organization = await getOrganizationById(organizationId);
-    if (!organization) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Organization not found',
-      });
-    }
+      const organization = await getOrganizationById(organizationId);
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
 
-    const existingUser = await findUserById(userId);
-    if (!existingUser) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'User not found',
-      });
-    }
+      const existingUser = await findUserById(userId);
+      if (!existingUser) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found',
+        });
+      }
 
-    if (organization.parent_organization_id) {
-      const [parentMembership] = await db
-        .select({ id: organization_memberships.id })
-        .from(organization_memberships)
-        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-        .innerJoin(
-          organizations,
-          and(
-            eq(organizations.id, organization_memberships.organization_id),
-            isNull(organizations.deleted_at)
+      if (organization.parent_organization_id) {
+        const [parentMembership] = await db
+          .select({ id: organization_memberships.id })
+          .from(organization_memberships)
+          .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+          .innerJoin(
+            organizations,
+            and(
+              eq(organizations.id, organization_memberships.organization_id),
+              isNull(organizations.deleted_at)
+            )
           )
-        )
-        .where(
-          and(
-            eq(organization_memberships.organization_id, organization.parent_organization_id),
-            eq(organization_memberships.kilo_user_id, userId),
-            eq(kilocode_users.is_bot, false)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, organization.parent_organization_id),
+              eq(organization_memberships.kilo_user_id, userId),
+              eq(kilocode_users.is_bot, false)
+            )
           )
-        )
-        .limit(1);
-      if (!parentMembership || existingUser.is_bot) {
+          .limit(1);
+        if (!parentMembership || existingUser.is_bot) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message:
+              'Child organizations can only add people who are already members of the parent organization.',
+          });
+        }
+      }
+
+      const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);
+      if (ssoPolicy.status === 'misconfigured') {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
-          message:
-            'Child organizations can only add people who are already members of the parent organization.',
+          message: 'Organization SSO policy is misconfigured',
         });
       }
-    }
 
-    const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);
-    if (ssoPolicy.status === 'misconfigured') {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: 'Organization SSO policy is misconfigured',
-      });
-    }
+      const userDomain = getLowerDomainFromEmail(existingUser.google_user_email);
+      if (
+        !existingUser.is_bot &&
+        ssoPolicy.status === 'required' &&
+        userDomain === ssoPolicy.domain
+      ) {
+        const workosProvider = await db.query.user_auth_provider.findFirst({
+          where: and(
+            eq(user_auth_provider.kilo_user_id, userId),
+            eq(user_auth_provider.provider, 'workos'),
+            eq(user_auth_provider.hosted_domain, ssoPolicy.domain)
+          ),
+        });
+        if (!workosProvider) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'User must authenticate through the organization SSO provider first',
+          });
+        }
+      }
 
-    const userDomain = getLowerDomainFromEmail(existingUser.google_user_email);
-    if (
-      !existingUser.is_bot &&
-      ssoPolicy.status === 'required' &&
-      userDomain === ssoPolicy.domain
-    ) {
-      const workosProvider = await db.query.user_auth_provider.findFirst({
-        where: and(
-          eq(user_auth_provider.kilo_user_id, userId),
-          eq(user_auth_provider.provider, 'workos'),
-          eq(user_auth_provider.hosted_domain, ssoPolicy.domain)
-        ),
-      });
-      if (!workosProvider) {
+      const added = await addUserToOrganization(organizationId, userId, role);
+      addAdminAuditMetadata({ userId, role, added });
+      if (added) {
+        await createAuditLog({
+          organization_id: organizationId,
+          action: 'organization.member.admin_add',
+          actor_name: ctx.user.google_user_name,
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          details: { id: 'member.added', email: existingUser.google_user_email, role },
+          message: `Added ${existingUser.google_user_email} as ${role}`,
+        });
+      }
+
+      return successResult();
+    }),
+
+  delete: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['organization.delete'] } })
+    .input(OrganizationIdInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
+      const { organizationId } = input;
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'User must authenticate through the organization SSO provider first',
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
         });
       }
-    }
 
-    const added = await addUserToOrganization(organizationId, userId, role);
-    if (added) {
-      await createAuditLog({
-        organization_id: organizationId,
-        action: 'organization.member.admin_add',
-        actor_name: ctx.user.google_user_name,
-        actor_email: ctx.user.google_user_email,
-        actor_id: ctx.user.id,
-        details: { id: 'member.added', email: existingUser.google_user_email, role },
-        message: `Added ${existingUser.google_user_email} as ${role}`,
-      });
-    }
-
-    return successResult();
-  }),
-
-  delete: adminProcedure.input(OrganizationIdInputSchema).mutation(async ({ input, ctx }) => {
-    const { organizationId } = input;
-
-    const existingOrg = await getOrganizationById(organizationId);
-    if (!existingOrg) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Organization not found',
-      });
-    }
-
-    // Block deletion while a non-ended subscription exists (Subscription Lifecycle rule 10)
-    const latestPurchase = await getMostRecentSeatPurchase(organizationId);
-    if (latestPurchase && latestPurchase.subscription_status !== 'ended') {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message:
-          'Cannot delete organization with an active subscription. Cancel the subscription first.',
-      });
-    }
-
-    // Secondary guard: check Stripe directly in case a live subscription exists
-    // but the webhook hasn't recorded it locally yet (e.g., checkout just completed).
-    if (existingOrg.stripe_customer_id) {
-      const { getSubscriptionsForStripeCustomerId } = await import('@/lib/stripe');
-      const stripeSubs = await getSubscriptionsForStripeCustomerId(existingOrg.stripe_customer_id);
-      if (stripeSubs.some(sub => sub.ended_at == null)) {
+      // Block deletion while a non-ended subscription exists (Subscription Lifecycle rule 10)
+      const latestPurchase = await getMostRecentSeatPurchase(organizationId);
+      if (latestPurchase && latestPurchase.subscription_status !== 'ended') {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message:
             'Cannot delete organization with an active subscription. Cancel the subscription first.',
         });
       }
-    }
 
-    let affectedUserIds: string[] = [];
-    try {
-      await db.transaction(async tx => {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
-        await assertOrganizationHierarchyChangeAllowed(tx, organizationId);
-        affectedUserIds = await markOrganizationAsDeleted(organizationId, tx);
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
-        });
+      // Secondary guard: check Stripe directly in case a live subscription exists
+      // but the webhook hasn't recorded it locally yet (e.g., checkout just completed).
+      if (existingOrg.stripe_customer_id) {
+        const { getSubscriptionsForStripeCustomerId } = await import('@/lib/stripe');
+        const stripeSubs = await getSubscriptionsForStripeCustomerId(
+          existingOrg.stripe_customer_id
+        );
+        if (stripeSubs.some(sub => sub.ended_at == null)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              'Cannot delete organization with an active subscription. Cancel the subscription first.',
+          });
+        }
       }
-      throw error;
-    }
 
-    await recordAdminAction(ctx, {
-      action: 'organization.delete',
-      target: organizationActionTarget(organizationId),
-      message: 'Deleted organization',
-      metadata: { name: existingOrg.name },
-    });
+      let affectedUserIds: string[] = [];
+      try {
+        await db.transaction(async tx => {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+          await assertOrganizationHierarchyChangeAllowed(tx, organizationId);
+          affectedUserIds = await markOrganizationAsDeleted(organizationId, tx);
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
+          });
+        }
+        throw error;
+      }
 
-    // The database already denies access: the organization is soft-deleted.
-    // Cached grants expire within the documented cache bound, so fan-out is
-    // best-effort and bounded after the response instead of extending the
-    // admin mutation for every member.
-    await runAfterResponse(() =>
-      invalidateOrganizationSessionAccessForUsers(organizationId, affectedUserIds)
-    );
+      await recordAdminAction(ctx, {
+        action: 'organization.delete',
+        target: organizationActionTarget(organizationId),
+        message: 'Deleted organization',
+        metadata: { name: existingOrg.name },
+      });
 
-    return successResult();
-  }),
+      // The database already denies access: the organization is soft-deleted.
+      // Cached grants expire within the documented cache bound, so fan-out is
+      // best-effort and bounded after the response instead of extending the
+      // admin mutation for every member.
+      await runAfterResponse(() =>
+        invalidateOrganizationSessionAccessForUsers(organizationId, affectedUserIds)
+      );
+
+      return successResult();
+    }),
 
   list: adminProcedure
     .input(OrganizationListInputSchema)

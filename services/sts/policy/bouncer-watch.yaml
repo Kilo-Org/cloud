@@ -1,0 +1,9 @@
+workload: bouncer-watch
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - BOUNCER_WATCH_AXIOM_QUERY_TOKEN
+  - BOUNCER_WATCH_SLACK_BOT_TOKEN
+  - BOUNCER_WATCH_SLACK_FISHY_WEBHOOK_URL

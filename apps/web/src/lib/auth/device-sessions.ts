@@ -9,7 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, gte, lt, ne, inArray, desc, sql, getTableColumns } from 'drizzle-orm';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';

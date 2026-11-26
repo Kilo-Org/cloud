@@ -5,7 +5,7 @@ import {
   INTERNAL_API_SECRET,
   USER_DATA_EXPORT_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
-import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import {
   USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
   USER_DATA_EXPORT_AUDIENCE,

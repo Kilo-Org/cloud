@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { timestampToIso } from '@kilocode/app-shared/utils';
 import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { fetchWithinBudget, readJsonWithinBudget } from '@/lib/bounded-service-fetch';
-import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2, cloud_agent_session_runs } from '@kilocode/db/schema';

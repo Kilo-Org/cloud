@@ -8,7 +8,8 @@
       "securityFinding": "Saugumo radiniui reikia dėmesio",
       "securityUpdate": "Saugumo patikra turi atnaujinimą",
       "agentBriefing": "Jūsų agento suvestinė yra paruošta",
-      "activeAgentsGlanceable": "Aktyvūs agentai turi atnaujinimą"
+      "activeAgentsGlanceable": "Aktyvūs agentai turi atnaujinimą",
+      "accountSecurity": "Jūsų paskyroje buvo saugos veiksmų"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA pažeidimas"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Prie jūsų paskyros pridėtas prieigos raktas"
+      },
+      "passkeyRemoved": {
+        "title": "Iš jūsų paskyros pašalintas prieigos raktas"
+      },
+      "signInMethodLinked": {
+        "title": "Prie jūsų paskyros pridėtas prisijungimo būdas"
+      },
+      "signInMethodUnlinked": {
+        "title": "Iš jūsų paskyros pašalintas prisijungimo būdas"
+      },
+      "deviceSignInApproved": {
+        "title": "Prisijungimas iš įrenginio patvirtintas"
+      },
+      "apiKeyReset": {
+        "title": "API žetonas atkurtas"
+      },
+      "browserSessionsRevoked": {
+        "title": "Atsijungta nuo visų naršyklių"
+      },
+      "deviceSessionRevoked": {
+        "title": "Įrenginys atjungtas nuo jūsų paskyros"
+      },
+      "signInResetBySupport": {
+        "title": "Prisijungimą atkūrė Kilo pagalba"
+      },
+      "newSignIn": {
+        "title": "Naujas prisijungimas prie jūsų paskyros"
+      },
+      "body": {
+        "deviceAndLocation": "Iš {{device}} netoli {{location}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
+        "device": "Iš {{device}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
+        "location": "Netoli {{location}}. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
+        "unknown": "Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
+        "selfNamedDevice": "Iš įrenginio, kuris save pavadino „{{name}}“. Tai ne jūs? Dabar peržiūrėkite savo paskyros saugą.",
+        "support": "Atliko Kilo pagalba. Jei to neprašėte, susisiekite su pagalba."
+      }
     }
   },
   "sessionReady": {

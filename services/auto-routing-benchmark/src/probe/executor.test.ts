@@ -13,6 +13,7 @@ import { PROBE_CASES } from '../datasets/probe-cases';
 import {
   BenchmarkProbeFamilyError,
   PROBE_TIMEOUT_MS,
+  probeHeaders,
   runCancellableProbeCase,
   runProbeCaseViaGateway,
 } from './executor';
@@ -903,7 +904,6 @@ function cancellableProbe(env: Env) {
     variant: 'high',
     benchCase: probeCase,
     catalogModel: catalogModel(),
-    kiloToken: 'user-token',
     kiloApiUrl: 'https://api.test',
     orgId: 'org-1',
     now: new Date('2026-11-20T09:00:00.000Z').getTime(),
@@ -931,8 +931,26 @@ describe('runCancellableProbeCase', () => {
     expect(forwarded.execution).toEqual(cancellableExecution);
     expect(forwarded.inference).toEqual(cancellableInference);
     expect(forwarded.timeoutMs).toBe(PROBE_TIMEOUT_MS);
-    expect(JSON.stringify(forwarded)).not.toContain('user-token');
     expect(JSON.parse(forwarded.body)).toMatchObject({ model });
+  });
+
+  it('builds no credential header for the runner transport, whichever header the template names', () => {
+    const values = { orgId: 'org-1', sessionId: 'ses_1', machineId: 'machine-1' };
+    const credentialNames = ['authorization', 'x-api-key'];
+    let credentialHeaders = 0;
+    for (const template of Object.values(PROBE_TEMPLATES.families)) {
+      if (template === undefined) continue;
+      const named = Object.keys(template.headers).filter(name => credentialNames.includes(name));
+      credentialHeaders += named.length;
+      const direct = probeHeaders(template, { ...values, kiloToken: 'user-token' });
+      const runner = probeHeaders(template, { ...values, kiloToken: null });
+      for (const name of named) {
+        expect(direct[name]).toContain('user-token');
+        expect(runner).not.toHaveProperty(name);
+      }
+      expect(Object.keys(runner).length).toBe(Object.keys(direct).length - named.length);
+    }
+    expect(credentialHeaders).toBeGreaterThan(0);
   });
 
   it('reports a cancelled generation as terminal instead of a timed-out probe', async () => {

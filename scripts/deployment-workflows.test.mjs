@@ -806,12 +806,14 @@ test('every Worker deploy job retries a failed dependency install at most three 
       'deploy-changed',
       'deploy-session-ingest',
       'deploy-cloud-agent-after-session-ingest',
+      'deploy-uts',
+      'deploy-uts-feed-after-uts',
     ]) {
       installRuns.push(
         ...workers.jobs[job].steps.filter(step => (step.run ?? '').includes('pnpm install'))
       );
     }
-    assert.equal(installRuns.length, 4);
+    assert.equal(installRuns.length, 6);
 
     for (const { run } of installRuns) {
       for (const [failures, status, calls, sleeps] of [
@@ -854,6 +856,8 @@ test('every Worker deploy job installs only the Worker closure and the root proj
     ['deploy-changed', '${{ matrix.worker }}'],
     ['deploy-session-ingest', 'services/session-ingest'],
     ['deploy-cloud-agent-after-session-ingest', 'services/cloud-agent-next'],
+    ['deploy-uts', 'services/uts'],
+    ['deploy-uts-feed-after-uts', 'services/uts-feed'],
   ]) {
     const installs = workers.jobs[job].steps.filter(step =>
       (step.run ?? '').includes('pnpm install')
@@ -983,6 +987,10 @@ test('Worker detection and deploy run beside the Vercel chain in both pipelines'
       deploy.with.deploy_cloud_agent_after_session_ingest,
       '${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}'
     );
+    assert.equal(
+      deploy.with.deploy_uts_feed_after_uts,
+      '${{ needs.detect-workers.outputs.deploy-uts-feed-after-uts }}'
+    );
     assert.equal(deploy.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
     assert.equal(deploy.with.base_sha, undefined, `${name} deploy call must not run detection`);
   }
@@ -1043,6 +1051,10 @@ test('Worker detection and deploy run beside the Vercel chain in both pipelines'
   assert.equal(
     workers.on.workflow_call.outputs['deploy-cloud-agent-after-session-ingest'].value,
     '${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}'
+  );
+  assert.equal(
+    workers.on.workflow_call.outputs['deploy-uts-feed-after-uts'].value,
+    '${{ jobs.detect-changes.outputs.deploy-uts-feed-after-uts }}'
   );
   const changed = workers.jobs['deploy-changed'];
   assert.equal(changed.needs, undefined);
@@ -1335,6 +1347,8 @@ test('every Worker deployment path retries a deploy once', () => {
     ['deploy-changed', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-session-ingest', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-cloud-agent-after-session-ingest', 'Deploy cloud-agent-next', 'deploy-cloud-agent'],
+    ['deploy-uts', 'Deploy uts', 'deploy'],
+    ['deploy-uts-feed-after-uts', 'Deploy uts-feed', 'deploy'],
   ]) {
     const steps = workers.jobs[name].steps;
     const first = steps.findIndex(step => step.name === deployName);
@@ -1409,7 +1423,7 @@ test('the ordered production path takes both workers out of the parallel matrix'
   assert.ok(start >= 0 && end > start, 'the matrix filter must exist');
   const loop = script.slice(start, end + reassignment.length);
 
-  const filter = (changed, ordered) =>
+  const filter = (changed, ordered, utsOrdered = 'false') =>
     execFileSync(
       'bash',
       [
@@ -1420,6 +1434,7 @@ test('the ordered production path takes both workers out of the parallel matrix'
         '-c',
         [
           `DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=${ordered}`,
+          `DEPLOY_UTS_FEED_AFTER_UTS=${utsOrdered}`,
           `CHANGED=(${changed.map(dir => `'${dir}'`).join(' ')})`,
           loop,
           'printf "%s\\n" "${CHANGED[@]}"',
@@ -1430,7 +1445,6 @@ test('the ordered production path takes both workers out of the parallel matrix'
       .trim()
       .split('\n')
       .filter(Boolean);
-
   assert.deepEqual(filter(['services/session-ingest', 'services/cloud-agent-next'], 'true'), []);
   assert.deepEqual(
     filter(['services/session-ingest', 'services/cloud-agent-next', 'services/scim-sync'], 'true'),
@@ -1441,6 +1455,79 @@ test('the ordered production path takes both workers out of the parallel matrix'
     ['services/session-ingest', 'services/cloud-agent-next'],
     'every other deployment path keeps both workers in the matrix'
   );
+  assert.deepEqual(
+    filter(['services/uts', 'services/uts-feed', 'services/scim-sync'], 'false', 'true'),
+    ['services/scim-sync'],
+    'the ordered UTS path owns both UTS workers'
+  );
+  assert.deepEqual(filter(['services/uts-feed'], 'false', 'false'), ['services/uts-feed']);
+});
+
+test('the UTS feed Worker deploys after the UTS mint Worker job when both change', () => {
+  const detect = workers.jobs['detect-changes'];
+  assert.equal(
+    detect.outputs['deploy-uts-feed-after-uts'],
+    '${{ steps.set-matrix.outputs.deploy-uts-feed-after-uts }}'
+  );
+  assert.equal(workers.on.workflow_call.inputs.deploy_uts_feed_after_uts.default, 'false');
+
+  // The flag is set only when both UTS Workers are among the changed workers.
+  const script = detect.steps.find(step => step.id === 'set-matrix').run;
+  const start = script.indexOf('DEPLOY_UTS_FEED_AFTER_UTS=false');
+  const end = script.indexOf('echo "deploy-uts-feed-after-uts=');
+  assert.ok(start >= 0 && end > start, 'the UTS order decision must exist');
+  const decide = changed =>
+    execFileSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-eo',
+        'pipefail',
+        '-c',
+        [
+          `CHANGED=(${changed.map(dir => `'${dir}'`).join(' ')})`,
+          script.slice(start, end),
+          'echo "$DEPLOY_UTS_FEED_AFTER_UTS"',
+        ].join('\n'),
+      ],
+      { encoding: 'utf8' }
+    ).trim();
+  assert.equal(decide(['services/uts', 'services/uts-feed']), 'true');
+  assert.equal(decide(['services/scim-sync', 'services/uts-feed', 'services/uts']), 'true');
+  assert.equal(decide(['services/uts']), 'false');
+  assert.equal(decide(['services/uts-feed']), 'false');
+  assert.equal(decide(['services/uts-feedback', 'services/uts']), 'false');
+  assert.equal(decide([]), 'false');
+
+  const mint = workers.jobs['deploy-uts'];
+  assert.equal(mint.needs, undefined);
+  assert.equal(
+    mint.if,
+    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_uts_feed_after_uts == 'true'"
+  );
+  assert.equal(mint.environment, '${{ inputs.target_environment }}');
+
+  const feed = workers.jobs['deploy-uts-feed-after-uts'];
+  assert.deepEqual([feed.needs].flat(), ['deploy-uts']);
+  assert.match(feed.if, /deploy_uts_feed_after_uts == 'true'/);
+  assert.match(feed.if, /needs\.deploy-uts\.result == 'success'/);
+  assert.equal(feed.environment, '${{ inputs.target_environment }}');
+
+  for (const [job, dir] of [
+    [mint, 'services/uts'],
+    [feed, 'services/uts-feed'],
+  ]) {
+    const deploys = job.steps.filter(step => step.uses?.startsWith('cloudflare/wrangler-action@'));
+    assert.equal(deploys.length, 2);
+    for (const step of deploys) {
+      assert.equal(step.with.workingDirectory, dir);
+      assert.equal(
+        step.with.command,
+        "${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}"
+      );
+    }
+  }
 });
 
 test('a Pages pin move deploys the output shell beside Pages', t => {

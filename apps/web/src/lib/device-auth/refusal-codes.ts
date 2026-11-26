@@ -101,12 +101,15 @@ export function refusalCopyFor(code: DeviceAuthRefusalCode): string {
  */
 export class DeviceAuthRefusalError extends Error {
   readonly code: DeviceAuthRefusalCode;
+  /** The refused request's row id, when one matched; for the audit row only. */
+  readonly requestId: string | undefined;
 
-  constructor(code: DeviceAuthRefusalCode) {
+  constructor(code: DeviceAuthRefusalCode, requestId?: string) {
     // The message names the code rather than repeating presentation text, so a
     // stack trace stays readable without duplicating the copy table.
     super(`Device authorization refused: ${code}`);
     this.name = 'DeviceAuthRefusalError';
     this.code = code;
+    this.requestId = requestId;
   }
 }

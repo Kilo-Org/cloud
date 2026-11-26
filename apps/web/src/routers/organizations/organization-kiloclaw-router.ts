@@ -3,7 +3,7 @@ import 'server-only';
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   AgentIdSchema,

@@ -97,7 +97,6 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'fireworks',
   'gmicloud',
   'google', // Google AI Studio
-  'inception',
   'openai',
   'minimax',
   'mistral',
@@ -170,7 +169,6 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.gmicloud]: 'zai/glm-5.3-flash',
-  [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.moonshotai]: 'moonshotai/kimi-k2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.nebius]: 'openai/gpt-oss-120b',
   [VercelUserByokInferenceProviderIdSchema.enum.novita]: 'openai/gpt-oss-20b',

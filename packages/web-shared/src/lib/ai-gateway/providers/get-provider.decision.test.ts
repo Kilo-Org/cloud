@@ -31,7 +31,7 @@ import {
 import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type * as encryptionModule from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getByokKeyDefaultRank } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import type * as chatGptRoutingModule from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
@@ -43,7 +43,6 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   byok_api_keys,
@@ -58,7 +57,10 @@ import {
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import {
+  insertCustomLlmForTest,
+  testCustomLlmCredentialsEnvelope,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
@@ -1491,7 +1493,7 @@ describe('getProvider routing decision for custom LLMs', () => {
     await insertCustomLlmForTest(
       publicId,
       definition,
-      encryptApiKey(credentials, BYOK_ENCRYPTION_KEY)
+      testCustomLlmCredentialsEnvelope(credentials)
     );
     return routeAndRecord({
       requestedModel: publicId,

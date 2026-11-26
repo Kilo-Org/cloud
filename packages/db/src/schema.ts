@@ -148,7 +148,10 @@ import type {
   CustomPricingConfig,
   KiloClawAdminAuditAction,
   AdminActionAuditAction,
+  AdminActionAuditOutcome,
   AdminActionAuditTargetType,
+  AuthAuditAction,
+  AuthAuditOutcome,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
@@ -174,6 +177,7 @@ import type {
   OrganizationSettings,
   AuditLogAction,
   BYOKApiKeyEnvelope,
+  CustomLlmCredentialsEnvelope,
   EncryptedData,
   ByocCredentialEnvelope,
   ByocSetupStatus,
@@ -3252,7 +3256,7 @@ export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
-  encrypted_api_key: jsonb().$type<EncryptedData>(),
+  encrypted_api_key: jsonb().$type<CustomLlmCredentialsEnvelope>(),
 });
 
 export type CustomLlm2 = typeof custom_llm2.$inferSelect;
@@ -10203,6 +10207,7 @@ export const admin_action_audit_logs = pgTable(
     target_id: text(),
     message: text().notNull(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    outcome: text().$type<AdminActionAuditOutcome>().default('success').notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -10219,6 +10224,38 @@ export const admin_action_audit_logs = pgTable(
 
 export type AdminActionAuditLog = typeof admin_action_audit_logs.$inferSelect;
 export type NewAdminActionAuditLog = typeof admin_action_audit_logs.$inferInsert;
+
+// Self-service authentication audit log: one row per auth action attempt,
+// success or failure. Rows never hold an email address in clear: the subject
+// is the account id when known, and `subject_email_hash` is a keyed hash that
+// correlates attempts on one address. Rows older than the retention window are
+// pruned by a cron, so the created_at index also serves deletion.
+export const auth_audit_logs = pgTable(
+  'auth_audit_logs',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    action: text().$type<AuthAuditAction>().notNull(),
+    outcome: text().$type<AuthAuditOutcome>().notNull(),
+    user_id: text(),
+    method: text(),
+    failure_reason: text(),
+    subject_email_hash: text(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_auth_audit_logs_created_at').on(table.created_at),
+    index('IDX_auth_audit_logs_user_id_created_at').on(table.user_id, table.created_at),
+    index('IDX_auth_audit_logs_subject_email_hash_created_at')
+      .on(table.subject_email_hash, table.created_at)
+      .where(sql`${table.subject_email_hash} IS NOT NULL`),
+  ]
+);
+
+export type AuthAuditLog = typeof auth_audit_logs.$inferSelect;
 
 // KiloClaw Access Codes — one-time codes for authenticating browser sessions to the worker
 export const kiloclaw_access_codes = pgTable(
@@ -12096,6 +12133,48 @@ export const native_attested_keys = pgTable(
 );
 
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
+
+/**
+ * The devices and networks a user has signed in from, so a sign-in from an
+ * unseen device on an unseen network can be noticed. Holds only HMAC-SHA-256
+ * hex digests of the keys, under a key the database does not hold, never a
+ * raw address or cookie value. `key_id` is a fingerprint of that key: only
+ * rows under the current key are read, and the scheduled prune deletes the
+ * others.
+ *
+ * `device` and `network` rows are the sign-in contexts. The single `notice`
+ * row per user records when the last new-sign-in notice was sent
+ * (`last_seen_at`), so the notice is capped per user. The single `history`
+ * row per user and key (`key_hash` = `key_id`) marks that the user has
+ * signed in before; it holds no device or network data. The scheduled prune
+ * deletes device, network, and notice rows not seen for 90 days, and keeps
+ * the history row.
+ */
+export const user_sign_in_contexts = pgTable(
+  'user_sign_in_contexts',
+  {
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kind: text().notNull().$type<'device' | 'network' | 'notice' | 'history'>(),
+    key_hash: text().notNull(),
+    key_id: text().notNull(),
+    first_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.user_id, table.kind, table.key_hash] }),
+    index('IDX_user_sign_in_contexts_key_kind_last_seen').on(
+      table.key_id,
+      table.kind,
+      table.last_seen_at
+    ),
+    check(
+      'user_sign_in_contexts_kind_check',
+      sql`${table.kind} IN ('device', 'network', 'notice', 'history')`
+    ),
+  ]
+);
 
 // ── W3-B operation ledger and analytics outbox (P1-A-08a / P2-A-04) ──────
 

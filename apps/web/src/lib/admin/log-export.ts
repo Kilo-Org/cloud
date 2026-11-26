@@ -6,7 +6,10 @@ import { eq, or } from 'drizzle-orm';
 import { kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { findUserByEmailCaseInsensitive } from '@/lib/user';
-import { organizationActionTarget, userActionTarget } from '@/lib/admin/admin-action-audit';
+import {
+  organizationActionTarget,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 
 export const INCOMPLETE_NOTICE_NAME = 'INCOMPLETE_EXPORT_README.txt';
 

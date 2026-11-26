@@ -1,7 +1,13 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
-import type { UserDeletionRequest, UserDeletionStep } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  type UserDeletionRequest,
+  type UserDeletionStep,
+} from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { eq } from 'drizzle-orm';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { getUserDeletionRequestById, getUserDeletionRequestForUser } from '@/lib/user/deletion';
@@ -192,6 +198,29 @@ describe('/admin/api/users/gdpr-removal', () => {
       });
     });
 
+    test('records an enqueue row naming the admin and the target user', async () => {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, ADMIN_ID));
+
+      expect((await POST(postRequest())).status).toBe(202);
+
+      const rows = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, ADMIN_ID));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'user.gdpr_removal.enqueue',
+          outcome: 'success',
+          target_type: 'user',
+          target_id: USER_ID,
+          message: '/admin/api/users/gdpr-removal',
+          metadata: { requestId: REQUEST_ID, status: 'enqueued' },
+        }),
+      ]);
+    });
+
     test('returns 202 when a request is already active', async () => {
       mockedEnqueueUserDeletionTargets.mockResolvedValue([
         { status: 'already_active', requestId: REQUEST_ID },
@@ -227,6 +256,28 @@ describe('/admin/api/users/gdpr-removal', () => {
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toEqual({ error: 'User not found' });
       expect(mockedEnqueueUserDeletionTargets).not.toHaveBeenCalled();
+    });
+
+    test('records a 404 failure row without a target', async () => {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, ADMIN_ID));
+      mockedFindUserById.mockResolvedValue(undefined);
+
+      expect((await POST(postRequest())).status).toBe(404);
+
+      const rows = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, ADMIN_ID));
+      expect(rows).toEqual([
+        expect.objectContaining({
+          action: 'user.gdpr_removal.enqueue',
+          outcome: 'failure',
+          target_type: null,
+          target_id: null,
+        }),
+      ]);
     });
 
     test('returns 500 and reports unexpected errors to Sentry', async () => {

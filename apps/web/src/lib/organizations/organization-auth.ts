@@ -14,11 +14,13 @@ import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   effectiveMembershipRole,
-  loadEffectiveMembershipRows,
-  loadEffectiveMembershipRowsWithOrganization,
   observeMembershipRole,
   resolveOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  loadEffectiveMembershipRows,
+  loadEffectiveMembershipRowsWithOrganization,
+} from '@kilocode/web-shared/lib/organizations/effective-membership';
 import {
   findSupportAllowEntry,
   isSupportAccessEnabled,

@@ -97,9 +97,6 @@ describe('evaluateAlerts infrastructure isolation', () => {
       const slackMessages: unknown[] = [];
       const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
-        if (url.includes('/containers/dash/applications')) {
-          return Response.json({ success: true, result: [], result_info: { total_pages: 1 } });
-        }
         if (url.includes('/containers/applications/native-id/instances-v2')) {
           return Response.json({
             success: true,
@@ -155,11 +152,6 @@ describe('evaluateAlerts infrastructure isolation', () => {
         `Alert evaluation failed with ${nativeUnavailable ? 3 : 2} error(s)`
       );
 
-      expect(
-        fetchFn.mock.calls.some(([input]) =>
-          String(input).includes('/containers/dash/applications')
-        )
-      ).toBe(true);
       expect(slackMessages).toHaveLength(nativeUnavailable ? 1 : 2);
       expect(JSON.stringify(slackMessages)).toContain('Queue Backlog Alert');
       if (!nativeUnavailable) {

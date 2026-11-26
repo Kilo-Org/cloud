@@ -23,7 +23,7 @@ jest.mock('@/lib/device-auth/device-auth', () => {
 
 import { POST } from './route';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 function createRequest(headers: Record<string, string> = {}) {
@@ -48,7 +48,12 @@ describe('POST /api/device-auth/tokens integration', () => {
       kiloUserId: user.id,
       webSessionPepper: user.web_session_pepper,
     });
-    mockApproveDeviceAuthRequest.mockResolvedValue(undefined);
+    mockApproveDeviceAuthRequest.mockResolvedValue({
+      id: crypto.randomUUID(),
+      requestingClientName: null,
+      userAgent: null,
+      ipAddress: null,
+    });
 
     const response = await POST(createRequest({ Cookie: 'next-auth.session-token=valid-cookie' }));
 

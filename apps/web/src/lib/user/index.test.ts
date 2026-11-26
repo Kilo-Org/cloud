@@ -38,6 +38,7 @@ import {
   device_sessions,
   device_refresh_tokens,
   native_attested_keys,
+  user_sign_in_contexts,
   native_admission_challenges,
   stytch_fingerprints,
   kiloclaw_instances,
@@ -65,6 +66,7 @@ import {
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  auth_audit_logs,
   blacklisted_domains_settings,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
@@ -178,6 +180,8 @@ import {
   unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { authAuditEmailHash } from '@/lib/auth/auth-audit';
+import { recordSignInContext } from '@/lib/auth/sign-in-context';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
@@ -212,6 +216,7 @@ import {
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+import type * as EmailModule from '@kilocode/web-shared/lib/email';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -266,6 +271,15 @@ jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
 }));
 
+jest.mock('@kilocode/web-shared/lib/email', () => ({
+  ...jest.requireActual<typeof EmailModule>('@kilocode/web-shared/lib/email'),
+  sendNewSignInMethodEmail: jest.fn(async () => ({ sent: true })),
+}));
+
+const mockSendNewSignInMethodEmail = jest.mocked(
+  jest.requireMock<typeof EmailModule>('@kilocode/web-shared/lib/email').sendNewSignInMethodEmail
+);
+
 // Account deletion purges the deleted user's pending cloud-agent objects from
 // R2 before it drops the ledger rows; keep that off the network in tests.
 const mockR2Send = jest.fn(async (_command: { input: { Key?: string } }) => ({}));
@@ -281,10 +295,25 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
   recordAffiliateAttributionAndQueueParentEvent
 );
 
+/** The sign-in-method-linked notices claimed for a user, by their outbox keys. */
+async function linkNoticeKeys(userId: string) {
+  const rows = await db
+    .select({ key: transactional_email_log.idempotency_key })
+    .from(transactional_email_log)
+    .where(
+      and(
+        eq(transactional_email_log.user_id, userId),
+        eq(transactional_email_log.email_type, 'security_notice')
+      )
+    );
+  return rows.map(row => row.key).filter(key => key?.startsWith('sign_in_method_linked:'));
+}
+
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   beforeEach(() => {
     mockCapture.mockReset();
+    mockSendNewSignInMethodEmail.mockClear();
   });
 
   afterEach(async () => {
@@ -1781,6 +1810,29 @@ describe('User', () => {
       expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
       expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
+      // The account had no other sign-in method, so the notice names none,
+      // and it still reports the browser sign-out and points to support.
+      expect(mockSendNewSignInMethodEmail).toHaveBeenCalledTimes(1);
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual({
+        kind: 'sso_settled',
+        replacedMethodNames: [],
+      });
+
+      // Signing in again with the same WorkOS profile is not a new link.
+      await createOrUpdateUser(
+        {
+          google_user_email: 'workos-upgrade@example.com',
+          google_user_name: 'WorkOS Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-upgrade-provider-id',
+        },
+        undefined,
+        true
+      );
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
     });
 
     it('replaces a stale WorkOS profile ID for an existing user', async () => {
@@ -1824,6 +1876,55 @@ describe('User', () => {
         where: eq(kilocode_users.id, existingUser.id),
       });
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos-relink');
+      // The replaced profile is a new link, so the owner hears of it.
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
+      // A stale WorkOS row (such as one directory sync provisioned) is the same
+      // method, not one the link replaced; the browser sign-out and the
+      // support step still apply.
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual({
+        kind: 'sso_settled',
+        replacedMethodNames: [],
+      });
+    });
+
+    it('names the sign-in methods an SSO link replaced', async () => {
+      const existingUser = await insertTestUser({ google_user_email: 'sso-replace@example.com' });
+      const providerRow = (provider: AuthProviderId, providerAccountId: string) => ({
+        kilo_user_id: existingUser.id,
+        provider,
+        provider_account_id: providerAccountId,
+        email: existingUser.google_user_email,
+        avatar_url: 'https://example.com/avatar.png',
+        hosted_domain: 'example.com',
+      });
+      await db
+        .insert(user_auth_provider)
+        .values([providerRow('google', 'google-sso-replace'), providerRow('github', 'gh-sso')]);
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: existingUser.google_user_email,
+          google_user_name: 'SSO Replace',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-sso-replace',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSendNewSignInMethodEmail).toHaveBeenCalledTimes(1);
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual({
+        kind: 'sso_settled',
+        replacedMethodNames: ['GitHub', 'Google'],
+      });
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
+      const providers = await db.query.user_auth_provider.findMany({
+        where: eq(user_auth_provider.kilo_user_id, existingUser.id),
+      });
+      expect(providers.map(row => row.provider)).toEqual(['workos']);
     });
 
     it('returns deferredSignInEvent when deferSignInAnalytics is true and user is existing', async () => {
@@ -5895,6 +5996,125 @@ describe('User', () => {
       expect(orgTargeted?.target_id).toBe(targetUser.id);
     });
 
+    it('should anonymize auth audit logs naming the user or the hash of their email', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const userEmailHash = authAuditEmailHash(user.google_user_email);
+      const otherEmailHash = authAuditEmailHash(otherUser.google_user_email);
+
+      await db.insert(auth_audit_logs).values([
+        {
+          action: 'auth.sign_in',
+          outcome: 'success',
+          user_id: user.id,
+          method: 'google',
+          subject_email_hash: userEmailHash,
+          metadata: { marker: 'own-sign-in' },
+        },
+        {
+          action: 'auth.sign_in',
+          outcome: 'failure',
+          method: 'magic_link',
+          failure_reason: 'invalid_code',
+          subject_email_hash: userEmailHash,
+          metadata: { marker: 'unresolved-attempt' },
+        },
+        {
+          action: 'auth.sign_in',
+          outcome: 'success',
+          user_id: otherUser.id,
+          subject_email_hash: otherEmailHash,
+          metadata: { marker: 'other-user' },
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      // Other tests in this file write auth rows of their own (a sign-in that
+      // links a method); only the rows inserted above are under test.
+      const rows = (await db.select().from(auth_audit_logs)).filter(
+        row => row.metadata?.marker !== undefined
+      );
+      const byMarker = new Map(rows.map(row => [row.metadata?.marker, row]));
+      expect(rows).toHaveLength(3);
+      expect(byMarker.get('own-sign-in')).toMatchObject({
+        user_id: 'deleted-user',
+        subject_email_hash: null,
+      });
+      expect(byMarker.get('unresolved-attempt')).toMatchObject({
+        user_id: null,
+        subject_email_hash: null,
+      });
+      expect(byMarker.get('other-user')).toMatchObject({
+        user_id: otherUser.id,
+        subject_email_hash: otherEmailHash,
+      });
+    });
+
+    it('should clear auth audit hashes of a linked provider email that differs from the primary', async () => {
+      const user = await insertTestUser({
+        google_user_email: `primary-${crypto.randomUUID()}@example.com`,
+      });
+      const providerEmail = `provider-${crypto.randomUUID()}@example.org`;
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'github',
+        provider_account_id: `github-${user.id}`,
+        email: providerEmail,
+        avatar_url: '',
+        hosted_domain: null,
+      });
+      const [inserted] = await db
+        .insert(auth_audit_logs)
+        .values({
+          action: 'auth.sign_in',
+          outcome: 'failure',
+          method: 'github',
+          failure_reason: 'account_blocked',
+          subject_email_hash: authAuditEmailHash(providerEmail),
+          metadata: { marker: 'provider-attempt' },
+        })
+        .returning({ id: auth_audit_logs.id });
+
+      await softDeleteUser(user.id);
+
+      const [row] = await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.id, inserted.id));
+      expect(row).toMatchObject({
+        user_id: null,
+        subject_email_hash: null,
+        metadata: { marker: 'provider-attempt' },
+      });
+    });
+
+    it('should keep the auth audit hash on a row another live account owns', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      // The other account signed in with an address the deleted user also holds,
+      // e.g. after it changed hands.
+      const sharedHash = authAuditEmailHash(user.google_user_email);
+      const [inserted] = await db
+        .insert(auth_audit_logs)
+        .values({
+          action: 'auth.sign_in',
+          outcome: 'success',
+          user_id: otherUser.id,
+          subject_email_hash: sharedHash,
+          metadata: { marker: 'other-account' },
+        })
+        .returning({ id: auth_audit_logs.id });
+
+      await softDeleteUser(user.id);
+
+      const [row] = await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.id, inserted.id));
+      expect(row).toMatchObject({ user_id: otherUser.id, subject_email_hash: sharedHash });
+    });
+
     it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {
       // Per the GDPR policy in softDeleteUser's doc-comment, scheduled
       // action targets are retained operational records. The user_id FK
@@ -8239,6 +8459,46 @@ describe('User', () => {
           .where(eq(device_refresh_tokens.device_session_id, otherSession.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should delete sign-in contexts', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      for (const userId of [user.id, otherUser.id]) {
+        await recordSignInContext({
+          userId,
+          device: { kind: 'browser_cookie', secret: 'laptop' },
+          network: 'DE 203.0.0.0/16',
+        });
+      }
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db
+        .selectDistinct({ userId: user_sign_in_contexts.user_id })
+        .from(user_sign_in_contexts)
+        .where(inArray(user_sign_in_contexts.user_id, [user.id, otherUser.id]));
+      expect(remaining).toEqual([{ userId: otherUser.id }]);
+    });
+
+    it('a sign-in check after soft deletion writes no sign-in contexts', async () => {
+      const user = await insertTestUser();
+
+      await softDeleteUser(user.id);
+
+      await expect(
+        recordSignInContext({
+          userId: user.id,
+          device: { kind: 'browser_cookie', secret: 'laptop' },
+          network: 'DE 203.0.0.0/16',
+        })
+      ).resolves.toEqual({ kind: 'account_inactive' });
+      expect(
+        await db
+          .select({ kind: user_sign_in_contexts.kind })
+          .from(user_sign_in_contexts)
+          .where(eq(user_sign_in_contexts.user_id, user.id))
+      ).toEqual([]);
     });
 
     it('should delete native attested keys and admission challenges', async () => {

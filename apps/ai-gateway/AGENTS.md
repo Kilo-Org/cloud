@@ -15,7 +15,7 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   aliases. Each `apps/web` route maps to the path without that prefix, and the
   `v1` variants in `apps/web` collapse into the same route: `/api/gateway/v1/models`
   and `/api/openrouter/models` both become `/api/v1/models`. `/api/fim`,
-  `/api/edit`, `/api/organizations` and the typesafe `/api/gateway/typesafe/v1/systemone`
+  `/api/organizations` and the typesafe `/api/gateway/typesafe/v1/systemone`
   move under `/api/v1` too; the latter becomes `/api/v1/systemone`.
 - Tests live next to the routes and run in the `apps/web` Jest suite, which
   includes this app as a root. Import from this app and `@kilocode/web-shared`

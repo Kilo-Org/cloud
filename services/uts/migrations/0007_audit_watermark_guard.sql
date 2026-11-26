@@ -86,6 +86,9 @@ BEGIN
     WHERE passed.shard = p_shard
       AND (passed.txid, passed.id) > (current.last_txid, current.last_id)
       AND (passed.txid, passed.id) <= (p_to_txid, p_to_id)
+    -- The index order keeps the generic plan on ordered index scans that stop at 501 rows;
+    -- without it the planner may take a bitmap scan that reads the whole window first.
+    ORDER BY passed.txid, passed.id
     LIMIT 501
   ) AS window_rows;
   IF covered <> p_to_seq - p_from_seq THEN

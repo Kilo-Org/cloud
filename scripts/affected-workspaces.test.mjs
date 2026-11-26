@@ -60,6 +60,25 @@ test('a web .env change selects ai-gateway, which builds with those files', () =
   assert.ok(result.packages.includes('ai-gateway'));
 });
 
+test('a Worker config change in any workspace selects the STS repository suite', () => {
+  const workers = [
+    ...items,
+    workspace('cloudflare-sts', 'services/sts'),
+    workspace('o11y', 'services/o11y'),
+  ];
+  const run = changedFiles =>
+    selectAffected({ items: workers, changedFiles, dependencyDirs: [], references: [] });
+  for (const file of [
+    'services/o11y/wrangler.jsonc',
+    'services/o11y/wrangler.test.jsonc',
+    'services/leaf/wrangler.json',
+    'services/agent/wrapper/wrangler.toml',
+  ]) {
+    assert.ok(run([file]).dirs.includes('services/sts'), file);
+  }
+  assert.deepEqual(run(['services/o11y/src/index.ts']).dirs, ['services/o11y']);
+});
+
 test('a change reaches workspace dependents and relative-import readers', () => {
   assert.deepEqual(select(['packages/db/src/schema.ts']).packages, [
     '@kilocode/db',

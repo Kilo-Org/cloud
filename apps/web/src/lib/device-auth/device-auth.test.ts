@@ -39,7 +39,7 @@ import {
 } from './device-auth';
 import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
 import { createSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 
 // Capture real implementations for pass-through default behaviour.
 // Must use var declarations — jest.mock factories are hoisted and run before
@@ -48,8 +48,8 @@ import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 // eslint-disable-next-line no-var
 var _realGenerateApiToken: ((...args: any[]) => any) | undefined;
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => {
-  const actual = jest.requireActual('@kilocode/web-shared/lib/tokens') as any;
+jest.mock('@/lib/auth/kilo-token-signing', () => {
+  const actual = jest.requireActual('@/lib/auth/kilo-token-signing') as any;
   _realGenerateApiToken = actual.generateApiToken;
   return {
     ...actual,

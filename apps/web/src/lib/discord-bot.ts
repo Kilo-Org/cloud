@@ -41,7 +41,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { formatPlatformConversationContext } from '@/lib/bot/platforms/shared';
 import type { PlatformIntegration } from '@kilocode/db';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 
 // Version string for API requests

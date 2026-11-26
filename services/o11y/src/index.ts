@@ -20,7 +20,7 @@ export default class extends WorkerEntrypoint<Env> {
   }
 
   async scheduled(_controller: ScheduledController): Promise<void> {
-    await evaluateAlerts(this.env);
+    await evaluateAlerts(this.env, this.ctx);
   }
 
   /** RPC method called by session-ingest via service binding. */

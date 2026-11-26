@@ -12,7 +12,7 @@ const mockOpenIdeAutomatically = jest.fn(() => null);
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuanceOrRedirect: mockGetUserForCredentialIssuance,
 }));
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateApiToken: mockGenerateApiToken,
   TOKEN_EXPIRY: { thirtyDays: 2_592_000 },
 }));

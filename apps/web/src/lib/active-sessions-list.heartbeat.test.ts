@@ -76,7 +76,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://session-ingest.test',
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateBoundedInternalServiceToken: () => 'test-token',
 }));
 

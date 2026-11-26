@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import {
   generateGitHubInstallationToken,
   findKiloReviewComment,

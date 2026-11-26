@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { SignJWT, exportJWK, generateKeyPair, type CryptoKey as JoseKey } from 'jose';
 import type { ServiceTokens } from '@kilocode/service-token-client';
-import { ServiceTokenError } from '@kilocode/service-token-client';
+import { ServiceTokenError, createServiceTokens } from '@kilocode/service-token-client';
 import { createVerifier, failureResponse } from '@kilocode/verify';
 import {
   STS_CANARY_ROUTE_MAX_DURATION_SECONDS,
+  type MintRequest,
+  type MintResult,
   type StsCanaryReport,
 } from '@kilocode/sts-contracts';
 import { createStsCanaryHandler } from './sts-canary';
@@ -79,10 +81,33 @@ function fakeTokens(get: () => Promise<string>): ServiceTokens {
   return { get: jest.fn(get) };
 }
 
-function handler(tokens: ServiceTokens, fetchFn: typeof fetch, now?: () => number) {
+/** What STS answers the `web` workload for the reserved probe: no policy lists the audience `canary`. */
+const DENIED = {
+  status: 'denied',
+  audience: 'canary',
+  scope: 'canary:denied-probe',
+  reason: 'audience_not_allowed',
+} as const;
+
+function deniedTokens(): ServiceTokens {
+  return fakeTokens(async () => {
+    throw new ServiceTokenError(
+      { reason: 'denied', deniedReason: DENIED.reason },
+      { audience: DENIED.audience, scope: DENIED.scope }
+    );
+  });
+}
+
+function handler(
+  tokens: ServiceTokens,
+  fetchFn: typeof fetch,
+  now?: () => number,
+  newTokens: () => ServiceTokens = deniedTokens
+) {
   return createStsCanaryHandler({
     verifier: verifierFor('web'),
     tokens,
+    newTokens,
     verifyUrl: VERIFY_URL,
     waitUntil,
     fetch: fetchFn,
@@ -144,6 +169,7 @@ describe('STS canary route handler', () => {
         wrongAudience: { result: 'ok', status: 403 },
         forged: { result: 'ok', status: 401 },
         expired: 'skipped',
+        stsDenied: { result: 'ok', status: null },
       },
     } satisfies StsCanaryReport);
     expect(body).not.toContain(own);

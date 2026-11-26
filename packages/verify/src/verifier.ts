@@ -41,6 +41,7 @@ import {
   maxHeadAgeForLifetime,
   type RevocationFeed,
   type RevocationFeedSource,
+  type RevocationList,
 } from './revocation';
 
 export type IssuerKind = 'sts' | 'uts';
@@ -149,6 +150,36 @@ export type VerifySuccess =
 
 export type VerifyResult = VerifySuccess | VerifyFailure;
 
+/**
+ * A browser session as UTS answered it to `kilo-web` (`read` or the code exchange): `sid` is its
+ * `session_id` and `issuedAt` its `issued_at`, never a client time.
+ */
+export type BrowserSessionRecord = { sub: string; sid: string; issuedAt: number };
+
+/**
+ * The fields of a UTS access token that the caller verified earlier and kept in a capability it
+ * authenticated itself: `issuedAt` is the token's `iat`, `kid` its header `kid`.
+ */
+export type UtsTokenRecord = BrowserSessionRecord & { kid: string };
+
+/**
+ * What a record check answers. `ok: true` only says the feed revokes nothing about the record; it
+ * grants nothing. `reason` is for the caller's logs and tests.
+ */
+export type RecordCheckResult =
+  | { ok: true }
+  | {
+      ok: false;
+      status: 401;
+      reason:
+        | 'invalid_session_record'
+        | 'invalid_record'
+        | 'revoked_session'
+        | 'revoked_key'
+        | 'account_blocked';
+    }
+  | { ok: false; status: 503; reason: 'revocation_unavailable' };
+
 export type Verifier<RequireAddress extends boolean = true> = {
   /**
    * Checks the bearer credential of `input` (a request or its `Authorization` header value)
@@ -166,6 +197,22 @@ export type Verifier<RequireAddress extends boolean = true> = {
    * request, beside the secrets bundle call; a later `verify` joins the fetches in flight.
    */
   warm(ctx: { waitUntil: WaitUntil }): void;
+  /**
+   * Checks a browser session record against the held revocation feed, with the 60 s head-age limit
+   * of a long-lived credential. Rejects only when the verifier has no UTS issuer.
+   */
+  checkBrowserSession(
+    record: BrowserSessionRecord,
+    ctx: { waitUntil: WaitUntil }
+  ): Promise<RecordCheckResult>;
+  /**
+   * Checks a UTS token record, as `checkBrowserSession` does, plus its signing key. Never feed it a
+   * value the caller did not authenticate. Rejects only when the verifier has no UTS issuer.
+   */
+  checkUtsTokenRecord(
+    record: UtsTokenRecord,
+    ctx: { waitUntil: WaitUntil }
+  ): Promise<RecordCheckResult>;
 };
 
 /** An issuer URL: `https:`, or `http:` on a loopback host for local development. */
@@ -192,6 +239,27 @@ const ConfigSchema = z.object({
 export const MAX_AUTHORIZATION_LENGTH = 8_192;
 
 const BEARER = /^Bearer +([^\s]+) *$/i;
+
+const LOWERCASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** `issuedAt`: positive integer seconds, at most 60 s in the future. */
+const BrowserSessionRecordSchema = z.object({
+  sub: z.string().min(1).max(255),
+  sid: z.string().regex(LOWERCASE_UUID),
+  issuedAt: z
+    .number()
+    .int()
+    .positive()
+    .refine(issuedAt => issuedAt <= Date.now() / 1000 + TOKEN_CLOCK_SKEW_SECONDS),
+});
+
+const UtsTokenRecordSchema = BrowserSessionRecordSchema.extend({
+  kid: z.string().startsWith(UTS_TOKEN_KID_PREFIX),
+});
+
+type RecordRefusal = Extract<RecordCheckResult, { status: 401 }>['reason'];
+
+const refused = (reason: RecordRefusal): RecordCheckResult => ({ ok: false, status: 401, reason });
 
 /** Maps the first schema issue to the §7 row it breaks. */
 function claimsReason(error: z.ZodError): FailureReason {
@@ -551,6 +619,47 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     };
   }
 
+  function recordIssuer(): UtsIssuer {
+    if (uts === null)
+      throw new Error('record checks read the UTS feed, but the verifier has no uts');
+    return uts;
+  }
+
+  /**
+   * The held feed list, loaded as on the PAT path (bootstrap when cold, then the key set its head
+   * verifies under), with the 60 s head-age limit; null when it is unavailable.
+   */
+  async function recordFeed(issuer: UtsIssuer, scope: CallScope): Promise<RevocationList | null> {
+    if ((await utsLoaded(issuer, scope)) !== null) return null;
+    if ((await issuer.keySet.ready(scope)).status === 'unavailable') return null;
+    const read = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
+    return read.status === 'ok' ? read.list : null;
+  }
+
+  /** A validated record against the feed: its key when it has one, then the session rule. */
+  async function checkRecord(
+    issuer: UtsIssuer,
+    record: BrowserSessionRecord,
+    kid: string | null,
+    ctx: { waitUntil: WaitUntil }
+  ): Promise<RecordCheckResult> {
+    const scope = newCallScope();
+    try {
+      const list = await recordFeed(issuer, scope);
+      if (list === null) return { ok: false, status: 503, reason: 'revocation_unavailable' };
+      if (kid !== null && list.revokedKids.has(kid)) return refused('revoked_key');
+      if (list.revokedSids.has(record.sid)) return refused('revoked_session');
+      const revokedBefore = list.revokedBefore.get(record.sub);
+      if (revokedBefore !== undefined && revokedBefore >= record.issuedAt) {
+        return refused('revoked_session');
+      }
+      if (list.blockedAccounts.has(record.sub)) return refused('account_blocked');
+      return { ok: true };
+    } finally {
+      handOff(scope, ctx.waitUntil);
+    }
+  }
+
   function dispatch(
     token: string,
     route: Route,
@@ -602,6 +711,19 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
         else uts.keySet.prefetch(scope);
       }
       handOff(scope, ctx.waitUntil);
+    },
+    async checkBrowserSession(record, ctx) {
+      const issuer = recordIssuer();
+      // Malformed input touches no feed.
+      const parsed = BrowserSessionRecordSchema.safeParse(record);
+      if (!parsed.success) return refused('invalid_session_record');
+      return await checkRecord(issuer, parsed.data, null, ctx);
+    },
+    async checkUtsTokenRecord(record, ctx) {
+      const issuer = recordIssuer();
+      const parsed = UtsTokenRecordSchema.safeParse(record);
+      if (!parsed.success) return refused('invalid_record');
+      return await checkRecord(issuer, parsed.data, parsed.data.kid, ctx);
     },
   };
 }

@@ -47,7 +47,7 @@ jest.mock('@/lib/user', () => ({
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateApiToken: jest.fn(),
   TOKEN_EXPIRY: { oneHour: 3600 },
 }));

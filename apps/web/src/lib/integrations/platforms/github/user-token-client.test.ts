@@ -77,8 +77,8 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   },
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => {
-  const actual = jest.requireActual('@kilocode/web-shared/lib/tokens');
+jest.mock('@/lib/auth/kilo-token-signing', () => {
+  const actual = jest.requireActual('@/lib/auth/kilo-token-signing');
   return {
     ...actual,
     TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
@@ -141,7 +141,7 @@ describe('getGitHubUserAccessToken', () => {
     if (result.status !== 'connected') throw new Error('expected connected');
 
     const generateMock = (
-      jest.requireMock('@kilocode/web-shared/lib/tokens') as {
+      jest.requireMock('@/lib/auth/kilo-token-signing') as {
         generateBoundedInternalServiceToken: jest.Mock;
       }
     ).generateBoundedInternalServiceToken;

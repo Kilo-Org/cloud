@@ -82,6 +82,11 @@
       "path": "/api/cron/cleanup-mcp-connect-events",
       "requestMethod": "GET"
     },
+    "prune-sign-in-contexts": {
+      "schedule": "25 * * * *",
+      "path": "/api/cron/prune-sign-in-contexts",
+      "requestMethod": "GET"
+    },
     "cleanup-pr-watches": {
       "schedule": "15 4 * * *",
       "path": "/api/cron/cleanup-pr-watches",

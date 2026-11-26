@@ -66,6 +66,20 @@ describe('web session revocation', () => {
     expect(updated.api_token_pepper).toBe('api-pepper');
   });
 
+  it('returns the signed-out account and a distinct rotation id per revocation, never the pepper', async () => {
+    const user = await insertTestUser();
+
+    const first = await revokeWebSessions(user.id);
+    const second = await revokeWebSessions(user.id);
+    const pepper = await readWebSessionPepper(user.id);
+
+    expect(first?.user).toEqual({ id: user.id, google_user_email: user.google_user_email });
+    expect(first?.rotationId).toMatch(/^[0-9a-f]{64}$/);
+    expect(second?.rotationId).not.toBe(first?.rotationId);
+    expect(JSON.stringify(second)).not.toContain(String(pepper));
+    await expect(revokeWebSessions(`test-user-missing-${user.id}`)).resolves.toBeNull();
+  });
+
   it('reads the current pepper from the primary, null before one is set', async () => {
     const user = await insertTestUser({ web_session_pepper: 'before-revocation' });
     const neverRevoked = await insertTestUser({ web_session_pepper: null });

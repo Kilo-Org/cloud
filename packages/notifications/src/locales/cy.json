@@ -8,7 +8,8 @@
       "securityFinding": "Mae angen sylw ar ganfyddiad diogelwch",
       "securityUpdate": "Mae gan wiriad diogelwch ddiweddariad",
       "agentBriefing": "Mae eich briff asiant yn barod",
-      "activeAgentsGlanceable": "Mae gan asiantau gweithredol ddiweddariad"
+      "activeAgentsGlanceable": "Mae gan asiantau gweithredol ddiweddariad",
+      "accountSecurity": "Bu gweithgarwch diogelwch ar eich cyfrif"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Torri SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Ychwanegwyd allwedd mynediad at eich cyfrif"
+      },
+      "passkeyRemoved": {
+        "title": "Tynnwyd allwedd mynediad o'ch cyfrif"
+      },
+      "signInMethodLinked": {
+        "title": "Ychwanegwyd dull mewngofnodi at eich cyfrif"
+      },
+      "signInMethodUnlinked": {
+        "title": "Tynnwyd dull mewngofnodi o'ch cyfrif"
+      },
+      "deviceSignInApproved": {
+        "title": "Cymeradwywyd mewngofnodi dyfais"
+      },
+      "apiKeyReset": {
+        "title": "Ailosodwyd y tocyn API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Allgofnodwyd o bob porwr"
+      },
+      "deviceSessionRevoked": {
+        "title": "Allgofnodwyd dyfais o'ch cyfrif"
+      },
+      "signInResetBySupport": {
+        "title": "Ailosodwyd mewngofnodi gan gymorth Kilo"
+      },
+      "newSignIn": {
+        "title": "Mewngofnodi newydd i'ch cyfrif"
+      },
+      "body": {
+        "deviceAndLocation": "O {{device}} ger {{location}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
+        "device": "O {{device}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
+        "location": "Ger {{location}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
+        "unknown": "Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
+        "selfNamedDevice": "O ddyfais a alwodd ei hun yn \"{{name}}\". Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
+        "support": "Gwnaed gan gymorth Kilo. Os na wnaethoch ofyn am hyn, cysylltwch â chymorth."
+      }
     }
   },
   "sessionReady": {

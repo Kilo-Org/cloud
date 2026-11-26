@@ -5,7 +5,7 @@ import {
 } from '@kilocode/db/github-identity';
 
 import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
-import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 export async function disconnectStoredGitHubUserAuthorization(

@@ -8,7 +8,8 @@
       "securityFinding": "یک یافته امنیتی نیاز به توجه دارد",
       "securityUpdate": "یک بررسی امنیتی به‌روزرسانی دارد",
       "agentBriefing": "گزارش عامل شما آماده است",
-      "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند"
+      "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند",
+      "accountSecurity": "فعالیت امنیتی در حساب شما رخ داد"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "نقض SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "کلید عبور به حساب شما اضافه شد"
+      },
+      "passkeyRemoved": {
+        "title": "کلید عبور از حساب شما حذف شد"
+      },
+      "signInMethodLinked": {
+        "title": "روش ورود به حساب شما اضافه شد"
+      },
+      "signInMethodUnlinked": {
+        "title": "روش ورود از حساب شما حذف شد"
+      },
+      "deviceSignInApproved": {
+        "title": "ورود از دستگاه تأیید شد"
+      },
+      "apiKeyReset": {
+        "title": "توکن API بازنشانی شد"
+      },
+      "browserSessionsRevoked": {
+        "title": "از همه مرورگرها خارج شدید"
+      },
+      "deviceSessionRevoked": {
+        "title": "یک دستگاه از حساب شما خارج شد"
+      },
+      "signInResetBySupport": {
+        "title": "ورود توسط پشتیبانی Kilo بازنشانی شد"
+      },
+      "newSignIn": {
+        "title": "ورود جدید به حساب شما"
+      },
+      "body": {
+        "deviceAndLocation": "از {{device}} نزدیک {{location}}. شما نبودید؟ همین حالا امنیت حسابتان را بررسی کنید.",
+        "device": "از {{device}}. شما نبودید؟ همین حالا امنیت حسابتان را بررسی کنید.",
+        "location": "نزدیک {{location}}. شما نبودید؟ همین حالا امنیت حسابتان را بررسی کنید.",
+        "unknown": "شما نبودید؟ همین حالا امنیت حسابتان را بررسی کنید.",
+        "selfNamedDevice": "از دستگاهی که خود را «{{name}}» نامید. شما نبودید؟ همین حالا امنیت حسابتان را بررسی کنید.",
+        "support": "توسط پشتیبانی Kilo انجام شد. اگر چنین درخواستی نداده‌اید، با پشتیبانی تماس بگیرید."
+      }
     }
   },
   "sessionReady": {

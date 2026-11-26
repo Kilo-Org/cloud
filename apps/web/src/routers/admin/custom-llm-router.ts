@@ -5,14 +5,13 @@ import {
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
   CustomLlmPublicIdSchema,
+  type CustomLlmCredentialsEnvelope,
   type CustomLlmDefinition,
-  type EncryptedData,
 } from '@kilocode/db/schema-types';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { encryptCustomLlmCredentials } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/credentials-encryption';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -127,7 +126,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
     return { items: rows };
   }),
 
-  upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {
+  upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ ctx, input }) => {
     assertPricingMatchesPublicId(input.public_id, input.definition);
     assertBaseUrlUsesHttps(input.definition);
     const existing = await db.query.custom_llm2.findFirst({
@@ -142,16 +141,13 @@ export const adminCustomLlmRouter = createTRPCRouter({
       await assertPublicIdIsClaimable(input.public_id);
     }
 
-    let encrypted_api_key: EncryptedData | undefined = undefined;
+    let encrypted_api_key: CustomLlmCredentialsEnvelope;
 
     if (input.credentials) {
-      if (!BYOK_ENCRYPTION_KEY) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'BYOK_ENCRYPTION_KEY is not configured',
-        });
-      }
-      encrypted_api_key = encryptApiKey(JSON.stringify(input.credentials), BYOK_ENCRYPTION_KEY);
+      encrypted_api_key = await encryptCustomLlmCredentials({
+        credentials: input.credentials,
+        actorUserId: ctx.user.id,
+      });
     } else if (existing?.encrypted_api_key) {
       encrypted_api_key = existing.encrypted_api_key;
     } else {

@@ -1,10 +1,11 @@
-import { afterEach, describe, test, expect, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, test, expect, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
   kilo_pass_subscriptions,
   kilocode_users,
   organizations,
+  transactional_email_log,
   user_admin_notes,
   user_auth_provider,
 } from '@kilocode/db/schema';
@@ -15,8 +16,12 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  deleteTransactionalEmailLogForUsers,
+  insertTestUser,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { getAllUserProviders } from '@/lib/user';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -243,6 +248,24 @@ describe('admin action audit logging', () => {
       'user.browser_sessions.revoke',
     ]);
     expect(audits.every(audit => audit.target_id === user.id)).toBe(true);
+
+    // Each action sent the account owner one notice, and the admin none.
+    const notices = await db
+      .select({
+        userId: transactional_email_log.user_id,
+        key: transactional_email_log.idempotency_key,
+      })
+      .from(transactional_email_log)
+      .where(eq(transactional_email_log.email_type, 'security_notice'));
+    const forUser = notices.filter(notice => notice.userId === user.id);
+    expect(forUser.map(notice => notice.key?.split(':')[0]).sort()).toEqual([
+      'api_key_reset',
+      'browser_sessions_revoked',
+    ]);
+    expect(notices.some(notice => notice.userId === admin.id)).toBe(false);
+    // The outbox rows reference the user; a later suite in this worker that
+    // deletes every user would hit them.
+    await deleteTransactionalEmailLogForUsers([user.id]);
   });
 });
 
@@ -718,20 +741,37 @@ describe('admin.cancelAndRefundKiloPass', () => {
 });
 
 describe('admin.syncProviders manual sync', () => {
+  // Setting VERCEL_ENV makes the admin network check enforce, which refuses
+  // every admin outside Vercel, so these callers act as Vercel requests from an
+  // allowed address.
+  const originalVercel = process.env.VERCEL;
   const originalVercelEnv = process.env.VERCEL_ENV;
+  const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+  const allowedAddress = { 'x-vercel-forwarded-for': '203.0.113.7' };
+
+  beforeEach(() => {
+    process.env.VERCEL = '1';
+    process.env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
+    resetAdminNetworkConfigForTest();
+  });
 
   afterEach(() => {
-    if (originalVercelEnv === undefined) {
-      delete process.env.VERCEL_ENV;
-    } else {
-      process.env.VERCEL_ENV = originalVercelEnv;
+    const env: Record<string, string | undefined> = process.env;
+    for (const [key, value] of [
+      ['VERCEL', originalVercel],
+      ['VERCEL_ENV', originalVercelEnv],
+      ['ADMIN_ALLOWED_NETWORKS', originalNetworks],
+    ] as const) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
     }
+    resetAdminNetworkConfigForTest();
   });
 
   test('is disabled in production', async () => {
     process.env.VERCEL_ENV = 'production';
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
     await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(false);
     await expect(caller.admin.syncProviders.triggerSync()).rejects.toMatchObject({
@@ -748,7 +788,7 @@ describe('admin.syncProviders manual sync', () => {
   test.each(['preview', 'development'])('is enabled when VERCEL_ENV is %s', async vercelEnv => {
     process.env.VERCEL_ENV = vercelEnv;
     const admin = await insertTestUser({ is_admin: true });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
     await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(true);
   });

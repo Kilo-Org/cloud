@@ -4,8 +4,15 @@ import {
   DEVICE_AUTH_REFUSAL_CODES,
   DeviceAuthRefusalError,
   refusalCopyFor,
+  type ApprovedDeviceAuthRequest,
   type DeviceAuthRefusalCode,
 } from '@/lib/device-auth/device-auth';
+import {
+  recognisedClientLabel,
+  scheduleSecurityNotice,
+  securityNoticeRequestFromHeaders,
+} from '@/lib/security-notices';
+import type { DeviceSignInRequester } from '@kilocode/web-shared/lib/email';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import * as z from 'zod';
@@ -47,6 +54,23 @@ const APPROVAL_REFUSAL_STATUS: Partial<Record<DeviceAuthRefusalCode, number>> = 
   [DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired]: 403,
 };
 
+/**
+ * How the approval notice names the device that asked to sign in. A
+ * requesting client name is chosen by the requesting device itself, before
+ * anyone signs in, so the email and the push show it only quoted and
+ * attributed to that device ("named itself …"), cut short and with any quote
+ * mark inside it replaced. Without one, the notice shows a recognised client
+ * kind or a parsed browser label from the stored user agent, never the raw
+ * header.
+ */
+function requesterFor(request: ApprovedDeviceAuthRequest): DeviceSignInRequester {
+  if (request.requestingClientName) {
+    return { kind: 'self_named', name: request.requestingClientName };
+  }
+  const label = recognisedClientLabel(request.userAgent);
+  return label === null ? { kind: 'unidentified' } : { kind: 'recognised', label };
+}
+
 export const POST = withRestTiming('/api/device-auth/tokens', async (request: Request) => {
   const origin = request.headers.get('origin');
   if (origin !== new URL(APP_URL).origin) {
@@ -77,8 +101,9 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
     pending_link_challenge_id: pendingLinkChallengeId,
   } = validation.data;
 
+  let approved: ApprovedDeviceAuthRequest;
   try {
-    await approveDeviceAuthRequest(code, user.id, {
+    approved = await approveDeviceAuthRequest(code, user.id, {
       ...(confirmedClientId ? { confirmedClientId } : {}),
       ...(addPendingLink !== undefined ? { addPendingLink } : {}),
       ...(addPendingLink
@@ -104,6 +129,17 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
     }
     throw error;
   }
+
+  await scheduleSecurityNotice(
+    user,
+    {
+      type: 'device_sign_in_approved',
+      deviceAuthRequestId: approved.id,
+      requester: requesterFor(approved),
+      requestIp: approved.ipAddress,
+    },
+    securityNoticeRequestFromHeaders(request.headers)
+  );
 
   return NextResponse.json({ success: true });
 });

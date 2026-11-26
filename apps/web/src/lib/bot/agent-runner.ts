@@ -34,7 +34,7 @@ import {
   generateApiToken,
   generateCloudAgentWorkflowToken,
   TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+} from '@/lib/auth/kilo-token-signing';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';

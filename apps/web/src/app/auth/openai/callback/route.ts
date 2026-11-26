@@ -1,4 +1,5 @@
 import { nextAuthHttpHandler } from '@/lib/user/next-auth-options';
+import { withWebSignInDevice } from '@/lib/auth/web-sign-in-device';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { SSO_SIGNIN_PATH } from '@kilocode/web-shared/lib/auth/constants';
@@ -143,9 +144,10 @@ async function handler(request: NextRequest, _context: unknown) {
 
   const rewrittenUrl = request.nextUrl.clone();
   rewrittenUrl.pathname = NEXT_AUTH_CALLBACK_PATH;
-  const response = await nextAuthHttpHandler(
-    new NextRequest(rewrittenUrl, request),
-    NEXT_AUTH_CALLBACK_CONTEXT
+  // A sign-in completed here sets the browser device cookie, as on the
+  // NextAuth route.
+  const response = await withWebSignInDevice(request, () =>
+    nextAuthHttpHandler(new NextRequest(rewrittenUrl, request), NEXT_AUTH_CALLBACK_CONTEXT)
   );
   const failure = await redirectCallbackFailureToByok(response, request);
   return failure ?? response;

@@ -2,6 +2,8 @@ import type * as linkingModule from '@/lib/account-linking-session';
 import type * as userModule from '@/lib/user';
 import type * as userServerModule from '@kilocode/web-shared/lib/user/server';
 import type * as domainGatesModule from '@kilocode/web-shared/lib/user/domain-gates';
+import type * as signInContextModule from '@/lib/auth/sign-in-context';
+import type * as securityNoticesModule from '@/lib/security-notices';
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(), headers: jest.fn() }));
 jest.mock('@/lib/user/sso', () => ({ processSSOUserLogin: jest.fn() }));
@@ -23,8 +25,22 @@ jest.mock('@/lib/account-linking-session', () => ({
   ...jest.requireActual<typeof linkingModule>('@/lib/account-linking-session'),
   getAccountLinkingSession: jest.fn(),
 }));
+jest.mock('@/lib/auth/sign-in-context', () => ({
+  ...jest.requireActual<typeof signInContextModule>('@/lib/auth/sign-in-context'),
+  recordSignInContext: jest.fn(
+    jest.requireActual<typeof signInContextModule>('@/lib/auth/sign-in-context').recordSignInContext
+  ),
+}));
+jest.mock('@/lib/security-notices', () => ({
+  ...jest.requireActual<typeof securityNoticesModule>('@/lib/security-notices'),
+  scheduleSecurityNotice: jest.fn(),
+}));
 
-import { describe, test, expect } from '@jest/globals';
+import { beforeEach, describe, test, expect } from '@jest/globals';
+import { NextRequest } from 'next/server';
+import { recordSignInContext } from '@/lib/auth/sign-in-context';
+import { withWebSignInDevice } from '@/lib/auth/web-sign-in-device';
+import { scheduleSecurityNotice } from '@/lib/security-notices';
 import { cookies, headers } from 'next/headers';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
@@ -51,6 +67,7 @@ import {
   organizations,
   passkey_sign_in_tickets,
   user_auth_provider,
+  user_sign_in_contexts,
 } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
@@ -985,5 +1002,80 @@ describe('passkey provider', () => {
     expect(token.webSessionPepper).toBe('passkey-web-session-pepper');
     // 32 random bytes, base64url, minted only on the sign-in trigger.
     expect(token.webSessionId).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+});
+
+describe('new sign-in check on browser sign-in', () => {
+  const jwtCallback = authOptions.callbacks!.jwt!;
+  const mockRecordSignInContext = jest.mocked(recordSignInContext);
+
+  beforeEach(() => {
+    mockRecordSignInContext.mockClear();
+    jest.mocked(scheduleSecurityNotice).mockClear();
+  });
+
+  function passkeySignIn(user: { id: string; google_user_email: string }) {
+    return {
+      token: {},
+      account: { provider: 'passkey', providerAccountId: user.id, type: 'credentials' },
+      user: { id: user.id, email: user.google_user_email },
+      trigger: 'signIn',
+      profile: undefined,
+      isNewUser: false,
+      session: undefined,
+    } as never;
+  }
+
+  /** Runs the jwt callback as the NextAuth route runs it, inside the device scope. */
+  async function signInThroughRoute(user: { id: string; google_user_email: string }) {
+    let token: JWT | undefined;
+    const request = new NextRequest('https://app.kilo.ai/api/auth/callback/passkey', {
+      method: 'POST',
+      headers: { 'x-vercel-forwarded-for': '203.0.113.45', 'x-vercel-ip-country': 'DE' },
+    });
+    const response = await withWebSignInDevice(request, async () => {
+      token = await jwtCallback(passkeySignIn(user));
+      return new Response(null, { status: 200 });
+    });
+    return { token, response };
+  }
+
+  test('records the browser and network of a sign-in and sets the device cookie', async () => {
+    const user = await insertTestUser();
+
+    const { token, response } = await signInThroughRoute(user);
+
+    expect(token?.kiloUserId).toBe(user.id);
+    expect(response.headers.get('set-cookie')).toContain('__Host-kilo-device=');
+    const contexts = await db
+      .select({ kind: user_sign_in_contexts.kind })
+      .from(user_sign_in_contexts)
+      .where(eq(user_sign_in_contexts.user_id, user.id));
+    expect(contexts.map(row => row.kind).sort()).toEqual(['device', 'history', 'network']);
+  });
+
+  test('a session read records nothing', async () => {
+    const user = await insertTestUser();
+    const request = new NextRequest('https://app.kilo.ai/api/auth/session');
+
+    const response = await withWebSignInDevice(request, async () => {
+      await jwtCallback({ token: { kiloUserId: user.id } } as never);
+      return new Response(null, { status: 200 });
+    });
+
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(mockRecordSignInContext).not.toHaveBeenCalled();
+  });
+
+  test('a failed detection does not fail the sign-in', async () => {
+    const user = await insertTestUser();
+    mockRecordSignInContext.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const { token } = await signInThroughRoute(user);
+
+    expect(token?.kiloUserId).toBe(user.id);
+    expect(token?.webSessionId).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(mockRecordSignInContext).toHaveBeenCalledTimes(1);
+    expect(scheduleSecurityNotice).not.toHaveBeenCalled();
   });
 });

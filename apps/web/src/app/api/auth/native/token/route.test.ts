@@ -19,7 +19,7 @@ import {
   findUserBySignInCodeEmail,
   findUserIdByAuthProvider,
 } from '@/lib/user';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import type { User } from '@kilocode/db/schema';
 
@@ -39,7 +39,7 @@ jest.mock('@/lib/auth/passkey', () => ({
 jest.mock('@/lib/user');
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-jest.mock('@kilocode/web-shared/lib/tokens');
+jest.mock('@/lib/auth/kilo-token-signing');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
@@ -88,6 +88,9 @@ jest.mock('@kilocode/web-shared/lib/posthog', () => {
     })),
   };
 });
+jest.mock('@/lib/auth/new-sign-in-check', () => ({
+  scheduleNewSignInCheck: jest.fn(),
+}));
 
 import { POST } from './route';
 import {
@@ -116,6 +119,7 @@ import {
   resolvePendingLinkForUser,
   summarizePendingLink,
 } from '@/lib/auth/pending-link';
+import { scheduleNewSignInCheck } from '@/lib/auth/new-sign-in-check';
 
 const mockWarnExceptInTest = jest.mocked(warnExceptInTest);
 
@@ -3048,6 +3052,84 @@ describe('POST /api/auth/native/token', () => {
       }
       // The marketing version identifies a cohort, not a build or install.
       expect(serialized).toContain('"headerVersion":"1.0.16"');
+    });
+  });
+
+  describe('new sign-in check', () => {
+    const mockScheduleNewSignInCheck = jest.mocked(scheduleNewSignInCheck);
+
+    beforeEach(() => {
+      mockScheduleNewSignInCheck.mockResolvedValue(undefined);
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+    });
+
+    it('checks an iOS sign-in by its attested key', async () => {
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockScheduleNewSignInCheck).toHaveBeenCalledTimes(1);
+      expect(mockScheduleNewSignInCheck).toHaveBeenCalledWith({
+        user: fakeUser,
+        method: 'apple',
+        device: { kind: 'ios_attested_key', keyId: 'key1' },
+        headers: expect.any(Headers),
+      });
+    });
+
+    it('checks an Android sign-in without a device key', async () => {
+      mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
+      const request = new NextRequest('http://localhost:3000/api/auth/native/token', {
+        method: 'POST',
+        body: JSON.stringify({ provider: 'email', email: 'emailuser@example.com', code: '1' }),
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Kilo-Code/1.0.4 (android)' },
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockScheduleNewSignInCheck).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'email',
+          device: { kind: 'no_install_key' },
+        })
+      );
+    });
+
+    it('checks a passkey sign-in once its ticket is redeemed', async () => {
+      mockFindUserById.mockResolvedValue(fakeUser);
+
+      const response = await POST(createRequest({ provider: 'passkey', ticket: 'ticket-1' }));
+
+      expect(response.status).toBe(200);
+      expect(mockScheduleNewSignInCheck).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'passkey' })
+      );
+    });
+
+    it('does not check a refused sign-in', async () => {
+      mockVerifyNativeAppleIdToken.mockRejectedValue(new NativeIdTokenError('bad token'));
+
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'bad' }));
+
+      expect(response.status).toBe(401);
+      expect(mockScheduleNewSignInCheck).not.toHaveBeenCalled();
+    });
+
+    it('does not check a sign-in whose code was already spent', async () => {
+      mockCommitSignInCode.mockResolvedValue(false);
+      mockConsumeSignInCode.mockResolvedValue(false);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '1' })
+      );
+
+      expect(response.status).toBe(401);
+      expect(mockScheduleNewSignInCheck).not.toHaveBeenCalled();
     });
   });
 });

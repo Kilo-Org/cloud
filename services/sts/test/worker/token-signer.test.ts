@@ -1,7 +1,6 @@
 import { SELF, createExecutionContext, runInDurableObject } from 'cloudflare:test';
 import {
   Ed25519PublicJwkSchema,
-  JWKS_CACHE_CONTROL,
   JWKS_PATH,
   ServiceTokenClaimsSchema,
   type MintRequest,
@@ -11,9 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuditLog } from '../../src/audit/log';
 import { TOKEN_AUDIT_RETENTION_MS } from '../../src/constants';
 import { getTokenSignerStub } from '../../src/dos/stubs';
-import { TokenSignerDO, type TokenSignRequest } from '../../src/dos/TokenSignerDO';
+import {
+  TokenSignerDO,
+  type TokenSignRequest,
+  type TokenSignResult,
+} from '../../src/dos/TokenSignerDO';
 import { handleRequest } from '../../src/http';
-import { recordSignedExp, type KeyRing } from '../../src/tokens/key-ring';
+import type { KeyRing } from '../../src/tokens/key-ring';
 import { stubOfflineNetwork } from './manager';
 import { resetTokenSignerObject } from './reset';
 import { config, env } from './test-env';
@@ -154,6 +157,25 @@ describe('token signer', () => {
     });
   });
 
+  it('exposes only mint, getJwks and alarm to a stub, so no caller reaches a key', async () => {
+    expect(Object.getOwnPropertyNames(TokenSignerDO.prototype).sort()).toEqual([
+      'alarm',
+      'constructor',
+      'getJwks',
+      'mint',
+    ]);
+    // An internal method name is refused over RPC, not answered with the key record. Awaited
+    // directly: handing the RPC promise to `expect(...).rejects` left an unhandled rejection.
+    const stub = signer() as unknown as { currentKey(): Promise<unknown> };
+    let refusal: unknown = null;
+    try {
+      await stub.currentKey();
+    } catch (error) {
+      refusal = error;
+    }
+    expect(String(refusal)).toContain('does not implement "currentKey"');
+  });
+
   it('keeps its key across an object restart and records the key creation once', async () => {
     const before = await signer().getJwks();
     expect(before.keys).toHaveLength(1);
@@ -170,6 +192,44 @@ describe('token signer', () => {
       change: 'created',
       kid: before.keys[0].kid,
     });
+  });
+
+  it('loads a ring stored with a retired private key, drops that key at load and signs with the current key', async () => {
+    const [{ kid: currentKid }] = (await signer().getJwks()).keys;
+    const retiredKid = 'r'.repeat(43);
+    const after = await runInDurableObject(signer(), async (_instance, state) => {
+      const stored = await state.storage.get<KeyRing>('token-key-ring');
+      if (stored === undefined) throw new Error('expected a stored ring');
+      const now = Date.now();
+      // As an earlier build stored it: the retired key kept its PKCS#8.
+      await state.storage.put('token-key-ring', {
+        keys: [
+          ...stored.keys,
+          {
+            kid: retiredKid,
+            pkcs8: 'legacy-private-key',
+            x: 'x'.repeat(43),
+            state: 'retired',
+            createdAt: now - 60_000,
+            activatesAt: now - 60_000,
+            retiredAt: now - 1_000,
+            maxExp: Math.floor(now / 1000) + 300,
+          },
+        ],
+      });
+      const restarted = new TokenSignerDO(state, env);
+      const jwks = await restarted.getJwks();
+      const loaded = (await state.storage.get<KeyRing>('token-key-ring'))?.keys;
+      const minted = await restarted.mint(signRequest());
+      return { jwks, loaded, minted };
+    });
+    expect(after.jwks.keys.map(key => key.kid)).toEqual([currentKid, retiredKid]);
+    expect(after.loaded?.map(key => [key.kid, key.pkcs8 === null])).toEqual([
+      [currentKid, false],
+      [retiredKid, true],
+    ]);
+    if (after.minted.status !== 'signed') throw new Error(`got ${after.minted.status}`);
+    expect(decodeProtectedHeader(after.minted.tokens[0].token).kid).toBe(currentKid);
   });
 
   it('drops a revoked current key from the key set, promotes a fresh one and audits the removal', async () => {
@@ -236,32 +296,40 @@ describe('token signer', () => {
 
   it('keeps a latest exp a mint records while a rotation is writing its audit rows', async () => {
     const [{ kid }] = (await signer().getJwks()).keys;
-    const exp = Math.floor(Date.now() / 1000) + 300;
-    const stored = await runInDurableObject(signer(), async (instance, state) => {
-      const inner = instance as unknown as { ring: KeyRing; advance(now: number): Promise<void> };
+    const after = await runInDurableObject(signer(), async (instance, state) => {
       const append = AuditLog.prototype.append;
-      // A mint that read the current key before the rotation finishes in its first await.
+      let minted: TokenSignResult | undefined;
+      // 24 days on, the next call publishes the next key.
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 24 * 24 * 60 * 60 * 1000);
+      // A mint that read the current key before the rotation records its exp in the rotation's
+      // first await.
       vi.spyOn(AuditLog.prototype, 'append').mockImplementationOnce(async function (
         this: AuditLog,
         ...args
       ) {
-        recordSignedExp(inner.ring, kid, exp);
+        clock.mockRestore();
+        minted = await instance.mint(signRequest());
         return await append.apply(this, args);
       });
-      // 24 days on, the rotation publishes the next key.
-      await inner.advance(Date.now() + 24 * 24 * 60 * 60 * 1000);
-      return (await state.storage.get<KeyRing>('token-key-ring'))?.keys;
+      await instance.getJwks();
+      return { minted, keys: (await state.storage.get<KeyRing>('token-key-ring'))?.keys };
     });
-    expect(stored?.map(key => key.state)).toEqual(['current', 'next']);
-    expect(stored?.find(key => key.kid === kid)?.maxExp).toBe(Math.ceil(exp / 60) * 60);
+    if (after.minted?.status !== 'signed') throw new Error('expected the racing mint to sign');
+    const [token] = after.minted.tokens;
+    expect(decodeProtectedHeader(token.token).kid).toBe(kid);
+    expect(after.keys?.map(key => key.state)).toEqual(['current', 'next']);
+    expect(after.keys?.find(key => key.kid === kid)?.maxExp).toBe(
+      Math.ceil(token.expiresAt / 60) * 60
+    );
   });
 });
 
 describe('service-token key set route', () => {
-  it('serves the public keys with the design cache headers and no private material', async () => {
+  it('serves the public keys with no-store and no private material', async () => {
     const response = await SELF.fetch(`${config.issuer}${JWKS_PATH}`);
     expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe(JWKS_CACHE_CONTROL);
+    // No HTTP cache may hold the set or serve it stale; only the verifier's own 5-minute copy counts.
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('content-type')).toBe('application/json');
     const body = await response.json<{ keys: Array<Record<string, unknown>> }>();
     expect(body.keys.length).toBeGreaterThan(0);

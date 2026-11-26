@@ -56,6 +56,8 @@ identity:
   repositoryId: '1001'
   repositoryOwnerId: '2002'
   environment: release
+  # Two listed refs, one workflow entry pinned to main: ci-bundle-check.ts checks the pin.
+  refs: [refs/heads/main, refs/heads/release]
   jobWorkflowRefs: [kilo-e2e/ci-fixture/.github/workflows/publish.yml@refs/heads/main]
   events: [workflow_dispatch]
 secrets: [E2E_RELEASE_KEY, E2E_SHARED_WEBHOOK]

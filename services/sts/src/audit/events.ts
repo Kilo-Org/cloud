@@ -156,7 +156,7 @@ function grantKeys(
   grant: 'secrets' | 'audiences' | 'scopes' | 'dynamic'
 ): Set<string> {
   return new Set(
-    snapshot.flatMap(entry => entry[grant].map(value => `${entry.workload}:${value}`))
+    snapshot.flatMap(entry => (entry[grant] ?? []).map(value => `${entry.workload}:${value}`))
   );
 }
 
@@ -463,11 +463,13 @@ export type LeaseRevokeCause = 'caller' | 'late' | 'expiry_mismatch' | 'audit_fa
 
 /**
  * What the revocation at Infisical gave: `revoked`; `gone` (Infisical no longer had the lease: it
- * had expired or was already revoked there); `revoke_failed` (Infisical could not be reached, and
- * the lease object retries until the lease expires; a later row records success, or none comes if
- * the lease expires first, since Infisical drops an expired lease itself).
+ * had expired and Infisical revoked it, or it was revoked before); `revoke_failed` (Infisical could
+ * not be reached, refused, or answered that its revocation statement failed; the lease object
+ * retries, past the lease's expiry, and a later row records success); `unconfirmed` (no attempt
+ * succeeded within a day of the lease's expiry: the object stopped trying, and a person must end
+ * the role's sessions).
  */
-export type LeaseRevocationResult = 'revoked' | 'gone' | 'revoke_failed';
+export type LeaseRevocationResult = 'revoked' | 'gone' | 'revoke_failed' | 'unconfirmed';
 
 export function leaseRevokedEvent(input: {
   environment: StsEnvironment;
@@ -478,7 +480,7 @@ export function leaseRevokedEvent(input: {
   result: LeaseRevocationResult;
 }): AuditEvent {
   const { caller } = input;
-  const failed = input.result === 'revoke_failed';
+  const failed = input.result === 'revoke_failed' || input.result === 'unconfirmed';
   return AuditEventSchema.parse({
     specversion: '1.0',
     id: crypto.randomUUID(),
@@ -490,7 +492,7 @@ export function leaseRevokedEvent(input: {
       classUid: OCSF_CLASS.apiActivity,
       activityId: OCSF_API_ACTIVITY.delete,
       outcome: failed ? 'failure' : 'success',
-      outcomeDetail: failed ? 'revoke_failed' : input.cause,
+      outcomeDetail: failed ? input.result : input.cause,
       actor:
         input.cause === 'caller'
           ? { kind: 'workload', id: caller.workload }

@@ -1,3 +1,5 @@
+import { TOKEN_CLOCK_SKEW_SECONDS } from '@kilocode/sts-contracts';
+
 /** Refresher cadence: one read of each manager folder every four minutes (design 4.4). */
 export const REFRESH_INTERVAL_MS = 4 * 60 * 1000;
 
@@ -114,10 +116,13 @@ export const TOKEN_KEY_CURRENT_MS = 30 * 24 * 60 * 60 * 1000;
 /** The next key is published this long before it signs, so every verifier holds it first. */
 export const TOKEN_KEY_PUBLISH_AHEAD_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** A retired key stays published this long after the last token it signed expires. */
-export const TOKEN_KEY_RETIRED_GRACE_MS = 10 * 60 * 1000;
+/**
+ * A retired key stays published this long after the last token it signed expires: the verifier
+ * clock skew, past which no legitimate token verifies under it.
+ */
+export const TOKEN_KEY_RETIRED_GRACE_MS = TOKEN_CLOCK_SKEW_SECONDS * 1000;
 
-/** Each isolate serves the token key set from memory this long; the response's max-age matches. */
+/** Each isolate serves the token key set from memory this long; the response itself is no-store. */
 export const TOKEN_JWKS_CACHE_MS = 5 * 60 * 1000;
 
 /**
@@ -158,11 +163,20 @@ export const LEASE_CREATE_BUDGET_MS = 20_000;
 export const LEASE_OBJECT_DEADLINE_MS = 25_000;
 
 /**
- * A revocation Infisical could not take is retried by the lease object's alarm, until it succeeds
- * or the lease expires. The alarm retries a lease no sooner than this after its last attempt,
- * whether a caller or the alarm made it, or after Infisical's `Retry-After` on a 429 when longer.
+ * A revocation Infisical could not take is retried by the lease object's alarm until Infisical
+ * confirms it, through the lease's expiry and `LEASE_REVOKE_CLEANUP_MS` past it. The alarm retries
+ * a lease no sooner than this after its last attempt, whether a caller or the alarm made it, or
+ * after Infisical's `Retry-After` on a 429 when longer.
  */
 export const LEASE_REVOKE_RETRY_MS = 30_000;
+
+/**
+ * An owed revocation is retried this long past its lease's expiry: `VALID UNTIL` refuses new
+ * logins at expiry, but a session that is open stays until a revocation ends it, and Infisical's own
+ * expiry revocation can fail. After this the object stops, writes `lease.revoked` with result
+ * `unconfirmed`, and logs an error for a person to end the sessions by hand.
+ */
+export const LEASE_REVOKE_CLEANUP_MS = 24 * 60 * 60 * 1000;
 
 /** Owed revocations one alarm retries, least recently tried first; the next alarm takes the rest. */
 export const LEASE_REVOKE_RETRIES_PER_ALARM = 5;

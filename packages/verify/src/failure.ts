@@ -8,11 +8,13 @@
 export type FailureReason =
   | 'missing_credential'
   | 'malformed_token'
+  | 'credential_too_long'
   | 'header_extension'
   | 'algorithm'
   | 'kid_missing'
   | 'type'
   | 'issuer'
+  | 'environment'
   | 'issuer_per_route'
   | 'not_token_key'
   | 'unknown_kid'

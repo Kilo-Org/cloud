@@ -24,11 +24,11 @@ export const StsCanaryRunIdSchema = z.uuid();
  * Time budget of one canary run (services/usage-ingest README, "STS canary"). The web route
  * verifies the caller (a cold key-set fetch takes up to 5 s, `JWKS_FETCH_TIMEOUT_MS` of
  * `@kilocode/verify`), waits at most the HTTP client's 30 s attempt (`HTTP_ATTEMPT_TIMEOUT_MS` of
- * `@kilocode/service-token-client`: a 20 s shared Vercel exchange plus a 10 s mint), then makes at
- * most four calls to usage-ingest of `STS_CANARY_VERIFY_CALL_TIMEOUT_MS` each: 5 + 30 + 4 x 10 =
- * 75 s. usage-ingest waits 80 s (`WEB_CALL_TIMEOUT_MS` there), so it reads the route's report even
- * in the slowest run, and the route's 90 s `maxDuration`, after which Vercel ends the function,
- * stays above both.
+ * `@kilocode/service-token-client`, which ends both of its tries, the retry with a fresh Vercel
+ * identity token after a refusal included, within that time), then makes at most four calls to
+ * usage-ingest of `STS_CANARY_VERIFY_CALL_TIMEOUT_MS` each: 5 + 30 + 4 x 10 = 75 s. usage-ingest
+ * waits 80 s (`WEB_CALL_TIMEOUT_MS` there), so it reads the route's report even in the slowest
+ * run, and the route's 90 s `maxDuration`, after which Vercel ends the function, stays above both.
  */
 export const STS_CANARY_VERIFY_CALL_TIMEOUT_MS = 10_000;
 export const STS_CANARY_VERIFY_CALLS_MAX = 4;

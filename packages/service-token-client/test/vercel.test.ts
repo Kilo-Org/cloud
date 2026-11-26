@@ -24,11 +24,16 @@ function nowSeconds(): number {
 }
 
 const DEPLOYMENT = {
+  owner: 'kilocode',
+  iss: 'https://oidc.vercel.com/kilocode',
   owner_id: 'team_T1',
   project_id: 'prj_P1',
   environment: 'production',
   deployment_id: 'dpl_D1',
 };
+
+/** The `act` Vercel adds on an exchange: the base token's audience, the team default. */
+const ACT = { iat: nowSeconds(), aud: 'https://vercel.com/kilocode' };
 
 function memoryCache(): SharedCache {
   const entries = new Map<string, { value: unknown; expiresAt: number }>();
@@ -54,7 +59,7 @@ function exchangeLikeVercel(): { exchange: Exchange; calls: string[] } {
   const exchange: Exchange = async (baseToken, audience) => {
     calls.push(audience);
     const claims = JSON.parse(Buffer.from(baseToken.split('.')[1] ?? '', 'base64url').toString());
-    return { kind: 'token', token: unsignedJwt({ ...claims, aud: audience }) };
+    return { kind: 'token', token: unsignedJwt({ ...claims, aud: audience, act: ACT }) };
   };
   return { exchange, calls };
 }
@@ -171,7 +176,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
 
   function setup(refuses: (identity: string) => boolean) {
     const base = unsignedJwt({ ...DEPLOYMENT, iat: nowSeconds(), exp: nowSeconds() + 7200 });
-    const poisoned = `${unsignedJwt({ ...DEPLOYMENT, aud: STS, iat: nowSeconds(), exp: nowSeconds() + 3600 }).slice(0, -'signature'.length)}forged`;
+    const poisoned = `${unsignedJwt({ ...DEPLOYMENT, aud: STS, act: ACT, iat: nowSeconds(), exp: nowSeconds() + 3600 }).slice(0, -'signature'.length)}forged`;
     const { exchange, calls } = exchangeLikeVercel();
     const { fetchFn, presented } = sts(identity => identity === poisoned || refuses(identity));
     const tokens = createHttpServiceTokens({
@@ -188,14 +193,15 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
     return { tokens, exchanges: calls, presented, poisoned };
   }
 
+  // These tests fake only `Date` and let timers run for real: the shared cache hashes its key with
+  // `crypto.subtle.digest`, which finishes on real time, so a fixed fake-timer advance could end
+  // before it and leave the read's later timers unfired.
   async function settled<T>(promise: Promise<T>): Promise<T | unknown> {
-    const outcome = promise.catch((error: unknown) => error);
-    await vi.advanceTimersByTimeAsync(1_000);
-    return await outcome;
+    return await promise.catch((error: unknown) => error);
   }
 
   it('drops the poisoned entry and exchanges once more in the same attempt', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
     try {
       const { tokens, exchanges, presented, poisoned } = setup(() => false);
       expect(await settled(tokens.get(INGEST))).toBe('usage-ingest:sts.canary#2');
@@ -209,7 +215,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
   });
 
   it('does not loop: one re-exchange per refusal, then the denial holds until the recheck', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
     try {
       const { tokens, exchanges, presented } = setup(() => true);
       expect(await settled(tokens.get(INGEST))).toMatchObject({
@@ -224,7 +230,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
       expect(presented).toHaveLength(2);
 
       // The recheck presents the token this instance exchanged itself: refused, kept, not re-exchanged.
-      await vi.advanceTimersByTimeAsync(DENIED_RECHECK_MS);
+      vi.setSystemTime(Date.now() + DENIED_RECHECK_MS);
       expect(await settled(tokens.get(INGEST))).toMatchObject({ reason: 'denied' });
       expect(presented).toHaveLength(3);
       expect(exchanges).toEqual([STS]);
@@ -248,7 +254,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
         );
         return {
           kind: 'token',
-          token: unsignedJwt({ ...claims, aud: audience, n: exchangedAt.length }),
+          token: unsignedJwt({ ...claims, aud: audience, act: ACT, n: exchangedAt.length }),
         };
       };
       const { fetchFn, presented } = sts(() => true);
@@ -292,6 +298,7 @@ describe('a shared-cache identity STS refuses (identity_rejected)', () => {
 });
 
 describe('vercelExchange', () => {
+  const signal = new AbortController().signal;
   function answering(response: Response) {
     const requests: { url: string; body: unknown }[] = [];
     // The exchange posts a string URL and a JSON string body.
@@ -304,7 +311,7 @@ describe('vercelExchange', () => {
 
   it('posts the base token and audience to the exchange and returns its token', async () => {
     const { fetchFn, requests } = answering(Response.json({ token: 'exchanged' }));
-    expect(await vercelExchange(fetchFn)('base', STS)).toEqual({
+    expect(await vercelExchange(fetchFn)('base', STS, signal)).toEqual({
       kind: 'token',
       token: 'exchanged',
     });
@@ -313,18 +320,53 @@ describe('vercelExchange', () => {
 
   it('tells a 429 from other failures and never returns the error body', async () => {
     expect(
-      await vercelExchange(answering(new Response('slow down', { status: 429 })).fetchFn)('b', STS)
+      await vercelExchange(answering(new Response('slow down', { status: 429 })).fetchFn)(
+        'b',
+        STS,
+        signal
+      )
     ).toEqual({
       kind: 'rate_limited',
     });
     expect(
       await vercelExchange(
         answering(new Response('{"error":"base.payload.sig"}', { status: 401 })).fetchFn
-      )('b', STS)
+      )('b', STS, signal)
     ).toEqual({ kind: 'failed', detail: 'the exchange answered 401' });
-    expect(await vercelExchange(answering(Response.json({})).fetchFn)('b', STS)).toEqual({
+    expect(await vercelExchange(answering(Response.json({})).fetchFn)('b', STS, signal)).toEqual({
       kind: 'failed',
       detail: 'the exchange answered no token',
+    });
+  });
+
+  it('never follows a redirect: the exchange is manual and a 3xx fails it', async () => {
+    const redirects: (RequestRedirect | undefined)[] = [];
+    const fetchFn = (async (_url: string, init?: RequestInit) => {
+      redirects.push(init?.redirect);
+      // A followed 307 would resend the body, the base token included, to the target.
+      return init?.redirect === 'manual'
+        ? new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/' } })
+        : Response.json({ token: 'exchanged' });
+    }) as typeof fetch;
+    expect(await vercelExchange(fetchFn)('base', STS, signal)).toEqual({
+      kind: 'failed',
+      detail: 'the exchange answered 307',
+    });
+    expect(redirects).toEqual(['manual']);
+  });
+
+  it('aborts the exchange when the shared-token deadline aborts its signal', async () => {
+    const deadline = new AbortController();
+    const fetchFn = (async (_url: string, init?: RequestInit) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      return await promise;
+    }) as typeof fetch;
+    const attempt = vercelExchange(fetchFn)('base', STS, deadline.signal);
+    deadline.abort();
+    expect(await attempt).toEqual({
+      kind: 'failed',
+      detail: 'the exchange request failed (AbortError)',
     });
   });
 });

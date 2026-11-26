@@ -123,19 +123,25 @@ call should the alarm be late:
 - the current key signs for 30 days;
 - the next key is generated and published 7 days before it becomes current (if the object slept
   through that date, the next key still waits a full 7 days after it is published);
-- a retired key stays published until 10 minutes after the last token it signed expires. The
-  object keeps that latest `exp` per key, rounded up to a whole minute, so it writes it at most
-  once a minute.
+- a retired key drops its private key at once and stays published until 1 minute (the verifier
+  clock skew) after the last token it signed expires; after that no legitimate token verifies
+  under it. The object keeps that latest `exp` per key, rounded up to a whole minute, so it writes
+  it at most once a minute.
 
 Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `created`, `published`,
 `activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys
-with `Cache-Control: public, max-age=300, stale-if-error=86400`. Each isolate serves it from memory
+with `Cache-Control: no-store`: removing a kid from this set is the only recall of an STS token
+(design 6.1), so no HTTP cache may hold it or serve it stale while STS answers 503; a verifier
+keeps its own copy for 5 minutes and never serves it longer. Each isolate serves it from memory
 for 5 minutes, together with the `TOKEN_SIGNING_KIDS_REVOKED` list it was built under; a request
 that finds no fresh copy, or a copy built under another list, calls the four shards itself, in
 parallel (each bounded at 5 s and retried like the manager key set), and stores the plain result
 only when all four answered; otherwise it answers 503 with `Retry-After: 30`. Requests that find the
 copy stale at the same moment each load it, because no promise is shared across requests: a few
-extra shard calls per isolate per 5 minutes, accepted.
+extra shard calls per isolate per 5 minutes, accepted. So a scheduled removal (a retired key
+leaving its ring) reaches verifiers up to 10 minutes later: up to 5 minutes in an isolate copy,
+then up to 5 in the verifier's. An emergency removal is filtered from every answer, so it reaches
+them within 5 minutes (see the runbook below for the rollout of the list itself).
 
 ### Cost per request
 
@@ -189,9 +195,10 @@ key out of service:
 5. Verify: `curl -s https://sts.kiloapps.io/.well-known/jwks.json` no longer lists the kid or its
    shard's old next kid, and a new token's header names another kid.
 
-Worst case for the removed key: a verifier keeps a removed kid until its key-set copy expires
-(max-age 300 s), and a token signed just before the removal lives up to 300 s, so the old key stops
-being accepted everywhere about 10 minutes after the deploy.
+Worst case for the removed key: a verifier keeps a removed kid until its own key-set copy expires
+(5 minutes; the response is `no-store`, so no HTTP cache adds to that), and a token signed just
+before the removal lives up to 300 s, so the old key stops being accepted everywhere about 10
+minutes after the deploy.
 
 Worst case for the fresh key: an isolate of the old version that is still serving during the
 rollout can answer with its copy of the old set for up to one isolate cache period (5 minutes);
@@ -214,9 +221,15 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
   in the bundle's `missing`.
 - **`/ci`.** The refresher reads `/ci` as a third folder, in the same read and with the same rules,
   only in an environment where at least one GitHub policy applies; elsewhere it makes no `/ci` call.
-  A `/ci` read that fails fails the whole read, like the other two folders. The read drops every
-  entry in `/ci/minting` and below before anything else sees it: those are the minting
-  credentials, which only the deploy-token object reads, with a read of its own
+  A `/ci` read that fails holds back nothing else: `/workloads` and `/shared` are stored and every
+  other bundle is rebuilt as usual, while each CI bundle keeps the last `/ci` copy, marked stale, or
+  stays empty if `/ci` was never read. STS logs `sts: /ci read failed` and retries at the next
+  regular refresh, with no backoff. The refresher records the failure
+  (`refresher_state.ci_failed_at`), so until then a fill of an empty CI bundle object makes no
+  manager read while `/workloads` and `/shared` are current: a refused `/ci` costs at most one read
+  per refresh interval, not one per CI request. The read drops every entry in `/ci/minting` and
+  below before anything else sees it: those are the minting credentials, which only the
+  deploy-token object reads, with a read of its own
   ([Cloudflare deploy tokens](#cloudflare-deploy-tokens)).
 - **Missing folder.** Infisical answers a folder that does not exist with 404 and error
   `SecretPathNotFound`; STS reads that as an empty folder, not an outage. Only a transport error, a
@@ -228,10 +241,10 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 - **Cadence.** Every 4 minutes. A signed `secrets.modified` webhook opens a 30-second merge window;
   the refresh runs at the window's end and never sooner than 30 seconds after the last refresh. A
   policy change after a deploy refreshes within about 5 seconds.
-- **Backoff.** After a failed read the next attempt waits 15 s, 30 s, 60 s, 120 s, then 240 s
-  (each jittered over its upper half; a 429's `Retry-After` raises it, capped at 4 minutes).
-  Webhooks do not shorten a running backoff. Bundle objects keep serving their copies, marked
-  stale, and an empty object is filled stale from the refresher's last copy.
+- **Backoff.** After a failed read of `/workloads` or `/shared` the next attempt waits 15 s, 30 s,
+  60 s, 120 s, then 240 s (each jittered over its upper half; a 429's `Retry-After` raises it,
+  capped at 4 minutes). Webhooks do not shorten a running backoff. Bundle objects keep serving their
+  copies, marked stale, and an empty object is filled stale from the refresher's last copy.
 - **Token.** The Infisical access token is cached until 60 seconds before it expires; concurrent
   logins merge into one.
 - **Starting the loop.** A cron trigger (`*/5 * * * *` in production and staging, none locally)
@@ -415,12 +428,20 @@ base token the reader holds; on a miss a random wait and a re-read, then a claim
 request exchanges; others, and an exchanger that got 429, poll the cache with backoff instead of
 exchanging again. A cached token STS refuses is dropped and exchanged once more; when STS refuses
 the fresh one too, a refusal marker stops every instance of the deployment from exchanging for
-that audience for 60 seconds (the client's denied recheck). The cache key is not secret: code that
-can write the same Runtime Cache partition (other deployments of the project in the same scope; a
-custom environment may share the preview partition) can stall a deployment's exchanges, never
-change which token it presents (the reader checks the claims, STS checks the signature);
-production has its own partition. There is no
-early refresh: the exchanged token keeps the base token's `exp`, so
+that audience for 60 seconds (the client's denied recheck). The cache key is not secret and the
+entry holds the whole exchanged token: code that can use the same Runtime Cache partition (other
+deployments of the project in the same environment) can read and present that token and can stall
+a deployment's exchanges, but cannot make a deployment present another deployment's token (the
+reader checks the claims, STS checks the signature). Within one environment a read gains nothing,
+since STS takes no deployment claim. Vercel documents separate partitions only for preview and
+production, so a custom environment may share the preview partition; the client therefore keeps a
+custom environment's token (a base token with `custom_environment_id`, or an `environment` other
+than `preview` and `production`) in instance memory only, never in the Runtime Cache, at the cost
+of one exchange per instance per base-token renewal for custom environments only. Encrypting
+custom-environment entries (AES-GCM under a key only that environment holds, the cache key as
+associated data) is the way to share them through the cache again later. The client refuses
+redirects on `oidc.vercel.com` (a 3xx fails the exchange), so the base token in the request body
+never follows one. There is no early refresh: the exchanged token keeps the base token's `exp`, so
 exchanging earlier cannot get a later one. On a miss, a base token with under 60 seconds left fails
 the request at once. When the cache is down (the claim marker does not read back), each request
 exchanges once and fails at once on a 429: about 100 requests per 65 seconds get a token and the
@@ -542,25 +563,33 @@ How a token finds its policy, in this order:
    `github:<repository id>`: a workflow file that no policy lists, or a listed one on another ref.
 3. **Exact bindings.** On that policy, `sub` must equal the immutable-format subject
    `repo:<owner>@<owner id>/<repo>@<repository id>:environment:<environment>` (a policy without an
-   `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, and `event_name` must be in
-   `events`. A failure is refused `identity_rejected` and audited under the policy's workload.
+   `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, the matched `jobWorkflowRefs`
+   entry must be pinned to that same `ref`, and `event_name` must be in `events`. A failure is
+   refused `identity_rejected` and audited under the policy's workload.
 
 Rules the loader enforces:
 
 - `jobWorkflowRefs` lists every workflow file whose jobs may use the policy, each as
   `<owner>/<repo>/.github/workflows/<file>@<ref>` with a ref from `refs`, all in the policy's own
-  repository, with no wildcard. A called reusable workflow is its own entry: its jobs carry its own
-  `job_workflow_ref`, while `ref` and `event_name` come from the calling run. STS does not check the
-  caller (`workflow_ref`): any workflow on a listed ref that calls a listed reusable workflow, with
-  a listed event and in the policy's environment, gets the bundle, so list a reusable workflow only
-  when every caller on `main` may hold it.
+  repository, with no wildcard. A token's `job_workflow_ref` must equal an entry whose ref equals the
+  token's own `ref`. A called reusable workflow is its own entry: its jobs carry its own
+  `job_workflow_ref`, at the ref it was called with, while `ref` and `event_name` come from the
+  calling run, so a run on one listed ref that calls a workflow pinned to another listed ref is
+  refused. STS does not check the caller (`workflow_ref`) or compare commits (`workflow_sha`,
+  `job_workflow_sha`): any workflow on a listed ref that calls a listed reusable workflow at that
+  ref, with a listed event and in the policy's environment, gets the bundle, so list a reusable
+  workflow only when every caller on that ref may hold it.
 - `events` is an allowlist of `push`, `schedule`, `workflow_dispatch` and `workflow_run`. No event
   that a fork author can start (`pull_request`, `pull_request_target`, `issues`, `issue_comment`,
-  `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed, and a policy that
-  lists `workflow_run` lists no other event.
+  `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that
+  lists `workflow_run` lists no other event, binds an `environment`, and does not grant
+  `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
+  pull request started the upstream run, and STS cannot see that run.
 - A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`; a
   policy with token grants binds an `environment`.
-- The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`).
+- The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`). No
+  other kind of policy may use a `ci-` name, so a workload's name alone fixes its folder and a
+  stored bundle never moves between `/workloads` and `/ci`.
 
 Preconditions on the GitHub side, which STS cannot check:
 
@@ -575,8 +604,11 @@ Preconditions on the GitHub side, which STS cannot check:
   exactly as the policy does.
 
 Denial rows carry `repository_id`, `repository_owner_id`, `repository`, `environment`, `ref`,
-`event_name`, `job_workflow_ref` and `sub`, never the token and never per-run claims such as
-`run_id` (they would make every refusal its own row). A delivery writes the usual
+`event_name`, `job_workflow_ref` and `sub_format`, never the token, the raw `sub`, or per-run
+claims such as `run_id` (they would make every refusal its own row). `sub_format` names the
+subject's shape: `immutable:` or `name-only:` followed by `environment`, `ref` or `pull_request`
+for GitHub's default forms, `custom` for a customized template (which can carry per-run claims),
+or `absent`. A delivery writes the usual
 `ai.kilo.sts.bundle.delivered` row for the policy's workload, plus the verified token's
 `jobWorkflowRef`, `runId` and, when present, `runAttempt` as flat string attributes (a run id or
 attempt that is not 1-20 decimal digits is left out). GitHub tokens carry no job claim, so the row
@@ -668,10 +700,13 @@ GitHub token lives minutes, the lease up to an hour.
 | `invalid_request` | 400 (413 above 1 KB) | Not `LeaseRequestSchema`: an unknown grant, a lifetime under 5 minutes or above a day |
 | `unavailable` | 503, `Retry-After` | Infisical refused or failed, the lease object failed or did not answer in 25 seconds, or the environment has no `MANAGER_PROJECT_SLUG` |
 
-Revoke answers `revoked` (200) for the caller's own lease, also when it already ended (no
-Infisical call then), and `not_found` (404) for any lease id STS did not hand to this workload,
-another workload's included. A GitHub caller's lease belongs to its run: a job of another run of
-the same workflow gets `not_found` too, and a re-run attempt of the same run may revoke it.
+Revoke answers `revoked` (200) for the caller's own lease once STS has revoked it (no Infisical
+call then), `unavailable` without an Infisical call once STS stopped its revocation as
+`unconfirmed`, and `not_found` (404) for any lease id STS did not hand to this workload, another
+workload's included. An expired lease still goes to Infisical, which answers 404 once its own expiry
+revocation succeeded: expiry stops new logins, not open sessions. A GitHub caller's lease belongs to
+its run: a job of another run of the same workflow gets `not_found` too, and a re-run attempt of the
+same run may revoke it.
 
 **How a lease is made.** The Worker checks the caller (props or provider token, as for bundles)
 and the policy grant, takes the request's lifetime or the policy default, and shortens it to the
@@ -692,23 +727,37 @@ object's 20-second budget runs from then, so a slow start of the object counts. 
    could not be written (`audit_failed`). The password never leaves the object.
 4. Otherwise writes `lease.created` and marks the row active in the same output gate, and returns.
 
-A revocation Infisical cannot take (unreachable, 5xx, a refusal other than 404) stays owed on the
-lease row: the first failure writes `lease.revoked` with result `revoke_failed` (if that append
-fails, the next failure writes it), and the object's alarm retries until Infisical takes it (a
-second `lease.revoked` row) or the lease expires and Infisical drops it (no further row). The
-alarm takes at most 5 leases, least recently tried first, so leases that keep failing cannot hold
-back a newer one; it retries a lease no sooner than 30 seconds after its last attempt, the
-caller's included, or after Infisical's `Retry-After` on a 429 when that is longer. A caller's
-revoke then answers `unavailable`, and the caller may retry too. A creation that times out may still have made a role
-at the database. Its password reached no one, and Infisical drops it at expiry. Rows are deleted a
-day after their lease ended.
+Infisical confirms a revocation only with a 200 whose lease row carries no `status`, or with its
+404 for a lease it does not have (`Dynamic secret lease with ID '…' not found`). A 200 whose row
+says `Failed to delete` (the revocation statement failed at the database; Infisical keeps the
+lease and retries it itself every few hours), any other 404 (a missing folder or project), a
+malformed answer, a 5xx, a timeout or another refusal leaves the revocation owed on the lease row;
+no answer body is logged or kept. The first failure writes `lease.revoked` with result
+`revoke_failed` (if that append fails, the next failure writes it), and the object's alarm retries
+until Infisical confirms it (a second `lease.revoked` row), also after the lease expired, since
+`VALID UNTIL` refuses new logins but ends no open session. A failure after the expiry logs an
+error that says the sessions may still be open. A day after the expiry the object stops: it writes
+`lease.revoked` with result `unconfirmed`, logs an error naming the lease id, for a person to end
+the role's sessions by hand (Risks below), and ends a delivered lease's row in state `unconfirmed`,
+so a later revoke does not make it owed again; if that row cannot be written, it tries again 30
+seconds later. It stops the same way on a 404 after a recorded `revoke_failed`: until trial check 3
+shows that Infisical keeps a lease whose revocation failed until a revocation succeeds, a missing
+lease may be one deleted without its role being revoked. The alarm takes at most 5 leases, least recently tried
+first, so leases that keep failing cannot hold back a newer one; it retries a lease no sooner than
+30 seconds after its last attempt, the caller's included, or after Infisical's `Retry-After` on a
+429 when that is longer. A caller's revoke then answers `unavailable`, and the caller may retry
+too. A creation that times out may still have made a role at the database. Its password reached no
+one, and Infisical drops it at expiry. Rows are deleted a day after their lease ended; a row whose
+revocation is still owed stays until the object stops it.
 
 **Audit.** On the `sts:<environment>:leases` stream: `ai.kilo.sts.lease.created` (workload,
 identity, channel, grant, lease id, `ttlSeconds`, `requestedTtlSeconds` when given, `clamped`,
 `expiresAt`, and a GitHub caller's `jobWorkflowRef`, `runId`, `runAttempt`) and
 `ai.kilo.sts.lease.revoked` (`cause`: `caller`, `late`, `expiry_mismatch` or `audit_failed`;
-`result`: `revoked`, `gone` when Infisical no longer had it, or `revoke_failed`, with outcome
-`failure`, when Infisical could not be reached). Refusals of an identified caller become
+`result`: `revoked`, `gone` when Infisical no longer had it, `revoke_failed` when Infisical did not
+confirm it, or `unconfirmed` when the object stopped a day after the expiry or on a 404 after a
+recorded failure; the last two with
+outcome `failure`). Refusals of an identified caller become
 `ai.kilo.sts.lease.denied` through the denial object, merged per minute: the answer's reason, or
 for a revoke the caller heard as `not_found`, `not_owner` (another workload's lease), `other_run`
 (another GitHub run's lease) or `unknown_lease`. No row carries a username or a password.
@@ -728,13 +777,16 @@ leases); `VALID UNTIL` and the dropped role refuse a new login on both nodes. Th
 `idle_session_timeout` (15 min) protect an honest consumer only: a session can change any of them
 with `SET`, and a database-level setting is a default too. Only a pooler or a kill job outside the
 session enforces a time limit, and on the replica STS has neither. `check.sh` shows on one node
-that `VALID UNTIL` refuses new logins and leaves an open session alone until a revocation.
+that `VALID UNTIL` refuses new logins and leaves an open session alone until a revocation. So
+`replica-read` is staging-only until a replica-side session sweeper ships (a phase 2 follow-up PR
+that runs the session-ending function on each replica): no production policy grants it before.
 
 **Risks.**
 
 - A `ci-migration` lease is equivalent to holding the `postgres` owner credential for up to an
-  hour, not a bounded capability (design decision Q64, which needs Igor's security acceptance
-  before any production use). Within that hour it can create permanent `LOGIN` roles, grant them
+  hour, not a bounded capability (design decision Q64, which Igor accepted on 2026-11-26 on these
+  terms: it acts as `postgres` for up to an hour, and its effects outlive the revocation). Within
+  that hour it can create permanent `LOGIN` roles, grant them
   any right `postgres` holds, plant `SECURITY DEFINER` functions, triggers or event triggers,
   change any object `postgres` owns and read every row. Everything it leaves behind outlives the
   revocation and the expiry, which end only its own logins and sessions. What stands between a
@@ -758,14 +810,17 @@ that `VALID UNTIL` refuses new logins and leaves an open session alone until a r
   strong as `postgres`. Each login lives only in its dynamic secret's configuration; the
   break-glass owner enters it once, and Terraform ignores the field (design 4.2).
 - Neither login can end another role's session: they hold no `pg_signal_backend`. The revocation
-  calls `kilo_lease.end_sessions`, a `SECURITY DEFINER` function owned by `postgres` (which
-  Supabase makes a member of `pg_signal_backend`) with a fixed `search_path`. It ends only the
-  sessions of lease roles of the caller's own template, of expired ones, and of roles that no
-  longer exist. A leaked login can still create roles and use up connections: each lease role
-  has a connection limit (4 for `replica-read`, 2 for `ci-migration`; at most 8 and 4 at the
-  policies' `maxActive`), but the login sets the limit itself when it creates a role, so only
-  `max_connections` caps a leaked login. Each login's own `CONNECTION LIMIT 4` caps its sessions,
-  not the roles it makes.
+  calls `kilo_lease.end_sessions`, a `SECURITY DEFINER` function with a fixed `search_path`, owned
+  by `postgres` (which Supabase makes a member of `pg_signal_backend`) or, after the `ci-migration`
+  setup, by `kilo_lease_owner` (a member of it). It ends only the
+  sessions of the caller's own template's lease roles, as `kilo_lease.lease_role` records them by
+  OID at creation: the one being revoked, blocked or expired ones, and dropped ones. A session of a
+  dropped role that was never a lease is left alone (PostgreSQL keeps an ordinary role's sessions
+  open when the role is dropped). A leaked login can still create roles and use up connections:
+  each lease role has a connection limit (4 for `replica-read`, 2 for `ci-migration`; at most 8
+  and 4 at the policies' `maxActive`), but the login sets the limit itself when it creates a role,
+  so only `max_connections` caps a leaked login. Each login's own `CONNECTION LIMIT 4` caps its
+  sessions, not the roles it makes.
 - A `replica-read` role is read-only by grant only. The role setting
   `default_transaction_read_only` stops accidental writes; a session can turn it off. Beyond its
   `SELECT` grants, a role holds what PostgreSQL and the installed extensions grant to PUBLIC.
@@ -793,24 +848,41 @@ that `VALID UNTIL` refuses new logins and leaves an open session alone until a r
     requests. Supabase owns these grants, so they cannot be removed: before the first lease,
     confirm that `pg_net` is off, or accept this.
   - No `USAGE` on `auth`, `storage`, `extensions`, `vault` or `cron`.
-- A revocation runs in one transaction, so its `NOLOGIN` takes effect only at the commit. It ends
-  the role's sessions, drops what the role owns, ends any session that logged in meanwhile and
-  drops the role. A login that lands between the last of these and the commit keeps a session
-  of a role that no longer exists, until the next revocation of any lease ends it (`check.sh` runs
-  a reconnect loop through a revocation). A `replica-read` session of that kind holds no grant.
-  A `ci-migration` one keeps owner rights: its `role` setting made `current_user` `postgres` at
-  login, and privilege checks use that role, which still exists (design decision Q64).
+- A login checks the committed catalog, so a `NOLOGIN` in the transaction that also drops the role
+  would leave a gap: a login landing between the last session scan and the commit would keep a
+  session, and a `ci-migration` one would keep acting as `postgres` (its `role` setting made
+  `current_user` `postgres` at login). So `revoke.sql` is two transactions in Infisical's one call
+  (it runs the parts split on `;` on one connection, between its own `BEGIN` and `COMMIT`): the
+  first commits `NOLOGIN` and `VALID UNTIL -infinity` and ends the sessions; the second refuses a
+  role that still has its login, waits one second for a login that passed its checks before that
+  commit to show in `pg_stat_activity`, ends the sessions, drops what the role owns, ends them
+  again and drops the role. `check.sh` runs a reconnect loop through a revocation (3
+  `replica-read` rounds and a `ci-migration` round) and finds no session left, of the role or of a
+  dropped one, and shows that a one-transaction revocation statement is refused. What remains: a
+  login stalled for over a second between its role check and its `pg_stat_activity` entry, which a
+  later revocation of the template ends.
 - The admin logins hold no lease role's rights. `kilo_lease.revoke_lease` grants the lease role to
   its admin, for `DROP OWNED`, only inside the revocation transaction that drops it (undone if the
   drop fails).
-- Infisical puts the generated password into the creation statement. The statement it sends is
-  `SELECT kilo_lease.create_lease(...)`, which runs the `CREATE ROLE` through `EXECUTE`, so
-  `log_statement = 'ddl'` (design Addendum B.6 notes that Supabase logs DDL) does not log it;
-  `check.sh` shows that with the server at `ddl`, and that a top-level `CREATE ROLE` would be
-  logged. The password still reaches the Postgres log under `log_statement = 'all'`, pgaudit,
-  `log_min_duration_statement` at a threshold the call exceeds, or as the statement of an error
-  (`log_min_error_statement`), and `pg_stat_activity` shows it to roles that may read other
-  sessions' queries while the call runs. The trial checks these settings before the first lease.
+- Infisical puts the generated password into the creation statement as a literal: its PostgreSQL
+  engine has no bind parameters. The statement it sends is `SELECT kilo_lease.create_lease(...)`,
+  and each admin login carries role settings that keep its statements out of the server log
+  whatever the server-wide settings: `log_statement = 'none'`, `log_min_duration_statement = -1`,
+  `log_min_error_statement = 'panic'`, and `pgaudit.log = 'none'` and
+  `auto_explain.log_min_duration = -1` when those modules are loaded at setup. Supabase lets
+  `postgres` set them per role (supautils); the login cannot change them. A failed `CREATE ROLE`
+  is raised again without its text, so the error and its context carry no password, and a failed
+  creation rolls back, so a password in any error belongs to a role that never existed.
+  `check.sh` shows that with the server at `log_statement = 'all'` and
+  `log_min_duration_statement = 0`, and with a failed creation. While the call runs,
+  `pg_stat_activity` shows the statement to roles that read other sessions' queries
+  (`pg_read_all_stats`, which `postgres` holds through `pg_monitor`). After `setup.sql` alone, they
+  are `postgres` and the superusers, who can already create such a role; `setup-ci-migration.sql`,
+  run as the superuser before any lease can act as `postgres`, sets `track_activities = off` for
+  both admin logins, so a `ci-migration` lease cannot read another lease's password there
+  (`check.sh`). A pgaudit object audit (`pgaudit.role`) that covers the `kilo_lease` functions, or
+  a module enabled after setup, still could log it; the trial checks for both before the first
+  lease.
 - The setup files never put an admin login's password into a top-level DDL statement either:
   `setup.sql` and `setup-ci-migration.sql` pass it in a transaction-local setting
   (`SELECT set_config(...)`) to a `DO` block that runs the `CREATE ROLE` through `EXECUTE` and
@@ -831,9 +903,19 @@ psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
 Generate the password into the break-glass owner's session only (or into a variable) and enter it
 into the dynamic secret below. `setup.sql` ends with `report.sql`, one row per finding and a
 `summary` row; every count in the summary must be 0 (Risks lists the rows that remain by design).
-Run `report.sql` again after a migration adds a function or an extension. Only after Igor has
-accepted design decision Q64, and only as a superuser, run `setup-ci-migration.sql` with
-`-v migration_admin_password=...`; on Supabase that needs Supabase's own staff.
+Run `report.sql` again after a migration adds a function or an extension. Igor accepted design
+decision Q64 on 2026-11-26; `ci-migration` still needs `setup-ci-migration.sql`, run only as a
+superuser with `-v migration_admin_password=...`, which on Supabase needs Supabase's own staff.
+
+What each setup guarantees. After `setup.sql` alone (`replica-read` only), `postgres` owns the
+`kilo_lease` schema, its table and its functions and administers the replica login, so whoever
+holds `postgres` could change them; no lease acts as `postgres` then, and `postgres` already holds
+every right a `replica-read` lease has. `setup-ci-migration.sql` then, before any lease can act as
+`postgres`, removes `postgres`'s ADMIN on the replica login, moves the schema, its table and its
+functions to `kilo_lease_owner` (no login, created by the superuser, a member of
+`pg_signal_backend`), and turns off activity tracking for both admin logins, so a `ci-migration`
+lease can neither reset an admin password, replace `kilo_lease.create_lease` to record later
+passwords, nor read a creation statement in `pg_stat_activity` (`check.sh`).
 
 **Infisical setup, per environment (staging first).**
 
@@ -844,8 +926,10 @@ accepted design decision Q64, and only as a superuser, run `setup-ci-migration.s
    username template `lease_rr_{{lowercase (random 20)}}`, so every name is `lease_rr_` and 20 of
    `[a-z0-9]` (`kilo_lease.check_username` refuses any other name before the creation statement
    quotes it); creation statement `sql/leases/replica-read.create.sql`, revocation statement
-   `sql/leases/revoke.sql`, renew statement `sql/leases/renew.sql`, pasted as they are (Infisical
-   splits each on `;`, so they hold no other semicolon).
+   `sql/leases/revoke.sql`, renew statement `sql/leases/renew.sql`, pasted as they are. Infisical
+   splits each on `;` and runs the parts in one transaction, so the creation and renew statements
+   hold no other semicolon, and the revocation statement's `COMMIT;BEGIN;` commits its first part
+   (the login block) before the second (Risks).
 3. Dynamic secret `ci-migration` in `/dynamic/ci-migration`, only once `setup-ci-migration.sql`
    ran: the same, with user `kilo_lease_migration_admin`, default and max TTL `1h`, username
    template `lease_cm_{{lowercase (random 20)}}`, and creation statement
@@ -859,24 +943,36 @@ accepted design decision Q64, and only as a superuser, run `setup-ci-migration.s
    addresses (https://infisical.com/docs/documentation/setup/networking).
 6. A lease from the Infisical dashboard (trial check 3): create, log in through the replica,
    renew, then let one expire with a session open on the primary and see it ended and the role
-   dropped.
+   dropped. Revoke one from the dashboard with a session open and see in the Postgres log that the
+   two parts ran as two transactions (the role has no login after the first commit). Check that
+   neither admin login's statements reach the Postgres log (`select rolname, rolconfig from
+   pg_roles where rolname like 'kilo_lease_%admin'` shows the settings) and that no pgaudit
+   object audit covers schema `kilo_lease`. Force a revocation failure (for example, revoke
+   `EXECUTE` on `kilo_lease.revoke_lease` from the admin login for the test) and check that every
+   later revoke answers 200 with the kept row (`status` `Failed to delete`) and never a 404 until a
+   revocation succeeds; until this is confirmed, STS treats a 404 after a recorded failure as
+   `unconfirmed`.
 7. STS: set `MANAGER_PROJECT_SLUG` (Infisical → project settings) and `LEASE_CI_MIGRATION_TARGET`
    in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants. In
-   production, leave `LEASE_CI_MIGRATION_TARGET` empty and grant no `ci-migration` until Igor has
-   accepted design decision Q64.
+   production, grant no `replica-read` until the replica-side session sweeper ships, and leave
+   `LEASE_CI_MIGRATION_TARGET` empty and grant no `ci-migration` until `setup-ci-migration.sql` ran
+   there.
 
 **Cost.** One lease is one `LeaseDO` call and one Infisical create, plus a login and one `SignerDO`
 call when the object's 10-minute token has lapsed (leases are sparse, so assume it has), and one
 `lease.created` row; one revocation is the same with a delete and one `lease.revoked` row. A
-revocation Infisical cannot take adds one `lease.revoked` row and, until it succeeds or the lease
-expires, at most one Infisical delete per 30 seconds per lease: the alarm skips a lease whose
-last attempt (a caller's included) is under 30 seconds old, and waits out a longer `Retry-After`.
-A caller retrying faster than 30 seconds adds its own deletes. Worst case, the alarm makes 10
+revocation Infisical does not confirm adds one `lease.revoked` row and, until Infisical confirms
+it or a day after the lease's expiry, at most one Infisical delete per 30 seconds per lease: the
+alarm skips a lease whose last attempt (a caller's included) is under 30 seconds old, and waits
+out a longer `Retry-After`. A caller retrying faster than 30 seconds adds its own deletes. A lease
+still unconfirmed a day after its expiry adds one `unconfirmed` row. Worst case, the alarm makes 10
 deletes a minute (5 per alarm) whatever the number of owed leases, plus each caller's retries
 and, when every call gets 401/403, one login per delete. A refusal costs no
 Infisical call; a limit refusal also costs its `LeaseDO` call. At the database, a lease is one
-`SELECT kilo_lease.create_lease` (one `CREATE ROLE` and its role settings), a revocation two `pg_stat_activity` scans, one `DROP OWNED`
-and one `DROP ROLE`, all on the primary. bouncer-watch runs 24 hourly and 1 daily run a day;
+`SELECT kilo_lease.create_lease` (one `CREATE ROLE`, its role settings and one row in
+`kilo_lease.lease_role`), a revocation two transactions with three `pg_stat_activity` scans, a
+one-second wait, one `DROP OWNED` and one `DROP ROLE`, all on the primary; a revocation holds an
+admin connection for about a second. bouncer-watch runs 24 hourly and 1 daily run a day;
 sized at twice that for retried runs, 48 and 2 leases, each revoked at the end of its run, it
 makes 100 `LeaseDO` calls, at most 200 Infisical requests (against 600 a minute), 100 `SignerDO`
 calls and 100 audit rows a day. CI: 2 `LeaseDO` calls, at most 4 Infisical requests, 2 `SignerDO`
@@ -1356,11 +1452,13 @@ per request that arrives before the first call lands, since requests share only 
 set, never a pending call; while `SignerDO` fails, each request makes its own call (up to 3
 attempts) and nothing is cached.
 
-The identity's project role grants `readValue` on `/workloads/**` and `/shared/**` of its own
-environment in the `kilo` project, and no write. Before the first GitHub policy reaches an
-environment, the role also grants `readValue` on `/ci/**` there. Without that grant the `/ci` read
-fails, which fails every refresh in that environment, so every bundle there goes stale until the
-grant is added. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
+The identity's project role grants `describeSecret` and `readValue` on `/workloads/**` and
+`/shared/**` of its own environment in the `kilo` project, and no write. Infisical reads a value
+only with both: `readValue` requires `describeSecret` as well
+(https://infisical.com/docs/internals/permissions/project-permissions). Before the first GitHub
+policy reaches an environment, the role also grants both on `/ci/**` there. Without that grant the
+`/ci` read fails: CI bundles in that environment stay empty or go stale, and every other bundle
+refreshes as usual. `/ci` holds only folders STS may read: the CI bundles (`/ci/ci-<job>`) and
 `/ci/minting`. The STS deploy job's own token lives outside it, under `/sts-deploy` (design 4.2).
 Before the first lease in an environment, the role also grants `dynamic-secrets` `lease` on
 `/dynamic/replica-read` and `/dynamic/ci-migration` there ([Database leases](#database-leases));
@@ -1440,9 +1538,9 @@ production. Complete and verify every item below before merging.
    and not the 4-day default. Verify: `wrangler queues info kilo-audit` prints the queue, and the
    Queues API shows `message_retention_period: 1209600`.
 3. **Infisical identity.** The production machine identity `c531ad9b-eec9-4f93-b173-e14d3d94f6ef`
-   exists in the `kilo` project with a role that grants `readValue` on `/workloads/**` and
-   `/shared/**` in `production` and no write. Verify: Infisical → Access Control → Machine
-   Identities → that id → Projects shows `kilo` with the role.
+   exists in the `kilo` project with a role that grants `describeSecret` and `readValue` on
+   `/workloads/**` and `/shared/**` in `production` and no write. Verify: Infisical → Access
+   Control → Machine Identities → that id → Projects shows `kilo` with the role.
 4. **Runtime secrets.** Each policy file's names exist in `production` under
    `/workloads/<workload>` or `/shared`. Verify: Infisical → `kilo` → `production` lists them. A
    missing name is reported in the bundle's `missing` list rather than failing the read, so this
@@ -1469,14 +1567,19 @@ Staging (`sts-staging`, `sts-staging.kiloapps.io`, queue `kilo-audit-staging`, i
 **Before an environment's first GitHub policy deploys** (a `policy/ci-*.yaml` naming that
 environment), in this order:
 
-1. **`/ci` read grant.** Grant the environment's Infisical STS role `readValue` on `/ci/**` there.
-   Without it every refresh in that environment fails and every bundle there goes stale. Verify:
-   Infisical → Access Control → the identity's role lists `/ci/**` for that environment.
-2. **Deploy the policy.** The refresher's stored copy has no `/ci` folder yet, so the first refresh
-   after this deploy needs a fresh manager read for every workload in that environment, not only
-   the CI ones. If the manager is down at that moment, an empty bundle object has no stale copy to
-   fill from until a read succeeds; objects that already hold a bundle keep serving it. Deploy
-   while the manager is up and check the Infisical audit log for the read within 5 minutes.
+1. **`/ci` read grant.** Grant the environment's Infisical STS role `describeSecret` and
+   `readValue` on `/ci/**` there. Without both, the `/ci` read fails and the CI bundles there stay
+   empty (other bundles are not affected). Verify with the STS identity itself, before the deploy:
+   Infisical → `kilo` → Access Control → the STS identity → Assume Privileges
+   (https://infisical.com/docs/documentation/platform/access-controls/assume-privilege), then open
+   that environment's `/ci` and a `/ci/ci-<job>` folder below it: each lists its secrets, and no
+   value shows as hidden. Do not reveal a value. Exit the session. Infisical records the session's
+   actions under your own account.
+2. **Deploy the policy.** The refresher has no `/ci` copy yet, so the CI bundles in that
+   environment stay empty until the first `/ci` read after this deploy succeeds; other bundles are
+   not affected. After the deploy, check the Infisical audit log for the `/ci` read within 5
+   minutes, and that the Worker logs show no `sts: /ci read failed` and no
+   `sts: manager hid secret values`.
 
 ## Tests
 
@@ -1542,11 +1645,13 @@ npx wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/
 The script signs a job token the way GitHub does and checks that the listed workflow's job gets its
 bundle (its `/ci/ci-e2e-release` value and its `/shared` value, not the `/workloads` or `/ci/minting`
 decoys), that the refresher read `/ci`, and that a job of another workflow file, a `pull_request`
-job and a name-only subject each get 401 `identity_rejected`. It then waits for the
-`bundle.delivered` row, which must carry the job's workflow file, run id and attempt, and for the
-`bundle.denied` rows that name the refused `job_workflow_ref`, `event_name` and `sub` and no run id,
-and checks that no audit row carries a value. It needs empty local state: a bundle kept from an
-earlier run skips the refresher read, so run `rm -rf test/fixtures/e2e/.wrangler/state` before
+job, a name-only subject, a customized subject carrying the run id, and a run on the policy's
+second listed ref (`refs/heads/release`) calling the workflow pinned to `main` each get 401
+`identity_rejected`. It then waits for the `bundle.delivered` row, which must carry the job's
+workflow file, run id and attempt, and for the `bundle.denied` rows that name the refused
+`job_workflow_ref`, `event_name`, `ref` and `sub_format` and no run id or raw subject, and checks
+that no audit row carries a value. It needs empty local state: a bundle kept from an earlier run
+skips the refresher read, so run `rm -rf test/fixtures/e2e/.wrangler/state` before
 `wrangler dev`.
 
 **Local end-to-end check of database leases.** The probe policy also holds `replica-read`
@@ -1623,17 +1728,22 @@ non-superuser owner of the database and `public`, member of `pg_signal_backend`;
 `setup-ci-migration.sql` as the superuser, and each statement file the way Infisical does. It
 proves that the setup report lists what PUBLIC reaches and that `setup.sql` removed PUBLIC's
 `EXECUTE` on definer functions in `public`; that under `log_statement = 'ddl'` neither admin
-password (both setup files) nor the lease password reaches the server log; that `postgres` can
-reset the replica
+password (both setup files) reaches the server log; that with the server at `log_statement =
+'all'` and `log_min_duration_statement = 0` no lease password does, nor that of a failed creation,
+whose error carries none; that after `setup-ci-migration.sql` `postgres` cannot read either admin
+login's query text in `pg_stat_activity`; that `postgres` can reset the replica
 admin's password until `setup-ci-migration.sql` ran and neither afterwards; that a malformed
 username is refused; that a `replica-read` role reads and cannot write, create or run a definer
 function even with read-only mode turned off; that neither admin login can end an application
 session or the other template's sessions; that renewal moves `VALID UNTIL`; that an expired role
 cannot log in while its open session lives on until a revocation of any lease ends it; that
 revocation ends open sessions, drops what the role owned (a large object, a temporary table) and
-the role, and is idempotent; that a client reconnecting through a revocation keeps no session;
-that a role revocation cannot drop (an object in `template1`, a right `postgres` granted) stays
-without login and is listed; that a `ci-migration` session runs as `postgres`, holds none of its
-rights after `SET ROLE NONE`, and its DDL (`CREATE EXTENSION` included) leaves nothing owned by
-the lease role; and that `DROP ROLE` alone would leave a session open and unnamed, which the next
-revocation ends.
+the role, and is idempotent; that a client reconnecting through a revocation keeps no session and
+leaves none of a dropped role (`replica-read` and `ci-migration`), and that a one-transaction
+revocation statement is refused; that a role revocation cannot drop (an object in `template1`, a
+right `postgres` granted) stays without login and is listed; that a `ci-migration` session runs
+as `postgres`, holds none of its rights after `SET ROLE NONE`, and its DDL (`CREATE EXTENSION`
+included) leaves nothing owned by the lease role, and that neither it nor `postgres` can replace,
+add or take over a `kilo_lease` function after `setup-ci-migration.sql`; that `DROP ROLE` alone
+would leave a session open and unnamed, which the next revocation ends for a lease role; and that
+no revocation ends the session of a dropped role that was never a lease.

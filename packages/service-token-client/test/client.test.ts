@@ -4,6 +4,7 @@ import {
   DENIED_RECHECK_MS,
   HELD_TOKEN_MARGIN_SECONDS,
   MINT_BATCH_WINDOW_MS,
+  OPEN_ATTEMPT_STALE_MS,
   POLL_MAX_MS,
   POLL_START_MS,
   createServiceTokens,
@@ -166,6 +167,49 @@ describe('renewal', () => {
     expect(await tokens.get(WEB, { waitUntil })).toBe('web:sts.canary#1');
     expect(waitUntil).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(MINT_BATCH_WINDOW_MS + 5);
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(await tokens.get(WEB)).toBe('web:sts.canary#2');
+  });
+
+  it('without a lifetime extension, a read that starts a renewal waits for it', async () => {
+    const { transport } = scripted(issueAll());
+    const tokens = client(transport);
+    expect(await settle(tokens.get(WEB))).toBe('web:sts.canary#1');
+
+    await vi.advanceTimersByTimeAsync(241_000);
+    let returned = false;
+    const renewal = tokens.get(WEB).then(token => {
+      returned = true;
+      return token;
+    });
+    await vi.advanceTimersByTimeAsync(MINT_BATCH_WINDOW_MS - 1);
+    expect(returned).toBe(false);
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(await settle(renewal)).toBe('web:sts.canary#1');
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(await tokens.get(WEB)).toBe('web:sts.canary#2');
+  });
+
+  it('a renewal batch whose timer the runtime dropped does not hold later mints', async () => {
+    const { transport } = scripted(issueAll());
+    const tokens = client(transport);
+    expect(await settle(tokens.get(WEB))).toBe('web:sts.canary#1');
+
+    // workerd cancels the timers of a request that ended: the renewal's batch window never ends.
+    await vi.advanceTimersByTimeAsync(241_000);
+    vi.spyOn(globalThis, 'setTimeout').mockImplementationOnce(
+      (() => 0) as unknown as typeof setTimeout
+    );
+    const ended = { waitUntil: () => {} };
+    expect(await tokens.get(WEB, ended)).toBe('web:sts.canary#1');
+    await vi.advanceTimersByTimeAsync(MINT_BATCH_WINDOW_MS + 5);
+    expect(transport).toHaveBeenCalledTimes(1);
+
+    // Past the dead attempt's timeout and its first backoff, the next read opens a new attempt
+    // instead of joining the stale one.
+    expect(ATTEMPT_TIMEOUT_MS + 3_000).toBeGreaterThan(OPEN_ATTEMPT_STALE_MS);
+    await vi.advanceTimersByTimeAsync(ATTEMPT_TIMEOUT_MS + 3_000);
+    expect(await settle(tokens.get(WEB, ended))).toBe('web:sts.canary#1');
     expect(transport).toHaveBeenCalledTimes(2);
     expect(await tokens.get(WEB)).toBe('web:sts.canary#2');
   });

@@ -11,17 +11,17 @@ import {
   CLAIM_EXCHANGES_PER_REGION,
   DESIGN_PEAK_INSTANCES,
   MIN_DISTINCT_INSTANCES,
+  MIN_REMAINING_SECONDS,
   TIME_TO_TOKEN_MAX_MS,
   TIME_TO_TOKEN_P99_MS,
   sharedChecks,
+  tokenExpOk,
 } from './lib/pass-rule.ts';
 
 type Mode = 'cold' | 'shared' | 'warm';
 type Json = Record<string, unknown>;
 type Invocation = { httpStatus: number | 'network_error'; ms: number; answer: Json | null };
 
-/** The client fails at once on a base token with under 60 seconds left (lib/shared-token.ts). */
-const MIN_REMAINING_SECONDS = 60;
 /** Salts the shared-cache key so this run never reads an earlier run's entry (same audience). */
 const runId = randomUUID();
 
@@ -62,6 +62,8 @@ const deadlineMs = positiveInteger(values['deadline-ms'], 'deadline-ms');
 
 function targetFor(base: string): URL {
   const url = new URL(mode === 'shared' ? '/api/shared' : '/api/cold', base);
+  // Every request carries the proof key: never in clear text.
+  if (url.protocol !== 'https:') throw new Error('--url must be an https URL');
   if (mode === 'shared') {
     url.searchParams.set('run', runId);
     if (jitterMs !== undefined) url.searchParams.set('jitterMs', String(jitterMs));
@@ -89,7 +91,7 @@ const PLANS: Record<Mode, Json> = {
       claim: !values['no-claim'],
       deadlineMs: deadlineMs ?? 'default 20000',
     },
-    passes: `every invocation got a token; no in-memory cache backend; exchange attempts (429s included) <= ${BUDGET_EXCHANGES_PER_WAVE} in total and per region (hard limit); claimHolds: exchange attempts per region (one audience) <= ${CLAIM_EXCHANGES_PER_REGION} and no 429; time-to-token p99 <= ${TIME_TO_TOKEN_P99_MS} ms and max <= ${TIME_TO_TOKEN_MAX_MS} ms; exchanged exp equals the base token exp; act.aud is the team default and not nested; at least ${MIN_DISTINCT_INSTANCES} distinct instances (reported next to the design peak of ${DESIGN_PEAK_INSTANCES})`,
+    passes: `every invocation got a token; no in-memory cache backend; exchange attempts (429s included) <= ${BUDGET_EXCHANGES_PER_WAVE} in total and per region (hard limit); claimHolds: exchange attempts per region (one audience) <= ${CLAIM_EXCHANGES_PER_REGION} and no 429; time-to-token p99 <= ${TIME_TO_TOKEN_P99_MS} ms and max <= ${TIME_TO_TOKEN_MAX_MS} ms; the exchanging invocation's token exp equals its base token exp and every other served token has at least ${MIN_REMAINING_SECONDS} s left; act.aud is the team default and not nested; at least ${MIN_DISTINCT_INSTANCES} distinct instances (reported next to the design peak of ${DESIGN_PEAK_INSTANCES})`,
   },
   warm: {
     perInvocation:
@@ -174,6 +176,8 @@ async function invoke(url: URL): Promise<Invocation> {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'x-proof-key': proofKey ?? '' },
+      // A redirect would carry the proof key to wherever it points; it fails the invocation instead.
+      redirect: 'error',
       signal: AbortSignal.timeout(90_000),
     });
     const text = await response.text();
@@ -292,9 +296,7 @@ async function runShared(): Promise<Json> {
     })
   );
   const { exchangedClaims, actOk } = claimsCheck(answers);
-  const expMatchesBase = answers
-    .filter(answer => answer.status === 'ok')
-    .every(answer => answer.tokenExpMatchesBase === true);
+  const expMatchesBase = answers.filter(answer => answer.status === 'ok').every(tokenExpOk);
   const checks = sharedChecks({
     invocations,
     served,

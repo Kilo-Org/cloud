@@ -2,7 +2,7 @@ import type { MintRequest, MintResult } from '@kilocode/sts-contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MINT_BATCH_WINDOW_MS } from '../src/client';
 import { ServiceTokenError } from '../src/errors';
-import { createHttpServiceTokens } from '../src/http';
+import { createHttpServiceTokens, HTTP_ATTEMPT_TIMEOUT_MS } from '../src/http';
 import { createWorkerServiceTokens } from '../src/worker';
 
 const WEB = { audience: 'web', scope: 'web:sts.canary' };
@@ -128,5 +128,80 @@ describe('createHttpServiceTokens', () => {
     expect(await settle(mismatched.get(WEB).catch((caught: unknown) => caught))).toMatchObject({
       reason: 'unavailable',
     });
+  });
+
+  it('ends both tries of a refused attempt before the client stops waiting', async () => {
+    // STS refuses the first identity token after 9 s; the fresh one would take 20 s more, then
+    // a mint: about 40 s in all without one deadline for both tries.
+    let identities = 0;
+    const getIdentityToken = Object.assign(
+      async () => {
+        identities += 1;
+        if (identities > 1) {
+          const fresh = Promise.withResolvers<void>();
+          setTimeout(fresh.resolve, 20_000);
+          await fresh.promise;
+        }
+        return `identity-${identities}`;
+      },
+      { invalidate: async () => true }
+    );
+    const fetchFn = vi.fn(async () => {
+      const answered = Promise.withResolvers<void>();
+      setTimeout(answered.resolve, 9_000);
+      await answered.promise;
+      return Response.json({ status: 'identity_rejected' }, { status: 401 });
+    });
+    const tokens = createHttpServiceTokens({
+      stsUrl: 'https://sts.test',
+      getIdentityToken,
+      fetch: fetchFn as typeof fetch,
+    });
+
+    let settled: unknown = null;
+    void tokens.get(WEB).catch((caught: unknown) => {
+      settled = caught;
+    });
+    await vi.advanceTimersByTimeAsync(HTTP_ATTEMPT_TIMEOUT_MS - 1);
+    expect(settled).toBeInstanceOf(ServiceTokenError);
+    expect(settled).toMatchObject({
+      reason: 'unavailable',
+      cause: { message: 'the STS identity token was not ready in time for a mint' },
+    });
+    expect(identities).toBe(2);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('a refused attempt whose fresh identity token fits the deadline still mints', async () => {
+    let identities = 0;
+    const getIdentityToken = Object.assign(
+      async () => {
+        identities += 1;
+        if (identities > 1) {
+          const fresh = Promise.withResolvers<void>();
+          setTimeout(fresh.resolve, 10_000);
+          await fresh.promise;
+        }
+        return `identity-${identities}`;
+      },
+      { invalidate: async () => true }
+    );
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+      const answered = Promise.withResolvers<void>();
+      setTimeout(answered.resolve, 9_000);
+      await answered.promise;
+      return new Headers(init?.headers).get('authorization') === 'Bearer identity-1'
+        ? Response.json({ status: 'identity_rejected' }, { status: 401 })
+        : Response.json(issued(JSON.parse(init?.body as string) as MintRequest));
+    });
+    const tokens = createHttpServiceTokens({
+      stsUrl: 'https://sts.test',
+      getIdentityToken,
+      fetch: fetchFn as typeof fetch,
+    });
+    expect(await settle(tokens.get(WEB), HTTP_ATTEMPT_TIMEOUT_MS - 1)).toBe(
+      'header.payload.signature'
+    );
+    expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 });

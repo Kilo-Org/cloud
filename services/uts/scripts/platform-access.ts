@@ -8,7 +8,10 @@ import { z } from 'zod';
  *   every table in the database, hashes and emails included.
  * * It confirms that the Supabase API roles (`anon`, `authenticated`, `service_role`) hold no
  *   privilege on the identity-store schemas or anything in them, whether granted directly,
- *   through PUBLIC or through a role they inherit. A role that does not exist holds nothing.
+ *   through PUBLIC or through a role they inherit. It checks every role a platform role can
+ *   become with `SET ROLE` the same way, because a membership with `SET TRUE, INHERIT FALSE`
+ *   passes on no privilege until the session switches to that role. A role that does not exist
+ *   holds nothing.
  */
 
 export const PLATFORM_ROLES = ['anon', 'authenticated', 'service_role'] as const;
@@ -45,46 +48,61 @@ const PRESENT_ROLES = `
   SELECT rolname::text AS role FROM pg_roles WHERE rolname = ANY ($1::text[]) ORDER BY 1`;
 
 // The has_*_privilege functions count direct grants, PUBLIC grants, inherited roles and the
-// predefined data roles alike.
+// predefined data roles alike. `pg_has_role(..., 'SET')` is true for the role itself and for every
+// role it can switch to through a chain of memberships with the SET option. A privilege that the
+// platform role holds itself is reported once, without the role it could also switch to.
 const FINDINGS = `
   WITH platform AS (
     SELECT oid, rolname::text AS role FROM pg_roles WHERE rolname = ANY ($1::text[])
   ),
+  reachable AS (
+    SELECT platform.role, target.oid, target.rolname::text AS via, target.oid = platform.oid AS own
+    FROM platform
+    JOIN pg_roles AS target ON pg_has_role(platform.oid, target.oid, 'SET')
+  ),
   schemas AS (
     SELECT oid, nspname::text AS name FROM pg_namespace WHERE nspname = ANY ($2::text[])
+  ),
+  held AS (
+    SELECT reachable.role, reachable.via, reachable.own, finding.privilege
+    FROM reachable
+    CROSS JOIN LATERAL (
+      SELECT 'member of ' || data_role AS privilege
+      FROM unnest($3::text[]) AS data_role
+      WHERE pg_has_role(reachable.oid, data_role, 'USAGE')
+      UNION ALL
+      SELECT privilege || ' on schema ' || schemas.name
+      FROM schemas CROSS JOIN unnest(ARRAY['USAGE', 'CREATE']) AS privilege
+      WHERE has_schema_privilege(reachable.oid, schemas.oid, privilege)
+      UNION ALL
+      SELECT privilege || ' on ' || schemas.name || '.' || class.relname
+      FROM pg_class AS class
+      JOIN schemas ON schemas.oid = class.relnamespace
+      CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES',
+                              'TRIGGER']) AS privilege
+      WHERE class.relkind IN ('r', 'p', 'v', 'm', 'f')
+        AND (has_table_privilege(reachable.oid, class.oid, privilege)
+          OR (privilege IN ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
+            AND has_any_column_privilege(reachable.oid, class.oid, privilege)))
+      UNION ALL
+      SELECT privilege || ' on sequence ' || schemas.name || '.' || class.relname
+      FROM pg_class AS class
+      JOIN schemas ON schemas.oid = class.relnamespace
+      CROSS JOIN unnest(ARRAY['USAGE', 'SELECT', 'UPDATE']) AS privilege
+      WHERE class.relkind = 'S' AND has_sequence_privilege(reachable.oid, class.oid, privilege)
+      UNION ALL
+      SELECT 'EXECUTE on ' || procedure.oid::regprocedure::text
+      FROM pg_proc AS procedure
+      JOIN schemas ON schemas.oid = procedure.pronamespace
+      WHERE has_function_privilege(reachable.oid, procedure.oid, 'EXECUTE')
+    ) AS finding
   )
-  SELECT platform.role, finding.privilege
-  FROM platform
-  CROSS JOIN LATERAL (
-    SELECT 'member of ' || data_role AS privilege
-    FROM unnest($3::text[]) AS data_role
-    WHERE pg_has_role(platform.oid, data_role, 'USAGE')
-    UNION ALL
-    SELECT privilege || ' on schema ' || schemas.name
-    FROM schemas CROSS JOIN unnest(ARRAY['USAGE', 'CREATE']) AS privilege
-    WHERE has_schema_privilege(platform.oid, schemas.oid, privilege)
-    UNION ALL
-    SELECT privilege || ' on ' || schemas.name || '.' || class.relname
-    FROM pg_class AS class
-    JOIN schemas ON schemas.oid = class.relnamespace
-    CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES',
-                            'TRIGGER']) AS privilege
-    WHERE class.relkind IN ('r', 'p', 'v', 'm', 'f')
-      AND (has_table_privilege(platform.oid, class.oid, privilege)
-        OR (privilege IN ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
-          AND has_any_column_privilege(platform.oid, class.oid, privilege)))
-    UNION ALL
-    SELECT privilege || ' on sequence ' || schemas.name || '.' || class.relname
-    FROM pg_class AS class
-    JOIN schemas ON schemas.oid = class.relnamespace
-    CROSS JOIN unnest(ARRAY['USAGE', 'SELECT', 'UPDATE']) AS privilege
-    WHERE class.relkind = 'S' AND has_sequence_privilege(platform.oid, class.oid, privilege)
-    UNION ALL
-    SELECT 'EXECUTE on ' || procedure.oid::regprocedure::text
-    FROM pg_proc AS procedure
-    JOIN schemas ON schemas.oid = procedure.pronamespace
-    WHERE has_function_privilege(platform.oid, procedure.oid, 'EXECUTE')
-  ) AS finding
+  SELECT role, privilege || CASE WHEN own THEN '' ELSE ' through SET ROLE ' || via END AS privilege
+  FROM (
+    SELECT DISTINCT ON (role, privilege) role, privilege, via, own
+    FROM held
+    ORDER BY role, privilege, own DESC, via
+  ) AS first_path
   ORDER BY 1, 2`;
 
 export async function checkPlatformAccess(client: pg.Client): Promise<PlatformAccessReport> {

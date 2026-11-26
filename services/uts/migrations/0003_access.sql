@@ -1,12 +1,26 @@
 -- Privileges for the three Hyperdrive configs (design section 5.2).
 --
---   uts_app     USAGE on `uts`; table DML on the credential tables; INSERT on chosen audit columns
---               and SELECT on audit rows; SELECT and UPDATE on watermarks; the partition entry
---               point. No TRUNCATE, no DDL, no role changes.
+--   uts_app     USAGE on `uts`; table DML on the credential tables, except the gated ones below;
+--               INSERT on chosen audit columns and SELECT on audit rows; SELECT on watermarks and
+--               the guarded watermark move; the partition and long-transaction entry points. No
+--               TRUNCATE, no DDL, no role changes.
 --   uts_pat     USAGE on `uts` and EXECUTE on the two lookup functions; no table privileges, so a
 --               PAT login cannot read grants, sessions or codes.
 --   uts_reader  USAGE on `uts_read` and SELECT on its views, which leave out every hash, DPoP key,
 --               public key and client address. Its logins default to read-only transactions.
+--
+-- Gated rows (design section 5.11): the app role writes no gate pass, PAT, org bot key, CI trust
+-- policy or third-party consent, and cannot approve a device code. A gated row comes only from a
+-- SECURITY DEFINER statement that writes its pass already consumed in the same statement. This
+-- migration has the write steps for PATs and org bot keys only (`uts.write_gated_pat`,
+-- `uts.write_gated_bot_key` in 0001_identity.sql), and no SECURITY DEFINER entry point calls them
+-- yet. The entry points for those two, and the write paths for CI trust policies, third-party
+-- consents and device approval, arrive in later pull requests of this stack; until then none of
+-- these flows has a write path. The app role may still revoke, flag, keep, deny and record use,
+-- through the column grants below, which leave out every column that names the holder, the hash,
+-- the scope, the lifetime or the pass, so an update cannot turn a row into a different
+-- credential; a row in a final state keeps it, and a flagged bot key becomes only kept or revoked
+-- (`uts.refuse_reopening`).
 
 CREATE SCHEMA uts_read AUTHORIZATION uts_owner;
 
@@ -28,35 +42,59 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   uts.passkey_credentials,
   uts.browser_sessions,
   uts.device_sessions,
-  uts.gate_passes,
   uts.step_ups,
   uts.refresh_grants,
   uts.third_party_clients,
-  uts.third_party_consents,
   uts.third_party_grant_families,
   uts.third_party_refresh_tokens,
   uts.authorization_codes,
-  uts.device_codes,
   uts.email_codes,
   uts.email_code_limits,
   uts.tickets,
-  uts.personal_access_tokens,
-  uts.org_bot_keys,
-  uts.ci_trust_policies,
   uts.sandbox_grants,
   uts.revocations,
   uts.notices
 TO uts_app;
 
+GRANT SELECT ON uts.gate_passes TO uts_app;
+GRANT SELECT, DELETE ON
+  uts.personal_access_tokens,
+  uts.org_bot_keys,
+  uts.ci_trust_policies,
+  uts.third_party_consents,
+  uts.device_codes
+TO uts_app;
+GRANT UPDATE (
+  last_used_at, last_used_ip, last_used_asn, last_used_country, status, revoked_at, revoke_reason
+) ON uts.personal_access_tokens TO uts_app;
+GRANT UPDATE (last_used_at, status, flagged_at, kept_by, kept_at, revoked_at, revoked_by)
+  ON uts.org_bot_keys TO uts_app;
+GRANT UPDATE (status, revoked_at, updated_at) ON uts.ci_trust_policies TO uts_app;
+GRANT UPDATE (status, revoked_at) ON uts.third_party_consents TO uts_app;
+-- A device authorization request writes a pending code; polling, denial and the exchange update
+-- it. Approval needs `gate_pass_id` and `approved_at`, which only a gated statement writes.
+GRANT INSERT (
+  device_code_hash, user_code_hash, client_id, scopes, expires_at, poll_interval_seconds,
+  user_agent, client_ip, asn, country, city
+) ON uts.device_codes TO uts_app;
+GRANT UPDATE (last_polled_at, poll_interval_seconds, status, account_id, denied_at, consumed_at)
+  ON uts.device_codes TO uts_app;
+
 GRANT SELECT, INSERT (event_id, event_type, account_id, event) ON uts.audit_events TO uts_app;
-GRANT SELECT, UPDATE (last_txid, last_id, last_seq, updated_at) ON uts.audit_relay_watermarks
-  TO uts_app;
-GRANT EXECUTE ON FUNCTION uts.maintain_audit_partitions() TO uts_app;
+GRANT SELECT ON uts.audit_relay_watermarks TO uts_app;
+GRANT EXECUTE ON FUNCTION
+  uts.advance_audit_watermark(smallint, bigint, xid8, bigint, bigint),
+  uts.maintain_audit_partitions(),
+  uts.end_long_transactions()
+TO uts_app;
 
 -- The two lookups below are the only statements the PAT config runs. Each is one probe of the
 -- unique index on the token hash (plus the owner account's primary key for a PAT), and only a
 -- live credential comes back; the caller treats no row as an unknown token. The bodies use `$1`
--- rather than the parameter name so `test/db/index-probes.test.ts` can plan the exact body.
+-- rather than the parameter name so `test/db/index-probes.test.ts` can plan the exact body. They
+-- compare expiry with `statement_timestamp()`, not `now()`: `now()` is the start of the
+-- transaction, so a lookup late in a long transaction would still accept a credential that has
+-- since expired.
 
 -- A PAT of a blocked account finds nothing, so a block stops every PAT at once.
 CREATE FUNCTION uts.lookup_pat(p_token_hash bytea)
@@ -78,12 +116,13 @@ AS $$
   JOIN uts.accounts AS account ON account.id = pat.account_id
   WHERE pat.token_hash = $1
     AND pat.status = 'active'
-    AND pat.expires_at > now()
+    AND pat.expires_at > statement_timestamp()
     AND account.status = 'active'
 $$;
 
--- A flagged key works until 7 days after it was flagged; `valid_until` is the earlier of that
--- cutoff and the key's expiry.
+-- A flagged key works until 168 hours (7 days) after it was flagged; `valid_until` is the earlier
+-- of that cutoff and the key's expiry. Hours, because the length of 7 calendar days depends on the
+-- session's time zone across a daylight-saving change.
 CREATE FUNCTION uts.lookup_bot_key(p_token_hash bytea)
 RETURNS TABLE (
   bot_key_id uuid,
@@ -105,15 +144,16 @@ AS $$
     bot_key.scope,
     bot_key.status,
     CASE bot_key.status
-      WHEN 'flagged' THEN least(bot_key.expires_at, bot_key.flagged_at + interval '7 days')
+      WHEN 'flagged' THEN least(bot_key.expires_at, bot_key.flagged_at + interval '168 hours')
       ELSE bot_key.expires_at
     END
   FROM uts.org_bot_keys AS bot_key
   WHERE bot_key.token_hash = $1
-    AND bot_key.expires_at > now()
+    AND bot_key.expires_at > statement_timestamp()
     AND (
       bot_key.status IN ('active', 'kept')
-      OR (bot_key.status = 'flagged' AND bot_key.flagged_at + interval '7 days' > now())
+      OR (bot_key.status = 'flagged'
+        AND bot_key.flagged_at + interval '168 hours' > statement_timestamp())
     )
 $$;
 

@@ -296,9 +296,7 @@ async function runShared(): Promise<Json> {
     })
   );
   const { exchangedClaims, actOk } = claimsCheck(answers);
-  const expMatchesBase = answers
-    .filter(answer => answer.status === 'ok')
-    .every(tokenExpOk);
+  const expMatchesBase = answers.filter(answer => answer.status === 'ok').every(tokenExpOk);
   const checks = sharedChecks({
     invocations,
     served,

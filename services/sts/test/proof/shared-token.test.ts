@@ -329,7 +329,9 @@ describe('shared exchanged token (D10)', () => {
         stored.set(key, value);
       },
     };
-    const instance = new SharedExchangedToken(cache, { settings: { jitterMs: 1, deadlineMs: 400 } });
+    const instance = new SharedExchangedToken(cache, {
+      settings: { jitterMs: 1, deadlineMs: 400 },
+    });
     const first = await instance.get(BASE_TOKEN, AUDIENCE, exchange);
     expect(first).toMatchObject({ status: 'failed', detail: 'no token before the deadline' });
     expect(first.report.timeToTokenMs).toBeLessThan(600);

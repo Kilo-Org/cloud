@@ -75,7 +75,9 @@ describe('served token exp check', () => {
   });
 
   it('fails a served answer without an exchanged exp', () => {
-    expect(tokenExpOk({ source: 'cache', baseExp: now + 7200, exchangedExp: null, nowSeconds: now })).toBe(false);
+    expect(
+      tokenExpOk({ source: 'cache', baseExp: now + 7200, exchangedExp: null, nowSeconds: now })
+    ).toBe(false);
   });
 });
 

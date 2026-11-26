@@ -470,17 +470,38 @@ const accountSecurityLabelSchema = nonEmptyStringSchema
   .max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH)
   .nullable();
 
+/** Double quote marks, straight and curly, and guillemets and corner brackets. */
+const QUOTE_MARKS = /["“”„‟«»「」『』]/g;
+
+/**
+ * A name with every double quote mark replaced by an apostrophe. The copy
+ * that repeats a name a device chose for itself quotes it, and a quote mark
+ * inside the name could close that quote early and add words that read as
+ * Kilo's own.
+ */
+export function replaceQuoteMarks(name: string): string {
+  return name.replace(QUOTE_MARKS, "'");
+}
+
 /**
  * Who took the action an account-security notice reports. The owner's own
  * request carries the device and approximate location, each null when the
- * request did not say; an action by Kilo support carries nothing about the
- * staff member's request.
+ * request did not say. A device sign-in whose requesting device named itself
+ * carries that name alone, which the push repeats quoted and attributed to
+ * the device, with no quote mark inside it. An action by Kilo support carries
+ * nothing about the staff member's request.
  */
 export const accountSecurityOriginSchema = z.discriminatedUnion('actor', [
   z.object({
     actor: z.literal('owner'),
     device: accountSecurityLabelSchema,
     location: accountSecurityLabelSchema,
+  }),
+  z.object({
+    actor: z.literal('self_named_device'),
+    name: nonEmptyStringSchema
+      .max(ACCOUNT_SECURITY_LABEL_MAX_LENGTH)
+      .refine(name => replaceQuoteMarks(name) === name, 'name contains a quote mark'),
   }),
   z.object({ actor: z.literal('support') }),
 ]);

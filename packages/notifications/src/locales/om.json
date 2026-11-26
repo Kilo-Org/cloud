@@ -80,6 +80,7 @@
         "device": "{{device}} irraa. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
         "location": "{{location}} bira. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
         "unknown": "Isin miti? Amma nageenya herrega keessanii ilaalaa.",
+        "selfNamedDevice": "Meeshaa ofiin \"{{name}}\" jedhee of moggaase irraa. Isin miti? Amma nageenya herrega keessanii ilaalaa.",
         "support": "Deeggarsa Kilo’n raawwatame. Yoo kana hin gaafanne, deeggarsa qunnamaa."
       }
     }

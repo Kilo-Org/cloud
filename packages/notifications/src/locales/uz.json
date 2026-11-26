@@ -80,6 +80,7 @@
         "device": "{{device}} qurilmasidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
         "location": "{{location}} yaqinidan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
         "unknown": "Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
+        "selfNamedDevice": "O‘zini \"{{name}}\" deb atagan qurilmadan. Siz emasmidingiz? Hisobingiz xavfsizligini hozir tekshiring.",
         "support": "Kilo yordam xizmati tomonidan bajarildi. Agar buni so‘ramagan bo‘lsangiz, yordam xizmatiga murojaat qiling."
       }
     }

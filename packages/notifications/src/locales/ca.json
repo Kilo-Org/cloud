@@ -80,6 +80,7 @@
         "device": "Des de {{device}}. No has estat tu? Revisa ara la seguretat del teu compte.",
         "location": "A prop de {{location}}. No has estat tu? Revisa ara la seguretat del teu compte.",
         "unknown": "No has estat tu? Revisa ara la seguretat del teu compte.",
+        "selfNamedDevice": "Des d'un dispositiu que es va anomenar a si mateix «{{name}}». No has estat tu? Revisa ara la seguretat del teu compte.",
         "support": "Ho ha fet el suport de Kilo. Si no ho has demanat, contacta amb el suport."
       }
     }

@@ -80,6 +80,7 @@
         "device": "Desde {{device}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
         "location": "Preto de {{location}}. Non fuches ti? Revisa agora a seguranza da túa conta.",
         "unknown": "Non fuches ti? Revisa agora a seguranza da túa conta.",
+        "selfNamedDevice": "Desde un dispositivo que se chamou a si mesmo «{{name}}». Non fuches ti? Revisa agora a seguranza da túa conta.",
         "support": "Fíxoo o soporte de Kilo. Se non o pediches, contacta co soporte."
       }
     }

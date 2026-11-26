@@ -80,6 +80,7 @@
         "device": "{{device}} gailutik. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
         "location": "{{location}} inguruan. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
         "unknown": "Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
+        "selfNamedDevice": "Bere burua \"{{name}}\" izendatu zuen gailu batetik. Ez zara zu izan? Berrikusi orain zure kontuaren segurtasuna.",
         "support": "Kiloren laguntza-taldeak egin du. Ez baduzu eskatu, jarri harremanetan laguntza-taldearekin."
       }
     }

@@ -80,6 +80,7 @@
         "device": "Dari {{device}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
         "location": "Di dekat {{location}}. Bukan Anda? Tinjau keamanan akun Anda sekarang.",
         "unknown": "Bukan Anda? Tinjau keamanan akun Anda sekarang.",
+        "selfNamedDevice": "Dari perangkat yang menamai dirinya \"{{name}}\". Bukan Anda? Tinjau keamanan akun Anda sekarang.",
         "support": "Dilakukan oleh dukungan Kilo. Jika Anda tidak memintanya, hubungi dukungan."
       }
     }

@@ -80,6 +80,7 @@
         "device": "Ó {{device}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
         "location": "Gar do {{location}}. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
         "unknown": "Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
+        "selfNamedDevice": "Ó ghléas a thug \"{{name}}\" air féin. Nárbh tusa a bhí ann? Athbhreithnigh slándáil do chuntais anois.",
         "support": "Rinne tacaíocht Kilo é seo. Mura ndearna tú é a iarraidh, déan teagmháil le tacaíocht."
       }
     }

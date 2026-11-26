@@ -80,6 +80,7 @@
         "device": "Sa {{device}}. Niste vi? Odmah provjerite sigurnost svog računa.",
         "location": "U blizini {{location}}. Niste vi? Odmah provjerite sigurnost svog računa.",
         "unknown": "Niste vi? Odmah provjerite sigurnost svog računa.",
+        "selfNamedDevice": "Sa uređaja koji se sam nazvao \"{{name}}\". Niste vi? Odmah provjerite sigurnost svog računa.",
         "support": "Uradila Kilo podrška. Ako ovo niste tražili, kontaktirajte podršku."
       }
     }

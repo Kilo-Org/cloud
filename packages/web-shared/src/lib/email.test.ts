@@ -15,7 +15,9 @@ import {
   sendAccountDeletionCompletedEmail,
   sendAccountDeletionSupportNotification,
   sendApiKeyResetEmail,
+  sendDeviceSessionRevokedEmail,
   sendDeviceSignInApprovedEmail,
+  sendNewSignInMethodEmail,
   sendKiloPassDuplicateCardCanceledEmail,
   sendPasskeyAddedEmail,
   sendSignInResetBySupportEmail,
@@ -34,6 +36,7 @@ import fs from 'fs';
 import path from 'path';
 import { captureException } from '@sentry/nextjs';
 import { sendViaMailgun } from '@kilocode/web-shared/lib/email-mailgun';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
@@ -525,6 +528,16 @@ describe('security notice emails', () => {
     expect(text).not.toContain('If this was you');
   });
 
+  it('says a support token reset leaves browsers and devices signed in', async () => {
+    await sendApiKeyResetEmail('owner@example.com', supportRequest);
+
+    const text = sentText();
+    expect(text).toContain(
+      'Every earlier API token stopped working. Browsers and signed-in devices stay signed in.'
+    );
+    expect(text).not.toContain('were signed out');
+  });
+
   it('describes the owner’s own reset by its address, location and browser', async () => {
     await sendApiKeyResetEmail('owner@example.com', ownerRequest);
 
@@ -532,8 +545,56 @@ describe('security notice emails', () => {
     expect(text).toContain('IP address: 203.0.113.7');
     expect(text).toContain('Approximate location: Berlin, DE');
     expect(text).toContain('Browser: Firefox on Linux');
+    expect(text).toContain(
+      'Every earlier token stopped working, and every browser, the app, and the CLI were signed out.'
+    );
     expect(text).toContain('If this was you, no action is needed.');
+    expect(text).not.toContain('stay signed in');
     expect(text).not.toContain('Kilo support made this change');
+  });
+
+  it('tells the owner to remove a new sign-in method that replaced nothing', async () => {
+    await sendNewSignInMethodEmail(
+      'owner@example.com',
+      'WorkOS',
+      { email: 'owner@example.com', displayName: null },
+      null,
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'WorkOS was added as a sign-in method for your Kilo Code account. If this was you, no action is needed.'
+    );
+    expect(text).toContain(`If this was not you: remove this sign-in method at ${NEXTAUTH_URL}`);
+    expect(text).not.toContain('It replaced');
+  });
+
+  it('names the sign-in methods a link replaced and points to support', async () => {
+    await sendNewSignInMethodEmail(
+      'owner@example.com',
+      'WorkOS',
+      { email: 'owner@example.com', displayName: null },
+      ['Google', 'GitHub'],
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'WorkOS was added as a sign-in method for your Kilo Code account. It replaced: Google, GitHub. Every browser was signed out. If this was you, no action is needed.'
+    );
+    expect(text).toContain(
+      `If this was not you: contact ${SUPPORT_EMAIL} to remove this sign-in method, which you cannot remove yourself`
+    );
+    expect(text).not.toContain('remove this sign-in method at');
+  });
+
+  it('names an unidentified signed-out device as the requester line does', async () => {
+    await sendDeviceSessionRevokedEmail('owner@example.com', null, ownerRequest);
+
+    const text = sentText();
+    expect(text).toContain('Signed-out device: Unidentified');
+    expect(text).not.toContain('Signed-out device: A device');
   });
 
   it('tells the owner how to get back in after a support reset', async () => {
@@ -570,6 +631,20 @@ describe('security notice emails', () => {
       'Requesting device: named itself &quot;Kilo security check no action needed eve…&quot;'
     );
     expect(text).not.toContain('everything');
+  });
+
+  it('replaces a quote mark in a name the requesting device chose', async () => {
+    await sendDeviceSignInApprovedEmail(
+      'owner@example.com',
+      { client: { kind: 'self_named', name: 'Kilo CLI" verified by Kilo' }, ip: null },
+      ownerRequest
+    );
+
+    const text = sentText();
+    expect(text).toContain(
+      'Requesting device: named itself &quot;Kilo CLI&#039; verified by Kilo&quot;'
+    );
+    expect(text).not.toContain('CLI&quot;');
   });
 
   it('names a recognised requesting client plainly, with a space after the article', async () => {

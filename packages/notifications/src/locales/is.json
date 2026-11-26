@@ -80,6 +80,7 @@
         "device": "Frá {{device}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
         "location": "Nálægt {{location}}. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
         "unknown": "Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
+        "selfNamedDevice": "Frá tæki sem kallaði sig „{{name}}“. Varst þetta ekki þú? Farðu yfir öryggi reikningsins núna.",
         "support": "Gert af þjónustu Kilo. Ef þú baðst ekki um þetta skaltu hafa samband við þjónustuna."
       }
     }

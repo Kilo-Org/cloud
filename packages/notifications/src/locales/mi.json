@@ -80,6 +80,7 @@
         "device": "Mai i {{device}}. Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
         "location": "E tata ana ki {{location}}. Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
         "unknown": "Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
+        "selfNamedDevice": "Mai i tētahi pūrere i tapa i a ia anō ko \"{{name}}\". Ehara i a koe? Arotakehia te haumaru o tō pūkete ināianei.",
         "support": "Nā te tautoko o Kilo i mahi. Ki te kore koe i tono, whakapā atu ki te tautoko."
       }
     }

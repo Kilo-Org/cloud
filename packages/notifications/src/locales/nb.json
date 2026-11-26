@@ -80,6 +80,7 @@
         "device": "Fra {{device}}. Var det ikke deg? Gå gjennom kontosikkerheten nå.",
         "location": "Nær {{location}}. Var det ikke deg? Gå gjennom kontosikkerheten nå.",
         "unknown": "Var det ikke deg? Gå gjennom kontosikkerheten nå.",
+        "selfNamedDevice": "Fra en enhet som kalte seg selv «{{name}}». Var det ikke deg? Gå gjennom kontosikkerheten nå.",
         "support": "Utført av Kilo-støtte. Hvis du ikke ba om dette, kontakt støtte."
       }
     }

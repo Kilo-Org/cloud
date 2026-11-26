@@ -21,7 +21,7 @@ import { clientIpFromHeaders } from '@kilocode/web-shared/lib/admin/admin-access
 import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
-  quotedClientName,
+  selfNamedClientName,
   sendApiKeyResetEmail,
   sendBrowserSessionsRevokedEmail,
   sendDeviceSessionRevokedEmail,
@@ -58,6 +58,11 @@ export type SecurityNoticeEvent =
       linkedIdentity: { email: string; displayName?: string | null };
       /** When the link row was written; a later re-link after an unlink is a new event. */
       linkedAt: Date;
+      /**
+       * The other sign-in methods the link removed, as an SSO link does;
+       * absent when it removed none.
+       */
+      replacedProviders?: readonly [AuthProviderId, ...AuthProviderId[]];
     }
   | { type: 'sign_in_method_unlinked'; provider: AuthProviderId; actingSessionId: ActingSessionId }
   | {
@@ -243,6 +248,7 @@ function sendSecurityNoticeEmail(
         email,
         AUTH_PROVIDER_DISPLAY_NAMES[event.provider],
         event.linkedIdentity,
+        replacedMethodNames(event.replacedProviders),
         request
       );
     case 'sign_in_method_unlinked':
@@ -274,6 +280,17 @@ function sendSecurityNoticeEmail(
   }
 }
 
+function replacedMethodNames(
+  providers: readonly [AuthProviderId, ...AuthProviderId[]] | undefined
+): readonly [string, ...string[]] | null {
+  if (providers === undefined) return null;
+  const [first, ...rest] = providers;
+  return [
+    AUTH_PROVIDER_DISPLAY_NAMES[first],
+    ...rest.map(provider => AUTH_PROVIDER_DISPLAY_NAMES[provider]),
+  ];
+}
+
 function pushLabel(value: string | null): string | null {
   const label = value?.trim().slice(0, PUSH_LABEL_MAX_LENGTH).trim();
   return label ? label : null;
@@ -299,12 +316,14 @@ function pushOrigin(
   }
   const { requester } = event;
   switch (requester.kind) {
-    case 'self_named':
-      return {
-        actor: 'owner',
-        device: pushLabel(quotedClientName(requester.name)),
-        location: null,
-      };
+    case 'self_named': {
+      // The push quotes the name and attributes it to the device, as the
+      // email does; the name holds no quote mark that could close the quote.
+      const name = selfNamedClientName(requester.name);
+      return name
+        ? { actor: 'self_named_device', name }
+        : { actor: 'owner', device: null, location: null };
+    }
     case 'recognised':
       return { actor: 'owner', device: pushLabel(requester.label), location: null };
     case 'unidentified':

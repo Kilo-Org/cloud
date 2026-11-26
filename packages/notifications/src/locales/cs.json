@@ -80,6 +80,7 @@
         "device": "Ze zařízení {{device}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
         "location": "Poblíž {{location}}. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
         "unknown": "Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
+        "selfNamedDevice": "Ze zařízení, které se samo nazvalo „{{name}}“. Nebyli jste to vy? Zkontrolujte hned zabezpečení svého účtu.",
         "support": "Provedla podpora Kilo. Pokud jste o to nežádali, kontaktujte podporu."
       }
     }

@@ -80,6 +80,7 @@
         "device": "Depuis {{device}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
         "location": "Près de {{location}}. Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
         "unknown": "Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
+        "selfNamedDevice": "Depuis un appareil qui s'est nommé lui-même « {{name}} ». Ce n'était pas vous ? Vérifiez dès maintenant la sécurité de votre compte.",
         "support": "Effectué par l'assistance Kilo. Si vous ne l'avez pas demandé, contactez l'assistance."
       }
     }

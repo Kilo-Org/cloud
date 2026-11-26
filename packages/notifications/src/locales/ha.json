@@ -80,6 +80,7 @@
         "device": "Daga {{device}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
         "location": "Kusa da {{location}}. Ba kai ba ne? Duba tsaron asusunka yanzu.",
         "unknown": "Ba kai ba ne? Duba tsaron asusunka yanzu.",
+        "selfNamedDevice": "Daga na'urar da ta kira kanta \"{{name}}\". Ba kai ba ne? Duba tsaron asusunka yanzu.",
         "support": "Tallafin Kilo ne ya yi wannan. Idan ba kai ka nema ba, tuntuɓi tallafi."
       }
     }

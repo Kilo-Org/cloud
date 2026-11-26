@@ -80,6 +80,7 @@
         "device": "Depi {{device}}. Se pa ou? Verifye sekirite kont ou kounye a.",
         "location": "Toupre {{location}}. Se pa ou? Verifye sekirite kont ou kounye a.",
         "unknown": "Se pa ou? Verifye sekirite kont ou kounye a.",
+        "selfNamedDevice": "Depi yon aparèy ki rele tèt li \"{{name}}\". Se pa ou? Verifye sekirite kont ou kounye a.",
         "support": "Se sipò Kilo ki fè sa. Si ou pa t mande sa, kontakte sipò."
       }
     }

@@ -80,6 +80,7 @@
         "device": "Z {{device}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
         "location": "W pobliżu {{location}}. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
         "unknown": "To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
+        "selfNamedDevice": "Z urządzenia, które nazwało się „{{name}}”. To nie Ty? Sprawdź teraz bezpieczeństwo swojego konta.",
         "support": "Wykonane przez pomoc techniczną Kilo. Jeśli to nie była Twoja prośba, skontaktuj się z pomocą techniczną."
       }
     }

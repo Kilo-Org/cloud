@@ -80,6 +80,7 @@
         "device": "O {{device}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
         "location": "Ger {{location}}. Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
         "unknown": "Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
+        "selfNamedDevice": "O ddyfais a alwodd ei hun yn \"{{name}}\". Nid chi? Adolygwch ddiogelwch eich cyfrif nawr.",
         "support": "Gwnaed gan gymorth Kilo. Os na wnaethoch ofyn am hyn, cysylltwch â chymorth."
       }
     }

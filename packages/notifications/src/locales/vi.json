@@ -80,6 +80,7 @@
         "device": "Từ {{device}}. Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
         "location": "Gần {{location}}. Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
         "unknown": "Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
+        "selfNamedDevice": "Từ một thiết bị tự đặt tên là \"{{name}}\". Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
         "support": "Do bộ phận hỗ trợ Kilo thực hiện. Nếu bạn không yêu cầu, hãy liên hệ bộ phận hỗ trợ."
       }
     }

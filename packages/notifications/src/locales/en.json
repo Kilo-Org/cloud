@@ -80,6 +80,7 @@
         "device": "From {{device}}. Not you? Review your account security now.",
         "location": "Near {{location}}. Not you? Review your account security now.",
         "unknown": "Not you? Review your account security now.",
+        "selfNamedDevice": "From a device that named itself \"{{name}}\". Not you? Review your account security now.",
         "support": "Done by Kilo support. If you did not ask for this, contact support."
       }
     }

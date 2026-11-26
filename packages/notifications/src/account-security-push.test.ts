@@ -24,6 +24,8 @@ const request = {
 const owner = (device: string | null, location: string | null) =>
   ({ actor: 'owner', device, location }) as const;
 
+const selfNamed = (name: string) => ({ actor: 'self_named_device', name }) as const;
+
 const SHIPPED_LOCALES = readdirSync(join(dirname(fileURLToPath(import.meta.url)), 'locales'))
   .filter(file => file.endsWith('.json') && file !== 'en.json')
   .map(file => file.slice(0, -'.json'.length));
@@ -64,6 +66,17 @@ describe('account-security dispatch request', () => {
       internalDispatchRequestSchema.safeParse({ ...request, idempotencyKey: '' }).success
     ).toBe(false);
   });
+
+  it('accepts a self-named device origin only without a quote mark in its name', () => {
+    const origin = selfNamed("Kilo CLI' verified by Kilo");
+    expect(internalDispatchRequestSchema.parse({ ...request, origin })).toMatchObject({ origin });
+    for (const name of ['Kilo CLI" verified by Kilo', 'Kilo “CLI”', '', 'x'.repeat(121)]) {
+      expect(
+        internalDispatchRequestSchema.safeParse({ ...request, origin: selfNamed(name) }).success,
+        name
+      ).toBe(false);
+    }
+  });
 });
 
 describe('account-security push', () => {
@@ -87,6 +100,10 @@ describe('account-security push', () => {
       accountSecurityPushCopy({ event: 'new_sign_in', origin: owner(null, 'Oslo, NO') }),
       accountSecurityPushCopy({ event: 'new_sign_in', origin: owner(null, null) }),
       accountSecurityPushCopy({ event: 'api_key_reset', origin: { actor: 'support' } }),
+      accountSecurityPushCopy({
+        event: 'device_sign_in_approved',
+        origin: selfNamed('Kilo security check'),
+      }),
     ].map(copy => copy.body);
 
     expect(bodies).toEqual([
@@ -95,6 +112,7 @@ describe('account-security push', () => {
       'Near Oslo, NO. Not you? Review your account security now.',
       'Not you? Review your account security now.',
       'Done by Kilo support. If you did not ask for this, contact support.',
+      'From a device that named itself "Kilo security check". Not you? Review your account security now.',
     ]);
   });
 
@@ -115,7 +133,11 @@ describe('account-security push', () => {
   it('renders its own translated title and body for every event in every shipped locale', () => {
     expect(SHIPPED_LOCALES.length).toBeGreaterThan(80);
     for (const event of ACCOUNT_SECURITY_EVENTS) {
-      for (const origin of [owner('Edge on Windows', 'Rome, IT'), { actor: 'support' } as const]) {
+      for (const origin of [
+        owner('Edge on Windows', 'Rome, IT'),
+        selfNamed('Edge Helper'),
+        { actor: 'support' } as const,
+      ]) {
         const copy = accountSecurityPushCopy({ event, origin });
         const titleKey = pushTitleCatalogKey(copy.i18nKey);
         const bodyKey = pushBodyCatalogKey(copy.i18nKey);
@@ -129,6 +151,9 @@ describe('account-security push', () => {
           if (origin.actor === 'owner') {
             expect(body, `${locale} ${event} body`).toContain('Edge on Windows');
             expect(body, `${locale} ${event} body`).toContain('Rome, IT');
+          }
+          if (origin.actor === 'self_named_device') {
+            expect(body, `${locale} ${event} self-named body`).toContain('Edge Helper');
           }
         }
       }

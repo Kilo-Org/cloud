@@ -80,6 +80,7 @@
         "device": "Site na {{device}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
         "location": "Nso {{location}}. Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
         "unknown": "Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
+        "selfNamedDevice": "Site na ngwaọrụ kpọrọ onwe ya \"{{name}}\". Ọ bụghị gị? Lelee nchekwa akaụntụ gị ugbu a.",
         "support": "Nkwado Kilo mere nke a. Ọ bụrụ na ịrịọghị ya, kpọtụrụ nkwado."
       }
     }

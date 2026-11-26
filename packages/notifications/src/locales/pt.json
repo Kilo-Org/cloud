@@ -80,6 +80,7 @@
         "device": "A partir de {{device}}. Não foi você? Reveja agora a segurança da sua conta.",
         "location": "Perto de {{location}}. Não foi você? Reveja agora a segurança da sua conta.",
         "unknown": "Não foi você? Reveja agora a segurança da sua conta.",
+        "selfNamedDevice": "A partir de um dispositivo que se identificou como \"{{name}}\". Não foi você? Reveja agora a segurança da sua conta.",
         "support": "Feito pelo suporte da Kilo. Se não pediu isto, contacte o suporte."
       }
     }

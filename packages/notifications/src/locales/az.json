@@ -80,6 +80,7 @@
         "device": "{{device}} cihazından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
         "location": "{{location}} yaxınlığından. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
         "unknown": "Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
+        "selfNamedDevice": "Özünü \"{{name}}\" adlandıran cihazdan. Siz deyilsiniz? Hesabınızın təhlükəsizliyini indi yoxlayın.",
         "support": "Kilo dəstəyi tərəfindən edildi. Bunu istəməmisinizsə, dəstəklə əlaqə saxlayın."
       }
     }

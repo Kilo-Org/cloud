@@ -213,6 +213,7 @@ import {
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+import type * as EmailModule from '@kilocode/web-shared/lib/email';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -267,6 +268,15 @@ jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
 }));
 
+jest.mock('@kilocode/web-shared/lib/email', () => ({
+  ...jest.requireActual<typeof EmailModule>('@kilocode/web-shared/lib/email'),
+  sendNewSignInMethodEmail: jest.fn(async () => ({ sent: true })),
+}));
+
+const mockSendNewSignInMethodEmail = jest.mocked(
+  jest.requireMock<typeof EmailModule>('@kilocode/web-shared/lib/email').sendNewSignInMethodEmail
+);
+
 // Account deletion purges the deleted user's pending cloud-agent objects from
 // R2 before it drops the ledger rows; keep that off the network in tests.
 const mockR2Send = jest.fn(async (_command: { input: { Key?: string } }) => ({}));
@@ -300,6 +310,7 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   beforeEach(() => {
     mockCapture.mockReset();
+    mockSendNewSignInMethodEmail.mockClear();
   });
 
   afterEach(async () => {
@@ -1797,6 +1808,9 @@ describe('User', () => {
       expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
       expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
+      // The account had no other sign-in method, so the notice names none.
+      expect(mockSendNewSignInMethodEmail).toHaveBeenCalledTimes(1);
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toBeNull();
 
       // Signing in again with the same WorkOS profile is not a new link.
       await createOrUpdateUser(
@@ -1857,6 +1871,45 @@ describe('User', () => {
       expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos-relink');
       // The replaced profile is a new link, so the owner hears of it.
       expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
+      // A stale WorkOS row is the same method, not one the link replaced.
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toBeNull();
+    });
+
+    it('names the sign-in methods an SSO link replaced', async () => {
+      const existingUser = await insertTestUser({ google_user_email: 'sso-replace@example.com' });
+      const providerRow = (provider: AuthProviderId, providerAccountId: string) => ({
+        kilo_user_id: existingUser.id,
+        provider,
+        provider_account_id: providerAccountId,
+        email: existingUser.google_user_email,
+        avatar_url: 'https://example.com/avatar.png',
+        hosted_domain: 'example.com',
+      });
+      await db
+        .insert(user_auth_provider)
+        .values([providerRow('google', 'google-sso-replace'), providerRow('github', 'gh-sso')]);
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: existingUser.google_user_email,
+          google_user_name: 'SSO Replace',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-sso-replace',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSendNewSignInMethodEmail).toHaveBeenCalledTimes(1);
+      expect(mockSendNewSignInMethodEmail.mock.calls[0]?.[3]).toEqual(['GitHub', 'Google']);
+      expect(await linkNoticeKeys(existingUser.id)).toHaveLength(1);
+      const providers = await db.query.user_auth_provider.findMany({
+        where: eq(user_auth_provider.kilo_user_id, existingUser.id),
+      });
+      expect(providers.map(row => row.provider)).toEqual(['workos']);
     });
 
     it('returns deferredSignInEvent when deferSignInAnalytics is true and user is existing', async () => {

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
+import { replaceQuoteMarks } from '@kilocode/notifications/schemas';
 import type { Organization } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -433,10 +434,43 @@ function actorNoticeVars(request: SecurityNoticeRequest): TemplateVars {
     : { actor_note: 'If this was you, no action is needed.', not_you_lead: 'If this was not you:' };
 }
 
+/**
+ * The first paragraph's addition and the "If this was not you" step of a
+ * new sign-in method notice. A link that replaced the account's other sign-in
+ * methods names them and the browser sign-out it caused, and points to
+ * support: the owner cannot remove the replacing method themselves.
+ */
+function newSignInMethodReplacementVars(
+  replacedMethodNames: readonly [string, ...string[]] | null
+): TemplateVars {
+  const profileLink = appPageLink('/profile').html;
+  const supportEmail = escapeHtml(SUPPORT_EMAIL);
+  const resetStep = `reset your API token at ${profileLink}, which signs out every browser, the app, and the CLI`;
+  if (replacedMethodNames === null) {
+    return {
+      replaced_note: '',
+      not_you_steps: new RawHtml(
+        `remove this sign-in method at ${appPageLink('/connected-accounts').html}, ${resetStep}, and contact ${supportEmail}.`
+      ),
+    };
+  }
+  return {
+    replaced_note: ` It replaced: ${replacedMethodNames.join(', ')}. Every browser was signed out.`,
+    not_you_steps: new RawHtml(
+      `contact ${supportEmail} to remove this sign-in method, which you cannot remove yourself, and ${resetStep}.`
+    ),
+  };
+}
+
+/**
+ * `replacedMethodNames` are the display names of the sign-in methods the link
+ * removed, or null when it removed none.
+ */
 export async function sendNewSignInMethodEmail(
   email: string,
   providerName: string,
   linkedIdentity: { email: string; displayName?: string | null },
+  replacedMethodNames: readonly [string, ...string[]] | null,
   request: SecurityNoticeRequest
 ): Promise<SendResult> {
   const displayName = linkedIdentity.displayName?.trim();
@@ -445,6 +479,7 @@ export async function sendNewSignInMethodEmail(
     templateName: 'newSignInMethod',
     templateVars: {
       ...securityNoticeVars(email, request),
+      ...newSignInMethodReplacementVars(replacedMethodNames),
       provider_name: providerName,
       linked_identity: displayName
         ? `${displayName} (${linkedIdentity.email})`
@@ -517,15 +552,19 @@ const SELF_NAMED_CLIENT_MAX_LENGTH = 40;
 
 /**
  * A name the requesting device chose for itself, cut to a short length and
- * quoted so it never reads as Kilo's own words.
+ * with every double quote mark replaced, so the quotes a notice puts around
+ * it cannot be closed early by the name itself.
  */
-export function quotedClientName(name: string): string {
-  const characters = Array.from(name.trim());
-  const short =
-    characters.length > SELF_NAMED_CLIENT_MAX_LENGTH
-      ? `${characters.slice(0, SELF_NAMED_CLIENT_MAX_LENGTH).join('').trimEnd()}…`
-      : characters.join('');
-  return `"${short}"`;
+export function selfNamedClientName(name: string): string {
+  const characters = Array.from(replaceQuoteMarks(name.trim()));
+  return characters.length > SELF_NAMED_CLIENT_MAX_LENGTH
+    ? `${characters.slice(0, SELF_NAMED_CLIENT_MAX_LENGTH).join('').trimEnd()}…`
+    : characters.join('');
+}
+
+/** A self-chosen device name, quoted so it never reads as Kilo's own words. */
+function quotedClientName(name: string): string {
+  return `"${selfNamedClientName(name)}"`;
 }
 
 function requesterSentenceLabel(requester: DeviceSignInRequester): string {
@@ -572,6 +611,16 @@ export async function sendDeviceSignInApprovedEmail(
   });
 }
 
+/**
+ * What an API token reset did. The owner's own reset also signs out every
+ * browser and device; a reset by Kilo support stops only the API tokens.
+ */
+function apiKeyResetEffect(request: SecurityNoticeRequest): string {
+  return request.actor === 'support'
+    ? 'Every earlier API token stopped working. Browsers and signed-in devices stay signed in.'
+    : 'Every earlier token stopped working, and every browser, the app, and the CLI were signed out.';
+}
+
 export async function sendApiKeyResetEmail(
   email: string,
   request: SecurityNoticeRequest
@@ -579,7 +628,11 @@ export async function sendApiKeyResetEmail(
   return send({
     to: email,
     templateName: 'apiKeyReset',
-    templateVars: { ...securityNoticeVars(email, request), ...actorNoticeVars(request) },
+    templateVars: {
+      ...securityNoticeVars(email, request),
+      ...actorNoticeVars(request),
+      reset_effect: apiKeyResetEffect(request),
+    },
   });
 }
 
@@ -605,7 +658,7 @@ export async function sendDeviceSessionRevokedEmail(
     templateName: 'deviceSessionRevoked',
     templateVars: {
       ...securityNoticeVars(email, request),
-      revoked_device: renderNonAutolinkedText(revokedDevice ?? 'A device'),
+      revoked_device: renderNonAutolinkedText(revokedDevice ?? 'Unidentified'),
     },
   });
 }

@@ -80,6 +80,7 @@
         "device": "Iz naprave {{device}}. To niste bili vi? Takoj preverite varnost svojega računa.",
         "location": "Blizu {{location}}. To niste bili vi? Takoj preverite varnost svojega računa.",
         "unknown": "To niste bili vi? Takoj preverite varnost svojega računa.",
+        "selfNamedDevice": "Iz naprave, ki se je sama poimenovala »{{name}}«. To niste bili vi? Takoj preverite varnost svojega računa.",
         "support": "Izvedla podpora Kilo. Če tega niste zahtevali, se obrnite na podporo."
       }
     }

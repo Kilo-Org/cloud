@@ -80,6 +80,7 @@
         "device": "{{device}} cihazından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
         "location": "{{location}} yakınından. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
         "unknown": "Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
+        "selfNamedDevice": "Kendini \"{{name}}\" olarak adlandıran bir cihazdan. Siz değil miydiniz? Hesap güvenliğinizi şimdi gözden geçirin.",
         "support": "Kilo desteği tarafından yapıldı. Bunu siz istemediyseniz destekle iletişime geçin."
       }
     }

@@ -19,7 +19,7 @@ import { GET, maxDuration } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 const BATCH_SIZE = 2_500;
-const MAX_BATCHES_PER_RUN = 2;
+const TIME_BUDGET_MS = 120_000;
 
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1_000).toISOString();
@@ -111,21 +111,58 @@ describe('GET /api/cron/cleanup-admin-action-audit-logs', () => {
     expect(remaining).toHaveLength(0);
   });
 
-  it('caps deletion at MAX_BATCHES_PER_RUN batches and reports remaining expired rows', async () => {
+  it('keeps deleting batches until no expired rows are left', async () => {
     await db
       .insert(admin_action_audit_logs)
       .values(
-        Array.from({ length: BATCH_SIZE * MAX_BATCHES_PER_RUN + 1 }, (_, index) =>
-          auditRow(`cleanup-max-${index}`, daysAgo(184))
+        Array.from({ length: BATCH_SIZE * 2 + 1 }, (_, index) =>
+          auditRow(`cleanup-drain-${index}`, daysAgo(184))
         )
       );
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
     const body = await response.json();
 
-    expect(body.deletedCount).toBe(BATCH_SIZE * MAX_BATCHES_PER_RUN);
-    expect(body.batchesRun).toBe(MAX_BATCHES_PER_RUN);
-    expect(body.hasMore).toBe(true);
+    expect(body.deletedCount).toBe(BATCH_SIZE * 2 + 1);
+    expect(body.batchesRun).toBe(3);
+    expect(body.hasMore).toBe(false);
+    const remaining = await db
+      .select({ id: admin_action_audit_logs.id })
+      .from(admin_action_audit_logs);
+    expect(remaining).toHaveLength(0);
+  });
+
+  it('stops once the time budget is used and reports the expired rows left', async () => {
+    await db
+      .insert(admin_action_audit_logs)
+      .values(
+        Array.from({ length: BATCH_SIZE + 1 }, (_, index) =>
+          auditRow(`cleanup-budget-${index}`, daysAgo(184))
+        )
+      );
+    const startedAt = Date.now();
+    // The run reads the clock once to start, then after each batch.
+    const now = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(startedAt)
+      .mockReturnValue(startedAt + TIME_BUDGET_MS);
+
+    try {
+      const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+      const body = await response.json();
+
+      expect(body.deletedCount).toBe(BATCH_SIZE);
+      expect(body.batchesRun).toBe(1);
+      expect(body.hasMore).toBe(true);
+      expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deleted_admin_action_audit_logs_count: BATCH_SIZE,
+          has_more: true,
+        })
+      );
+    } finally {
+      now.mockRestore();
+    }
     const remaining = await db
       .select({ id: admin_action_audit_logs.id })
       .from(admin_action_audit_logs);
@@ -133,7 +170,8 @@ describe('GET /api/cron/cleanup-admin-action-audit-logs', () => {
   });
 
   it('reports database failures without treating them as successful cleanup', async () => {
-    const select = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+    // Each batch runs in its own transaction.
+    const transaction = jest.spyOn(db, 'transaction').mockImplementationOnce(async () => {
       throw new Error('database unavailable');
     });
 
@@ -146,7 +184,7 @@ describe('GET /api/cron/cleanup-admin-action-audit-logs', () => {
         exception_name: 'Error',
       });
     } finally {
-      select.mockRestore();
+      transaction.mockRestore();
     }
   });
 });

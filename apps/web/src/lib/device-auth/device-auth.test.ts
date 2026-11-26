@@ -8,6 +8,7 @@ import {
   pending_auth_links,
 } from '@kilocode/db/schema';
 import { and, eq, gt, sql } from 'drizzle-orm';
+import { deleteTransactionalEmailLogForUsers } from '@kilocode/web-shared/tests/helpers/user.helper';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import {
@@ -39,7 +40,7 @@ import {
 } from './device-auth';
 import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
 import { createSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 
 // Capture real implementations for pass-through default behaviour.
 // Must use var declarations — jest.mock factories are hoisted and run before
@@ -48,8 +49,8 @@ import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 // eslint-disable-next-line no-var
 var _realGenerateApiToken: ((...args: any[]) => any) | undefined;
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => {
-  const actual = jest.requireActual('@kilocode/web-shared/lib/tokens') as any;
+jest.mock('@/lib/auth/kilo-token-signing', () => {
+  const actual = jest.requireActual('@/lib/auth/kilo-token-signing') as any;
   _realGenerateApiToken = actual.generateApiToken;
   return {
     ...actual,
@@ -101,6 +102,9 @@ describe('Device Auth', () => {
 
     // Clean up test data
     await db.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, testUserId));
+    // A completed pending link sends a security notice, which claims its key
+    // under the user.
+    await deleteTransactionalEmailLogForUsers([testUserId]);
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUserId));
   });
 
@@ -1534,6 +1538,7 @@ describe('Device Auth', () => {
 
       await expect(consumeDeviceAuthByDeviceCode(device.deviceCode)).resolves.toEqual({
         status: 'expired',
+        requestId: expect.any(String),
       });
       const deviceRequest = await getDeviceAuthRequest(device.userCode);
       expect(deviceRequest?.status).toBe('expired');
@@ -1542,7 +1547,10 @@ describe('Device Auth', () => {
       await approveDeviceAuthRequest(legacy.userCode, testUserId);
       await setDeadline(legacy.code, deadline);
 
-      await expect(pollDeviceAuthRequest(legacy.code)).resolves.toEqual({ status: 'expired' });
+      await expect(pollDeviceAuthRequest(legacy.code)).resolves.toEqual({
+        status: 'expired',
+        requestId: expect.any(String),
+      });
       const legacyRequest = await getDeviceAuthRequest(legacy.userCode);
       expect(legacyRequest?.status).toBe('expired');
     });

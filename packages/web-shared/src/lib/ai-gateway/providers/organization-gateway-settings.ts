@@ -11,7 +11,7 @@ export type ManagedGatewayId = 'openrouter';
 /**
  * The organization's advanced gateway policies, as they apply to requests Kilo pays for. A user's
  * own BYOK key (a provider key, or an OpenRouter or Vercel AI Gateway key) is exempt from both, as
- * are a linked ChatGPT subscription or Claude billing connection, and autocomplete (FIM) and edit
+ * are a linked ChatGPT subscription or Claude billing connection, and autocomplete (FIM)
  * completions, which go straight to their providers without this policy.
  *
  * Neither policy changes the model lists the model endpoints return. That is a deliberate

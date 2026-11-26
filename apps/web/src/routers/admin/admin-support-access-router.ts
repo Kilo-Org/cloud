@@ -11,9 +11,14 @@ import {
   isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
-import { loadEffectiveMembershipRows } from '@kilocode/web-shared/routers/organizations/utils';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
-import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  addAdminAuditMetadata,
+  organizationActionTarget,
+  recordAdminAction,
+  setAdminAuditTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   approveSupportGrant,
   assertGrantApprovable,
@@ -56,6 +61,7 @@ async function dbUserIsSuperadmin(userId: string): Promise<boolean> {
 
 export const adminSupportAccessRouter = createTRPCRouter({
   request: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['support_access.request'] } })
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -74,6 +80,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       assertSupportAccessEnabled();
       // Both classes are checked here: the resolver knows the organization, and
       // a read grant is cross-organization read authority in its own right.
@@ -110,6 +117,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
     }),
 
   approve: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['support_access.approve'] } })
     .input(
       z.object({
         grantId: z.uuid(),
@@ -122,6 +130,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      addAdminAuditMetadata({ grantId: input.grantId });
       assertSupportAccessEnabled();
       if (isSupportAccessEnabled()) {
         // The organization is a property of the grant, and the proof must name
@@ -187,39 +196,49 @@ export const adminSupportAccessRouter = createTRPCRouter({
       return toSupportGrantSummary(approved);
     }),
 
-  deny: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
-    assertSupportAccessEnabled();
-    const grant = await denySupportGrant({
-      approverKiloUserId: ctx.user.id,
-      grantId: input.grantId,
-    });
-    await recordAdminAction(ctx, {
-      action: 'support_access.deny',
-      target: { type: 'organization', id: grant.organization_id },
-      message: 'Denied support write access',
-      metadata: { grantId: grant.id },
-    });
-    return toSupportGrantSummary(grant);
-  }),
+  deny: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['support_access.deny'] } })
+    .input(z.object({ grantId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      addAdminAuditMetadata({ grantId: input.grantId });
+      assertSupportAccessEnabled();
+      const grant = await denySupportGrant({
+        approverKiloUserId: ctx.user.id,
+        grantId: input.grantId,
+      });
+      await recordAdminAction(ctx, {
+        action: 'support_access.deny',
+        target: { type: 'organization', id: grant.organization_id },
+        message: 'Denied support write access',
+        metadata: { grantId: grant.id },
+      });
+      return toSupportGrantSummary(grant);
+    }),
 
-  cancel: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
-    assertSupportAccessEnabled();
-    const grant = await cancelSupportGrant({
-      actorKiloUserId: ctx.user.id,
-      grantId: input.grantId,
-    });
-    await recordAdminAction(ctx, {
-      action: 'support_access.cancel',
-      target: { type: 'organization', id: grant.organization_id },
-      message: 'Cancelled support access request',
-      metadata: { grantId: grant.id },
-    });
-    return toSupportGrantSummary(grant);
-  }),
+  cancel: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['support_access.cancel'] } })
+    .input(z.object({ grantId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      addAdminAuditMetadata({ grantId: input.grantId });
+      assertSupportAccessEnabled();
+      const grant = await cancelSupportGrant({
+        actorKiloUserId: ctx.user.id,
+        grantId: input.grantId,
+      });
+      await recordAdminAction(ctx, {
+        action: 'support_access.cancel',
+        target: { type: 'organization', id: grant.organization_id },
+        message: 'Cancelled support access request',
+        metadata: { grantId: grant.id },
+      });
+      return toSupportGrantSummary(grant);
+    }),
 
   revoke: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['support_access.revoke'] } })
     .input(z.object({ grantId: z.uuid(), reason: ReasonSchema }))
     .mutation(async ({ ctx, input }) => {
+      addAdminAuditMetadata({ grantId: input.grantId });
       const grant = await revokeSupportGrant({
         actorKiloUserId: ctx.user.id,
         grantId: input.grantId,
@@ -235,6 +254,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
     }),
 
   emergencyIssue: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['support_access.emergency_issue'] } })
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -249,6 +269,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      setAdminAuditTarget(organizationActionTarget(input.organizationId));
       assertSupportAccessEnabled();
       if (!(await dbUserIsSuperadmin(ctx.user.id))) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
@@ -280,23 +301,27 @@ export const adminSupportAccessRouter = createTRPCRouter({
       return toSupportGrantSummary(grant);
     }),
 
-  review: adminProcedure.input(z.object({ grantId: z.uuid() })).mutation(async ({ ctx, input }) => {
-    assertSupportAccessEnabled();
-    if (!(await dbUserIsSuperadmin(ctx.user.id))) {
-      throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
-    }
-    const grant = await reviewSupportGrant({
-      reviewerKiloUserId: ctx.user.id,
-      grantId: input.grantId,
-    });
-    await recordAdminAction(ctx, {
-      action: 'support_access.review',
-      target: { type: 'organization', id: grant.organization_id },
-      message: 'Reviewed emergency support access',
-      metadata: { grantId: grant.id },
-    });
-    return toSupportGrantSummary(grant);
-  }),
+  review: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['support_access.review'] } })
+    .input(z.object({ grantId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      addAdminAuditMetadata({ grantId: input.grantId });
+      assertSupportAccessEnabled();
+      if (!(await dbUserIsSuperadmin(ctx.user.id))) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
+      }
+      const grant = await reviewSupportGrant({
+        reviewerKiloUserId: ctx.user.id,
+        grantId: input.grantId,
+      });
+      await recordAdminAction(ctx, {
+        action: 'support_access.review',
+        target: { type: 'organization', id: grant.organization_id },
+        message: 'Reviewed emergency support access',
+        metadata: { grantId: grant.id },
+      });
+      return toSupportGrantSummary(grant);
+    }),
 
   listMine: adminProcedure.query(async ({ ctx }) => {
     const grants = await listMySupportGrants(ctx.user.id);

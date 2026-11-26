@@ -1,7 +1,16 @@
 import { translatePush } from './i18n';
 import en from './locales/en.json';
-import { type PushData } from './push-data';
-import { GENERIC_PUSH_TITLE_KEY, SECURITY_LIFECYCLE_BODY_LEAF } from './push-i18n-keys';
+import { type AccountSecurityEvent, type PushData } from './push-data';
+import {
+  ACCOUNT_SECURITY_BODY_LEAF,
+  ACCOUNT_SECURITY_PUSH_BODY_KEYS,
+  ACCOUNT_SECURITY_PUSH_TITLE_KEYS,
+  accountSecurityPushI18nKey,
+  type AccountSecurityPushContext,
+  GENERIC_PUSH_TITLE_KEY,
+  SECURITY_LIFECYCLE_BODY_LEAF,
+} from './push-i18n-keys';
+import { type AccountSecurityOrigin } from './rpc-schemas';
 
 type GenericBodyLeaf = keyof typeof en.generic.body;
 
@@ -36,6 +45,9 @@ const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
   // outstanding finding, so it must not reuse the finding body.
   security_lifecycle: SECURITY_LIFECYCLE_BODY_LEAF,
   agent_briefing: BRIEFING_LEAF,
+  // Names no event, device, or place: the lock screen only says that
+  // something happened to the account.
+  account_security: ACCOUNT_SECURITY_BODY_LEAF,
   active_agents_glanceable: ACTIVE_AGENTS_LEAF,
 };
 
@@ -67,5 +79,66 @@ export function genericPushContentForPushData(
   return {
     title: genericPushTitle(locale),
     body: translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]),
+  };
+}
+
+function accountSecurityPushContext(origin: AccountSecurityOrigin): AccountSecurityPushContext {
+  switch (origin.actor) {
+    case 'support':
+      return 'support';
+    case 'self_named_device':
+      return 'selfNamedDevice';
+    case 'owner':
+      if (origin.device !== null && origin.location !== null) return 'deviceAndLocation';
+      if (origin.device !== null) return 'device';
+      if (origin.location !== null) return 'location';
+      return 'unknown';
+  }
+}
+
+function accountSecurityPushParams(origin: AccountSecurityOrigin): Record<string, string> {
+  switch (origin.actor) {
+    case 'support':
+      return {};
+    case 'self_named_device':
+      return { name: origin.name };
+    case 'owner':
+      return {
+        ...(origin.device !== null ? { device: origin.device } : {}),
+        ...(origin.location !== null ? { location: origin.location } : {}),
+      };
+  }
+}
+
+/**
+ * The full-preview copy of an account-security notice: a title naming the
+ * event and a body naming who acted: the owner's device and approximate
+ * location when the request carried them, the quoted name a requesting device
+ * gave itself, or Kilo support. `title` and `body`
+ * are the English rendering, which the channel shows when a token's catalog
+ * cannot resolve `i18nKey`; the generic product copy stands in if even
+ * English lost an entry, so the push is never blank.
+ */
+export function accountSecurityPushCopy(input: {
+  event: AccountSecurityEvent;
+  origin: AccountSecurityOrigin;
+}): { title: string; body: string; i18nKey: string; i18nParams: Record<string, string> } {
+  const context = accountSecurityPushContext(input.origin);
+  const i18nParams = accountSecurityPushParams(input.origin);
+  return {
+    title: translatePush(
+      'en',
+      ACCOUNT_SECURITY_PUSH_TITLE_KEYS[input.event],
+      i18nParams,
+      en.generic.title
+    ),
+    body: translatePush(
+      'en',
+      ACCOUNT_SECURITY_PUSH_BODY_KEYS[context],
+      i18nParams,
+      en.generic.body[ACCOUNT_SECURITY_BODY_LEAF]
+    ),
+    i18nKey: accountSecurityPushI18nKey(input.event, context),
+    i18nParams,
   };
 }

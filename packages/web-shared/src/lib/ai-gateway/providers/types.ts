@@ -16,7 +16,6 @@ export { ReasoningDetailsTransform };
 export const ProviderTypeSchema = z.enum([
   'openrouter',
   'direct-byok',
-  'inception',
   'mistral',
   'vercel',
   'openai-chatgpt',

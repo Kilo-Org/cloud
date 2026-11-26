@@ -11,14 +11,19 @@ import { pushDataSchema, type PushData } from './push-data';
 const ALL_PUSH_KINDS = pushDataSchema.options.map(option => option.shape.type.value);
 
 describe('notificationHistoryEntryForPushData', () => {
-  it('records the message kinds and leaves every OS-only surface out', () => {
+  it('records the message kinds and leaves every OS-only surface and the account notice out', () => {
     const unrecorded = ALL_PUSH_KINDS.filter(
       kind => !(RECORDED_NOTIFICATION_PUSH_TYPES as readonly string[]).includes(kind)
     );
 
-    // Exactly the OS-only surfaces with nothing to reopen from a list: the
-    // aggregate glanceable and the followed-session live update.
-    expect(unrecorded.sort()).toEqual(['active_agents_glanceable', 'session_live_update']);
+    // The OS-only surfaces with nothing to reopen from a list (the aggregate
+    // glanceable and the followed-session live update), and the
+    // account-security notice, whose email is its durable record.
+    expect(unrecorded.sort()).toEqual([
+      'account_security',
+      'active_agents_glanceable',
+      'session_live_update',
+    ]);
   });
 
   it('maps each recorded kind to its settings category', () => {

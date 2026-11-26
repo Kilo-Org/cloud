@@ -12,7 +12,7 @@ import {
   toSharedTranscriptMessages,
   type SharedTranscriptMessage,
 } from '@/lib/shared-session-transcript';
-import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
 import {

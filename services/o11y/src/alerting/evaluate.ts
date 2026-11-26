@@ -18,8 +18,6 @@ import { shouldSuppress, recordAlertFired } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
 import { listAlertingConfigs, type AlertingConfig } from './config-store';
 import { listTtfbAlertingConfigs, type TtfbAlertingConfig } from './ttfb-config-store';
-import { evaluateContainerCapacity } from './container-capacity-evaluate';
-import { queryContainerApplications } from './container-capacity-query';
 import { evaluateContainerAllocations, queryContainerAllocations } from './container-allocations';
 import { evaluateQueueBacklogAlert } from './queue-backlog-evaluate';
 import { queryQueueBacklog } from './queue-backlog-query';
@@ -325,12 +323,6 @@ export async function evaluateAlerts(env: Env, ctx?: SecretsExecutionContext): P
 
   // Infrastructure evaluations run once per cron tick, independent of burn-rate windows. Each
   // query gets the cron run's ctx, which keeps a bundle revalidation it starts alive.
-  try {
-    await evaluateContainerCapacity(env, e => queryContainerApplications(e, fetch, ctx));
-  } catch (err) {
-    errors.push(new Error('container_capacity evaluation', { cause: err }));
-  }
-
   try {
     await evaluateContainerAllocations(env, e => queryContainerAllocations(e, fetch, ctx));
   } catch (err) {

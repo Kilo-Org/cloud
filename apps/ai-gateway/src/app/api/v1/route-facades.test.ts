@@ -1,7 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import * as llmProxy from './[...path]/route';
 import * as audioTranscriptions from './audio/transcriptions/route';
-import * as editCompletions from './edit/completions/route';
 import * as embeddingModels from './embedding-models/route';
 import * as embeddings from './embeddings/route';
 import * as fimCompletions from './fim/completions/route';
@@ -16,7 +15,6 @@ import * as systemOne from './systemone/route';
 import * as transcriptionModels from './transcription-models/route';
 import * as autoRoutingDeniedModels from './internal/auto-routing/denied-models/route';
 import { handleAutoRoutingDeniedModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/auto-routing-denied-models';
-import { handleEditCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/edit-completions';
 import { handleEmbeddingModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embedding-models';
 import { handleEmbeddingsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';
 import { handleFimCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/fim-completions';
@@ -41,7 +39,6 @@ describe('ai-gateway route facades', () => {
     ['embedding-models', embeddingModels.GET, handleEmbeddingModelsRequest],
     ['models/[provider]/[model]/endpoints', modelEndpoints.GET, handleModelEndpointsRequest],
     ['models/validate', modelValidation.POST, handleModelValidationRequest],
-    ['edit/completions', editCompletions.POST, handleEditCompletionsRequest],
     ['fim/completions', fimCompletions.POST, handleFimCompletionsRequest],
     ['organizations/[id]/models', organizationModels.GET, handleOrganizationModelsRequest],
     [
@@ -77,7 +74,6 @@ describe('ai-gateway route facades', () => {
     ['[...path]', llmProxy.maxDuration, 800],
     ['audio/transcriptions', audioTranscriptions.maxDuration, 800],
     ['embeddings', embeddings.maxDuration, 800],
-    ['edit/completions', editCompletions.maxDuration, 800],
     ['fim/completions', fimCompletions.maxDuration, 800],
     ['systemone', systemOne.maxDuration, 800],
   ])('%s keeps its route duration limit', (_route, maxDuration, expected) => {
@@ -88,7 +84,6 @@ describe('ai-gateway route facades', () => {
     ['[...path]', llmProxy.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
     ['audio/transcriptions', audioTranscriptions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
     ['embeddings', embeddings.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
-    ['edit/completions', editCompletions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
     ['fim/completions', fimCompletions.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
     ['systemone', systemOne.maxDuration, UPSTREAM_DURATION_BUDGET_MS],
   ])(

@@ -25,6 +25,10 @@ import {
 import { headers } from 'next/headers';
 import { POST } from './route';
 import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
+import { eq } from 'drizzle-orm';
+import { auth_audit_logs } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { setAuthActionSinkForTest, type AuthActionEvent } from '@/lib/auth/auth-audit';
 
 const mockCreate = jest.mocked(createDeviceAuthRequest);
 const mockHeaders = jest.mocked(headers);
@@ -54,6 +58,7 @@ describe('POST /api/device-auth/codes', () => {
 
   test.each(['', '   '])('keeps the plain flow for a body of %j', async body => {
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -77,6 +82,7 @@ describe('POST /api/device-auth/codes', () => {
 
   test('keeps the plain flow for a payload a client serializes as literal null', async () => {
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -160,6 +166,7 @@ describe('POST /api/device-auth/codes', () => {
   test('stores a live pending link token with the device code', async () => {
     mockGetPendingLink.mockResolvedValue({ id: 'pending-1' } as never);
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'poll-secret',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -184,6 +191,7 @@ describe('POST /api/device-auth/codes', () => {
   test('returns code as the poll secret plus user_code, device_code, verificationUrl, and expiresIn', async () => {
     const expiresAt = new Date(Date.now() + 600_000);
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'poll-secret-value-for-the-requesting-client',
       userCode: 'ABCD-EFGH',
       deviceCode: 'base64url-device-secret',
@@ -214,6 +222,7 @@ describe('POST /api/device-auth/codes', () => {
   test('verificationUrl uses the user code, never the poll secret', async () => {
     const expiresAt = new Date(Date.now() + 600_000);
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'poll-secret-value-for-the-requesting-client',
       userCode: 'WXYZ-1234',
       deviceCode: 'super-long-secret-that-should-not-leak',
@@ -262,6 +271,7 @@ describe('POST /api/device-auth/codes', () => {
       })
     );
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -280,6 +290,7 @@ describe('POST /api/device-auth/codes', () => {
   test('passes no address when neither platform header carries a hop', async () => {
     mockHeaders.mockResolvedValueOnce(new Headers({ 'x-forwarded-for': '192.0.2.11' }));
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -290,6 +301,45 @@ describe('POST /api/device-auth/codes', () => {
     await POST(new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' }));
 
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ ipAddress: undefined }));
+  });
+
+  test('keeps a pairing the device creates out of the audit table, as one log line', async () => {
+    const events: AuthActionEvent[] = [];
+    setAuthActionSinkForTest(event => events.push(event));
+    mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    try {
+      const response = await POST(
+        new NextRequest('http://localhost:3000/api/device-auth/codes', { method: 'POST' })
+      );
+      expect(response.status).toBe(200);
+    } finally {
+      setAuthActionSinkForTest(null);
+    }
+
+    // No one has approved the pairing yet, so it names no account.
+    expect(
+      await db
+        .select()
+        .from(auth_audit_logs)
+        .where(eq(auth_audit_logs.action, 'auth.device_auth.create'))
+    ).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.device_auth.create',
+        outcome: 'success',
+        userId: null,
+        stored: false,
+        persisted: false,
+      }),
+    ]);
   });
 
   test('re-throws unexpected errors to the global 500 handler', async () => {
@@ -309,6 +359,7 @@ describe('POST /api/device-auth/codes', () => {
       redirectOrigin: 'https://client.test',
     };
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -338,6 +389,7 @@ describe('POST /api/device-auth/codes', () => {
 
   test('opens a plain pairing for a body that names no client', async () => {
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -461,6 +513,7 @@ describe('POST /api/device-auth/codes', () => {
       redirectOrigin: 'cursor://anysphere.cursor',
     };
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
@@ -495,6 +548,7 @@ describe('POST /api/device-auth/codes', () => {
       redirectOrigin: 'https://a.test',
     };
     mockCreate.mockResolvedValue({
+      requestId: 'device-auth-request-1',
       code: 'ABCD-EFGH',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',

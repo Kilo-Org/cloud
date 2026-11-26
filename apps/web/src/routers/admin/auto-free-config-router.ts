@@ -25,28 +25,31 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
     return { config: row?.auto_free ?? null, fallback: AUTO_FREE_FALLBACK_CONFIG };
   }),
 
-  set: adminProcedure.input(SetAutoFreeConfigSchema).mutation(async ({ input }) => {
-    // Read the primary, not the cached catalog, so a custom LLM saved moments ago counts.
-    const ineligibleModelIds = input.config
-      ? getIneligibleAutoFreeModelIds(
-          input.config,
-          parseCustomLlmRows(await db.select().from(custom_llm2))
-        )
-      : [];
-    if (ineligibleModelIds.length > 0) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider, or a public custom LLM that serves Chat Completions): ${ineligibleModelIds.join(', ')}`,
-      });
-    }
+  set: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'auto_free_config.set' } })
+    .input(SetAutoFreeConfigSchema)
+    .mutation(async ({ input }) => {
+      // Read the primary, not the cached catalog, so a custom LLM saved moments ago counts.
+      const ineligibleModelIds = input.config
+        ? getIneligibleAutoFreeModelIds(
+            input.config,
+            parseCustomLlmRows(await db.select().from(custom_llm2))
+          )
+        : [];
+      if (ineligibleModelIds.length > 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider, or a public custom LLM that serves Chat Completions): ${ineligibleModelIds.join(', ')}`,
+        });
+      }
 
-    await db
-      .insert(ai_gateway_config)
-      .values({ auto_free: input.config })
-      .onConflictDoUpdate({
-        target: ai_gateway_config.id,
-        set: { auto_free: input.config },
-      });
-    return { config: input.config };
-  }),
+      await db
+        .insert(ai_gateway_config)
+        .values({ auto_free: input.config })
+        .onConflictDoUpdate({
+          target: ai_gateway_config.id,
+          set: { auto_free: input.config },
+        });
+      return { config: input.config };
+    }),
 });

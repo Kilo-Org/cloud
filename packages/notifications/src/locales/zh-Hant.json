@@ -8,7 +8,8 @@
       "securityFinding": "安全發現需要留意",
       "securityUpdate": "安全檢查有更新",
       "agentBriefing": "您的代理簡報已準備好",
-      "activeAgentsGlanceable": "使用中的代理程式有更新"
+      "activeAgentsGlanceable": "使用中的代理程式有更新",
+      "accountSecurity": "你的帳戶有安全相關活動"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 違規"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "你的帳戶已新增通行密鑰"
+      },
+      "passkeyRemoved": {
+        "title": "你的帳戶已移除通行密鑰"
+      },
+      "signInMethodLinked": {
+        "title": "你的帳戶已新增登入方式"
+      },
+      "signInMethodUnlinked": {
+        "title": "你的帳戶已移除登入方式"
+      },
+      "deviceSignInApproved": {
+        "title": "裝置登入已獲核准"
+      },
+      "apiKeyReset": {
+        "title": "API 權杖已重設"
+      },
+      "browserSessionsRevoked": {
+        "title": "已從所有瀏覽器登出"
+      },
+      "deviceSessionRevoked": {
+        "title": "有裝置已從你的帳戶登出"
+      },
+      "signInResetBySupport": {
+        "title": "Kilo 支援團隊已重設登入"
+      },
+      "newSignIn": {
+        "title": "你的帳戶有新的登入"
+      },
+      "body": {
+        "deviceAndLocation": "來自 {{location}} 附近的 {{device}}。不是你本人？請立即檢查你的帳戶安全。",
+        "device": "來自 {{device}}。不是你本人？請立即檢查你的帳戶安全。",
+        "location": "來自 {{location}} 附近。不是你本人？請立即檢查你的帳戶安全。",
+        "unknown": "不是你本人？請立即檢查你的帳戶安全。",
+        "selfNamedDevice": "來自一台自稱「{{name}}」的裝置。不是你本人？請立即檢查你的帳戶安全。",
+        "support": "由 Kilo 支援團隊操作。如果你沒有提出此要求，請聯絡支援團隊。"
+      }
     }
   },
   "sessionReady": {

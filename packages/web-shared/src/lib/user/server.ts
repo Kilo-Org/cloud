@@ -58,6 +58,11 @@ import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-i
 import { runStepUpGuard, stepUpRefusalPayload } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isCredentialExemptibleClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import {
+  adminNetworkRefusal,
+  type AdminNetworkDenialReason,
+  type AdminNetworkRefusal,
+} from '@kilocode/web-shared/lib/admin/admin-network';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import {
@@ -252,6 +257,8 @@ type GetAuthResponse =
        */
       refusalReason?: AccountBlockedRefusalReason;
       rejectionReason?: 'empty_organization_context';
+      /** Set when the admin network allowlist refused an admin. */
+      adminNetworkDenial?: AdminNetworkDenialReason;
       isNewUser?: undefined;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -273,6 +280,7 @@ type GetAuthResponse =
       authorizationRefused?: undefined;
       refusalReason?: undefined;
       rejectionReason?: undefined;
+      adminNetworkDenial?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -346,6 +354,33 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
 
     if (result.user) {
+      const networkRefusal = adminNetworkRefusal(headersList, {
+        route,
+        kiloUserId: result.user.id,
+      });
+      if (networkRefusal) {
+        if (credential !== 'session') {
+          const { actionClass, inventoryId } = routeAttribution();
+          emitPrivilegedAccessEvent({
+            surface,
+            user: result.user,
+            credential,
+            outcome: 'denied',
+            actionClass,
+            actionId: inventoryId,
+            target: null,
+            wouldBlock: true,
+            userAgentProduct: userAgentProductFromHeaders(headersList),
+            tokenSource: result.tokenSource ?? null,
+            route,
+            method,
+            // The network decision's address, never `x-forwarded-for`.
+            ip: networkRefusal.clientAddress,
+          });
+        }
+        return adminNetworkAuthFailure(result, networkRefusal);
+      }
+
       emitAdminAccessEvent({
         surface,
         kind: 'admin_guard',
@@ -465,7 +500,30 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
  * caller still enforces the route's Origin check before trusting the session.
  */
 export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
-  return resolveSessionOnly({ adminOnly: true });
+  const result = await resolveSessionOnly({ adminOnly: true });
+  if (!result.user) return result;
+  const headersList = await headers();
+  const refusal = adminNetworkRefusal(headersList, {
+    route: routeFromHeaders(headersList),
+    kiloUserId: result.user.id,
+  });
+  return refusal ? adminNetworkAuthFailure(result, refusal) : result;
+}
+
+/** The 403 for an admin whose request the admin network allowlist refused. */
+function adminNetworkAuthFailure(
+  admin: Pick<GetAuthResponse, 'internalApiUse' | 'tokenSource' | 'cloudAgentAuthority'> & {
+    user: User;
+  },
+  refusal: AdminNetworkRefusal
+): GetAuthResponse {
+  return authError(403, refusal.message, admin.user.id, {
+    authorizationRefused: true,
+    adminNetworkDenial: refusal.reason,
+    internalApiUse: admin.internalApiUse,
+    tokenSource: admin.tokenSource,
+    cloudAgentAuthority: admin.cloudAgentAuthority,
+  });
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
@@ -802,6 +860,7 @@ function authError(
     tokenSource?: string;
     cloudAgentAuthority?: CloudAgentAuthority;
     stepUp?: StepUpRequirementPayload;
+    adminNetworkDenial?: AdminNetworkDenialReason;
   }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
@@ -818,6 +877,7 @@ function authError(
     tokenSource: options?.tokenSource,
     cloudAgentAuthority: options?.cloudAgentAuthority,
     ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
+    ...(options?.adminNetworkDenial && { adminNetworkDenial: options.adminNetworkDenial }),
   };
 }
 

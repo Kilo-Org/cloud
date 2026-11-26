@@ -11,6 +11,13 @@ import {
   getKiloClawGoogleOAuthConnection,
 } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
 const OrganizationIdSchema = z.string().uuid();
 
@@ -60,47 +67,67 @@ export async function POST(request: NextRequest) {
       await ensureOrganizationAccess({ user, tokenSource }, organizationId);
     }
 
-    const instance = organizationId
-      ? await getActiveOrgInstance(user.id, organizationId)
-      : await getActiveInstance(user.id);
+    const disconnect = async (): Promise<NextResponse> => {
+      const instance = organizationId
+        ? await getActiveOrgInstance(user.id, organizationId)
+        : await getActiveInstance(user.id);
 
-    if (!instance) {
-      captureMessage('Google disconnect missing active KiloClaw instance', {
-        level: 'warning',
-        tags: { endpoint: 'google/disconnect', source: 'google_oauth' },
-        extra: {
+      if (!instance) {
+        captureMessage('Google disconnect missing active KiloClaw instance', {
+          level: 'warning',
+          tags: { endpoint: 'google/disconnect', source: 'google_oauth' },
+          extra: {
+            userId: user.id,
+            organizationId,
+          },
+        });
+
+        setAdminAuditOutcome({ outcome: 'failure', errorCode: 'missing_instance' });
+        return NextResponse.redirect(
+          new URL(buildDisconnectPath(organizationId, 'error=missing_instance'), APP_URL),
+          303
+        );
+      }
+
+      const existingConnection = await getKiloClawGoogleOAuthConnection(instance.id);
+      if (existingConnection) {
+        console.log('[google-disconnect] removing connection', {
+          instanceId: instance.id,
           userId: user.id,
-          organizationId,
-        },
+          accountEmail: existingConnection.account_email,
+          accountSubject: existingConnection.account_subject,
+          organizationId: organizationId ?? null,
+        });
+      }
+      addAdminAuditMetadata({
+        instanceId: instance.id,
+        hadConnection: Boolean(existingConnection),
       });
 
+      // Revoke broker credentials first so disconnect fails closed if any later
+      // cleanup step errors.
+      await clearKiloClawGoogleOAuthConnection(instance.id);
+
+      const kiloclawClient = new KiloClawInternalClient();
+      await kiloclawClient.clearGoogleOAuthConnection(user.id, instance.id);
+
+      setAdminAuditOutcome({ outcome: 'success' });
       return NextResponse.redirect(
-        new URL(buildDisconnectPath(organizationId, 'error=missing_instance'), APP_URL),
+        new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL),
         303
       );
-    }
+    };
 
-    const existingConnection = await getKiloClawGoogleOAuthConnection(instance.id);
-    if (existingConnection) {
-      console.log('[google-disconnect] removing connection', {
-        instanceId: instance.id,
-        userId: user.id,
-        accountEmail: existingConnection.account_email,
-        accountSubject: existingConnection.account_subject,
-        organizationId: organizationId ?? null,
-      });
-    }
-
-    // Revoke broker credentials first so disconnect fails closed if any later
-    // cleanup step errors.
-    await clearKiloClawGoogleOAuthConnection(instance.id);
-
-    const kiloclawClient = new KiloClawInternalClient();
-    await kiloclawClient.clearGoogleOAuthConnection(user.id, instance.id);
-
-    return NextResponse.redirect(
-      new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL),
-      303
+    if (!organizationId) return await disconnect();
+    return await runElevatedOrganizationWrite(
+      adminActionContextFromHeaders(user, request.headers),
+      {
+        organizationId,
+        requiredRoles: ORGANIZATION_ROLES,
+        action: 'organization.google.disconnect',
+        message: 'Google: OAuth connection removed',
+      },
+      disconnect
     );
   } catch (error) {
     console.error('Error disconnecting Google OAuth:', error);

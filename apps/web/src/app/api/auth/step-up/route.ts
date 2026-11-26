@@ -14,6 +14,7 @@ import { getUserFromSessionForStepUp } from '@kilocode/web-shared/lib/user/serve
 import { PRIVILEGED_ACTION_CLASSES } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { stepUpOperationSchema } from '@kilocode/web-shared/lib/admin/step-up-binding';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import { adminNetworkRefusalFor } from '@kilocode/web-shared/lib/admin/admin-network';
 
 /**
  * Firewall rate-limit rule ids, created in the Vercel project. Until a rule
@@ -55,7 +56,9 @@ function rateLimitKey(action: 'options' | 'verify', userId: string): string {
  *
  * Error contract: 400 invalid request, 401 `{ error }` with a stable
  * `StepUpVerificationError` code (including `SESSION_UNBOUND`), 403 missing or
- * foreign Origin, 429 rate limited, 503 rate limiter unavailable.
+ * foreign Origin, 403 `ADMIN_NETWORK_DENIED` (off the corporate network,
+ * retryable) or `ADMIN_NETWORK_NOT_CONFIGURED` (no usable allowlist, or not
+ * running on Vercel), 429 rate limited, 503 rate limiter unavailable.
  */
 export async function POST(request: NextRequest) {
   if (request.headers.has('authorization')) {
@@ -67,8 +70,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_ORIGIN' }, { status: 403 });
   }
 
-  const { user, authFailedResponse, webSessionId, webSessionPepper } =
+  const { user, authFailedResponse, adminNetworkDenial, webSessionId, webSessionPepper } =
     await getUserFromSessionForStepUp();
+  if (adminNetworkDenial) {
+    return NextResponse.json(
+      { error: adminNetworkRefusalFor(adminNetworkDenial).code },
+      { status: 403 }
+    );
+  }
   if (authFailedResponse) {
     return authFailedResponse;
   }

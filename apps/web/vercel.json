@@ -77,9 +77,19 @@
       "path": "/api/cron/cleanup-admin-action-audit-logs",
       "requestMethod": "GET"
     },
+    "cleanup-auth-audit-logs": {
+      "schedule": "40 3 * * *",
+      "path": "/api/cron/cleanup-auth-audit-logs",
+      "requestMethod": "GET"
+    },
     "cleanup-mcp-connect-events": {
       "schedule": "45 3 * * *",
       "path": "/api/cron/cleanup-mcp-connect-events",
+      "requestMethod": "GET"
+    },
+    "prune-sign-in-contexts": {
+      "schedule": "25 * * * *",
+      "path": "/api/cron/prune-sign-in-contexts",
       "requestMethod": "GET"
     },
     "cleanup-pr-watches": {

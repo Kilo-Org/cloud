@@ -3,10 +3,20 @@ import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
+import { decryptCustomLlmCredentials } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/credentials-encryption';
+import {
+  TEST_BYOK_DATA_KEY,
+  useFakeByokKms,
+} from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { eq } from 'drizzle-orm';
-import type { CustomLlmDefinition, CustomPricingTiers } from '@kilocode/db/schema-types';
+import type {
+  CustomLlmCredentialsEnvelope,
+  CustomLlmDefinition,
+  CustomPricingTiers,
+} from '@kilocode/db/schema-types';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -39,6 +49,12 @@ const publicDefinition: CustomLlmDefinition = {
   base_url: 'https://upstream.example.com/v1',
   public: { inference_providers: ['acme'], description: 'A public custom model' },
 };
+
+const kms = useFakeByokKms();
+
+function decryptStoredCredentials(envelope: CustomLlmCredentialsEnvelope) {
+  return JSON.parse(decryptApiKey(envelope.encrypted_data, TEST_BYOK_DATA_KEY));
+}
 
 beforeEach(async () => {
   jest
@@ -85,8 +101,35 @@ describe('adminCustomLlmRouter', () => {
       expect(row).toBeDefined();
       expect(row.encrypted_api_key).toBeDefined();
       expect((row.definition as Record<string, unknown>).api_key).toBeUndefined();
-      const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
+      const decrypted = decryptStoredCredentials(row.encrypted_api_key!);
       expect(decrypted.api_key).toBe('sk-test-secret-key-123');
+      await expect(decryptCustomLlmCredentials(row.encrypted_api_key!)).resolves.toEqual({
+        type: 'api_key',
+        api_key: 'sk-test-secret-key-123',
+      });
+    });
+
+    it('binds the stored credentials to the Kilo organization in the KMS context', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-kms-context';
+
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: validDefinition,
+        credentials: { type: 'api_key', api_key: 'sk-test-secret-key-123' },
+      });
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row.encrypted_api_key?.key_id).toEqual(expect.any(String));
+      const dataKeyRequests = kms.requests.filter(request => request.path === '/data-key');
+      expect(dataKeyRequests).toHaveLength(1);
+      expect(dataKeyRequests[0].body).toMatchObject({
+        key_id: row.encrypted_api_key?.key_id,
+        owner_type: 'organization',
+        owner_id: KILO_ORGANIZATION_ID,
+        provider_id: 'custom-llm',
+        actor_user_id: admin.id,
+      });
     });
 
     it.each([false, true])(
@@ -152,7 +195,7 @@ describe('adminCustomLlmRouter', () => {
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
       expect(row).toBeDefined();
       expect(row.encrypted_api_key).toBeDefined();
-      const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
+      const decrypted = decryptStoredCredentials(row.encrypted_api_key!);
       expect(decrypted.type).toBe('service_account');
       expect(decrypted.project_id).toBe('test-project');
       expect(decrypted.private_key).toBe('pk-secret');
@@ -180,9 +223,7 @@ describe('adminCustomLlmRouter', () => {
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
       expect(row?.encrypted_api_key).toBeDefined();
       expect(JSON.stringify(row?.definition)).not.toContain('bedrock-secret');
-      expect(JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY))).toEqual(
-        credentials
-      );
+      expect(decryptStoredCredentials(row.encrypted_api_key!)).toEqual(credentials);
     });
 
     it('rejects creating new custom LLM when credentials are completely missing', async () => {
@@ -221,7 +262,7 @@ describe('adminCustomLlmRouter', () => {
       expect(updated.definition.display_name).toBe('Updated Name');
 
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
-      const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
+      const decrypted = decryptStoredCredentials(row.encrypted_api_key!);
       expect(decrypted.api_key).toBe('sk-initial-secret');
     });
 
@@ -275,7 +316,7 @@ describe('adminCustomLlmRouter', () => {
       });
 
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
-      const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
+      const decrypted = decryptStoredCredentials(row.encrypted_api_key!);
       expect(decrypted.api_key).toBe('sk-rotated-secret');
     });
   });
@@ -794,19 +835,37 @@ describe('adminCustomLlmRouter', () => {
       base_url: 'http://upstream.example.com/v1',
     };
     const originalNodeEnv = process.env.NODE_ENV;
-    const setNodeEnv = (value: string | undefined) => {
+    const originalVercel = process.env.VERCEL;
+    const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+    const allowedAddress = { 'x-vercel-forwarded-for': '203.0.113.7' };
+    const setEnv = (
+      key: 'NODE_ENV' | 'VERCEL' | 'ADMIN_ALLOWED_NETWORKS',
+      value: string | undefined
+    ) => {
       const env: Record<string, string | undefined> = process.env;
-      if (value === undefined) delete env.NODE_ENV;
-      else env.NODE_ENV = value;
+      if (value === undefined) delete env[key];
+      else env[key] = value;
     };
 
+    // Production mode enforces the admin network check, which refuses every
+    // admin outside Vercel; these callers act as Vercel requests from an
+    // allowed address.
+    beforeEach(() => {
+      setEnv('VERCEL', '1');
+      setEnv('ADMIN_ALLOWED_NETWORKS', '203.0.113.7');
+      resetAdminNetworkConfigForTest();
+    });
+
     afterEach(() => {
-      setNodeEnv(originalNodeEnv);
+      setEnv('NODE_ENV', originalNodeEnv);
+      setEnv('VERCEL', originalVercel);
+      setEnv('ADMIN_ALLOWED_NETWORKS', originalNetworks);
+      resetAdminNetworkConfigForTest();
     });
 
     it('rejects a non-https base_url when the URL policy is enforced', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(admin.id);
+      setEnv('NODE_ENV', 'production');
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
       await expect(
         caller.admin.customLlm.upsert({
@@ -826,7 +885,7 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('rejects changing an existing definition to a non-https base_url when enforced', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
       const publicId = 'kilo-internal/http-update-model';
       await caller.admin.customLlm.upsert({
         public_id: publicId,
@@ -834,7 +893,7 @@ describe('adminCustomLlmRouter', () => {
         credentials,
       });
 
-      setNodeEnv('production');
+      setEnv('NODE_ENV', 'production');
 
       await expect(
         caller.admin.customLlm.upsert({ public_id: publicId, definition: httpDefinition })
@@ -845,8 +904,8 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('accepts an https base_url when the URL policy is enforced', async () => {
-      setNodeEnv('production');
-      const caller = await createCallerForUser(admin.id);
+      setEnv('NODE_ENV', 'production');
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/https-model',
@@ -858,8 +917,8 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('accepts a non-https base_url in the test environment', async () => {
-      setNodeEnv('test');
-      const caller = await createCallerForUser(admin.id);
+      setEnv('NODE_ENV', 'test');
+      const caller = await createCallerForUser(admin.id, { headers: allowedAddress });
 
       const result = await caller.admin.customLlm.upsert({
         public_id: 'kilo-internal/http-model-test-env',

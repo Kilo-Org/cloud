@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, gt, isNull, isNotNull, not, sql, type SQL } from 'drizzle-orm';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { randomInt, randomBytes } from 'node:crypto';
 import { createDeviceSessionWithCredentials } from '@/lib/auth/device-sessions';
 import { hashOpaqueSecret } from '@/lib/auth/secret-hash';
@@ -19,6 +19,7 @@ import {
   type PendingLinkResult,
 } from '@/lib/auth/pending-link';
 import { consumeSignInMethodChangeCode } from '@/lib/auth/sign-in-method-change-email-code';
+import { markAuthAuditLockout } from '@/lib/auth/auth-audit';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
@@ -90,15 +91,19 @@ export type DeviceAuthPendingLinkProof = {
  * link started from Connected accounts.
  */
 async function spendPendingLinkCode(
+  requestId: string,
   userId: string,
   provider: AuthProviderId,
   proof: DeviceAuthPendingLinkProof | undefined
 ): Promise<void> {
   if (!proof?.webSessionId) {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired);
+    throw new DeviceAuthRefusalError(
+      DEVICE_AUTH_REFUSAL_CODES.pendingLinkReauthRequired,
+      requestId
+    );
   }
   if (!proof.code || !proof.challengeId) {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid, requestId);
   }
   const result = await consumeSignInMethodChangeCode(
     { userId, email: proof.email, change: 'link', provider, webSessionId: proof.webSessionId },
@@ -106,10 +111,15 @@ async function spendPendingLinkCode(
     proof.challengeId
   );
   if (result === 'invalid') {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeInvalid, requestId);
+  }
+  if (result === 'locked_now') {
+    throw markAuthAuditLockout(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked, requestId)
+    );
   }
   if (result === 'locked') {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkCodeLocked, requestId);
   }
 }
 
@@ -216,6 +226,8 @@ export async function createDeviceAuthRequest(params: {
   requestingClient?: RequestingClient;
   pendingLinkToken?: string;
 }): Promise<{
+  /** The row id, for the audit row; never shown to the device. */
+  requestId: string;
   code: string;
   userCode: string;
   deviceCode: string;
@@ -301,6 +313,7 @@ export async function createDeviceAuthRequest(params: {
 
         if (inserted) {
           return {
+            requestId: inserted.id,
             code: pollSecret,
             userCode,
             deviceCode: deviceSecret,
@@ -388,8 +401,18 @@ export function isDeviceAuthRequestExpired(
   return request.status === 'expired' || isExpiredAt(request.expires_at, now);
 }
 
+/** The approved request as its approval notice describes the requester. */
+export type ApprovedDeviceAuthRequest = {
+  id: string;
+  requestingClientName: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+};
+
 /**
- * Approve a device authorization request by its displayed user code.
+ * Approve a device authorization request by its displayed user code. Returns
+ * the request only to the call whose conditional update approved it; a refusal
+ * names the row it refused when one matched.
  */
 export async function approveDeviceAuthRequest(
   userCode: string,
@@ -400,7 +423,7 @@ export async function approveDeviceAuthRequest(
     /** Required to add a pending link to an existing account. */
     pendingLinkProof?: DeviceAuthPendingLinkProof;
   } = {}
-): Promise<void> {
+): Promise<ApprovedDeviceAuthRequest> {
   const now = new Date().toISOString();
   const code = normalizeDeviceAuthUserCode(userCode);
   const existing = await getDeviceAuthRequest(code);
@@ -409,8 +432,8 @@ export async function approveDeviceAuthRequest(
   // An actionable row that names a client requires its confirmation before any
   // other outcome is considered; an expired row reports its expiry below.
   const confirmed =
-    requestingClientId !== null && actionable
-      ? confirmRequestingClient(requestingClientId, options.confirmedClientId)
+    requestingClientId !== null && actionable && existing
+      ? confirmRequestingClient(existing.id, requestingClientId, options.confirmedClientId)
       : false;
 
   // A live pending link must never attach silently: an actionable row that
@@ -422,11 +445,19 @@ export async function approveDeviceAuthRequest(
     const livePending = await getLivePendingLinkByHash(existing.pending_link_secret_hash);
     if (livePending) {
       if (options.addPendingLink === undefined) {
-        throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired);
+        throw new DeviceAuthRefusalError(
+          DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired,
+          existing.id
+        );
       }
       clearPendingLink = options.addPendingLink === false;
       if (options.addPendingLink && livePending.kind === 'existing_account') {
-        await spendPendingLinkCode(userId, livePending.provider, options.pendingLinkProof);
+        await spendPendingLinkCode(
+          existing.id,
+          userId,
+          livePending.provider,
+          options.pendingLinkProof
+        );
       }
     }
   }
@@ -447,10 +478,15 @@ export async function approveDeviceAuthRequest(
         requestIsLiveAt(now)
       )
     )
-    .returning({ id: device_auth_requests.id });
+    .returning({
+      id: device_auth_requests.id,
+      requestingClientName: device_auth_requests.requesting_client_name,
+      userAgent: device_auth_requests.user_agent,
+      ipAddress: device_auth_requests.ip_address,
+    });
 
   if (approved) {
-    return;
+    return approved;
   }
 
   const request = await getDeviceAuthRequest(code);
@@ -460,7 +496,7 @@ export async function approveDeviceAuthRequest(
   }
 
   if (request.status !== 'pending') {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending, request.id);
   }
 
   const [expired] = await db
@@ -476,22 +512,30 @@ export async function approveDeviceAuthRequest(
     .returning({ id: device_auth_requests.id });
 
   if (!expired) {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending, request.id);
   }
-  throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestExpired);
+  throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestExpired, request.id);
 }
 
-function confirmRequestingClient(requestingClientId: string, confirmedClientId?: string): true {
+function confirmRequestingClient(
+  requestId: string,
+  requestingClientId: string,
+  confirmedClientId?: string
+): true {
   if (confirmedClientId !== requestingClientId) {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch);
+    throw new DeviceAuthRefusalError(
+      DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch,
+      requestId
+    );
   }
   return true;
 }
 
 /**
- * Deny a device authorization request by its displayed user code.
+ * Deny a device authorization request by its displayed user code. Returns the
+ * denied row's id; a refusal names the row it refused when one matched.
  */
-export async function denyDeviceAuthRequest(userCode: string): Promise<void> {
+export async function denyDeviceAuthRequest(userCode: string): Promise<{ requestId: string }> {
   const code = normalizeDeviceAuthUserCode(userCode);
   const request = await getDeviceAuthRequest(code);
 
@@ -500,7 +544,7 @@ export async function denyDeviceAuthRequest(userCode: string): Promise<void> {
   }
 
   if (request.status !== 'pending') {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending, request.id);
   }
 
   const [denied] = await db
@@ -512,16 +556,21 @@ export async function denyDeviceAuthRequest(userCode: string): Promise<void> {
     .returning({ id: device_auth_requests.id });
 
   if (!denied) {
-    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending, request.id);
   }
+  return { requestId: denied.id };
 }
 
 /**
  * Cancel a request from the device that started it. The poll secret is that
  * device's proof of ownership: it already authorises polling the request and
- * no browser session exists in the client that started it.
+ * no browser session exists in the client that started it. Returns the
+ * cancelled row's id, and whether this call cancelled it (`changed`) or found
+ * it already denied or expired.
  */
-export async function cancelDeviceAuthRequest(code: string): Promise<void> {
+export async function cancelDeviceAuthRequest(
+  code: string
+): Promise<{ requestId: string; changed: boolean }> {
   const [cancelled] = await db
     .update(device_auth_requests)
     .set({ status: 'denied' })
@@ -529,11 +578,11 @@ export async function cancelDeviceAuthRequest(code: string): Promise<void> {
     .returning({ id: device_auth_requests.id });
 
   if (cancelled) {
-    return;
+    return { requestId: cancelled.id, changed: true };
   }
 
   const [request] = await db
-    .select({ status: device_auth_requests.status })
+    .select({ id: device_auth_requests.id, status: device_auth_requests.status })
     .from(device_auth_requests)
     .where(eq(device_auth_requests.code, code))
     .limit(1);
@@ -544,10 +593,10 @@ export async function cancelDeviceAuthRequest(code: string): Promise<void> {
 
   // A request the approver denied, or that already expired, is cancelled.
   if (request.status === 'denied' || request.status === 'expired') {
-    return;
+    return { requestId: request.id, changed: false };
   }
 
-  throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
+  throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending, request.id);
 }
 
 /**
@@ -561,8 +610,8 @@ type RedeemOutcome<TCredentials> =
       request: DeviceAuthRequestRow;
       pendingLink?: PendingLinkResult;
     }
-  | { outcome: 'denied' }
-  | { outcome: 'not-redeemed'; status: DeviceAuthRequestStatus };
+  | { outcome: 'denied'; requestId: string; userId: string }
+  | { outcome: 'not-redeemed'; status: DeviceAuthRequestStatus; requestId?: string };
 
 /**
  * The current status of a request a caller could not consume. A request past
@@ -575,7 +624,7 @@ async function describeNotRedeemed(identity: SQL): Promise<RedeemOutcome<never>>
   if (!request) return { outcome: 'not-redeemed', status: 'expired' };
 
   if (!isDeviceAuthRequestExpired(request)) {
-    return { outcome: 'not-redeemed', status: request.status };
+    return { outcome: 'not-redeemed', status: request.status, requestId: request.id };
   }
 
   if (request.status !== 'expired') {
@@ -584,7 +633,7 @@ async function describeNotRedeemed(identity: SQL): Promise<RedeemOutcome<never>>
       .set({ status: 'expired' })
       .where(eq(device_auth_requests.id, request.id));
   }
-  return { outcome: 'not-redeemed', status: 'expired' };
+  return { outcome: 'not-redeemed', status: 'expired', requestId: request.id };
 }
 
 /**
@@ -647,7 +696,7 @@ async function redeemApprovedRequest<TCredentials>(params: {
         .update(device_auth_requests)
         .set({ status: 'denied' })
         .where(eq(device_auth_requests.id, consumed.id));
-      return { outcome: 'denied' };
+      return { outcome: 'denied', requestId: consumed.id, userId: user.id };
     }
 
     const credentials = await params.mint({ user, request: consumed });
@@ -691,6 +740,8 @@ export async function consumeDeviceAuthByDeviceCode(
   options?: { supportsRefresh?: boolean }
 ): Promise<{
   status: 'pending' | 'approved' | 'denied' | 'expired' | 'consumed';
+  /** The redeemed or refused row's id, when one matched; for the audit row only. */
+  requestId?: string;
   token?: string;
   refreshToken?: string;
   expiresIn?: number;
@@ -746,13 +797,14 @@ export async function consumeDeviceAuthByDeviceCode(
     case 'redeemed':
       return {
         status: 'approved',
+        requestId: outcome.request.id,
         ...outcome.credentials,
         ...(outcome.pendingLink ? { pendingLink: outcome.pendingLink } : {}),
       };
     case 'denied':
-      return { status: 'denied' };
+      return { status: 'denied', requestId: outcome.requestId, userId: outcome.userId };
     case 'not-redeemed':
-      return { status: outcome.status };
+      return { status: outcome.status, requestId: outcome.requestId };
   }
 }
 
@@ -764,6 +816,8 @@ export async function consumeDeviceAuthByDeviceCode(
  */
 export async function pollDeviceAuthRequest(code: string): Promise<{
   status: 'pending' | 'approved' | 'denied' | 'expired';
+  /** The redeemed or refused row's id, when one matched; for the audit row only. */
+  requestId?: string;
   token?: string;
   userId?: string;
   userEmail?: string;
@@ -795,16 +849,20 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
     case 'redeemed':
       return {
         status: 'approved',
+        requestId: outcome.request.id,
         ...outcome.credentials,
         requestingClient: requestingClientOfRow(outcome.request),
         clientConfirmed: outcome.request.client_confirmed_at !== null,
         ...(outcome.pendingLink ? { pendingLink: outcome.pendingLink } : {}),
       };
     case 'denied':
-      return { status: 'denied' };
+      return { status: 'denied', requestId: outcome.requestId, userId: outcome.userId };
     case 'not-redeemed':
       // A consumed request is spent, so the legacy response reports it expired.
-      return { status: outcome.status === 'consumed' ? 'expired' : outcome.status };
+      return {
+        status: outcome.status === 'consumed' ? 'expired' : outcome.status,
+        requestId: outcome.requestId,
+      };
   }
 }
 

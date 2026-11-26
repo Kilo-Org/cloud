@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import { onlyRoute } from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
-import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import {
+  insertCustomLlmForTest,
+  testCustomLlmCredentialsEnvelope,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import {
   createAnonymousContext,
   type AnonymousUserContext,
@@ -30,7 +32,7 @@ async function insertCustomLlm(credentials: CustomLlmCredentials) {
   await insertCustomLlmForTest(
     PUBLIC_ID,
     definition,
-    encryptApiKey(JSON.stringify(credentials), BYOK_ENCRYPTION_KEY)
+    testCustomLlmCredentialsEnvelope(credentials)
   );
 }
 
@@ -50,6 +52,8 @@ function resolveProvider(
     })
   );
 }
+
+useFakeByokKms();
 
 describe('getProvider custom LLM credentials', () => {
   beforeEach(async () => {

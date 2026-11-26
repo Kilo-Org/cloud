@@ -40,6 +40,8 @@ jobs:
       mobile_diagram_host: ${{ steps.filter_diagram.outputs.mobile_diagram_host || steps.filter_diagram_retry.outputs.mobile_diagram_host }}
       # The session-sync account database suite, also its own pair.
       session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
+      # The UTS identity-store Postgres suite, also its own pair.
+      uts: ${{ steps.filter_uts.outputs.uts || steps.filter_uts_retry.outputs.uts }}
       # Every input the ci-wiring job reads, also its own pair.
       wiring: ${{ steps.filter_wiring.outputs.wiring || steps.filter_wiring_retry.outputs.wiring }}
       # The two input sets of the test-scripts job, each its own pair. The
@@ -341,6 +343,28 @@ jobs:
               - 'services/session-sync/**'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
+      - name: Detect UTS identity-store changes
+        id: filter_uts
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            uts:
+              - 'services/uts/**'
+              - 'packages/sts-contracts/**'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
+      - name: Detect UTS identity-store changes (retry)
+        id: filter_uts_retry
+        if: steps.filter_uts.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            uts:
+              - 'services/uts/**'
+              - 'packages/sts-contracts/**'
               - '.github/workflows/ci.yml'
               - 'pnpm-lock.yaml'
       # The ci-wiring job reads more than one workflow: two of its suites scan
@@ -1254,6 +1278,7 @@ jobs:
       - harness-sdk
       - mobile-diagram-host
       - session-sync-postgres
+      - uts-postgres
       - build
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
@@ -1713,6 +1738,75 @@ jobs:
       # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
       - name: Run session-sync account database tests
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-sync test:postgres
+
+  # The UTS identity-store suite needs a Postgres server; the `test (cloudflare-uts)`
+  # row of workspace-tests runs only the suites that need none. The image is
+  # the release services/uts/scripts/local-db.sh pins, and the server keeps
+  # password authentication, as the local container does, so the UTS logins
+  # authenticate with the random password the suite gives them on each run.
+  uts-postgres:
+    needs: changes
+    if: needs.changes.outputs.uts == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17.12
+        env:
+          POSTGRES_PASSWORD: uts-local-superuser
+          # The suite clones a database per test file and runs the files in
+          # parallel, which needs more than the default 100 connections. A
+          # service container takes no server options, so initdb writes the
+          # value the local container gets on its command line.
+          POSTGRES_INITDB_ARGS: -c max_connections=200
+        # The image's first-boot server listens only on its socket, so the
+        # health check waits for TCP.
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready --host 127.0.0.1 --username postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 25
+        # Published on the runner's loopback only, as local-db.sh publishes it.
+        ports:
+          - 127.0.0.1:5432:5432
+
+    env:
+      UTS_PG_PORT: 5432
+      # The suite refuses an admin URL whose host is not a loopback address.
+      UTS_TEST_ADMIN_URL: postgres://uts_admin:uts-local-admin@127.0.0.1:5432/uts
+
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # Only the UTS closure is installed: every step below runs `pnpm --filter
+      # cloudflare-uts`, and its suite imports @kilocode/sts-contracts, which
+      # the service declares. Widen the filter when a step here imports a
+      # workspace outside the closure.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter 'cloudflare-uts...'
+
+      # The local bootstrap finds the running service container by its id
+      # and creates the admin login and the `uts` database in it.
+      - name: Create the identity-store admin login
+        env:
+          UTS_PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: pnpm --filter cloudflare-uts db:up
+
+      - name: Run UTS identity-store tests
+        run: pnpm --filter cloudflare-uts test:postgres
 
   workspace-tests:
     needs: changes

@@ -91,6 +91,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/connector', () => ({
   resolveConnectionConnector: (...args: unknown[]) => mockResolveConnectionConnector(...args),
 }));
 
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
 const PAID_MODEL = 'anthropic/claude-sonnet-4';
@@ -230,7 +231,9 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
   });
 
   it('does not count a ChatGPT connection the KMS service cannot open', async () => {
-    mockGetOpenAiChatGptStoredConnection.mockRejectedValue(new Error('BYOK KMS /decrypt failed'));
+    mockGetOpenAiChatGptStoredConnection.mockRejectedValue(
+      new CredentialKmsError(new Error('BYOK KMS /decrypt failed'))
+    );
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,
@@ -239,6 +242,18 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     });
 
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
+  });
+
+  it('propagates a database failure reading the ChatGPT connection', async () => {
+    mockGetOpenAiChatGptStoredConnection.mockRejectedValue(new Error('connection timeout'));
+
+    await expect(
+      computeCloudAgentNextBalanceCheckEligibility({
+        fromDb: fakeDb,
+        user: fakeUser,
+        modelId: 'openai/gpt-5',
+      })
+    ).rejects.toThrow('connection timeout');
   });
 
   it("counts the organization's shared-services ChatGPT connection for service runs", async () => {

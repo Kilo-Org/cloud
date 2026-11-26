@@ -49,6 +49,7 @@ jest.mock('next/server', () => ({
   }),
 }));
 
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
@@ -946,9 +947,9 @@ describe('checkOpenAiChatGptByok', () => {
   });
 
   describe('when the KMS service cannot open the stored payload', () => {
-    const kmsFailure = Object.assign(new Error('BYOK KMS /decrypt failed: stored-refresh-token'), {
-      name: 'KmsRefusal',
-    });
+    const kmsFailure = new CredentialKmsError(
+      new Error('BYOK KMS /decrypt failed: stored-refresh-token')
+    );
 
     async function withLoggedErrors<T>(run: () => Promise<T>): Promise<[T, string]> {
       const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -974,10 +975,18 @@ describe('checkOpenAiChatGptByok', () => {
 
       const [, logged] = await withLoggedErrors(() => checkOpenAiChatGptByok(routingInput()));
 
-      expect(logged).toContain('KmsRefusal');
+      expect(logged).toContain('CredentialKmsError');
       expect(logged).toContain(`${USER_ID}:personal`);
       expect(logged).not.toContain('stored-refresh-token');
       expect(logged).not.toContain('/decrypt');
+    });
+
+    it('still fails the request when the database read fails, instead of changing who pays', async () => {
+      const databaseFailure = new Error('connection timeout');
+      jest.mocked(getOpenAiChatGptStoredConnection).mockRejectedValue(databaseFailure);
+
+      await expect(checkOpenAiChatGptByok(routingInput())).rejects.toBe(databaseFailure);
+      expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
     });
 
     it('offers no model set', async () => {

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 
 /**
@@ -12,7 +13,10 @@ export async function ChatGptUsageLink({ kiloUserId }: { kiloUserId: string }) {
   const connection = await getOpenAiChatGptConnection({
     kiloUserId,
     organizationId: null,
-  }).catch(() => null);
+  }).catch((error: unknown) => {
+    if (error instanceof CredentialKmsError) return null;
+    throw error;
+  });
   if (connection?.status !== 'connected') return null;
 
   return <ChatGptUsageLinkView />;

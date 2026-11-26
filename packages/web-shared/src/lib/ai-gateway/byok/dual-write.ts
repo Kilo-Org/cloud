@@ -35,6 +35,27 @@ export function legacyCiphertextDigestSql(column: AnyColumn): SQL<string> {
   return sql<string>`encode(sha256(convert_to((${column} ->> 'iv') || '.' || (${column} ->> 'data') || '.' || (${column} ->> 'authTag'), 'UTF8')), 'hex')`;
 }
 
+/**
+ * The KMS service did not open a current envelope. Distinct from a database or parse
+ * failure, so a caller can treat an unreadable credential differently from an unreachable
+ * database. The cause is kept for debugging and never carries the plaintext.
+ */
+export class CredentialKmsError extends Error {
+  constructor(cause: unknown) {
+    super('The BYOK KMS service did not open the credential envelope', { cause });
+    this.name = 'CredentialKmsError';
+  }
+}
+
+/**
+ * Throws unless `dataKey` and the static key can both encrypt. Callers that must not
+ * consume anything before the credential is stored, such as a rotating refresh token,
+ * check this first: the KMS response is only validated as non-empty.
+ */
+export function assertSealable(dataKey: ByokDataKey): void {
+  sealDualWrittenCredential('', dataKey);
+}
+
 export type DualWrittenCredential = {
   legacy: EncryptedData;
   envelope: DualWrittenCredentialEnvelope;
@@ -95,8 +116,21 @@ export async function openDualWrittenCredential<Envelope extends DualWrittenCred
 ): Promise<string | null> {
   if (legacy === null) return null;
   if (isEnvelopeCurrent(legacy, envelope)) {
-    return await decryptByokEnvelope(envelope, contextFor(envelope));
+    try {
+      return await decryptByokEnvelope(envelope, contextFor(envelope));
+    } catch (error) {
+      throw new CredentialKmsError(error);
+    }
   }
+  return openStaticKeyCopy(legacy);
+}
+
+/**
+ * The static-key copy alone, null when it does not decrypt. Only for comparing a stored
+ * credential with one a caller already holds, never for serving it: readers must use
+ * `openDualWrittenCredential`, which does not bypass the KMS service.
+ */
+export function openStaticKeyCopy(legacy: EncryptedData): string | null {
   try {
     return decryptApiKey(legacy, BYOK_ENCRYPTION_KEY);
   } catch {

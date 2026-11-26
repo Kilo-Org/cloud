@@ -12,6 +12,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
 }));
 
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { EncryptedData, OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -378,7 +379,9 @@ describe('openai-chatgpt connection store', () => {
       await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
       kms.fail('/decrypt');
 
-      await expect(getOpenAiChatGptConnection(USER_OWNER)).rejects.toThrow('/decrypt');
+      await expect(getOpenAiChatGptConnection(USER_OWNER)).rejects.toBeInstanceOf(
+        CredentialKmsError
+      );
     });
 
     it('does not create a data key when the KMS service fails, and stores nothing', async () => {

@@ -13,6 +13,7 @@ import {
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import {
+  CredentialKmsError,
   isEnvelopeCurrent,
   legacyCiphertextDigest,
   legacyCiphertextDigestSql,
@@ -218,7 +219,7 @@ describe('openDualWrittenCredential', () => {
 
     await expect(
       openDualWrittenCredential(legacy, envelope, () => uncachedContext)
-    ).rejects.toThrow('/decrypt');
+    ).rejects.toBeInstanceOf(CredentialKmsError);
   });
 
   it('reads a static-key copy that does not decrypt as null', async () => {

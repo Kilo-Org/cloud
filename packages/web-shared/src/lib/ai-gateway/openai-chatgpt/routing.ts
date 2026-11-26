@@ -3,6 +3,7 @@ import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -244,8 +245,10 @@ async function readServableStoredConnection(
   try {
     stored = await getOpenAiChatGptStoredConnection(owner);
   } catch (error) {
-    // The KMS service could not open the payload. Like a transient refresh failure, the
-    // request keeps its existing route; only the error type is logged.
+    // Only a payload the KMS service could not open keeps the existing route, like a
+    // transient refresh failure. A database failure still fails the request, as it did
+    // before envelopes existed, rather than quietly changing who pays.
+    if (!(error instanceof CredentialKmsError)) throw error;
     console.error(
       '[openai-chatgpt] stored connection unreadable: %s (%s)',
       error instanceof Error ? error.name : 'UnknownError',

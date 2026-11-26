@@ -9,6 +9,7 @@ import {
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import {
@@ -217,8 +218,11 @@ async function hasOpenAiChatGptByokForModel(params: {
 
   for (const owner of owners) {
     // A payload the KMS service cannot open counts as no usable connection, so the
-    // ordinary balance check applies.
-    const stored = await getOpenAiChatGptStoredConnection(owner).catch(() => null);
+    // ordinary balance check applies. A database failure still propagates.
+    const stored = await getOpenAiChatGptStoredConnection(owner).catch((error: unknown) => {
+      if (error instanceof CredentialKmsError) return null;
+      throw error;
+    });
     if (!stored?.isEnabled || stored.connection.status !== 'connected') continue;
     // The shared row bills the organization only while the person who connected
     // it is usable. A row that records no connector still counts.

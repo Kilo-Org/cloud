@@ -16,18 +16,24 @@ const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
  */
 async function renderChatGptUsageLink(
   hasConnection: boolean,
-  readFailure?: Error
+  readFailure?: 'kms' | 'database'
 ): Promise<string> {
   jest.resetModules();
-  const [store, link, server] = await Promise.all([
+  const [store, link, server, dualWrite] = await Promise.all([
     import('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store'),
     import('@/components/chatgpt/ChatGptUsageLink'),
     import('react-dom/server'),
+    import('@kilocode/web-shared/lib/ai-gateway/byok/dual-write'),
   ]);
 
   const readConnection = jest.mocked(store.getOpenAiChatGptConnection);
   if (readFailure) {
-    readConnection.mockRejectedValue(readFailure);
+    // Built from the module registry the component was loaded from, so `instanceof` holds.
+    readConnection.mockRejectedValue(
+      readFailure === 'kms'
+        ? new dualWrite.CredentialKmsError(new Error('BYOK KMS /decrypt failed'))
+        : new Error('connection timeout')
+    );
   } else {
     readConnection.mockResolvedValue(
       hasConnection ? ({ status: 'connected' } as Awaited<ReturnType<typeof readConnection>>) : null
@@ -52,6 +58,10 @@ describe('ChatGptUsageLink', () => {
   });
 
   it('renders nothing instead of failing the page when the KMS service cannot open the payload', async () => {
-    expect(await renderChatGptUsageLink(true, new Error('BYOK KMS /decrypt failed'))).toBe('');
+    expect(await renderChatGptUsageLink(true, 'kms')).toBe('');
+  });
+
+  it('still fails when the database read fails', async () => {
+    await expect(renderChatGptUsageLink(true, 'database')).rejects.toThrow('connection timeout');
   });
 });

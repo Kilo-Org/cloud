@@ -3,6 +3,13 @@ import {
   STS_DENIED_PROBE,
   STS_DENIED_PROBE_REASON,
   STS_DENIED_PROBE_WORKLOAD,
+  STS_ENVIRONMENTS,
+  STS_SECURE_PROXY_FORWARD,
+  STS_USAGE_PUBLISH,
+  STS_USAGE_RECORD,
+  STS_O11Y_ALERTING_READ,
+  STS_O11Y_ALERTING_WRITE,
+  STS_O11Y_API_METRICS_WRITE,
   isStsDeniedProbe,
   type MintRequest,
   type MintResult,
@@ -601,6 +608,85 @@ describe('UTS grants of the shipped web policy', () => {
       scope: 'uts-feed:revocation.read',
     });
   });
+});
+
+describe('phase 4 service scopes under the shipped policies (default deny)', () => {
+  // The O11y scopes share one audience and a mint holds one token per audience, so each scope is
+  // asked for in a request of its own.
+  const SERVICE_SCOPES = [
+    STS_SECURE_PROXY_FORWARD,
+    STS_USAGE_PUBLISH,
+    STS_USAGE_RECORD,
+    STS_O11Y_API_METRICS_WRITE,
+    STS_O11Y_ALERTING_READ,
+    STS_O11Y_ALERTING_WRITE,
+  ];
+  const shipped = STS_ENVIRONMENTS.flatMap(environment =>
+    defaultMintAuthority.policies
+      .forEnvironment(environment)
+      .map(policy => ({ environment, workload: policy.workload, policy }))
+  );
+
+  async function mintAsShipped(
+    environment: (typeof STS_ENVIRONMENTS)[number],
+    workload: string,
+    entry: { audience: string; scope: string }
+  ) {
+    const result = await serveMint(
+      env,
+      { ...config, environment },
+      {
+        caller: { channel: 'http', workload, identity: 'test', attestationExp: null, claims: {} },
+        request: { tokens: [entry] },
+        waitUntil,
+        authority: defaultMintAuthority,
+      }
+    );
+    await Promise.all(pending);
+    return result;
+  }
+
+  it('covers the web, usage-ingest and o11y policies in every environment', () => {
+    for (const environment of STS_ENVIRONMENTS) {
+      const workloads = shipped
+        .filter(entry => entry.environment === environment)
+        .map(entry => entry.workload);
+      expect(workloads).toEqual(expect.arrayContaining(['web', 'usage-ingest', 'o11y']));
+    }
+  });
+
+  it.each(shipped)(
+    'refuses $workload in $environment every phase 4 service scope, never as unknown_scope',
+    async ({ environment, workload, policy }) => {
+      for (const entry of SERVICE_SCOPES) {
+        // No shipped policy lists the Secure Proxy or O11y audience. A policy holding a usage
+        // audience (the canary pair) is refused the scope instead.
+        const usage = entry === STS_USAGE_PUBLISH || entry === STS_USAGE_RECORD;
+        const reason =
+          usage && policy.audiences.includes(entry.audience)
+            ? 'scope_not_allowed'
+            : 'audience_not_allowed';
+        expect(await mintAsShipped(environment, workload, entry)).toEqual({
+          status: 'ok',
+          tokens: [{ status: 'denied', ...entry, reason }],
+        });
+      }
+    }
+  );
+
+  it.each(STS_ENVIRONMENTS)(
+    'refuses the canary pair, which holds the audiences, the usage scopes as not granted in %s',
+    async environment => {
+      expect(await mintAsShipped(environment, 'web', STS_USAGE_PUBLISH)).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...STS_USAGE_PUBLISH, reason: 'scope_not_allowed' }],
+      });
+      expect(await mintAsShipped(environment, 'usage-ingest', STS_USAGE_RECORD)).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...STS_USAGE_RECORD, reason: 'scope_not_allowed' }],
+      });
+    }
+  );
 });
 
 describe('canary denied probe', () => {

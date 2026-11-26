@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@/lib/auth/kilo-token-signing';
 import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
@@ -27,7 +27,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateApiToken: jest.fn(() => 'minted-token'),
 }));
 

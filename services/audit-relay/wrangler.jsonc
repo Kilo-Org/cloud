@@ -1,0 +1,242 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Top level is PRODUCTION. Deploy staging with `wrangler deploy --env staging`.
+  "name": "audit-relay",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  // Capped at the newest date the pinned miniflare/workerd binary supports, so tests and
+  // `wrangler dev` run the same runtime as production. Raise it with the wrangler bump.
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "port": 8820,
+    "local_protocol": "http",
+    "ip": "127.0.0.1",
+  },
+  // Logs only, never traces. A trace records every outbound fetch with `url.full`, and the Slack
+  // paging webhook URL is itself the secret; `redact_query_string` would not help, because the
+  // secret is in the path. Spans and attributes:
+  // https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/
+  // Nothing this Worker logs carries a URL it fetched. Named environments inherit this block.
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
+  },
+  // Worker logs (Workers Trace Events: event, logs, exceptions, outcome; no subrequest URLs) reach
+  // the account Logpush job, which forwards them to Axiom.
+  "logpush": true,
+  // The public checkpoint key set lives at
+  // https://audit-relay.kiloapps.io/.well-known/audit-checkpoint-keys.json
+  "routes": [
+    {
+      "pattern": "audit-relay.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "AXIOM_DATASET": "kilo-audit",
+    "AXIOM_URL": "https://api.axiom.co",
+    "AUDIT_ENVIRONMENT": "production",
+  },
+  // Production prerequisites: README.md (queues, DLQ, EU R2 bucket with 400-day lock rules).
+  "queues": {
+    "consumers": [
+      {
+        "queue": "kilo-audit",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        // 24 retries: an archive failure backs off to 15 minutes and spans about 5.25 hours.
+        "max_retries": 24,
+        "retry_delay": 60,
+        "max_concurrency": 6,
+        "dead_letter_queue": "kilo-audit-dlq",
+      },
+      // Offers each dead letter to its stream again (streams in parallel, each in sequence
+      // order), and keeps its raw bytes in R2 under dead-letter/. One still behind a gap retries
+      // after 30 s while its stream's head advances, else (and after an R2 failure) every 15
+      // minutes, for up to the Queues maximum of 100 retries;
+      // one that cannot recover is paged and acked. One consumer: several would hold later
+      // chunks of a stream while an earlier chunk still archives, and push them all back behind
+      // its gap; one consumer with 100 messages per batch, streams in parallel, drains in order.
+      {
+        "queue": "kilo-audit-dlq",
+        "max_batch_size": 100,
+        "max_batch_timeout": 30,
+        "max_concurrency": 1,
+        "max_retries": 100,
+        "retry_delay": 900,
+      },
+    ],
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
+      { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
+      { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+      { "name": "AUDIT_VERIFIER", "class_name": "VerifierDO" },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["StreamDO", "RegistryDO", "SignerDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["VerifierDO"],
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIT_ARCHIVE",
+      "bucket_name": "kilo-audit-archive",
+      // The bucket is created with --jurisdiction eu; without this the binding names a
+      // default-jurisdiction bucket outside the EU and outside the lock rules.
+      "jurisdiction": "eu",
+    },
+  ],
+  // Secrets arrive through STS: no `secrets_store_secrets` or `vars` hold them.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "audit-relay" },
+    },
+  ],
+  "triggers": {
+    "crons": ["0 * * * *", "30 3 * * *", "0 4 1 * *"],
+  },
+  "env": {
+    // Deploy with: wrangler deploy --env staging
+    // `vars`, `durable_objects`, `queues`, `r2_buckets`, `services`, `routes` and `triggers` are
+    // not inherited by a named environment, so this block restates each one in full.
+    "staging": {
+      "name": "audit-relay-staging",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "audit-relay-staging.kiloapps.io",
+          "zone_name": "kiloapps.io",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "AXIOM_DATASET": "kilo-audit-staging",
+        "AXIOM_URL": "https://api.axiom.co",
+        "AUDIT_ENVIRONMENT": "staging",
+      },
+      "queues": {
+        "consumers": [
+          {
+            "queue": "kilo-audit-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 24,
+            "retry_delay": 60,
+            "max_concurrency": 6,
+            "dead_letter_queue": "kilo-audit-staging-dlq",
+          },
+          {
+            "queue": "kilo-audit-staging-dlq",
+            "max_batch_size": 100,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 900,
+          },
+        ],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
+          { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
+          { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+          { "name": "AUDIT_VERIFIER", "class_name": "VerifierDO" },
+        ],
+      },
+      "r2_buckets": [
+        {
+          "binding": "AUDIT_ARCHIVE",
+          "bucket_name": "kilo-audit-archive-staging",
+          "jurisdiction": "eu",
+        },
+      ],
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-staging",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "audit-relay" },
+        },
+      ],
+      "triggers": {
+        "crons": ["0 * * * *", "30 3 * * *", "0 4 1 * *"],
+      },
+    },
+    // Local development only (`wrangler dev --env local`); no deploy workflow targets this name.
+    "local": {
+      "name": "audit-relay-local",
+      "workers_dev": true,
+      // Not inherited from the top level: a local run has no custom domain.
+      "routes": [],
+      "vars": {
+        "AXIOM_DATASET": "kilo-audit-local",
+        "AXIOM_URL": "https://api.axiom.co",
+        "AUDIT_ENVIRONMENT": "local",
+      },
+      "queues": {
+        "consumers": [
+          {
+            "queue": "kilo-audit-local",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "retry_delay": 10,
+            "dead_letter_queue": "kilo-audit-local-dlq",
+          },
+          {
+            "queue": "kilo-audit-local-dlq",
+            "max_batch_size": 100,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 900,
+          },
+        ],
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "AUDIT_STREAM", "class_name": "StreamDO" },
+          { "name": "AUDIT_REGISTRY", "class_name": "RegistryDO" },
+          { "name": "AUDIT_SIGNER", "class_name": "SignerDO" },
+          { "name": "AUDIT_VERIFIER", "class_name": "VerifierDO" },
+        ],
+      },
+      "r2_buckets": [
+        {
+          "binding": "AUDIT_ARCHIVE",
+          // Local only: miniflare's simulated bucket has no jurisdiction.
+          "bucket_name": "kilo-audit-archive-local",
+        },
+      ],
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-local",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "audit-relay" },
+        },
+      ],
+      // No schedules outside production and staging; trigger a cron by hand with
+      // `curl "http://127.0.0.1:8820/__scheduled?cron=0+*+*+*+*"` under `wrangler dev --test-scheduled`.
+      "triggers": {
+        "crons": [],
+      },
+    },
+  },
+}

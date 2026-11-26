@@ -93,6 +93,9 @@ catalog:
   vitest: 4.1.12
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
+  # The STS policy parser. `overrides` pins the same version tree-wide, so the
+  # catalog pin is the one place both readers take it from.
+  yaml: 2.9.1
   zod: 4.6.7
 
 catalogs:
@@ -261,7 +264,7 @@ overrides:
   'cmdk>@radix-ui/react-primitive': 2.2.0
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.7
-  yaml: 2.9.1
+  yaml: 'catalog:'
   undici@^7: 'catalog:'
   path-to-regexp: 8.4.2
   ip-address: 10.7.1

@@ -16,16 +16,19 @@ import {
   verifyKiloTokenForResource,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { validateAuthorizationHeader, type JWTTokenPayload } from '@kilocode/web-shared/lib/tokens';
+import {
+  signTestApiToken,
+  signTestInternalServiceToken,
+} from '@kilocode/web-shared/tests/helpers/api-token.helper';
 import {
   generateApiToken,
   generateBoundedInternalServiceToken,
   generateInternalServiceToken,
   generateOrganizationApiToken,
   TOKEN_EXPIRY,
-  validateAuthorizationHeader,
   type BoundedInternalServiceAudience,
-  type JWTTokenPayload,
-} from './tokens';
+} from './kilo-token-signing';
 
 // Test fixtures
 const mockUser: User = {
@@ -237,6 +240,23 @@ describe('Token Functions', () => {
       expect(decoded.aud).toBeUndefined();
     });
 
+    it.each([
+      ['defaults', undefined],
+      [
+        'audience, organization and lifetime',
+        { audience: 'x', organizationId: 'org-1', expiresIn: 300 },
+      ],
+    ])('matches the web-shared test signer (%s)', (_label, options) => {
+      const decode = (token: string) => {
+        const { iat, exp, ...claims } = jwt.decode(token) as jwt.JwtPayload;
+        return { claims, lifetime: exp! - iat! };
+      };
+
+      expect(decode(signTestInternalServiceToken(mockUser.id, options))).toEqual(
+        decode(generateInternalServiceToken(mockUser.id, options))
+      );
+    });
+
     it('accepts a lifetime of up to one hour', () => {
       const decoded = jwt.decode(
         generateInternalServiceToken(mockUser.id, { expiresIn: 3600 })
@@ -269,6 +289,24 @@ describe('Token Functions', () => {
       expect(decoded.env).toBe(process.env.NODE_ENV);
       // Organization ID should never be in the token
       expect(decoded.organizationId).toBeUndefined();
+    });
+
+    it.each([
+      ['no extra claims', undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays }],
+      [
+        'organization claims and a custom lifetime',
+        { organizationId: 'org-1', organizationRole: 'member' as const },
+        { expiresIn: 900 },
+      ],
+    ])('matches the web-shared test signer (%s)', (_label, extraPayload, options) => {
+      const decode = (token: string) => {
+        const { iat, exp, ...claims } = jwt.decode(token) as jwt.JwtPayload;
+        return { claims, lifetime: exp! - iat! };
+      };
+
+      expect(decode(signTestApiToken(mockUser, extraPayload, options))).toEqual(
+        decode(generateApiToken(mockUser, extraPayload, options))
+      );
     });
 
     it('should generate different tokens for different users', () => {

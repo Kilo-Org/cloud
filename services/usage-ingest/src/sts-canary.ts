@@ -148,12 +148,15 @@ class StsCanaryError extends Error {
   }
 }
 
+/**
+ * Each check's result and status only. The report's `detail` is text from another service, so it
+ * never reaches this Worker's logs; the web route's own line carries it.
+ */
 function checkMetadata(prefix: string, check: StsCanaryCheck | 'skipped'): ScheduledJobMetadata {
   if (check === 'skipped') return { [`${prefix}_result`]: 'skipped' };
   return {
     [`${prefix}_result`]: check.result,
     [`${prefix}_status`]: check.status ?? undefined,
-    [`${prefix}_detail`]: check.detail,
   };
 }
 

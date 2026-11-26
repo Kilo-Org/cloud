@@ -232,10 +232,15 @@ describe('scheduled STS canary', () => {
       WEB_STS_CANARY_URL: WEB_URL,
     });
 
+    // A detail echoing a credential stays out of this Worker's logs.
+    const echoed = 'authorization echoed: minted.web.token';
     stubFetch(() =>
       Response.json({
         ...PASSING_REPORT,
-        negatives: { ...PASSING_REPORT.negatives, forged: { result: 'failed', status: 204 } },
+        negatives: {
+          ...PASSING_REPORT.negatives,
+          forged: { result: 'failed', status: 204, detail: echoed },
+        },
       })
     );
     await runStsCanary(CONTROLLER, env(binding(issue)), context());
@@ -275,6 +280,9 @@ describe('scheduled STS canary', () => {
         mint_detail: 'scope_not_allowed',
       }),
     ]);
+    const [checkFailed] = events(info, error);
+    expect(checkFailed).not.toHaveProperty('negative_forged_detail');
+    expect(JSON.stringify(events(info, error))).not.toContain(echoed);
   });
 
   it('never follows a redirect from the web route: the call is manual and a 3xx fails the run', async () => {

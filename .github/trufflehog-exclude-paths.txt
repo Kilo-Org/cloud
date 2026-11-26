@@ -79,10 +79,3 @@ apps/mobile/src/components/chat/mcp-settings-state-remote-servers\.test\.ts
 # those commits stay in branch history. Exclude the fixture path so the
 # historical commits do not fail the scan.
 services/uts/test/db/operator-connection\.test\.ts
-
-# Sentry scrubber fixtures. These tests assert that a database URL with a user and
-# password is filtered. An earlier commit in this PR held synthetic credential URLs;
-# later commits assemble them from parts, but the earlier commit stays in branch
-# history. Exclude the fixture paths so the historical commit does not fail the scan.
-packages/web-shared/src/lib/observability/sentry-secret-patterns\.test\.ts
-packages/web-shared/src/lib/observability/sentry-sdk-secret-text\.test\.ts

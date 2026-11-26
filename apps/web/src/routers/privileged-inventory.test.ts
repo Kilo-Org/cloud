@@ -1,21 +1,28 @@
 import { describe, expect, test } from '@jest/globals';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { rootRouter } from './root-router';
 import { appShellProceduresRouter } from './app-shell-procedures-router';
 import {
   ADMIN_AREA_POLICIES,
+  ADMIN_REST_WRITING_GET_ROUTES,
   ADMIN_STEP_UP_SELF_GUARDED_ROUTES,
   TARGET_ID_FIELD_BY_ADMIN_PROCEDURE,
   actionClassForEntry,
   findPrivilegedInventoryEntry,
   internalElevationSites,
+  organizationElevationWriteSites,
   privilegedGuardTiers,
   resolvesOwnStepUp,
   targetIdFieldForAdminProcedure,
   targetIdFromInput,
   targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import {
+  adminMutationsMissingAuditSpec,
+  isAuditedAdminRoute,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   ADMIN_ONLY_TRPC_NAMESPACES,
   ADMIN_ONLY_TRPC_PROCEDURES,
@@ -193,6 +200,32 @@ function discoverServerComponents(): { file: string; route: string }[] {
           source.includes('getAuthorizedOrgContextOrSupport('))
       );
     });
+}
+
+const ELEVATED_WRITE_REACHABILITY_TOOL = path.join(
+  REPO_ROOT,
+  'tools/admin-audit/elevated-write-reachability.mjs'
+);
+
+/**
+ * For each route handler, the actions it can record through
+ * runElevatedOrganizationWrite, following its imports and its `import()`
+ * loads into other modules. The tool runs in its own Node process because its
+ * parser, oxc-parser, is an ES module this CommonJS suite cannot load.
+ */
+function elevatedWriteActionsReachableFrom(
+  handlers: readonly { file: string; method: string }[]
+): string[][] {
+  const output = execFileSync(
+    process.execPath,
+    [
+      ELEVATED_WRITE_REACHABILITY_TOOL,
+      ...handlers.flatMap(handler => [handler.file, handler.method]),
+    ],
+    { encoding: 'utf8' }
+  );
+  const reached: string[][] = JSON.parse(output);
+  return reached;
 }
 
 const procedures = rootRouter._def.procedures as Record<string, ProcedureDef>;
@@ -490,6 +523,99 @@ describe('privileged inventory covers discovered route handlers', () => {
     }
 
     expect(missing).toEqual([]);
+  });
+});
+
+describe('admin console route writes are audited', () => {
+  test('every admin API write handler is built with auditedAdminRoute', async () => {
+    const writingGets = new Set(ADMIN_REST_WRITING_GET_ROUTES);
+    const unaudited: string[] = [];
+
+    for (const file of walkFiles(path.join(APP_ROOT, 'admin/api'))) {
+      if (path.basename(file) !== 'route.ts') continue;
+      const route = routePathFromAppFile(file);
+      // The route set is discovered from the file tree, so the specifier is runtime data.
+      const routeModule: Record<string, unknown> = await import(file);
+      const methods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+      if (writingGets.delete(route)) methods.push('GET');
+      for (const method of methods) {
+        const handler = routeModule[method];
+        if (handler !== undefined && !isAuditedAdminRoute(handler)) {
+          unaudited.push(`${route} ${method}`);
+        }
+      }
+    }
+
+    expect(unaudited).toEqual([]);
+    // A writing GET that moved or was renamed must not drop out of the check.
+    expect([...writingGets]).toEqual([]);
+  }, 120_000);
+});
+
+describe('organization admin bypass write sites are audited', () => {
+  const classified = new Set(
+    organizationElevationWriteSites.map(site => `${site.route} ${site.method}`)
+  );
+
+  test('every route write behind an organization guard has an audit classification', () => {
+    const unclassified: string[] = [];
+
+    for (const discovered of discoverRESTRoutes()) {
+      if (!discovered.organizationContext || discovered.route.startsWith('/admin/')) continue;
+      for (const method of discovered.methods) {
+        // GET is checked too: an OAuth callback writes on a GET.
+        if (method === 'HEAD' || method === 'OPTIONS') continue;
+        if (!classified.has(`${discovered.route} ${method}`)) {
+          unclassified.push(
+            `${discovered.route} ${method} (${path.relative(REPO_ROOT, discovered.file)})`
+          );
+        }
+      }
+    }
+
+    expect(unclassified).toEqual([]);
+  });
+
+  test('every classified site is a mounted handler with recorded actions or a reason', () => {
+    const mounted = new Map(
+      discoverRESTRoutes().map(discovered => [discovered.route, discovered.methods])
+    );
+    const problems: string[] = [];
+
+    for (const site of organizationElevationWriteSites) {
+      if (!mounted.get(site.route)?.includes(site.method)) {
+        problems.push(`${site.route} ${site.method}: no such route handler`);
+      }
+      if (site.audit.kind === 'skipped' && site.audit.reason.trim() === '') {
+        problems.push(`${site.route} ${site.method}: skipped without a reason`);
+      }
+    }
+
+    expect(problems).toEqual([]);
+    expect(classified.size).toBe(organizationElevationWriteSites.length);
+  });
+
+  test('every recorded site reaches runElevatedOrganizationWrite with each action it lists', () => {
+    const routeFiles = new Map(
+      discoverRESTRoutes().map(discovered => [discovered.route, discovered.file])
+    );
+    // A route without a handler file is reported by the test above.
+    const recorded = organizationElevationWriteSites.flatMap(site => {
+      const file = routeFiles.get(site.route);
+      return site.audit.kind === 'recorded' && file !== undefined
+        ? [{ file, method: site.method, route: site.route, actions: site.audit.actions }]
+        : [];
+    });
+
+    const reached = elevatedWriteActionsReachableFrom(recorded);
+
+    const problems = recorded.flatMap((site, index) =>
+      site.actions
+        .filter(action => !reached[index]?.includes(action))
+        .map(action => `${site.route} ${site.method}: never records ${action}`)
+    );
+    expect(recorded.length).toBeGreaterThan(0);
+    expect(problems).toEqual([]);
   });
 });
 
@@ -797,5 +923,11 @@ describe('admin target id fields name mounted mutations', () => {
     }
 
     expect(problems).toEqual([]);
+  });
+});
+
+describe('admin mutations declare how they are audited', () => {
+  test('every admin-guarded mutation carries valid adminAudit meta', () => {
+    expect(adminMutationsMissingAuditSpec(procedures)).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -16,8 +17,17 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
+  recordAdminAction,
+  recordAdminActions,
+  userActionTarget,
+  type AdminActionContext,
+  type AdminActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
 import { USER_DELETION_STALE_REQUEST_MS } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
@@ -163,6 +173,57 @@ async function processHistoricalUsers(params: {
     }
   }
   return results;
+}
+
+function statusCounts(results: readonly { status: string }[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const { status } of results) counts[status] = (counts[status] ?? 0) + 1;
+  return counts;
+}
+
+/**
+ * The subject user of each committed deletion request, for its audit row. The
+ * requests are already queued, so a failed lookup is reported and the rows
+ * fall back to the request ids rather than failing the call.
+ */
+async function deletionSubjectUserIds(requestIds: string[]): Promise<Map<string, string | null>> {
+  if (requestIds.length === 0) return new Map();
+  try {
+    const subjects = await db
+      .select({ id: user_deletion_requests.id, userId: user_deletion_requests.user_id })
+      .from(user_deletion_requests)
+      .where(inArray(user_deletion_requests.id, requestIds));
+    return new Map(subjects.map(subject => [subject.id, subject.userId]));
+  } catch (error) {
+    captureException(error, { tags: { operation: 'admin_deletion_audit_subject_lookup' } });
+    return new Map();
+  }
+}
+
+/** One admin row per deletion request the call created, or one summary row when none. */
+async function recordDeletionRequestsCreated(
+  ctx: AdminActionContext,
+  created: readonly { target: AdminActionTarget; requestId: string }[],
+  results: readonly { status: string }[]
+) {
+  await recordAdminActions(
+    ctx,
+    created.length > 0
+      ? created.map(({ target, requestId }) => ({
+          action: 'user_deletion.request.create' as const,
+          target,
+          message: 'Queued user deletion',
+          metadata: { requestId },
+        }))
+      : [
+          {
+            action: 'user_deletion.request.create' as const,
+            target: null,
+            message: 'Queued no user deletions',
+            metadata: { statusCounts: statusCounts(results) },
+          },
+        ]
+  );
 }
 
 function iso(value: string): string {
@@ -346,22 +407,55 @@ function tabCondition(tab: ListTab) {
 }
 
 export const adminUserDeletionQueueRouter = createTRPCRouter({
-  preview: adminProcedure.input(EntriesInputSchema).mutation(({ ctx, input }) => {
-    return inspectDeletionTargets(input.entries, {
-      id: ctx.user.id,
-      email: ctx.user.google_user_email,
-    });
-  }),
+  preview: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'mutation-typed read: inspects deletion targets and writes nothing',
+      },
+    })
+    .input(EntriesInputSchema)
+    .mutation(({ ctx, input }) => {
+      return inspectDeletionTargets(input.entries, {
+        id: ctx.user.id,
+        email: ctx.user.google_user_email,
+      });
+    }),
 
-  submit: adminProcedure.input(EntriesInputSchema).mutation(async ({ ctx, input }) => {
-    return enqueueUserDeletionTargets({
-      actor: { kiloUserId: ctx.user.id, email: ctx.user.google_user_email },
-      targets: input.entries,
-      catalogVersion: 2,
-    });
-  }),
+  submit: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['user_deletion.request.create'] } })
+    .input(EntriesInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const results = await enqueueUserDeletionTargets({
+        actor: { kiloUserId: ctx.user.id, email: ctx.user.google_user_email },
+        targets: input.entries,
+        catalogVersion: 2,
+      });
+      const createdIds = results.flatMap(result =>
+        result.status === 'enqueued' ? [result.requestId] : []
+      );
+      const subjectUserIds = await deletionSubjectUserIds(createdIds);
+      await recordDeletionRequestsCreated(
+        ctx,
+        createdIds.map(requestId => {
+          const userId = subjectUserIds.get(requestId);
+          return {
+            target: userId ? userActionTarget(userId) : { type: 'other' as const, id: requestId },
+            requestId,
+          };
+        }),
+        results
+      );
+      return results;
+    }),
 
   previewHistoricalUsers: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'exempt',
+        reason: 'mutation-typed read: dry-run eligibility check that writes nothing',
+      },
+    })
     .input(HistoricalUsersInputSchema)
     .mutation(({ ctx, input }) => {
       return processHistoricalUsers({
@@ -372,13 +466,24 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
     }),
 
   submitHistoricalUsers: adminProcedure
+    .meta({ adminAudit: { kind: 'handler', actions: ['user_deletion.request.create'] } })
     .input(HistoricalUsersInputSchema)
-    .mutation(({ ctx, input }) => {
-      return processHistoricalUsers({
+    .mutation(async ({ ctx, input }) => {
+      const results = await processHistoricalUsers({
         userIds: input.userIds,
         adminUserId: ctx.user.id,
         execute: true,
       });
+      await recordDeletionRequestsCreated(
+        ctx,
+        results.flatMap(result =>
+          result.status === 'enqueued'
+            ? [{ target: userActionTarget(result.userId), requestId: result.requestId }]
+            : []
+        ),
+        results
+      );
+      return results;
     }),
 
   list: adminProcedure.input(ListInputSchema).query(async ({ input }) => {
@@ -523,37 +628,63 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
     };
   }),
 
-  cancel: adminProcedure.input(RequestIdSchema).mutation(async ({ ctx, input }) => {
-    const result = await cancelPendingDeletionRequest({
-      requestId: input.requestId,
-      actorKiloUserId: ctx.user.id,
-    });
-    if (result.cancelled) return { cancelled: true as const };
-    if (result.code === 'not_found') failClosed('NOT_FOUND', 'Deletion request not found');
-    failClosed('PRECONDITION_FAILED', 'Only pending requests can be cancelled');
-  }),
-
-  retryTask: adminProcedure.input(RetryTaskInputSchema).mutation(async ({ ctx, input }) => {
-    try {
-      const retried = await retryAttentionTask({
+  cancel: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user_deletion.request.cancel',
+        target: inputFieldTarget('other', 'requestId'),
+      },
+    })
+    .input(RequestIdSchema)
+    .mutation(async ({ ctx, input }) => {
+      const result = await cancelPendingDeletionRequest({
         requestId: input.requestId,
-        stepKey: input.stepKey,
         actorKiloUserId: ctx.user.id,
-        reason: input.reason,
       });
-      if (!retried) {
-        failClosed('PRECONDITION_FAILED', 'Task is not eligible for retry');
+      if (result.cancelled) return { cancelled: true as const };
+      if (result.code === 'not_found') failClosed('NOT_FOUND', 'Deletion request not found');
+      failClosed('PRECONDITION_FAILED', 'Only pending requests can be cancelled');
+    }),
+
+  retryTask: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user_deletion.task.retry',
+        target: inputFieldTarget('other', 'requestId'),
+      },
+    })
+    .input(RetryTaskInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      addAdminAuditMetadata({ stepKey: input.stepKey });
+      try {
+        const retried = await retryAttentionTask({
+          requestId: input.requestId,
+          stepKey: input.stepKey,
+          actorKiloUserId: ctx.user.id,
+          reason: input.reason,
+        });
+        if (!retried) {
+          failClosed('PRECONDITION_FAILED', 'Task is not eligible for retry');
+        }
+        return { retried: true as const };
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Retry reason is required') {
+          failClosed('BAD_REQUEST', error.message);
+        }
+        throw error;
       }
-      return { retried: true as const };
-    } catch (error) {
-      if (error instanceof Error && error.message === 'Retry reason is required') {
-        failClosed('BAD_REQUEST', error.message);
-      }
-      throw error;
-    }
-  }),
+    }),
 
   retryPreflight: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user_deletion.preflight.retry',
+        target: inputFieldTarget('other', 'requestId'),
+      },
+    })
     .input(RetryPreflightInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -574,52 +705,91 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
       }
     }),
 
-  verifyTask: adminProcedure.input(VerifyTaskInputSchema).mutation(async ({ ctx, input }) => {
-    try {
-      const verified = await markTaskManuallyVerified({
-        requestId: input.requestId,
-        stepKey: input.stepKey,
-        actorKiloUserId: ctx.user.id,
-        reason: input.reason,
-        evidence: input.evidence,
-      });
-      if (!verified) {
-        failClosed('PRECONDITION_FAILED', 'Task is not eligible for manual verification');
-      }
-      return { verified: true as const };
-    } catch (error) {
-      if (error instanceof Error) {
-        if (
-          error.message === 'Manual verification requires reason and evidence' ||
-          error.message === 'Manual verification evidence must not contain email addresses'
-        ) {
-          failClosed('BAD_REQUEST', error.message);
+  verifyTask: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'user_deletion.task.verify',
+        target: inputFieldTarget('other', 'requestId'),
+      },
+    })
+    .input(VerifyTaskInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      addAdminAuditMetadata({ stepKey: input.stepKey });
+      try {
+        const verified = await markTaskManuallyVerified({
+          requestId: input.requestId,
+          stepKey: input.stepKey,
+          actorKiloUserId: ctx.user.id,
+          reason: input.reason,
+          evidence: input.evidence,
+        });
+        if (!verified) {
+          failClosed('PRECONDITION_FAILED', 'Task is not eligible for manual verification');
         }
+        return { verified: true as const };
+      } catch (error) {
+        if (error instanceof Error) {
+          if (
+            error.message === 'Manual verification requires reason and evidence' ||
+            error.message === 'Manual verification evidence must not contain email addresses'
+          ) {
+            failClosed('BAD_REQUEST', error.message);
+          }
+        }
+        throw error;
       }
-      throw error;
-    }
-  }),
+    }),
 
   substackCredential: adminProcedure.query(async () => {
     return getSubstackCredentialMeta();
   }),
 
   testSubstackCredential: adminProcedure
+    .meta({
+      adminAudit: { kind: 'handler', actions: ['user_deletion.substack_credential.test'] },
+    })
     .input(
       z.object({
         material: z.string().min(1).max(16_000).optional(),
         totpSecret: z.string().max(512).optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      if (input.material) {
-        return testSubstackCredentialMaterial(input.material, input.totpSecret);
-      }
-      const result = await testStoredSubstackCredential();
-      return { result, refreshedCookie: null };
+    .mutation(async ({ ctx, input }) => {
+      const source = input.material ? 'material' : 'stored';
+      addAdminAuditMetadata({ source });
+      const outcome = input.material
+        ? await testSubstackCredentialMaterial(input.material, input.totpSecret)
+        : { result: await testStoredSubstackCredential(), refreshedCookie: null };
+      // The test resolves with an error result rather than throwing, e.g. when
+      // a refreshed stored cookie could not be saved. Its stable code is the
+      // row's errorCode; the credential and the cookie are never recorded.
+      const { result } = outcome;
+      await recordAdminAction(
+        ctx,
+        result.status === 'error'
+          ? {
+              action: 'user_deletion.substack_credential.test',
+              outcome: 'failure',
+              errorCode: result.errorCode,
+              target: null,
+              message: 'Substack credential test failed',
+              metadata: { source },
+            }
+          : {
+              action: 'user_deletion.substack_credential.test',
+              target: null,
+              message: 'Tested Substack credential',
+              metadata: { source, status: result.status },
+            }
+      );
+      return outcome;
     }),
 
   replaceSubstackCredential: adminProcedure
+    .meta({
+      adminAudit: { kind: 'declarative', action: 'user_deletion.substack_credential.replace' },
+    })
     .input(ReplaceCredentialInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -637,7 +807,11 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
       return { stored: true as const };
     }),
 
-  deleteSubstackCredential: adminProcedure.mutation(async () => {
-    return deleteSubstackCredential();
-  }),
+  deleteSubstackCredential: adminProcedure
+    .meta({
+      adminAudit: { kind: 'declarative', action: 'user_deletion.substack_credential.delete' },
+    })
+    .mutation(async () => {
+      return deleteSubstackCredential();
+    }),
 });

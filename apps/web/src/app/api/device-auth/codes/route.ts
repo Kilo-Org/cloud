@@ -21,6 +21,11 @@ import {
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 import { callerAddressOrNull } from '@/lib/auth/caller-address';
 import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
 
 /**
  * The optional body of a pairing request. A caller that names the OAuth client
@@ -90,6 +95,19 @@ async function readPairingBody(request: Request): Promise<ReadRequestBodyResult>
 
 export const POST = withRestTiming('/api/device-auth/codes', async (request: Request) => {
   const headersList = await headers();
+  const attempt: AuthAuditAttempt = { action: 'auth.device_auth.create' };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(headersList, '/api/device-auth/codes'),
+    attempt,
+    () => createPairing(request, headersList, attempt)
+  );
+});
+
+async function createPairing(
+  request: Request,
+  headersList: Headers,
+  attempt: AuthAuditAttempt
+): Promise<Response> {
   const userAgent = headersList.get('user-agent') || undefined;
   const ipAddress = callerAddressOrNull(headersList) ?? undefined;
 
@@ -119,6 +137,7 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
 
   try {
     const {
+      requestId,
       code,
       userCode,
       deviceCode,
@@ -130,6 +149,7 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
       ...(pairingBody.client ? { requestingClient: pairingBody.client } : {}),
       ...(pairingBody.pendingLinkToken ? { pendingLinkToken: pairingBody.pendingLinkToken } : {}),
     });
+    attempt.metadata = { deviceAuthRequestId: requestId };
 
     const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, userCode, {
       app: getDeviceAuthAppModeFromRequestUrl(request.url),
@@ -156,4 +176,4 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
     }
     throw error;
   }
-});
+}

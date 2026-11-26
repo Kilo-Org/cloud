@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
-import type { User } from '@kilocode/db';
+import { admin_action_audit_logs, type User } from '@kilocode/db';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { eq } from 'drizzle-orm';
 import {
   getBenchmarkConfig,
   updateBenchmarkConfig,
@@ -142,5 +144,27 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Invalid benchmark config' });
     expect(mockUpdateBenchmarkConfig).not.toHaveBeenCalled();
+  });
+
+  it('records an update row naming the admin and the router', async () => {
+    await db
+      .delete(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, adminUserFixture().id));
+
+    const response = await PUT(putRequest({ ...validConfig, router: 'frontier' }));
+
+    expect(response.status).toBe(200);
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, adminUserFixture().id));
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auto_routing.benchmark_config.update',
+        outcome: 'success',
+        message: '/admin/api/auto-routing/benchmark-config',
+        metadata: { router: 'frontier' },
+      }),
+    ]);
   });
 });

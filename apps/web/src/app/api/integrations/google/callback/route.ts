@@ -18,6 +18,12 @@ import {
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { oauthStateHash, validOAuthCode } from '@/lib/integrations/oauth/callback-safety';
+import {
+  adminActionContextFromHeaders,
+  runElevatedOrganizationWrite,
+  setAdminAuditOutcome,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
 /**
  * Build the post-OAuth redirect path. The query-string fragment is appended
@@ -132,128 +138,157 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
-    if (verifiedState.owner.type === 'org') {
-      await ensureOrganizationAccess({ user, tokenSource }, verifiedState.owner.id);
-    } else if (verifiedState.owner.id !== user.id) {
+    if (verifiedState.owner.type === 'user' && verifiedState.owner.id !== user.id) {
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
-    const oauthErrorCode = sanitizeOAuthProviderError(error, errorDescription);
-    if (oauthErrorCode) {
-      captureMessage('Google OAuth error', {
-        level: 'warning',
-        tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: oauthSentryContext(searchParams),
-      });
+    const connect = async (): Promise<NextResponse> => {
+      // Names the outcome an elevated organization write records: a
+      // `returnTo` with its own query or fragment keeps the redirect target from
+      // saying it reliably.
+      const failWith = (errorCode: string, path: string) => {
+        setAdminAuditOutcome({ outcome: 'failure', errorCode });
+        return NextResponse.redirect(new URL(path, APP_URL));
+      };
+      const oauthErrorCode = sanitizeOAuthProviderError(error, errorDescription);
+      if (oauthErrorCode) {
+        captureMessage('Google OAuth error', {
+          level: 'warning',
+          tags: { endpoint: 'google/callback', source: 'google_oauth' },
+          extra: oauthSentryContext(searchParams),
+        });
 
-      return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState, `error=${oauthErrorCode}`), APP_URL)
-      );
-    }
-
-    const oauthCode = sanitizeOAuthCode(code);
-    if (!oauthCode) {
-      captureMessage('Google callback missing code', {
-        level: 'warning',
-        tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: oauthSentryContext(searchParams),
-      });
-
-      return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_code'), APP_URL)
-      );
-    }
-
-    const instance = await getInstanceById(verifiedState.instanceId);
-    if (!instance) {
-      captureMessage('Google callback missing target instance', {
-        level: 'warning',
-        tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: {
-          instanceId: verifiedState.instanceId,
-          owner: verifiedState.owner,
-          userId: user.id,
-        },
-      });
-
-      return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_instance'), APP_URL)
-      );
-    }
-
-    const isUserOwnerMatch =
-      verifiedState.owner.type === 'user' &&
-      instance.userId === user.id &&
-      instance.organizationId === null;
-
-    const isOrgOwnerMatch =
-      verifiedState.owner.type === 'org' && instance.organizationId === verifiedState.owner.id;
-
-    if (!isUserOwnerMatch && !isOrgOwnerMatch) {
-      captureMessage('Google callback owner/instance mismatch', {
-        level: 'warning',
-        tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: {
-          owner: verifiedState.owner,
-          instanceId: instance.id,
-          instanceUserId: instance.userId,
-          instanceOrgId: instance.organizationId,
-          userId: user.id,
-        },
-      });
-
-      return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
-    }
-
-    if (verifiedState.owner.type === 'org') {
-      await requireOrganizationKiloClawComputeEntitlement(verifiedState.owner.id);
-    } else {
-      await requireKiloClawAccess(user.id);
-    }
-
-    let oauthData;
-    try {
-      oauthData = await exchangeGoogleOAuthCode(oauthCode, verifiedState.capabilities);
-    } catch (error) {
-      if (error instanceof GoogleOAuthCapabilityScopesNotGrantedError) {
-        return NextResponse.redirect(
-          new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_permissions'), APP_URL)
+        return failWith(
+          'oauth_provider_error',
+          buildGoogleRedirectPath(verifiedState, `error=${oauthErrorCode}`)
         );
       }
-      throw error;
-    }
 
-    const persisted = await upsertKiloClawGoogleOAuthConnection({
-      instanceId: verifiedState.instanceId,
-      accountSubject: oauthData.googleSubject,
-      accountEmail: oauthData.googleEmail,
-      scopes: oauthData.grantedScopes,
-      capabilities: verifiedState.capabilities,
-      refreshToken: oauthData.refreshToken,
-    });
+      const oauthCode = sanitizeOAuthCode(code);
+      if (!oauthCode) {
+        captureMessage('Google callback missing code', {
+          level: 'warning',
+          tags: { endpoint: 'google/callback', source: 'google_oauth' },
+          extra: oauthSentryContext(searchParams),
+        });
 
-    const kiloclawClient = new KiloClawInternalClient();
-    await kiloclawClient.updateGoogleOAuthConnection(
-      user.id,
+        return failWith(
+          'missing_code',
+          buildGoogleRedirectPath(verifiedState, 'error=missing_code')
+        );
+      }
+
+      const instance = await getInstanceById(verifiedState.instanceId);
+      if (!instance) {
+        captureMessage('Google callback missing target instance', {
+          level: 'warning',
+          tags: { endpoint: 'google/callback', source: 'google_oauth' },
+          extra: {
+            instanceId: verifiedState.instanceId,
+            owner: verifiedState.owner,
+            userId: user.id,
+          },
+        });
+
+        return failWith(
+          'missing_instance',
+          buildGoogleRedirectPath(verifiedState, 'error=missing_instance')
+        );
+      }
+
+      const isUserOwnerMatch =
+        verifiedState.owner.type === 'user' &&
+        instance.userId === user.id &&
+        instance.organizationId === null;
+
+      const isOrgOwnerMatch =
+        verifiedState.owner.type === 'org' && instance.organizationId === verifiedState.owner.id;
+
+      if (!isUserOwnerMatch && !isOrgOwnerMatch) {
+        captureMessage('Google callback owner/instance mismatch', {
+          level: 'warning',
+          tags: { endpoint: 'google/callback', source: 'google_oauth' },
+          extra: {
+            owner: verifiedState.owner,
+            instanceId: instance.id,
+            instanceUserId: instance.userId,
+            instanceOrgId: instance.organizationId,
+            userId: user.id,
+          },
+        });
+
+        return failWith('unauthorized', '/claw/settings?error=unauthorized');
+      }
+
+      if (verifiedState.owner.type === 'org') {
+        await requireOrganizationKiloClawComputeEntitlement(verifiedState.owner.id);
+      } else {
+        await requireKiloClawAccess(user.id);
+      }
+
+      let oauthData;
+      try {
+        oauthData = await exchangeGoogleOAuthCode(oauthCode, verifiedState.capabilities);
+      } catch (error) {
+        if (error instanceof GoogleOAuthCapabilityScopesNotGrantedError) {
+          return failWith(
+            'missing_permissions',
+            buildGoogleRedirectPath(verifiedState, 'error=missing_permissions')
+          );
+        }
+        throw error;
+      }
+
+      const persisted = await upsertKiloClawGoogleOAuthConnection({
+        instanceId: verifiedState.instanceId,
+        accountSubject: oauthData.googleSubject,
+        accountEmail: oauthData.googleEmail,
+        scopes: oauthData.grantedScopes,
+        capabilities: verifiedState.capabilities,
+        refreshToken: oauthData.refreshToken,
+      });
+
+      const kiloclawClient = new KiloClawInternalClient();
+      await kiloclawClient.updateGoogleOAuthConnection(
+        user.id,
+        {
+          googleOAuthConnection: {
+            status: persisted.status,
+            accountEmail: persisted.accountEmail,
+            accountSubject: oauthData.googleSubject,
+            scopes: persisted.scopes,
+            capabilities: persisted.capabilities,
+          },
+        },
+        verifiedState.instanceId
+      );
+
+      const successPath = verifiedState.returnTo
+        ? appendQueryParam(verifiedState.returnTo, 'success', 'google_connected')
+        : verifiedState.owner.type === 'org'
+          ? `/organizations/${verifiedState.owner.id}/claw/settings?success=google_connected`
+          : '/claw/settings?success=google_connected';
+
+      setAdminAuditOutcome({ outcome: 'success' });
+      return NextResponse.redirect(new URL(successPath, APP_URL));
+    };
+
+    if (verifiedState.owner.type === 'user') return await connect();
+    await ensureOrganizationAccess({ user, tokenSource }, verifiedState.owner.id);
+    return await runElevatedOrganizationWrite(
+      adminActionContextFromHeaders(user, request.headers),
       {
-        googleOAuthConnection: {
-          status: persisted.status,
-          accountEmail: persisted.accountEmail,
-          accountSubject: oauthData.googleSubject,
-          scopes: persisted.scopes,
-          capabilities: persisted.capabilities,
+        organizationId: verifiedState.owner.id,
+        requiredRoles: ORGANIZATION_ROLES,
+        action: 'organization.google.connect',
+        message: 'Google: OAuth connection stored',
+        metadata: {
+          instanceId: verifiedState.instanceId,
+          capabilities: verifiedState.capabilities,
         },
       },
-      verifiedState.instanceId
+      connect
     );
-
-    const successPath = verifiedState.returnTo
-      ? appendQueryParam(verifiedState.returnTo, 'success', 'google_connected')
-      : verifiedState.owner.type === 'org'
-        ? `/organizations/${verifiedState.owner.id}/claw/settings?success=google_connected`
-        : '/claw/settings?success=google_connected';
-
-    return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {
     console.error('Error handling Google OAuth callback:', error);
 

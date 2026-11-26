@@ -11,6 +11,7 @@ import {
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
@@ -111,6 +112,7 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
   const input = organizationId ? { organizationId } : {};
 
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     mutationFn: (variables: DisconnectVariables) =>
       disconnectIntegration(organizationId, variables),
     onSuccess: async (_result, variables) => {

@@ -13,6 +13,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 function isPersonal(scope: string) {
@@ -407,6 +408,7 @@ export function useCancelReview(scope: string) {
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     mutationFn: cancelReviewMutationFn,
     onSuccess: (_data, vars) => {
       invalidateReviews(vars.reviewId);
@@ -434,6 +436,7 @@ export function useRetriggerReview(scope: string) {
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     mutationFn: retriggerReviewMutationFn,
     onSuccess: (_data, vars) => {
       invalidateReviews(vars.reviewId);
@@ -481,6 +484,7 @@ export function useCreateManualReview(
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     mutationFn: createManualReviewMutationFn.bind(null, scope),
     onSuccess: () => {
       invalidateReviews();

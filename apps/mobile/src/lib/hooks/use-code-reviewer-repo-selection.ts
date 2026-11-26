@@ -14,6 +14,7 @@ import {
 import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { settleReviewerWrite } from '@/lib/hooks/reviewer-settled-refresh';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient } from '@/lib/trpc';
 
 import {
@@ -39,6 +40,7 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
   const refusal = useReviewerBillingRefusal(scope);
 
   return useMutation({
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: RepoSelectionSaveVars) =>
       chainSave(saveChainKey, async () => {

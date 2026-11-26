@@ -12,6 +12,7 @@ import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import {
   type FlattenedSecurityAgentConfig,
   type SecurityAgentConfig,
@@ -91,7 +92,7 @@ export function useSaveSecurityAgentConfig(
     // Attempting the request instead lets it fail through the normal path:
     // onError restores the snapshot and toasts the failure, so Save returns to
     // an enabled retry state with the draft intact.
-    networkMode: 'always',
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: Omit<SecurityAgentConfigPatch, 'expectedRevision'>) => {
       // The server rejects a save whose revision is stale, so send the revision
@@ -198,7 +199,7 @@ export function useSetSecurityAgentEnabled(scope: string) {
     // manager reports offline keeps the switch in its optimistic position with
     // no rollback and no toast, and the queued toggle lands silently after
     // reconnecting. Attempting the request fails through the normal path.
-    networkMode: 'always',
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.setEnabled.mutate>[0]) =>
       isPersonalSecurityScope(scope)
@@ -291,7 +292,7 @@ export function useTriggerSecuritySync(scope: string) {
     // the transport deadline, and the reconcile-first row written above records
     // the ambiguous outcome, so a relaunch offers the reconcile retry instead
     // of blindly re-POSTing.
-    networkMode: 'always',
+    ...MUTATE_WHILE_OFFLINE,
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}
     ) => {

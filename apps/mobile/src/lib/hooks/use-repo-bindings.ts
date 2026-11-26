@@ -7,6 +7,7 @@ import { mergeRepositoryOptions, type RepoOption } from '@/components/profiles/r
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
 import { type AgentRepoBinding } from '@/lib/hooks/agent-profile-types';
 import { keepPreviousDataForQueryKey } from '@/lib/hooks/use-agent-profiles';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 /** Stable empty fallbacks so an unsettled result is not a new array each render. */
@@ -64,11 +65,11 @@ export function useRepoBindingMutations(organizationId?: string) {
   const queryClient = useQueryClient();
   const bindingsFilter = trpc.agentProfiles.listRepoBindings.pathFilter();
 
-  // `networkMode: 'always'` keeps a bind or unbind settling while the online
+  // `MUTATE_WHILE_OFFLINE` keeps a bind or unbind settling while the online
   // manager is offline (NetInfo can misreport while the backend is reachable):
   // the request either succeeds or fails fast, so `isPending` can never stick.
   const callbacks = {
-    networkMode: 'always' as const,
+    ...MUTATE_WHILE_OFFLINE,
     onSuccess: () => {
       void queryClient.invalidateQueries(bindingsFilter);
     },

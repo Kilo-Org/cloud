@@ -11,6 +11,7 @@ import {
   type OrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { isTrialExpiredRefusal, organizationErrorMessage } from '@/lib/server-error-copy';
 import {
@@ -136,6 +137,7 @@ export function useOrganizationMutations(
     // onError policy: roll back the onMutate snapshot (latest generation only);
     // the caller renders the error inline (no toast).
     rename: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { name: string }) =>
         trpcClient.organizations.update.mutate({ organizationId, name: input.name }),
@@ -194,6 +196,7 @@ export function useOrganizationMutations(
     // No onMutationError toast here: invite-member-sheet (the only caller)
     // shows the error inline while it stays open (see Pattern P2).
     invite: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { email: string; role: OrgRole }) =>
         trpcClient.organizations.members.invite.mutate({ organizationId, ...input }),
@@ -202,6 +205,7 @@ export function useOrganizationMutations(
     }),
 
     updateMember: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: {
         memberId: string;
@@ -227,6 +231,7 @@ export function useOrganizationMutations(
     }),
 
     removeMember: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { memberId: string }) =>
         trpcClient.organizations.members.remove.mutate({ organizationId, ...input }),
@@ -242,6 +247,7 @@ export function useOrganizationMutations(
     }),
 
     deleteInvite: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { inviteId: string }) =>
         trpcClient.organizations.members.deleteInvite.mutate({ organizationId, ...input }),
@@ -259,6 +265,7 @@ export function useOrganizationMutations(
     // onError policy: roll back the onMutate snapshot (latest generation only);
     // the caller renders the error inline (no toast).
     updateMinimumBalanceAlert: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: {
         enabled: boolean;

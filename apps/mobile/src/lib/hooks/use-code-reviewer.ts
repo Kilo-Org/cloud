@@ -27,6 +27,7 @@ import {
 } from '@/lib/hooks/reviewer-refusal';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { settleReviewerWrite } from '@/lib/hooks/reviewer-settled-refresh';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
@@ -208,7 +209,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
     // the switch keeps the optimistic position with no rollback and no toast,
     // and the queued toggle lands silently after reconnecting). Attempting the
     // request fails through the normal path instead.
-    networkMode: 'always',
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { isEnabled: boolean }) =>
       // The toggle joins the same chain key the config save uses, so a toggle
@@ -304,7 +305,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
     // silently once the connection returns. Attempting the request instead lets
     // it fail through the normal path: onError restores the previous value and
     // the rejection reaches the screen, which offers the inline Retry.
-    networkMode: 'always',
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: ConfigPatch) =>
       // Rapid taps (e.g. toggling several focus areas in a row) each send a

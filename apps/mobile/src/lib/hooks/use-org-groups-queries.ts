@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -73,6 +74,7 @@ export function useOrgGroupMutations(organizationId: string, canManageBilling = 
 
   return {
     create: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       mutationFn: (input: { name: string; description: string | null }) =>
         trpcClient.organizations.groups.create.mutate({
           organizationId,
@@ -85,6 +87,7 @@ export function useOrgGroupMutations(organizationId: string, canManageBilling = 
       scope,
     }),
     updateDetails: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       mutationFn: (input: {
         groupId: string;
         name: string;
@@ -103,6 +106,7 @@ export function useOrgGroupMutations(organizationId: string, canManageBilling = 
       scope,
     }),
     remove: useMutation({
+      ...MUTATE_WHILE_OFFLINE,
       mutationFn: (input: { groupId: string }) =>
         trpcClient.organizations.groups.delete.mutate({ organizationId, groupId: input.groupId }),
       onSuccess,

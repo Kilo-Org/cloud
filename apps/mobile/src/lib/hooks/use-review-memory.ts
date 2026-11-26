@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { type ProposalDraft } from '@/lib/review-memory-proposals';
 import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
@@ -59,7 +60,7 @@ export function useSetReviewMemoryEnabled(scope: string) {
     // silently once the connection returns. Attempting the request instead
     // lets it fail through the normal path: onError toasts the failure, so
     // the switch returns to an enabled retry state.
-    networkMode: 'always',
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (enabled: boolean) =>
       trpcClient.reviewMemory.setEnabled.mutate({ ...ownerInput, enabled }),
@@ -102,7 +103,7 @@ export function useTriggerReviewMemoryAnalysis(scope: string) {
     // silently later. Attempting the request instead lets it fail through the
     // normal path: onError toasts the failure, so the action returns to an
     // enabled retry state.
-    networkMode: 'always',
+    ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (repoFullName: string) =>
       trpcClient.reviewMemory.triggerAnalysis.mutate({ ...ownerInput, repoFullName }),
@@ -158,10 +159,9 @@ export function useReviewMemoryProposalActions(scope: string) {
   // lands silently once the connection returns. Attempting the request
   // instead lets it fail through the normal path: onError toasts the failure,
   // so the controls return to an enabled retry state.
-  const networkMode = { networkMode: 'always' } as const;
   const save = useMutation(
     trpc.reviewMemory.updateProposal.mutationOptions({
-      ...networkMode,
+      ...MUTATE_WHILE_OFFLINE,
       onError,
       onSettled,
       onSuccess: () => {
@@ -171,7 +171,7 @@ export function useReviewMemoryProposalActions(scope: string) {
   );
   const reject = useMutation(
     trpc.reviewMemory.rejectProposal.mutationOptions({
-      ...networkMode,
+      ...MUTATE_WHILE_OFFLINE,
       onError,
       onSettled,
       onSuccess: () => {
@@ -181,7 +181,7 @@ export function useReviewMemoryProposalActions(scope: string) {
   );
   const approve = useMutation(
     trpc.reviewMemory.approveAndOpenChangeRequest.mutationOptions({
-      ...networkMode,
+      ...MUTATE_WHILE_OFFLINE,
       onError,
       onSettled,
       onSuccess: proposal => {

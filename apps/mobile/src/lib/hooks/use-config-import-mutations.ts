@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
+import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -15,19 +16,19 @@ export function useConfigImportMutations(organizationId?: string) {
   const queryClient = useQueryClient();
   const profilesFilter = trpc.agentProfiles.pathFilter();
 
-  // `networkMode: 'always'` keeps the request settling while the online manager
+  // `MUTATE_WHILE_OFFLINE` keeps the request settling while the online manager
   // is offline (NetInfo can misreport while the backend is reachable), so the
   // sheet's busy state always returns to idle.
   const previewConfigImport = useMutation(
     withOrganization(
-      trpc.agentProfiles.previewConfigImport.mutationOptions({ networkMode: 'always' }),
+      trpc.agentProfiles.previewConfigImport.mutationOptions({ ...MUTATE_WHILE_OFFLINE }),
       organizationId
     )
   );
   const applyConfigImport = useMutation(
     withOrganization(
       trpc.agentProfiles.applyConfigImport.mutationOptions({
-        networkMode: 'always',
+        ...MUTATE_WHILE_OFFLINE,
         onSuccess: () => {
           void queryClient.invalidateQueries(profilesFilter);
         },

@@ -133,6 +133,8 @@ import {
   bouncer_credit_event_outbox,
   bouncer_usage_event_outbox,
   external_side_effect_outbox,
+  microdollar_usage,
+  microdollar_usage_metadata,
   user_data_exports,
   content_moderation_reports,
   user_moderation_blocks,
@@ -203,6 +205,10 @@ import {
   type ParsedImpactReferralTouch,
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
+import {
+  USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
+  USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -1221,6 +1227,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
+ * - Usage prompt prefixes are scrubbed by the `usage_prompt_prefixes` queue step
+ *   (or by the synchronous page helper on the `softDeleteUser` path)
  * - user_auth_provider (auth links with email/avatar)
  * - enrichment_data (GitHub/LinkedIn/Clay PII)
  * - user_admin_notes
@@ -2294,12 +2302,96 @@ export async function anonymizeCloudUserData(
     .where(eq(security_advisor_scans.kilo_user_id, userId));
 }
 
+export type UsagePromptPrefixCursor = {
+  createdAt: string;
+  id: string;
+};
+
+export type UsagePromptPrefixPage = {
+  pageSize: number;
+  updatedCount: number;
+  lastCursor: UsagePromptPrefixCursor | null;
+};
+
+/**
+ * Scrub one bounded page of usage metadata for a user.
+ *
+ * The caller owns the transaction and any queue claim/checkpoint fencing. The
+ * cursor advances over usage rows considered, rather than only rows changed,
+ * so pages that are already scrubbed cannot stall the scan.
+ */
+export async function scrubUsagePromptPrefixesPage(
+  tx: DrizzleTransaction,
+  userId: string,
+  cursor: UsagePromptPrefixCursor | null,
+  limit: number
+): Promise<UsagePromptPrefixPage> {
+  const usageRows = await tx
+    .select({ id: microdollar_usage.id, created_at: microdollar_usage.created_at })
+    .from(microdollar_usage)
+    .where(
+      cursor
+        ? and(
+            eq(microdollar_usage.kilo_user_id, userId),
+            sql`(${microdollar_usage.created_at}, ${microdollar_usage.id}) > (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`
+          )
+        : eq(microdollar_usage.kilo_user_id, userId)
+    )
+    .orderBy(microdollar_usage.created_at, microdollar_usage.id)
+    .limit(limit);
+
+  const lastUsageRow = usageRows.at(-1);
+  if (!lastUsageRow) {
+    return { pageSize: 0, updatedCount: 0, lastCursor: null };
+  }
+
+  const updatedRows = await tx
+    .update(microdollar_usage_metadata)
+    .set({ user_prompt_prefix: null, system_prompt_prefix_id: null })
+    .where(
+      and(
+        inArray(
+          microdollar_usage_metadata.id,
+          usageRows.map(row => row.id)
+        ),
+        or(
+          isNotNull(microdollar_usage_metadata.user_prompt_prefix),
+          isNotNull(microdollar_usage_metadata.system_prompt_prefix_id)
+        )
+      )
+    )
+    .returning({ id: microdollar_usage_metadata.id });
+
+  return {
+    pageSize: usageRows.length,
+    updatedCount: updatedRows.length,
+    lastCursor: { createdAt: lastUsageRow.created_at, id: lastUsageRow.id },
+  };
+}
+
 export async function softDeleteUser(userId: string) {
   const user = await findUserById(userId);
   if (!user) return;
 
   await assertUserCanBeSoftDeleted(userId);
   await deleteUserClaudeProfiles(userId);
+
+  let cursor: UsagePromptPrefixCursor | null = null;
+  while (true) {
+    const page = await db.transaction(async tx => {
+      await tx.execute(
+        sql.raw(`SET LOCAL statement_timeout = ${USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS}`)
+      );
+      return scrubUsagePromptPrefixesPage(
+        tx,
+        userId,
+        cursor,
+        USER_DELETION_USAGE_PREFIX_BATCH_SIZE
+      );
+    });
+    if (page.pageSize < USER_DELETION_USAGE_PREFIX_BATCH_SIZE || !page.lastCursor) break;
+    cursor = page.lastCursor;
+  }
 
   await db.transaction(async tx => {
     await anonymizeCloudUserData(tx, userId);

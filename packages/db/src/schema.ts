@@ -174,6 +174,7 @@ import type {
   OrganizationSettings,
   AuditLogAction,
   BYOKApiKeyEnvelope,
+  CustomLlmCredentialsEnvelope,
   EncryptedData,
   ByocCredentialEnvelope,
   ByocSetupStatus,
@@ -3252,7 +3253,7 @@ export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
-  encrypted_api_key: jsonb().$type<EncryptedData>(),
+  encrypted_api_key: jsonb().$type<CustomLlmCredentialsEnvelope>(),
 });
 
 export type CustomLlm2 = typeof custom_llm2.$inferSelect;

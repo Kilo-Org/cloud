@@ -1,5 +1,7 @@
 import { join } from 'node:path';
+import { UTS_MINT_DEPLOYMENTS } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { experimental_readRawConfig } from 'wrangler';
 import {
   FEED_CONFIG,
@@ -52,6 +54,28 @@ describe('repository Worker configs', () => {
 
   it('keep the two UTS Workers as configured: names, eu jurisdiction, placement, no traces', () => {
     expect(utsConfigProblems(repoConfigs())).toEqual([]);
+  });
+
+  it('deploy the mint Worker under exactly the names @kilocode/uts-contracts exports', () => {
+    expect(UTS_MINT_DEPLOYMENTS).toEqual({
+      production: 'uts',
+      staging: 'uts-staging',
+      development: 'uts-local',
+    });
+    const mint = z
+      .object({
+        name: z.string(),
+        env: z.object({
+          staging: z.object({ name: z.string() }),
+          local: z.object({ name: z.string() }),
+        }),
+      })
+      .parse(configAt(MINT_CONFIG).config);
+    expect([mint.name, mint.env.staging.name, mint.env.local.name]).toEqual([
+      UTS_MINT_DEPLOYMENTS.production,
+      UTS_MINT_DEPLOYMENTS.staging,
+      UTS_MINT_DEPLOYMENTS.development,
+    ]);
   });
 });
 

@@ -410,6 +410,20 @@ describe('notice delivery statements', () => {
     expect(outbox.map(entry => entry.channel)).toEqual(['push', 'email', 'email']);
   });
 
+  it('delivers by email and never retries push after the push receiver refused', async () => {
+    const accountId = await insertAccount(owner);
+    const noticeId = await insertNotice(accountId, 'new_device_network', { deviceKind: 'browser' });
+    const result = await dispatchNotice(
+      noticeDeps({ push: () => 'permanent_failure', email: () => 'sent' }, []),
+      noticeId
+    );
+    expect(result?.finish).toEqual({ outcome: 'finished', delivery: 'delivered' });
+    expect(await attempts(noticeId)).toEqual([
+      { round: 1, channel: 'push', outcome: 'permanent_failure' },
+      { round: 1, channel: 'email', outcome: 'sent' },
+    ]);
+  });
+
   it('fails a notice that no channel could send, and gives up after the third round', async () => {
     const accountId = await insertAccount(owner);
     const refused = await insertNotice(accountId, 'device_sign_in_approved');

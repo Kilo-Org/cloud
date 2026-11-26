@@ -4,11 +4,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   UTS_ENDPOINTS,
+  UTS_MINT_DEPLOYMENTS,
   UTS_SIGNER_KEYS_ENTRYPOINT,
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
-import { FEED_DEPLOYMENTS, MINT_DEPLOYMENTS } from '../../src/env';
+import { FEED_DEPLOYMENTS } from '../../src/env';
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
@@ -290,9 +291,9 @@ function serviceBindingProblems(path: string, block: Block): string[] {
       problems.push(`${where}: env.${block.env} is not a UTS environment`);
       continue;
     }
-    if (binding.service !== MINT_DEPLOYMENTS[environment]) {
+    if (binding.service !== UTS_MINT_DEPLOYMENTS[environment]) {
       problems.push(
-        `${where} binds ${binding.service}; this block must bind ${MINT_DEPLOYMENTS[environment]}`
+        `${where} binds ${binding.service}; this block must bind ${UTS_MINT_DEPLOYMENTS[environment]}`
       );
     }
     if (binding.entrypoint !== UTS_SIGNER_KEYS_ENTRYPOINT) {
@@ -402,7 +403,7 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   }
   const mint = byPath.get(MINT_CONFIG);
   if (mint !== undefined) {
-    const expected = expectedDeployments(MINT_DEPLOYMENTS);
+    const expected = expectedDeployments(UTS_MINT_DEPLOYMENTS);
     if (deployments(mint) !== expected)
       problems.push(`${MINT_CONFIG} deploys ${deployments(mint)}; expected ${expected}`);
     for (const block of blocksOf(mint)) {

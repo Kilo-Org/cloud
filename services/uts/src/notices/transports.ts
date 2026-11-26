@@ -1,3 +1,4 @@
+import type { UtsNoticeKind } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { NOTICE_ATTEMPT_OUTCOMES } from '../db/enums';
 
@@ -21,6 +22,7 @@ export type PushMessage = {
   accountId: string;
   /** One key per notice, so a retried round that already reached the devices is not repeated. */
   idempotencyKey: string;
+  kind: UtsNoticeKind;
   title: string;
   body: string;
 };
@@ -42,15 +44,17 @@ export type NoticeTransports = { push: PushTransport | null; email: EmailTranspo
 export const PROVIDER_TIMEOUT_MS = 10_000;
 
 /**
- * The `notifications` Worker's RPC for a security notice: one push to every Expo token of the
- * user, with no presence, preference or rate-limit suppression (a security notice is never
- * muted), deduplicated by `idempotencyKey`. Its answer uses the outcome vocabulary of that
- * Worker's `dispatchPush`.
+ * The `notifications` Worker's RPC for a security notice, on its named entrypoint
+ * `SecurityNotices`, which the mint Worker binds with its own deployed name as `props.caller`
+ * (`UTS_MINT_DEPLOYMENTS`): one push to every Expo token of the user, with no presence,
+ * preference or rate-limit suppression (a security notice is never muted), deduplicated by
+ * `idempotencyKey`. Its answer uses the outcome vocabulary of that Worker's `dispatchPush`.
  */
 export type SecurityPushService = {
   dispatchSecurityNotice(input: {
     userId: string;
     idempotencyKey: string;
+    kind: UtsNoticeKind;
     title: string;
     body: string;
   }): Promise<unknown>;
@@ -79,7 +83,23 @@ async function withinProviderTimeout<Result>(work: Promise<Result>): Promise<Tim
   }
 }
 
-/** Push through the `notifications` Worker's service binding. */
+function logRefusal(kind: UtsNoticeKind, reason: 'threw' | 'invalid_answer', error?: unknown) {
+  console.error(
+    JSON.stringify({
+      event: 'uts.notice.push_refused',
+      kind,
+      reason,
+      ...(error === undefined ? {} : { error: error instanceof Error ? error.name : 'unknown' }),
+    })
+  );
+}
+
+/**
+ * Push through the `notifications` Worker's service binding. The receiver refuses a wrong caller
+ * or an invalid payload by throwing, or by an answer outside its outcome union; either is a
+ * permanent failure of push for that notice, which is logged and not retried, and email still
+ * goes out. Only a timeout and a `failed` answer are retried.
+ */
 export function notificationsServicePush(service: SecurityPushService): PushTransport {
   return async message => {
     let answer;
@@ -88,16 +108,21 @@ export function notificationsServicePush(service: SecurityPushService): PushTran
         service.dispatchSecurityNotice({
           userId: message.accountId,
           idempotencyKey: message.idempotencyKey,
+          kind: message.kind,
           title: message.title,
           body: message.body,
         })
       );
-    } catch {
-      return 'retryable_failure';
+    } catch (error) {
+      logRefusal(message.kind, 'threw', error);
+      return 'permanent_failure';
     }
     if (answer.status === 'timed_out') return 'retryable_failure';
     const outcome = DispatchOutcomeSchema.safeParse(answer.value);
-    if (!outcome.success) return 'permanent_failure';
+    if (!outcome.success) {
+      logRefusal(message.kind, 'invalid_answer');
+      return 'permanent_failure';
+    }
     switch (outcome.data.kind) {
       case 'delivered':
         return outcome.data.tokenCount > 0 ? 'sent' : 'no_target';

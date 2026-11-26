@@ -219,6 +219,7 @@ describe('notice delivery', () => {
       message: {
         accountId: 'oauth/user-1',
         idempotencyKey: 'uts-notice:00000000-0000-4000-8000-000000000001',
+        kind: 'credential_created',
       },
     });
     expect(outbox[1]).toMatchObject({ message: { to: ['user@example.com'] } });
@@ -451,7 +452,13 @@ describe('Mailgun email', () => {
 });
 
 describe('push through the notifications Worker', () => {
-  const message = { accountId: 'oauth/u', idempotencyKey: 'uts-notice:n', title: 'T', body: 'B' };
+  const message = {
+    accountId: 'oauth/u',
+    idempotencyKey: 'uts-notice:n',
+    kind: 'sessions_revoked',
+    title: 'T',
+    body: 'B',
+  } as const;
 
   it.each([
     [{ kind: 'delivered', tokenCount: 2 }, 'sent'],
@@ -459,6 +466,7 @@ describe('push through the notifications Worker', () => {
     [{ kind: 'duplicate' }, 'sent'],
     [{ kind: 'no_tokens' }, 'no_target'],
     [{ kind: 'failed', error: 'expo' }, 'retryable_failure'],
+    [{ kind: 'refused', error: 'invalid_payload' }, 'permanent_failure'],
     [{ kind: 'something_else' }, 'permanent_failure'],
   ] as const)('maps %o to %s', async (answer, outcome) => {
     const inputs: unknown[] = [];
@@ -470,16 +478,51 @@ describe('push through the notifications Worker', () => {
     });
     expect(await push(message)).toBe(outcome);
     expect(inputs).toEqual([
-      { userId: 'oauth/u', idempotencyKey: 'uts-notice:n', title: 'T', body: 'B' },
+      {
+        userId: 'oauth/u',
+        idempotencyKey: 'uts-notice:n',
+        kind: 'sessions_revoked',
+        title: 'T',
+        body: 'B',
+      },
     ]);
   });
 
-  it('maps a failed call to a retryable failure', async () => {
+  it('takes a thrown refusal, such as a wrong caller, as a permanent failure', async () => {
     const push = notificationsServicePush({
       dispatchSecurityNotice: async () => {
-        throw new Error('binding');
+        throw new Error('caller not allowed');
       },
     });
-    expect(await push(message)).toBe('retryable_failure');
+    expect(await push(message)).toBe('permanent_failure');
+  });
+
+  it('still emails, and does not retry push, when the receiver refuses', async () => {
+    for (const refuse of [
+      async () => {
+        throw new Error('caller not allowed');
+      },
+      async () => ({ kind: 'refused', error: 'invalid_payload' }),
+    ]) {
+      const outbox: RecordedMessage[] = [];
+      const { store, finished } = memoryStore([]);
+      const result = await deliverClaimed(
+        {
+          notices: work => work(store),
+          transports: {
+            push: notificationsServicePush({ dispatchSecurityNotice: refuse }),
+            email: fakeTransports(ALWAYS_SENT, outbox).email,
+          },
+          now: () => CREATED_AT,
+        },
+        claimed('new_device_network')
+      );
+      expect(finished[0].attempts.map(attempt => [attempt.channel, attempt.outcome])).toEqual([
+        ['push', 'permanent_failure'],
+        ['email', 'sent'],
+      ]);
+      expect(outbox.map(entry => entry.channel)).toEqual(['email']);
+      expect(result.finish).toEqual({ outcome: 'finished', delivery: 'delivered' });
+    }
   });
 });

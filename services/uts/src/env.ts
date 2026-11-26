@@ -46,13 +46,6 @@ export type Env = {
   IDENTITY_STORE_REPLICA?: Hyperdrive;
 };
 
-/** The mint Worker's deployed name in each environment. */
-export const MINT_DEPLOYMENTS: Readonly<Record<UtsEnvironment, string>> = {
-  production: 'uts',
-  staging: 'uts-staging',
-  development: 'uts-local',
-};
-
 /**
  * The feed Worker's deployed name in each environment. It is the only caller the `SignerKeys`
  * entrypoint answers, and the `props.caller` its binding carries.

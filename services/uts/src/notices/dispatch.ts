@@ -50,6 +50,7 @@ async function sendOn(
       return await transports.push({
         accountId: claimed.accountId,
         idempotencyKey: `uts-notice:${claimed.noticeId}`,
+        kind: claimed.kind,
         ...noticePush(rendered),
       });
     }

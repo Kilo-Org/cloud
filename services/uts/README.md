@@ -244,8 +244,11 @@ identity-store connection is not held while a provider answers:
    round. A pending notice written more than 24 hours ago is never claimed. The credential claim
    reads only the account's pending notices of the last hour.
 2. Send push, then email, skipping the channels an earlier round settled. Each answers `sent`,
-   `no_target`, `not_configured`, `retryable_failure` or `permanent_failure`; a provider that throws
-   or does not answer within 10 seconds is a retryable failure.
+   `no_target`, `not_configured`, `retryable_failure` or `permanent_failure`; a provider that does
+   not answer within 10 seconds is a retryable failure. The push receiver refuses a wrong caller or
+   an invalid payload by throwing or by an answer outside its outcome union: that is a permanent
+   failure of push for the notice, logged as `uts.notice.push_refused` and never retried, and email
+   still goes out.
 3. Finish (`uts.finish_notice`) with the round's attempts, one `uts.notice_attempts` row each. The
    notice is `pending` again (1 minute after round 1, 5 after round 2) while a planned channel only
    failed retryably, else `delivered` when a channel sent it, else `failed`. A finish under a claim
@@ -267,7 +270,7 @@ credential notice port sends at once, once it is wired with real transports.
 
 | Channel | Provider | Adapter |
 |---|---|---|
-| Push | Expo push through the `notifications` Worker, which holds the users' Expo push tokens and the Expo access token; RPC `dispatchSecurityNotice` with no presence, preference or rate-limit suppression | `notificationsServicePush` |
+| Push | Expo push through the `notifications` Worker, which holds the users' Expo push tokens and the Expo access token: its named entrypoint `SecurityNotices`, bound with the mint Worker's deployed name (`UTS_MINT_DEPLOYMENTS` in `@kilocode/uts-contracts`) as `props.caller`; RPC `dispatchSecurityNotice` `{ userId, idempotencyKey, kind, title, body }` with no presence, preference or rate-limit suppression | `notificationsServicePush` |
 | Email | Mailgun messages API, plain text, tracking off, one message per address | `mailgunEmail` |
 
 Locally both channels use `fakeTransports` (`src/notices/fake-transports.ts`), which send nothing.

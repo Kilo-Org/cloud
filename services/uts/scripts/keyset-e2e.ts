@@ -28,7 +28,8 @@
  *                      Worker and its inspector at +4 and +5
  *
  * The run drops and recreates the database `uts_keyset_e2e`, applies the migrations and writes the
- * run's logs under a new temporary directory, whose path it prints.
+ * run's logs under a new temporary directory, whose path it prints. It stops its Workers when it
+ * ends, also on SIGINT (exit 130) or SIGTERM (exit 143).
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import {
@@ -54,6 +55,7 @@ import {
   UTS_SIGNER_COUNT,
 } from '@kilocode/uts-contracts';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import type pg from 'pg';
 import { z } from 'zod';
 import { openE2eStore } from './e2e-store';
 
@@ -84,8 +86,6 @@ type Jwks = z.infer<typeof JwksSchema>;
 const MetadataSchema = z.object({ issuer: z.url(), jwks_uri: z.url() });
 const SignResponseSchema = z.object({ signer: z.number(), kid: z.string(), token: z.string() });
 
-/** `jose` takes the Node `URL`; the Worker types' `URL` is a different class. */
-const remoteKeys = createRemoteJWKSet(new NodeUrl(JWKS));
 let failures = 0;
 
 function log(step: string, detail: unknown): void {
@@ -107,6 +107,14 @@ const logs = new Map<string, string[]>();
 let mint: Worker | undefined;
 let feed: Worker | undefined;
 let intruder: Worker | undefined;
+let admin: pg.Client | undefined;
+
+/** Set once cleanup starts; no Worker starts after it. */
+let cleaning: Promise<void> | undefined;
+
+/** Rejects when a Worker process cannot be spawned; the start-up waits race on it. */
+const { promise: spawnFailed, reject: failSpawn } = Promise.withResolvers<never>();
+spawnFailed.catch(() => undefined);
 
 function start(
   label: string,
@@ -114,6 +122,7 @@ function start(
   args: readonly string[],
   env: NodeJS.ProcessEnv = {}
 ): Worker {
+  if (cleaning !== undefined) throw new Error('the run is stopping');
   const lines: string[] = [];
   logs.set(label, lines);
   const file = createWriteStream(join(LOGS, `${label}.log`), { flags: 'a' });
@@ -136,6 +145,7 @@ function start(
   child.stdout?.on('data', collect);
   child.stderr?.on('data', collect);
   child.once('exit', () => file.end());
+  child.once('error', error => failSpawn(new Error(`${label} did not start: ${error.message}`)));
   return { label, child };
 }
 
@@ -172,16 +182,16 @@ function errorCode(error: unknown): string {
 }
 
 async function stop(worker: Worker | undefined): Promise<void> {
-  if (worker === undefined) return;
-  const { child } = worker;
-  if (child.exitCode === null && child.signalCode === null && child.pid !== undefined) {
+  const child = worker?.child;
+  if (child?.pid === undefined) return;
+  if (child.exitCode === null && child.signalCode === null) {
     try {
       process.kill(-child.pid, 'SIGTERM');
     } catch {
       // The Worker exited between the check and the signal.
     }
   }
-  if (!(await waitForExit(child, 5000)) && child.pid !== undefined) {
+  if (!(await waitForExit(child, 5000))) {
     try {
       process.kill(-child.pid, 'SIGKILL');
     } catch {
@@ -198,7 +208,7 @@ async function waitForHttp(url: string, name: string): Promise<void> {
       () => false
     );
     if (answered) return;
-    await sleep(1000);
+    await Promise.race([sleep(1000), spawnFailed]);
   }
   throw new Error(`${name} did not answer at ${url}`);
 }
@@ -267,6 +277,31 @@ async function stopAll(): Promise<void> {
   feed = undefined;
   await waitForClosed(MINT);
   await waitForClosed(FEED);
+}
+
+/** Stops every Worker and closes the admin connection, once. */
+function cleanup(): Promise<void> {
+  cleaning ??= (async () => {
+    await stopAll();
+    await admin?.end().catch(() => undefined);
+    console.log(`run directory: ${WORK}`);
+  })();
+  return cleaning;
+}
+
+// `on`, not `once`: pnpm and tsx pass the signal on again, and tsx ends the process when a signal
+// finds no listener, before cleanup finishes. The first signal picks the exit code.
+let signalled = false;
+for (const [signal, code] of [
+  ['SIGINT', 130],
+  ['SIGTERM', 143],
+] as const) {
+  process.on(signal, () => {
+    if (signalled) return;
+    signalled = true;
+    console.log(`keyset e2e: ${signal}, stopping`);
+    void cleanup().finally(() => process.exit(code));
+  });
 }
 
 function age(headers: Headers): number | null {
@@ -409,8 +444,14 @@ async function sign(body: unknown): Promise<Response> {
   });
 }
 
+/** A key set per call, so each verification fetches the set the feed Worker serves now. */
+function remoteKeys() {
+  // `jose` takes the Node `URL`; the Worker types' `URL` is a different class.
+  return createRemoteJWKSet(new NodeUrl(JWKS));
+}
+
 async function verifiedKid(token: string): Promise<string> {
-  const { protectedHeader } = await jwtVerify(token, remoteKeys, {
+  const { protectedHeader } = await jwtVerify(token, remoteKeys(), {
     issuer,
     audience: 'gateway',
     typ: 'at+jwt',
@@ -420,7 +461,7 @@ async function verifiedKid(token: string): Promise<string> {
 }
 
 async function refused(token: string): Promise<string> {
-  return await jwtVerify(token, remoteKeys, { algorithms: ['EdDSA'] }).then(
+  return await jwtVerify(token, remoteKeys(), { algorithms: ['EdDSA'] }).then(
     () => 'accepted',
     error => errorCode(error)
   );
@@ -428,7 +469,7 @@ async function refused(token: string): Promise<string> {
 
 async function main(): Promise<void> {
   const store = await openE2eStore('uts_keyset_e2e');
-  const admin = store.admin;
+  admin = store.admin;
   try {
     rmSync(STATE, { recursive: true, force: true });
     console.log(`== start 1: both Workers, fresh state at ${STATE}`);
@@ -838,9 +879,7 @@ async function main(): Promise<void> {
       process.exitCode = 1;
     }
   } finally {
-    await stopAll();
-    await admin.end().catch(() => undefined);
-    console.log(`run directory: ${WORK}`);
+    await cleanup();
   }
 }
 

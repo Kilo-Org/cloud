@@ -210,8 +210,10 @@ Two runs bring up their own Workers and a fresh identity-store database, so neit
 query parameters, and `UTS_E2E_PORT`, the first of the run's ports (9300 and 9310 by default). Each
 drops and recreates its own database (`uts_keyset_e2e`, `uts_relay_e2e`), applies the migrations,
 and gives `uts_app_a`, `uts_pat_a` and `uts_reader_a` a random password for the run. Roles are
-cluster-wide, so run them one at a time. Each prints a `PASS` line per check, a final pass line and
-the path of its log directory, and exits nonzero when a check fails.
+cluster-wide and the database names and ports are fixed, so run one of them at a time. Each prints
+a `PASS` line per check, a final pass line and the path of its log directory, and exits nonzero
+when a check fails. Both stop their Workers when they end, also on SIGINT (exit 130) or SIGTERM
+(exit 143).
 
 `scripts/keyset-e2e.ts` starts the mint and feed Workers under `wrangler dev`, in one persisted
 state directory, and runs the key-set proof: 36 keys with `Age` and `Kilo-Key-Set-Oldest-Age`
@@ -227,7 +229,11 @@ over two configs (`--env local`) with the local queue and the consumer's R2 arch
 outbox proof: a transaction held open for 7 seconds holds every shard's watermark, 600 rows
 inserted while the app login cannot move a watermark move nothing, 6,000 rows follow once it can,
 terminated relay sessions resend rather than skip, every shard relays, and the archive holds every
-row once, contiguous, in transaction order. A cron run after the drain logs no lag alert.
+row once, contiguous, in transaction order. A cron run after the drain logs no lag alert. The run
+writes a synthetic Axiom token, Slack webhook and loopback Axiom URL to
+`services/audit-relay/.dev.vars` and deletes the file when it ends. It refuses to run (exit 2) when
+`services/audit-relay/.dev.vars` or `.dev.vars.local` (which wrangler reads in its place) already
+exists; move your own file away for the run.
 
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which

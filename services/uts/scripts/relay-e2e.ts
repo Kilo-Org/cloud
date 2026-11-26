@@ -16,7 +16,10 @@
  * Synthetic data only: every event id is random, the identity-store passwords are random per run,
  * and the audit relay's Axiom token and Slack webhook are local values that reach no listener. The
  * run writes both, with a loopback Axiom URL, to `services/audit-relay/.dev.vars` (the file its
- * local run reads), then deletes it or restores the one it found.
+ * local run reads), and deletes it when the run ends, also on SIGINT or SIGTERM. It refuses to run
+ * (exit 2) when that file or `services/audit-relay/.dev.vars.local`, which wrangler reads in its
+ * place, already exists, so a developer's own values are never overwritten and never override the
+ * synthetic ones.
  *
  *   UTS_E2E_ADMIN_URL  admin login to the identity-store database (loopback only)
  *   UTS_E2E_PORT       first of the run's ports (default 9310): the Worker and its inspector
@@ -28,6 +31,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
   createWriteStream,
+  existsSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -52,6 +56,19 @@ const PORT = z.coerce
 const BASE = `http://127.0.0.1:${PORT}`;
 const SYNTHETIC_ORIGIN = `http://127.0.0.1:${PORT + 9}`;
 const UTS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const AUDIT_RELAY_DIR = resolve(UTS_DIR, '../audit-relay');
+const VARS_FILE = join(AUDIT_RELAY_DIR, '.dev.vars');
+const presentVars = [VARS_FILE, join(AUDIT_RELAY_DIR, '.dev.vars.local')].filter(file =>
+  existsSync(file)
+);
+if (presentVars.length > 0) {
+  console.error(
+    `relay e2e: refusing to run, ${presentVars.join(' and ')} exists. The run writes synthetic ` +
+      `values to ${VARS_FILE}, and wrangler reads .dev.vars.local in its place. Move the file ` +
+      'away for the run.'
+  );
+  process.exit(2);
+}
 const WORK = mkdtempSync(join(tmpdir(), 'uts-relay-e2e-'));
 const STATE = join(WORK, 'state');
 
@@ -88,7 +105,19 @@ function check(condition: boolean, message: string): void {
 
 const lines: string[] = [];
 
+/** Set once cleanup starts; nothing new starts after it. */
+let cleaning: Promise<void> | undefined;
+
+function admit(): void {
+  if (cleaning !== undefined) throw new Error('the run is stopping');
+}
+
+/** Rejects when a Worker process cannot be spawned; the start-up wait races on it. */
+const { promise: spawnFailed, reject: failSpawn } = Promise.withResolvers<never>();
+spawnFailed.catch(() => undefined);
+
 function startWrangler(appUrl: string): ChildProcess {
+  admit();
   const file = createWriteStream(join(WORK, 'wrangler.log'), { flags: 'a' });
   const child = spawn(
     './node_modules/.bin/wrangler',
@@ -134,6 +163,9 @@ function startWrangler(appUrl: string): ChildProcess {
   child.stdout?.on('data', collect);
   child.stderr?.on('data', collect);
   child.once('exit', () => file.end());
+  child.once('error', error =>
+    failSpawn(new Error(`wrangler dev did not start: ${error.message}`))
+  );
   return child;
 }
 
@@ -153,15 +185,15 @@ function waitForExit(child: ChildProcess, ms: number): Promise<boolean> {
 }
 
 async function stop(child: ChildProcess | undefined): Promise<void> {
-  if (child === undefined) return;
-  if (child.exitCode === null && child.signalCode === null && child.pid !== undefined) {
+  if (child?.pid === undefined) return;
+  if (child.exitCode === null && child.signalCode === null) {
     try {
       process.kill(-child.pid, 'SIGTERM');
     } catch {
       // The Worker exited between the check and the signal.
     }
   }
-  if (!(await waitForExit(child, 10_000)) && child.pid !== undefined) {
+  if (!(await waitForExit(child, 10_000))) {
     try {
       process.kill(-child.pid, 'SIGKILL');
     } catch {
@@ -178,7 +210,7 @@ async function waitForHttp(url: string): Promise<void> {
       () => false
     );
     if (answered) return;
-    await sleep(1000);
+    await Promise.race([sleep(1000), spawnFailed]);
   }
   throw new Error(`the Worker did not answer at ${url}`);
 }
@@ -290,31 +322,57 @@ const SYNTHETIC_SECRETS = JSON.stringify({
   AUDIT_RELAY_SLACK_WEBHOOK_PAGE: `${SYNTHETIC_ORIGIN}/page`,
 });
 
+/** What the run holds; `cleanup` releases each part. */
+const held: { worker?: ChildProcess; admin?: pg.Client; app?: pg.Client; wroteVars: boolean } = {
+  wroteVars: false,
+};
+
+/** Stops the Worker, deletes the synthetic `.dev.vars` and closes the connections, once. */
+function cleanup(): Promise<void> {
+  cleaning ??= (async () => {
+    await stop(held.worker);
+    if (held.wroteVars) rmSync(VARS_FILE, { force: true });
+    await held.app?.end().catch(() => undefined);
+    await held.admin?.end().catch(() => undefined);
+    console.log(`run directory: ${WORK}`);
+  })();
+  return cleaning;
+}
+
+// `on`, not `once`: pnpm and tsx pass the signal on again, and tsx ends the process when a signal
+// finds no listener, before cleanup finishes. The first signal picks the exit code.
+let signalled = false;
+for (const [signal, code] of [
+  ['SIGINT', 130],
+  ['SIGTERM', 143],
+] as const) {
+  process.on(signal, () => {
+    if (signalled) return;
+    signalled = true;
+    console.log(`relay e2e: ${signal}, stopping`);
+    void cleanup().finally(() => process.exit(code));
+  });
+}
+
 async function main(): Promise<void> {
-  const store = await openE2eStore('uts_relay_e2e');
-  const admin = store.admin;
-  const varsFile = resolve(UTS_DIR, '../audit-relay/.dev.vars');
-  let previousVars: Buffer | null = null;
-  let wroteVars = false;
-  let worker: ChildProcess | undefined;
-  let app: pg.Client | undefined;
   try {
-    if (statSync(varsFile, { throwIfNoEntry: false }) !== undefined) {
-      previousVars = readFileSync(varsFile);
-    }
+    const store = await openE2eStore('uts_relay_e2e');
+    held.admin = store.admin;
+    const admin = store.admin;
+    admit();
+    // `wx` fails if the file appeared after the check at start-up.
     writeFileSync(
-      varsFile,
+      VARS_FILE,
       `AXIOM_URL=${SYNTHETIC_ORIGIN}\nAUDIT_RELAY_LOCAL_SECRETS=${SYNTHETIC_SECRETS}\n`,
-      {
-        mode: 0o600,
-      }
+      { mode: 0o600, flag: 'wx' }
     );
-    wroteVars = true;
-    worker = startWrangler(store.urls.app);
+    held.wroteVars = true;
+    held.worker = startWrangler(store.urls.app);
     await waitForHttp(`${BASE}/`);
     log('wrangler dev', `up on ${BASE}`);
 
-    app = new pg.Client({ connectionString: store.urls.app });
+    const app = new pg.Client({ connectionString: store.urls.app });
+    held.app = app;
     await app.connect();
     await admin.query('SET ROLE uts_owner');
     // The migration creates no partition; the UTS cron creates them one per call. Bring the
@@ -481,14 +539,7 @@ async function main(): Promise<void> {
       process.exitCode = 1;
     }
   } finally {
-    await stop(worker);
-    if (wroteVars) {
-      if (previousVars === null) rmSync(varsFile, { force: true });
-      else writeFileSync(varsFile, previousVars, { mode: 0o600 });
-    }
-    await app?.end().catch(() => undefined);
-    await admin.end().catch(() => undefined);
-    console.log(`run directory: ${WORK}`);
+    await cleanup();
   }
 }
 

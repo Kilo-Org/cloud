@@ -38,6 +38,51 @@ async function readProvider(url: string, headers: Headers) {
   return readBoundedJsonBody(response.body, 1024 * 1024);
 }
 
+async function verifyBitbucketDiffRedirect(
+  scope: ReviewCapability,
+  resource: 'diff' | 'diffstat',
+  url: URL,
+  headers: Headers
+) {
+  const redirect = await fetch(`${scope.apiRoot}/pullrequests/${scope.number}/${resource}`, {
+    headers,
+    redirect: 'manual',
+    signal: AbortSignal.timeout(10_000),
+  });
+  const location = redirect.headers.get('Location');
+  await redirect.body?.cancel();
+  if (redirect.status !== 302 || !location) return false;
+  const expected = new URL(location);
+  if (
+    expected.origin !== url.origin ||
+    expected.pathname !== url.pathname ||
+    expected.username ||
+    expected.password ||
+    expected.hash
+  )
+    return false;
+
+  const requestedOptions = new URLSearchParams(url.search);
+  const expectedOptions = new URLSearchParams(expected.search);
+  if (resource === 'diffstat') {
+    for (const key of ['page', 'pagelen']) {
+      const values = requestedOptions.getAll(key);
+      const [value] = values;
+      if (value !== undefined) {
+        if (values.length !== 1 || !/^[1-9]\d{0,7}$/.test(value)) return false;
+        expected.searchParams.set(key, value);
+      }
+      requestedOptions.delete(key);
+      expectedOptions.delete(key);
+    }
+  }
+  requestedOptions.sort();
+  expectedOptions.sort();
+  if (requestedOptions.toString() !== expectedOptions.toString()) return false;
+  url.search = expected.search;
+  return true;
+}
+
 async function verifyTarget(
   scope: ReviewCapability,
   url: URL,
@@ -46,6 +91,16 @@ async function verifyTarget(
   access: ReviewAccess
 ) {
   if (op === 'git' || op === 'read') return true;
+  if (op === 'bitbucket-diff' || op === 'bitbucket-diffstat') {
+    const redirectHeaders = new Headers(headers);
+    if (op === 'bitbucket-diff') redirectHeaders.set('Accept', 'text/plain');
+    return verifyBitbucketDiffRedirect(
+      scope,
+      op === 'bitbucket-diff' ? 'diff' : 'diffstat',
+      url,
+      redirectHeaders
+    );
+  }
   if (scope.provider === 'github') {
     if (op !== 'summary-edit' && op !== 'summary-read') return true;
     const comment = z

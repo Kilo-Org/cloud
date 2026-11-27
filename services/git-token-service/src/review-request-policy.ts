@@ -48,6 +48,8 @@ const bbComment = z
 export type ReviewOperation =
   | 'read'
   | 'git'
+  | 'bitbucket-diff'
+  | 'bitbucket-diffstat'
   | 'inline'
   | 'summary-create'
   | 'summary-edit'
@@ -102,8 +104,13 @@ export function reviewOperation(
   )
     return 'git';
   if (method === 'POST' && !url.search && gitPath === git + '/git-upload-pack') return 'git';
-  if (!scope.number || (read(method) ? !reviewReadQuery(url, scope) : !!url.search)) return null;
+  if (!scope.number) return null;
   const root = scope.apiRoot;
+  if (scope.provider === 'bitbucket' && read(method)) {
+    if (path.startsWith(root + '/diff/')) return 'bitbucket-diff';
+    if (path.startsWith(root + '/diffstat/')) return 'bitbucket-diffstat';
+  }
+  if (read(method) ? !reviewReadQuery(url, scope) : !!url.search) return null;
   let tail = path.startsWith(root + '/') ? path.slice(root.length) : path === root ? '' : null;
   if (
     scope.provider === 'github' &&
@@ -182,8 +189,7 @@ export function reviewOperation(
       read(method) &&
       (['', '/diff', '/diffstat', '/comments'].some(suffix => tail === pr + suffix) ||
         (tail.startsWith(pr + '/comments/') &&
-          /^\d+$/.test(tail.slice((pr + '/comments/').length))) ||
-        /^\/(diff|diffstat)\/[a-f0-9.]+$/i.test(tail))
+          /^\d+$/.test(tail.slice((pr + '/comments/').length))))
     )
       return 'read';
     const comment = bbComment.safeParse(body);

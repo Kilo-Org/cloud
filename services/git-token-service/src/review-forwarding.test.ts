@@ -298,3 +298,36 @@ it('permits the read requests used by glab mr view --comments and glab mr diff',
     expect(reviewOperation(scope, 'PUT', new URL(root + suffix), {})).toBeNull();
   }
 });
+
+it.each([
+  ['diff', 'main..feature/widgets?from_pullrequest_id=7&topic=true&context=3', ''],
+  ['diff', 'o/r:aaaaaaaaaaaa%0Dbbbbbbbbbbbb', ''],
+  ['diffstat', 'main..feature/widgets?from_pullrequest_id=7&topic=true', '&page=2'],
+])('forwards a Bitbucket %s redirect observed on the assigned PR', async (resource, spec, page) => {
+  const scope = await issue('bitbucket');
+  const target = `${scope.apiRoot}/pullrequests/7/${resource}`;
+  const location = `${scope.apiRoot}/${resource}/${spec}`;
+  const upstream = vi.fn(async (url: string) => {
+    if (url === target) return new Response(null, { status: 302, headers: { Location: location } });
+    if (url === location + page) return new Response('diff content');
+    throw new Error('Unexpected provider request');
+  });
+  vi.stubGlobal('fetch', upstream);
+  const access = { redeem: async () => new Headers() };
+  expect((await forwardReviewRequest(scope, request(target), access)).status).toBe(302);
+  const response = await forwardReviewRequest(scope, request(location + page), access);
+  expect(await response.text()).toBe('diff content');
+
+  upstream.mockClear();
+  const otherDiff = `${scope.apiRoot}/${resource}/main..unrelated`;
+  expect((await forwardReviewRequest(scope, request(otherDiff), access)).status).toBe(403);
+  expect(upstream.mock.calls.map(([url]) => url)).toEqual([target]);
+
+  upstream.mockClear();
+  const changedOptions = new URL(location);
+  changedOptions.searchParams.set('context', '8');
+  expect((await forwardReviewRequest(scope, request(changedOptions.href), access)).status).toBe(
+    403
+  );
+  expect(upstream.mock.calls.map(([url]) => url)).toEqual([target]);
+});

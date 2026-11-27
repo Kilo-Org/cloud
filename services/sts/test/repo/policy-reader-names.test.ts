@@ -15,10 +15,11 @@ import { parseWorkerConfig, workerConfigPaths, type WorkerConfig } from './worke
  *
  * The three artefacts must agree one-to-one:
  * - the policy's `secrets` list,
- * - the reader's `BINDINGS` keys,
+ * - the reader's map keys,
  * - and the wrangler manifest: an entry's binding may never be a `vars` entry, and where the
- *   manifest declares a Secrets Store binding of that name, its `secret_name` is the canonical name
- *   or that name with the `_PROD` alias.
+ *   manifest declares a Secrets Store binding of that name, its `secret_name` is the name the
+ *   lookup name denotes — that name, or that name behind a manager prefix — with or without the
+ *   `_PROD` suffix the first entries used.
  *
  * A name present in one place and absent from another fails only at cutover: the legacy read keeps
  * working while `sts` answers `not_granted`.

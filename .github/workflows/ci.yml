@@ -278,6 +278,8 @@ jobs:
             ai_gateway_secure_proxy:
               - 'apps/ai-gateway-secure-proxy/**'
               - 'packages/ai-gateway-secure-proxy-contracts/**'
+              - 'packages/sts-contracts/**'
+              - 'packages/verify/**'
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -290,6 +292,8 @@ jobs:
             ai_gateway_secure_proxy:
               - 'apps/ai-gateway-secure-proxy/**'
               - 'packages/ai-gateway-secure-proxy-contracts/**'
+              - 'packages/sts-contracts/**'
+              - 'packages/verify/**'
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -387,7 +391,9 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
-              - 'services/sts/wrangler.jsonc'
+              - 'services/*/wrangler.json'
+              - 'services/*/wrangler.jsonc'
+              - 'services/*/wrangler.toml'
               - 'packages/harness-sdk/tsconfig.json'
               - 'package.json'
               - '**/package.json'
@@ -410,7 +416,9 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
-              - 'services/sts/wrangler.jsonc'
+              - 'services/*/wrangler.json'
+              - 'services/*/wrangler.jsonc'
+              - 'services/*/wrangler.toml'
               - 'packages/harness-sdk/tsconfig.json'
               - 'package.json'
               - '**/package.json'
@@ -657,9 +665,11 @@ jobs:
 
       # One install pass links what the remaining steps read: the root project
       # for the wiring suites and the runtime admission, and the usage-ingest
-      # closure because the relay regression executes Wrangler's real config
-      # parser. Lifecycle scripts stay suppressed, as both installs suppressed
-      # them before.
+      # closure because two suites execute Wrangler's real config parser: the
+      # relay regression in scripts/deployment-workflows.test.mjs and the
+      # nonproduction fence in scripts/wrangler-nonproduction-fence.test.mjs.
+      # Lifecycle scripts stay suppressed, as both installs suppressed them
+      # before.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts --filter cloudflare-usage-ingest --filter kilocode-monorepo
 
@@ -695,6 +705,7 @@ jobs:
           scripts/meta-janitor-approve.test.mjs
           scripts/mobile-sbom-workflow.test.mjs
           scripts/sts-deployment-watch.test.mjs
+          scripts/wrangler-nonproduction-fence.test.mjs
 
       # The same split for the release workflow: a PR that changes it alone
       # trips no product filter, and its test runs in no other job, so its

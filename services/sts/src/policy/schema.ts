@@ -96,9 +96,34 @@ export const GithubIdentitySchema = z.strictObject({
   refs: z.array(RefSchema).min(1).max(32).default([GITHUB_PRODUCTION_REF]),
   jobWorkflowRefs: z.array(JobWorkflowRefSchema).min(1).max(32),
   events: z.array(z.enum(GITHUB_EVENTS)).min(1).max(GITHUB_EVENTS.length),
+  /** Accept GitHub's default (name-only) subject too; see `GITHUB_LEGACY_SUBJECT_REPOSITORY`. */
+  legacySubject: z.literal(true).optional(),
 });
 
 export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
+
+/**
+ * The one repository whose policies may set `legacySubject` (decision 2026-11-27): Kilo-Org/kilocode.
+ * Its tokens still carry the default subject `repo:Kilo-Org/kilocode:environment:<env>`, so STS
+ * accepts that form for it; the token's `repository_id` and `repository_owner_id` claims must still
+ * equal these ids, and every other binding still applies, so a renamed or recreated repository with
+ * the same name is refused.
+ *
+ * WHY: npm/cli#9969 (open): npm trusted publishing fails with "package not found" for repositories
+ * using use_immutable_subject, so kilocode cannot turn it on without breaking npm releases; Azure
+ * signing (its federated credential matches `sub`) also needs a new trust entry before the switch.
+ *
+ * HOW TO UPGRADE: when npm fixes #9969 -> add the Azure federated credential for
+ * `repo:Kilo-Org@201822503/kilocode@946087422:ref:refs/heads/main` -> turn on use_immutable_subject
+ * for kilocode -> prove oidc_check on main and v2 -> delete this exception (this constant, the
+ * `legacySubject` field and its loader check, `githubLegacySubject`, and the flag in the seven
+ * `ci-kilocode-*` policies).
+ */
+export const GITHUB_LEGACY_SUBJECT_REPOSITORY = {
+  repository: 'Kilo-Org/kilocode',
+  repositoryId: '946087422',
+  repositoryOwnerId: '201822503',
+} as const;
 
 /**
  * The `sub` a token for this identity must carry: GitHub's immutable format, which names the owner
@@ -108,6 +133,14 @@ export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
 export function githubSubject(identity: GithubIdentity, ref: string): string {
   const [owner, name] = identity.repository.split('/');
   const repository = `repo:${owner}@${identity.repositoryOwnerId}/${name}@${identity.repositoryId}`;
+  return identity.environment === undefined
+    ? `${repository}:ref:${ref}`
+    : `${repository}:environment:${identity.environment}`;
+}
+
+/** GitHub's default subject for a `legacySubject` policy: the immutable form without the ids. */
+export function githubLegacySubject(identity: GithubIdentity, ref: string): string {
+  const repository = `repo:${identity.repository}`;
   return identity.environment === undefined
     ? `${repository}:ref:${ref}`
     : `${repository}:environment:${identity.environment}`;
@@ -609,6 +642,16 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   if (!policy.workload.startsWith(GITHUB_WORKLOAD_PREFIX)) {
     problems.push(
       `a github-oidc workload is named ${GITHUB_WORKLOAD_PREFIX}<job>; its bundle folder is /ci/<workload>`
+    );
+  }
+  if (
+    identity.legacySubject === true &&
+    (identity.repository !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repository ||
+      identity.repositoryId !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryId ||
+      identity.repositoryOwnerId !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryOwnerId)
+  ) {
+    problems.push(
+      `identity.legacySubject is allowed only for ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repository} (repository id ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryId}, owner id ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryOwnerId})`
     );
   }
   if (hasDuplicates(identity.refs)) problems.push('identity.refs contains a duplicate');

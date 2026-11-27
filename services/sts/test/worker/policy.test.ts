@@ -323,6 +323,35 @@ ${options.extra ?? ''}`;
       );
     });
 
+    it('allows identity.legacySubject only for Kilo-Org/kilocode with its ids', () => {
+      const kilocode = (repository: string, repositoryId: string, ownerId: string) =>
+        github({
+          repository,
+          workflows: `[${repository}/.github/workflows/publish.yml@refs/heads/main]`,
+          identity: '\n  legacySubject: true',
+        })
+          .replace("repositoryId: '123'", `repositoryId: '${repositoryId}'`)
+          .replace("repositoryOwnerId: '456'", `repositoryOwnerId: '${ownerId}'`);
+      const loaded = loadPolicies({
+        'ci-release.yaml': kilocode('Kilo-Org/kilocode', '946087422', '201822503'),
+      });
+      expect(loaded.get('production', 'ci-release')?.identity).toMatchObject({
+        legacySubject: true,
+      });
+      expect(loaded.snapshot('production')[0]?.identity).toMatch(/\|legacy-subject$/);
+      for (const [repository, repositoryId, ownerId] of [
+        ['acme/repo', '123', '456'],
+        ['Kilo-Org/kilocode', '1395255492', '201822503'],
+        ['Kilo-Org/kilocode', '946087422', '1'],
+        ['Kilo-Org/bouncer', '946087422', '201822503'],
+      ] as const) {
+        expectThrow(
+          { 'ci-release.yaml': kilocode(repository, repositoryId, ownerId) },
+          'identity.legacySubject is allowed only for Kilo-Org/kilocode'
+        );
+      }
+    });
+
     it('rejects a workflow of another repository, a wildcard, and a ref refs does not list', () => {
       expectThrow(
         {

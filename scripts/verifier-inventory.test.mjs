@@ -146,10 +146,7 @@ const SURFACES = [
   {
     entry: 'services/usage-ingest',
     dir: 'services/usage-ingest',
-    evidence: [
-      ['services/usage-ingest/src/publish-usage.ts', 'primitive'],
-      ['services/usage-ingest/src/publish-tagged-usage.ts', 'primitive'],
-    ],
+    evidence: [['services/usage-ingest/src/publish-auth.ts', 'primitive']],
   },
   {
     entry: 'services/o11y',

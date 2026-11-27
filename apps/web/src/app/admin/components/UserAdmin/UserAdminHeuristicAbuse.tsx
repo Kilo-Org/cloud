@@ -89,6 +89,12 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
     render: row => row.http_user_agent || 'N/A',
     visible: true,
   },
+  {
+    key: 'system_prompt_kind',
+    title: 'Guessed Client',
+    render: row => row.system_prompt_kind ?? 'N/A',
+    visible: true,
+  },
   { key: 'model', title: 'Model', render: row => row.model || 'N/A', visible: true },
   {
     key: 'requested_model',
@@ -141,24 +147,6 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
     title: 'middle_out',
     render: row => (row.has_middle_out_transform ? 'Yes' : 'No'),
     visible: true,
-  },
-  {
-    key: 'user_prompt_prefix',
-    title: 'User Prompt Prefix',
-    render: row => row.user_prompt_prefix || 'N/A',
-    visible: true,
-  },
-  {
-    key: 'system_prompt_prefix',
-    title: 'System Prompt Prefix',
-    render: row => row.system_prompt_prefix || 'N/A',
-    visible: true,
-  },
-  {
-    key: 'system_prompt_kind',
-    title: 'Guessed Client',
-    render: row => row.system_prompt_kind ?? 'N/A',
-    visible: false,
   },
   {
     key: 'cache_write_tokens',
@@ -607,11 +595,7 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
                           key={String(column.key)}
                           className={`px-1 ${column.key === 'abuse_classification' ? getAbuseStatusColor(item) : ''} max-w-xs truncate`}
                           title={
-                            [
-                              'user_prompt_prefix',
-                              'system_prompt_prefix',
-                              'http_user_agent',
-                            ].includes(String(column.key))
+                            column.key === 'http_user_agent'
                               ? (item[column.key] as string) || 'N/A'
                               : undefined
                           }

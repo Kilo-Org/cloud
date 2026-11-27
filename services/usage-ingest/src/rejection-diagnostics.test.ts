@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { usage } from './usage.test-fixture';
+import { usage, wireUsage } from './usage.test-fixture';
 import worker from './index';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import { type Env } from './publish-usage';
@@ -86,7 +86,7 @@ describe('authenticated rejection diagnostics at the handler boundary', () => {
     const logs = capture();
     const { env, send } = setup();
     const core = { ...usage.core, cost: 1.5, created_at: marker, organization_id: marker };
-    const metadata = { ...usage.metadata, api_kind: marker, user_prompt_prefix: marker };
+    const metadata = { ...usage.metadata, api_kind: marker, http_user_agent: marker };
     const req = request(JSON.stringify({ ...usage, core, metadata, [marker]: marker }), {
       Cookie: marker,
       'X-Private': marker,
@@ -290,7 +290,7 @@ describe('authenticated rejection diagnostics at the handler boundary', () => {
       return value;
     });
     await vi.waitFor(() =>
-      expect(send).toHaveBeenCalledExactlyOnceWith(usage, { contentType: 'json' })
+      expect(send).toHaveBeenCalledExactlyOnceWith(wireUsage, { contentType: 'json' })
     );
     expect(responded).toBe(false);
     accepted.resolve(queueResult);

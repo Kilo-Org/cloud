@@ -160,7 +160,12 @@
   "env": {
     "dev": {
       "name": "security-auto-analysis-dev",
+      "routes": [],
       "workers_dev": false,
+      "preview_urls": false,
+      "triggers": {
+        "crons": [],
+      },
       "vars": {
         "ENVIRONMENT": "development",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
@@ -178,7 +183,7 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

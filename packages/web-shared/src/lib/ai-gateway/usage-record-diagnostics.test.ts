@@ -18,7 +18,7 @@ describe('shared usage completion observations', () => {
   const usage = {
     id: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
     created_at: '2026-04-29T01:16:12.945Z',
-    user_prompt_prefix: 'sensitive-prompt',
+    http_user_agent: 'sensitive-agent',
     secret: 'sensitive-secret',
   };
   const recorded = {
@@ -379,14 +379,14 @@ describe('stackFramesUnderHeader', () => {
     );
   });
 
-  // A user pasting a stack trace into their prompt is routine for a coding
-  // assistant, and `user_prompt_prefix` is interpolated into the message. Anchoring
-  // on the first frame-shaped line would start the slice inside the message and
-  // carry the remaining parameters — client IP, city — into the result.
-  test('does not leak parameters when the prompt itself contains a stack trace', () => {
-    const prompt = 'Fix this:\n    at handler (app.js:10:5)\n    at run (app.js:2:1)';
+  // A client-controlled value, such as a user agent, can contain a stack trace and
+  // is interpolated into the message. Anchoring on the first frame-shaped line would
+  // start the slice inside the message and carry the remaining parameters — client
+  // IP, city — into the result.
+  test('does not leak parameters when a parameter itself contains a stack trace', () => {
+    const userAgent = 'Fix this:\n    at handler (app.js:10:5)\n    at run (app.js:2:1)';
     const error = new Error(
-      `Failed query: WITH microdollar_usage_ins AS (...)\nparams: 3f5826e7,${prompt},134.82.68.167,Miami`
+      `Failed query: WITH microdollar_usage_ins AS (...)\nparams: 3f5826e7,${userAgent},134.82.68.167,Miami`
     );
     error.name = 'DrizzleQueryError';
 
@@ -452,7 +452,7 @@ describe('isUsageRowConflict', () => {
   test.each([
     'http_ip',
     'http_user_agent',
-    'system_prompt_prefix',
+    'system_prompt_kind',
     'ja4_digest',
     'vercel_ip_city',
     'finish_reason',

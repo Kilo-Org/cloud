@@ -1,8 +1,5 @@
-import type { EncryptedData } from '@kilocode/db/schema-types';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { sealOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connection-encryption';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { TEST_BYOK_DATA_KEY } from './byok-kms.helper';
 
 /**
@@ -20,11 +17,4 @@ export function sealedOpenAiChatGptConnectionColumns(connection: OpenAiChatGptCo
       kms_key_version: '1',
     },
   });
-}
-
-/** A static-key ciphertext of the kind written before the KMS migration. Nothing reads it any more. */
-export function staticKeyOpenAiChatGptConnection(
-  connection: OpenAiChatGptConnection
-): EncryptedData {
-  return encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY);
 }

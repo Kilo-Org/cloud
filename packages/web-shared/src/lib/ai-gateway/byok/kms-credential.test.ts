@@ -1,19 +1,15 @@
 import { describe, expect, it } from '@jest/globals';
-import { createHash } from 'node:crypto';
-import type { KmsCredentialEnvelope } from '@kilocode/db/schema-types';
-import type { ByokDataKey } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
+import {
+  encryptByokWithDataKey,
+  type ByokDataKey,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import {
   TEST_BYOK_DATA_KEY,
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
-import {
-  assertSealable,
-  CredentialKmsError,
-  OBSOLETE_STATIC_KEY_PLACEHOLDER,
-  openKmsCredential,
-  sealKmsCredential,
-} from './kms-credential';
+import { assertSealable, CredentialKmsError, openKmsCredential } from './kms-credential';
 
 const kms = useFakeByokKms();
 
@@ -31,9 +27,9 @@ const context: ByokKmsContext = {
   provider_id: 'provider-1',
 };
 
-describe('sealKmsCredential and openKmsCredential', () => {
+describe('encryptByokWithDataKey and openKmsCredential', () => {
   it('round-trips a credential through the envelope, binding the decrypt to the context', async () => {
-    const envelope = sealKmsCredential('secret-value', dataKey);
+    const envelope = encryptByokWithDataKey('secret-value', dataKey);
 
     await expect(openKmsCredential(envelope, () => context)).resolves.toBe('secret-value');
 
@@ -51,7 +47,7 @@ describe('sealKmsCredential and openKmsCredential', () => {
   });
 
   it('keeps the plaintext out of the envelope and records the data key that wraps it', () => {
-    const envelope = sealKmsCredential('secret-value', dataKey);
+    const envelope = encryptByokWithDataKey('secret-value', dataKey);
 
     expect(JSON.stringify(envelope)).not.toContain('secret-value');
     expect(envelope).toMatchObject({
@@ -63,22 +59,15 @@ describe('sealKmsCredential and openKmsCredential', () => {
     });
   });
 
-  it('records the digest of the placeholder, which only a rollback to the dual-write release reads', () => {
-    const envelope = sealKmsCredential('secret-value', dataKey);
-
-    expect(envelope.legacy_digest).toBe(createHash('sha256').update('..').digest('hex'));
-    expect(OBSOLETE_STATIC_KEY_PLACEHOLDER).toEqual({ iv: '', data: '', authTag: '' });
-  });
-
   it('gives each seal its own ciphertext', () => {
-    expect(sealKmsCredential('secret-value', dataKey).encrypted_data).not.toEqual(
-      sealKmsCredential('secret-value', dataKey).encrypted_data
+    expect(encryptByokWithDataKey('secret-value', dataKey).encrypted_data).not.toEqual(
+      encryptByokWithDataKey('secret-value', dataKey).encrypted_data
     );
   });
 
   it('passes the envelope it opens to the context callback', async () => {
-    const envelope = sealKmsCredential('secret-value', dataKey);
-    const seen: KmsCredentialEnvelope[] = [];
+    const envelope = encryptByokWithDataKey('secret-value', dataKey);
+    const seen: BYOKApiKeyEnvelope[] = [];
 
     await openKmsCredential(envelope, opened => {
       seen.push(opened);
@@ -100,7 +89,7 @@ describe('sealKmsCredential and openKmsCredential', () => {
 
 describe('openKmsCredential when the KMS service fails', () => {
   it('throws a CredentialKmsError that names the cause and keeps the plaintext out of it', async () => {
-    const envelope = sealKmsCredential('secret-value', dataKey);
+    const envelope = encryptByokWithDataKey('secret-value', dataKey);
     kms.fail('/decrypt', 403);
     // A binding no earlier test decrypted, so no cached data key answers in place of KMS.
     const uncachedContext = { ...context, key_id: crypto.randomUUID() };
@@ -117,8 +106,8 @@ describe('openKmsCredential when the KMS service fails', () => {
   });
 
   it('throws a CredentialKmsError when the data key does not open the ciphertext', async () => {
-    const envelope = sealKmsCredential('secret-value', dataKey);
-    const wrongKeyEnvelope = sealKmsCredential('secret-value', {
+    const envelope = encryptByokWithDataKey('secret-value', dataKey);
+    const wrongKeyEnvelope = encryptByokWithDataKey('secret-value', {
       ...dataKey,
       data_key: Buffer.alloc(32, 9).toString('base64'),
     });

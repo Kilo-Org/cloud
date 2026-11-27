@@ -1743,7 +1743,6 @@ export async function anonymizeCloudUserData(
   await tx.execute(sql`
      UPDATE coding_plan_key_inventory
      SET status = 'revocation_pending',
-         encrypted_api_key = NULL,
          encrypted_api_key_envelope = NULL,
          assigned_to_user_id = NULL,
          revocation_requested_at = now(),

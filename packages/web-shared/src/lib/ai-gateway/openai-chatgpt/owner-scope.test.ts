@@ -138,31 +138,31 @@ describe('openai-chatgpt owner scope (real database)', () => {
   it('advances updated_at when a reconnect replaces the connection', async () => {
     const org = await createTestOrganization(`ChatGPT Org C ${randomUUID()}`, user.id, 0);
     const owner = { kiloUserId: user.id, organizationId: org.id };
-    const readUpdatedAt = async () => {
-      const [row] = await db
-        .select({ updated_at: openai_chatgpt_connections.updated_at })
-        .from(openai_chatgpt_connections)
-        .where(
-          and(
-            eq(openai_chatgpt_connections.kilo_user_id, user.id),
-            eq(openai_chatgpt_connections.organization_id, org.id)
-          )
-        );
-      return new Date(row.updated_at).getTime();
-    };
+    const ownRow = and(
+      eq(openai_chatgpt_connections.kilo_user_id, user.id),
+      eq(openai_chatgpt_connections.organization_id, org.id)
+    );
+    // A fixed older value, so the assertion does not depend on how far apart the two saves run.
+    const staleUpdatedAt = '2000-01-01T00:00:00.000Z';
     try {
       await saveOpenAiChatGptConnection(
         owner,
         connection(`first-${randomUUID()}@example.com`),
         user.id
       );
-      const firstUpdatedAt = await readUpdatedAt();
+      await db.update(openai_chatgpt_connections).set({ updated_at: staleUpdatedAt }).where(ownRow);
       await saveOpenAiChatGptConnection(
         owner,
         connection(`second-${randomUUID()}@example.com`),
         user.id
       );
-      expect(await readUpdatedAt()).toBeGreaterThan(firstUpdatedAt);
+      const [row] = await db
+        .select({ updated_at: openai_chatgpt_connections.updated_at })
+        .from(openai_chatgpt_connections)
+        .where(ownRow);
+      expect(new Date(row.updated_at).getTime()).toBeGreaterThan(
+        new Date(staleUpdatedAt).getTime()
+      );
     } finally {
       // Deleting the organization cascades to its connection rows.
       await db.delete(organizations).where(eq(organizations.id, org.id));

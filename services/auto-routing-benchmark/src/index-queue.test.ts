@@ -100,9 +100,9 @@ describe('queue handler — DLQ branch', () => {
   it('acks dead-lettered messages after processDeadLetter succeeds', async () => {
     const { batch, messages } = fakeBatch('auto-routing-benchmark-dlq', [{ runId: 'r1' }]);
 
-    await worker.queue(batch, env);
+    await worker.queue(batch, env, executionCtx);
 
-    expect(processDeadLetter).toHaveBeenCalledWith(env, { runId: 'r1' });
+    expect(processDeadLetter).toHaveBeenCalledWith(env, { runId: 'r1' }, executionCtx);
     expect(messages[0].ack).toHaveBeenCalled();
   });
 
@@ -184,11 +184,11 @@ describe('queue handler — jobs branch', () => {
 describe('scheduled router queues', () => {
   it('drains both routers on frequent ticks', async () => {
     vi.mocked(sweepStaleRunsAndDrain).mockResolvedValue({ staleRunIds: [], drained: [] });
-    await worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env);
-    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'efficient');
-    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
-    expect(continueDailyReconcile).toHaveBeenCalledWith(env, 'efficient');
-    expect(continueDailyReconcile).toHaveBeenCalledWith(env, 'frontier');
+    await worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env, executionCtx);
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'efficient', executionCtx);
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier', executionCtx);
+    expect(continueDailyReconcile).toHaveBeenCalledWith(env, 'efficient', { ctx: executionCtx });
+    expect(continueDailyReconcile).toHaveBeenCalledWith(env, 'frontier', { ctx: executionCtx });
     expect(dailyReconcileSubscriptions).not.toHaveBeenCalled();
   });
 
@@ -198,19 +198,21 @@ describe('scheduled router queues', () => {
     vi.mocked(drainQueues).mockResolvedValue([]);
     vi.mocked(publishPlatformRoutingTable).mockResolvedValue(null);
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
+    await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env, executionCtx);
     expect(sweepStaleRuns).toHaveBeenCalledTimes(2);
     expect(dailyReconcileSubscriptions).toHaveBeenCalledTimes(2);
     for (const router of ['efficient', 'frontier'] as const) {
-      expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, router);
-      expect(dailyReconcileSubscriptions).toHaveBeenCalledWith(env, router);
+      expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, router, executionCtx);
+      expect(dailyReconcileSubscriptions).toHaveBeenCalledWith(env, router, { ctx: executionCtx });
       const dailyCall = vi.mocked(dailyReconcileSubscriptions).mock.invocationCallOrder[
         router === 'efficient' ? 0 : 1
       ];
       expect(dailyCall).toBeLessThan(
         vi.mocked(syncPlatformRegistry).mock.invocationCallOrder[router === 'efficient' ? 0 : 1]
       );
-      expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, router);
+      expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, router, {
+        ctx: executionCtx,
+      });
       expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, router);
     }
     const summaries = log.mock.calls
@@ -230,11 +232,13 @@ describe('scheduled router queues', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(
-      worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env)
+      worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env, executionCtx)
     ).rejects.toThrow('Benchmark scheduled routers failed');
 
-    expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, 'efficient');
-    expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, 'efficient');
+    expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, 'efficient', executionCtx);
+    expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, 'efficient', {
+      ctx: executionCtx,
+    });
     expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, 'efficient');
     expect(warn).toHaveBeenCalledWith(
       JSON.stringify({
@@ -256,10 +260,12 @@ describe('scheduled router queues', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(
-      worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env)
+      worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env, executionCtx)
     ).rejects.toThrow('Benchmark scheduled routers failed');
 
-    expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, 'efficient');
+    expect(drainQueues).toHaveBeenCalledWith(env, 'both', undefined, 'efficient', {
+      ctx: executionCtx,
+    });
     expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, 'efficient');
     expect(warn).toHaveBeenCalledWith(
       JSON.stringify({
@@ -280,7 +286,7 @@ describe('scheduled router queues', () => {
       owners: { status: 'pending', reconciled: 200, pages: 2 },
     });
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await worker.scheduled({ cron: '* * * * *' } as ScheduledController, env);
+    await worker.scheduled({ cron: '* * * * *' } as ScheduledController, env, executionCtx);
     const tick = log.mock.calls
       .map(([message]) => JSON.parse(String(message)) as Record<string, unknown>)
       .find(entry => entry.event === 'benchmark_queue_drain_tick_completed');
@@ -296,8 +302,8 @@ describe('scheduled router queues', () => {
       .mockRejectedValueOnce(new Error('efficient queue failed'))
       .mockResolvedValueOnce({ staleRunIds: [], drained: [] });
     await expect(
-      worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env)
+      worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env, executionCtx)
     ).rejects.toThrow('Benchmark scheduled routers failed');
-    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier', executionCtx);
   });
 });

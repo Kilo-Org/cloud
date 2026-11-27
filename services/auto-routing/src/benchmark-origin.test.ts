@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { forwardClientEval } from './benchmark-origin';
+import type * as SecretsModule from './secrets';
 import type { AutoRoutingSecretName, AutoRoutingSecretsEnv } from './secrets';
 
 /**
@@ -12,7 +13,7 @@ import type { AutoRoutingSecretName, AutoRoutingSecretsEnv } from './secrets';
 const readSecret = vi.hoisted(() => vi.fn());
 
 vi.mock('./secrets', async importOriginal => {
-  const actual = await importOriginal<typeof import('./secrets')>();
+  const actual = await importOriginal<typeof SecretsModule>();
   return {
     ...actual,
     readAutoRoutingSecret: async (

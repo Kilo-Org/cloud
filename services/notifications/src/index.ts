@@ -17,6 +17,7 @@ import {
   callerLabel,
   internalAuthAnalyticsSink,
   observeInternalAuth,
+  type InternalAuthAnalyticsBinding,
 } from '@kilocode/worker-utils/internal-auth-observation';
 import { useWorkersLogger } from 'workers-tagged-logger';
 
@@ -111,7 +112,8 @@ app.post('/v1/badges/mark-read', async c => {
 async function hasValidInternalSecret(
   c: {
     req: { header(name: string): string | undefined };
-    env: Env;
+    /** The counter dataset is optional: a deployment without it writes no data points. */
+    env: Env & { INTERNAL_AUTH_COUNTER?: InternalAuthAnalyticsBinding };
     executionCtx: SecretsExecutionContext;
   },
   route: string

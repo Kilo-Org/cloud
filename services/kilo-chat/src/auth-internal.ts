@@ -6,6 +6,8 @@ import {
   observeInternalAuth,
 } from '@kilocode/worker-utils/internal-auth-observation';
 import { logger } from './util/logger';
+import { readKiloChatSecret } from './secrets';
+import { requestContext } from './util/request-context';
 import type { AuthContext } from './auth';
 
 /**
@@ -28,7 +30,7 @@ export const internalApiMiddleware = createMiddleware<{
 
   let secret: string;
   try {
-    secret = await c.env.INTERNAL_API_SECRET.get();
+    secret = await readKiloChatSecret(c.env, 'INTERNAL_API_SECRET', requestContext(c));
   } catch (err) {
     logger.error('Failed to read INTERNAL_API_SECRET', { err: String(err) });
     return c.json({ error: 'Server configuration error' }, 500);

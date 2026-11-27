@@ -5,6 +5,7 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { AttestEnv } from './attest/config';
 import type { UtsAuditRelayDO } from './dos/UtsAuditRelayDO';
 import type { UtsKeySetDO } from './dos/UtsKeySetDO';
 import type { UtsManagerAuthDO } from './dos/UtsManagerAuthDO';
@@ -141,7 +142,8 @@ export type Env = {
   KILO_WEB_CLIENT_JWKS?: string;
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
-} & SignInEnv;
+} & SignInEnv &
+  AttestEnv;
 
 /**
  * The feed Worker's deployed name in each environment. It is the only caller the `SignerKeys`

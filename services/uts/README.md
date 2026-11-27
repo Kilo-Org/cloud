@@ -351,6 +351,89 @@ about ceil(N / 5,000) cron cycles (about 20 at 100k); the operator path retries 
 rather than treating it as a failure. Once it succeeds, no family comes back. The batches write
 no audit row; the operator action that blocks or unblocks the client writes it.
 
+## Mobile attestation
+
+`kilo-mobile` needs device attestation at its code exchange (design 5.5, decision Q67): iOS App
+Attest and Android Play Integrity (`src/attest/`, migration 0017). The client is served only
+where the environment's attestation config is complete (`src/attest/config.ts`); anything less
+refuses it at `/authorize` with `unauthorized_client` and logs `uts.attestation.misconfigured`
+with the names (never the values) of what is missing. Development with no attestation value at
+all serves it without attestation, for the local tests.
+
+| Name | Kind | Value |
+|---|---|---|
+| `ATTEST_APPLE_TEAM_ID` | var | the Apple Developer team id (10 characters) |
+| `ATTEST_APPLE_BUNDLE_ID` | var | the iOS bundle id; with the team id it is the App ID whose SHA-256 is the RP ID hash |
+| `ATTEST_PLAY_INTEGRITY_PACKAGE_NAME` | var | the Android package name |
+| `ATTEST_PLAY_INTEGRITY_CERT_DIGESTS` | var | comma-separated SHA-256 digests of the accepted app signing certificates (Play Console hex, with or without colons, or base64url) |
+| `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` | secret | the JSON key of a Google service account allowed to call `decodeIntegrityToken` in the Cloud project linked to the app |
+| `ATTEST_DEV_ENDPOINTS` | development only | a stand-in App Attest root and Play Integrity origin on loopback; set anywhere else it refuses the client |
+
+The Apple App Attestation Root CA is pinned in code (`APPLE_APP_ATTEST_ROOT`, checked by its
+SHA-256). Google's token endpoint and API URLs are fixed; the key file's `token_uri` is ignored.
+
+**App contract.** The challenge is the lowercase hex SHA-256 of
+`kilo-uts-attestation-v1:<code>` (`@kilocode/uts-contracts` `attestation.ts`), with the code as the
+redirect delivered it. The token request adds:
+
+| `attestation_type` | `attestation_key_id` | `attestation` |
+|---|---|---|
+| `app_attest_key` (the install holds no key for UTS: first sign-in, or after `attestation_required`) | the new key's id, standard base64 | `attestKey(keyId, challenge)`, standard base64 |
+| `app_attest_assertion` (every other sign-in) | the stored key's id | `generateAssertion(keyId, challenge)`, standard base64 |
+| `play_integrity` | absent | the token of a standard request whose `requestHash` is the challenge itself (`requestIntegrityCheckAsync(challenge)`), as returned |
+
+App Attest signs `SHA-256(UTF-8(challenge))` as its client data hash. Once `attestKey` ran for a
+key, the app stores its id and sends only assertions for it, also when the attestation's answer
+was lost; it attests a new key only after `attestation_required`. An exchange without an
+attestation, an assertion of a key UTS does not hold, or an attestation of a key UTS holds
+already answers `attestation_required` (400) and leaves the code usable while its 60 seconds
+last. A refused attestation answers `invalid_grant` and the code never exchanges. A dependency
+failure answers 503 with `Retry-After`; the app retries the same exchange. A retry of an attested
+exchange (same code, verifier and DPoP key, a fresh proof) needs no attestation and gets the same
+grant. UTS treats the Play Integrity token as opaque (base64url characters and dots, at most 16
+KiB); `decodeIntegrityToken` decides.
+
+**Checks.** App Attest: the chain to the pinned root with each certificate valid now, the nonce
+`SHA-256(authData || clientDataHash)` in the credential certificate, the key id as the SHA-256 of
+its key, the App ID hash, counter 0, the production AAGUID (development also accepts
+`appattestdevelop`), the credential id, and the COSE key equal to the certificate's; an assertion's
+signature over `SHA-256(authenticatorData || clientDataHash)`, its App ID hash, and a counter above
+the stored one. Play Integrity: `requestHash`, the package (request and app), a verdict under 5
+minutes old, `PLAY_RECOGNIZED`, an accepted signing certificate and `MEETS_DEVICE_INTEGRITY`.
+
+**Statements and calls per mobile sign-in.** `uts.claim_code_attestation` checks the code against
+the request (client, redirect URI, PKCE challenge, DPoP key, lifetime) before any verification, so
+a request without a valid code reaches no verifier and no Google call; it claims the code for one
+verification at a time (taken over after 15 seconds), and returns the stored key for an assertion.
+`uts.settle_code_attestation` stores a new key, moves an assertion's counter only upward, refuses
+(one `token.denied` audit row with the reason, and the code is dead), drops the claim for a key
+stored already, or releases the claim after a retryable failure; a settle of a claim another
+request took over changes nothing. Within an isolate a second request for a code in verification
+answers 503 before its first await. The exchange statement then runs as for any first-party
+client, behind a backstop: the trigger `authorization_codes_require_attestation` refuses to
+consume a `kilo-mobile` code (SQLSTATE 23514) unless it is attested or, in development without
+attestation config only, marked exempt (`uts.exempt_code_attestation`, refused in every other
+environment; it trusts the Worker's `UTS_ENVIRONMENT`, so a production deploy misconfigured as
+development would mark codes exempt and the backstop would not catch it; `test/repo` holds the
+trigger's client list equal to the attestation-required clients). Per mobile sign-in: 3 statements (claim, settle, exchange) instead of 1, a retry of
+an attested exchange 2, development without config 2 (exempt, exchange); for Android one
+`decodeIntegrityToken` call plus one token exchange per isolate per hour; no Durable Object hop
+beyond the signer call; no queue message; one audit row per refusal. After a Google 429 each
+isolate answers 503 without calling Google for the `Retry-After` (60 seconds without one, at most
+5 minutes). The config is parsed once per isolate. Refresh is unchanged. App Attest keys stay
+until 400 days after their last use (`uts.maintain_attestation_rows()`, minute cron); a code's
+attestation goes with its code.
+
+Deliberate deferrals (decision Q86): the Play licensing verdict is not checked, and the App
+Attest receipt is not stored or sent to Apple's fraud-metric service.
+
+`scripts/attest-e2e.ts` (`UTS_E2E_ADMIN_URL`, `UTS_E2E_PORT`, default 9490) runs the mint Worker
+with a complete config and stand-ins for Apple and Google in their real formats, and a second
+mint Worker with one value missing: it checks an admitted key attestation, assertion and Play
+Integrity verdict, refused replays, repeated counters, missing attestations, wrong packages,
+unrecognized apps and other signers, one decode per code across a retry, the refusal by default,
+and that no credential value reaches an audit row.
+
 ## Third-party clients, consent and the broker exchange
 
 Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata Document

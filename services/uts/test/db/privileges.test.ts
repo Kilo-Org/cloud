@@ -59,6 +59,9 @@ const FUNCTION_ONLY_TABLES = [
   'subject_operations',
   'subject_tombstones',
   'app_account_events',
+  // Migration 0017: only the attestation claim and settle functions reach them.
+  'app_attest_keys',
+  'code_attestations',
 ];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
@@ -678,6 +681,7 @@ describe('functions', () => {
       { routine: 'advance_audit_watermark', grantee: 'uts_app' },
       { routine: 'apply_subject_operation', grantee: 'uts_app' },
       { routine: 'bridge_legacy_session', grantee: 'uts_app' },
+      { routine: 'claim_code_attestation', grantee: 'uts_app' },
       { routine: 'claim_credential_notice', grantee: 'uts_app' },
       { routine: 'claim_due_notices', grantee: 'uts_app' },
       { routine: 'claim_notice', grantee: 'uts_app' },
@@ -697,6 +701,7 @@ describe('functions', () => {
       { routine: 'exchange_delegated_token', grantee: 'uts_app' },
       { routine: 'exchange_device_code', grantee: 'uts_app' },
       { routine: 'exchange_web_code', grantee: 'uts_app' },
+      { routine: 'exempt_code_attestation', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'finish_notice', grantee: 'uts_app' },
       { routine: 'grant_third_party_consent', grantee: 'uts_app' },
@@ -713,6 +718,7 @@ describe('functions', () => {
       { routine: 'list_third_party_consents', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
+      { routine: 'maintain_attestation_rows', grantee: 'uts_app' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
       { routine: 'maintain_notice_rows', grantee: 'uts_app' },
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
@@ -736,6 +742,7 @@ describe('functions', () => {
       { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
       { routine: 'revoke_web_device', grantee: 'uts_app' },
+      { routine: 'settle_code_attestation', grantee: 'uts_app' },
       { routine: 'sso_app_organization', grantee: 'uts_app' },
       { routine: 'start_email_sign_in', grantee: 'uts_app' },
       { routine: 'start_sign_in_flow', grantee: 'uts_app' },

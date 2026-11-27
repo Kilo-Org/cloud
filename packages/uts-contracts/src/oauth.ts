@@ -149,6 +149,12 @@ export const OAUTH_ERROR_CODES = [
   'invalid_session',
   /** RFC 9470: the scope needs a fresher sign-in; `WWW-Authenticate` carries `max_age`. */
   'insufficient_user_authentication',
+  /**
+   * The `kilo-mobile` code exchange (`attestation.ts`) carried no device attestation, or an App
+   * Attest assertion whose key UTS does not hold: attest a new key and send the exchange again
+   * while the code lasts.
+   */
+  'attestation_required',
 ] as const;
 export type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
 

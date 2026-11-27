@@ -3871,9 +3871,18 @@ importers:
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
+      '@peculiar/asn1-schema':
+        specifier: 2.9.4
+        version: 2.9.4
+      '@peculiar/asn1-x509':
+        specifier: 2.9.4
+        version: 2.9.4
       '@simplewebauthn/server':
         specifier: 14.0.1
         version: 14.0.1
+      cbor2:
+        specifier: 2.3.0
+        version: 2.3.0
       jose:
         specifier: 'catalog:'
         version: 6.2.17

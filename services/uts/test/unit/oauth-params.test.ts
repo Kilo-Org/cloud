@@ -382,14 +382,14 @@ describe('clients', () => {
     expect(allowed('http://127.0.0.1:4100/callback')).toBe(false);
   });
 
-  it('serve the mobile app, which needs device attestation, in development only', () => {
+  it('serve the mobile app, which needs device attestation, only where the policy allows it', () => {
     const mobile = identifyClient('kilo-mobile');
     const cli = identifyClient('kilo-cli');
     if (mobile.kind !== 'first_party' || cli.kind !== 'first_party') throw new Error('first-party');
-    expect(clientServedIn(mobile.client, 'development')).toBe(true);
-    expect(clientServedIn(mobile.client, 'staging')).toBe(false);
-    expect(clientServedIn(mobile.client, 'production')).toBe(false);
-    expect(clientServedIn(cli.client, 'production')).toBe(true);
+    expect(clientServedIn(mobile.client, 'verified')).toBe(true);
+    expect(clientServedIn(mobile.client, 'unattested_development')).toBe(true);
+    expect(clientServedIn(mobile.client, 'refused')).toBe(false);
+    expect(clientServedIn(cli.client, 'refused')).toBe(true);
   });
 });
 

@@ -72,10 +72,10 @@ function bindingEntries(source: string): Array<[stsName: string, binding: string
 }
 
 /**
- * The config a directory deploys from. `wrangler.test.jsonc`, `wrangler.dev.jsonc` and the
- * fixtures under `test/` are harnesses, not workloads: they carry their own `name` and no store
- * entries, so including them would register a workload no policy grants and make the manifest
- * check read the harness instead of the deployment.
+ * The config a directory deploys from. A file named anything else — `wrangler.test.jsonc`,
+ * `wrangler.dev.jsonc`, `wrangler.e2e-workers.jsonc` — is a harness: it carries its own `name` and
+ * usually no store entries, so including it would register a workload no policy grants and make
+ * the manifest check read the harness instead of the deployment.
  */
 const DEPLOYMENT_CONFIGS: Readonly<Record<string, true>> = {
   'wrangler.jsonc': true,
@@ -144,9 +144,17 @@ describe('policy secrets match the reader that serves them', () => {
         // instead of at cutover. A plain Worker secret (`wrangler secret put`) has no manifest
         // entry at all: only the deployment holds it, and the Worker's own reader suite pins the
         // binding names it reads.
+        const exception = STORE_SUFFIX_EXCEPTIONS[workload]?.[stsName];
         const entry = storeEntries.find(secret => secret.binding === binding);
+        if (exception !== undefined) {
+          // A named row must be spent: a rename of the store entry or of the binding fails here
+          // instead of leaving the exception accepted but unchecked.
+          expect(
+            entry,
+            `${workload}: ${stsName} names ${exception} but the manifest has no store entry for ${binding}`
+          ).toBeDefined();
+        }
         if (entry !== undefined) {
-          const exception = STORE_SUFFIX_EXCEPTIONS[workload]?.[stsName];
           if (exception !== undefined) {
             // Named row: the entry is that exact secret, not merely one sharing the name's prefix.
             expect(
@@ -166,6 +174,15 @@ describe('policy secrets match the reader that serves them', () => {
       }
     });
   }
+
+  it('names a store exception only for a row its reader declares', () => {
+    const unknown = Object.entries(STORE_SUFFIX_EXCEPTIONS).flatMap(([workload, rows]) =>
+      Object.keys(rows)
+        .filter(stsName => !(readerOf.get(workload) ?? []).some(([name]) => name === stsName))
+        .map(stsName => `${workload}:${stsName}`)
+    );
+    expect(unknown).toEqual([]);
+  });
 
   it('serves every reader from an active policy', () => {
     const granted = new Set(policies.map(({ policy }) => policy.workload));

@@ -1328,8 +1328,10 @@ are app (`IDENTITY_STORE`, `uts_app_a/b`), pat (`IDENTITY_STORE_PAT`, `uts_pat_a
   `describeSecret` every hour for this request's name only, and logs
   `uts.login_rotation.approval_overdue` once a day from 24 hours on. A request still missing after
   72 hours counts as rejected or expired: the job logs `uts.login_rotation.approval_expired` and
-  asks again under a new name with the same password. A retry after a lost create answer describes
-  first, so it never asks twice.
+  asks again under a new name with the same password. Only the newest request counts: a secret
+  admin approves the newest `<login>_…` request and rejects any older one of the same login, since
+  an older one is never checked again. A retry after a lost create answer describes first, so it
+  never asks twice.
 - **Hyperdrive.** Only from 02:00 to 05:00 UTC and at least 5 minutes after the previous switch, it
   patches the config's user and password through the Cloudflare API, keeping its scheme, host,
   port and database, then reads the config with a GET and refuses the step if the user differs. It
@@ -1373,7 +1375,10 @@ rotated that login.
    config under load, with no failed query, must pass first (design trial check 4).
 3. **The switch token.** At provisioning, check the token with `GET /user/tokens/verify` and its
    policies: Hyperdrive edit only. The permission covers every Hyperdrive config in the account,
-   which is why the origins are pinned.
+   which is why the origins are pinned. With the real `uts-rotation-<environment>` identity, also
+   check the seed read: `GET /api/v4/secrets/<login>?projectId=<project>&environment=<slug>&secretPath=/db-switch/uts&viewSecretValue=true&expandSecretReferences=false&includeImports=false`
+   answers 200 with `secret.secretValue` for a seed that exists and 404 for one that does not, and
+   the same read of any other folder is refused.
 4. **The origins.** Pin the environment's direct host, port and database for each pool in
    `ORIGIN_PINS`.
 

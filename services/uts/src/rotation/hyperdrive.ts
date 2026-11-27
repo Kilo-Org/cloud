@@ -68,8 +68,9 @@ export class HyperdriveClient {
   /**
    * Points the config at `user` with `password`, keeping its scheme, host, port and database, then
    * reads the config back with a GET and checks the user. It refuses an origin with fields it does
-   * not rebuild, which the PATCH would drop. Hyperdrive keeps its open pool and opens new
-   * connections with the new login.
+   * not rebuild, which the PATCH would drop. Cloudflare documents that an edit keeps the open pool
+   * and opens new connections with the new login; that is unverified here until a real PATCH under
+   * load passes (README, "Login rotation", precondition 2).
    */
   async switchLogin(
     configId: string,

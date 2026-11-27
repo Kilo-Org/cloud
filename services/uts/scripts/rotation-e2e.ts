@@ -1,8 +1,9 @@
 /**
  * Local end-to-end run of the identity-store login rotation (design 5.2): the mint Worker under
  * `wrangler dev` with `LOGIN_ROTATION=on`, a local Postgres with the migrations applied, a stand-in
- * secrets manager (JWT Auth login, create and describe in `/admin/identity-store` under a change
- * policy) and a stand-in Cloudflare API that holds the three Hyperdrive configs.
+ * secrets manager (JWT Auth login; create and describe in `/admin/identity-store` under a change
+ * policy; the login seed read from `/db-switch/uts`) and a stand-in Cloudflare API that holds the
+ * three Hyperdrive configs.
  *
  * The run triggers the Worker's cron (`/__scheduled`) once a second, approves each change request
  * a second after it opens, and proves:

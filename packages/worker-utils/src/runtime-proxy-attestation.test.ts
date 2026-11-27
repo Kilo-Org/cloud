@@ -90,7 +90,10 @@ describe('runtime proxy attestation', () => {
       .setIssuedAt(Math.floor(now.getTime() / 1000))
       .setExpirationTime(Math.floor(now.getTime() / 1000) + 30)
       .sign(new TextEncoder().encode('wrong-secret'));
-    const proof = await issueRuntimeProxyAttestation(input);
+    const proof = await issueRuntimeProxyAttestation({
+      ...input,
+      now: new Date(now.getTime() - 90_000),
+    });
     await expect(verifyRuntimeProxyAttestation({ ...input, value: forged, now })).resolves.toBe(
       false
     );
@@ -135,7 +138,7 @@ describe('runtime proxy attestation', () => {
   it('accepts signed lifetimes up to 120 seconds without extending expiration', async () => {
     const claims = decodeJwt(await issueRuntimeProxyAttestation(input));
     const issuedAt = Math.floor(now.getTime() / 1000);
-    expect(claims.exp).toBe(issuedAt + 30);
+    expect(claims.exp).toBe(issuedAt + 120);
 
     const signWithLifetime = (seconds: number) =>
       new SignJWT(claims)

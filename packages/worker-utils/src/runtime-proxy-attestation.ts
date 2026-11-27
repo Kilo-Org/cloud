@@ -11,9 +11,8 @@ export const RUNTIME_PROXY_ATTESTATION_HEADER = 'X-Kilo-Runtime-Proxy-Attestatio
 export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_TYPE = 'cloud-agent-next-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_VERSION = 1;
-export const RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS = 30;
-/** Verifiers accept longer signed lifetimes so they can deploy before issuers extend them. */
-export const RUNTIME_PROXY_ATTESTATION_MAX_ACCEPTED_AGE_SECONDS = 120;
+/** Issuers mint proofs with a 120-second lifetime; verifiers accept lifetimes of at most 120 seconds. */
+export const RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS = 120;
 /** Sanity bound on the untrusted header value in characters, checked before any JWT parsing runs. */
 export const RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH = 4096;
 
@@ -49,7 +48,7 @@ const runtimeProxyAttestationClaims = z
   .superRefine((claims, ctx) => {
     if (
       claims.exp <= claims.iat ||
-      claims.exp - claims.iat > RUNTIME_PROXY_ATTESTATION_MAX_ACCEPTED_AGE_SECONDS
+      claims.exp - claims.iat > RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS
     ) {
       ctx.addIssue({ code: 'custom', message: 'Invalid runtime proxy attestation lifetime' });
     }

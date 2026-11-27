@@ -127,12 +127,13 @@ async function attempts(noticeId: string) {
   });
 }
 
+/** A notice as the statement of a change writes it; no login role writes one itself. */
 async function insertNotice(
   accountId: string,
   kind: NoticeKind,
   details: object = {}
 ): Promise<string> {
-  const result = await app.query<{ id: string }>(
+  const result = await owner.query<{ id: string }>(
     'INSERT INTO uts.notices (account_id, kind, details) VALUES ($1, $2, $3) RETURNING id',
     [accountId, kind, details]
   );
@@ -617,6 +618,26 @@ describe('notice delivery statements', () => {
     expect(states.rows).toEqual([{ delivery: 'failed', count: 25 }]);
   });
 
+  it('drains a backlog larger than one claim in one pass, oldest first', async () => {
+    const accountId = await insertAccount(owner);
+    const backlog: string[] = [];
+    for (let index = 0; index < 45; index += 1) {
+      backlog.push(await insertNotice(accountId, 'sessions_revoked'));
+    }
+    await owner.query(
+      `UPDATE uts.notices SET next_attempt_at = now() - interval '10 minutes' WHERE id = ANY ($1)`,
+      [backlog]
+    );
+    const fresh = await insertNotice(accountId, 'suspicious_sign_in');
+    const result = await sweepNotices(noticeDeps(ALWAYS_SENT, []));
+    expect(result.claimed).toBeGreaterThan(45);
+    const states = await owner.query<{ delivery: string; count: number }>(
+      `SELECT delivery, count(*)::int AS count FROM uts.notices WHERE id = ANY ($1) GROUP BY 1`,
+      [[...backlog, fresh]]
+    );
+    expect(states.rows).toEqual([{ delivery: 'delivered', count: 46 }]);
+  });
+
   it('clears the sign-ins of a deleted notice through an index probe', async () => {
     // The foreign key's ON DELETE SET NULL runs this update for each deleted notice.
     await owner.query('BEGIN');
@@ -785,9 +806,11 @@ describe('migration 0010 baseline', () => {
     try {
       const admin = await empty.connect();
       const migrations = await loadMigrations();
+      // Every migration before 0010, then the rest: the runner refuses a file that sorts before an
+      // applied one.
       await applyMigrations(
         admin,
-        migrations.filter(migration => migration.name !== '0010_notices.sql')
+        migrations.filter(migration => migration.name < '0010_notices.sql')
       );
       await admin.query('SET ROLE uts_owner');
       const accountId = await insertAccount(admin);

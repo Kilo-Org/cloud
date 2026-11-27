@@ -119,9 +119,10 @@ runs; the hourly sampled check about $0.30 a month per environment.
    `run_finished`:
    `['kilo-audit'] | where type startswith 'ai.kilo.migration_proxy.run_' | summarize started = countif(type endswith 'run_started'), finished = countif(type endswith 'run_finished') by tostring(data.attributes.runId) | where finished == 0`
    (no row means nothing is running).
-2. As `postgres`, with statement logging and pgaudit off for the session (the password passes
-   through one `set_config` statement) and never with `psql -a` or `-e`, which echo statements:
-   `MIGRATION_PROXY_DB_PASSWORD="$(openssl rand -base64 48 | tr -d '\n')" PGOPTIONS='-c log_statement=none -c pgaudit.log=none' psql "<target, sslmode=verify-full sslrootcert=services/migration-proxy/container/ca-bundle.pem>" -v ON_ERROR_STOP=1 -v block=rotate -f services/migration-proxy/sql/setup-login.sql`.
+2. As `postgres`, never with `psql -a` or `-e`, which echo statements (the script turns statement
+   logging and pgaudit off for its own session before the one statement that carries the
+   password; Supabase refuses them as `PGOPTIONS` connection options):
+   `MIGRATION_PROXY_DB_PASSWORD="$(openssl rand -base64 48 | tr -d '\n')" psql "<target, sslmode=verify-full sslrootcert=services/migration-proxy/container/ca-bundle.pem>" -v ON_ERROR_STOP=1 -v block=rotate -f services/migration-proxy/sql/setup-login.sql`.
    A missing password makes psql exit non-zero.
 3. Write the password to Infisical; the bundle reaches the object within about 8 minutes.
 4. Dispatch no deploy for 10 minutes (a run in that window fails `auth_failed`; the next passes).
@@ -143,6 +144,11 @@ the run, so CI makes no retry POST. Then cancel its backend in the SQL editor
 (`SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE application_name = 'kilo-migration-proxy:<runId>'`);
 the run fails `migration_failed` with `57014`, which stays retryable because a `statement_timeout`
 raises the same code: a CI job still waiting would POST once more and start the run again.
+The next scheduled deploy (hourly) would also re-POST the same commit and run the migration
+again, so before it runs either disable the deploy workflow
+(`gh workflow disable "Deploy to Production"`, or `deploy-staging.yml` for staging) or merge a
+revert of the migration; once the fix or revert is on `main`, re-enable it
+(`gh workflow enable …`).
 
 **A fresh database.** A new database, or one restored from empty, cannot be migrated by the proxy
 alone: on main's journal `0035_third_shiver_man` has a lower `when` than `0034_bouncy_whizzer`,

@@ -1,8 +1,9 @@
 -- Production member mode only (design Q64a). Run as postgres: -v block=create | rotate.
 -- The password comes from MIGRATION_PROXY_DB_PASSWORD (\getenv), never argv. It passes
--- through a transaction-local setting, so no DDL statement carries it; like the lease setup,
--- the set_config SELECT is still logged under log_statement = 'all' or pgaudit: run it with both
--- off for the session (README "Rotation"), and never with psql -a or -e, which echo it.
+-- through a transaction-local setting, so no DDL statement carries it. The script turns statement
+-- logging and pgaudit off for its own session first, so the set_config SELECT is not logged;
+-- Supabase lets postgres SET both in a session (supautils privileged_role_allowed_configs), but
+-- refuses them as connection options (PGOPTIONS). Never run it with psql -a or -e, which echo it.
 \set ON_ERROR_STOP 1
 \getenv proxy_password MIGRATION_PROXY_DB_PASSWORD
 \if :{?proxy_password}
@@ -11,6 +12,8 @@
   -- A failing statement, so psql exits non-zero (ON_ERROR_STOP) instead of 0.
   DO $$ BEGIN RAISE EXCEPTION 'MIGRATION_PROXY_DB_PASSWORD is not set'; END $$;
 \endif
+SET log_statement = 'none';
+SET pgaudit.log = 'none';
 SELECT :'block' = 'create' AS is_create, :'block' = 'rotate' AS is_rotate \gset
 BEGIN;
 DO $$

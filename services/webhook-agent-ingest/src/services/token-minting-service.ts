@@ -10,12 +10,14 @@ import {
   isDirectOrgMember,
   type WorkerDb,
 } from '../db/queries.js';
+import {
+  readWebhookAgentIngestSecret,
+  type WebhookAgentIngestSecretsEnv,
+} from '../secrets.js';
 import { logger } from '../util/logger.js';
-import { getSecretValue } from '../util/secret.js';
 
-export type TokenMintingEnv = {
+export type TokenMintingEnv = WebhookAgentIngestSecretsEnv & {
   HYPERDRIVE: { connectionString: string };
-  NEXTAUTH_SECRET: SecretsStoreSecret | string; // Same secret used by kilocode-backend
   ENVIRONMENT: string;
   SHARED_RESOURCE_TOKENS_ENABLED?: string | boolean;
 };
@@ -64,7 +66,7 @@ export class TokenMintingService {
 
   private async getJwtSecret(): Promise<string> {
     if (!this.jwtSecret) {
-      this.jwtSecret = await getSecretValue(this.env.NEXTAUTH_SECRET);
+      this.jwtSecret = await readWebhookAgentIngestSecret(this.env, 'NEXTAUTH_SECRET');
     }
     return this.jwtSecret;
   }

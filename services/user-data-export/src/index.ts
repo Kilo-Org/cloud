@@ -11,6 +11,7 @@ import {
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { logExportEvent, safeError } from './observability';
+import { readUserDataExportSecret } from './secrets';
 
 const DOWNLOAD_EXPIRES_SECONDS = 300;
 const DOWNLOAD_CONTENT_DISPOSITION = 'attachment; filename="kilo-data-export.jsonl.gz"';
@@ -30,13 +31,16 @@ function authorized(request: Request, expected: string): boolean {
 }
 
 async function authenticatedUserId(request: Request, env: ExportEnv): Promise<string | null> {
-  if (!authorized(request, env.INTERNAL_API_SECRET)) return null;
-  const token = extractBearerToken(request.headers.get('authorization'));
-  if (!token) return null;
   try {
-    const payload = await verifyKiloToken(token, env.NEXTAUTH_SECRET, {
-      audience: USER_DATA_EXPORT_AUDIENCE,
-    });
+    const internalApiSecret = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET');
+    if (!authorized(request, internalApiSecret)) return null;
+    const token = extractBearerToken(request.headers.get('authorization'));
+    if (!token) return null;
+    const payload = await verifyKiloToken(
+      token,
+      await readUserDataExportSecret(env, 'NEXTAUTH_SECRET'),
+      { audience: USER_DATA_EXPORT_AUDIENCE }
+    );
     const now = Math.floor(Date.now() / 1000);
     if (
       payload.iat === undefined ||
@@ -159,9 +163,13 @@ export default {
           logExportEvent('warn', 'export_download_expired', { exportId: parsed.data.exportId });
           return Response.json({ error: 'Export not found' }, { status: 404 });
         }
+        const [accessKeyId, secretAccessKey] = await Promise.all([
+          readUserDataExportSecret(env, 'R2_ACCESS_KEY_ID'),
+          readUserDataExportSecret(env, 'R2_SECRET_ACCESS_KEY'),
+        ]);
         const signer = createR2Client({
-          accessKeyId: env.R2_ACCESS_KEY_ID,
-          secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+          accessKeyId,
+          secretAccessKey,
           endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
         });
         const downloadUrl = await signer.getSignedURL(

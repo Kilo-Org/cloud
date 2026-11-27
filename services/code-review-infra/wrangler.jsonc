@@ -9,6 +9,9 @@
   "upload_source_maps": true,
   "observability": {
     "enabled": true,
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts).
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "version_metadata": {
@@ -19,7 +22,23 @@
     "ENVIRONMENT": "production",
     "API_URL": "https://app.kilo.ai",
     "CLOUD_AGENT_NEXT_URL": "https://cloud-agent-next.kilosessions.ai",
+    // Where every runtime secret read goes: `env` (the Worker secrets below) or `sts` (the bundle
+    // over the `STS` binding). An absent value means `env`; any other value refuses every read.
+    // The `sts` source never falls back to the legacy binding.
+    "SECRETS_SOURCE": "env",
   },
+  "services": [
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // kilo-code-review-worker.yaml grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
+    // BACKEND_AUTH_TOKEN. Nothing reads it while SECRETS_SOURCE is `env`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "kilo-code-review-worker" },
+    },
+  ],
   // Durable Objects configuration
   "durable_objects": {
     "bindings": [

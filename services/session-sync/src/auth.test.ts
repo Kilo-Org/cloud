@@ -164,10 +164,10 @@ describe('authorize', () => {
     ).toEqual({ status: 503, code: 'auth_unavailable' });
   });
 
-  it('retries a failed secret fetch and caches only the resolved value', async () => {
+  it('retries a failed secret read on the next request', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const get = vi
-      .fn<() => Promise<string | null>>()
+      .fn<() => Promise<string>>()
       .mockRejectedValueOnce(new Error('secret store unavailable'))
       .mockResolvedValue(GRANT_SECRET);
     const bindingEnv = env({ SESSION_SYNC_SECRET: { get } });
@@ -183,7 +183,7 @@ describe('authorize', () => {
     await expect(authorize(dataRequest(token), bindingEnv)).resolves.toMatchObject({
       userID: USER,
     });
-    expect(get).toHaveBeenCalledTimes(2);
+    expect(get).toHaveBeenCalledTimes(3);
   });
 });
 

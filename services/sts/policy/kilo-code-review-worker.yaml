@@ -1,4 +1,13 @@
-# Registration only: services/code-review-infra/wrangler.jsonc. No environment, identity or grant.
+# The kilo-code-review-worker Worker (services/code-review-infra/wrangler.jsonc). It reads its
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the plain
+# Worker secrets) until secrets-cutover flips it. INTERNAL_API_SECRET and CALLBACK_TOKEN_SECRET
+# resolve from /shared; BACKEND_AUTH_TOKEN resolves from /workloads/kilo-code-review-worker.
 workload: kilo-code-review-worker
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET
+  - CALLBACK_TOKEN_SECRET
+  - BACKEND_AUTH_TOKEN

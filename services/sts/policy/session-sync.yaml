@@ -1,4 +1,14 @@
-# Registration only: services/session-sync/wrangler.jsonc. No environment, identity or grant.
+# The session-sync Worker (services/session-sync/wrangler.jsonc). Production only: the local env
+# block binds no STS. It reads its runtime secrets over the `STS` SecretsBroker binding;
+# SECRETS_SOURCE stays `env` (the Secrets Store bindings) until secrets-cutover flips it. All three
+# names resolve from /shared; INTERNAL_API_SECRET keeps the _PROD name its Secrets Store binding
+# already uses.
 workload: session-sync
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - NEXTAUTH_SECRET
+  - SESSION_SYNC_SECRET
+  - INTERNAL_API_SECRET

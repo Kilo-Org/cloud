@@ -26,6 +26,7 @@ import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { SECURITY_SYNC_OWNER_BUDGET_MS, releaseOwnerSyncLease, syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
 import { runSecurityNotificationSweep } from './notifications/sweep';
+import { readSecuritySyncSecret } from './secrets';
 
 const SecuritySyncOwnerSchema = z
   .object({
@@ -811,7 +812,7 @@ export default {
         );
       }
       const [internalSecret, authHeader] = await Promise.all([
-        env.INTERNAL_API_SECRET.get(),
+        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET'),
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 
@@ -847,7 +848,7 @@ export default {
         );
       }
       const [internalSecret, authHeader] = await Promise.all([
-        env.INTERNAL_API_SECRET.get(),
+        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET'),
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 

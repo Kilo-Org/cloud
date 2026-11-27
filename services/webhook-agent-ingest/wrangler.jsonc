@@ -17,6 +17,9 @@
   // Observability - enables Workers Logs
   "observability": {
     "enabled": true,
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts).
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "version_metadata": {
@@ -35,6 +38,10 @@
     "WEBHOOK_AGENT_URL": "https://hooks.kilosessions.ai",
     "KILOCLAW_API_URL": "https://claw.kilosessions.ai",
     "SHARED_RESOURCE_TOKENS_ENABLED": "true",
+    // Where every runtime secret read goes: `env` (the Secrets Store bindings below) or `sts`
+    // (the bundle over the `STS` binding). An absent value means `env`; any other value refuses
+    // every read. The `sts` source never falls back to the legacy binding.
+    "SECRETS_SOURCE": "env",
   },
   // PRODUCTION service binding to Cloud Agent Next
   "services": [
@@ -46,6 +53,16 @@
       "binding": "KILO_CHAT",
       "service": "kilo-chat",
       "entrypoint": "KiloChatService",
+    },
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // cloudflare-webhook-agent-ingest.yaml grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
+    // NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `env`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloudflare-webhook-agent-ingest" },
     },
   ],
   // PRODUCTION Queue for webhook delivery

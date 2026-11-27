@@ -25,6 +25,7 @@ import {
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
 import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
+import { readUserDataExportSecret, type UserDataExportSecretsEnv } from './secrets';
 
 /**
  * The wall-clock deadlines, and the reason tuning past this point does not help.
@@ -141,16 +142,12 @@ export async function handleGenerationFailure(input: {
   return 'retry';
 }
 
-export type ExportEnv = {
+export type ExportEnv = UserDataExportSecretsEnv & {
   PRIMARY_STATE_DB: HyperdriveBinding;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   EXPORT_WAREHOUSE_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
-  INTERNAL_API_SECRET: string;
-  NEXTAUTH_SECRET: string;
-  R2_ACCESS_KEY_ID: string;
-  R2_SECRET_ACCESS_KEY: string;
   R2_ACCOUNT_ID: string;
   R2_BUCKET_NAME: string;
   USER_DATA_EXPORT_WEB_URL?: string;
@@ -1005,6 +1002,7 @@ async function dispatchReadyNotifications(
   }
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
   const callbackUrl = new URL('/api/internal/user-data-exports/ready', baseUrl);
+  const internalApiKey = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET');
   for (const item of await state.pendingNotifications()) {
     try {
       // redirect: 'manual' is fail-closed — we never follow a redirect and therefore
@@ -1016,7 +1014,7 @@ async function dispatchReadyNotifications(
         redirect: 'manual',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': env.INTERNAL_API_SECRET,
+          'x-internal-api-key': internalApiKey,
         },
         body: JSON.stringify({ exportId: item.id }),
         signal: AbortSignal.timeout(10_000),

@@ -2,6 +2,7 @@
  * Shared types for code review worker
  */
 
+import type { BundleBinding } from '@kilocode/secrets-client';
 import type { CodeReviewOrchestrator } from './code-review-orchestrator';
 import type { Owner, MCPServerConfig, CloudAgentTerminalReason } from '@kilocode/worker-utils';
 import type {
@@ -167,10 +168,16 @@ export interface Env {
 
   // Environment variables
   API_URL: string;
+  CLOUD_AGENT_NEXT_URL: string;
+
+  // Runtime secrets, read through `src/secrets.ts`: `wrangler types` has not run for the
+  // SecretsBroker binding yet; this is its RPC shape (packages/secrets-client `BundleBinding`).
+  // Absent until the binding deploys.
   INTERNAL_API_SECRET: string;
   CALLBACK_TOKEN_SECRET: string;
-  CLOUD_AGENT_NEXT_URL: string;
   BACKEND_AUTH_TOKEN: string;
+  SECRETS_SOURCE?: string;
+  STS?: BundleBinding;
 
   // Optional Sentry
   SENTRY_DSN?: string;

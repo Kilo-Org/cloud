@@ -1,4 +1,10 @@
-# Registration only: services/security-sync/wrangler.jsonc. No environment, identity or grant.
+# The cloudflare-security-sync Worker (services/security-sync/wrangler.jsonc). It reads its
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Secrets
+# Store binding) until secrets-cutover flips it. INTERNAL_API_SECRET resolves from /shared.
 workload: cloudflare-security-sync
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET

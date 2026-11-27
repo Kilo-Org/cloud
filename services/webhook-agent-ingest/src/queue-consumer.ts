@@ -18,7 +18,7 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
-import { getSecretValue } from './util/secret';
+import { readWebhookAgentIngestSecret } from './secrets';
 import { deliverExistingChatMessage, ExistingChatDeliveryError } from './existing-chat-delivery';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
@@ -389,8 +389,8 @@ async function processWebhookMessage(
     const { token } = await getOrMintToken(env, triggerConfig);
 
     const [internalApiSecret, callbackTokenSecret] = await Promise.all([
-      getSecretValue(env.INTERNAL_API_SECRET),
-      getSecretValue(env.CALLBACK_TOKEN_SECRET),
+      readWebhookAgentIngestSecret(env, 'INTERNAL_API_SECRET'),
+      readWebhookAgentIngestSecret(env, 'CALLBACK_TOKEN_SECRET'),
     ]);
 
     if (!cloudAgentSessionId) {

@@ -26,21 +26,23 @@ import {
 } from './protocol';
 import { rateLimit } from './rate-limit';
 import { jsonResponse, requestMetrics, timed } from './metrics';
+import { readSessionSyncSecret, type SessionSyncSecretsEnv } from './secrets';
 import { exchangeCloudAgentUpload, type CloudAgentUploadEnv } from './cloud-agent-upload';
 
 export type { Principal };
 
 /** A Secrets Store binding in deployment, or a plain string from local vars. */
-export type SecretBinding = string | { get(): Promise<string | null> };
+export type SecretBinding = string | { get(): Promise<string> };
 
-export type AuthEnv = CloudAgentUploadEnv & {
-  NEXTAUTH_SECRET: SecretBinding;
-  SESSION_SYNC_SECRET: SecretBinding;
-  HYPERDRIVE: Hyperdrive;
-  ENVIRONMENT?: string;
-  EXCHANGE_IP_LIMITER?: RateLimit;
-  EXCHANGE_ACCOUNT_LIMITER?: RateLimit;
-};
+export type AuthEnv = CloudAgentUploadEnv &
+  SessionSyncSecretsEnv & {
+    NEXTAUTH_SECRET: SecretBinding;
+    SESSION_SYNC_SECRET: SecretBinding;
+    HYPERDRIVE: Hyperdrive;
+    ENVIRONMENT?: string;
+    EXCHANGE_IP_LIMITER?: RateLimit;
+    EXCHANGE_ACCOUNT_LIMITER?: RateLimit;
+  };
 
 const GRANT_ISSUER = 'session-sync';
 const GRANT_AUDIENCE = 'session-sync';
@@ -109,17 +111,11 @@ type Credential = {
   deviceSessionID: string | undefined;
 };
 
-// Holds resolved values only. A pending get() belongs to the request that
-// started it and is never shared with another request.
-const resolvedSecrets = new WeakMap<object, string>();
-
-async function resolveSecret(binding: SecretBinding, minBytes: number): Promise<string> {
-  const value =
-    typeof binding === 'string' ? binding : (resolvedSecrets.get(binding) ?? (await binding.get()));
+/** Refuses a secret that is missing or shorter than the minimum this Worker requires. */
+function requireSecret(value: string, minBytes: number): string {
   if (!value || new TextEncoder().encode(value).byteLength < minBytes) {
     throw new Error('Secret is not configured');
   }
-  if (typeof binding !== 'string') resolvedSecrets.set(binding, value);
   return value;
 }
 
@@ -128,7 +124,10 @@ export async function syncSigningKey(
   env: Pick<AuthEnv, 'SESSION_SYNC_SECRET'>
 ): Promise<Uint8Array> {
   return new TextEncoder().encode(
-    await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES)
+    requireSecret(
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET'),
+      MIN_GRANT_SECRET_BYTES
+    )
   );
 }
 
@@ -315,8 +314,14 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (hosted) return hosted;
 
   try {
-    const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);
-    const grantSecret = await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES);
+    const nextAuthSecret = requireSecret(
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET'),
+      MIN_GRANT_SECRET_BYTES
+    );
+    const grantSecret = requireSecret(
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET'),
+      MIN_GRANT_SECRET_BYTES
+    );
     const credential = await verifyCredential(token, nextAuthSecret, environment);
     if (credential instanceof Response) return credential;
     const accountDenied = await rateLimit(env.EXCHANGE_ACCOUNT_LIMITER, credential.userID);
@@ -430,7 +435,10 @@ export async function authorizeTranscript(request: Request, env: AuthEnv) {
 
   let secret: string;
   try {
-    secret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);
+    secret = requireSecret(
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET'),
+      MIN_GRANT_SECRET_BYTES
+    );
   } catch (error) {
     return unavailable('authorize', error);
   }

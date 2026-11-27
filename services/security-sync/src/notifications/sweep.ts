@@ -29,6 +29,7 @@ import {
   resolveNotificationRecipientUserIds,
   type SecurityNotificationOwner,
 } from './recipients';
+import { readSecuritySyncSecret, type SecuritySyncSecretsEnv } from '../secrets';
 
 const STUCK_CLAIM_RECOVERY_MINUTES = 5;
 const MAX_SLA_MATERIALIZATION_PER_TICK = 1000;
@@ -41,12 +42,9 @@ const INELIGIBLE_EVALUATION_LIMIT = 5000;
 const PENDING_SELECTION_LIMIT = 250;
 const MAX_ATTEMPTS = 4;
 
-type SecretBinding = { get(): Promise<string> };
-
-export type SecurityNotificationSweepEnv = {
+export type SecurityNotificationSweepEnv = SecuritySyncSecretsEnv & {
   HYPERDRIVE?: { connectionString: string };
   BACKEND_API_URL?: string;
-  INTERNAL_API_SECRET?: SecretBinding;
   SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED?: string;
   SECURITY_NOTIFICATION_DISPATCH_ENABLED?: string;
 };
@@ -1091,9 +1089,8 @@ async function dispatchPendingRows(
 }
 
 async function readInternalSecret(env: SecurityNotificationSweepEnv): Promise<string | null> {
-  if (!env.INTERNAL_API_SECRET) return null;
   try {
-    const secret = await env.INTERNAL_API_SECRET.get();
+    const secret = await readSecuritySyncSecret(env, 'INTERNAL_API_SECRET');
     return secret || null;
   } catch {
     return null;

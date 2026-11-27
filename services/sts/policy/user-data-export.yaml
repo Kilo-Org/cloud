@@ -1,4 +1,14 @@
-# Registration only: services/user-data-export/wrangler.jsonc. No environment, identity or grant.
+# The user-data-export Worker (services/user-data-export/wrangler.jsonc). It reads its runtime
+# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the plain Worker
+# secrets) until secrets-cutover flips it. INTERNAL_API_SECRET and NEXTAUTH_SECRET resolve from
+# /shared; the R2 key pair resolves from /workloads/user-data-export.
 workload: user-data-export
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET
+  - NEXTAUTH_SECRET
+  - R2_ACCESS_KEY_ID
+  - R2_SECRET_ACCESS_KEY

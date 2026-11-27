@@ -21,19 +21,10 @@
       "enabled": true,
       "head_sampling_rate": 1,
     },
-    // observability.enabled alone does not turn on tracing while Workers tracing is
-    // in beta, and a destination only receives spans from Workers that name it, so
-    // both keys below are required. "axiom-traces" must match the destination
-    // configured under Workers Observability in the Cloudflare dashboard; without it
-    // Axiom receives only the one-off pre-flight span emitted when the destination
-    // is saved. Sampling stays at 1: this Worker runs a 5-minute cron plus one queue
-    // message per export, so full-fidelity tracing is far below the free tier.
-    "traces": {
-      "enabled": true,
-      "persist": true,
-      "head_sampling_rate": 1,
-      "destinations": ["axiom-traces"],
-    },
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts). The Axiom traces destination carried only
+    // spans, so it went with them; logs stay on above.
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "routes": [
@@ -47,7 +38,23 @@
     "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "R2_BUCKET_NAME": "user-data-export",
     "USER_DATA_EXPORT_WEB_URL": "https://api.kilo.ai",
+    // Where every runtime secret read goes: `env` (the Worker secrets below) or `sts` (the bundle
+    // over the `STS` binding). An absent value means `env`; any other value refuses every read.
+    // The `sts` source never falls back to the legacy binding.
+    "SECRETS_SOURCE": "env",
   },
+  "services": [
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // user-data-export.yaml grants INTERNAL_API_SECRET, NEXTAUTH_SECRET and the R2 key pair.
+    // Nothing reads it while SECRETS_SOURCE is `env`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "user-data-export" },
+    },
+  ],
   "triggers": {
     "crons": ["*/5 * * * *"],
   },

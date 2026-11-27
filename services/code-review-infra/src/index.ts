@@ -24,6 +24,7 @@ import {
   createNotFoundHandler,
 } from '@kilocode/worker-utils';
 import { doNameForAttempt } from './do-name';
+import { readCodeReviewInfraSecret } from './secrets';
 
 // Import base Durable Object
 import {
@@ -41,7 +42,7 @@ const app = new Hono<HonoEnv>();
 // Authentication middleware
 app.use(
   '*',
-  backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN)
+  backendAuthMiddleware<HonoEnv>(c => readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN'))
 );
 
 // Route: POST /review

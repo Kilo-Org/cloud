@@ -29,6 +29,7 @@ export const CLOUD_WORKFLOW_FILES = [
   'kilo-mcp-release.yml',
   'meta-janitor-approve.yml',
   'mobile-native-build.yml',
+  'notifications-runtime-copy.yml',
   'notify-main-failure.yml',
   'notify-production-deploy-failure.yml',
   'promote-vercel-deployment.yml',

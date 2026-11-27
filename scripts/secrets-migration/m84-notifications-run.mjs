@@ -14,8 +14,9 @@
 //      <= notAfter + 15 min, with one minute of margin). The earliest tick keeps the run short.
 //      A writer secret that expires more than 60 minutes after start is refused.
 //      Then the core's validated name table, printed once; a refusal stops before any network call.
-//   3. GitHub guards: the protected environment reads back main-only with no admin bypass, and no
-//      Worker rollout workflow is queued or running. A rollout workflow that cannot be read stops
+//   3. GitHub guards: the protected environment reads back main-only with no admin bypass and a
+//      required-reviewers rule (at least one reviewer, self-review prevented), and no Worker
+//      rollout workflow is queued or running. A rollout workflow that cannot be read stops
 //      the run. The copy uses its own concurrency group, so it never displaces a pending rollout.
 //   4. Names-only snapshot of every existing Worker's current deployment (versions and percentages).
 //      The copier script must be absent.
@@ -34,7 +35,9 @@
 //      Readback: a new version at 100% whose bindings are the verified unarmed bindings plus
 //      exactly the writer `secret_text` (core `bindArmedPreflight`), and the tracked modules.
 //      A failed or timed-out put is unproved: stop, clean up only attributable objects, and
-//      require operator reconciliation. Never retried.
+//      require operator reconciliation. Never retried. For cleanup only, a post-put version that
+//      fails that readback but carries this run's unique pins and the tracked modules is still
+//      this run's to delete; it never counts as armed and never pins the post-run gate.
 //  10. Same tail: the armed version's idle `outside_window` receipt before not-before, else delete.
 //  11. Same tail: the final receipt. Cloudflare post-run gate against the armed pins. There is no
 //      second preflight and no acceptance after a failed gate.
@@ -42,13 +45,17 @@
 //      attributed by this run (never forced, never retried). Prove it and its gate namespace gone,
 //      then prove every other Worker's deployment unchanged. Only on drift, list the rollout
 //      workflow runs created during the run (names, ids, timestamps); an unreadable list is
-//      reported and never changes the verdict.
+//      reported and never changes the verdict. Drift after a passing final receipt fails the
+//      report, not the copy: the value is already in Infisical.
 //  13. Stop the tail: SIGINT, then SIGKILL, each bounded.
 //
-// SIGINT and SIGTERM (job cancel or timeout) stop further phases, unblock any wait, stop a running
-// child, then run the same cleanup and tail shutdown. A SIGKILL skips all of it: after any run that
-// does not end with a passing cleanup gate, the operator revokes the writer and reads the copier
-// back privately before anything else.
+// SIGINT and SIGTERM (job cancel or timeout) stop further phases, unblock any wait and stop a
+// running child within about one second, then cleanup runs only read, delete and status (no
+// namespace read, snapshot or rollout listing) and the tail is stopped. GitHub follows with SIGKILL
+// a few seconds later, so cancel and timeout can still act like SIGKILL: cleanup may not finish.
+// After any run that does not end with a passing cleanup gate, the operator revokes the writer
+// and reads the copier back privately before anything else; `operatorAction` reads
+// `REVOKE THE WRITER NOW` while not-before has not passed.
 //
 // CI proves only the Cloudflare half. The operator completes the Infisical post-run and cleanup
 // gates privately with this report's `preflightPins` and `finalReceipt` and its own readback.
@@ -89,6 +96,8 @@ export const ENVIRONMENT = 'notifications-runtime-copy';
 export const ROLLOUT_WORKFLOWS = Object.freeze([
   'deploy-production.yml',
   'deploy-staging.yml',
+  // Counts only its direct workflow_dispatch runs: its workflow_call runs are listed under the
+  // calling deploy-production/deploy-staging run, which is already guarded above.
   'deploy-workers.yml',
   'cloud-agent-e2e-deploy.yml',
 ]);
@@ -115,6 +124,9 @@ export const TIMING = Object.freeze({
   readRetryMs: 2_000,
   processTimeoutMs: 5 * 60_000,
   killGraceMs: 5_000,
+  // After a stop signal: GitHub sends SIGINT, then SIGTERM, then SIGKILL within seconds, so each
+  // child gets about one second before SIGKILL and cleanup runs only read, delete and status.
+  abortGraceMs: 1_000,
   rolloutRunsPerWorkflow: 20,
 });
 
@@ -520,12 +532,27 @@ export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fet
   };
 }
 
-/** The protected environment must exist, allow only `main`, and give admins no bypass. */
+/**
+ * The protected environment must exist, allow only `main`, give admins no bypass, and require a
+ * reviewer other than the dispatcher (a required_reviewers rule with at least one reviewer and
+ * prevent_self_review on).
+ */
 export async function environmentProblems(gh) {
   const env = await gh.environment();
   if (env === null) return ['environment_absent'];
   const p = [];
   if (env.can_admins_bypass !== false) p.push('environment_admin_bypass');
+  const reviewers = (Array.isArray(env.protection_rules) ? env.protection_rules : []).filter(
+    r => isRecord(r) && r.type === 'required_reviewers'
+  );
+  if (
+    reviewers.length !== 1 ||
+    reviewers[0].prevent_self_review !== true ||
+    !Array.isArray(reviewers[0].reviewers) ||
+    reviewers[0].reviewers.length < 1
+  ) {
+    p.push('environment_required_reviewers');
+  }
   const policy = env.deployment_branch_policy;
   if (policy?.custom_branch_policies !== true || policy?.protected_branches !== false) {
     p.push('environment_branch_policy');
@@ -843,9 +870,11 @@ export function runChild(command, args, { env, stdin, timeoutMs, signal, graceMs
     const stop = reason => {
       if (stopped || settled) return;
       stopped = reason;
-      stopChild(child, graceMs, 'SIGTERM').then(exit =>
-        finish({ code: -1, output, stopped, exit })
-      );
+      const grace =
+        reason === 'signal'
+          ? Math.min(graceMs ?? TIMING.killGraceMs, TIMING.abortGraceMs)
+          : graceMs;
+      stopChild(child, grace, 'SIGTERM').then(exit => finish({ code: -1, output, stopped, exit }));
     };
     const onAbort = () => stop('signal');
     const timer = setTimeout(() => stop('timeout'), Math.max(0, timeoutMs ?? 0));
@@ -930,7 +959,10 @@ export function processIo(env, signal) {
           }
           return queue.shift();
         },
-        stop: () => (closed ? Promise.resolve('exited') : stopChild(child)),
+        stop: () =>
+          closed
+            ? Promise.resolve('exited')
+            : stopChild(child, signal?.aborted ? TIMING.abortGraceMs : TIMING.killGraceMs),
       };
     },
   };
@@ -1142,6 +1174,11 @@ export async function run(io) {
     if (armed.ok && modulesKept) {
       recorded.add(armedId);
       report.armedVersion = armedId;
+    } else if (modulesKept && carriesThisRun(observed, armedId, pins)) {
+      // Cleanup only: a post-put version with this run's unique pins and the tracked modules is
+      // this run's to delete. It never stands in for the armed proof or the post-run pin.
+      recorded.add(armedId);
+      report.cleanupAttributedVersion = armedId;
     }
     if (put.code !== 0) throw writeFailed('secret_put_unproved', put.output);
     if (!armed.ok || !modulesKept) throw new StopError('arm_readback_refused');
@@ -1185,7 +1222,14 @@ export async function run(io) {
     if (err?.codes?.length) report.errorCodes = err.codes;
   } finally {
     try {
-      report.cleanup = await cleanup(io, { created, recorded, before, plan, since });
+      report.cleanup = await cleanup(io, {
+        created,
+        recorded,
+        before,
+        plan,
+        since,
+        aborted: signal?.aborted === true,
+      });
     } finally {
       report.tail = { ...stats, stop: tail ? ((await tail.stop()) ?? 'stopped') : 'not_started' };
     }
@@ -1196,9 +1240,26 @@ export async function run(io) {
   if (signal?.aborted) unresolved.push('stopped_by_signal');
   if (unresolved.length) {
     report.unresolved = unresolved;
-    report.operatorAction = 'revoke_writer_then_read_back_copier';
+    // Before not-before no copy can have run yet: revoking the writer now prevents it outright.
+    report.operatorAction =
+      report.cleanup.beforeNotBefore === true
+        ? 'REVOKE THE WRITER NOW'
+        : 'revoke_writer_then_read_back_copier';
   }
   return report;
+}
+
+/** The single 100% post-put version, read by its id, carries this run's pins exactly once each. */
+function carriesThisRun(observed, versionId, pins) {
+  const v = observed?.version;
+  return (
+    typeof versionId === 'string' &&
+    isRecord(v) &&
+    v.id === versionId &&
+    Array.isArray(v.bindings) &&
+    v.bindings.every(isRecord) &&
+    carriesPins(v.bindings, pins)
+  );
 }
 
 /** The operator readback keys the core preflight reads; CI adds nothing to them. */
@@ -1212,9 +1273,11 @@ export function operatorPreflightMeta(operator) {
 /**
  * Deletes the copier only when every version it serves was attributed by this run. Every step
  * catches its own failure and records it by name, so a malformed response never skips the report;
- * a failed read never leads to a delete.
+ * a failed read never leads to a delete. After a stop signal only read, delete and status run (no
+ * namespace read, snapshot or rollout listing), so the cleanup gate stays failed and the job's
+ * last seconds go to the delete; a SIGKILL can still land first.
  */
-export async function cleanup(io, { created, recorded, before, plan, since }) {
+export async function cleanup(io, { created, recorded, before, plan, since, aborted = false }) {
   const { cf, clock } = io;
   const result = { attempted: false, deleted: false, scriptStatus: null, drift: null, errors: [] };
   if (!created) {
@@ -1247,12 +1310,16 @@ export async function cleanup(io, { created, recorded, before, plan, since }) {
     result.scriptStatus = 200;
     result.note = 'unattributable_versions';
   }
-  if (result.scriptStatus === 404) {
-    const ns = await step('namespaces', () => readBack(io, () => cf.doNamespaces(COPIER)));
-    if (ns) result.gateNamespacePresent = ns.value.length > 0;
+  if (aborted) {
+    result.aborted = true;
+  } else {
+    if (result.scriptStatus === 404) {
+      const ns = await step('namespaces', () => readBack(io, () => cf.doNamespaces(COPIER)));
+      if (ns) result.gateNamespacePresent = ns.value.length > 0;
+    }
   }
   let after = null;
-  if (before) {
+  if (before && !aborted) {
     const snap = await step('snapshot', () => readBack(io, () => snapshot(cf)));
     if (snap) {
       after = snap.value;
@@ -1322,10 +1389,13 @@ async function main() {
     gh: github({ token: env.GITHUB_TOKEN, apiUrl: env.GITHUB_API_URL }),
   });
   log(report);
+  if (report.operatorAction) {
+    process.stdout.write(`::error title=M84 operator action::${report.operatorAction}\n`);
+  }
   if (env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       env.GITHUB_STEP_SUMMARY,
-      `### M84 Notifications runtime copy\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`
+      `### M84 Notifications runtime copy\n\n${report.operatorAction ? `**Operator action: ${report.operatorAction}**\n\n` : ''}\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`
     );
   }
   return exitCode(report);

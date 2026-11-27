@@ -6,8 +6,9 @@ name: Notifications runtime copy (M84, temporary)
 # Notifications values come from 1Password through secrets-cutover, never from this workflow.
 # Removed after the run. It takes no input except the exact commit the dispatcher approved,
 # and it runs only from Kilo-Org/cloud main in the protected `notifications-runtime-copy`
-# environment. That environment must already exist with main as its only deployment branch
-# and no admin bypass. A first job with no secret and no environment reads it back; the copy
+# environment. That environment must already exist with main as its only deployment branch,
+# no admin bypass, and required reviewers with self-review prevented (the dispatcher cannot
+# approve their own run). A first job with no secret and no environment reads it back; the copy
 # job references the environment only after that guard passes, so a dispatch can never
 # auto-create it unprotected. The driver reads it back again. This workflow never creates
 # or configures it.
@@ -89,7 +90,9 @@ jobs:
 
       - name: Install the pinned Wrangler
         working-directory: services/notifications
-        run: pnpm install --frozen-lockfile --filter '{.}...' --filter kilocode-monorepo
+        # No lifecycle scripts: the pinned Wrangler runs from its optional-dependency binaries
+        # alone (checked with this exact install and a closed `wrangler deploy --dry-run`).
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter '{.}...' --filter kilocode-monorepo
 
       - name: Run the copier
         env:

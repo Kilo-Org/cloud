@@ -262,6 +262,18 @@ function makeWorld(o = {}) {
         name: ENVIRONMENT,
         can_admins_bypass: false,
         deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+        protection_rules: [
+          { id: 1, type: 'branch_policy' },
+          {
+            id: 2,
+            type: 'required_reviewers',
+            prevent_self_review: true,
+            reviewers: [
+              { type: 'User', reviewer: { login: 'synthetic-reviewer-a' } },
+              { type: 'User', reviewer: { login: 'synthetic-reviewer-b' } },
+            ],
+          },
+        ],
         ...o.environment,
       };
     },
@@ -643,6 +655,35 @@ test('missing or loosened protected environment stops before any Cloudflare call
     [{ branches: [{ name: 'main', type: 'tag' }] }, 'environment_branches'],
     [{ branches: [{ name: 'main' }] }, 'environment_branches'],
     [{ environment: { can_admins_bypass: undefined } }, 'environment_admin_bypass'],
+    [{ environment: { protection_rules: undefined } }, 'environment_required_reviewers'],
+    [
+      { environment: { protection_rules: [{ id: 1, type: 'branch_policy' }] } },
+      'environment_required_reviewers',
+    ],
+    [
+      {
+        environment: {
+          protection_rules: [
+            {
+              type: 'required_reviewers',
+              prevent_self_review: false,
+              reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
+            },
+          ],
+        },
+      },
+      'environment_required_reviewers',
+    ],
+    [
+      {
+        environment: {
+          protection_rules: [
+            { type: 'required_reviewers', prevent_self_review: true, reviewers: [] },
+          ],
+        },
+      },
+      'environment_required_reviewers',
+    ],
   ]) {
     await t.test(reason, async () => {
       const { world, report } = await drive(o);
@@ -835,7 +876,8 @@ test('a preflight refusal never arms, even when the cleanup delete is refused', 
   assert.equal(report.cleanup.scriptStatus, 200);
   assert.equal(report.armWrite, undefined);
   assert.deepEqual(report.unresolved, ['copier_not_proved_deleted']);
-  assert.equal(report.operatorAction, 'revoke_writer_then_read_back_copier');
+  // Before not-before nothing can have been copied yet: revoking the writer prevents any copy.
+  assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
   assert.equal(exitCode(report), 1);
 });
 
@@ -873,7 +915,7 @@ test('a put that fails after landing is unproved: the attributed armed copier is
   assert.deepEqual(wranglerVerbs(world), ['deploy', 'secret', 'delete']);
   assert.equal(report.cleanup.scriptStatus, 404);
   assert.deepEqual(report.unresolved, ['secret_put_unproved']);
-  assert.equal(report.operatorAction, 'revoke_writer_then_read_back_copier');
+  assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
   assert.equal(world.readLog.length, 0);
   assert.equal(exitCode(report), 1);
 });
@@ -889,18 +931,38 @@ test('a put that fails without landing is still unproved; only the unarmed copie
   assert.deepEqual(report.unresolved, ['secret_put_unproved']);
 });
 
-test('an armed version with any binding beyond the writer secret is refused and never deleted', async () => {
+test('a landed put whose armed readback fails is still deleted by cleanup when it carries the run pins', async () => {
   const { world, report } = await drive({
     put: { extra: [{ name: 'EXTRA', type: 'plain_text', text: 'x' }] },
   });
   assert.equal(report.stopReason, 'arm_readback_refused');
   assert.ok(report.gates.at(-1).failures.includes('armed_bindings_not_writer_only'));
   assert.equal(report.armWrite, 'unproved');
-  assert.equal(report.armedVersion, undefined);
+  assert.equal(report.armedVersion, undefined, 'never counted as armed');
+  assert.equal(report.preflightPins, undefined, 'never pins the post-run gate');
+  assert.ok(report.cleanupAttributedVersion);
   assert.deepEqual(world.secretInputs, [CLIENT_SECRET]);
+  assert.deepEqual(wranglerVerbs(world), ['deploy', 'secret', 'delete']);
+  assert.equal(report.cleanup.scriptStatus, 404);
+  assert.equal(report.cleanup.gate.ok, true);
+  assert.deepEqual(report.unresolved, ['secret_put_unproved']);
+  assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
+  assert.equal(world.readLog.length, 0);
+  assert.equal(world.infisical.calls.length, 0);
+  assert.equal(exitCode(report), 1);
+});
+
+test('a post-put version without exactly this run pins is never deleted', async () => {
+  const { world, report } = await drive({
+    put: { extra: [{ name: 'M65_RUN_ID', type: 'plain_text', text: 'm65-gh-someone-else-1' }] },
+  });
+  assert.equal(report.stopReason, 'arm_readback_refused');
+  assert.equal(report.armedVersion, undefined);
+  assert.equal(report.cleanupAttributedVersion, undefined);
   assert.ok(!wranglerVerbs(world).includes('delete'));
   assert.equal(report.cleanup.note, 'unattributable_versions');
   assert.deepEqual(report.unresolved, ['secret_put_unproved', 'copier_not_proved_deleted']);
+  assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
   assert.equal(world.readLog.length, 0);
 });
 
@@ -985,6 +1047,9 @@ test('a refused cleanup delete is reported and fails the run; it is never forced
   assert.equal(report.cleanup.scriptStatus, 200);
   assert.equal(report.cleanup.gate.ok, false);
   assert.equal(world.calls.filter(c => c[1] === 'deleteScript').length, 1);
+  // After not-before a copy may have run: revoke, then read the copier back.
+  assert.equal(report.cleanup.beforeNotBefore, false);
+  assert.equal(report.operatorAction, 'revoke_writer_then_read_back_copier');
   assert.deepEqual(report.unresolved, ['copier_not_proved_deleted']);
   assert.equal(exitCode(report), 1);
 });
@@ -1038,7 +1103,14 @@ test('a stop signal ends the readiness wait, refuses arming, and cleans up befor
   assert.ok(callIndex(world, 'cf', 'deleteScript') < callIndex(world, 'tail', 'stop'));
   assert.equal(report.tail.stop, 'killed');
   assert.equal(report.cleanup.scriptStatus, 404);
+  // Only read, delete and status after the signal: no namespace read, snapshot or rollout list.
+  assert.equal(report.cleanup.aborted, true);
+  assert.deepEqual([report.cleanup.drift, report.cleanup.gateNamespacePresent], [null, undefined]);
+  const afterDelete = world.calls.slice(callIndex(world, 'cf', 'deleteScript') + 1);
+  assert.ok(!afterDelete.some(c => c[1] === 'scriptNames' || c[1] === 'runsCreated'));
+  assert.equal(report.cleanup.gate.ok, false, 'an aborted cleanup never passes the gate');
   assert.deepEqual(report.unresolved, ['stopped_by_signal']);
+  assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
   assert.equal(exitCode(report), 1);
 });
 
@@ -1387,15 +1459,20 @@ test('a child that ignores its stop signal is killed within the bound', async ()
   // SIGTERM may land before the child installs its handler; either way the result is bounded.
   assert.ok(['exited', 'killed'].includes(timedOut.exit));
   assert.ok(Date.now() - started < 5_000);
+  // A stop signal cuts the grace to about one second, whatever grace the caller asked for.
   const controller = new AbortController();
   const pending = runChild(process.execPath, ['-e', stubborn], {
     env: { PATH: process.env.PATH },
     timeoutMs: 60_000,
-    graceMs: 300,
+    graceMs: 30_000,
     signal: controller.signal,
   });
+  await new Promise(r => setTimeout(r, 300));
+  const abortedAt = Date.now();
   controller.abort();
-  assert.equal((await pending).stopped, 'signal');
+  const aborted = await pending;
+  assert.equal(aborted.stopped, 'signal');
+  assert.ok(Date.now() - abortedAt < 3_000, 'about one second per stage, not 30 s');
   const missing = await runChild('/nonexistent/m84-synthetic-binary', [], { timeoutMs: 1_000 });
   assert.equal(missing.code, -1);
   const ok = await runChild(process.execPath, ['-e', 'process.stdin.pipe(process.stdout)'], {
@@ -1451,6 +1528,11 @@ test('workflow: dispatch-only, exact guards, pinned actions, secrets only in the
     s => String(s.uses).startsWith('actions/setup-node@') && s.with?.cache === 'pnpm'
   );
   assert.ok(warm >= 0 && warm < install, 'pnpm cache restored before the install');
+  assert.equal(
+    job.steps[install].run,
+    "pnpm install --frozen-lockfile --ignore-scripts --filter '{.}...' --filter kilocode-monorepo",
+    'no lifecycle scripts in the protected job'
+  );
   const withSecrets = job.steps.filter(s => JSON.stringify(s).includes('secrets.'));
   assert.deepEqual(
     withSecrets.map(s => s.name),

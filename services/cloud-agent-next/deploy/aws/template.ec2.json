@@ -1,0 +1,605 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Kilo sandbox on one private EC2 host with encrypted workspace storage.",
+  "Metadata": { "KiloProvider": "aws-ec2", "KiloTemplateVersion": 1 },
+  "Parameters": {
+    "KiloRoleArn": {
+      "Type": "String",
+      "AllowedPattern": "arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+"
+    },
+    "ExternalId": { "Type": "String", "NoEcho": true, "AllowedPattern": "[A-Za-z0-9_-]{32,128}" },
+    "InstallationId": {
+      "Type": "String",
+      "AllowedPattern": "[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}"
+    },
+    "HostAmiId": {
+      "Type": "AWS::EC2::Image::Id",
+      "Description": "Approved x86-64 Kilo host AMI with the supervisor, firewall, proxy and pinned OCI image."
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.84.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true
+      }
+    },
+    "InternetGateway": { "Type": "AWS::EC2::InternetGateway" },
+    "GatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "InternetGatewayId": { "Ref": "InternetGateway" }
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "CidrBlock": "10.84.0.0/24",
+        "AvailabilityZone": { "Fn::Select": [0, { "Fn::GetAZs": "" }] },
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "PrivateSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": { "Ref": "Vpc" },
+        "CidrBlock": "10.84.16.0/20",
+        "AvailabilityZone": { "Fn::Select": [0, { "Fn::GetAZs": "" }] },
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "PublicRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": { "VpcId": { "Ref": "Vpc" } }
+    },
+    "PrivateRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": { "VpcId": { "Ref": "Vpc" } }
+    },
+    "PublicRoutesAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "PublicSubnet" },
+        "RouteTableId": { "Ref": "PublicRoutes" }
+      }
+    },
+    "PrivateRoutesAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "PrivateSubnet" },
+        "RouteTableId": { "Ref": "PrivateRoutes" }
+      }
+    },
+    "InternetRoute": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "GatewayAttachment",
+      "Properties": {
+        "RouteTableId": { "Ref": "PublicRoutes" },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": { "Ref": "InternetGateway" }
+      }
+    },
+    "NatAddress": { "Type": "AWS::EC2::EIP", "Properties": { "Domain": "vpc" } },
+    "NatGateway": {
+      "Type": "AWS::EC2::NatGateway",
+      "DependsOn": "InternetRoute",
+      "Properties": {
+        "SubnetId": { "Ref": "PublicSubnet" },
+        "AllocationId": { "Fn::GetAtt": ["NatAddress", "AllocationId"] }
+      }
+    },
+    "PrivateInternetRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": { "Ref": "PrivateRoutes" },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": { "Ref": "NatGateway" }
+      }
+    },
+    "HostSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Outbound HTTP and HTTPS for Kilo sandbox hosts. No inbound traffic.",
+        "VpcId": { "Ref": "Vpc" },
+        "SecurityGroupEgress": [
+          { "IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "CidrIp": "0.0.0.0/0" },
+          { "IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "CidrIp": "0.0.0.0/0" }
+        ]
+      }
+    },
+    "Artifacts": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            { "ServerSideEncryptionByDefault": { "SSEAlgorithm": "AES256" } }
+          ]
+        },
+        "OwnershipControls": { "Rules": [{ "ObjectOwnership": "BucketOwnerEnforced" }] },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            { "Prefix": "kilo/launch/", "Status": "Enabled", "ExpirationInDays": 1 },
+            { "Prefix": "kilo/stopped/", "Status": "Enabled", "ExpirationInDays": 1 }
+          ]
+        }
+      }
+    },
+    "ArtifactPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": { "Ref": "Artifacts" },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RequireTls",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                { "Fn::GetAtt": ["Artifacts", "Arn"] },
+                { "Fn::Sub": "${Artifacts.Arn}/*" }
+              ],
+              "Condition": { "Bool": { "aws:SecureTransport": "false" } }
+            }
+          ]
+        }
+      }
+    },
+    "ArtifactEndpoint": {
+      "Type": "AWS::EC2::VPCEndpoint",
+      "Properties": {
+        "ServiceName": { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" },
+        "VpcId": { "Ref": "Vpc" },
+        "VpcEndpointType": "Gateway",
+        "RouteTableIds": [{ "Ref": "PrivateRoutes" }],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:GetObject",
+              "Resource": { "Fn::Sub": "${Artifacts.Arn}/kilo/launch/*" }
+            },
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": { "Fn::Sub": "${Artifacts.Arn}/kilo/stopped/*" }
+            }
+          ]
+        }
+      }
+    },
+    "HostRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "ec2.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ManageOwnHostDocuments",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:GetObject",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        { "Fn::GetAtt": ["Artifacts", "Arn"] },
+                        "/kilo/launch/${ec2:SourceInstanceARN}/*"
+                      ]
+                    ]
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:SourceVpce": { "Ref": "ArtifactEndpoint" },
+                      "aws:VpcSourceIp": "${aws:Ec2InstanceSourcePrivateIPv4}"
+                    }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:PutObject",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        { "Fn::GetAtt": ["Artifacts", "Arn"] },
+                        "/kilo/stopped/${ec2:SourceInstanceARN}/*"
+                      ]
+                    ]
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:SourceVpce": { "Ref": "ArtifactEndpoint" },
+                      "aws:VpcSourceIp": "${aws:Ec2InstanceSourcePrivateIPv4}"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "HostProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": { "Roles": [{ "Ref": "HostRole" }] }
+    },
+    "HostLaunchTemplate": {
+      "Type": "AWS::EC2::LaunchTemplate",
+      "DependsOn": ["ArtifactPolicy", "PrivateInternetRoute", "PrivateRoutesAssociation"],
+      "Properties": {
+        "LaunchTemplateData": {
+          "ImageId": { "Ref": "HostAmiId" },
+          "InstanceType": "m7i.large",
+          "IamInstanceProfile": { "Arn": { "Fn::GetAtt": ["HostProfile", "Arn"] } },
+          "MetadataOptions": {
+            "HttpEndpoint": "enabled",
+            "HttpProtocolIpv6": "disabled",
+            "HttpPutResponseHopLimit": 1,
+            "HttpTokens": "required",
+            "InstanceMetadataTags": "enabled"
+          },
+          "NetworkInterfaces": [
+            {
+              "DeviceIndex": 0,
+              "AssociatePublicIpAddress": false,
+              "DeleteOnTermination": true,
+              "SubnetId": { "Ref": "PrivateSubnet" },
+              "Groups": [{ "Ref": "HostSecurityGroup" }]
+            }
+          ],
+          "BlockDeviceMappings": [
+            {
+              "DeviceName": "/dev/xvda",
+              "Ebs": {
+                "Encrypted": true,
+                "DeleteOnTermination": true,
+                "VolumeType": "gp3",
+                "VolumeSize": 16
+              }
+            },
+            {
+              "DeviceName": "/dev/sdf",
+              "Ebs": {
+                "Encrypted": true,
+                "DeleteOnTermination": true,
+                "VolumeType": "gp3",
+                "VolumeSize": 32
+              }
+            }
+          ],
+          "InstanceInitiatedShutdownBehavior": "stop",
+          "UserData": {
+            "Fn::Base64": {
+              "Fn::Sub": "#cloud-config\nwrite_files:\n  - path: /etc/kilo-ec2/host.conf\n    owner: root:root\n    permissions: '0600'\n    content: |\n      AWS_REGION=${AWS::Region}\n      KILO_LAUNCH_BUCKET=${Artifacts}\nruncmd:\n  - [systemctl, restart, kilo-ec2.service]\n"
+            }
+          }
+        }
+      }
+    },
+    "ControllerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "AWS": { "Ref": "KiloRoleArn" } },
+              "Action": "sts:AssumeRole",
+              "Condition": { "StringEquals": { "sts:ExternalId": { "Ref": "ExternalId" } } }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ManageSandboxResources",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ObserveRegion",
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:DescribeInstances",
+                    "ec2:DescribeVolumes",
+                    "ec2:DescribeSnapshots",
+                    "ec2:DescribeLaunchTemplateVersions"
+                  ],
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": { "aws:RequestedRegion": { "Ref": "AWS::Region" } }
+                  }
+                },
+                {
+                  "Sid": "ReadOwnStack",
+                  "Effect": "Allow",
+                  "Action": "cloudformation:DescribeStacks",
+                  "Resource": { "Ref": "AWS::StackId" }
+                },
+                {
+                  "Sid": "UseOwnLaunchTemplate",
+                  "Effect": "Allow",
+                  "Action": "ec2:RunInstances",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${HostLaunchTemplate}"
+                  }
+                },
+                {
+                  "Sid": "UsePinnedLaunchResources",
+                  "Effect": "Allow",
+                  "Action": "ec2:RunInstances",
+                  "Resource": [
+                    { "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}::image/${HostAmiId}" },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${HostSecurityGroup}"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*"
+                    }
+                  ],
+                  "Condition": {
+                    "ArnEquals": {
+                      "ec2:LaunchTemplate": {
+                        "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${HostLaunchTemplate}"
+                      }
+                    },
+                    "Bool": { "ec2:IsLaunchTemplateResource": "true" }
+                  }
+                },
+                {
+                  "Sid": "UseOwnWorkspaceSnapshots",
+                  "Effect": "Allow",
+                  "Action": "ec2:RunInstances",
+                  "Resource": { "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}::snapshot/*" },
+                  "Condition": {
+                    "ArnEquals": {
+                      "ec2:LaunchTemplate": {
+                        "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${HostLaunchTemplate}"
+                      }
+                    },
+                    "StringEquals": {
+                      "aws:ResourceTag/KiloInstallation": { "Ref": "InstallationId" }
+                    },
+                    "Null": { "aws:ResourceTag/KiloSnapshotCapture": "false" }
+                  }
+                },
+                {
+                  "Sid": "CreateSandboxInstance",
+                  "Effect": "Allow",
+                  "Action": "ec2:RunInstances",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                  },
+                  "Condition": {
+                    "ArnEquals": {
+                      "ec2:LaunchTemplate": {
+                        "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${HostLaunchTemplate}"
+                      }
+                    },
+                    "StringEquals": {
+                      "aws:RequestTag/KiloInstallation": { "Ref": "InstallationId" },
+                      "ec2:InstanceType": "m7i.large",
+                      "ec2:MetadataHttpTokens": "required"
+                    },
+                    "Null": { "aws:RequestTag/KiloSandboxGeneration": "false" }
+                  }
+                },
+                {
+                  "Sid": "CreateSandboxVolumes",
+                  "Effect": "Allow",
+                  "Action": "ec2:RunInstances",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:volume/*"
+                  },
+                  "Condition": {
+                    "ArnEquals": {
+                      "ec2:LaunchTemplate": {
+                        "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:launch-template/${HostLaunchTemplate}"
+                      }
+                    },
+                    "StringEquals": {
+                      "aws:RequestTag/KiloInstallation": { "Ref": "InstallationId" },
+                      "ec2:VolumeType": "gp3"
+                    },
+                    "Bool": { "ec2:Encrypted": "true" },
+                    "Null": { "aws:RequestTag/KiloSandboxGeneration": "false" }
+                  }
+                },
+                {
+                  "Sid": "PassOnlyHostRole",
+                  "Effect": "Allow",
+                  "Action": "iam:PassRole",
+                  "Resource": { "Fn::GetAtt": ["HostRole", "Arn"] },
+                  "Condition": { "StringEquals": { "iam:PassedToService": "ec2.amazonaws.com" } }
+                },
+                {
+                  "Sid": "TagInstancesAndVolumesOnCreate",
+                  "Effect": "Allow",
+                  "Action": "ec2:CreateTags",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:volume/*"
+                    }
+                  ],
+                  "Condition": {
+                    "StringEquals": {
+                      "ec2:CreateAction": "RunInstances",
+                      "aws:RequestTag/KiloInstallation": { "Ref": "InstallationId" }
+                    },
+                    "ForAllValues:StringEquals": {
+                      "aws:TagKeys": ["KiloInstallation", "KiloSandboxGeneration"]
+                    }
+                  }
+                },
+                {
+                  "Sid": "ManageOwnedInstances",
+                  "Effect": "Allow",
+                  "Action": ["ec2:StartInstances", "ec2:StopInstances", "ec2:TerminateInstances"],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/KiloInstallation": { "Ref": "InstallationId" }
+                    }
+                  }
+                },
+                {
+                  "Sid": "SetOnlyAllocationHint",
+                  "Effect": "Allow",
+                  "Action": "ec2:CreateTags",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/KiloInstallation": { "Ref": "InstallationId" }
+                    },
+                    "ForAllValues:StringEquals": { "aws:TagKeys": ["KiloAllocation"] }
+                  }
+                },
+                {
+                  "Sid": "DeleteOwnedDetachedVolumes",
+                  "Effect": "Allow",
+                  "Action": "ec2:DeleteVolume",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:volume/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/KiloInstallation": { "Ref": "InstallationId" }
+                    },
+                    "Null": { "aws:ResourceTag/KiloSandboxGeneration": "false" }
+                  }
+                },
+                {
+                  "Sid": "CaptureOwnedVolumes",
+                  "Effect": "Allow",
+                  "Action": "ec2:CreateSnapshot",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:volume/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/KiloInstallation": { "Ref": "InstallationId" }
+                    }
+                  }
+                },
+                {
+                  "Sid": "CreateTaggedSnapshots",
+                  "Effect": "Allow",
+                  "Action": "ec2:CreateSnapshot",
+                  "Resource": { "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}::snapshot/*" },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:RequestTag/KiloInstallation": { "Ref": "InstallationId" }
+                    },
+                    "Null": {
+                      "aws:RequestTag/KiloSandboxGeneration": "false",
+                      "aws:RequestTag/KiloSnapshotCapture": "false"
+                    }
+                  }
+                },
+                {
+                  "Sid": "TagSnapshotsOnCreate",
+                  "Effect": "Allow",
+                  "Action": "ec2:CreateTags",
+                  "Resource": { "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}::snapshot/*" },
+                  "Condition": {
+                    "StringEquals": {
+                      "ec2:CreateAction": "CreateSnapshot",
+                      "aws:RequestTag/KiloInstallation": { "Ref": "InstallationId" }
+                    },
+                    "ForAllValues:StringEquals": {
+                      "aws:TagKeys": [
+                        "KiloInstallation",
+                        "KiloSandboxGeneration",
+                        "KiloSnapshotCapture"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "Sid": "DeleteOwnedSnapshots",
+                  "Effect": "Allow",
+                  "Action": "ec2:DeleteSnapshot",
+                  "Resource": { "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}::snapshot/*" },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/KiloInstallation": { "Ref": "InstallationId" }
+                    }
+                  }
+                },
+                {
+                  "Sid": "CheckForMissingLaunchDocuments",
+                  "Effect": "Allow",
+                  "Action": "s3:ListBucket",
+                  "Resource": { "Fn::GetAtt": ["Artifacts", "Arn"] }
+                },
+                {
+                  "Sid": "ManageLaunchDocuments",
+                  "Effect": "Allow",
+                  "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+                  "Resource": { "Fn::Sub": "${Artifacts.Arn}/kilo/launch/*" }
+                },
+                {
+                  "Sid": "ReconcileCleanStops",
+                  "Effect": "Allow",
+                  "Action": ["s3:GetObject", "s3:DeleteObject"],
+                  "Resource": { "Fn::Sub": "${Artifacts.Arn}/kilo/stopped/*" }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "Provider": { "Value": "aws-ec2" },
+    "TemplateVersion": { "Value": "1" },
+    "InstallationId": { "Value": { "Ref": "InstallationId" } },
+    "ControllerRoleArn": { "Value": { "Fn::GetAtt": ["ControllerRole", "Arn"] } },
+    "ArtifactBucket": { "Value": { "Ref": "Artifacts" } },
+    "PrivateSubnetId": { "Value": { "Ref": "PrivateSubnet" } },
+    "HostSecurityGroupId": { "Value": { "Ref": "HostSecurityGroup" } },
+    "HostAmiId": { "Value": { "Ref": "HostAmiId" } },
+    "HostInstanceProfileArn": { "Value": { "Fn::GetAtt": ["HostProfile", "Arn"] } },
+    "LaunchTemplateId": { "Value": { "Ref": "HostLaunchTemplate" } },
+    "LaunchTemplateVersion": {
+      "Value": { "Fn::GetAtt": ["HostLaunchTemplate", "LatestVersionNumber"] }
+    }
+  }
+}

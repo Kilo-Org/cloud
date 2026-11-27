@@ -1,3 +1,4 @@
+import { readAwsResponseBytes } from './aws-client';
 import { describe, expect, it } from 'vitest';
 import { assumeAwsRole, createAwsClient, readAwsResponse } from './aws-client';
 
@@ -12,16 +13,16 @@ describe('AWS signed transport', () => {
     const client = createAwsClient({
       credentials,
       region: 'us-east-1',
-      service: 'lambda',
+      service: 'ecs',
       fetch: async request => {
-        expect(request.headers.get('authorization')).toContain('/us-east-1/lambda/aws4_request');
+        expect(request.headers.get('authorization')).toContain('/us-east-1/ecs/aws4_request');
         expect(request.headers.get('x-amz-security-token')).toBe('test-token');
         expect(await request.text()).toBe('{"clientToken":"intent-1"}');
         expect(request.redirect).toBe('manual');
         return new Response('{}');
       },
     });
-    await client.request('https://lambda.us-east-1.amazonaws.com/2025-09-09/microvms', {
+    await client.request('https://ecs.us-east-1.amazonaws.com/', {
       method: 'POST',
       body: '{"clientToken":"intent-1"}',
     });
@@ -133,5 +134,15 @@ describe('AWS signed transport', () => {
     await expect(
       client.signedUrl(new URL('https://bucket.s3.us-east-1.amazonaws.com/key'), 'GET', 60)
     ).rejects.toThrow('AWS credentials expire before the signed URL');
+  });
+});
+
+describe('bounded AWS binary responses', () => {
+  it('preserves exact bytes for immutable artifact checksums', async () => {
+    const bytes = Uint8Array.from([0xef, 0xbb, 0xbf, 0x7b, 0x7d]);
+    expect(await readAwsResponseBytes(new Response(bytes))).toEqual(bytes);
+    await expect(readAwsResponseBytes(new Response(bytes), 4)).rejects.toMatchObject({
+      code: 'ResponseTooLarge',
+    });
   });
 });

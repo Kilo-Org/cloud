@@ -1,0 +1,21 @@
+{
+  // Throwaway spike for contract §11 A. Not for merge; the Worker is deleted after the spike.
+  "name": "migration-proxy-spike-staging",
+  "main": "src/index.js",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": { "SPIKE_VERSION": "v1", "REAPPLY_TIMEOUT": "1" },
+  "containers": [
+    {
+      "class_name": "SpikeDO",
+      "scheduling_policy": "durable_object",
+      "images": { "probe": { "dockerfile": "./container/Dockerfile" } },
+    },
+  ],
+  "durable_objects": { "bindings": [{ "name": "SPIKE_DO", "class_name": "SpikeDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SpikeDO"] }],
+}

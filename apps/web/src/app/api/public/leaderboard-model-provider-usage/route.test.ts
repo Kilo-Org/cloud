@@ -170,7 +170,6 @@ describe('GET /api/public/leaderboard-model-provider-usage', () => {
     await insertLeaderboardUsage([
       { requested_model: 'acme/kept' },
       { requested_model: 'acme/user-byok', is_user_byok: true },
-      { requested_model: 'acme/unknown-byok', is_user_byok: null },
       { provider: 'custom', requested_model: 'private/model' },
       { provider: 'custom', requested_model: 'reflection/beam-free' },
       { provider: 'custom', requested_model: null, model: 'reflection/beam-free' },

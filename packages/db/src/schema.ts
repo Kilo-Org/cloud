@@ -2921,7 +2921,8 @@ export const leaderboard_usage_daily = pgTable(
     model: text(),
     inference_provider: text(),
     mode: text(),
-    is_user_byok: boolean(),
+    // Usage without a metadata row, or with a NULL flag, counts as not BYOK.
+    is_user_byok: boolean().notNull(),
     input_tokens: bigint({ mode: 'number' }).notNull(),
     output_tokens: bigint({ mode: 'number' }).notNull(),
     cache_hit_tokens: bigint({ mode: 'number' }).notNull(),

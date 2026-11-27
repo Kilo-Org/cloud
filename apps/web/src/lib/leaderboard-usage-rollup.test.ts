@@ -107,6 +107,12 @@ describe('leaderboard usage rollup', () => {
       requested_model: 'no/metadata',
       withMetadata: false,
     });
+    // A NULL flag and a missing metadata row both count as not BYOK.
+    await insertUsage({
+      created_at: '2026-11-10T10:00:00.000Z',
+      requested_model: 'no/metadata',
+      is_user_byok: null,
+    });
     await insertUsage({ created_at: '2026-11-09T23:59:59.999Z', mode: 'code' });
     await insertUsage({ created_at: '2026-11-11T00:00:00.000Z', mode: 'code' });
 
@@ -148,12 +154,12 @@ describe('leaderboard usage rollup', () => {
         ...shared,
         requested_model: 'no/metadata',
         mode: null,
-        is_user_byok: null,
-        input_tokens: 1_000,
-        output_tokens: 500,
-        cache_hit_tokens: 200,
-        cost_microdollars: 100,
-        request_count: 1,
+        is_user_byok: false,
+        input_tokens: 2_000,
+        output_tokens: 1_000,
+        cache_hit_tokens: 400,
+        cost_microdollars: 200,
+        request_count: 2,
         error_count: 0,
       },
       {

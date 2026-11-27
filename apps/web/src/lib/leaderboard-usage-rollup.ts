@@ -36,7 +36,7 @@ type LeaderboardUsageKey = {
   model: string | null;
   inference_provider: string | null;
   mode: string | null;
-  is_user_byok: boolean | null;
+  is_user_byok: boolean;
 };
 
 type LeaderboardUsageRow = LeaderboardUsageKey & {
@@ -90,7 +90,7 @@ async function aggregateSlice(
         mu.model,
         mu.inference_provider,
         md.mode,
-        meta.is_user_byok,
+        COALESCE(meta.is_user_byok, false) AS is_user_byok,
         SUM(mu.input_tokens)::text AS input_tokens,
         SUM(mu.output_tokens)::text AS output_tokens,
         SUM(mu.cache_hit_tokens)::text AS cache_hit_tokens,

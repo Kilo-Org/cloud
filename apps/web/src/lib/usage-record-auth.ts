@@ -76,7 +76,8 @@ async function stsDeployment(): Promise<StsDeployment | null> {
   // Loaded on the first STS request only. Not a static import: that would load the transport's
   // secrets client and Vercel OIDC exchange on every legacy request; `sts-secret-reader.ts` defers
   // this module the same way.
-  const { stsEnvironmentOfDeployment } = await import('@/lib/sts-secret-transport');
+  const { stsEnvironmentOfDeployment } =
+    await import('@kilocode/web-shared/lib/sts-secret-transport');
   let environment: StsEnvironment;
   try {
     environment = stsEnvironmentOfDeployment(process.env);

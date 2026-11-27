@@ -1,7 +1,8 @@
-// Synthetic proof for the M84 driver (../m84-notifications-run.mjs) and its workflow. A simulated
-// account (scripts, deployments, versions, store, copier, cron ticks) drives every branch. Each
-// tick runs the real core `runTick` against the fake Infisical, so the receipts are the copier's
-// own, and every gate is the real core gate. No provider, credential or real value is involved.
+// Synthetic proof for the runtime copier driver (../runtime-copy-run.mjs) and its matrix
+// workflow, for the checked-in table's Notifications entry. A simulated account (scripts,
+// deployments, versions, store, copier, cron ticks) drives every branch. Each tick runs the real
+// core `runTick` against the fake Infisical, so the receipts are the copier's own, and every gate
+// is the real core gate. No provider, credential or real value is involved.
 
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -11,9 +12,6 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 
 import {
-  BATCH_TARGETS,
-  COPIER,
-  ENVIRONMENT,
   OPERATOR_META,
   OPERATOR_SCHEMA,
   RENDER_CONFIG,
@@ -27,15 +25,18 @@ import {
   exitCode,
   github,
   jsonObjectSplitter,
+  planMatrix,
   planRun,
   receiptsOf,
   rolloutRunsDuring,
   run,
   runChild,
   stopChild,
-} from '../m84-notifications-run.mjs';
-import { NAME_MAP, moduleHashes } from './checks.mjs';
+  targetOf,
+} from '../runtime-copy-run.mjs';
+import { WORKER_SOURCES, moduleHashes } from './checks.mjs';
 import {
+  BATCH,
   CLIENT_ID,
   CLIENT_SECRET,
   armedCopierBindings,
@@ -49,7 +50,10 @@ import {
   unarmedCopierBindings,
 } from './fakes.mjs';
 import { CRON, RECEIPT_SCHEMA, WRITER_SECRET, runTick } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
+
+const NAME_MAP = WORKER_SOURCES.notifications.names;
+const TARGET = targetOf('notifications');
+const { copier: COPIER, environment: ENVIRONMENT, targets: BATCH_TARGETS } = TARGET;
 
 const T0 = Date.parse('2026-11-27T18:00:00Z');
 const SHA = 'c'.repeat(40);
@@ -103,6 +107,9 @@ function baseEnv(overrides = {}) {
     GITHUB_RUN_ID: '4242',
     GITHUB_RUN_ATTEMPT: '1',
     RUNNER_TEMP: '/tmp/runner-temp',
+    COPY_WORKER: 'notifications',
+    COPY_INDEX: '0',
+    CLOUDFLARE_TOKEN_SOURCE: 'secret',
     GITHUB_TOKEN: 'synthetic-github-token',
     CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token',
     M65_INFISICAL_CLIENT_ID: CLIENT_ID,
@@ -301,6 +308,7 @@ function makeWorld(o = {}) {
     );
     world.pins = {
       M65_RUN_ID: flags['--run-id'],
+      M65_BATCH: flags['--batch'],
       M65_NOT_BEFORE: flags['--not-before'],
       M65_NOT_AFTER: flags['--not-after'],
       M65_INFISICAL_CLIENT_ID: flags['--client-id'],
@@ -563,6 +571,10 @@ test('window: the earliest minute tick that both the lead and the writer expiry 
 test('context and operator refusals make no provider, GitHub or process call', async t => {
   const cases = [
     [{ GITHUB_REF: 'refs/heads/feature' }, 'ref'],
+    [{ COPY_WORKER: 'not-in-table' }, 'worker'],
+    [{ COPY_WORKER: '__proto__' }, 'worker'],
+    [{ COPY_INDEX: 'x' }, 'matrix_index'],
+    [{ CLOUDFLARE_TOKEN_SOURCE: 'STS' }, 'token_source'],
     [{ GITHUB_REPOSITORY: 'someone/cloud' }, 'repository'],
     [{ GITHUB_EVENT_NAME: 'push' }, 'event'],
     [{ EXPECTED_COMMIT: 'd'.repeat(40) }, 'expected_commit'],
@@ -1180,7 +1192,15 @@ test('an aborted cleanup reads once with the short timeout, never retries, and s
     clock: { now: () => T0 },
     sleep: async () => seen.push(['sleep']),
   });
-  const state = { created: true, recorded: new Set([id]), before: {}, since: T0, aborted: true };
+  const state = {
+    created: true,
+    recorded: new Set([id]),
+    before: {},
+    since: T0,
+    aborted: true,
+    copier: COPIER,
+    source: 'notifications',
+  };
   const flaky = await cleanup(
     io({
       async deploymentVersions(_name, opts) {
@@ -1257,6 +1277,8 @@ test('cleanup survives malformed provider data, reports it, and never deletes on
       before: {},
       plan: { notBefore: T0 + 60_000 },
       since: T0,
+      copier: COPIER,
+      source: 'notifications',
     }
   );
   assert.deepEqual(calls, ['read']);
@@ -1292,7 +1314,15 @@ test('a transient cleanup read is read once more; the delete itself is never rep
   };
   const result = await cleanup(
     { cf, gh: {}, clock: { now: () => T0 }, sleep: async () => {} },
-    { created: true, recorded: new Set([id]), before: {}, plan: { notBefore: T0 }, since: T0 }
+    {
+      created: true,
+      recorded: new Set([id]),
+      before: {},
+      plan: { notBefore: T0 },
+      since: T0,
+      copier: COPIER,
+      source: 'notifications',
+    }
   );
   assert.deepEqual(calls, ['delete']);
   assert.equal(result.deleted, true);
@@ -1333,13 +1363,13 @@ test('receipts are filtered by run id and exact schema; exceptions are only coun
     logs: [{ message: [line, 'plain text', JSON.stringify({ ...receipt, extra: 1 })] }],
     exceptions: [{ message: 'synthetic' }],
   };
-  const mine = receiptsOf(event, receipt.runId);
+  const mine = receiptsOf(event, receipt.runId, BATCH);
   assert.equal(mine.receipts.length, 1);
   assert.equal(mine.exceptions, 1);
-  assert.equal(receiptsOf(event, 'm65-another-run-0001').receipts.length, 0);
+  assert.equal(receiptsOf(event, 'm65-another-run-0001', BATCH).receipts.length, 0);
 });
 
-test('child processes inherit no writer secret, operator readback or GitHub token', () => {
+test('child processes inherit no writer secret, operator readback or GitHub token; no Wrangler log', () => {
   const env = baseEnv();
   const plain = childEnv(env);
   const wrangler = childEnv(env, { cloudflare: true });
@@ -1348,6 +1378,7 @@ test('child processes inherit no writer secret, operator readback or GitHub toke
     'HOME',
     'PATH',
     'WRANGLER_SEND_METRICS',
+    'WRANGLER_WRITE_LOGS',
     'XDG_CONFIG_HOME',
   ]);
   assert.deepEqual(Object.keys(wrangler).sort(), [
@@ -1357,10 +1388,14 @@ test('child processes inherit no writer secret, operator readback or GitHub toke
     'HOME',
     'PATH',
     'WRANGLER_SEND_METRICS',
+    'WRANGLER_WRITE_LOGS',
     'XDG_CONFIG_HOME',
   ]);
+  // M124: every Wrangler child (deploy, secret put, tail) runs with log files off.
+  assert.equal(wrangler.WRANGLER_WRITE_LOGS, 'false');
+  assert.equal(plain.WRANGLER_WRITE_LOGS, 'false');
   assert.equal(wrangler.CLOUDFLARE_ACCOUNT_ID, BATCH.accountId);
-  assert.equal(wrangler.HOME, '/tmp/runner-temp/m84-isolated-home');
+  assert.equal(wrangler.HOME, '/tmp/runner-temp/runtime-copy-isolated-home');
   assert.notEqual(wrangler.HOME, env.HOME);
   assert.ok(wrangler.XDG_CONFIG_HOME.startsWith(wrangler.HOME));
 });
@@ -1393,7 +1428,7 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
   const parts = {
     'worker.mjs': ['file', 'export default {};\n// lf only\n'],
     'core.mjs': ['field', 'export const synthetic = "ü";\nexport const two = 2;\n'],
-    'manifest.mjs': ['file', 'export const mixed = 1;\r\n// crlf then lf\n'],
+    'table.mjs': ['file', 'export const mixed = 1;\r\n// crlf then lf\n'],
     metadata: ['field', '{"synthetic":true}'],
   };
   const boundary = 'm84-synthetic-boundary';
@@ -1469,13 +1504,8 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
   });
   assert.deepEqual(await cf.doNamespaces(COPIER), [{ id: 'n2', script: COPIER, class: 'M65Gate' }]);
   const hashes = await cf.moduleHashes(COPIER);
-  assert.deepEqual(Object.keys(hashes).sort(), [
-    'core.mjs',
-    'manifest.mjs',
-    'metadata',
-    'worker.mjs',
-  ]);
-  for (const m of ['worker.mjs', 'core.mjs', 'manifest.mjs']) {
+  assert.deepEqual(Object.keys(hashes).sort(), ['core.mjs', 'metadata', 'table.mjs', 'worker.mjs']);
+  for (const m of ['worker.mjs', 'core.mjs', 'table.mjs']) {
     assert.equal(hashes[m], sha(parts[m][1]), `${m}: digest of the exact uploaded bytes`);
   }
   assert.equal(hashes.metadata, 'unexpected');
@@ -1594,45 +1624,53 @@ test('a child that ignores its stop signal is killed within the bound', async ()
   assert.deepEqual(ok, { code: 0, output: 'echo' });
 });
 
-test('workflow: dispatch-only, exact guards, pinned actions, secrets only in the driver step', () => {
+test('workflow: dispatch-only plan job, serial per-Worker matrix, twins, secrets only in the drivers', () => {
   const { load } = createRequire(import.meta.url)('js-yaml');
   const text = readFileSync(
-    new URL('../../../.github/workflows/notifications-runtime-copy.yml', import.meta.url),
+    new URL('../../../.github/workflows/runtime-copy.yml', import.meta.url),
     'utf8'
   );
   const wf = load(text);
   assert.deepEqual(Object.keys(wf.on), ['workflow_dispatch']);
   assert.deepEqual(Object.keys(wf.on.workflow_dispatch.inputs), ['expected_commit']);
   assert.deepEqual(wf.permissions, {});
-  assert.deepEqual(wf.concurrency, {
-    group: 'notifications-runtime-copy',
-    'cancel-in-progress': false,
-  });
-  assert.deepEqual(Object.keys(wf.jobs), ['environment-guard', 'copy']);
-  const guard = wf.jobs['environment-guard'];
-  assert.equal(guard.environment, undefined);
-  assert.deepEqual(guard.permissions, { contents: 'read', actions: 'read' });
-  assert.ok(!JSON.stringify(guard).includes('secrets.'));
-  assert.equal(
-    guard.steps.at(-1).run,
-    'node scripts/secrets-migration/m84-notifications-run.mjs --environment-guard'
-  );
-  assert.deepEqual(Object.keys(guard.steps.at(-1).env).sort(), ['EXPECTED_COMMIT', 'GITHUB_TOKEN']);
-  assert.equal(guard.if, wf.jobs.copy.if);
+  // M124: Wrangler writes no log file anywhere in the workflow.
+  assert.deepEqual(wf.env, { WRANGLER_WRITE_LOGS: 'false', WRANGLER_SEND_METRICS: 'false' });
+  assert.deepEqual(wf.concurrency, { group: 'runtime-copy', 'cancel-in-progress': false });
+  assert.deepEqual(Object.keys(wf.jobs), ['plan', 'copy']);
+  const guardIf =
+    "github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'";
+
+  const plan = wf.jobs.plan;
+  assert.equal(plan.if, guardIf);
+  assert.equal(plan.environment, undefined);
+  assert.deepEqual(plan.permissions, { contents: 'read', actions: 'read' });
+  assert.ok(!JSON.stringify(plan).includes('secrets.'));
+  assert.deepEqual(plan.outputs, { workers: '${{ steps.plan.outputs.workers }}' });
+  const planStep = plan.steps.at(-1);
+  assert.equal(planStep.id, 'plan');
+  assert.equal(planStep.run, 'node scripts/secrets-migration/runtime-copy-run.mjs --plan');
+  assert.deepEqual(Object.keys(planStep.env).sort(), ['EXPECTED_COMMIT', 'GITHUB_TOKEN']);
+
   const job = wf.jobs.copy;
-  assert.equal(job.needs, 'environment-guard');
-  assert.equal(
-    job.if,
-    "github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'"
-  );
-  assert.equal(job.environment, ENVIRONMENT);
+  assert.equal(job.needs, 'plan');
+  assert.equal(job.if, guardIf);
+  assert.deepEqual(job.strategy, {
+    'max-parallel': 1,
+    'fail-fast': true,
+    matrix: { worker: '${{ fromJSON(needs.plan.outputs.workers) }}' },
+  });
+  assert.equal(job.environment, 'runtime-copy-${{ matrix.worker }}');
+  assert.equal(job.environment.replace('${{ matrix.worker }}', 'notifications'), ENVIRONMENT);
   assert.equal(job['runs-on'], 'ubuntu-24.04');
-  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read' });
+  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read', 'id-token': 'write' });
   for (const step of job.steps) {
     if (step.uses) assert.match(step.uses, /^[\w./-]+@[0-9a-f]{40}$/);
     if (step.run) assert.ok(!step.run.includes('${{'), `${step.name} interpolates into run`);
   }
-  assert.equal(job.steps[0].with['persist-credentials'], false);
+  assert.equal(job.steps[0].name, 'Check DEPLOY_TOKEN_SOURCE');
+  const checkout = job.steps.find(s => String(s.uses).startsWith('actions/checkout@'));
+  assert.equal(checkout.with['persist-credentials'], false);
   // The install restores setup-node's pnpm cache first (scripts/typecheck-ci.test.mjs rule).
   const install = job.steps.findIndex(s => /\bpnpm\b.*\binstall\b/.test(s.run ?? ''));
   const warm = job.steps.findIndex(
@@ -1644,21 +1682,122 @@ test('workflow: dispatch-only, exact guards, pinned actions, secrets only in the
     "pnpm install --frozen-lockfile --ignore-scripts --filter '{.}...' --filter kilocode-monorepo",
     'no lifecycle scripts in the protected job'
   );
+
+  // Twins: the stored token only when DEPLOY_TOKEN_SOURCE is not `sts`, the STS token only when
+  // it is; each driver step sees exactly one Cloudflare credential and never the other.
+  const drivers = job.steps.filter(
+    s => s.run === 'node scripts/secrets-migration/runtime-copy-run.mjs'
+  );
+  assert.deepEqual(
+    drivers.map(s => [s.name, s.if, s.env.CLOUDFLARE_TOKEN_SOURCE, s.env.CLOUDFLARE_API_TOKEN]),
+    [
+      [
+        'Run the copier (stored token)',
+        "vars.DEPLOY_TOKEN_SOURCE != 'sts'",
+        'secret',
+        '${{ secrets.CLOUDFLARE_API_TOKEN }}',
+      ],
+      [
+        'Run the copier (STS token)',
+        "vars.DEPLOY_TOKEN_SOURCE == 'sts'",
+        'sts',
+        '${{ steps.sts.outputs.token }}',
+      ],
+    ]
+  );
+  for (const d of drivers) {
+    assert.deepEqual(Object.keys(d.env).sort(), [
+      'CLOUDFLARE_API_TOKEN',
+      'CLOUDFLARE_TOKEN_SOURCE',
+      'COPY_INDEX',
+      'COPY_WORKER',
+      'EXPECTED_COMMIT',
+      'GITHUB_TOKEN',
+      'M65_INFISICAL_CLIENT_ID',
+      'M65_INFISICAL_CLIENT_SECRET',
+      'M65_OPERATOR_PREFLIGHT',
+    ]);
+    assert.equal(d.env.COPY_WORKER, '${{ matrix.worker }}');
+    assert.equal(d.env.COPY_INDEX, '${{ strategy.job-index }}');
+  }
   const withSecrets = job.steps.filter(s => JSON.stringify(s).includes('secrets.'));
   assert.deepEqual(
     withSecrets.map(s => s.name),
-    ['Run the copier']
+    drivers.map(s => s.name)
   );
-  const driver = withSecrets[0];
-  assert.equal(driver.run, 'node scripts/secrets-migration/m84-notifications-run.mjs');
-  assert.deepEqual(Object.keys(driver.env).sort(), [
-    'CLOUDFLARE_API_TOKEN',
-    'EXPECTED_COMMIT',
-    'GITHUB_TOKEN',
-    'M65_INFISICAL_CLIENT_ID',
-    'M65_INFISICAL_CLIENT_SECRET',
-    'M65_OPERATOR_PREFLIGHT',
-  ]);
+  const mint = job.steps.find(s => s.id === 'sts');
+  assert.deepEqual(
+    [mint.if, mint.env, mint.run],
+    [
+      "vars.DEPLOY_TOKEN_SOURCE == 'sts'",
+      { STS_ENVIRONMENT: 'production' },
+      'bash scripts/ci/sts-deploy-token.sh mint',
+    ]
+  );
+  const revoke = job.steps.at(-1);
+  assert.deepEqual(
+    [revoke.if, revoke.run],
+    [
+      "always() && steps.sts.outputs.token_id != ''",
+      'bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"',
+    ]
+  );
+  assert.ok(job.steps.indexOf(mint) < job.steps.indexOf(drivers[1]));
   assert.ok(!/deploy-workers-|deploy-production/.test(JSON.stringify(wf.concurrency)));
   assert.ok(!text.includes('upload-artifact'));
+});
+
+test('plan job: the valid table and every protected environment, else no matrix', async () => {
+  const env = baseEnv();
+  const protectedEnv = name => ({
+    async environment() {
+      return {
+        name,
+        can_admins_bypass: false,
+        deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+        protection_rules: [
+          {
+            type: 'required_reviewers',
+            prevent_self_review: true,
+            reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
+          },
+        ],
+      };
+    },
+    async branchPolicies() {
+      return { branch_policies: [{ name: 'main', type: 'branch' }] };
+    },
+  });
+  const asked = [];
+  const ok = await planMatrix({
+    env,
+    headSha: SHA,
+    ghFor: name => {
+      asked.push(name);
+      return protectedEnv(name);
+    },
+  });
+  assert.deepEqual(ok, { gate: 'plan', ok: true, failures: [], workers: ['notifications'] });
+  assert.deepEqual(asked, ['runtime-copy-notifications']);
+
+  const missing = await planMatrix({
+    env,
+    headSha: SHA,
+    ghFor: () => ({ environment: async () => null }),
+  });
+  assert.deepEqual(missing, {
+    gate: 'plan',
+    ok: false,
+    failures: ['notifications:environment_absent'],
+    workers: [],
+  });
+
+  const offline = await planMatrix({
+    env: { ...env, GITHUB_REF: 'refs/heads/feature' },
+    headSha: SHA,
+    ghFor: () => {
+      throw new Error('no GitHub call before the offline checks pass');
+    },
+  });
+  assert.deepEqual([offline.ok, offline.failures, offline.workers], [false, ['ref'], []]);
 });

@@ -19,17 +19,12 @@ import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
-import { WRITER_SECRET } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
-import { MODULES, parseReceipt } from './checks.mjs';
+import { WRITER_SECRET, copierName } from './src/core.mjs';
+import { BATCHES, WORKERS } from './src/table.mjs';
+import { MODULES, parseReceipt as parseReceiptFor } from './checks.mjs';
+import { COMPATIBILITY_DATE, REPO_ROOT, SRC_DIR, buildConfig } from './render-config.mjs';
 import {
-  COMPATIBILITY_DATE,
-  COPIER_NAME,
-  REPO_ROOT,
-  SRC_DIR,
-  buildConfig,
-} from './render-config.mjs';
-import {
+  BATCH,
   CLIENT_ID,
   CLIENT_SECRET,
   RUN_ID,
@@ -39,6 +34,9 @@ import {
   leaks,
   syntheticValues,
 } from './fakes.mjs';
+
+const COPIER_NAME = copierName(BATCH.sourceScript);
+const parseReceipt = line => parseReceiptFor(line, BATCH);
 
 // The pool package exports only an ESM entry, so locate its package.json and load Miniflare from
 // its real path (pnpm's own dependency of the pool, not a hoisted copy).
@@ -79,6 +77,7 @@ async function start({ armed = true, notBefore, notAfter, fake, persist = false 
         compatibilityDate: COMPATIBILITY_DATE,
         bindings: {
           M65_RUN_ID: RUN_ID,
+          M65_BATCH: BATCH.sourceScript,
           M65_NOT_BEFORE: notBefore ?? iso(Date.now() - 60_000),
           M65_NOT_AFTER: notAfter ?? iso(Date.now() + 20 * 60_000),
           M65_INFISICAL_CLIENT_ID: CLIENT_ID,
@@ -311,69 +310,76 @@ test('module surface: only the scheduled handler and the Durable Object class', 
     /^export default \{\n {2}async scheduled\(controller, env\) \{/
   );
   assert.doesNotMatch(src, /WorkerEntrypoint|async fetch\(|\bfetch\(request/);
-  for (const m of ['core.mjs', 'manifest.mjs']) {
+  for (const m of ['core.mjs', 'table.mjs']) {
     const text = readFileSync(join(SRC_DIR, m), 'utf8');
     assert.doesNotMatch(text, /console\.|cloudflare:/, m);
   }
   assert.equal((src.match(/console\./g) ?? []).length, 1, 'one receipt log line');
 });
 
-test('the rendered config parses with the pinned Wrangler and dry-runs to exactly the three modules', () => {
-  const dir = scratch('m65-config-');
-  const pins = {
-    M65_RUN_ID: RUN_ID,
-    M65_NOT_BEFORE: iso(Date.now() + 20 * 60_000),
-    M65_NOT_AFTER: iso(Date.now() + 45 * 60_000),
-    M65_INFISICAL_CLIENT_ID: CLIENT_ID,
-  };
-  const path = join(dir, 'copier.wrangler.json');
-  writeFileSync(path, JSON.stringify(buildConfig(pins), null, 2));
-  const cfg = unstable_readConfig({ config: path });
-  assert.deepEqual(
-    [cfg.name, cfg.workers_dev, cfg.preview_urls, cfg.triggers.crons, cfg.logpush],
-    [COPIER_NAME, false, false, [CRON], false]
-  );
-  assert.deepEqual(cfg.routes ?? [], []);
-  assert.deepEqual(
-    [cfg.services, cfg.queues?.producers, cfg.queues?.consumers, cfg.workflows].map(x => x ?? []),
-    [[], [], [], []]
-  );
-  assert.equal(cfg.observability.traces.enabled, false);
-  assert.deepEqual(cfg.secrets_store_secrets, [
-    {
-      binding: 'EXPO_ACCESS_TOKEN',
-      store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
-      secret_name: 'EXPO_ACCESS_TOKEN',
-    },
-  ]);
+test('every table Worker: the rendered config parses with the pinned Wrangler and dry-runs to exactly the three modules', () => {
+  assert.ok(WORKERS.length > 0);
+  for (const worker of WORKERS) {
+    const batch = BATCHES[worker];
+    const dir = scratch(`m65-config-${worker}-`);
+    const pins = {
+      M65_RUN_ID: RUN_ID,
+      M65_BATCH: worker,
+      M65_NOT_BEFORE: iso(Date.now() + 20 * 60_000),
+      M65_NOT_AFTER: iso(Date.now() + 45 * 60_000),
+      M65_INFISICAL_CLIENT_ID: CLIENT_ID,
+    };
+    const path = join(dir, 'copier.wrangler.json');
+    writeFileSync(path, JSON.stringify(buildConfig(pins), null, 2));
+    const cfg = unstable_readConfig({ config: path });
+    assert.deepEqual(
+      [cfg.name, cfg.workers_dev, cfg.preview_urls, cfg.triggers.crons, cfg.logpush],
+      [copierName(worker), false, false, [CRON], false]
+    );
+    assert.deepEqual(cfg.routes ?? [], []);
+    assert.deepEqual(
+      [cfg.services, cfg.queues?.producers, cfg.queues?.consumers, cfg.workflows].map(x => x ?? []),
+      [[], [], [], []]
+    );
+    assert.equal(cfg.observability.traces.enabled, false);
+    // Exactly that Worker's table rows, nothing else.
+    assert.deepEqual(
+      cfg.secrets_store_secrets,
+      batch.rows.map(r => ({ binding: r.binding, store_id: r.storeId, secret_name: r.secretName }))
+    );
+    assert.equal(cfg.vars.M65_BATCH, worker);
 
-  const out = join(dir, 'out');
-  const env = { ...process.env, WRANGLER_SEND_METRICS: 'false' };
-  for (const k of Object.keys(env)) if (k.startsWith('CLOUDFLARE_')) delete env[k];
-  const run = spawnSync(
-    process.execPath,
-    [WRANGLER_BIN, 'deploy', '--dry-run', '--outdir', out, '--config', path],
-    {
-      cwd: dir,
-      env,
-      encoding: 'utf8',
-    }
-  );
-  assert.equal(run.status, 0, run.stderr);
-  const files = readdirSync(out).sort();
-  assert.deepEqual(
-    files.filter(f => f.endsWith('.mjs')),
-    ['core.mjs', 'manifest.mjs', 'worker.mjs']
-  );
-  for (const m of MODULES)
-    assert.ok(readFileSync(join(out, m)).equals(readFileSync(join(SRC_DIR, m))), m);
-  // Wrangler writes this notice into --outdir itself; it is not an upload part.
-  assert.deepEqual(
-    files.filter(f => !f.endsWith('.mjs')),
-    ['README.md']
-  );
-  assert.match(
-    readFileSync(join(out, 'README.md'), 'utf8'),
-    /^This folder contains the built output assets for the worker "m65-notifications-copy"/
-  );
+    const out = join(dir, 'out');
+    // M124: no Wrangler log file; no Cloudflare credential in reach.
+    const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_WRITE_LOGS: 'false' };
+    for (const k of Object.keys(env)) if (k.startsWith('CLOUDFLARE_')) delete env[k];
+    const run = spawnSync(
+      process.execPath,
+      [WRANGLER_BIN, 'deploy', '--dry-run', '--outdir', out, '--config', path],
+      {
+        cwd: dir,
+        env,
+        encoding: 'utf8',
+      }
+    );
+    assert.equal(run.status, 0, run.stderr);
+    const files = readdirSync(out).sort();
+    assert.deepEqual(
+      files.filter(f => f.endsWith('.mjs')),
+      ['core.mjs', 'table.mjs', 'worker.mjs']
+    );
+    for (const m of MODULES)
+      assert.ok(readFileSync(join(out, m)).equals(readFileSync(join(SRC_DIR, m))), m);
+    // Wrangler writes this notice into --outdir itself; it is not an upload part.
+    assert.deepEqual(
+      files.filter(f => !f.endsWith('.mjs')),
+      ['README.md']
+    );
+    assert.match(
+      readFileSync(join(out, 'README.md'), 'utf8'),
+      new RegExp(
+        `^This folder contains the built output assets for the worker "${copierName(worker)}"`
+      )
+    );
+  }
 });

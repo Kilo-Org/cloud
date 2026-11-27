@@ -7,29 +7,10 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { RUN_VARS, newReceipt } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
-import {
-  EXPECTED_ALIASES,
-  NAME_MAP,
-  checkRenderedConfig,
-  checkSource,
-  evaluateCleanup,
-  evaluateCleanupCloudflare,
-  evaluateCleanupInfisical,
-  evaluatePostRun,
-  evaluatePostRunCloudflare,
-  evaluatePostRunInfisical,
-  bindArmedPreflight,
-  evaluatePreflight,
-  moduleHashes,
-  parseJsonc,
-  parseReceipt,
-  pathCovers,
-  readTrackedSource,
-  validatedNameTable,
-} from './checks.mjs';
+import * as C from './checks.mjs';
 import { REPO_ROOT, buildConfig, insideRepo, parseArgs, pinProblems } from './render-config.mjs';
 import {
+  BATCH,
   CLIENT_ID,
   RUN_ID,
   VERSION_ID,
@@ -39,10 +20,35 @@ import {
   unarmedCopierBindings,
 } from './fakes.mjs';
 
+const {
+  WORKER_SOURCES,
+  bindArmedPreflight,
+  checkRenderedConfig,
+  evaluateCleanup,
+  evaluateCleanupCloudflare,
+  evaluateCleanupInfisical,
+  moduleHashes,
+  parseJsonc,
+  pathCovers,
+} = C;
+// The Notifications entry of the per-Worker sources, and every gate bound to its batch.
+const SRC = WORKER_SOURCES.notifications;
+const NAME_MAP = SRC.names;
+const EXPECTED_ALIASES = SRC.aliases;
+const readTrackedSource = () => C.readTrackedSource(SRC);
+const checkSource = (w, p, r, batch = BATCH, src = SRC) => C.checkSource(w, p, r, batch, src);
+const validatedNameTable = () => C.validatedNameTable(BATCH);
+const parseReceipt = (text, batch = BATCH) => C.parseReceipt(text, batch);
+const evaluatePreflight = (input, batch = BATCH) => C.evaluatePreflight(input, batch);
+const evaluatePostRun = input => C.evaluatePostRun(input, BATCH);
+const evaluatePostRunCloudflare = input => C.evaluatePostRunCloudflare(input, BATCH);
+const evaluatePostRunInfisical = input => C.evaluatePostRunInfisical(input, BATCH);
+
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const T0 = Date.parse('2026-11-27T16:00:00Z');
 const PINS = {
   M65_RUN_ID: RUN_ID,
+  M65_BATCH: 'notifications',
   M65_NOT_BEFORE: iso(T0 + 20 * 60_000),
   M65_NOT_AFTER: iso(T0 + 45 * 60_000),
   M65_INFISICAL_CLIENT_ID: CLIENT_ID,
@@ -97,10 +103,10 @@ test('M108: the copy batch is exactly the Expo row of the four-name map', () => 
   ]) {
     expect(checkSource(wranglerText, policyText, readerText, swap(patch)), code);
   }
-  // Another name map row (a 1Password-sourced target) is not a reviewed copy target.
+  // Another name map row (a 1Password-sourced target) is not in the reviewed table.
   for (const n of NAME_MAP.filter(x => x.binding !== 'EXPO_ACCESS_TOKEN')) {
     const failures = checkSource(wranglerText, policyText, readerText, swap(n));
-    assert.deepEqual(failures, ['batch_row_target_not_reviewed'], n.secretKey);
+    expect(failures, 'batch_not_in_table');
   }
 });
 
@@ -116,13 +122,16 @@ test('name map proposals targeting a store name, a *_PROD name or the unprefixed
     [propose(1, 'EXPO_ACCESS_TOKEN', '/shared'), 'target_is_store_name_EXPO_ACCESS_TOKEN'],
   ];
   for (const [names, code] of cases) {
-    const failures = checkSource(wranglerText, policyText, readerText, BATCH, names);
+    const failures = checkSource(wranglerText, policyText, readerText, BATCH, { ...SRC, names });
     expect(failures, code);
     expect(failures, 'policy_targets_differ');
   }
   // Dropping a 1Password-sourced name from the map breaks the source, reader and policy match.
   const three = NAME_MAP.filter(r => r.binding !== 'INTERNAL_API_SECRET');
-  const failures = checkSource(wranglerText, policyText, readerText, BATCH, three);
+  const failures = checkSource(wranglerText, policyText, readerText, BATCH, {
+    ...SRC,
+    names: three,
+  });
   for (const code of ['source_bindings_differ', 'reader_keys_differ', 'policy_targets_differ']) {
     expect(failures, code);
   }
@@ -217,6 +226,8 @@ test('renderer CLI writes once to scratch with mode 0600 and refuses the reposit
       join(HERE, 'render-config.mjs'),
       '--run-id',
       RUN_ID,
+      '--batch',
+      'notifications',
       '--not-before',
       iso(now + 17 * 60_000),
       '--not-after',
@@ -348,7 +359,7 @@ function preflightFixture() {
     ready: { pins: true, envClosed: true, bindings: true, gate: true, cron: true },
   };
   const meta = {
-    notifications: {
+    source: {
       deployments: [{ version_id: SOURCE_VERSION, percentage: 100 }],
       version: { id: SOURCE_VERSION, bindings: srcBindings },
     },
@@ -438,7 +449,7 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
   const withCopier = p => ({ copier: { ...meta.copier, ...p } });
   const withBindings = bindings => withCopier({ version: { id: VERSION_ID, bindings } });
   const withInf = p => ({ infisical: { ...meta.infisical, ...p } });
-  const withSource = p => ({ notifications: { ...meta.notifications, ...p } });
+  const withSource = p => ({ source: { ...meta.source, ...p } });
   const receipt = p => ({ readinessReceipt: JSON.stringify({ ...readiness, ...p }) });
 
   // Too late: at or after not-before, or an unusable clock.
@@ -819,7 +830,7 @@ test('preflight fails closed on malformed input and never names a value or princ
   const throwing = evaluatePreflight({
     ...input,
     meta: {
-      get notifications() {
+      get source() {
         throw new Error('synthetic');
       },
     },
@@ -1002,10 +1013,10 @@ test('post-run and cleanup gates', () => {
     );
   }
   // The source serving version must stay the pinned one, read back by its id.
-  for (const notifications of [
+  for (const source of [
     {
       deployments: [{ version_id: OTHER_VERSION, percentage: 100 }],
-      version: { id: OTHER_VERSION, bindings: meta.notifications.version.bindings },
+      version: { id: OTHER_VERSION, bindings: meta.source.version.bindings },
     },
     {
       deployments: [
@@ -1015,20 +1026,20 @@ test('post-run and cleanup gates', () => {
       version: null,
     },
     {
-      ...meta.notifications,
-      version: { id: SOURCE_VERSION, bindings: meta.notifications.version.bindings.slice(1, 3) },
+      ...meta.source,
+      version: { id: SOURCE_VERSION, bindings: meta.source.version.bindings.slice(1, 3) },
     },
-    { deployments: meta.notifications.deployments, bindings: meta.notifications.version.bindings },
+    { deployments: meta.source.deployments, bindings: meta.source.version.bindings },
   ]) {
     expect(
-      evaluatePostRun({ pre, meta: { ...post, notifications }, receipt: JSON.stringify(complete) })
+      evaluatePostRun({ pre, meta: { ...post, source }, receipt: JSON.stringify(complete) })
         .failures,
       'source_changed_during_run'
     );
   }
 
   // Split halves: the Cloudflare half ignores Infisical; the full gate needs both.
-  const cloudOnly = { notifications: meta.notifications, store: meta.store };
+  const cloudOnly = { source: meta.source, store: meta.store };
   assert.deepEqual(
     evaluatePostRunCloudflare({ pre, meta: cloudOnly, receipt: JSON.stringify(complete) }),
     { gate: 'postrun-cloudflare', ok: true, failures: [] }
@@ -1059,7 +1070,7 @@ test('post-run and cleanup gates', () => {
       openApprovalRequestsByWriter: 0,
     },
     writerTokenStatus: 401,
-    notificationsUnchanged: true,
+    sourceUnchanged: true,
     existingDeploymentsUnchanged: true,
   };
   assert.deepEqual(evaluateCleanup({ meta: clean, baseline }), {
@@ -1086,7 +1097,7 @@ test('post-run and cleanup gates', () => {
     'infisical_open_approval_requests'
   );
   expect(
-    evaluateCleanup({ meta: { ...clean, notificationsUnchanged: false }, baseline }).failures,
+    evaluateCleanup({ meta: { ...clean, sourceUnchanged: false }, baseline }).failures,
     'source_binding_changed'
   );
   expect(
@@ -1096,7 +1107,7 @@ test('post-run and cleanup gates', () => {
   expect(evaluateCleanup({ meta: clean, baseline: {} }).failures, 'infisical_counts_differ');
   const cloudClean = {
     copier: clean.copier,
-    notificationsUnchanged: true,
+    sourceUnchanged: true,
     existingDeploymentsUnchanged: true,
   };
   assert.deepEqual(evaluateCleanupCloudflare({ meta: cloudClean }), {
@@ -1118,13 +1129,20 @@ test('checks CLI: verdict JSON on stdout, exit 0/1/2', () => {
   const src = cli(['source'], '');
   assert.equal(src.status, 0, src.stdout);
   assert.deepEqual(JSON.parse(src.stdout).failures, []);
+  assert.deepEqual(
+    JSON.parse(src.stdout).workers.map(w => w.worker),
+    ['notifications']
+  );
   const good = JSON.stringify({
     ...newReceipt(BATCH.id),
     outcome: 'refused',
     reason: 'not_ready_cron',
   });
-  assert.equal(cli(['receipt'], `${good}\n`).status, 0);
-  const bad = cli(['receipt'], JSON.stringify({ ...newReceipt(BATCH.id), extra: true }));
+  assert.equal(cli(['receipt', 'notifications'], `${good}\n`).status, 0);
+  const bad = cli(
+    ['receipt', 'notifications'],
+    JSON.stringify({ ...newReceipt(BATCH.id), extra: true })
+  );
   assert.equal(bad.status, 1);
   assert.deepEqual(JSON.parse(bad.stdout), {
     gate: 'receipt',
@@ -1132,6 +1150,8 @@ test('checks CLI: verdict JSON on stdout, exit 0/1/2', () => {
     failures: ['receipt_keys'],
     receipt: null,
   });
-  assert.equal(cli(['preflight'], '{').status, 2);
+  assert.equal(cli(['receipt'], `${good}\n`).status, 2, 'a per-Worker gate needs the Worker');
+  assert.equal(cli(['receipt', 'other-worker'], `${good}\n`).status, 2, 'only table Workers');
+  assert.equal(cli(['preflight', 'notifications'], '{').status, 2);
   assert.equal(cli(['nope'], '').status, 2);
 });

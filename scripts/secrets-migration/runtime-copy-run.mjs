@@ -1,8 +1,11 @@
 #!/usr/bin/env node
-// M84 one-shot driver for the temporary Notifications copier. It runs only inside
-// .github/workflows/notifications-runtime-copy.yml. The workflow takes no script, ref, account,
-// path or runner input, so everything this driver does is fixed here or in the core
-// (scripts/secrets-migration/notifications-copy/).
+// Driver for one matrix entry of the temporary runtime copier (M122; M84 properties per Worker).
+// It runs only inside .github/workflows/runtime-copy.yml, one source Worker per job, the jobs one
+// at a time. The workflow passes only the Worker name (a Worker of the reviewed row table,
+// src/table.mjs) and its matrix index; everything else is fixed here or in the core
+// (scripts/secrets-migration/runtime-copy/). `--plan` (the workflow's first job, no secrets)
+// validates the whole table offline, reads back every Worker's protected environment and prints
+// the matrix.
 //
 // Order. Each step stops on its first failure; cleanup always runs for the attributable new script.
 //   1. Context guards: repository, ref, event, exact commit, credentials present. The writer secret
@@ -82,19 +85,23 @@ import {
   moduleHashes,
   parseReceipt,
   validatedNameTable,
-} from './notifications-copy/checks.mjs';
-import { OUTCOMES, RUN_VARS, WRITER_SECRET } from './notifications-copy/src/core.mjs';
-import { BATCH } from './notifications-copy/src/manifest.mjs';
+} from './runtime-copy/checks.mjs';
+import {
+  ACCOUNT_ID,
+  OUTCOMES,
+  RUN_VARS,
+  WRITER_SECRET,
+  copierName,
+} from './runtime-copy/src/core.mjs';
+import { BATCHES, TABLE_PROBLEMS, WORKERS } from './runtime-copy/src/table.mjs';
 
-export const COPIER = 'm65-notifications-copy';
-export const SOURCE = BATCH.sourceScript;
 export const REPOSITORY = 'Kilo-Org/cloud';
 export const REF = 'refs/heads/main';
 export const OPERATOR_META = 'M65_OPERATOR_PREFLIGHT';
-// /2: M108 batch (Expo only); the readback no longer carries the /shared consumer grants.
-export const OPERATOR_SCHEMA = 'm84-operator-preflight/2';
+export const OPERATOR_SCHEMA = 'runtime-copy-preflight/1';
 export const CF_API = 'https://api.cloudflare.com/client/v4';
-export const ENVIRONMENT = 'notifications-runtime-copy';
+/** The protected GitHub environment of one source Worker's matrix entry. */
+export const environmentName = worker => `runtime-copy-${worker}`;
 /** Workflows that deploy Workers into this account; none may be queued or running beside the copy. */
 export const ROLLOUT_WORKFLOWS = Object.freeze([
   'deploy-production.yml',
@@ -137,8 +144,27 @@ export const TIMING = Object.freeze({
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 export const REPO_ROOT = resolve(HERE, '../..');
+// The pinned Wrangler from one Worker closure (the workflow installs it); the copier needs no
+// code of any source Worker.
 export const WRANGLER_BIN = join(REPO_ROOT, 'services/notifications/node_modules/.bin/wrangler');
-export const RENDER_CONFIG = join(HERE, 'notifications-copy/render-config.mjs');
+export const RENDER_CONFIG = join(HERE, 'runtime-copy/render-config.mjs');
+
+/**
+ * Everything one matrix entry acts on, from the valid table only: the Worker's reviewed batch, its
+ * copier script, its protected environment and its Infisical targets. Null for anything else.
+ */
+export function targetOf(worker) {
+  if (TABLE_PROBLEMS.length > 0 || !Object.hasOwn(BATCHES, String(worker))) return null;
+  const batch = BATCHES[worker];
+  return Object.freeze({
+    worker,
+    batch,
+    source: batch.sourceScript,
+    copier: copierName(worker),
+    environment: environmentName(worker),
+    targets: Object.freeze(batch.rows.map(r => `${r.secretPath}/${r.secretKey}`)),
+  });
+}
 
 const SHA = /^[0-9a-f]{40}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -169,6 +195,9 @@ export function dispatchProblems(env, headSha) {
 /** Names-only context problems for the copy job. Empty means the run may start. */
 export function contextProblems(env, headSha) {
   const p = dispatchProblems(env, headSha);
+  if (!targetOf(env.COPY_WORKER)) p.push('worker');
+  if (!/^[0-9]{1,3}$/.test(env.COPY_INDEX ?? '')) p.push('matrix_index');
+  if (!['secret', 'sts'].includes(env.CLOUDFLARE_TOKEN_SOURCE)) p.push('token_source');
   if (!isAbsolute(env.RUNNER_TEMP ?? '')) p.push('runner_temp');
   if (!env.CLOUDFLARE_API_TOKEN) p.push('cloudflare_token');
   if (!env[WRITER_SECRET]) p.push('writer_secret');
@@ -182,17 +211,16 @@ const isoSeconds = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const isRecord = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const exactKeys = (o, keys) =>
   isRecord(o) && JSON.stringify(Object.keys(o).sort()) === JSON.stringify([...keys].sort());
-export const BATCH_TARGETS = Object.freeze(BATCH.rows.map(r => `${r.secretPath}/${r.secretKey}`));
 
 /**
  * Operator readback: the names-only Infisical metadata, the allowed readers and the writer's
- * issuer settings, read privately by the operator immediately before dispatch. It is bound to this
- * commit, batch, source and targets, and it must be fresh. It must be one line: the runner masks a
- * multi-line secret line by line (actions/runner Worker.cs), which would blank short lines such as
- * `}` all over this job's log. CI never reads Infisical; the core preflight judges the content.
- * Returns `{operator}` or `{problem}`.
+ * issuer settings, read privately by the operator immediately before this entry is approved. It is
+ * bound to this commit and this Worker's batch, source and targets, and it must be fresh. It must
+ * be one line: the runner masks a multi-line secret line by line (actions/runner Worker.cs), which
+ * would blank short lines such as `}` all over this job's log. CI never reads Infisical; the core
+ * preflight judges the content. Returns `{operator}` or `{problem}`.
  */
-export function parseOperatorMeta(text, env, nowMs) {
+export function parseOperatorMeta(text, env, nowMs, target) {
   if (/[\r\n]/.test(String(text))) return { problem: 'operator_meta_not_compact' };
   let o;
   try {
@@ -212,11 +240,15 @@ export function parseOperatorMeta(text, env, nowMs) {
     'writer',
   ];
   if (!exactKeys(o, keys)) return { problem: 'operator_meta_keys' };
-  if (o.schema !== OPERATOR_SCHEMA || o.batch !== BATCH.id || o.sourceScript !== SOURCE) {
+  if (
+    o.schema !== OPERATOR_SCHEMA ||
+    o.batch !== target.batch.id ||
+    o.sourceScript !== target.source
+  ) {
     return { problem: 'operator_meta_identity' };
   }
   if (o.commit !== env.GITHUB_SHA) return { problem: 'operator_meta_commit' };
-  if (JSON.stringify(o.targets) !== JSON.stringify(BATCH_TARGETS)) {
+  if (JSON.stringify(o.targets) !== JSON.stringify(target.targets)) {
     return { problem: 'operator_meta_targets' };
   }
   const readAt = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(String(o.readAt))
@@ -261,14 +293,17 @@ export function planRun(env, operator, nowMs) {
   const notAfter = notBefore + TIMING.windowMs;
   if (notAfter > latestNotAfter) return { problem: 'writer_expiry_too_soon' };
   return {
-    runId: `m65-gh-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`,
+    runId: `m65-gh-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}-${env.COPY_INDEX}`,
     notBefore,
     notAfter,
     armDeadline: notBefore - TIMING.armBudgetMs,
     putDeadline: notBefore - TIMING.putMarginMs,
     armedReadyDeadline: notBefore - TIMING.readyMarginMs,
     resultDeadline: notAfter + TIMING.resultGraceMs,
-    out: join(env.RUNNER_TEMP, `m65-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}.wrangler.json`),
+    out: join(
+      env.RUNNER_TEMP,
+      `m65-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}-${env.COPY_INDEX}.wrangler.json`
+    ),
   };
 }
 
@@ -276,18 +311,20 @@ export function planRun(env, operator, nowMs) {
  * Child processes get only these variables; the writer secret, the operator readback and the
  * GitHub token never reach a child. HOME and XDG_CONFIG_HOME point at an empty run directory, so
  * Wrangler finds no stored login and can authenticate only with the job's sanctioned
- * CLOUDFLARE_API_TOKEN, which only Wrangler children receive.
+ * CLOUDFLARE_API_TOKEN, which only Wrangler children receive. WRANGLER_WRITE_LOGS=false (M124):
+ * Wrangler 4 otherwise writes its logger output, which can include token JSON, to log files.
  */
 export function childEnv(env, { cloudflare = false } = {}) {
-  const home = join(String(env.RUNNER_TEMP), 'm84-isolated-home');
+  const home = join(String(env.RUNNER_TEMP), 'runtime-copy-isolated-home');
   return {
     PATH: env.PATH ?? '/usr/bin:/bin',
     HOME: home,
     XDG_CONFIG_HOME: join(home, '.config'),
     CI: 'true',
     WRANGLER_SEND_METRICS: 'false',
+    WRANGLER_WRITE_LOGS: 'false',
     ...(cloudflare
-      ? { CLOUDFLARE_API_TOKEN: env.CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID: BATCH.accountId }
+      ? { CLOUDFLARE_API_TOKEN: env.CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID }
       : {}),
   };
 }
@@ -406,7 +443,7 @@ export function cloudflare({
     /**
      * SHA-256 of each known module part. A file part is hashed as its bytes; a part without a
      * filename is re-encoded as UTF-8, which equals the uploaded bytes because parsing keeps line
-     * endings (only FormData serialization normalizes them; m84-run.test.mjs proves both on raw
+     * endings (only FormData serialization normalizes them; run.test.mjs proves both on raw
      * multipart bytes). Any other part is listed as `unexpected` without hashing, so the module
      * check fails closed and nothing else is digested.
      */
@@ -480,8 +517,11 @@ export function cloudflare({
   };
 }
 
-/** Read-only GitHub client for the environment readback and the rollout guard. */
-export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fetch }) {
+/**
+ * Read-only GitHub client for the environment readback and the rollout guard. `environment` is the
+ * protected environment it reads back (one source Worker's).
+ */
+export function github({ token, repository = REPOSITORY, apiUrl, environment, fetchImpl = fetch }) {
   apiUrl ||= 'https://api.github.com';
   async function get(path) {
     let res;
@@ -515,9 +555,11 @@ export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fet
     return body;
   }
   return {
-    environment: () => get(`/environments/${ENVIRONMENT}`),
+    environment: () => get(`/environments/${encodeURIComponent(environment)}`),
     branchPolicies: () =>
-      get(`/environments/${ENVIRONMENT}/deployment-branch-policies?per_page=100`),
+      get(
+        `/environments/${encodeURIComponent(environment)}/deployment-branch-policies?per_page=100`
+      ),
     async activeRuns(workflow) {
       let count = 0;
       for (const status of ACTIVE_RUN_STATUSES) {
@@ -627,8 +669,8 @@ export async function snapshot(cf, concurrency = 8) {
   );
 }
 
-/** Script names whose deployment differs, ignoring the copier. */
-export function drift(before, after, ignore = [COPIER]) {
+/** Script names whose deployment differs, ignoring this run's copier. */
+export function drift(before, after, ignore) {
   const names = new Set([...Object.keys(before), ...Object.keys(after)]);
   return [...names]
     .sort()
@@ -651,30 +693,31 @@ export async function servingVersion(cf, name, opts) {
   return { deployments, version: only === null ? null : await cf.version(name, only, opts) };
 }
 
-const storeMeta = async cf => ({
-  id: BATCH.rows[0].storeId,
-  secrets: await cf.storeSecrets(BATCH.rows[0].storeId),
+const storeMeta = async (cf, batch) => ({
+  id: batch.rows[0].storeId,
+  secrets: await cf.storeSecrets(batch.rows[0].storeId),
 });
 
 /** Copier, source and store metadata in the shape the core preflight reads. */
-export async function cloudflareMeta(cf) {
-  const notifications = await servingVersion(cf, SOURCE);
-  const copier = await servingVersion(cf, COPIER);
+export async function cloudflareMeta(cf, target) {
+  const { copier: name } = target;
+  const source = await servingVersion(cf, target.source);
+  const copier = await servingVersion(cf, name);
   return {
-    notifications,
-    store: await storeMeta(cf),
+    source,
+    store: await storeMeta(cf, target.batch),
     copier: {
-      doNamespaces: await cf.doNamespaces(COPIER),
+      doNamespaces: await cf.doNamespaces(name),
       deployments: copier.deployments,
       version: copier.version,
-      settings: await cf.scriptSettings(COPIER),
-      subdomain: await cf.subdomain(COPIER),
-      routes: await cf.routes(COPIER),
-      domains: await cf.domains(COPIER),
-      queueConsumers: await cf.queueConsumers(COPIER),
-      workflows: await cf.workflows(COPIER),
-      schedules: await cf.schedules(COPIER),
-      modules: await cf.moduleHashes(COPIER),
+      settings: await cf.scriptSettings(name),
+      subdomain: await cf.subdomain(name),
+      routes: await cf.routes(name),
+      domains: await cf.domains(name),
+      queueConsumers: await cf.queueConsumers(name),
+      workflows: await cf.workflows(name),
+      schedules: await cf.schedules(name),
+      modules: await cf.moduleHashes(name),
     },
   };
 }
@@ -714,13 +757,13 @@ const carriesPins = (bindings, pins) =>
  * unique pins and no writer secret, and the script's modules equal the tracked source. Null when
  * any of that is not proved; such a version is never recorded, so cleanup never deletes it.
  */
-export async function attributeUnarmed(io, pins) {
-  const observed = await readBack(io, () => servingVersion(io.cf, COPIER));
+export async function attributeUnarmed(io, pins, copier) {
+  const observed = await readBack(io, () => servingVersion(io.cf, copier));
   const v = observed.version;
   if (!v || v.id !== observed.deployments[0].version_id) return null;
   if (!Array.isArray(v.bindings) || !v.bindings.every(isRecord)) return null;
   if (v.bindings.some(b => b.name === WRITER_SECRET) || !carriesPins(v.bindings, pins)) return null;
-  const modules = await readBack(io, () => io.cf.moduleHashes(COPIER));
+  const modules = await readBack(io, () => io.cf.moduleHashes(copier));
   return sameHashes(modules, moduleHashes()) ? v.id : null;
 }
 
@@ -760,11 +803,11 @@ export function jsonObjectSplitter(onObject) {
 }
 
 /** This run's parsed receipts from one tail event. Exceptions are counted, never read. */
-export function receiptsOf(event, runId) {
+export function receiptsOf(event, runId, batch) {
   const receipts = [];
   for (const log of Array.isArray(event?.logs) ? event.logs : []) {
     for (const item of Array.isArray(log?.message) ? log.message : []) {
-      const { ok, receipt } = parseReceipt(item);
+      const { ok, receipt } = parseReceipt(item, batch);
       if (ok && receipt.runId === runId) receipts.push(receipt);
     }
   }
@@ -831,11 +874,11 @@ export function untilAborted(promise, signal) {
  * Waits for the earliest receipt that matches, until `deadlineMs`; null when none arrived. A stop
  * signal ends the wait at once.
  */
-export async function awaitReceipt(tail, runId, matches, deadlineMs, stats, signal) {
+export async function awaitReceipt(tail, runId, matches, deadlineMs, stats, signal, batch) {
   for (;;) {
     const event = await untilAborted(tail.next(deadlineMs), signal);
     if (event === null) return null;
-    const { receipts, exceptions } = receiptsOf(event, runId);
+    const { receipts, exceptions } = receiptsOf(event, runId, batch);
     stats.exceptions += exceptions;
     stats.receipts += receipts.length;
     const hit = receipts.find(matches);
@@ -934,10 +977,10 @@ export function processIo(env, signal) {
   return {
     wrangler: (args, opts) => exec(WRANGLER_BIN, args, { ...opts, cloudflare: true }),
     node: (args, opts) => exec(process.execPath, args, opts),
-    startTail(clock) {
+    startTail(clock, copier) {
       if (!hasToken()) throw new StopError('cloudflare_token_absent');
       ensureHome();
-      const child = spawn(WRANGLER_BIN, ['tail', COPIER, '--format', 'json'], {
+      const child = spawn(WRANGLER_BIN, ['tail', copier, '--format', 'json'], {
         cwd: REPO_ROOT,
         env: withToken,
         stdio: ['ignore', 'pipe', 'ignore'],
@@ -1008,10 +1051,15 @@ function writeFailed(reason, output) {
  */
 export async function run(io) {
   const { env, clock, cf, log, signal } = io;
+  const target = targetOf(env.COPY_WORKER);
   const report = {
-    schema: 'm84-notifications-run/1',
+    schema: 'runtime-copy-run/1',
     status: 'started',
-    batchTargets: [...BATCH_TARGETS],
+    worker: target?.worker ?? null,
+    tokenSource: ['secret', 'sts'].includes(env.CLOUDFLARE_TOKEN_SOURCE)
+      ? env.CLOUDFLARE_TOKEN_SOURCE
+      : null,
+    batchTargets: target ? [...target.targets] : [],
     phases: [],
     gates: [],
   };
@@ -1023,8 +1071,9 @@ export async function run(io) {
 
   const problems = contextProblems(env, io.headSha);
   if (problems.length) return { ...report, status: 'refused', problems };
+  const { batch, copier } = target;
   const secret = env[WRITER_SECRET];
-  const parsed = parseOperatorMeta(env[OPERATOR_META], env, clock.now());
+  const parsed = parseOperatorMeta(env[OPERATOR_META], env, clock.now(), target);
   delete env[WRITER_SECRET];
   delete env[OPERATOR_META];
   if (parsed.problem) return { ...report, status: 'refused', problems: [parsed.problem] };
@@ -1038,6 +1087,7 @@ export async function run(io) {
   });
   const pins = {
     M65_RUN_ID: plan.runId,
+    M65_BATCH: target.worker,
     M65_NOT_BEFORE: report.notBefore,
     M65_NOT_AFTER: report.notAfter,
     M65_INFISICAL_CLIENT_ID: env.M65_INFISICAL_CLIENT_ID,
@@ -1052,7 +1102,7 @@ export async function run(io) {
 
   try {
     phase('name_table');
-    const names = (io.nameTable ?? validatedNameTable)();
+    const names = (io.nameTable ?? validatedNameTable)(batch);
     report.gates.push(verdictOf(names));
     if (!names.ok) throw new StopError('name_table_refused');
     io.printTable(names.table);
@@ -1072,7 +1122,7 @@ export async function run(io) {
     phase('snapshot_before');
     since = clock.now();
     before = await snapshot(cf);
-    if (COPIER in before || (await cf.scriptStatus(COPIER)) !== 404) {
+    if (copier in before || (await cf.scriptStatus(copier)) !== 404) {
       throw new StopError('copier_exists');
     }
     report.preexistingScripts = Object.keys(before).length;
@@ -1082,6 +1132,8 @@ export async function run(io) {
       RENDER_CONFIG,
       '--run-id',
       pins.M65_RUN_ID,
+      '--batch',
+      pins.M65_BATCH,
       '--not-before',
       pins.M65_NOT_BEFORE,
       '--not-after',
@@ -1099,7 +1151,7 @@ export async function run(io) {
     }
     if (
       rendered.code !== 0 ||
-      config?.name !== COPIER ||
+      config?.name !== copier ||
       config.configPath !== plan.out ||
       config.notBefore !== pins.M65_NOT_BEFORE ||
       config.notAfter !== pins.M65_NOT_AFTER
@@ -1116,7 +1168,7 @@ export async function run(io) {
       timeoutMs: deployTimeout,
     });
     report.deployWrite = deployed.code === 0 ? 'proved' : 'unproved';
-    const unarmedVersion = await attributeUnarmed(io, pins);
+    const unarmedVersion = await attributeUnarmed(io, pins, copier);
     if (unarmedVersion) {
       recorded.add(unarmedVersion);
       report.unarmedVersion = unarmedVersion;
@@ -1125,27 +1177,31 @@ export async function run(io) {
     if (!unarmedVersion) throw new StopError('copier_deployment_unattributable');
 
     phase('await_unarmed_readiness');
-    tail = io.startTail(clock);
+    tail = io.startTail(clock, copier);
     const unarmed = await awaitReceipt(
       tail,
       plan.runId,
       unarmedReady(unarmedVersion),
       plan.armDeadline,
       stats,
-      signal
+      signal,
+      batch
     );
     if (!unarmed) throw new StopError('held_no_readiness_tick');
     report.cronReadyAt = isoSeconds(clock.now());
 
     phase('preflight_gate');
-    const preflight = evaluatePreflight({
-      meta: { ...(await cloudflareMeta(cf)), ...operatorPreflightMeta(operator) },
-      pins,
-      deployedVersionId: unarmedVersion,
-      allowedReaders: operator.allowedReaders,
-      readinessReceipt: unarmed,
-      nowMs: clock.now(),
-    });
+    const preflight = evaluatePreflight(
+      {
+        meta: { ...(await cloudflareMeta(cf, target)), ...operatorPreflightMeta(operator) },
+        pins,
+        deployedVersionId: unarmedVersion,
+        allowedReaders: operator.allowedReaders,
+        readinessReceipt: unarmed,
+        nowMs: clock.now(),
+      },
+      batch
+    );
     report.gates.push(verdictOf(preflight));
     if (!preflight.ok) throw new StopError('preflight_gate_failed');
 
@@ -1155,12 +1211,12 @@ export async function run(io) {
       report.activeRollouts = rolloutsBeforeArm;
       throw new StopError('rollout_active_before_arm');
     }
-    const preArm = drift(before, await snapshot(cf));
+    const preArm = drift(before, await snapshot(cf), [copier]);
     if (preArm.length) {
       report.drift = preArm;
       throw new StopError('drift_before_arm');
     }
-    const serving = await cf.deploymentVersions(COPIER);
+    const serving = await cf.deploymentVersions(copier);
     if (
       serving?.length !== 1 ||
       serving[0].percentage !== 100 ||
@@ -1183,12 +1239,12 @@ export async function run(io) {
     phase('arm_readback', { stoppable: false });
     const quick = signal?.aborted ? { timeoutMs: TIMING.abortCallTimeoutMs } : undefined;
     const readOnce = read => (quick ? read() : readBack(io, read));
-    const observed = await readOnce(() => servingVersion(cf, COPIER, quick));
+    const observed = await readOnce(() => servingVersion(cf, copier, quick));
     const armedId = observed.deployments.length === 1 ? observed.deployments[0].version_id : null;
     const armed = bindArmedPreflight(preflight, armedId, observed);
     report.gates.push(verdictOf(armed));
     const modulesKept = sameHashes(
-      await readOnce(() => cf.moduleHashes(COPIER, quick)),
+      await readOnce(() => cf.moduleHashes(copier, quick)),
       moduleHashes()
     );
     if (armed.ok && modulesKept) {
@@ -1212,7 +1268,8 @@ export async function run(io) {
       armedReady(armedId),
       plan.armedReadyDeadline,
       stats,
-      signal
+      signal,
+      batch
     );
     if (!armedReceipt) throw new StopError('held_no_armed_readiness');
 
@@ -1223,17 +1280,24 @@ export async function run(io) {
       finalFor(armedId),
       plan.resultDeadline,
       stats,
-      signal
+      signal,
+      batch
     );
     if (!final) throw new StopError('result_unobserved');
     report.finalReceipt = final;
 
     phase('postrun_cloudflare_gate');
-    const postrun = evaluatePostRunCloudflare({
-      pre: armed,
-      meta: { notifications: await servingVersion(cf, SOURCE), store: await storeMeta(cf) },
-      receipt: final,
-    });
+    const postrun = evaluatePostRunCloudflare(
+      {
+        pre: armed,
+        meta: {
+          source: await servingVersion(cf, target.source),
+          store: await storeMeta(cf, batch),
+        },
+        receipt: final,
+      },
+      batch
+    );
     report.gates.push(verdictOf(postrun));
     report.status = postrun.ok ? 'cloudflare_complete' : 'incomplete';
   } catch (err) {
@@ -1248,6 +1312,8 @@ export async function run(io) {
         before,
         plan,
         since,
+        copier,
+        source: target.source,
         aborted: signal?.aborted === true,
       });
     } finally {
@@ -1298,7 +1364,10 @@ export function operatorPreflightMeta(operator) {
  * listing), so the cleanup gate stays failed and the job's last seconds go to the delete; a
  * SIGKILL can still land first.
  */
-export async function cleanup(io, { created, recorded, before, plan, since, aborted = false }) {
+export async function cleanup(
+  io,
+  { created, recorded, before, plan, since, copier, source, aborted = false }
+) {
   const { cf, clock } = io;
   const result = { attempted: false, deleted: false, scriptStatus: null, drift: null, errors: [] };
   // Unknown timing counts as before not-before, so the report asks for the urgent revoke.
@@ -1327,8 +1396,8 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
   const quick = { timeoutMs: TIMING.abortCallTimeoutMs };
   const read = await step('read', () =>
     aborted
-      ? cf.deploymentVersions(COPIER, quick)
-      : readBack(io, () => cf.deploymentVersions(COPIER))
+      ? cf.deploymentVersions(copier, quick)
+      : readBack(io, () => cf.deploymentVersions(copier))
   );
   const versions = read?.value;
   if (read && versions === null) {
@@ -1336,9 +1405,9 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
   } else if (read && versions.length > 0 && versions.every(v => recorded.has(v.version_id))) {
     result.attempted = true;
     result.deleted =
-      (await step('delete', () => cf.deleteScript(COPIER, aborted ? quick : undefined))) !== null;
+      (await step('delete', () => cf.deleteScript(copier, aborted ? quick : undefined))) !== null;
     if (!aborted) {
-      const status = await step('status', () => readBack(io, () => cf.scriptStatus(COPIER)));
+      const status = await step('status', () => readBack(io, () => cf.scriptStatus(copier)));
       if (status) result.scriptStatus = status.value;
     }
   } else if (read) {
@@ -1349,7 +1418,7 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
     result.aborted = true;
   } else {
     if (result.scriptStatus === 404) {
-      const ns = await step('namespaces', () => readBack(io, () => cf.doNamespaces(COPIER)));
+      const ns = await step('namespaces', () => readBack(io, () => cf.doNamespaces(copier)));
       if (ns) result.gateNamespacePresent = ns.value.length > 0;
     }
   }
@@ -1358,7 +1427,7 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
     const snap = await step('snapshot', () => readBack(io, () => snapshot(cf)));
     if (snap) {
       after = snap.value;
-      result.drift = drift(before, after);
+      result.drift = drift(before, after, [copier]);
     }
   }
   const verdict = evaluateCleanupCloudflare({
@@ -1367,8 +1436,8 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
         scriptStatus: result.scriptStatus,
         gateNamespacePresent: result.gateNamespacePresent,
       },
-      notificationsUnchanged:
-        after !== null && JSON.stringify(before[SOURCE]) === JSON.stringify(after[SOURCE]),
+      sourceUnchanged:
+        after !== null && JSON.stringify(before[source]) === JSON.stringify(after[source]),
       existingDeploymentsUnchanged: Array.isArray(result.drift) && result.drift.length === 0,
     },
   });
@@ -1412,6 +1481,7 @@ async function main() {
   const clock = { now: () => Date.now() };
   const log = line => process.stdout.write(`${JSON.stringify(line)}\n`);
   const printTable = text => process.stdout.write(`${text}\n`);
+  const target = targetOf(env.COPY_WORKER);
   const report = await run({
     ...processIo(env, controller.signal),
     env,
@@ -1420,50 +1490,74 @@ async function main() {
     printTable,
     signal: controller.signal,
     headSha: await gitHead(),
-    cf: cloudflare({ token: env.CLOUDFLARE_API_TOKEN, accountId: BATCH.accountId }),
-    gh: github({ token: env.GITHUB_TOKEN, apiUrl: env.GITHUB_API_URL }),
+    cf: cloudflare({ token: env.CLOUDFLARE_API_TOKEN, accountId: ACCOUNT_ID }),
+    gh: github({
+      token: env.GITHUB_TOKEN,
+      apiUrl: env.GITHUB_API_URL,
+      environment: target?.environment ?? '',
+    }),
   });
   log(report);
   if (report.operatorAction) {
-    process.stdout.write(`::error title=M84 operator action::${report.operatorAction}\n`);
+    process.stdout.write(`::error title=Runtime copy operator action::${report.operatorAction}\n`);
   }
   if (env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       env.GITHUB_STEP_SUMMARY,
-      `### M84 Notifications runtime copy\n\n${report.operatorAction ? `**Operator action: ${report.operatorAction}**\n\n` : ''}\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`
+      `### Runtime copy: ${report.worker ?? 'refused'}\n\n${report.operatorAction ? `**Operator action: ${report.operatorAction}**\n\n` : ''}\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`\n`
     );
   }
   return exitCode(report);
 }
 
 /**
- * `--environment-guard`: the credential-free first job. It reads the protected environment back
- * before the copy job can reference it, so a missing environment is never auto-created by a
- * dispatch. It needs only GITHUB_TOKEN; no other secret is in its environment.
+ * The workflow's credential-free first job. Offline first: the dispatch identity and the whole row
+ * table (`validateTable`), then every table Worker's name check (`validatedNameTable`). Then each
+ * Worker's protected environment is read back before any copy job can reference it, so a dispatch
+ * never auto-creates one. `ghFor(environment)` returns a read-only GitHub client. Returns
+ * {gate:"plan", ok, failures, workers}; `workers` is the matrix, in table order.
  */
-async function environmentGuardMain() {
-  const env = process.env;
-  let failures = dispatchProblems(env, await gitHead());
+export async function planMatrix({ env, headSha, ghFor }) {
+  const failures = [
+    ...dispatchProblems(env, headSha),
+    ...TABLE_PROBLEMS.map(p => `table_${p}`),
+    ...WORKERS.flatMap(w => validatedNameTable(BATCHES[w]).failures.map(f => `${w}:${f}`)),
+  ];
   if (failures.length === 0) {
-    try {
-      failures = await environmentProblems(
-        github({ token: env.GITHUB_TOKEN, apiUrl: env.GITHUB_API_URL })
-      );
-    } catch (err) {
-      if (!(err instanceof StopError)) throw err;
-      failures = [err.reason];
+    for (const w of WORKERS) {
+      try {
+        failures.push(
+          ...(await environmentProblems(ghFor(environmentName(w)))).map(f => `${w}:${f}`)
+        );
+      } catch (err) {
+        if (!(err instanceof StopError)) throw err;
+        failures.push(`${w}:${err.reason}`);
+      }
     }
   }
-  process.stdout.write(
-    `${JSON.stringify({ gate: 'environment', ok: failures.length === 0, failures })}\n`
-  );
-  return failures.length === 0 ? 0 : 1;
+  const ok = failures.length === 0 && WORKERS.length > 0;
+  return { gate: 'plan', ok, failures, workers: ok ? [...WORKERS] : [] };
+}
+
+async function planMain() {
+  const env = process.env;
+  const verdict = await planMatrix({
+    env,
+    headSha: await gitHead(),
+    ghFor: environment =>
+      github({ token: env.GITHUB_TOKEN, apiUrl: env.GITHUB_API_URL, environment }),
+  });
+  process.stdout.write(`${JSON.stringify(verdict)}\n`);
+  if (verdict.ok && env.GITHUB_OUTPUT) {
+    appendFileSync(env.GITHUB_OUTPUT, `workers=${JSON.stringify(verdict.workers)}\n`);
+  }
+  return verdict.ok ? 0 : 1;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   process.exitCode =
-    process.argv[2] === '--environment-guard' && process.argv.length === 3
-      ? await environmentGuardMain()
+    process.argv[2] === '--plan' && process.argv.length === 3
+      ? await planMain()
       : process.argv.length === 2
         ? await main()
         : 2;

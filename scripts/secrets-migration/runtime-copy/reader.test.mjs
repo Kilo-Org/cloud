@@ -9,9 +9,12 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { BATCH } from './src/manifest.mjs';
-import { NAME_MAP, mappingRows, parseReaderBindings, readTrackedSource } from './checks.mjs';
+import { BATCH } from './fakes.mjs';
+import { WORKER_SOURCES, mappingRows, parseReaderBindings, readTrackedSource } from './checks.mjs';
 import { REPO_ROOT } from './render-config.mjs';
+
+const SRC = WORKER_SOURCES.notifications;
+const NAME_MAP = SRC.names;
 
 const { readNotificationsSecret } = await import(
   pathToFileURL(join(REPO_ROOT, 'services/notifications/src/secrets.ts')).href
@@ -94,13 +97,13 @@ test('the store names and unprefixed legacy names are not lookup names', async (
 });
 
 test('the parsed reader map and the four-column rows agree with the reader behaviour', () => {
-  const sources = readTrackedSource();
-  const reader = parseReaderBindings(sources.readerText);
+  const sources = readTrackedSource(SRC);
+  const reader = parseReaderBindings(sources.readerText, SRC.readerMap);
   assert.deepEqual(
     Object.entries(reader).sort(),
     NAME_MAP.map(r => [r.secretKey, r.binding]).sort()
   );
-  const rows = mappingRows(sources);
+  const rows = mappingRows(sources, SRC);
   assert.deepEqual(
     rows.map(r => [r.binding, r.storeSecretName, r.lookup, r.policyEntry]),
     NAME_MAP.map(r => [r.binding, r.secretName, r.secretKey, r.secretKey])

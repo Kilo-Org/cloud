@@ -1727,7 +1727,7 @@ const scriptSuiteInputs = [
   '.github/workflows/mobile-native-build.yml',
   '.github/workflows/kilo-mcp-release.yml',
   '.github/workflows/extension-store-release.yml',
-  '.github/workflows/notifications-runtime-copy.yml',
+  '.github/workflows/runtime-copy.yml',
   'apps/extension/wxt.config.ts',
   'packages/session-ingest-contracts/src/index.ts',
   'pnpm-lock.yaml',

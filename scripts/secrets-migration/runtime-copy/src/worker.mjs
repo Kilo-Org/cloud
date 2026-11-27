@@ -1,12 +1,19 @@
-// Temporary Notifications copier Worker, cron-only. The rendered config gives it no route, custom
-// domain, workers.dev or preview URL, queue, Workflow or service binding, and this module exports
-// no fetch handler and no RPC entrypoint: the only event it handles is `scheduled`. Each tick
-// writes exactly one sanitized receipt line (core.mjs `runTick`). M65Gate admits one run per
-// namespace with a single-row SQLite insert and keeps only the fixed final outcome.
+// Temporary runtime copier Worker, cron-only, one per source Worker. The rendered config gives it
+// no route, custom domain, workers.dev or preview URL, queue, Workflow or service binding, and this
+// module exports no fetch handler and no RPC entrypoint: the only event it handles is `scheduled`.
+// Each tick writes exactly one sanitized receipt line (core.mjs `runTick`). The `M65_BATCH` pin
+// selects one reviewed batch of the table; its bindings must be exactly that batch's (core
+// `preGate`). M65Gate admits one run per namespace with a single-row SQLite insert and keeps only
+// the fixed final outcome.
 
 import { DurableObject } from 'cloudflare:workers';
-import { BATCH } from './manifest.mjs';
+import { BATCHES } from './table.mjs';
 import { OUTCOMES, PIN_FORMAT, newReceipt, runTick } from './core.mjs';
+
+const batchOf = env =>
+  typeof env.M65_BATCH === 'string' && Object.hasOwn(BATCHES, env.M65_BATCH)
+    ? BATCHES[env.M65_BATCH]
+    : undefined;
 
 export class M65Gate extends DurableObject {
   constructor(ctx, env) {
@@ -55,10 +62,10 @@ export default {
         scheduledTime: controller.scheduledTime,
         now: () => Date.now(),
         fetchImpl: (u, i) => fetch(u, i),
-        batch: BATCH,
+        batch: batchOf(env),
       });
     } catch {
-      receipt = { ...newReceipt(BATCH.id), outcome: 'stopped', reason: 'internal_error' };
+      receipt = { ...newReceipt(batchOf(env)?.id), outcome: 'stopped', reason: 'internal_error' };
     }
     console.log(JSON.stringify(receipt));
   },

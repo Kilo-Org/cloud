@@ -9,6 +9,7 @@ import {
   BOUNCER_BREAKER_THRESHOLD,
   BOUNCER_COUNT_LOG_INTERVAL_MS,
   BOUNCER_REJECTED_HOLD_MS,
+  BOUNCER_STS_ORIGIN,
   BOUNCER_TOKEN_WAIT_MS,
   bouncerAuthHeaders,
   bouncerStsTokensEnabled,
@@ -17,21 +18,19 @@ import {
   type BouncerAuth,
   type BouncerAuthCall,
   type BouncerAuthOptions,
-  type BouncerCaller,
 } from './sts-auth';
 import {
+  BOUNCER_APP_SCOPES,
   BouncerStsConfigError,
+  type BouncerCaller,
   type BouncerScope,
   type BouncerTokenRead,
+  type BouncerTransportHooks,
 } from './sts-auth-contract';
 
 const TOKEN = 'header.payload.signature';
-const WEB_SCOPES: readonly BouncerScope[] = [
-  'bouncer:decide',
-  'bouncer:usage.write',
-  'bouncer:signup.decide',
-];
-const GATEWAY_SCOPES: readonly BouncerScope[] = ['bouncer:decide', 'bouncer:usage.write'];
+const WEB_SCOPES = BOUNCER_APP_SCOPES['kilocode-app'];
+const GATEWAY_SCOPES = BOUNCER_APP_SCOPES['kilocode-ai-gateway'];
 
 type Line = Record<string, unknown> & { level: 'info' | 'warn' };
 
@@ -41,6 +40,8 @@ type Harness = {
   exchangeReady: jest.MockedFunction<() => Promise<boolean>>;
   loadTransport: jest.MockedFunction<BouncerAuthOptions['loadTransport']>;
   waitUntil: jest.MockedFunction<BouncerAuthOptions['waitUntil']>;
+  /** The hooks the auth passed to the transport; set once it loaded. */
+  hooks: () => BouncerTransportHooks;
   lines: () => Line[];
   flag: { value: string | undefined };
   /** Added to `Date.now()` (faked or real) to jump past an interval or a hold. */
@@ -49,14 +50,16 @@ type Harness = {
 
 function harness(
   caller: BouncerCaller = 'kilocode-app',
-  scopes: readonly BouncerScope[] = ['bouncer:decide']
+  scopes: readonly BouncerScope[] = ['bouncer:decide'],
+  extra: Partial<BouncerAuthOptions> = {}
 ): Harness {
   const read = jest.fn<BouncerTokenRead>();
   const exchangeReady = jest.fn(async () => true);
-  const loadTransport = jest.fn<BouncerAuthOptions['loadTransport']>(async () => ({
-    read,
-    exchangeReady,
-  }));
+  let hooks: BouncerTransportHooks | null = null;
+  const loadTransport = jest.fn<BouncerAuthOptions['loadTransport']>(async given => {
+    hooks = given;
+    return { read, exchangeReady };
+  });
   const waitUntil = jest.fn<BouncerAuthOptions['waitUntil']>();
   const logged: Line[] = [];
   const flag = { value: 'on' as string | undefined };
@@ -69,26 +72,56 @@ function harness(
     waitUntil,
     now: () => Date.now() + clock.offset,
     log: (line, level) => logged.push({ ...(JSON.parse(line) as Record<string, unknown>), level }),
+    ...extra,
   });
-  return { auth, read, exchangeReady, loadTransport, waitUntil, lines: () => logged, flag, clock };
+  return {
+    auth,
+    read,
+    exchangeReady,
+    loadTransport,
+    waitUntil,
+    hooks: () => {
+      if (hooks === null) throw new Error('the transport has not loaded');
+      return hooks;
+    },
+    lines: () => logged,
+    flag,
+    clock,
+  };
 }
 
-const decideCall: BouncerAuthCall = { scope: 'bouncer:decide', wait: true };
+function call(scope: BouncerScope, wait: boolean, signal?: AbortSignal): BouncerAuthCall {
+  return { scope, wait, origin: BOUNCER_STS_ORIGIN, signal };
+}
+
+const decideCall = call('bouncer:decide', true);
 
 /** The counts since the last line: ends the interval and makes one `config` call to write them. */
-async function counts(h: Harness): Promise<{ attached: unknown; missed: unknown }> {
+async function counts(
+  h: Harness
+): Promise<{ attached: unknown; missed: unknown; mint: unknown; last_mint_age_s: unknown }> {
   h.clock.offset += BOUNCER_COUNT_LOG_INTERVAL_MS;
   const flag = h.flag.value;
   h.flag.value = 'probe';
-  await h.auth.headers({ scope: 'bouncer:decide', wait: false });
+  await h.auth.headers(call('bouncer:decide', false));
   h.flag.value = flag;
-  const line = h.lines().at(-1) as unknown as { attached: unknown; missed: unknown };
+  const line = h.lines().at(-1) as unknown as {
+    attached: unknown;
+    missed: unknown;
+    mint: unknown;
+    last_mint_age_s: unknown;
+  };
   const missed = structuredClone(line.missed) as Record<string, Record<string, number>>;
   const decide = missed['bouncer:decide'];
   if (decide.config === 1) delete decide.config;
   else decide.config -= 1;
   if (Object.keys(decide).length === 0) delete missed['bouncer:decide'];
-  return { attached: line.attached, missed };
+  return {
+    attached: line.attached,
+    missed,
+    mint: line.mint,
+    last_mint_age_s: line.last_mint_age_s,
+  };
 }
 
 function denied(): ServiceTokenError {
@@ -104,6 +137,9 @@ function unavailable(): ServiceTokenError {
     { audience: 'bouncer', scope: 'bouncer:decide' }
   );
 }
+
+const breakerOpened = (h: Harness) =>
+  h.lines().filter(line => line.event === 'bouncer_sts_breaker_open').length;
 
 afterEach(() => {
   jest.useRealTimers();
@@ -144,9 +180,12 @@ describe('createBouncerAuth', () => {
     expect(h.lines()).toEqual([
       {
         event: 'bouncer_sts_tokens',
+        instance: expect.any(String),
         caller: 'kilocode-app',
         attached: {},
         missed: { 'bouncer:decide': { config: 1 } },
+        mint: { ok: 0, failed: 0 },
+        last_mint_age_s: null,
         level: 'info',
       },
     ]);
@@ -155,17 +194,30 @@ describe('createBouncerAuth', () => {
   it('never reads a scope the app is not granted', async () => {
     const h = harness('kilocode-ai-gateway', GATEWAY_SCOPES);
     h.read.mockResolvedValue(TOKEN);
-    await expect(h.auth.headers({ scope: 'bouncer:signup.decide', wait: true })).resolves.toEqual({
+    await expect(h.auth.headers(call('bouncer:signup.decide', true))).resolves.toEqual({
       'x-kilo-caller': 'kilocode-ai-gateway',
     });
     expect(h.read).not.toHaveBeenCalled();
     expect(h.lines()[0]).toMatchObject({ missed: { 'bouncer:signup.decide': { config: 1 } } });
   });
 
+  it.each(['https://bouncer.example.com', 'http://bouncer.kiloapps.io', 'https://evil.example'])(
+    'sends no token to %s, only the legacy key',
+    async origin => {
+      const h = harness();
+      h.read.mockResolvedValue(TOKEN);
+      await expect(h.auth.headers({ ...decideCall, origin })).resolves.toEqual({
+        'x-kilo-caller': 'kilocode-app',
+      });
+      expect(h.read).not.toHaveBeenCalled();
+      expect(h.lines()[0]).toMatchObject({ missed: { 'bouncer:decide': { config: 1 } } });
+    }
+  );
+
   it.each(WEB_SCOPES)('sends the %s token as a bearer next to the caller name', async scope => {
     const h = harness('kilocode-app', WEB_SCOPES);
     h.read.mockResolvedValue(TOKEN);
-    await expect(h.auth.headers({ scope, wait: true })).resolves.toEqual({
+    await expect(h.auth.headers(call(scope, true))).resolves.toEqual({
       'x-kilo-caller': 'kilocode-app',
       authorization: `Bearer ${TOKEN}`,
     });
@@ -173,9 +225,12 @@ describe('createBouncerAuth', () => {
     expect(h.lines()).toEqual([
       {
         event: 'bouncer_sts_tokens',
+        instance: expect.any(String),
         caller: 'kilocode-app',
         attached: { [scope]: 1 },
         missed: {},
+        mint: { ok: 0, failed: 0 },
+        last_mint_age_s: null,
         level: 'info',
       },
     ]);
@@ -197,8 +252,6 @@ describe('createBouncerAuth', () => {
         expect(read.filter(scope => scope === sibling)).toHaveLength(2);
       }
       expect(new Set(read)).toEqual(new Set(['bouncer:decide', ...siblings]));
-      // Each background read is handed to `waitUntil`, so its renewal outlives the response.
-      expect(h.waitUntil).toHaveBeenCalledTimes(2 * siblings.length);
     }
   );
 
@@ -206,7 +259,18 @@ describe('createBouncerAuth', () => {
     const h = harness('kilocode-app', WEB_SCOPES);
     h.read.mockResolvedValue(TOKEN);
     await h.auth.headers(decideCall);
-    await h.auth.headers({ scope: 'bouncer:usage.write', wait: false });
+    await h.auth.headers(call('bouncer:usage.write', false));
+    await h.auth.headers(decideCall);
+    expect(h.loadTransport).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts loading the transport at once when asked to preload, and reads nothing', async () => {
+    const h = harness('kilocode-app', WEB_SCOPES, { preload: true });
+    await Promise.resolve();
+    expect(h.loadTransport).toHaveBeenCalledTimes(1);
+    expect(h.read).not.toHaveBeenCalled();
+    expect(h.exchangeReady).not.toHaveBeenCalled();
+    h.read.mockResolvedValue(TOKEN);
     await h.auth.headers(decideCall);
     expect(h.loadTransport).toHaveBeenCalledTimes(1);
   });
@@ -255,16 +319,40 @@ describe('createBouncerAuth', () => {
     await h.auth.headers(decideCall);
     expect(h.lines()).toHaveLength(1);
     await h.auth.headers(decideCall);
-    await h.auth.headers({ scope: 'bouncer:signup.decide', wait: true });
-    await h.auth.headers({ scope: 'bouncer:usage.write', wait: false });
-    await h.auth.headers({ scope: 'bouncer:usage.write', wait: false });
+    await h.auth.headers(call('bouncer:signup.decide', true));
+    await h.auth.headers(call('bouncer:usage.write', false));
+    await h.auth.headers(call('bouncer:usage.write', false));
     // Still inside the interval: nothing more written.
     expect(h.lines()).toHaveLength(1);
-    await expect(counts(h)).resolves.toEqual({
+    await expect(counts(h)).resolves.toMatchObject({
       attached: { 'bouncer:decide': 1, 'bouncer:signup.decide': 1 },
       missed: { 'bouncer:usage.write': { unavailable: 2 } },
     });
     expect(h.lines().every(line => line.level === 'info')).toBe(true);
+  });
+
+  it('marks every line with one instance id and counts the STS answers the transport reports', async () => {
+    jest.useFakeTimers();
+    const h = harness();
+    h.read.mockResolvedValue(TOKEN);
+    await h.auth.headers(decideCall);
+    h.hooks().mint(true);
+    h.hooks().mint(false);
+    h.hooks().mint(true);
+    await jest.advanceTimersByTimeAsync(5_000);
+    h.auth.rejected('bouncer:decide');
+    await expect(counts(h)).resolves.toMatchObject({
+      mint: { ok: 2, failed: 1 },
+      last_mint_age_s: BOUNCER_COUNT_LOG_INTERVAL_MS / 1000 + 5,
+    });
+    const instances = new Set(h.lines().map(line => line.instance));
+    expect(instances.size).toBe(1);
+    expect([...instances][0]).toMatch(/^[0-9a-f-]{36}$/);
+    // Another auth is another instance.
+    const other = harness();
+    other.flag.value = 'probe';
+    await other.auth.headers(decideCall);
+    expect(other.lines()[0].instance).not.toBe([...instances][0]);
   });
 
   it('never puts a token or an error text in a log line', async () => {
@@ -287,6 +375,7 @@ describe('createBouncerAuth', () => {
     expect(h.lines()).toEqual([
       {
         event: 'bouncer_sts_token_rejected',
+        instance: expect.any(String),
         caller: 'kilocode-app',
         scope: 'bouncer:decide',
         level: 'warn',
@@ -294,9 +383,9 @@ describe('createBouncerAuth', () => {
     ]);
     await expect(h.auth.headers(decideCall)).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
     // Other scopes are not held back.
-    await expect(
-      h.auth.headers({ scope: 'bouncer:usage.write', wait: false })
-    ).resolves.toMatchObject({ authorization: `Bearer ${TOKEN}` });
+    await expect(h.auth.headers(call('bouncer:usage.write', false))).resolves.toMatchObject({
+      authorization: `Bearer ${TOKEN}`,
+    });
     h.clock.offset += BOUNCER_REJECTED_HOLD_MS - 1;
     await expect(h.auth.headers(decideCall)).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
     h.clock.offset += 1;
@@ -325,10 +414,10 @@ describe('createBouncerAuth', () => {
       const h = harness();
       const mint = Promise.withResolvers<string>();
       h.read.mockReturnValue(mint.promise);
-      const call = h.auth.headers(decideCall);
-      expect(await settledAt(call, BOUNCER_TOKEN_WAIT_MS - 1)).toBe(false);
+      const pending = h.auth.headers(decideCall);
+      expect(await settledAt(pending, BOUNCER_TOKEN_WAIT_MS - 1)).toBe(false);
       await jest.advanceTimersByTimeAsync(1);
-      await expect(call).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+      await expect(pending).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
       expect(h.lines()[0]).toMatchObject({ missed: { 'bouncer:decide': { timeout: 1 } } });
       expect(h.waitUntil).toHaveBeenCalledTimes(1);
       mint.resolve(TOKEN);
@@ -339,10 +428,35 @@ describe('createBouncerAuth', () => {
       const h = harness();
       const mint = Promise.withResolvers<string>();
       h.read.mockReturnValue(mint.promise);
-      const call = h.auth.headers(decideCall);
+      const pending = h.auth.headers(decideCall);
       await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS - 50);
       mint.resolve(TOKEN);
-      await expect(call).resolves.toMatchObject({ authorization: `Bearer ${TOKEN}` });
+      await expect(pending).resolves.toMatchObject({ authorization: `Bearer ${TOKEN}` });
+    });
+
+    it('reads each scope once per mint: one read and one waitUntil per scope for 20 calls', async () => {
+      const h = harness('kilocode-app', WEB_SCOPES);
+      const mints = new Map<BouncerScope, PromiseWithResolvers<string>>();
+      h.read.mockImplementation(async target => {
+        const mint = Promise.withResolvers<string>();
+        mints.set(target.scope, mint);
+        return await mint.promise;
+      });
+      const calls = Array.from({ length: 20 }, (_, index) =>
+        h.auth.headers(call(WEB_SCOPES[index % WEB_SCOPES.length], true))
+      );
+      await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
+      await Promise.all(calls);
+      expect(h.read).toHaveBeenCalledTimes(WEB_SCOPES.length);
+      expect(h.waitUntil).toHaveBeenCalledTimes(WEB_SCOPES.length);
+      // 20 waits ran out together: one count, far below the threshold.
+      expect(breakerOpened(h)).toBe(0);
+      for (const mint of mints.values()) mint.resolve(TOKEN);
+      await jest.advanceTimersByTimeAsync(0);
+      h.read.mockResolvedValue(TOKEN);
+      await expect(h.auth.headers(decideCall)).resolves.toMatchObject({
+        authorization: `Bearer ${TOKEN}`,
+      });
     });
 
     it('does not wait while the exchanged Vercel token is not held, and never counts it', async () => {
@@ -350,23 +464,37 @@ describe('createBouncerAuth', () => {
       h.exchangeReady.mockResolvedValue(false);
       h.read.mockReturnValue(Promise.withResolvers<string>().promise);
       for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD + 1; index += 1) {
-        const call = h.auth.headers(decideCall);
-        expect(await settledAt(call, 1)).toBe(true);
-        await expect(call).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+        const pending = h.auth.headers(decideCall);
+        expect(await settledAt(pending, 1)).toBe(true);
+        await expect(pending).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
       }
-      await expect(counts(h)).resolves.toEqual({
-        attached: {},
+      await expect(counts(h)).resolves.toMatchObject({
         missed: { 'bouncer:decide': { exchange_pending: BOUNCER_BREAKER_THRESHOLD } },
       });
-      expect(h.lines().some(line => line.event === 'bouncer_sts_breaker_open')).toBe(false);
+      expect(breakerOpened(h)).toBe(0);
+    });
+
+    it('counts a readiness check that outlasts the wait as readiness_timeout, toward the breaker', async () => {
+      const h = harness();
+      h.exchangeReady.mockReturnValue(Promise.withResolvers<boolean>().promise);
+      h.read.mockReturnValue(Promise.withResolvers<string>().promise);
+      for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD; index += 1) {
+        const pending = h.auth.headers(decideCall);
+        await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
+        await expect(pending).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+      }
+      expect(h.lines()[0]).toMatchObject({
+        missed: { 'bouncer:decide': { readiness_timeout: 1 } },
+      });
+      expect(breakerOpened(h)).toBe(1);
     });
 
     it('never waits on a route that does not wait', async () => {
       const h = harness();
       h.read.mockReturnValue(Promise.withResolvers<string>().promise);
-      const call = h.auth.headers({ scope: 'bouncer:decide', wait: false });
-      expect(await settledAt(call, 1)).toBe(true);
-      await expect(call).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+      const pending = h.auth.headers(call('bouncer:decide', false));
+      expect(await settledAt(pending, 1)).toBe(true);
+      await expect(pending).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
       expect(h.lines()[0]).toMatchObject({ missed: { 'bouncer:decide': { not_held: 1 } } });
       expect(h.exchangeReady).not.toHaveBeenCalled();
     });
@@ -376,73 +504,78 @@ describe('createBouncerAuth', () => {
       h.read.mockReturnValue(Promise.withResolvers<string>().promise);
       for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD + 1; index += 1) {
         const controller = new AbortController();
-        const call = h.auth.headers({ ...decideCall, signal: controller.signal });
+        const pending = h.auth.headers(call('bouncer:decide', true, controller.signal));
         await jest.advanceTimersByTimeAsync(100);
         controller.abort();
-        await expect(call).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+        await expect(pending).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+        await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
       }
-      await expect(counts(h)).resolves.toEqual({
-        attached: {},
+      await expect(counts(h)).resolves.toMatchObject({
         missed: { 'bouncer:decide': { aborted: BOUNCER_BREAKER_THRESHOLD } },
       });
-      expect(h.lines().some(line => line.event === 'bouncer_sts_breaker_open')).toBe(false);
+      expect(breakerOpened(h)).toBe(0);
     });
 
-    it('counts many waits on one running mint once toward the breaker', async () => {
+    it('opens the breaker after about 2.5 s of continuous timeouts against a hung STS', async () => {
       const h = harness();
       h.read.mockReturnValue(Promise.withResolvers<string>().promise);
-      const calls = Array.from({ length: BOUNCER_BREAKER_THRESHOLD * 2 }, () =>
-        h.auth.headers(decideCall)
-      );
-      await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
-      await Promise.all(calls);
-      expect(h.lines().some(line => line.event === 'bouncer_sts_breaker_open')).toBe(false);
-      // One read keeps the running mint alive, not one per waiting call.
-      expect(h.waitUntil).toHaveBeenCalledTimes(1);
-    });
-
-    it('opens the breaker after the threshold of mints in a row, and closes it only when a read that waited gets its token', async () => {
-      const h = harness();
-      for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD; index += 1) {
-        const mint = Promise.withResolvers<string>();
-        h.read.mockReturnValueOnce(mint.promise);
-        const call = h.auth.headers(decideCall);
+      for (let index = 1; index <= BOUNCER_BREAKER_THRESHOLD; index += 1) {
+        const pending = h.auth.headers(decideCall);
         await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
-        await call;
-        // The mint ends without a token, so the next call's mint is a new one.
-        mint.reject(unavailable());
-        await jest.advanceTimersByTimeAsync(0);
+        await pending;
+        expect(breakerOpened(h)).toBe(index === BOUNCER_BREAKER_THRESHOLD ? 1 : 0);
       }
-      expect(h.lines().filter(line => line.event === 'bouncer_sts_breaker_open')).toEqual([
-        { event: 'bouncer_sts_breaker_open', caller: 'kilocode-app', level: 'warn' },
-      ]);
-
-      // Open: no wait.
-      const pending = Promise.withResolvers<string>();
-      h.read.mockReturnValueOnce(pending.promise);
+      // Open: no wait at all.
       const skipped = h.auth.headers(decideCall);
       expect(await settledAt(skipped, 1)).toBe(true);
-      await expect(skipped).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
-
-      // A held token does not close it; the read that waited for its mint does.
-      h.read.mockResolvedValueOnce(TOKEN);
-      await expect(h.auth.headers(decideCall)).resolves.toMatchObject({
-        authorization: `Bearer ${TOKEN}`,
+      await expect(counts(h)).resolves.toMatchObject({
+        missed: { 'bouncer:decide': { breaker_open: 1 } },
       });
-      expect(h.lines().some(line => line.event === 'bouncer_sts_breaker_closed')).toBe(false);
-      pending.resolve(TOKEN);
-      await jest.advanceTimersByTimeAsync(0);
-      expect(h.lines().at(-1)).toEqual({
+    });
+
+    it('opens the breaker against a slow STS whose tokens arrive after the wait, and closes on its next mint', async () => {
+      const h = harness();
+      // Each mint answers 300 ms after it starts, 50 ms after the call stopped waiting.
+      h.read.mockImplementation(async () => {
+        const mint = Promise.withResolvers<string>();
+        setTimeout(() => mint.resolve(TOKEN), 300);
+        return await mint.promise;
+      });
+      for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD; index += 1) {
+        const pending = h.auth.headers(decideCall);
+        await jest.advanceTimersByTimeAsync(300);
+        await expect(pending).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+      }
+      expect(breakerOpened(h)).toBe(1);
+      h.hooks().mint(true);
+      expect(h.lines().at(-1)).toMatchObject({
         event: 'bouncer_sts_breaker_closed',
-        caller: 'kilocode-app',
         level: 'warn',
       });
-      await expect(counts(h)).resolves.toMatchObject({
-        missed: {
-          // The first timeout was written with the instance's first line.
-          'bouncer:decide': { timeout: BOUNCER_BREAKER_THRESHOLD - 1, breaker_open: 1 },
-        },
-      });
+    });
+
+    it('resets the count when a token arrives within the wait', async () => {
+      const h = harness();
+      let next = Promise.withResolvers<string>();
+      h.read.mockImplementation(async () => await next.promise);
+      async function timedOutCall(): Promise<void> {
+        next = Promise.withResolvers<string>();
+        const pending = h.auth.headers(decideCall);
+        await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
+        await pending;
+        // That mint ends without a token, so the next call starts a new one.
+        next.reject(unavailable());
+        await jest.advanceTimersByTimeAsync(0);
+      }
+      for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD - 1; index += 1) await timedOutCall();
+      next = Promise.withResolvers<string>();
+      const inTime = h.auth.headers(decideCall);
+      await jest.advanceTimersByTimeAsync(100);
+      next.resolve(TOKEN);
+      await expect(inTime).resolves.toMatchObject({ authorization: `Bearer ${TOKEN}` });
+      await jest.advanceTimersByTimeAsync(0);
+      for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD - 1; index += 1) await timedOutCall();
+      expect(breakerOpened(h)).toBe(0);
     });
 
     it('does not count a fast failure toward the breaker', async () => {
@@ -450,8 +583,9 @@ describe('createBouncerAuth', () => {
       h.read.mockRejectedValue(unavailable());
       for (let index = 0; index < BOUNCER_BREAKER_THRESHOLD + 2; index += 1) {
         await h.auth.headers(decideCall);
+        await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
       }
-      expect(h.lines().some(line => line.event === 'bouncer_sts_breaker_open')).toBe(false);
+      expect(breakerOpened(h)).toBe(0);
     });
   });
 
@@ -537,7 +671,7 @@ describe('createBouncerAuth', () => {
 
       // usage.write, first used at about 280 s, past its first token's usable end (270 s).
       const before = transport.mock.calls.length;
-      const usage = await h.auth.headers({ scope: 'bouncer:usage.write', wait: false });
+      const usage = await h.auth.headers(call('bouncer:usage.write', false));
       await jest.advanceTimersByTimeAsync(20);
       expect(transport.mock.calls.length).toBe(before);
       const renewedAt = Number(
@@ -565,7 +699,7 @@ describe('installBouncerAuth', () => {
   });
 
   it('installs the caller name without loading the transport while the flag is unset', async () => {
-    installBouncerAuth('kilocode-app', WEB_SCOPES);
+    installBouncerAuth('kilocode-app');
     await expect(bouncerAuthHeaders(decideCall)).resolves.toEqual({
       'x-kilo-caller': 'kilocode-app',
     });

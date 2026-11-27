@@ -11,14 +11,10 @@ export async function register() {
       await import('@kilocode/web-shared/lib/sts-secret-reader');
     installSelectedInternalApiSecretRead();
     // Names this app in `x-kilo-caller` on every Bouncer call; BOUNCER_STS_TOKENS is checked per
-    // call (`bouncer/sts-auth.ts`), and unset sends the legacy key alone. The scopes are exactly
-    // the production Bouncer grant of `services/sts/policy/web.yaml`.
+    // call (`bouncer/sts-auth.ts`), and unset sends the legacy key alone. The scopes come from
+    // `BOUNCER_APP_SCOPES`, which a test keeps equal to the production grant of `web.yaml`.
     const { installBouncerAuth } = await import('@kilocode/web-shared/lib/bouncer/sts-auth');
-    installBouncerAuth('kilocode-app', [
-      'bouncer:decide',
-      'bouncer:usage.write',
-      'bouncer:signup.decide',
-    ]);
+    installBouncerAuth('kilocode-app');
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {

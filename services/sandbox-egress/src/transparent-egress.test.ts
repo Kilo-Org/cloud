@@ -5,7 +5,6 @@ import { createServer as createHttpsServer, request as httpsRequest } from 'node
 import { connect as connectTls } from 'node:tls';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { EgressAuditRequest } from '@kilocode/worker-utils/egress-audit';
-import { EgressTransportError } from './destination.js';
 import type { AwsEgressPolicy } from '@kilocode/worker-utils/aws-egress';
 import { createScmAuthority, type ScmAuthority } from './certificates.js';
 import { createTransparentTlsServer } from './transparent-tls.js';

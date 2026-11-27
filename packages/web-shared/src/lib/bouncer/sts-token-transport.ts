@@ -17,27 +17,30 @@ import { getCache } from '@vercel/functions';
  */
 
 /**
- * Builds the read, or throws `BouncerStsConfigError` when `stsUrl` is not the STS issuer of this
- * deployment's own environment, so a deployment never presents its identity to another
- * environment's STS. Bouncer accepts only production tokens, and only production STS grants them
- * (`services/sts/policy/web.yaml`, `ai-gateway.yaml`): elsewhere STS denies the token and every
- * call keeps the legacy key alone.
+ * Builds the read, or throws `BouncerStsConfigError` unless this is a Vercel production deployment
+ * whose `stsUrl` is the production STS issuer. Bouncer runs in production only and accepts only
+ * production STS tokens, and only production STS grants them (`services/sts/policy/web.yaml`,
+ * `ai-gateway.yaml`): a preview or staging deployment with the flag on makes no STS call at all and
+ * keeps the legacy key alone, and no deployment presents its identity to another environment's STS.
  */
 export function createBouncerTokenReadFor(options: {
   runtime: Readonly<Record<string, string | undefined>>;
   stsUrl: string;
   createTokens: (stsIssuer: string) => { get: BouncerTokenRead };
 }): BouncerTokenRead {
-  let issuer: string;
+  let production: boolean;
   try {
-    issuer = STS_ISSUERS[stsEnvironmentOfDeployment(options.runtime)];
+    production = stsEnvironmentOfDeployment(options.runtime) === 'production';
   } catch {
     throw new BouncerStsConfigError('This deployment environment has no STS environment');
   }
-  if (options.stsUrl !== issuer) {
-    throw new BouncerStsConfigError('STS_URL is not the STS issuer of this deployment environment');
+  if (!production) {
+    throw new BouncerStsConfigError('Bouncer accepts STS tokens from production deployments only');
   }
-  const tokens = options.createTokens(issuer);
+  if (options.stsUrl !== STS_ISSUERS.production) {
+    throw new BouncerStsConfigError('STS_URL is not the production STS issuer');
+  }
+  const tokens = options.createTokens(STS_ISSUERS.production);
   return async (target, ctx) => await tokens.get(target, ctx);
 }
 

@@ -140,6 +140,22 @@ describe('the installed Bouncer auth with the real transport', () => {
     expect(headers.get('x-internal-api-key')).toBe('env-only-secret');
   });
 
+  it.each([
+    ['a preview', { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' }, STS_ISSUERS.development],
+    ['staging', { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging' }, STS_ISSUERS.staging],
+  ])('makes no STS call from %s deployment, even with its own STS_URL', async (_name, runtime, issuer) => {
+    setRuntime({ ...runtime, BOUNCER_STS_TOKENS: 'on' });
+    mockStsUrl = issuer;
+    await decide({ requestId: 'r-6', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
+    expect(mockFetch.mock.calls.filter(([input]) => urlOf(input).endsWith('/v1/token'))).toEqual(
+      []
+    );
+    expect(mockIdentity).not.toHaveBeenCalled();
+    const [headers] = bouncerCalls();
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-internal-api-key')).toBe('env-only-secret');
+  });
+
   it('sends no token and loads no transport with the flag off', async () => {
     setRuntime({ VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' });
     await decide({ requestId: 'r-5', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
@@ -153,20 +169,26 @@ describe('the installed Bouncer auth with the real transport', () => {
 describe('createBouncerTokenReadFor', () => {
   const createTokens = jest.fn(() => ({ get: jest.fn(async () => 'token') }));
 
+  it('mints from production STS for a production deployment', () => {
+    createBouncerTokenReadFor({
+      runtime: { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' },
+      stsUrl: STS_ISSUERS.production,
+      createTokens,
+    });
+    expect(createTokens).toHaveBeenLastCalledWith(STS_ISSUERS.production);
+  });
+
   it.each([
-    [{ VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' }, STS_ISSUERS.production],
+    [{ VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' }, STS_ISSUERS.staging],
     [{ VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging' }, STS_ISSUERS.staging],
+    [{ VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging' }, STS_ISSUERS.production],
     [{ VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' }, STS_ISSUERS.development],
-  ])('mints for %j from %s only', (runtime, issuer) => {
-    createBouncerTokenReadFor({ runtime, stsUrl: issuer, createTokens });
-    expect(createTokens).toHaveBeenLastCalledWith(issuer);
-    expect(() =>
-      createBouncerTokenReadFor({
-        runtime,
-        stsUrl: issuer === STS_ISSUERS.production ? STS_ISSUERS.staging : STS_ISSUERS.production,
-        createTokens,
-      })
-    ).toThrow(BouncerStsConfigError);
+  ])('refuses %j with STS_URL %s', (runtime, stsUrl) => {
+    createTokens.mockClear();
+    expect(() => createBouncerTokenReadFor({ runtime, stsUrl, createTokens })).toThrow(
+      BouncerStsConfigError
+    );
+    expect(createTokens).not.toHaveBeenCalled();
   });
 
   it('refuses a deployment environment with no STS environment', () => {

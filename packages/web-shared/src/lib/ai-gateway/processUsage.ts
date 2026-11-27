@@ -773,21 +773,6 @@ async function insertUsageTransaction(
       coreUsageFields,
       metadataFields
     );
-    if (coreUsageFields.organization_id) {
-      if (coreUsageFields.cost > 0) {
-        const consumption = await recordOrganizationConsumption(tx, {
-          organizationId: coreUsageFields.organization_id,
-          kiloUserId: coreUsageFields.kilo_user_id,
-          amountMicrodollars: coreUsageFields.cost,
-          occurredAt: coreUsageFields.created_at,
-          source: 'ai-gateway',
-          sourceId: coreUsageFields.id,
-        });
-        inserted.organizationUsage = consumption.organizationUsage;
-      } else if (coreUsageFields.cost < 0) {
-        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
-      }
-    }
     if (coreUsageFields.cost !== 0) {
       await enqueueDailyUsageRollupRepair(tx, {
         usageId: coreUsageFields.id,
@@ -804,6 +789,23 @@ async function insertUsageTransaction(
         userId: coreUsageFields.kilo_user_id,
         payload: bouncerUsageEvent.payload,
       });
+    }
+    // The organization rows are the contended locks of this write, so they are taken last. For
+    // an organization outside Kilo Pass, only their combined statement and COMMIT then run.
+    if (coreUsageFields.organization_id) {
+      if (coreUsageFields.cost > 0) {
+        const consumption = await recordOrganizationConsumption(tx, {
+          organizationId: coreUsageFields.organization_id,
+          kiloUserId: coreUsageFields.kilo_user_id,
+          amountMicrodollars: coreUsageFields.cost,
+          occurredAt: coreUsageFields.created_at,
+          source: 'ai-gateway',
+          sourceId: coreUsageFields.id,
+        });
+        inserted.organizationUsage = consumption.organizationUsage;
+      } else if (coreUsageFields.cost < 0) {
+        inserted.organizationUsage = await mutateOrganizationUsage(tx, coreUsageFields);
+      }
     }
     return { inserted };
   });

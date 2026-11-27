@@ -11,7 +11,7 @@ import {
   organizations,
   organization_memberships,
 } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   directOrganizationMembershipCondition,
   liveOrganizationCondition,
@@ -58,6 +58,12 @@ export type OrganizationUsageMutationInput = Pick<
  * organization — the same two conditions the read paths apply. The result
  * reports the balance effects only; it does not say whether the per-user row
  * was written.
+ *
+ * Both rows are hot under concurrent usage, so both writes run in one statement:
+ * the transaction holds them for one round trip instead of two. The balance
+ * update reads the per-user upsert's result, which makes PostgreSQL finish the
+ * upsert before it locks the `organizations` row. That keeps the lock order
+ * `organization_user_usage` then `organizations`.
  */
 export async function mutateOrganizationUsage(
   tx: OrganizationTransaction,
@@ -67,70 +73,75 @@ export async function mutateOrganizationUsage(
   if (!organization_id) return emptyOrganizationUsageResult();
 
   const limitType: OrganizationUserLimitType = 'daily';
-  await tx.execute(sql`
-    INSERT INTO ${organization_user_usage} (
-      organization_id,
-      kilo_user_id,
-      usage_date,
-      limit_type,
-      microdollar_usage,
-      created_at,
-      updated_at
-    )
-    SELECT
-      ${organization_id},
-      ${kilo_user_id},
-      (${created_at}::timestamptz AT TIME ZONE 'UTC')::date,
-      ${limitType},
-      ${cost},
-      NOW(),
-      NOW()
-    WHERE EXISTS (
-      SELECT 1
-      FROM ${organization_memberships}
-      WHERE ${directOrganizationMembershipCondition({
-        organizationId: organization_id,
-        kiloUserId: kilo_user_id,
-      })}
-    )
-      AND EXISTS (
-        SELECT 1
-        FROM ${organizations}
-        WHERE ${organizations.id} = ${organization_id}
-          AND ${liveOrganizationCondition(organizations)}
-      )
-    ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
-    DO UPDATE SET
-      microdollar_usage = ${organization_user_usage.microdollar_usage} + ${cost},
-      updated_at = NOW()
-  `);
-
   type OrganizationBalanceRow = {
-    total_microdollars_acquired: number;
-    previous_microdollars_used: number;
-    new_microdollars_used: number;
+    total_microdollars_acquired: bigint | number;
+    previous_microdollars_used: bigint | number;
+    new_microdollars_used: bigint | number;
     settings: OrganizationSettings | null;
     auto_top_up_enabled: boolean;
   };
-  const balanceRows: OrganizationBalanceRow[] = await tx
-    .update(organizations)
-    .set({
-      microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
-      microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
-    })
-    .where(eq(organizations.id, organization_id))
-    .returning({
-      total_microdollars_acquired: organizations.total_microdollars_acquired,
-      previous_microdollars_used: sql<number>`${organizations.microdollars_used} - ${cost}`.mapWith(
-        Number
-      ),
-      new_microdollars_used: organizations.microdollars_used,
-      settings: organizations.settings,
-      auto_top_up_enabled: organizations.auto_top_up_enabled,
-    });
+  const balanceResult = await tx.execute<OrganizationBalanceRow>(sql`
+    WITH member_usage AS (
+      INSERT INTO ${organization_user_usage} (
+        organization_id,
+        kilo_user_id,
+        usage_date,
+        limit_type,
+        microdollar_usage,
+        created_at,
+        updated_at
+      )
+      SELECT
+        ${organization_id},
+        ${kilo_user_id},
+        (${created_at}::timestamptz AT TIME ZONE 'UTC')::date,
+        ${limitType},
+        ${cost},
+        NOW(),
+        NOW()
+      WHERE EXISTS (
+        SELECT 1
+        FROM ${organization_memberships}
+        WHERE ${directOrganizationMembershipCondition({
+          organizationId: organization_id,
+          kiloUserId: kilo_user_id,
+        })}
+      )
+        AND EXISTS (
+          SELECT 1
+          FROM ${organizations}
+          WHERE ${organizations.id} = ${organization_id}
+            AND ${liveOrganizationCondition(organizations)}
+        )
+      ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
+      DO UPDATE SET
+        microdollar_usage = ${organization_user_usage.microdollar_usage} + ${cost},
+        updated_at = NOW()
+      RETURNING 1
+    )
+    UPDATE ${organizations}
+    SET
+      microdollars_used = ${organizations.microdollars_used} + ${cost},
+      microdollars_balance = ${organizations.microdollars_balance} - ${cost},
+      updated_at = NOW()
+    WHERE ${organizations.id} = ${organization_id}
+      AND (SELECT count(*) FROM member_usage) >= 0
+    RETURNING
+      ${organizations.total_microdollars_acquired} AS total_microdollars_acquired,
+      ${organizations.microdollars_used} - ${cost} AS previous_microdollars_used,
+      ${organizations.microdollars_used} AS new_microdollars_used,
+      ${organizations.settings} AS settings,
+      ${organizations.auto_top_up_enabled} AS auto_top_up_enabled
+  `);
 
-  const [orgData] = balanceRows;
-  if (!orgData) return emptyOrganizationUsageResult();
+  const [orgRow] = balanceResult.rows;
+  if (!orgRow) return emptyOrganizationUsageResult();
+  const orgData = {
+    ...orgRow,
+    total_microdollars_acquired: Number(orgRow.total_microdollars_acquired),
+    previous_microdollars_used: Number(orgRow.previous_microdollars_used),
+    new_microdollars_used: Number(orgRow.new_microdollars_used),
+  };
 
   const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;
   const newBalance = orgData.total_microdollars_acquired - orgData.new_microdollars_used;

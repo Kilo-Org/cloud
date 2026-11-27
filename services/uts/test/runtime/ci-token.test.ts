@@ -68,7 +68,11 @@ const keyB = await githubSigningKey('github-key-b');
 
 /** GitHub's key set as a fake fetch serves it; `answer` swaps what it serves, `calls` counts. */
 function githubKeySet(initial: GithubSigningKey[]) {
-  const served = { keys: initial, answer: 'ok' as 'ok' | 'fail' | 'redirect', calls: 0 };
+  const served = {
+    keys: initial,
+    answer: 'ok' as 'ok' | 'fail' | 'redirect' | 'broken_body',
+    calls: 0,
+  };
   const fetcher: typeof fetch = async (input, init) => {
     served.calls += 1;
     expect(input).toBe(GITHUB_ACTIONS_JWKS_URL);
@@ -76,6 +80,16 @@ function githubKeySet(initial: GithubSigningKey[]) {
     if (served.answer === 'fail') return new Response('down', { status: 503 });
     if (served.answer === 'redirect') {
       return new Response(null, { status: 302, headers: { Location: 'https://example.com/' } });
+    }
+    if (served.answer === 'broken_body') {
+      // A 200 whose body resets after the headers, as a dropped connection does.
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"keys": ['));
+          controller.error(new Error('connection reset'));
+        },
+      });
+      return new Response(body, { status: 200 });
     }
     return Response.json({ keys: served.keys.map(key => key.jwk) });
   };
@@ -458,6 +472,26 @@ describe('the CI token exchange', () => {
     keys.served.answer = 'ok';
     expect((await exchange()).status).toBe(200);
     expect(keys.served.calls).toBe(3);
+  });
+
+  it('answers 503 when the key set body fails part way, and pauses fetches 10 seconds', async () => {
+    let now = Date.now();
+    const keys = githubKeySet([keyA]);
+    keys.served.answer = 'broken_body';
+    const ci = ciService({ fetcher: keys.fetcher, now: () => now });
+    const exchange = async () =>
+      await call(ciRequest(await githubToken(keyA, {}, Math.floor(now / 1000))), ci, standInSigner);
+    const failed = await exchange();
+    expect(failed.status).toBe(503);
+    expect(failed.headers.get('Retry-After')).toBe('2');
+    expect(await errorOf(failed)).toBe('temporarily_unavailable');
+    now += 9_000;
+    expect((await exchange()).status).toBe(503);
+    expect(keys.served.calls).toBe(1);
+    now += 1_000;
+    keys.served.answer = 'ok';
+    expect((await exchange()).status).toBe(200);
+    expect(keys.served.calls).toBe(2);
   });
 
   it('refuses an inactive account with invalid_grant, and maps store and signer failures', async () => {

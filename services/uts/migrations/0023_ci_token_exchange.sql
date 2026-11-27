@@ -11,8 +11,10 @@
 --   Worker writes at most one such row per policy and reason per minute in each isolate, and a
 --   token that names no policy's repository costs no statement.
 --
--- A CI token has no grant and no `sid`. It stops at its expiry, when its policy leaves the config,
--- or through the account's subject revocation (`revoked_before`) on the revocation feed.
+-- A CI token has no grant and no `sid`. It stops at its expiry, at most 1 hour after it was issued.
+-- Removing its policy from the config stops new CI tokens only; tokens already issued live until
+-- their expiry. To stop them at once, block the policy's CI account or revoke its subject
+-- (`revoked_before` on the revocation feed).
 
 SET LOCAL ROLE uts_owner;
 

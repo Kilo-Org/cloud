@@ -1,5 +1,7 @@
 # The usage-ingest Worker's STS canary (decision D6c): every 5 minutes it mints a web:sts.canary
 # token over its SecretsBroker binding and calls the web app's /api/internal/sts-canary route.
+# Its queue consumer records usage at the web app's /api/internal/{usage,enkrypt-usage,exa-usage}/record
+# routes with a web:usage.record token (USAGE_WRITER_AUTH=sts).
 workload: usage-ingest
 environments:
   - development
@@ -12,3 +14,4 @@ audiences:
   - web
 scopes:
   - web:sts.canary
+  - web:usage.record

@@ -72,10 +72,8 @@ describe('the real wrangler.jsonc', () => {
     });
   });
 
-  it('loads env.staging as staging, direct, postgres, pid, sample 0', () => {
-    const vars = stagingVars();
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    const loaded = readConfig({ ...vars, ...rest });
+  it('loads env.staging alone as staging, direct, postgres, pid, sample 0', () => {
+    const loaded = readConfig(stagingVars());
     expect(loaded.ok && loaded.config).toMatchObject({
       environment: 'staging',
       loginMode: 'direct',
@@ -83,6 +81,8 @@ describe('the real wrangler.jsonc', () => {
       sessionKey: 'pid',
       sampleMinutes: 0,
       target: { host: 'db.xrcpuwfztrhiazsslhuu.supabase.co', port: 5432, database: 'postgres' },
+      github: { appId: '5952011', installationId: '186479258' },
+      reviewBaselineSha: 'dd05d644626ca17bacb80a8b43384622f87a0605',
     });
   });
 
@@ -113,8 +113,7 @@ describe('the real wrangler.jsonc', () => {
     ['label', { MIGRATION_SESSION_KEY: 'label' }],
     ['a sample', { MIGRATION_SESSION_SAMPLE_MINUTES: '60' }],
   ])('refuses staging direct mode with %s', (_label, change) => {
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    expect(readConfig({ ...stagingVars(), ...rest, ...change })).toMatchObject({ ok: false });
+    expect(readConfig({ ...stagingVars(), ...change })).toMatchObject({ ok: false });
   });
 
   it('accepts a fake GitHub only in the development stack', () => {
@@ -124,8 +123,7 @@ describe('the real wrangler.jsonc', () => {
       ok: false,
       problems: ['MIGRATION_PROXY_GITHUB_API_URL: only the development stack may set it'],
     });
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    expect(readConfig({ ...stagingVars(), ...rest, ...fake }).ok).toBe(false);
+    expect(readConfig({ ...stagingVars(), ...fake }).ok).toBe(false);
     const development = readConfig({
       ...topLevelVars(),
       ...SET_BY_E,
@@ -150,8 +148,7 @@ describe('the real wrangler.jsonc', () => {
   });
 
   it('derives the login rule and the attestation re-check from the one environment constant', () => {
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    const staging = readConfig({ ...stagingVars(), ...rest });
+    const staging = readConfig(stagingVars());
     if (!staging.ok) throw new Error('staging must load');
     const stagingRun = {
       workload: 'ci-db-migrate-staging',
@@ -171,9 +168,9 @@ describe('the real wrangler.jsonc', () => {
 
     // The same vars with only the constant flipped to production: the login rule now refuses
     // direct mode, and the re-check now expects production's workflow and workload.
-    expect(
-      readConfig({ ...stagingVars(), ...rest, MIGRATION_PROXY_ENVIRONMENT: 'production' }).ok
-    ).toBe(false);
+    expect(readConfig({ ...stagingVars(), MIGRATION_PROXY_ENVIRONMENT: 'production' }).ok).toBe(
+      false
+    );
     const production = { ...staging.config, environment: 'production' as const };
     expect(claimsMismatch(stagingRun, production)).toBe(true);
     expect(expectedRun('production')).toEqual({

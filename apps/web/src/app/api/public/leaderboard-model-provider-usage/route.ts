@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import {
@@ -6,40 +7,48 @@ import {
   resolveLeaderboardModel,
 } from '@/lib/leaderboard-model';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
-import {
-  createPublicSnowflakeReport,
-  publicSnowflakeReportOptions,
-} from '@/lib/public-snowflake-report';
-import { LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
+import { createPublicReport, publicReportOptions } from '@/lib/public-report';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 const MINIMUM_TOKENS = 10_000_000;
 const MAXIMUM_ERROR_RATE = 0.5;
 
-const LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY = `
+type ModelProviderUsageRow = {
+  model: string | null;
+  provider: string | null;
+  sum_cost: number;
+  sum_tokens: number;
+  sum_input_tokens: number;
+  sum_cache_hit_tokens: number;
+  sum_request_count: number;
+  sum_error_count: number;
+  served_model: string | null;
+};
+
+const LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY = sql`
 select
-     ${LEADERBOARD_MODEL_SQL} as "model"
+     ${sql.raw(LEADERBOARD_MODEL_SQL)} as "model"
     , mu.inference_provider as "provider"
-    , sum(mu.total_cost_microdollars) as "sum_cost"
-    , sum(mu.total_input_tokens) + sum(mu.total_output_tokens) as "sum_tokens"
-    , sum(mu.total_input_tokens) as "sum_input_tokens"
-    , sum(mu.total_cache_hit_tokens) as "sum_cache_hit_tokens"
-    , sum(mu.request_count) as "sum_request_count"
-    , sum(mu.error_count) as "sum_error_count"
-    , ${LEADERBOARD_SERVED_MODEL_SQL} as "served_model"
-from microdollar_usage_daily as mu
+    , sum(mu.cost_microdollars)::float8 as "sum_cost"
+    , (sum(mu.input_tokens) + sum(mu.output_tokens))::float8 as "sum_tokens"
+    , sum(mu.input_tokens)::float8 as "sum_input_tokens"
+    , sum(mu.cache_hit_tokens)::float8 as "sum_cache_hit_tokens"
+    , sum(mu.request_count)::float8 as "sum_request_count"
+    , sum(mu.error_count)::float8 as "sum_error_count"
+    , ${sql.raw(LEADERBOARD_SERVED_MODEL_SQL)} as "served_model"
+from leaderboard_usage_daily as mu
 where
-    mu.usage_date >= dateadd(week, -1, current_date())
-    and mu.usage_date < current_date()
+    mu.usage_date >= (now() at time zone 'UTC')::date - 7
+    and mu.usage_date < (now() at time zone 'UTC')::date
     and (
         mu.provider != 'custom'
         or mu.requested_model = 'reflection/beam-free'
         or mu.requested_model = 'stealth/glyph-cluster'
     )
-    and mu.total_output_tokens > 0
+    and mu.output_tokens > 0
     and mu.is_user_byok = false
     and mu.requested_model not ilike '%mercury-edit%'
 group by 1, 2, 9
-order by 4 desc;
 `;
 
 const modelProviderUsageSchema = z.array(
@@ -72,29 +81,23 @@ function ratio(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
 }
 
-async function parseAndAggregateUsage(rows: string[][]): Promise<ModelProviderUsage[]> {
+async function aggregateUsage(rows: ModelProviderUsageRow[]): Promise<ModelProviderUsage[]> {
   const usageByModelAndProvider = new Map<string, AggregatedUsage>();
 
   for (const row of rows) {
-    const [rawModel, rawProvider, ...rawAggregates] = row;
-    const [sumCost, sumTokens, sumInputTokens, sumCacheHitTokens, sumRequestCount, sumErrorCount] =
-      rawAggregates.slice(0, 6).map(Number);
-    const servedModel = rawAggregates[6];
-    const model = await resolveLeaderboardModel(rawModel || '', servedModel);
-    const provider = normalizePublicInferenceProvider(rawProvider?.trim() || 'unknown');
+    const {
+      sum_cost: sumCost,
+      sum_tokens: sumTokens,
+      sum_input_tokens: sumInputTokens,
+      sum_cache_hit_tokens: sumCacheHitTokens,
+      sum_request_count: sumRequestCount,
+      sum_error_count: sumErrorCount,
+    } = row;
+    const model = await resolveLeaderboardModel(row.model ?? '', row.served_model ?? undefined);
+    const provider = normalizePublicInferenceProvider(row.provider?.trim() || 'unknown');
 
-    if (
-      !model ||
-      ![
-        sumCost,
-        sumTokens,
-        sumInputTokens,
-        sumCacheHitTokens,
-        sumRequestCount,
-        sumErrorCount,
-      ].every(Number.isFinite)
-    ) {
-      throw new Error('Snowflake returned an invalid leaderboard model provider usage row');
+    if (!model) {
+      throw new Error('Leaderboard model provider usage row has no model');
     }
 
     if (provider.key === 'other') {
@@ -156,13 +159,21 @@ async function parseAndAggregateUsage(rows: string[][]): Promise<ModelProviderUs
     .filter(usage => usage.errorRate < MAXIMUM_ERROR_RATE);
 }
 
-export const GET = createPublicSnowflakeReport({
-  cacheKey: LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY,
+export const GET = createPublicReport({
   errorMessage: 'Failed to fetch leaderboard model provider usage',
-  parseRows: parseAndAggregateUsage,
-  query: LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY,
+  load: async () => {
+    const { rows } = await readDb.execute<ModelProviderUsageRow>(
+      LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY
+    );
+    // An empty window means the rollup has not been built yet; failing keeps
+    // the last good report in the in-process cache instead of caching nothing.
+    if (rows.length === 0) {
+      throw new Error('leaderboard_usage_daily has no rows for the leaderboard window');
+    }
+    return await aggregateUsage(rows);
+  },
   schema: modelProviderUsageSchema,
   source: 'public-leaderboard-model-provider-usage-api',
 });
 
-export const OPTIONS = publicSnowflakeReportOptions;
+export const OPTIONS = publicReportOptions;

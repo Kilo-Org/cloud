@@ -14,10 +14,12 @@
 //      <= notAfter + 15 min, with one minute of margin). The earliest tick keeps the run short.
 //      A writer secret that expires more than 60 minutes after start is refused.
 //      Then the core's validated name table, printed once; a refusal stops before any network call.
-//   3. GitHub guards: the protected environment reads back main-only with no admin bypass and a
-//      required-reviewers rule (at least one reviewer, self-review prevented), and no Worker
-//      rollout workflow is queued or running. A rollout workflow that cannot be read stops
-//      the run. The copy uses its own concurrency group, so it never displaces a pending rollout.
+//   3. GitHub guard: no Worker rollout workflow is queued or running. A rollout workflow that
+//      cannot be read stops the run. The copy uses its own concurrency group, so it never
+//      displaces a pending rollout. The protected environment is not read back here: the job
+//      token cannot read environment settings (that needs administration). The operator reads it
+//      back with an admin token before dispatch (see the workflow header), and GitHub enforces
+//      its reviewers and branch policy before this job starts.
 //   4. Names-only snapshot of every existing Worker's current deployment (versions and percentages).
 //      The copier script must be absent.
 //   5. Render (core render-config.mjs), then `wrangler deploy` UNARMED: no writer secret. The
@@ -162,13 +164,13 @@ export function dispatchProblems(env, headSha) {
   else if (headSha !== env.GITHUB_SHA) p.push('checkout_head');
   if (!/^[0-9]{1,20}$/.test(env.GITHUB_RUN_ID ?? '')) p.push('run_id');
   if (!/^[0-9]{1,4}$/.test(env.GITHUB_RUN_ATTEMPT ?? '')) p.push('run_attempt');
-  if (!env.GITHUB_TOKEN) p.push('github_token');
   return p;
 }
 
 /** Names-only context problems for the copy job. Empty means the run may start. */
 export function contextProblems(env, headSha) {
   const p = dispatchProblems(env, headSha);
+  if (!env.GITHUB_TOKEN) p.push('github_token');
   if (!isAbsolute(env.RUNNER_TEMP ?? '')) p.push('runner_temp');
   if (!env.CLOUDFLARE_API_TOKEN) p.push('cloudflare_token');
   if (!env[WRITER_SECRET]) p.push('writer_secret');
@@ -480,7 +482,7 @@ export function cloudflare({
   };
 }
 
-/** Read-only GitHub client for the environment readback and the rollout guard. */
+/** Read-only GitHub client for the rollout guard; it reads only Actions workflow runs. */
 export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fetch }) {
   apiUrl ||= 'https://api.github.com';
   async function get(path) {
@@ -515,9 +517,6 @@ export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fet
     return body;
   }
   return {
-    environment: () => get(`/environments/${ENVIRONMENT}`),
-    branchPolicies: () =>
-      get(`/environments/${ENVIRONMENT}/deployment-branch-policies?per_page=100`),
     async activeRuns(workflow) {
       let count = 0;
       for (const status of ACTIVE_RUN_STATUSES) {
@@ -547,38 +546,6 @@ export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fet
       };
     },
   };
-}
-
-/**
- * The protected environment must exist, allow only `main`, give admins no bypass, and require a
- * reviewer other than the dispatcher (a required_reviewers rule with at least one reviewer and
- * prevent_self_review on).
- */
-export async function environmentProblems(gh) {
-  const env = await gh.environment();
-  if (env === null) return ['environment_absent'];
-  const p = [];
-  if (env.can_admins_bypass !== false) p.push('environment_admin_bypass');
-  const reviewers = (Array.isArray(env.protection_rules) ? env.protection_rules : []).filter(
-    r => isRecord(r) && r.type === 'required_reviewers'
-  );
-  if (
-    reviewers.length !== 1 ||
-    reviewers[0].prevent_self_review !== true ||
-    !Array.isArray(reviewers[0].reviewers) ||
-    reviewers[0].reviewers.length < 1
-  ) {
-    p.push('environment_required_reviewers');
-  }
-  const policy = env.deployment_branch_policy;
-  if (policy?.custom_branch_policies !== true || policy?.protected_branches !== false) {
-    p.push('environment_branch_policy');
-  } else {
-    const list = await gh.branchPolicies();
-    const names = (list?.branch_policies ?? []).map(b => `${b.type}:${b.name}`);
-    if (JSON.stringify(names) !== JSON.stringify(['branch:main'])) p.push('environment_branches');
-  }
-  return p;
 }
 
 /** Rollout workflows with a queued or running run; the copy never joins their concurrency group. */
@@ -1058,11 +1025,6 @@ export async function run(io) {
     io.printTable(names.table);
 
     phase('github_guards');
-    const envProblems = await environmentProblems(io.gh);
-    if (envProblems.length) {
-      report.environment = envProblems;
-      throw new StopError('environment_not_protected');
-    }
     const rolloutsAtStart = await activeRollouts(io.gh);
     if (rolloutsAtStart.length) {
       report.activeRollouts = rolloutsAtStart;
@@ -1437,33 +1399,22 @@ async function main() {
 }
 
 /**
- * `--environment-guard`: the credential-free first job. It reads the protected environment back
- * before the copy job can reference it, so a missing environment is never auto-created by a
- * dispatch. It needs only GITHUB_TOKEN; no other secret is in its environment.
+ * `--dispatch-guard`: the first job, with no secret, no token and no environment. It refuses a
+ * wrong dispatch (repository, ref, event, expected commit, checkout) before the protected copy
+ * job asks its reviewers for approval.
  */
-async function environmentGuardMain() {
-  const env = process.env;
-  let failures = dispatchProblems(env, await gitHead());
-  if (failures.length === 0) {
-    try {
-      failures = await environmentProblems(
-        github({ token: env.GITHUB_TOKEN, apiUrl: env.GITHUB_API_URL })
-      );
-    } catch (err) {
-      if (!(err instanceof StopError)) throw err;
-      failures = [err.reason];
-    }
-  }
+async function dispatchGuardMain() {
+  const failures = dispatchProblems(process.env, await gitHead());
   process.stdout.write(
-    `${JSON.stringify({ gate: 'environment', ok: failures.length === 0, failures })}\n`
+    `${JSON.stringify({ gate: 'dispatch', ok: failures.length === 0, failures })}\n`
   );
   return failures.length === 0 ? 0 : 1;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   process.exitCode =
-    process.argv[2] === '--environment-guard' && process.argv.length === 3
-      ? await environmentGuardMain()
+    process.argv[2] === '--dispatch-guard' && process.argv.length === 3
+      ? await dispatchGuardMain()
       : process.argv.length === 2
         ? await main()
         : 2;

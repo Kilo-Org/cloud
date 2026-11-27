@@ -9,6 +9,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   BATCH_TARGETS,
@@ -256,31 +257,6 @@ function makeWorld(o = {}) {
   };
 
   world.gh = {
-    async environment() {
-      calls.push(['gh', 'environment']);
-      if (o.environment === null) return null;
-      return {
-        name: ENVIRONMENT,
-        can_admins_bypass: false,
-        deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
-        protection_rules: [
-          { id: 1, type: 'branch_policy' },
-          {
-            id: 2,
-            type: 'required_reviewers',
-            prevent_self_review: true,
-            reviewers: [
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-a' } },
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-b' } },
-            ],
-          },
-        ],
-        ...o.environment,
-      };
-    },
-    async branchPolicies() {
-      return { branch_policies: o.branches ?? [{ name: 'main', type: 'branch' }] };
-    },
     async activeRuns(workflow) {
       calls.push(['gh', 'activeRuns', workflow]);
       return o.activeRuns?.(workflow, world) ?? 0;
@@ -536,6 +512,45 @@ test('happy path: unarmed preflight, then arm, one copy, cleanup; Cloudflare hal
   assert.deepEqual(leaked, []);
 });
 
+test('whole run with the real GitHub client never requests environment settings', async t => {
+  // The copy job's token cannot read environments; the operator reads them back before dispatch.
+  const scenarios = {
+    happy: [{}, 'cloudflare_complete'],
+    // Drift also lists rollout runs during cleanup, so every GitHub read of the driver is covered.
+    drift: [
+      {
+        onSnapshot: (w, n) => {
+          if (n === 2)
+            w.scripts.get('other-a').versions = [{ version_id: randomUUID(), percentage: 100 }];
+        },
+      },
+      null,
+    ],
+  };
+  for (const [name, [o, status]] of Object.entries(scenarios)) {
+    await t.test(name, async () => {
+      const urls = [];
+      const fetchImpl = async url => {
+        urls.push(new URL(url));
+        return new Response(JSON.stringify({ total_count: 0, workflow_runs: [] }), {
+          status: 200,
+        });
+      };
+      const world = makeWorld(o);
+      world.gh = github({ token: 'synthetic-github-token', fetchImpl });
+      const report = await run({ ...ioOf(world, o, baseEnv()), log: () => {} });
+      if (status) assert.equal(report.status, status, JSON.stringify(report.gates));
+      else assert.equal(report.stopReason, 'drift_before_arm');
+      assert.ok(urls.length >= ROLLOUT_WORKFLOWS.length);
+      if (name === 'drift') assert.ok(urls.some(u => u.searchParams.has('created')));
+      for (const u of urls) {
+        assert.ok(!/\/environments\b|deployment-branch-policies/.test(u.pathname), u.pathname);
+        assert.match(u.pathname, /^\/repos\/Kilo-Org\/cloud\/actions\/workflows\/[\w.-]+\/runs$/);
+      }
+    });
+  }
+});
+
 test('window: the earliest minute tick that both the lead and the writer expiry allow', () => {
   const env = baseEnv();
   const at = (expiresMs, nowMs = T0) =>
@@ -632,69 +647,6 @@ test('context and operator refusals make no provider, GitHub or process call', a
     assert.deepEqual(report.problems, ['checkout_head']);
     assert.deepEqual(world.calls, []);
   });
-});
-test('missing or loosened protected environment stops before any Cloudflare call', async t => {
-  for (const [o, reason] of [
-    [{ environment: null }, 'environment_absent'],
-    [{ environment: { can_admins_bypass: true } }, 'environment_admin_bypass'],
-    [
-      {
-        environment: {
-          deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
-        },
-      },
-      'environment_branch_policy',
-    ],
-    [
-      {
-        branches: [
-          { name: 'main', type: 'branch' },
-          { name: 'release/*', type: 'branch' },
-        ],
-      },
-      'environment_branches',
-    ],
-    [{ branches: [{ name: 'main', type: 'tag' }] }, 'environment_branches'],
-    [{ branches: [{ name: 'main' }] }, 'environment_branches'],
-    [{ environment: { can_admins_bypass: undefined } }, 'environment_admin_bypass'],
-    [{ environment: { protection_rules: undefined } }, 'environment_required_reviewers'],
-    [
-      { environment: { protection_rules: [{ id: 1, type: 'branch_policy' }] } },
-      'environment_required_reviewers',
-    ],
-    [
-      {
-        environment: {
-          protection_rules: [
-            {
-              type: 'required_reviewers',
-              prevent_self_review: false,
-              reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
-            },
-          ],
-        },
-      },
-      'environment_required_reviewers',
-    ],
-    [
-      {
-        environment: {
-          protection_rules: [
-            { type: 'required_reviewers', prevent_self_review: true, reviewers: [] },
-          ],
-        },
-      },
-      'environment_required_reviewers',
-    ],
-  ]) {
-    await t.test(reason, async () => {
-      const { world, report } = await drive(o);
-      assert.equal(report.stopReason, 'environment_not_protected');
-      assert.deepEqual(report.environment, [reason]);
-      assert.equal(world.calls.filter(c => c[0] === 'cf' || c[0] === 'wrangler').length, 0);
-      assert.equal(report.cleanup.note, 'not_created');
-    });
-  }
 });
 
 test('an active rollout at start stops before deploy; one before arming deletes the unarmed copier', async () => {
@@ -1553,6 +1505,42 @@ test('GitHub client: a missing rollout workflow is unreadable, never zero; run l
   assert.equal(await rolloutRunsDuring(gh, T0, T0 + 60_000), 'unreadable');
 });
 
+test('GitHub client: reads only Actions workflow runs, never environment settings', async () => {
+  const seen = [];
+  const fetchImpl = async url => {
+    seen.push(new URL(url).pathname);
+    return new Response(JSON.stringify({ total_count: 0, workflow_runs: [] }), { status: 200 });
+  };
+  const gh = github({ token: 'synthetic', fetchImpl });
+  assert.deepEqual(Object.keys(gh).sort(), ['activeRuns', 'runsCreated']);
+  await activeRollouts(gh);
+  await gh.runsCreated('deploy-production.yml', 'A', 'B');
+  assert.ok(seen.length > 0);
+  for (const path of seen) {
+    assert.match(path, /^\/repos\/Kilo-Org\/cloud\/actions\/workflows\/[\w.-]+\/runs$/);
+  }
+  // The job token cannot read environment settings; only the operator's admin readback does.
+  const driver = readFileSync(new URL('../m84-notifications-run.mjs', import.meta.url), 'utf8');
+  assert.ok(!/\/environments\b|deployment-branch-policies/.test(driver));
+});
+
+test('dispatch guard: needs no token and refuses a wrong dispatch', async () => {
+  const child = spawn(
+    process.execPath,
+    [fileURLToPath(new URL('../m84-notifications-run.mjs', import.meta.url)), '--dispatch-guard'],
+    { env: { PATH: process.env.PATH }, stdio: ['ignore', 'pipe', 'inherit'] }
+  );
+  let out = '';
+  child.stdout.on('data', d => (out += d));
+  const code = await new Promise(r => child.on('close', r));
+  assert.equal(code, 1);
+  assert.deepEqual(JSON.parse(out), {
+    gate: 'dispatch',
+    ok: false,
+    failures: ['repository', 'ref', 'event', 'sha', 'run_id', 'run_attempt'],
+  });
+});
+
 test('a child that ignores its stop signal is killed within the bound', async () => {
   const stubborn =
     "process.on('SIGINT',()=>{});process.on('SIGTERM',()=>{});setInterval(()=>{},1000);process.stdout.write('ready')";
@@ -1608,19 +1596,25 @@ test('workflow: dispatch-only, exact guards, pinned actions, secrets only in the
     group: 'notifications-runtime-copy',
     'cancel-in-progress': false,
   });
-  assert.deepEqual(Object.keys(wf.jobs), ['environment-guard', 'copy']);
-  const guard = wf.jobs['environment-guard'];
+  assert.deepEqual(Object.keys(wf.jobs), ['dispatch-guard', 'copy']);
+  const guard = wf.jobs['dispatch-guard'];
   assert.equal(guard.environment, undefined);
-  assert.deepEqual(guard.permissions, { contents: 'read', actions: 'read' });
+  assert.deepEqual(guard.permissions, { contents: 'read' });
   assert.ok(!JSON.stringify(guard).includes('secrets.'));
+  assert.ok(!JSON.stringify(guard).includes('github.token'));
   assert.equal(
     guard.steps.at(-1).run,
-    'node scripts/secrets-migration/m84-notifications-run.mjs --environment-guard'
+    'node scripts/secrets-migration/m84-notifications-run.mjs --dispatch-guard'
   );
-  assert.deepEqual(Object.keys(guard.steps.at(-1).env).sort(), ['EXPECTED_COMMIT', 'GITHUB_TOKEN']);
+  assert.deepEqual(Object.keys(guard.steps.at(-1).env), ['EXPECTED_COMMIT']);
   assert.equal(guard.if, wf.jobs.copy.if);
+  // No job reads the environment with its token: the job token cannot get the administration
+  // permission. The operator reads it back with an admin login before dispatch.
+  const jobsText = JSON.stringify(wf.jobs);
+  assert.ok(!/\/environments\b|deployment-branch-policies|\bgh api\b|\bcurl\b/.test(jobsText));
+  for (const j of Object.values(wf.jobs)) assert.ok(!('administration' in j.permissions));
   const job = wf.jobs.copy;
-  assert.equal(job.needs, 'environment-guard');
+  assert.equal(job.needs, 'dispatch-guard');
   assert.equal(
     job.if,
     "github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'"

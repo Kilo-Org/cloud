@@ -3,6 +3,7 @@ import { base64urlToBytes, bytesToBase64url } from '@kilocode/worker-utils/base6
 import { z } from 'zod';
 
 import { authorize, type Principal } from '../auth';
+import { authorizeCloudAgentPresenceRunner } from '../cloud-agent-upload';
 import { getSessionSyncDOStub } from '../dos/SessionSyncDO';
 import { getTenantStub } from '../dos/SessionSyncTenantDO';
 import { getPresenceStub } from '../dos/SessionPresenceDO';
@@ -12,7 +13,7 @@ import { ERROR_STATUS, errorBody, sessionIDSchema } from '../protocol';
 import { rateLimit } from '../rate-limit';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { LIVE_LIMITS, socketTicket } from './protocol';
-import { mintTicket, verifyTicket } from './ticket';
+import { mintTicket, signTicket, verifyTicket } from './ticket';
 import { phase } from '../metrics';
 
 type C = Context<{ Bindings: Env }>;
@@ -136,13 +137,27 @@ live.get('/sessions/:id/commands/:commandID', async c => {
 });
 
 live.post('/presence/ticket', async c => {
-  const auth = await principal(c);
-  if (auth instanceof Response) return auth;
+  // Consume the body before any rejection so a proxied request stream is never left unread.
   const input = await body(c, 1024);
-  if (input instanceof Response) return input;
   const parsed = z
     .strictObject({ role: z.enum(['viewer', 'runner', 'controller']) })
-    .safeParse(input);
+    .safeParse(input instanceof Response ? undefined : input);
+  const hosted = await authorizeCloudAgentPresenceRunner(
+    c.req.raw,
+    c.env,
+    parsed.success ? parsed.data.role : undefined
+  );
+  if (hosted instanceof Response) return hosted;
+  if (hosted) {
+    const denied = await rateLimit(c.env.USER_REQUEST_LIMITER, hosted.principal.userID);
+    if (denied) return denied;
+    return json(
+      await signTicket(c.env, hosted.principal, hosted.expiresAt, 'session-presence', 'runner')
+    );
+  }
+  const auth = await principal(c);
+  if (auth instanceof Response) return auth;
+  if (input instanceof Response) return input;
   if (!parsed.success)
     return error('invalid_request', 'A presence viewer, runner, or controller role is required');
   return json(await mintTicket(c.req.raw, c.env, auth, 'session-presence', parsed.data.role));
